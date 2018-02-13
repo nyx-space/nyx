@@ -2,6 +2,10 @@ extern crate nalgebra as na;
 
 use self::na::{DMatrix, DVector};
 
+// Re-Export
+mod classic_rk;
+pub use self::classic_rk::*;
+
 /// The `RK` trait defines a Runge Kutta
 pub trait RK
 where
@@ -13,7 +17,7 @@ where
     /// Returns a Matrix corresponding to the b_i and b^*_i coefficients of the Butcher table for that RK
     fn b_coeffs() -> DMatrix<f64>;
     fn from_options(opts: Options) -> Self;
-    fn options(&self) -> Options;
+    fn options(self) -> Options;
 }
 
 #[derive(Clone)]
@@ -53,7 +57,7 @@ impl Propagator {
             let ci: f64 = self.a_coeffs.row(i).iter().sum();
             let mut wi = DVector::from_element(self.state.shape().0 as usize, 0.0);
             for j in 0..k.len() {
-                let a_ij = self.a_coeffs.slice((i, j), (1, 1));
+                let a_ij = self.a_coeffs.slice((i, j), (1, 1)).0;
                 wi += a_ij * &k[j];
             }
             let ki = d_xdt(
@@ -66,8 +70,8 @@ impl Propagator {
         let mut next_state = self.state.clone();
         let mut next_state_star = self.state.clone();
         for i in 0..k.len() {
-            let b_ij = self.a_coeffs.slice((i, 0), (1, 1));
-            let b_ij_star = self.a_coeffs.slice((i, 1), (1, 1));
+            let b_ij = self.b_coeffs.slice((i, 0), (1, 1));
+            let b_ij_star = self.b_coeffs.slice((i, 1), (1, 1));
             next_state += self.opts.min_step * b_ij * &k[i];
             next_state_star += self.opts.min_step * b_ij_star * &k[i];
         }
@@ -146,4 +150,10 @@ fn test_options() {
     assert_eq!(opts.debug, false);
     opts.enable_debug();
     assert_eq!(opts.debug, true);
+}
+
+#[test]
+fn test_consistency() {
+    // All the RKs should be consistent.
+    println!("{}", RKF54::a_coeffs());
 }
