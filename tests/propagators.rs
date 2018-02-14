@@ -3,12 +3,10 @@ extern crate nyx;
 use self::na::DVector;
 
 fn two_body_dynamics(_t: f64, state: DVector<f64>) -> DVector<f64> {
-    let mut radius = state.slice((0, 0), (3, 1)); // TODO: Change to compile time slice
+    let radius = state.slice((0, 0), (3, 1)); // TODO: Change to compile time slice
     let velocity = state.slice((3, 0), (3, 1));
     let body_acceleration = (-398600.4 / radius.norm().powi(3)) * radius;
-    let test = DVector::from_iterator(6, velocity.iter().chain(body_acceleration.iter()).cloned());
-    println!("State:\n{}\n{}", radius, test);
-    DVector::from_row_slice(6, &[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0])
+    DVector::from_iterator(6, velocity.iter().chain(body_acceleration.iter()).cloned())
 }
 
 #[test]
@@ -21,8 +19,13 @@ fn geo_day_prop() {
     let init_state =
         DVector::from_row_slice(6, &[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
     let method = RKF54::from_options(Options::with_fixed_step(1.0));
-    let mut prop = Propagator::new::<RKF54>(0.0, init_state, method);
-    prop.prop(two_body_dynamics);
+    let mut prop = Propagator::new::<RKF54>(0.0, init_state.clone(), method);
+    let state = prop.prop(two_body_dynamics);
+    println!("delta state: \n {}", state - init_state);
+    /*while prop.latest_time() < 3600.0 * 24.0 {
+        let state = prop.prop(two_body_dynamics);
+        println!("final state: \n {}", state);
+    }*/
 
     /*
 virtObj := CelestialObject{"virtObj", 6378.145, 149598023, 398600.4, 23.4, 0.00005, 924645.0, 0.00108248, -2.5324e-6, -1.6204e-6, 0, nil}

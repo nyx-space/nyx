@@ -25,7 +25,7 @@ where
     fn options(self) -> Options;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Propagator<'a> {
     ti: f64,
     state: DVector<f64>,
@@ -92,6 +92,9 @@ impl<'a> Propagator<'a> {
         self.ti += self.opts.min_step;
         self.latest_error = (next_state.clone() - next_state_star).norm();
         next_state
+    }
+    pub fn latest_time(self) -> f64 {
+        self.ti
     }
     pub fn latest_error(self) -> f64 {
         self.latest_error
