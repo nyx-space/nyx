@@ -1,6 +1,5 @@
 extern crate nalgebra as na;
 
-use self::na::DMatrix;
 pub use super::{Options, RK};
 
 pub struct RKF54 {
@@ -13,7 +12,7 @@ impl RK for RKF54 {
         5 as usize
     }
 
-    fn a_coeffs<'a>() -> &'a [f64] {
+    fn a_coeffs() -> &'static [f64] {
         &[
             1.0 / 4.0,
             3.0 / 32.0,
@@ -32,7 +31,7 @@ impl RK for RKF54 {
             -11.0 / 40.0,
         ]
     }
-    fn b_coeffs<'a>() -> &'a [f64] {
+    fn b_coeffs() -> &'static [f64] {
         &[
             16.0 / 135.0,
             0.0,
