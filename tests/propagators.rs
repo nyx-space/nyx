@@ -7,7 +7,7 @@ fn two_body_dynamics(_t: f64, state: DVector<f64>) -> DVector<f64> {
     let velocity = state.slice((3, 0), (3, 1));
     let body_acceleration = (-398600.4 / radius.norm().powi(3)) * radius;
     let test = DVector::from_iterator(6, velocity.iter().chain(body_acceleration.iter()).cloned());
-    println!("State:\n{}", radius, test);
+    println!("State:\n{}\n{}", radius, test);
     DVector::from_row_slice(6, &[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0])
 }
 
