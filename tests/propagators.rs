@@ -16,18 +16,19 @@ fn geo_day_prop() {
     use nyx::propagators::*;
     use self::na::DVector;
     //let init_state = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
-    let mut prop = Propagator::new::<RKF54>(Options::with_fixed_step(1.0));
+    let opts = Options::with_fixed_step(1.0);
+    let mut prop = Propagator::new::<RKF54>(opts);
     let mut init_state =
         DVector::from_row_slice(6, &[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
     let mut cur_t = 0.0;
     loop {
         let (t, state) = prop.derive(cur_t, init_state.clone(), two_body_dynamics);
-        cur_t += t;
-        init_state += state.clone();
-        if cur_t >= 3600.0 {
+        cur_t = t;
+        init_state = state.clone();
+        if cur_t >= 24.0 * 3600.0 {
+            println!("final t = {} \n state = {}", t, state);
             break;
         }
-        println!("state @ {}: \n {}", cur_t, init_state.clone());
     }
 
     /*

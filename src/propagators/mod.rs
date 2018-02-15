@@ -91,10 +91,10 @@ impl<'a> Propagator<'a> {
         let mut next_state = state.clone();
         let mut next_state_star = state.clone();
         for i in 0..k.len() {
-            let b_ij = self.b_coeffs[i];
-            let b_ij_star = self.b_coeffs[i + self.order];
-            next_state += self.opts.min_step * b_ij * &k[i];
-            next_state_star += self.opts.min_step * b_ij_star * &k[i];
+            let b_i = self.b_coeffs[i];
+            let b_i_star = self.b_coeffs[i + self.order];
+            next_state += self.opts.min_step * b_i * &k[i];
+            next_state_star += self.opts.min_step * b_i_star * &k[i];
         }
         // TODO: Adaptive step size
         self.details = IntegrationDetails {
