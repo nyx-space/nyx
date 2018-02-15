@@ -21,8 +21,6 @@ where
     /// Returns a pointer to a list of f64 corresponding to the b_i and b^*_i coefficients of the
     /// Butcher table for that RK. `Self.a_coeffs().len()` must be of size (order+1)*2.
     fn b_coeffs() -> &'static [f64];
-    fn from_options(opts: Options) -> Self;
-    fn options(self) -> Options;
 }
 
 #[derive(Clone, Debug)]

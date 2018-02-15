@@ -1,10 +1,8 @@
 extern crate nalgebra as na;
 
-pub use super::{Options, RK};
+pub use super::RK;
 
-pub struct RKF54 {
-    opts: Options,
-}
+pub struct RKF54 {}
 
 /// RKF54 is a [Runge Kutta Ferhlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
 impl RK for RKF54 {
@@ -47,10 +45,29 @@ impl RK for RKF54 {
             0.0,
         ]
     }
-    fn from_options(opts: Options) -> RKF54 {
-        RKF54 { opts: opts }
+}
+
+pub struct RK4Fixed {}
+
+/// RKF54 is a [Runge Kutta Ferhlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
+impl RK for RK4Fixed {
+    fn order() -> usize {
+        3 as usize
     }
-    fn options(self) -> Options {
-        self.opts
+
+    fn a_coeffs() -> &'static [f64] {
+        &[0.5, 0.0, 0.5, 0.0, 0.0, 1.0]
+    }
+    fn b_coeffs() -> &'static [f64] {
+        &[
+            1.0 / 6.0,
+            1.0 / 3.0,
+            1.0 / 3.0,
+            1.0 / 6.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ]
     }
 }

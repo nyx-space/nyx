@@ -17,7 +17,7 @@ fn geo_day_prop() {
     use self::na::DVector;
     //let init_state = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
     let opts = Options::with_fixed_step(1.0);
-    let mut prop = Propagator::new::<RKF54>(opts);
+    let mut prop = Propagator::new::<RK4Fixed>(opts);
     let mut init_state =
         DVector::from_row_slice(6, &[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
     let mut cur_t = 0.0;
@@ -39,6 +39,15 @@ endDT := startDT.Add(24 * time.Hour).Add(time.Second)
 NewPreciseMission(NewEmptySC("est", 0), orbit, startDT, endDT, Perturbations{}, time.Second, false, ExportConfig{}).Propagate()
 expR := []float64{-5971.19544867343, 3945.58315019255, 2864.53021742433}
 expV := []float64{0.049002818030, -4.185030861883, 5.848985672439}
+RK4Fixed results
+┌                     ┐
+│   6114.203261740992 │
+│  -5141.377788757192 │
+│ -1375.7262264514577 │
+│  1.2456798220959286 │
+│    3.11121652512938 │
+│  -6.161327737875886 │
+└                     ]
 if !floats.EqualApprox(orbit.rVec, expR, 1e-8) {
     t.Fatalf("Incorrect R:\ngot: %+v\nexp: %+v", orbit.rVec, expR)
 }
