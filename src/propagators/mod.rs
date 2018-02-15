@@ -26,11 +26,15 @@ where
 }
 
 #[derive(Clone, Debug)]
+pub struct IntegrationDetails {
+    step: f64,
+    error: f64,
+}
+
+#[derive(Clone, Debug)]
 pub struct Propagator<'a> {
-    ti: f64,
-    state: DVector<f64>,
     opts: Options,
-    latest_error: f64,
+    details: IntegrationDetails,
     order: usize,
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
@@ -40,24 +44,28 @@ pub struct Propagator<'a> {
 /// TODO: Add examples
 impl<'a> Propagator<'a> {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(t0: f64, state: DVector<f64>, method: T) -> Propagator<'a> {
+    pub fn new<T: RK>(opts: Options) -> Propagator<'a> {
         Propagator {
-            ti: t0,
-            state: state,
-            opts: method.options(),
-            latest_error: 0.0,
+            opts: opts,
+            details: IntegrationDetails {
+                step: 0.0,
+                error: 0.0,
+            },
             order: T::order(),
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
         }
     }
 
-    /// The `prop` method is monomorphic to increase speed. The `d_xdt` parameter is the derivative
-    /// function which take a time t of type f64 and a state of type DVector<f64>, and returns the
-    /// result as DVector<f64> of the derivative.
-    pub fn prop<F>(&mut self, d_xdt: F) -> DVector<f64>
+    /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
+    /// then derives the dynamics at that time (i.e. propagates for one time step). The `d_xdt` parameter is the derivative
+    /// function which take a time t of type f64 and a reference to a state of type DVector<f64>, and returns the
+    /// result as DVector<f64> of the derivative. The reference should preferrably only be borrowed.
+    /// This function returns the next time (i.e. the previous time incremented by the timestep used) and
+    /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
+    pub fn derive<F>(&mut self, t: f64, state: DVector<f64>, d_xdt: F) -> (f64, DVector<f64>)
     where
-        F: Fn(f64, DVector<f64>) -> DVector<f64>,
+        F: Fn(f64, &DVector<f64>) -> DVector<f64>,
     {
         let mut k = Vec::new(); // Will store all the k_i.
         let mut prev_end = 0;
@@ -68,20 +76,20 @@ impl<'a> Propagator<'a> {
                 ci += self.a_coeffs[ak];
             }
             prev_end += i + 1;
-            let mut wi = DVector::from_element(self.state.shape().0 as usize, 0.0);
+            let mut wi = DVector::from_element(state.shape().0 as usize, 0.0);
             for j in 0..k.len() {
                 let a_ij = self.a_coeffs[(i + j) as usize];
                 wi += a_ij * &k[j];
             }
             let ki = d_xdt(
-                self.ti + ci * self.opts.min_step,
-                self.state.clone() + self.opts.min_step * wi,
+                t + ci * self.opts.min_step,
+                &(state.clone() + self.opts.min_step * wi),
             );
             k.push(ki);
         }
         // Compute the next state and the error
-        let mut next_state = self.state.clone();
-        let mut next_state_star = self.state.clone();
+        let mut next_state = state.clone();
+        let mut next_state_star = state.clone();
         for i in 0..k.len() {
             let b_ij = self.b_coeffs[i];
             let b_ij_star = self.b_coeffs[i + self.order];
@@ -89,18 +97,14 @@ impl<'a> Propagator<'a> {
             next_state_star += self.opts.min_step * b_ij_star * &k[i];
         }
         // TODO: Adaptive step size
-        self.ti += self.opts.min_step;
-        self.latest_error = (next_state.clone() - next_state_star).norm();
-        next_state
+        self.details = IntegrationDetails {
+            step: self.opts.min_step,
+            error: (next_state.clone() - next_state_star).norm(),
+        };
+        ((t + self.opts.min_step), next_state)
     }
-    pub fn latest_time(self) -> f64 {
-        self.ti
-    }
-    pub fn latest_error(self) -> f64 {
-        self.latest_error
-    }
-    pub fn latest_state(self) -> DVector<f64> {
-        self.state
+    pub fn latest_details(self) -> IntegrationDetails {
+        self.details
     }
 }
 

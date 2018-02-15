@@ -1,6 +1,6 @@
 [package]
 name = "nyx"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 
 [dependencies]
