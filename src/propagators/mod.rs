@@ -25,8 +25,8 @@ where
 
 #[derive(Clone, Debug)]
 pub struct IntegrationDetails {
-    step: f64,
-    error: f64,
+    pub step: f64,
+    pub error: f64,
 }
 
 #[derive(Clone, Debug)]
