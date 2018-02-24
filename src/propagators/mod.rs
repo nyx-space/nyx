@@ -65,9 +65,12 @@ impl<'a> Propagator<'a> {
     where
         F: Fn(f64, &DVector<f64>) -> DVector<f64>,
     {
-        let mut k = Vec::new(); // Will store all the k_i.
+        let mut k = Vec::with_capacity(self.order + 1); // Will store all the k_i.
         let mut prev_end = 0;
-        for i in 0..self.order {
+        let ki = d_xdt(t, &state.clone());
+        k.push(ki);
+        let mut a_idx: usize = 0;
+        for i in 0..(self.order) {
             // Let's compute the c_i by summing the relevant items from the list of coefficients.
             let mut ci: f64 = 0.0;
             for ak in prev_end..prev_end + i + 1 {
@@ -75,10 +78,12 @@ impl<'a> Propagator<'a> {
             }
             prev_end += i + 1;
             let mut wi = DVector::from_element(state.shape().0 as usize, 0.0);
-            for j in 0..k.len() {
-                let a_ij = self.a_coeffs[(i + j) as usize];
-                wi += a_ij * &k[j];
+            for kj in &k {
+                let a_ij = self.a_coeffs[a_idx];
+                wi += a_ij * kj;
+                a_idx += 1;
             }
+
             let ki = d_xdt(
                 t + ci * self.opts.min_step,
                 &(state.clone() + self.opts.min_step * wi),
