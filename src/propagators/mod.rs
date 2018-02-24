@@ -103,6 +103,9 @@ impl<'a> Propagator<'a> {
 
             self.details.error = (next_state.clone() - next_state_star).norm();
 
+            // TODO: Implement the adaptive step size as per https://en.wikipedia.org/wiki/Adaptive_stepsize
+            // and check its efficiency compared to the current /=2 algo
+
             if self.opts.fixed_step
                 || (!self.opts.fixed_step
                     && (self.details.error < self.opts.tolerance
