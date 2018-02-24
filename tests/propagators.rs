@@ -18,7 +18,7 @@ fn geo_day_prop() {
     // let opts = Options::with_fixed_step(1.0);
     //let mut prop = Propagator::new::<RK4Fixed>(opts);
     let opts = Options::with_adaptive_step(0.1, 30.0, 1e-1);
-    let mut prop = Propagator::new::<RKF54>(opts);
+    let mut prop = Propagator::new::<RKCK54>(opts);
     let mut init_state =
         DVector::from_row_slice(6, &[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
     let mut cur_t = 0.0;

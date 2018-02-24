@@ -101,17 +101,21 @@ impl<'a> Propagator<'a> {
                 next_state_star += self.details.step * b_i_star * &k[i];
             }
 
-            self.details.error = (next_state.clone() - next_state_star).norm(); // XXX: I _think_ I should be checking the norm
+            self.details.error = (next_state.clone() - next_state_star).norm();
 
             if self.opts.fixed_step
                 || (!self.opts.fixed_step
                     && (self.details.error < self.opts.tolerance
-                        || self.details.step / 2.0 < self.opts.min_step))
+                        || self.details.step == self.opts.min_step))
             {
                 return ((t + self.details.step), next_state);
             } else if !self.opts.fixed_step {
                 // Error is higher than tolerance, let's divide the step by two and repeat the computation.
-                self.details.step /= 2.0;
+                if self.details.step / 2.0 < self.opts.min_step {
+                    self.details.step = self.opts.min_step;
+                } else {
+                    self.details.step /= 2.0;
+                }
             }
         }
     }
