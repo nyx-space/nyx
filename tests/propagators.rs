@@ -15,13 +15,17 @@ fn geo_day_prop() {
     extern crate nalgebra as na;
     use nyx::propagators::*;
     use self::na::DVector;
-    let opts = Options::with_fixed_step(1.0);
-    let mut prop = Propagator::new::<RK4Fixed>(opts);
+    // let opts = Options::with_fixed_step(1.0);
+    //let mut prop = Propagator::new::<RK4Fixed>(opts);
+    let opts = Options::with_adaptive_step(0.1, 30.0, 1e-1);
+    let mut prop = Propagator::new::<RKF54>(opts);
     let mut init_state =
         DVector::from_row_slice(6, &[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
     let mut cur_t = 0.0;
+    let mut iterations = 0;
     loop {
         let (t, state) = prop.derive(cur_t, init_state.clone(), two_body_dynamics);
+        iterations += 1;
         cur_t = t;
         init_state = state.clone();
         if cur_t >= 3600.0 * 24.0 {
@@ -35,6 +39,11 @@ fn geo_day_prop() {
                     -4.185030861894159,
                     5.848985672431022,
                 ],
+            );
+            println!(
+                "Done in {} iterations\n{:?}",
+                iterations,
+                prop.latest_details()
             );
             assert_eq!(state, exp_state, "geo prop failed");
             break;

@@ -44,9 +44,9 @@ impl<'a> Propagator<'a> {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(opts: Options) -> Propagator<'a> {
         Propagator {
-            opts: opts,
+            opts: opts.clone(),
             details: IntegrationDetails {
-                step: 0.0,
+                step: opts.max_step,
                 error: 0.0,
             },
             order: T::order(),
@@ -65,46 +65,55 @@ impl<'a> Propagator<'a> {
     where
         F: Fn(f64, &DVector<f64>) -> DVector<f64>,
     {
-        let mut k = Vec::with_capacity(self.order + 1); // Will store all the k_i.
-        let mut prev_end = 0;
-        let ki = d_xdt(t, &state.clone());
-        k.push(ki);
-        let mut a_idx: usize = 0;
-        for i in 0..(self.order) {
-            // Let's compute the c_i by summing the relevant items from the list of coefficients.
-            let mut ci: f64 = 0.0;
-            for ak in prev_end..prev_end + i + 1 {
-                ci += self.a_coeffs[ak];
+        loop {
+            let mut k = Vec::with_capacity(self.order + 1); // Will store all the k_i.
+            let mut prev_end = 0;
+            let ki = d_xdt(t, &state.clone());
+            k.push(ki);
+            let mut a_idx: usize = 0;
+            for i in 0..self.order {
+                // Let's compute the c_i by summing the relevant items from the list of coefficients.
+                let mut ci: f64 = 0.0;
+                for ak in prev_end..prev_end + i + 1 {
+                    ci += self.a_coeffs[ak];
+                }
+                prev_end += i + 1;
+                let mut wi = DVector::from_element(state.shape().0 as usize, 0.0);
+                for kj in &k {
+                    let a_ij = self.a_coeffs[a_idx];
+                    wi += a_ij * kj;
+                    a_idx += 1;
+                }
+
+                let ki = d_xdt(
+                    t + ci * self.details.step,
+                    &(state.clone() + self.details.step * wi),
+                );
+                k.push(ki);
             }
-            prev_end += i + 1;
-            let mut wi = DVector::from_element(state.shape().0 as usize, 0.0);
-            for kj in &k {
-                let a_ij = self.a_coeffs[a_idx];
-                wi += a_ij * kj;
-                a_idx += 1;
+            // Compute the next state and the error
+            let mut next_state = state.clone();
+            let mut next_state_star = state.clone();
+            for i in 0..k.len() {
+                let b_i = self.b_coeffs[i];
+                let b_i_star = self.b_coeffs[i + self.order];
+                next_state += self.details.step * b_i * &k[i];
+                next_state_star += self.details.step * b_i_star * &k[i];
             }
 
-            let ki = d_xdt(
-                t + ci * self.opts.min_step,
-                &(state.clone() + self.opts.min_step * wi),
-            );
-            k.push(ki);
+            self.details.error = (next_state.clone() - next_state_star).norm(); // XXX: I _think_ I should be checking the norm
+
+            if self.opts.fixed_step
+                || (!self.opts.fixed_step
+                    && (self.details.error < self.opts.tolerance
+                        || self.details.step / 2.0 < self.opts.min_step))
+            {
+                return ((t + self.details.step), next_state);
+            } else if !self.opts.fixed_step {
+                // Error is higher than tolerance, let's divide the step by two and repeat the computation.
+                self.details.step /= 2.0;
+            }
         }
-        // Compute the next state and the error
-        let mut next_state = state.clone();
-        let mut next_state_star = state.clone();
-        for i in 0..k.len() {
-            let b_i = self.b_coeffs[i];
-            let b_i_star = self.b_coeffs[i + self.order];
-            next_state += self.opts.min_step * b_i * &k[i];
-            next_state_star += self.opts.min_step * b_i_star * &k[i];
-        }
-        // TODO: Adaptive step size
-        self.details = IntegrationDetails {
-            step: self.opts.min_step,
-            error: (next_state.clone() - next_state_star).norm(),
-        };
-        ((t + self.opts.min_step), next_state)
     }
     pub fn latest_details(self) -> IntegrationDetails {
         self.details
@@ -122,7 +131,6 @@ pub struct Options {
     max_step: f64,
     tolerance: f64,
     fixed_step: bool,
-    debug: bool,
 }
 
 impl Options {
@@ -134,7 +142,6 @@ impl Options {
             max_step: step,
             tolerance: 0.0,
             fixed_step: true,
-            debug: false,
         }
     }
 
@@ -146,13 +153,7 @@ impl Options {
             max_step: max_step,
             tolerance: tolerance,
             fixed_step: false,
-            debug: false,
         }
-    }
-
-    /// Calling enable_debug on a mutable `Options` will enable verbose debugging of the integrator.
-    pub fn enable_debug(&mut self) {
-        self.debug = true;
     }
 }
 
@@ -160,27 +161,15 @@ impl Options {
 
 #[test]
 fn test_options() {
-    let mut opts = Options::with_fixed_step(1e-1);
+    let opts = Options::with_fixed_step(1e-1);
     assert_eq!(opts.min_step, 1e-1);
     assert_eq!(opts.max_step, 1e-1);
     assert_eq!(opts.tolerance, 0.0);
     assert_eq!(opts.fixed_step, true);
-    assert_eq!(opts.debug, false);
-    opts.enable_debug();
-    assert_eq!(opts.debug, true);
 
-    let mut opts = Options::with_adaptive_step(1e-2, 10.0, 1e-12);
+    let opts = Options::with_adaptive_step(1e-2, 10.0, 1e-12);
     assert_eq!(opts.min_step, 1e-2);
     assert_eq!(opts.max_step, 10.0);
     assert_eq!(opts.tolerance, 1e-12);
     assert_eq!(opts.fixed_step, false);
-    assert_eq!(opts.debug, false);
-    opts.enable_debug();
-    assert_eq!(opts.debug, true);
-}
-
-#[test]
-fn test_consistency() {
-    // All the RKs should be consistent.
-    println!("{:?}", RKF54::a_coeffs());
 }
