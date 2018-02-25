@@ -1,7 +1,6 @@
 extern crate nalgebra as na;
 
-//use self::na::{DVector, Dim, DimName, U3, VectorN};
-use self::na::{DVector, DefaultAllocator, Dim, DimName, MatrixN, Scalar, VectorN};
+use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
 
 // Re-Export
@@ -59,10 +58,12 @@ impl<'a> Propagator<'a> {
 
     /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
     /// then derives the dynamics at that time (i.e. propagates for one time step). The `d_xdt` parameter is the derivative
-    /// function which take a time t of type f64 and a reference to a state of type DVector<f64>, and returns the
-    /// result as DVector<f64> of the derivative. The reference should preferrably only be borrowed.
+    /// function which take a time t of type f64 and a reference to a state of type VectorN<f64, N>, and returns the
+    /// result as VectorN<f64, N> of the derivative. The reference should preferrably only be borrowed.
     /// This function returns the next time (i.e. the previous time incremented by the timestep used) and
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
+    /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
+    /// size. This static allocation allows for high execution speeds.
     pub fn derive<F, N: Dim + DimName>(
         &mut self,
         t: f64,
@@ -73,12 +74,6 @@ impl<'a> Propagator<'a> {
         F: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
         DefaultAllocator: Allocator<f64, N>,
     {
-        /*
-
-        struct NPoint<N: Dim>(VectorN<f64, N>)
-        where
-            DefaultAllocator: Allocator<f64, N>;
-*/
         loop {
             let mut k = Vec::with_capacity(self.order + 1); // Will store all the k_i.
             let mut prev_end = 0;
@@ -92,7 +87,7 @@ impl<'a> Propagator<'a> {
                     ci += self.a_coeffs[ak];
                 }
                 prev_end += i + 1;
-                let mut wi = DVector::from_element(state.shape().0 as usize, 0.0);
+                let mut wi = VectorN::from_element(0.0);
                 for kj in &k {
                     let a_ij = self.a_coeffs[a_idx];
                     wi += a_ij * kj;
