@@ -122,11 +122,26 @@ impl<'a> Propagator<'a> {
             {
                 return ((t + self.details.step), next_state);
             } else if !self.opts.fixed_step {
-                // Error is higher than tolerance, let's divide the step by two and repeat the computation.
-                if self.details.step / 2.0 < self.opts.min_step {
-                    self.details.step = self.opts.min_step;
-                } else {
-                    self.details.step /= 2.0;
+                if self.details.step > self.opts.min_step {
+                    // Let's compute the new step using the [WP](https://en.wikipedia.org/wiki/Adaptive_stepsize) algorithm.
+                    // NOTE: We do a custom min and max implementation because std::cmp doesn't support f64s due to NaN and NNaN.
+                    let eta = self.opts.tolerance / self.details.error;
+                    self.details.step = 0.9 * self.details.step * if eta > 0.3 {
+                        // max(self.opts.tolerance / self.details.error, 0.3)
+                        if eta < 2.0 {
+                            // min(..., 2.0)
+                            eta
+                        } else {
+                            2.0
+                        }
+                    } else {
+                        // min(0.3, 2.0)
+                        0.3
+                    };
+                    // Check that our step isn't too small
+                    if self.details.step < self.opts.min_step {
+                        self.details.step = self.opts.min_step;
+                    }
                 }
             }
         }
