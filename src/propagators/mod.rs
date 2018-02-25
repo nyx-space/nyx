@@ -4,8 +4,10 @@ use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
 
 // Re-Export
-mod classic_rk;
-pub use self::classic_rk::*;
+mod rk;
+pub use self::rk::*;
+mod dormand;
+pub use self::dormand::*;
 
 /// The `RK` trait defines a Runge Kutta
 pub trait RK
