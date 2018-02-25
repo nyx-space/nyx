@@ -1,6 +1,8 @@
 extern crate nalgebra as na;
 
-use self::na::DVector;
+//use self::na::{DVector, Dim, DimName, U3, VectorN};
+use self::na::{DVector, DefaultAllocator, Dim, DimName, MatrixN, Scalar, VectorN};
+use self::na::allocator::Allocator;
 
 // Re-Export
 mod classic_rk;
@@ -61,10 +63,22 @@ impl<'a> Propagator<'a> {
     /// result as DVector<f64> of the derivative. The reference should preferrably only be borrowed.
     /// This function returns the next time (i.e. the previous time incremented by the timestep used) and
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
-    pub fn derive<F>(&mut self, t: f64, state: DVector<f64>, d_xdt: F) -> (f64, DVector<f64>)
+    pub fn derive<F, N: Dim + DimName>(
+        &mut self,
+        t: f64,
+        state: VectorN<f64, N>,
+        d_xdt: F,
+    ) -> (f64, VectorN<f64, N>)
     where
-        F: Fn(f64, &DVector<f64>) -> DVector<f64>,
+        F: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
+        DefaultAllocator: Allocator<f64, N>,
     {
+        /*
+
+        struct NPoint<N: Dim>(VectorN<f64, N>)
+        where
+            DefaultAllocator: Allocator<f64, N>;
+*/
         loop {
             let mut k = Vec::with_capacity(self.order + 1); // Will store all the k_i.
             let mut prev_end = 0;
