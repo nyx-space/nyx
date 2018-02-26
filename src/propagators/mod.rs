@@ -8,8 +8,10 @@ mod rk;
 pub use self::rk::*;
 mod dormand;
 pub use self::dormand::*;
-mod ferhlberg;
-pub use self::ferhlberg::*;
+mod fehlberg;
+pub use self::fehlberg::*;
+mod verner;
+pub use self::verner::*;
 
 /// The `RK` trait defines a Runge Kutta
 pub trait RK

@@ -17,7 +17,7 @@ fn geo_day_prop() {
     use self::na::Vector6;
     let all_props = vec![
         Propagator::new::<RK4Fixed>(Options::with_fixed_step(1.0)),
-        Propagator::new::<Ferhlberg54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Verner76>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<CashKarp54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Dormand54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
