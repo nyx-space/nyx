@@ -1,5 +1,6 @@
 extern crate nalgebra as na;
 
+use std::f64;
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
 
@@ -109,18 +110,18 @@ impl<'a> Propagator<'a> {
             // Compute the next state and the error
             let mut next_state = state.clone();
             let mut next_state_star = state.clone();
-            for i in 0..k.len() {
+            for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
                 let b_i_star = self.b_coeffs[i + self.order];
-                next_state += self.details.step * b_i * &k[i];
-                next_state_star += self.details.step * b_i_star * &k[i];
+                next_state += self.details.step * b_i * ki;
+                next_state_star += self.details.step * b_i_star * ki;
             }
 
             self.details.error = (next_state.clone() - next_state_star).norm();
 
             if self.opts.fixed_step
                 || (self.details.error < self.opts.tolerance
-                    || self.details.step == self.opts.min_step)
+                    || (self.details.step - self.opts.min_step).abs() <= f64::EPSILON)
             {
                 // Using a fixed step, no adaptive step necessary, or
                 // Error is within the desired tolerance, or it isn't but we've already reach the minimum step allowed

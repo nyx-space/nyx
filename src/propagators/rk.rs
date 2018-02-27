@@ -2,7 +2,7 @@ pub use super::RK;
 
 pub struct CashKarp54 {}
 
-/// CashKarp54 is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
+/// `CashKarp54` is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
 impl RK for CashKarp54 {
     fn order() -> usize {
         5 as usize
@@ -47,7 +47,7 @@ impl RK for CashKarp54 {
 
 pub struct RK4Fixed {}
 
-/// RKF54 is a [Runge Kutta Ferhlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
+/// `RK4Fixed` is a [Runge Kutta Ferhlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
 impl RK for RK4Fixed {
     fn order() -> usize {
         3 as usize

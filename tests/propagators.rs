@@ -1,11 +1,12 @@
 extern crate nalgebra as na;
 extern crate nyx;
+use std::f64;
 use self::na::Vector6;
 
 fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
     let radius = state.slice((0, 0), (3, 1)); // TODO: Change to compile time slice
     let velocity = state.slice((3, 0), (3, 1));
-    let body_acceleration = (-398600.4 / radius.norm().powi(3)) * radius;
+    let body_acceleration = (-398_600.4 / radius.norm().powi(3)) * radius;
     Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
 }
 
@@ -17,7 +18,7 @@ fn geo_day_prop() {
     use self::na::Vector6;
     let all_props = vec![
         Propagator::new::<RK4Fixed>(Options::with_fixed_step(1.0)),
-        Propagator::new::<Ferhlberg54>(Options::with_adaptive_step(0.01, 30.0, 1e-2)),
+        Propagator::new::<Ferhlberg54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<CashKarp54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Dormand54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
@@ -55,7 +56,7 @@ fn geo_day_prop() {
             5.848985672436005,
         ]),
     ];
-    let all_it_cnt = vec![86400, 864000, 864000, 864000];
+    let all_it_cnt = vec![86_400, 86_4000, 86_4000, 86_4000];
 
     let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
     for mut prop in all_props {
@@ -64,10 +65,10 @@ fn geo_day_prop() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(cur_t, init_state.clone(), two_body_dynamics);
+            let (t, state) = prop.derive(cur_t, init_state, two_body_dynamics);
             iterations += 1;
             cur_t = t;
-            init_state = state.clone();
+            init_state = state;
             if p_id > 0 {
                 // Check that the error is less than the max error.
                 let details = prop.clone().latest_details();
@@ -76,9 +77,8 @@ fn geo_day_prop() {
                     "error larger than expected (p_id = {})",
                     p_id
                 );
-                assert_eq!(
-                    details.step,
-                    1e-1,
+                assert!(
+                    details.step - 1e-1 < f64::EPSILON,
                     "step size should be at its minimum (p_id = {})",
                     p_id
                 );
