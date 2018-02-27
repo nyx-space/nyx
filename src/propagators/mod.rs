@@ -119,33 +119,22 @@ impl<'a> Propagator<'a> {
             self.details.error = (next_state.clone() - next_state_star).norm();
 
             if self.opts.fixed_step
-                || (!self.opts.fixed_step
-                    && (self.details.error < self.opts.tolerance
-                        || self.details.step == self.opts.min_step))
+                || (self.details.error < self.opts.tolerance
+                    || self.details.step == self.opts.min_step)
             {
+                // Using a fixed step, no adaptive step necessary, or
+                // Error is within the desired tolerance, or it isn't but we've already reach the minimum step allowed
                 return ((t + self.details.step), next_state);
             } else if !self.opts.fixed_step {
-                if self.details.step > self.opts.min_step {
-                    // Let's compute the new step using the [WP](https://en.wikipedia.org/wiki/Adaptive_stepsize) algorithm.
-                    // NOTE: We do a custom min and max implementation because std::cmp doesn't support f64s due to NaN and NNaN.
-                    let eta = self.opts.tolerance / self.details.error;
-                    self.details.step = 0.9 * self.details.step * if eta > 0.3 {
-                        // max(self.opts.tolerance / self.details.error, 0.3)
-                        if eta < 2.0 {
-                            // min(..., 2.0)
-                            eta
-                        } else {
-                            2.0
-                        }
-                    } else {
-                        // min(0.3, 2.0)
-                        0.3
-                    };
-                    // Check that our step isn't too small
-                    if self.details.step < self.opts.min_step {
-                        self.details.step = self.opts.min_step;
-                    }
-                }
+                // Error is too high and using adaptive step size
+                let proposed_step = 0.9 * self.details.step
+                    * (self.opts.tolerance / self.details.error)
+                        .powf(1.0 / (self.order as f64 - 1.0));
+                self.details.step = if proposed_step < self.opts.min_step {
+                    self.opts.min_step
+                } else {
+                    proposed_step
+                };
             }
         }
     }

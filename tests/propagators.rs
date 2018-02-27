@@ -17,7 +17,7 @@ fn geo_day_prop() {
     use self::na::Vector6;
     let all_props = vec![
         Propagator::new::<RK4Fixed>(Options::with_fixed_step(1.0)),
-        Propagator::new::<Verner76>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Ferhlberg54>(Options::with_adaptive_step(0.01, 30.0, 1e-2)),
         Propagator::new::<CashKarp54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Dormand54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
@@ -71,7 +71,7 @@ fn geo_day_prop() {
             if p_id > 0 {
                 // Check that the error is less than the max error.
                 let details = prop.clone().latest_details();
-                /*assert!(
+                assert!(
                     details.error < 1e-1,
                     "error larger than expected (p_id = {})",
                     p_id
@@ -81,7 +81,7 @@ fn geo_day_prop() {
                     1e-1,
                     "step size should be at its minimum (p_id = {})",
                     p_id
-                );*/
+                );
             }
             if cur_t >= 3600.0 * 24.0 {
                 assert_eq!(
