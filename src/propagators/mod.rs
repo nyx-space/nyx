@@ -50,7 +50,7 @@ pub struct Propagator<'a> {
 /// TODO: Add examples
 impl<'a> Propagator<'a> {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(opts: Options) -> Propagator<'a> {
+    pub fn new<T: RK>(opts: &Options) -> Propagator<'a> {
         Propagator {
             opts: opts.clone(),
             details: IntegrationDetails {
@@ -74,7 +74,7 @@ impl<'a> Propagator<'a> {
     pub fn derive<F, N: Dim + DimName>(
         &mut self,
         t: f64,
-        state: VectorN<f64, N>,
+        state: &VectorN<f64, N>,
         d_xdt: F,
     ) -> (f64, VectorN<f64, N>)
     where
@@ -84,7 +84,7 @@ impl<'a> Propagator<'a> {
         loop {
             let mut k = Vec::with_capacity(self.order + 1); // Will store all the k_i.
             let mut prev_end = 0;
-            let ki = d_xdt(t, &state.clone());
+            let ki = d_xdt(t, state);
             k.push(ki);
             let mut a_idx: usize = 0;
             for i in 0..self.order {
@@ -103,7 +103,7 @@ impl<'a> Propagator<'a> {
 
                 let ki = d_xdt(
                     t + ci * self.details.step,
-                    &(state.clone() + self.details.step * wi),
+                    &(state + self.details.step * wi),
                 );
                 k.push(ki);
             }

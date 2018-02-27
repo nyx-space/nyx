@@ -17,10 +17,10 @@ fn geo_day_prop() {
     use nyx::propagators::*;
     use self::na::Vector6;
     let all_props = vec![
-        Propagator::new::<RK4Fixed>(Options::with_fixed_step(1.0)),
-        Propagator::new::<Ferhlberg54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<CashKarp54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Dormand54>(Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
+        Propagator::new::<Ferhlberg54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<CashKarp54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Dormand54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -65,7 +65,7 @@ fn geo_day_prop() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(cur_t, init_state, two_body_dynamics);
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
             iterations += 1;
             cur_t = t;
             init_state = state;
