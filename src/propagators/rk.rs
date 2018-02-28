@@ -55,7 +55,7 @@ impl RK for RK4Fixed {
         4
     }
     fn stages() -> usize {
-        3
+        4
     }
     fn a_coeffs() -> &'static [f64] {
         &[0.5, 0.0, 0.5, 0.0, 0.0, 1.0]
@@ -66,10 +66,11 @@ impl RK for RK4Fixed {
             1.0 / 3.0,
             1.0 / 3.0,
             1.0 / 6.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
+            // NOTE: Duplicating the B coefficients for force the error to zero.
+            1.0 / 6.0,
+            1.0 / 3.0,
+            1.0 / 3.0,
+            1.0 / 6.0,
         ]
     }
 }
