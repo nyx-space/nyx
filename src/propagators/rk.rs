@@ -74,7 +74,7 @@ impl RK for RK4Fixed {
         ]
     }
 }
-
+/*
 pub struct RK98 {}
 
 /// `RK98` is a [Runge Kutta 8-9 integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
@@ -229,3 +229,4 @@ impl RK for RK98 {
         ]
     }
 }
+*/

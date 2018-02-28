@@ -21,6 +21,8 @@ fn geo_day_prop() {
         Propagator::new::<CashKarp54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Fehlberg54>(&Options::with_adaptive_step(0.01, 30.0, 1e-2)),
         Propagator::new::<Dormand54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Fehlberg65>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Verner76>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -55,8 +57,24 @@ fn geo_day_prop() {
             -4.185030861887087,
             5.848985672436005,
         ]),
+        Vector6::from_row_slice(&[
+            -5971.195448672514,
+            3945.5831501109246,
+            2864.5302175392503,
+            0.04900281813249359,
+            -4.185030861949536,
+            5.84898567238942,
+        ]),
+        Vector6::from_row_slice(&[
+            -5971.19539794548,
+            3945.581628280032,
+            2864.5322979076436,
+            0.04900468039431707,
+            -4.185032104074844,
+            5.848984795418991,
+        ]),
     ];
-    let all_it_cnt = vec![86_400, 2880, 2880, 86_4000];
+    let all_it_cnt = vec![86_400, 2880, 2880, 864_000, 864_000, 2880];
 
     let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
     for mut prop in all_props {
