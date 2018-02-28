@@ -5,7 +5,7 @@ pub struct Verner76 {}
 /// Verner76 is an RK Verner integrator [source](http://people.math.sfu.ca/~jverner/classify.1992.ps).
 impl RK for Verner76 {
     fn order() -> u8 {
-        6
+        7
     }
     fn stages() -> usize {
         8

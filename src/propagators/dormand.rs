@@ -5,7 +5,7 @@ pub struct Dormand54 {}
 /// Dormand54 is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
 impl RK for Dormand54 {
     fn order() -> u8 {
-        4
+        5
     }
     fn stages() -> usize {
         6

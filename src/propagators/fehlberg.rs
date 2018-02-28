@@ -6,7 +6,7 @@ pub struct Fehlberg65 {}
 /// Fehlberg54 is a [Runge Kutta Fehlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
 impl RK for Fehlberg54 {
     fn order() -> u8 {
-        4
+        5
     }
     fn stages() -> usize {
         6
