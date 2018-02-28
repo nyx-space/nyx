@@ -19,8 +19,13 @@ pub trait RK
 where
     Self: Sized,
 {
-    // Returns the order of this integrator.
-    fn order() -> usize;
+    /// Returns the order of this integrator (as u8 because there probably isn't an order greater than 255).
+    /// The order is used for the adaptive step size only to compute the error between estimates.
+    fn order() -> u8;
+
+    /// Returns the stages of this integrator (as usize because it's used as indexing)
+    fn stages() -> usize;
+
     /// Returns a pointer to a list of f64 corresponding to the A coefficients of the Butcher table for that RK.
     /// This module only supports *implicit* integrators, and as such, `Self.a_coeffs().len()` must be of
     /// size (order+1)*(order)/2.
@@ -41,7 +46,8 @@ pub struct IntegrationDetails {
 pub struct Propagator<'a> {
     opts: Options,
     details: IntegrationDetails,
-    order: usize,
+    order: u8,
+    stages: usize,
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
 }
@@ -57,6 +63,7 @@ impl<'a> Propagator<'a> {
                 step: opts.max_step,
                 error: 0.0,
             },
+            stages: T::stages(),
             order: T::order(),
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
@@ -82,21 +89,19 @@ impl<'a> Propagator<'a> {
         DefaultAllocator: Allocator<f64, N>,
     {
         loop {
-            let mut k = Vec::with_capacity(self.order + 1); // Will store all the k_i.
-            let mut prev_end = 0;
+            let mut k = Vec::with_capacity(self.stages + 1); // Will store all the k_i.
             let ki = d_xdt(t, state);
             k.push(ki);
             let mut a_idx: usize = 0;
-            for i in 0..self.order {
+            for _ in 0..(self.stages - 1) {
                 // Let's compute the c_i by summing the relevant items from the list of coefficients.
+                // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
-                for ak in prev_end..prev_end + i + 1 {
-                    ci += self.a_coeffs[ak];
-                }
-                prev_end += i + 1;
+                // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
                 let mut wi = VectorN::from_element(0.0);
                 for kj in &k {
                     let a_ij = self.a_coeffs[a_idx];
+                    ci += a_ij;
                     wi += a_ij * kj;
                     a_idx += 1;
                 }
@@ -112,7 +117,7 @@ impl<'a> Propagator<'a> {
             let mut next_state_star = state.clone();
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
-                let b_i_star = self.b_coeffs[i + self.order];
+                let b_i_star = self.b_coeffs[i + self.stages];
                 next_state += self.details.step * b_i * ki;
                 next_state_star += self.details.step * b_i_star * ki;
             }

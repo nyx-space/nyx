@@ -5,10 +5,12 @@ pub struct Ferhlberg65 {}
 
 /// Ferhlberg54 is a [Runge Kutta Fehlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
 impl RK for Ferhlberg54 {
-    fn order() -> usize {
-        5 as usize
+    fn order() -> u8 {
+        4
     }
-
+    fn stages() -> usize {
+        6
+    }
     fn a_coeffs() -> &'static [f64] {
         &[
             1.0 / 4.0,
@@ -50,21 +52,12 @@ impl RK for Ferhlberg54 {
 /// NOTE: The adaptive step size is identical for all integrators, regardless of the information in this implementation. Moreover,
 /// the coefficients used in this embedded implementation are slightly different than the WP definition when comparing the 54 order.
 impl RK for Ferhlberg65 {
-    fn order() -> usize {
-        6 as usize
+    fn order() -> u8 {
+        6
     }
-
-    //     k1 = f( x[i],y[i] ),                                                   //
-    //     k2 = f( x[i]+h/6, y[i] + h*k1/6 ),                                     //
-    //     k3 = f( x[i]+4h/15, y[i]+h/75*(4 k1 + 16 k2) ),                        //
-    //     k4 = f( x[i]+2h/3, y[i]+h/6*(5 k1 - 16 k2 + 15 k3) ),                  //
-    //     k5 = f( x[i]+4h/5, y[i]+h/25*(-40 k1 + 144 k2 - 100 k3 + 16 k4))       //
-    //     k6 = f( x[i]+h, y[i]+h/640*(722 k1 - 2304 k2 + 2035 k3                 //
-    //                                                       - 88 k4 + 275 k5) )  //
-    //     k7 = f( x[i], y[i]+h/1280*( -22 k1 + 55 k3 - 88 k4 + 55 k5) )          //
-    //     k8 = f( x[i]+h, y[i]+h/1280*( 186 k1 - 4608 k2 + 4015 k3 - 88 k4       //
-    //                                             + 495 k5 + 1280 K7) )          //
-
+    fn stages() -> usize {
+        8
+    }
     fn a_coeffs() -> &'static [f64] {
         &[
             1.0 / 6.0,
@@ -82,7 +75,6 @@ impl RK for Ferhlberg65 {
             407.0 / 128.0,
             -11.0 / 80.0,
             55.0 / 128.0,
-            0.0,
             -11.0 / 640.0,
             0.0,
             11.0 / 256.0,
@@ -92,17 +84,12 @@ impl RK for Ferhlberg65 {
             93.0 / 640.0,
             -18.0 / 5.0,
             803.0 / 256.0,
-            //-11.0 / 160.0,
-            //99.0 / 256.0,
-            //0.0,
-            //1.0,
+            -11.0 / 160.0,
+            99.0 / 256.0,
+            0.0,
+            1.0,
         ]
     }
-
-    //        y[i+1] = y[i] +  h / 8448 * ( 682 * k1 + 3375 * k3 + 2376 * k4      //
-    //                                                 + 1375 * k5 + 640 * k6 )   //
-    //        err = - 5*h*( k1 + k6 - k7 - k8 ) / 66                              //
-
     fn b_coeffs() -> &'static [f64] {
         &[
             7.0 / 1408.0,
@@ -111,6 +98,7 @@ impl RK for Ferhlberg65 {
             9.0 / 32.0,
             125.0 / 768.0,
             0.0,
+            5.0 / 66.0,
             5.0 / 66.0,
             7.0 / 1408.0 - 31.0 / 384.0,
             0.0,

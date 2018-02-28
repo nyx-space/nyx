@@ -4,10 +4,12 @@ pub struct CashKarp54 {}
 
 /// `CashKarp54` is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
 impl RK for CashKarp54 {
-    fn order() -> usize {
-        5 as usize
+    fn order() -> u8 {
+        4
     }
-
+    fn stages() -> usize {
+        6
+    }
     fn a_coeffs() -> &'static [f64] {
         &[
             1.0 / 5.0,
@@ -49,10 +51,12 @@ pub struct RK4Fixed {}
 
 /// `RK4Fixed` is a [Runge Kutta Ferhlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
 impl RK for RK4Fixed {
-    fn order() -> usize {
-        3 as usize
+    fn order() -> u8 {
+        4
     }
-
+    fn stages() -> usize {
+        3
+    }
     fn a_coeffs() -> &'static [f64] {
         &[0.5, 0.0, 0.5, 0.0, 0.0, 1.0]
     }
