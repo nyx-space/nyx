@@ -1,11 +1,11 @@
 pub use super::RK;
 
-pub struct Verner76 {}
+pub struct Verner65 {}
 
-/// Verner76 is an RK Verner integrator [source](http://people.math.sfu.ca/~jverner/classify.1992.ps).
-impl RK for Verner76 {
+/// Verner65 is an RK Verner integrator of order 5-6 [source](http://people.math.sfu.ca/~jverner/classify.1992.ps).
+impl RK for Verner65 {
     fn order() -> u8 {
-        7
+        6
     }
     fn stages() -> usize {
         8
@@ -19,7 +19,7 @@ impl RK for Verner76 {
             5.0 / 6.0,
             -8.0 / 3.0,
             5.0 / 2.0,
-            -156.0 / 64.0,
+            -165.0 / 64.0,
             55.0 / 6.0,
             -425.0 / 64.0,
             85.0 / 96.0,
@@ -33,7 +33,7 @@ impl RK for Verner76 {
             297275.0 / 52632.0,
             -319.0 / 2322.0,
             24068.0 / 84065.0,
-            3850.0 / 26705.0,
+            3850.0 / 26703.0,
             12.0 / 5.0,
             -8.0,
             4015.0 / 612.0,
@@ -45,14 +45,6 @@ impl RK for Verner76 {
     }
     fn b_coeffs() -> &'static [f64] {
         &[
-            3.0 / 40.0,
-            0.0,
-            875.0 / 2244.0,
-            23.0 / 72.0,
-            264.0 / 1955.0,
-            125.0 / 11592.0,
-            43.0 / 616.0,
-            0.0,
             13.0 / 160.0,
             0.0,
             2375.0 / 5984.0,
@@ -61,6 +53,14 @@ impl RK for Verner76 {
             0.0,
             0.0,
             3.0 / 44.0,
+            3.0 / 40.0,
+            0.0,
+            875.0 / 2244.0,
+            23.0 / 72.0,
+            264.0 / 1955.0,
+            125.0 / 11592.0,
+            43.0 / 616.0,
+            0.0,
         ]
     }
 }

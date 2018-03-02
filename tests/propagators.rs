@@ -22,7 +22,7 @@ fn geo_day_prop() {
         Propagator::new::<Fehlberg54>(&Options::with_adaptive_step(0.01, 30.0, 1e-2)),
         Propagator::new::<Dormand54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Fehlberg65>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Verner76>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Verner65>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -66,12 +66,12 @@ fn geo_day_prop() {
             5.84898567238942,
         ]),
         Vector6::from_row_slice(&[
-            -5971.19539794548,
-            3945.581628280032,
-            2864.5322979076436,
-            0.04900468039431707,
-            -4.185032104074844,
-            5.848984795418991,
+            -5971.195460543446,
+            3945.5835028716965,
+            2864.529735467152,
+            0.04900238652205916,
+            -4.185030573980658,
+            5.848985875519705,
         ]),
     ];
     let all_it_cnt = vec![86_400, 2880, 2880, 864_000, 864_000, 2880];
