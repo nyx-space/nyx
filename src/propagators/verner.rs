@@ -1,4 +1,4 @@
-pub use super::RK;
+use super::RK;
 
 pub struct Verner65 {}
 
