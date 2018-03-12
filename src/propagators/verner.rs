@@ -1,8 +1,8 @@
 use super::RK;
 
+/// Verner65 is an RK Verner integrator of order 5-6, coefficients taken from [here (PDF)](http://people.math.sfu.ca/~jverner/classify.1992.ps).
 pub struct Verner65 {}
 
-/// Verner65 is an RK Verner integrator of order 5-6 [source](http://people.math.sfu.ca/~jverner/classify.1992.ps).
 impl RK for Verner65 {
     fn order() -> u8 {
         6

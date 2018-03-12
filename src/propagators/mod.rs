@@ -14,7 +14,7 @@ pub use self::fehlberg::*;
 mod verner;
 pub use self::verner::*;
 
-/// The `RK` trait defines a Runge Kutta
+/// The `RK` trait defines a Runge Kutta integrator.
 pub trait RK
 where
     Self: Sized,
@@ -36,12 +36,15 @@ where
     fn b_coeffs() -> &'static [f64];
 }
 
+/// Store the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
 #[derive(Clone, Debug)]
 pub struct IntegrationDetails {
     pub step: f64,
     pub error: f64,
 }
 
+/// Includes the options, the integrator details of the previous step, and
+/// the set of coefficients used for the monomorphic instance. **WARNING:** must be stored in a mutuable variable.
 #[derive(Clone, Debug)]
 pub struct Propagator<'a> {
     opts: Options,

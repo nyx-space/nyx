@@ -1,8 +1,8 @@
 use super::RK;
 
+/// Dormand54 is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
 pub struct Dormand54 {}
 
-/// Dormand54 is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
 impl RK for Dormand54 {
     fn order() -> u8 {
         5
@@ -48,10 +48,10 @@ impl RK for Dormand54 {
     }
 }
 
-pub struct Dormand87 {}
-
 /// Dormand87 is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
 /// Coefficients taken from GMAT `src/base/propagator/PrinceDormand78.cpp`.
+pub struct Dormand87 {}
+
 impl RK for Dormand87 {
     fn order() -> u8 {
         8

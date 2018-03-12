@@ -1,9 +1,8 @@
 use super::RK;
 
-pub struct Fehlberg54 {}
-pub struct Fehlberg65 {}
-
 /// Fehlberg54 is a [Runge Kutta Fehlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
+pub struct Fehlberg54 {}
+
 impl RK for Fehlberg54 {
     fn order() -> u8 {
         5
@@ -51,6 +50,8 @@ impl RK for Fehlberg54 {
 /// Fehlberg65 is a [Runge Kutta Fehlberg integrator](http://www.mymathlib.com/diffeq/embedded_runge_kutta/embedded_fehlberg_5_6.html).
 /// NOTE: The adaptive step size is identical for all integrators, regardless of the information in this implementation. Moreover,
 /// the coefficients used in this embedded implementation are slightly different than the WP definition when comparing the 54 order.
+pub struct Fehlberg65 {}
+
 impl RK for Fehlberg65 {
     fn order() -> u8 {
         6

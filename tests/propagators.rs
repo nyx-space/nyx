@@ -1,11 +1,11 @@
 extern crate nalgebra as na;
 extern crate nyx;
 use std::f64;
-use self::na::Vector6;
+use self::na::{U1, U3, Vector6};
 
 fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
-    let radius = state.slice((0, 0), (3, 1)); // TODO: Change to compile time slice
-    let velocity = state.slice((3, 0), (3, 1));
+    let radius = state.fixed_slice::<U3, U1>(0, 0);
+    let velocity = state.fixed_slice::<U3, U1>(3, 0);
     let body_acceleration = (-398_600.4 / radius.norm().powi(3)) * radius;
     Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
 }
@@ -23,8 +23,8 @@ fn geo_day_prop() {
         Propagator::new::<Dormand54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Fehlberg65>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Verner65>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<RK98>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
         Propagator::new::<Dormand87>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<RK98>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -76,20 +76,20 @@ fn geo_day_prop() {
             5.848985875519705,
         ]),
         Vector6::from_row_slice(&[
-            -5971.195448675211,
-            3945.583150208691,
-            2864.530217404535,
-            0.049002818010257174,
-            -4.185030861868303,
-            5.848985672447304,
-        ]),
-        Vector6::from_row_slice(&[
             -5971.195448678458,
             3945.5831503373893,
             2864.530217225496,
             0.04900281785017413,
             -4.185030861762282,
             5.848985672523384,
+        ]),
+        Vector6::from_row_slice(&[
+            -5971.195448675211,
+            3945.583150208691,
+            2864.530217404535,
+            0.049002818010257174,
+            -4.185030861868303,
+            5.848985672447304,
         ]),
     ];
     let all_it_cnt = vec![86_400, 2880, 2880, 864_000, 864_000, 2880, 864_000, 864_000];
