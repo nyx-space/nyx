@@ -7,5 +7,3 @@ matrix:
   allow_failures:
     - rust: nightly
 cache: cargo
-script:
-  - cargo test --verbose
