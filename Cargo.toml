@@ -1,0 +1,7 @@
+[package]
+name = "nyx"
+version = "0.0.1"
+authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
+
+[dependencies]
+nalgebra = "0.14.0"
