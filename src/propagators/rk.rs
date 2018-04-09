@@ -1,9 +1,9 @@
 pub use super::RK;
 
-/// `CashKarp54` is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
-pub struct CashKarp54 {}
+/// `CashKarp45` is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
+pub struct CashKarp45 {}
 
-impl RK for CashKarp54 {
+impl RK for CashKarp45 {
     fn order() -> u8 {
         5
     }
@@ -78,10 +78,10 @@ impl RK for RK4Fixed {
 
 const SQRT6: f64 = 2.449489742783178;
 
-/// `RK98` is a Runge Kutta 8-9 integrator. Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
-pub struct RK98 {}
+/// `RK89` is a Runge Kutta 8-9 integrator. Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
+pub struct RK89 {}
 
-impl RK for RK98 {
+impl RK for RK89 {
     fn order() -> u8 {
         9
     }

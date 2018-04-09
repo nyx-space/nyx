@@ -18,13 +18,13 @@ fn geo_day_prop() {
     use self::na::Vector6;
     let all_props = vec![
         Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
-        Propagator::new::<CashKarp54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Fehlberg54>(&Options::with_adaptive_step(0.01, 30.0, 1e-2)),
-        Propagator::new::<Dormand54>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Fehlberg65>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Verner65>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Dormand87>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<RK98>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(0.01, 30.0, 1e-2)),
+        Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Fehlberg56>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<Dormand78>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
     ];
     let all_rslts = vec![
         Vector6::from_row_slice(&[
