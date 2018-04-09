@@ -6,7 +6,7 @@ use self::na::{U1, U3, Vector6};
 fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
     let radius = state.fixed_slice::<U3, U1>(0, 0);
     let velocity = state.fixed_slice::<U3, U1>(3, 0);
-    let body_acceleration = (-398_600.4 / radius.norm().powi(3)) * radius;
+    let body_acceleration = (-398_600.441500000015366822 / radius.norm().powi(3)) * radius;
     Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
 }
 
@@ -18,81 +18,83 @@ fn geo_day_prop() {
     use self::na::Vector6;
     let all_props = vec![
         Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
-        Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(0.01, 30.0, 1e-2)),
-        Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Fehlberg56>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<Dormand78>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
-        Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-2)),
+        Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
+        Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
+        Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
+        Propagator::new::<Fehlberg56>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
+        Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
+        Propagator::new::<Dormand78>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
+        Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
     ];
     let all_rslts = vec![
         Vector6::from_row_slice(&[
-            -5971.195448672869,
-            3945.5831501786265,
-            2864.530217443299,
-            0.04900281804671473,
-            -4.185030861894159,
-            5.848985672431022,
+            -5971.194191670768,
+            3945.506653227154,
+            2864.6366184109706,
+            0.04909695762764177,
+            -4.18509331847428,
+            5.8489408677500965,
         ]),
         Vector6::from_row_slice(&[
-            -5971.195422075937,
-            3945.5823545380795,
-            2864.5313049901433,
-            0.0490037916139182,
-            -4.185031511302435,
-            5.84898521402028,
+            -5971.194191669716,
+            3945.506653225098,
+            2864.6366184126337,
+            0.04909695762959668,
+            -4.185093318476122,
+            5.848940867749713,
         ]),
         Vector6::from_row_slice(&[
-            -5971.19539794548,
-            3945.581628280032,
-            2864.5322979076436,
-            0.04900468039431707,
-            -4.185032104074844,
-            5.848984795418991,
+            -5971.194191673688,
+            3945.506653306904,
+            2864.636618302827,
+            0.04909695753042703,
+            -4.185093318409565,
+            5.848940867795624,
         ]),
         Vector6::from_row_slice(&[
-            -5971.1954486729965,
-            3945.5831501881476,
-            2864.5302174302246,
-            0.04900281803620559,
-            -4.185030861887087,
-            5.848985672436005,
+            -5971.194191668567,
+            3945.5066531626767,
+            2864.636618498951,
+            0.04909695770740798,
+            -4.185093318527218,
+            5.848940867713008,
         ]),
         Vector6::from_row_slice(&[
-            -5971.195448672514,
-            3945.5831501109246,
-            2864.5302175392503,
-            0.04900281813249359,
-            -4.185030861949536,
-            5.84898567238942,
+            -5971.1763060616095,
+            3944.0101437173926,
+            2866.727622126912,
+            0.05095441538128432,
+            -4.1863204152348725,
+            5.848049439457298,
         ]),
         Vector6::from_row_slice(&[
-            -5971.195460543446,
-            3945.5835028716965,
-            2864.529735467152,
-            0.04900238652205916,
-            -4.185030573980658,
-            5.848985875519705,
+            -5971.194191670006,
+            3945.5066531852003,
+            2864.6366184678586,
+            0.04909695767907051,
+            -4.185093318508363,
+            5.848940867725646,
         ]),
         Vector6::from_row_slice(&[
-            -5971.195448678458,
-            3945.5831503373893,
-            2864.530217225496,
-            0.04900281785017413,
-            -4.185030861762282,
-            5.848985672523384,
+            -5971.194191670392,
+            3945.506653218658,
+            2864.63661842225,
+            0.049096957637897856,
+            -4.185093318481106,
+            5.8489408677453,
         ]),
         Vector6::from_row_slice(&[
-            -5971.195448675211,
-            3945.583150208691,
-            2864.530217404535,
-            0.049002818010257174,
-            -4.185030861868303,
-            5.848985672447304,
+            -5971.194191670676,
+            3945.506653225158,
+            2864.6366184134445,
+            0.04909695762999346,
+            -4.185093318475795,
+            5.848940867748944,
         ]),
     ];
-    let all_it_cnt = vec![86_400, 2880, 2880, 864_000, 864_000, 2880, 864_000, 864_000];
+    let all_it_cnt = vec![
+        86_400, 864_000, 864_000, 864_000, 63_590, 864_000, 2_880, 2_880
+    ];
 
     let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
     for mut prop in all_props {
@@ -106,16 +108,18 @@ fn geo_day_prop() {
             cur_t = t;
             init_state = state;
             if cur_t >= 3600.0 * 24.0 {
-                let details = prop.clone().latest_details();
-                if details.error > 1e-2 {
-                    assert!(
+                if p_id > 0 {
+                    let details = prop.clone().latest_details();
+                    if details.error > 1e-2 {
+                        assert!(
                         details.step - 1e-1 < f64::EPSILON,
                         "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
                         p_id,
                         details
                     );
+                    }
+                    println!("p_id={} => {:?}", p_id, prop.latest_details());
                 }
-                println!("p_id={} => {:?}", p_id, prop.latest_details());
                 assert_eq!(
                     state,
                     all_rslts[p_id],

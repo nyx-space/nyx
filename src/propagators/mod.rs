@@ -41,6 +41,7 @@ where
 pub struct IntegrationDetails {
     pub step: f64,
     pub error: f64,
+    pub attempts: u8,
 }
 
 /// Includes the options, the integrator details of the previous step, and
@@ -65,6 +66,7 @@ impl<'a> Propagator<'a> {
             details: IntegrationDetails {
                 step: opts.max_step,
                 error: 0.0,
+                attempts: 1,
             },
             stages: T::stages(),
             order: T::order(),
@@ -117,24 +119,41 @@ impl<'a> Propagator<'a> {
             }
             // Compute the next state and the error
             let mut next_state = state.clone();
-            let mut next_state_star = state.clone();
+            let mut error_est = VectorN::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
                 let b_i_star = self.b_coeffs[i + self.stages];
+                error_est += b_i_star * ki;
                 next_state += self.details.step * b_i * ki;
-                next_state_star += self.details.step * b_i_star * ki;
             }
 
-            self.details.error = (next_state.clone() - next_state_star).norm();
+            if !self.opts.fixed_step {
+                for (i, error_est_i) in error_est.clone().iter().enumerate() {
+                    let delta = next_state[(i, 0)] - state.clone()[(i, 0)];
+                    let err = if delta > self.opts.tolerance {
+                        // If greater than the relative tolerance, then we normalize it by the difference.
+                        (error_est_i / delta).abs()
+                    } else {
+                        error_est_i.abs()
+                    };
+                    if i == 0 || err > self.details.error {
+                        self.details.error = err;
+                    }
+                }
+            } else {
+                self.details.error = 0.0;
+            }
 
             if self.opts.fixed_step
                 || (self.details.error < self.opts.tolerance
                     || (self.details.step - self.opts.min_step).abs() <= f64::EPSILON)
+                || self.details.attempts >= self.opts.attempts
             {
                 // Using a fixed step, no adaptive step necessary, or
                 // Error is within the desired tolerance, or it isn't but we've already reach the minimum step allowed
                 return ((t + self.details.step), next_state);
             } else if !self.opts.fixed_step {
+                self.details.attempts += 1;
                 // Error is too high and using adaptive step size
                 let proposed_step = 0.9 * self.details.step
                     * (self.opts.tolerance / self.details.error)
@@ -163,6 +182,7 @@ pub struct Options {
     max_step: f64,
     tolerance: f64,
     fixed_step: bool,
+    attempts: u8,
 }
 
 impl Options {
@@ -174,17 +194,19 @@ impl Options {
             max_step: step,
             tolerance: 0.0,
             fixed_step: true,
+            attempts: 0,
         }
     }
 
     /// `with_adaptive_step` initializes an `Options` such that the integrator is used with an
-    ///  adaptive step size. TODO: Add algorithms for step size computation (sigmoid, etc.)
+    ///  adaptive step size.
     pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64) -> Options {
         Options {
             min_step: min_step,
             max_step: max_step,
             tolerance: tolerance,
             fixed_step: false,
+            attempts: 50,
         }
     }
 }
