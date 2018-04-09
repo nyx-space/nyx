@@ -1,11 +1,40 @@
+//! # nyx-space
+//!
+//! [Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity, fast, reliable and validated astrodynamical toolkit library written in Rust.
+//! It will _eventually_ provide most functionality in Python for rapid prototyping.
+//!
+//! The target audience is researchers and astrodynamics engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
+//! and portability to all platforms supported by [Rust](https://forge.rust-lang.org/platform-support.html).
+//!
+//! To some extend, the ultimate goal of this library is to retire [SPICE Toolkit](https://naif.jpl.nasa.gov/naif/toolkit.html).
+//!
+//! NOTE: It is recommended to compile all code in `nyx` with the `--release` flag. A lot of heavy
+//! computation is done in this library, and no one likes waiting for production code to run.
+//! ## Features
+//!
+//!  * Propagators / Integrators of equations of motions (cf. the `propagators` module)
+//!
+//! ## Usage
+//!
+//! Put this in your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! nyx-space = "0.0.1"
+//! ```
+//!
+//! And add the following to your crate root:
+//!
+//! ```rust
+//! extern crate nyx_space as nyx;
+//! ```
+
 /// The `propagators` includes all the propagators / integrators available in `nyx`.
 ///
-/// NOTE: It is recommended to compile all code in `nyx` with the `--release` flag. A lot of heavy
-/// computation is done in this library, and no one likes waiting for production code to run.
 /// # Full example
 /// ```
 /// extern crate nalgebra;
-/// extern crate nyx;
+/// extern crate nyx_space as nyx;
 /// use nalgebra::{U1, U3, Vector6};
 ///
 /// fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
