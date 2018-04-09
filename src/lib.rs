@@ -1,5 +1,7 @@
 /// The `propagators` includes all the propagators / integrators available in `nyx`.
 ///
+/// NOTE: It is recommended to compile all code in `nyx` with the `--release` flag. A lot of heavy
+/// computation is done in this library, and no one likes waiting for production code to run.
 /// # Full example
 /// ```
 /// extern crate nalgebra;

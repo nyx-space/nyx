@@ -47,8 +47,9 @@ impl RK for CashKarp45 {
     }
 }
 
-/// `RK4Fixed` is a fixed step RK4. If initialized with an `Options.with_adaptive_step`, the variable step
-/// will **not** be taken into consideration.
+/// `RK4Fixed` is a fixed step RK4.
+///
+/// If initialized with an `Options.with_adaptive_step`, the variable step will **not** be taken into consideration.
 pub struct RK4Fixed {}
 
 impl RK for RK4Fixed {
@@ -78,7 +79,9 @@ impl RK for RK4Fixed {
 
 const SQRT6: f64 = 2.449489742783178;
 
-/// `RK89` is a Runge Kutta 8-9 integrator. Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
+/// `RK89` is a Runge Kutta 8-9 integrator.
+///
+/// Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
 pub struct RK89 {}
 
 impl RK for RK89 {

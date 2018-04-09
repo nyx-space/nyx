@@ -1,6 +1,8 @@
 use super::RK;
 
-/// Verner56 is an RK Verner integrator of order 5-6, coefficients taken from [here (PDF)](http://people.math.sfu.ca/~jverner/classify.1992.ps).
+/// `Verner56` is an RK Verner integrator of order 5-6.
+///
+/// Coefficients taken from [here (PDF)](http://people.math.sfu.ca/~jverner/classify.1992.ps).
 pub struct Verner56 {}
 
 impl RK for Verner56 {

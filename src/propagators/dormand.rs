@@ -1,6 +1,6 @@
 use super::RK;
 
-/// Dormand45 is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
+/// `Dormand45` is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
 pub struct Dormand45 {}
 
 impl RK for Dormand45 {
@@ -48,7 +48,8 @@ impl RK for Dormand45 {
     }
 }
 
-/// Dormand78 is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
+/// `Dormand78` is a [Dormand-Prince integrator](https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method).
+///
 /// Coefficients taken from GMAT `src/base/propagator/PrinceDormand78.cpp`.
 pub struct Dormand78 {}
 

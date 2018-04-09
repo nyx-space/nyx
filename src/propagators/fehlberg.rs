@@ -1,6 +1,6 @@
 use super::RK;
 
-/// Fehlberg45 is a [Runge Kutta Fehlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
+/// `Fehlberg45` is a [Runge Kutta Fehlberg integrator](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method).
 pub struct Fehlberg45 {}
 
 impl RK for Fehlberg45 {
@@ -47,9 +47,14 @@ impl RK for Fehlberg45 {
     }
 }
 
-/// Fehlberg56 is a [Runge Kutta Fehlberg integrator](http://www.mymathlib.com/diffeq/embedded_runge_kutta/embedded_fehlberg_5_6.html).
+/// `Fehlberg56` is a [Runge Kutta Fehlberg integrator](http://www.mymathlib.com/diffeq/embedded_runge_kutta/embedded_fehlberg_5_6.html).
+///
 /// NOTE: The adaptive step size is identical for all integrators, regardless of the information in this implementation. Moreover,
 /// the coefficients used in this embedded implementation are slightly different than the WP definition when comparing the 54 order.
+/// **WARNING:** As evident from the tests, this propagator uses many less iterations and gets a much greater accuracy than the other
+/// propagators available for the same options and states. I will need to find another source to confirm the coefficients used here.
+/// More specifically, this source proposed another adaptive step size than all other propagators. This is concerning, especially
+/// given the differences in final states. I would recommend **against** using this propagator for the time being.
 pub struct Fehlberg56 {}
 
 impl RK for Fehlberg56 {
