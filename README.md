@@ -1,29 +1,40 @@
 # nyx
-[Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity astrodynamical toolkit library written in Rust.
-It will provide most functionality in C and will be usable in Python via a C-wrapper for rapid prototyping.
+[Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity, fast, reliable and validated astrodynamical toolkit library written in Rust.
+It will _eventually_ provide most functionality in Python for rapid prototyping.
 
-The goal is to provide researchers and astrodynamicists a fast, reliable and tested toolkit to rapidly prototype simulations
-in Python, and use the safety of Rust for significantly faster repetitive simulation runs. To some extend, the ultimate goal of 
-this library is to retire SPICE Toolkit and its analogs.
+The target audience is researchers and astrodynamics engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
+and portability to all platforms supported by [Rust](https://forge.rust-lang.org/platform-support.html).
+
+To some extend, the ultimate goal of this library is to retire [SPICE Toolkit](https://naif.jpl.nasa.gov/naif/toolkit.html).
+
+[![Build Status](https://travis-ci.org/ChristopherRabotin/nyx.svg?branch=master)](https://travis-ci.org/ChristopherRabotin/nyx)
+[![nyx-space on crates.io][cratesio-image]][cratesio]
+[![nyx-space on docs.rs][docsrs-image]][docsrs]
+
+[cratesio-image]: https://img.shields.io/crates/v/nyx-space.svg
+[cratesio]: https://crates.io/crates/nyx-space
+[docsrs-image]: https://docs.rs/nyx-space/badge.svg?version=0.0.1
+[docsrs]: https://docs.rs/nyx-space/0.0.1/
 
 # License
-The [LICENSE](https://github.com/ChristopherRabotin/nyx/blob/master/LICENSE) will be strictly enforced once (if?) this toolkit
+The [LICENSE](https://github.com/ChristopherRabotin/nyx/blob/master/LICENSE) will be strictly enforced once/if this toolkit
 reaches production-level quality.
 
 # Features
-Some of the following features may only be made available only through a commercial license.
-
+- [x] Propagation with different Runge Kutta methods (validated in GMAT)
+- [ ] Convenient and explicit definition of the dynamics for a simulation.
 - [ ] Multibody dynamics using SPICE Kernels
 - [ ] Planetary and Solar eclipse and visibility computation
-- [ ] Statistical Orbital Determination: Classical and Extended Kalman Filter
-- [ ] Finite burns with fuel depletion (includes low thrust / ion propulsion)
+- [ ] Statistical Orbital Determination: Classical and Extended Kalman Filter (SRIF?)
+- [ ] Finite burns with fuel depletion (including low thrust / ion propulsion)
 - [ ] Monte Carlo simulations on different parameters
-- [ ] Propagation with different stopping conditions
 - [ ] Sub-Optimal Control of continuous thrust (Ruggerio, Naasz, Petropoulos)
-- [ ] Link budget computations 
-- [ ] Spacecraft attitude control and algorithms
+- [ ] Link budget computations
+- [ ] Spacecraft attitude control and some useful optimal algorithms
+
+_Note:_ Some of these features may only be made available only through a commercial license in the future.
 
 # Who am I?
-A happily-employed astrodynamics engineer with a heavy background in software. Nyx will rely on the fallbacks of 
+A astrodynamics engineer with a heavy background in software. Nyx relies on the fallbacks of
 [smd](https://github.com/ChristopherRabotin/smd), a library I wrote in Go while researching at the University
-of Colorado at Boulder, and on my gained knowledge at Advanced Space ([check out the cool stuff we do!](http://advanced-space.com/)).
+of Colorado at Boulder. I work for Advanced Space ([we do cool stuff](http://advanced-space.com/)), but this code is developed on my leisure time.
