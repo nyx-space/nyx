@@ -1,3 +1,3 @@
-extern crate nyx;
+extern crate nyx_space as nyx;
 
 mod propagators;

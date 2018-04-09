@@ -1,5 +1,5 @@
 extern crate nalgebra as na;
-extern crate nyx;
+extern crate nyx_space as nyx;
 use std::f64;
 use self::na::{U1, U3, Vector6};
 
@@ -12,7 +12,6 @@ fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
 
 #[test]
 fn geo_day_prop() {
-    extern crate nyx;
     extern crate nalgebra as na;
     use nyx::propagators::*;
     use self::na::Vector6;
