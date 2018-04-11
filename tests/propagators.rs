@@ -108,7 +108,7 @@ fn geo_day_prop() {
             init_state = state;
             if cur_t >= 3600.0 * 24.0 {
                 if p_id > 0 {
-                    let details = prop.clone().latest_details();
+                    let details = prop.latest_details();
                     if details.error > 1e-2 {
                         assert!(
                         details.step - 1e-1 < f64::EPSILON,

@@ -69,7 +69,7 @@
 ///         cur_t = t;
 ///         state = state_t;
 ///         if cur_t >= 3600.0 * 24.0 {
-///             let details = prop.clone().latest_details();
+///             let details = prop.latest_details();
 ///             if details.error > 1e-2 {
 ///                 assert!(
 ///                              details.step - 1e-1 < f64::EPSILON,

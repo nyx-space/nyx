@@ -60,7 +60,6 @@ pub struct Propagator<'a> {
 }
 
 /// The `Propagator` trait defines the functions of a propagator.
-/// TODO: Add examples
 impl<'a> Propagator<'a> {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(opts: &Options) -> Propagator<'a> {
@@ -78,6 +77,8 @@ impl<'a> Propagator<'a> {
         }
     }
 
+    /// This method integrates whichever function is provided as `d_xdt`.
+    ///
     /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
     /// then derives the dynamics at that time (i.e. propagates for one time step). The `d_xdt` parameter is the derivative
     /// function which take a time t of type f64 and a reference to a state of type VectorN<f64, N>, and returns the
@@ -172,8 +173,10 @@ impl<'a> Propagator<'a> {
             }
         }
     }
-    pub fn latest_details(self) -> IntegrationDetails {
-        self.details
+
+    /// Borrow the details of the latest integration step.
+    pub fn latest_details(&self) -> &IntegrationDetails {
+        &self.details
     }
 }
 
