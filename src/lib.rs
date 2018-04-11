@@ -86,3 +86,6 @@
 /// }
 /// ```
 pub mod propagators;
+
+/// TODO: Documentation
+pub mod dynamics;
