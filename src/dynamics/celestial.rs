@@ -4,7 +4,9 @@ extern crate nalgebra as na;
 use std::f64;
 use self::na::{U1, U3, U6, Vector6, VectorN};
 
+#[derive(Copy, Clone)]
 pub struct TwoBody {
+    time: f64, // XXX: Ugh, if I have this here, it means that each Dynamics implementor will have its own time too. Sounds like extra storage, but then again it's only an f64.
     pos_vel: Vector6<f64>,
     mu: f64,
 }
@@ -12,6 +14,7 @@ pub struct TwoBody {
 impl TwoBody {
     pub fn new(state: &Vector6<f64>, mu: f64) -> TwoBody {
         TwoBody {
+            time: 0.0,
             pos_vel: *state,
             mu: mu,
         }
@@ -21,14 +24,15 @@ impl TwoBody {
 impl Dynamics for TwoBody {
     type StateSize = U6;
     fn time(&self) -> f64 {
-        0.0
+        self.time
     }
 
     fn state(&self) -> &VectorN<f64, Self::StateSize> {
         &self.pos_vel
     }
 
-    fn set_state(&mut self, _new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+        self.time = new_t;
         self.pos_vel = *new_state;
     }
 

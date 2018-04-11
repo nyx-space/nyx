@@ -11,7 +11,7 @@ pub mod celestial;
 /// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
 ///  parameters), it is up to the implementor to handle time and state organization correctly.
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
-pub trait Dynamics
+pub trait Dynamics: Copy
 where
     Self: Sized,
 {

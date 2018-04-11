@@ -1,18 +1,14 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
-use self::na::{U1, U3, Vector6};
+// use self::na::{U1, U3, Vector6};
 
 #[test]
-fn geo_day_prop() {
+fn two_body() {
     extern crate nalgebra as na;
     use nyx::propagators::*;
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
-    let mut dyn = TwoBody::new(
-        &Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]),
-        398_600.441500000015366822,
-    );
     use self::na::Vector6;
     let all_props = vec![
         Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
@@ -95,18 +91,21 @@ fn geo_day_prop() {
     ];
 
     let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
+
     for mut prop in all_props {
-        // XXX: Must update here
-        let mut init_state =
-            Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
-        let mut cur_t = 0.0;
+        let mut dyn = TwoBody::new(
+            &Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]),
+            398_600.441500000015366822,
+        );
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(dyn.time(), dyn.state(), dyn.eom);
+            let (t, state) =
+                prop.derive(dyn.time(), dyn.state(), |t_: f64, state_: &Vector6<f64>| {
+                    dyn.eom(t_, state_)
+                });
+            dyn.set_state(t, &state);
             iterations += 1;
-            cur_t = t;
-            init_state = state;
-            if cur_t >= 3600.0 * 24.0 {
+            if dyn.time() >= 3600.0 * 24.0 {
                 if p_id > 0 {
                     let details = prop.clone().latest_details();
                     if details.error > 1e-2 {
@@ -120,7 +119,7 @@ fn geo_day_prop() {
                     println!("p_id={} => {:?}", p_id, prop.latest_details());
                 }
                 assert_eq!(
-                    state,
+                    *dyn.state(),
                     all_rslts[p_id],
                     "geo prop failed for p_id = {}",
                     p_id
