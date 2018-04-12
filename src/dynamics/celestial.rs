@@ -1,4 +1,6 @@
 use super::Dynamics;
+// use super::super::celestia;
+use celestia::{Body, Planet};
 
 extern crate nalgebra as na;
 use std::f64;
@@ -12,11 +14,19 @@ pub struct TwoBody {
 }
 
 impl TwoBody {
-    pub fn new(state: &Vector6<f64>, mu: f64) -> TwoBody {
+    pub fn with_gm(state: &Vector6<f64>, mu: f64) -> TwoBody {
         TwoBody {
             time: 0.0,
             pos_vel: *state,
             mu: mu,
+        }
+    }
+
+    pub fn around(state: &Vector6<f64>, obj: Planet) -> TwoBody {
+        TwoBody {
+            time: 0.0,
+            pos_vel: *state,
+            mu: obj.gm(),
         }
     }
 }

@@ -89,3 +89,8 @@ pub mod propagators;
 
 /// TODO: Documentation
 pub mod dynamics;
+
+pub mod celestia;
+
+#[macro_use]
+extern crate lazy_static;
