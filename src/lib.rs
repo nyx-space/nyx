@@ -29,7 +29,7 @@
 //! extern crate nyx_space as nyx;
 //! ```
 
-/// The `propagators` includes all the propagators / integrators available in `nyx`.
+/// Provides all the propagators / integrators available in `nyx`.
 ///
 /// # Full example
 /// ```
@@ -87,9 +87,12 @@
 /// ```
 pub mod propagators;
 
-/// TODO: Documentation
+/// Provides several dynamics used for orbital mechanics and attitude dynamics.
+///
+/// These can be combined. Examples will be provided in the future.
 pub mod dynamics;
 
+/// Provides the solar system planets, and (eventually) ephemeride management.
 pub mod celestia;
 
 #[macro_use]

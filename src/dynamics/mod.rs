@@ -3,6 +3,10 @@ extern crate nalgebra as na;
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
 
+/// The celestial module handles all Cartesian based dynamics.
+///
+/// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
+/// from this module match, or perform the appropriate coordinate transformations.
 pub mod celestial;
 
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.

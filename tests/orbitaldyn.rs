@@ -8,6 +8,7 @@ fn two_body() {
     use nyx::propagators::*;
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
+    use nyx::celestia::EARTH;
     use self::na::Vector6;
 
     let rslt = Vector6::from_row_slice(&[
@@ -21,9 +22,9 @@ fn two_body() {
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
 
-    let mut dyn = TwoBody::with_gm(
+    let mut dyn = TwoBody::around(
         &Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]),
-        398_600.4415,
+        &EARTH,
     );
     loop {
         let (t, state) = prop.derive(dyn.time(), dyn.state(), |t_: f64, state_: &Vector6<f64>| {

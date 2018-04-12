@@ -6,6 +6,7 @@ extern crate nalgebra as na;
 use std::f64;
 use self::na::{U1, U3, U6, Vector6, VectorN};
 
+/// TwoBody exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]
 pub struct TwoBody {
     time: f64, // XXX: Ugh, if I have this here, it means that each Dynamics implementor will have its own time too. Sounds like extra storage, but then again it's only an f64.
@@ -14,6 +15,7 @@ pub struct TwoBody {
 }
 
 impl TwoBody {
+    /// Initialize TwoBody dynamics given a provided gravitional parameter (as `mu`)
     pub fn with_gm(state: &Vector6<f64>, mu: f64) -> TwoBody {
         TwoBody {
             time: 0.0,
@@ -22,7 +24,8 @@ impl TwoBody {
         }
     }
 
-    pub fn around(state: &Vector6<f64>, obj: Planet) -> TwoBody {
+    /// Initialize TwoBody dynamics given a provided a reference to a `Planet` (cf. nyx::celestia).
+    pub fn around(state: &Vector6<f64>, obj: &Planet) -> TwoBody {
         TwoBody {
             time: 0.0,
             pos_vel: *state,
