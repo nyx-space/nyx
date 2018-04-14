@@ -17,9 +17,11 @@ fn const_mom() {
     let mut dyn = AngularMom::from_tensor_matrix(&tensor, &omega);
     let init_momentum = dyn.momentum().norm();
     loop {
-        let (t, state) = prop.derive(dyn.time(), dyn.state(), |t_: f64, state_: &Vector3<f64>| {
-            dyn.eom(t_, state_)
-        });
+        let (t, state) = prop.derive(
+            dyn.time(),
+            &dyn.state(),
+            |t_: f64, state_: &Vector3<f64>| dyn.eom(t_, state_),
+        );
         dyn.set_state(t, &state);
         if dyn.time() >= 5.0 {
             println!("{:?}", prop.latest_details());

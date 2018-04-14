@@ -39,8 +39,8 @@ impl Dynamics for TwoBody {
         self.time
     }
 
-    fn state(&self) -> &VectorN<f64, Self::StateSize> {
-        &self.pos_vel
+    fn state(&self) -> VectorN<f64, Self::StateSize> {
+        self.pos_vel
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {

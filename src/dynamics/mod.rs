@@ -30,7 +30,7 @@ where
     fn time(&self) -> f64;
 
     /// Returns the current state of the dynamics so it can be integrated.
-    fn state(&self) -> &VectorN<f64, Self::StateSize>
+    fn state(&self) -> VectorN<f64, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 

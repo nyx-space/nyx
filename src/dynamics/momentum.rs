@@ -45,8 +45,8 @@ impl Dynamics for AngularMom {
     }
 
     /// Returns the **angular velocity** ω of the system, not its momentum.
-    fn state(&self) -> &VectorN<f64, Self::StateSize> {
-        &self.velocity
+    fn state(&self) -> VectorN<f64, Self::StateSize> {
+        self.velocity
     }
 
     /// Set the **angular velocity** ω of the system and the time.

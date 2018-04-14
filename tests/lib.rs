@@ -22,19 +22,6 @@ fn combining_dynamics() {
     pub struct PosVelAttMom {
         pub twobody: TwoBody,
         pub momentum: AngularMom,
-        full_state: VectorN<f64, U9>, // TODO: Add a quaternion of a given orientation.
-    }
-
-    impl PosVelAttMom {
-        pub fn init_state(&mut self) {
-            let twobody_state = self.twobody.state();
-            let momentum_state = self.momentum.state();
-            // We're channing both states ti create a combined state.
-            // The most important part here is make sure that the `state` and `set_state` handle the state in the same order.
-            self.full_state = <VectorN<f64, U9>>::from_iterator(
-                twobody_state.iter().chain(momentum_state.iter()).cloned(),
-            );
-        }
     }
 
     impl Dynamics for PosVelAttMom {
@@ -44,8 +31,14 @@ fn combining_dynamics() {
             self.twobody.time()
         }
 
-        fn state(&self) -> &VectorN<f64, Self::StateSize> {
-            &self.full_state
+        fn state(&self) -> VectorN<f64, Self::StateSize> {
+            let twobody_state = self.twobody.state();
+            let momentum_state = self.momentum.state();
+            // We're channing both states ti create a combined state.
+            // The most important part here is make sure that the `state` and `set_state` handle the state in the same order.
+            <VectorN<f64, U9>>::from_iterator(
+                twobody_state.iter().chain(momentum_state.iter()).cloned(),
+            )
         }
 
         fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
@@ -60,7 +53,6 @@ fn combining_dynamics() {
        = note: expected type `&na::Matrix<f64, na::U6, na::U1, na::MatrixArray<f64, na::U6, na::U1>>`
               found type `&na::Matrix<&f64, na::U6, na::U1, na::MatrixArray<&f64, na::U6, na::U1>>`
               */
-            self.full_state = *new_state;
             let mut pos_vel_vals = [0.0; 6];
             let mut mom_vals = [0.0; 3];
             for (i, val) in new_state.iter().enumerate() {
@@ -111,9 +103,7 @@ fn combining_dynamics() {
     let mut full_model = PosVelAttMom {
         twobody: dyn_twobody,
         momentum: dyn_mom,
-        full_state: <VectorN<f64, U9>>::zeros(),
     };
-    full_model.init_state();
 
     let init_momentum = full_model.momentum.momentum().norm();
     let mom_tolerance = 1e-8;
@@ -126,7 +116,7 @@ fn combining_dynamics() {
     loop {
         let (t, state) = prop.derive(
             full_model.time(),
-            full_model.state(),
+            &full_model.state(),
             |t_: f64, state_: &VectorN<f64, U9>| full_model.eom(t_, state_),
         );
         full_model.set_state(t, &state);

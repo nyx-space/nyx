@@ -27,9 +27,11 @@ fn two_body() {
         &EARTH,
     );
     loop {
-        let (t, state) = prop.derive(dyn.time(), dyn.state(), |t_: f64, state_: &Vector6<f64>| {
-            dyn.eom(t_, state_)
-        });
+        let (t, state) = prop.derive(
+            dyn.time(),
+            &dyn.state(),
+            |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+        );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {
             let details = prop.latest_details();
@@ -41,7 +43,7 @@ fn two_body() {
                     );
             }
             println!("{:?}", prop.latest_details());
-            assert_eq!(*dyn.state(), rslt, "two body prop failed",);
+            assert_eq!(dyn.state(), rslt, "two body prop failed",);
             break;
         }
     }
