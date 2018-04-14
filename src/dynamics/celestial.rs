@@ -8,7 +8,7 @@ use self::na::{U1, U3, U6, Vector6, VectorN};
 /// TwoBody exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]
 pub struct TwoBody {
-    time: f64, // XXX: Ugh, if I have this here, it means that each Dynamics implementor will have its own time too. Sounds like extra storage, but then again it's only an f64.
+    time: f64,
     pos_vel: Vector6<f64>,
     mu: f64,
 }

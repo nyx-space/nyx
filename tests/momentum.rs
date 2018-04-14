@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn const_mom() {
-    use nyx::propagators::*;
+    use nyx::propagators::{Options, Propagator, RK4Fixed};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::momentum::AngularMom;
     use self::na::{Matrix3, Vector3};
