@@ -26,9 +26,13 @@ impl Body for CustomBody {
 /// The `Planet`s provided in nyx use the same values as those in [GMAT 2016a](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/GmatDefaults.hpp).
 /// NOTE: There is no Pluto defined in nyx because it isn't a planet: it's a collection of three (four?) small rocks orbiting each other.
 pub struct Planet {
+    /// Its gravitational paramater
     pub mu: f64,
+    /// Its equatorial radius
     pub eq_radius: f64,
+    /// Its flatenning coefficient
     pub flatenning: f64,
+    /// Its NAIF ID, used for SPICE Kernel information parsing.
     pub naif_id: u16,
 }
 

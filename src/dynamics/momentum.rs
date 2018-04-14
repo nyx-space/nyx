@@ -13,12 +13,12 @@ pub struct AngularMom {
 }
 
 impl AngularMom {
-    /// Initializes a new AngularMom struct with an time-invariant inertia tensor of a rigid body and its original angular momentum.
+    /// Initializes a new AngularMom struct with an time-invariant inertia tensor of a rigid body and its original angular velocity.
     ///
-    /// Throughout this documentation `[I]` refers to the inertia tensor and ω to the angular velocity.
+    /// Throughout this documentation [I] refers to the inertia tensor and ω to the angular velocity.
     /// NOTE: The provided inertia tensor **must** be expressed in a frame such that it is a diagonal matrix.
     /// There is always such a frame. If this is _not_ the primary frame desired, use the parallel axis theorem.
-    /// This theorem is developped in Schaub & Junkins, "Analytical Mechanics of Space Systems", 4th ed., page 163,
+    /// This theorem is developped in Schaub & Junkins, "Analytical Mechanics of Space Systems", 3th ed., page 163,
     /// section 4.2.2 "Inertia Matrix Properties". This function will **panic!** if the inertia tensor is not diagonal.
     pub fn from_tensor_matrix(tensor: &Matrix3<f64>, velocity: &Vector3<f64>) -> AngularMom {
         if !is_diagonal(tensor) {
@@ -58,7 +58,7 @@ impl Dynamics for AngularMom {
     /// Computes the instantaneous equations of motion of the angular velocity of a tensor (i.e. the angular acceleration).
     /// [I]̲̇ω = -[̃ω][I]̲ω + ̲L
     ///
-    /// Source: Schaub & Junkins, 4th ed., eq. 4.32.
+    /// Source: Schaub & Junkins, 3th ed., eq. 4.32.
     fn eom(&self, _t: f64, omega: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let omega_dot_x = (self.tensor[(1, 1)] - self.tensor[(2, 2)]) / self.tensor[(0, 0)]
             * omega[(1, 0)] * omega[(2, 0)];
