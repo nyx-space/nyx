@@ -9,6 +9,11 @@ use self::na::allocator::Allocator;
 /// from this module match, or perform the appropriate coordinate transformations.
 pub mod celestial;
 
+/// The angular momentum module handles all angular momentum dynamics.
+///
+/// Note that this module does not handle attitude parameters or control. Refer to the relevant modules.
+pub mod momentum;
+
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
 /// Its design is such that several of the provided dynamics can be combined fairly easily. However,

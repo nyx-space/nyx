@@ -57,6 +57,7 @@ pub struct Propagator<'a> {
     stages: usize,
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
+    fixed_step: bool,
 }
 
 /// The `Propagator` trait defines the functions of a propagator.
@@ -74,6 +75,7 @@ impl<'a> Propagator<'a> {
             order: T::order(),
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
+            fixed_step: T::stages() == usize::from(T::order()),
         }
     }
 
@@ -128,8 +130,10 @@ impl<'a> Propagator<'a> {
             let mut error_est = VectorN::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
-                let b_i_star = self.b_coeffs[i + self.stages];
-                error_est += b_i_star * ki;
+                if !self.fixed_step {
+                    let b_i_star = self.b_coeffs[i + self.stages];
+                    error_est += b_i_star * ki;
+                }
                 next_state += self.details.step * b_i * ki;
             }
 

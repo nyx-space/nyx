@@ -95,5 +95,8 @@ pub mod dynamics;
 /// Provides the solar system planets, and (eventually) ephemeride management.
 pub mod celestia;
 
+/// Include utility functions shared by different modules, and which may be useful to engineers.
+pub mod utils;
+
 #[macro_use]
 extern crate lazy_static;

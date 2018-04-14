@@ -1,5 +1,4 @@
 use super::Dynamics;
-// use super::super::celestia;
 use celestia::{Body, Planet};
 
 extern crate nalgebra as na;
