@@ -5,7 +5,7 @@ extern crate nalgebra as na;
 use std::f64;
 use self::na::{U1, U3, U6, Vector6, VectorN};
 
-/// TwoBody exposes the equations of motion for a simple two body propagation.
+/// `TwoBody` exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]
 pub struct TwoBody {
     time: f64,

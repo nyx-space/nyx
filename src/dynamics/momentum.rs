@@ -4,7 +4,7 @@ use utils::is_diagonal;
 use super::na::{Matrix3, U3, Vector3, VectorN};
 // use alga::general::operator::Inverse;
 
-/// AngularMom exposes the equations of motion for the angular momentum of a **rigid body**.
+/// `AngularMom` exposes the equations of motion for the angular momentum of a **rigid body**.
 #[derive(Copy, Clone, Debug)]
 pub struct AngularMom {
     time: f64, // Needed to stop the integration by calling dyn.time()

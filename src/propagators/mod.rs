@@ -168,7 +168,7 @@ impl<'a> Propagator<'a> {
                 // Error is too high and using adaptive step size
                 let proposed_step = 0.9 * self.details.step
                     * (self.opts.tolerance / self.details.error)
-                        .powf(1.0 / (self.order as f64 - 1.0));
+                        .powf(1.0 / (f64::from(self.order) - 1.0));
                 self.details.step = if proposed_step < self.opts.min_step {
                     self.opts.min_step
                 } else {
