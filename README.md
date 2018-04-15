@@ -13,8 +13,8 @@ To some extend, the ultimate goal of this library is to retire [SPICE Toolkit](h
 
 [cratesio-image]: https://img.shields.io/crates/v/nyx-space.svg
 [cratesio]: https://crates.io/crates/nyx-space
-[docsrs-image]: https://docs.rs/nyx-space/badge.svg?version=0.0.1
-[docsrs]: https://docs.rs/nyx-space/0.0.1/
+[docsrs-image]: https://docs.rs/nyx-space/badge.svg?version=0.0.2
+[docsrs]: https://docs.rs/nyx-space/0.0.2/
 
 # License
 The [LICENSE](https://github.com/ChristopherRabotin/nyx/blob/master/LICENSE) will be strictly enforced once/if this toolkit
@@ -22,7 +22,7 @@ reaches production-level quality.
 
 # Features
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
-- [ ] Convenient and explicit definition of the dynamics for a simulation.
+- [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/lib.rs](tests/lib.rs))
 - [ ] Multibody dynamics using SPICE Kernels
 - [ ] Planetary and Solar eclipse and visibility computation
 - [ ] Statistical Orbital Determination: Classical and Extended Kalman Filter (SRIF?)

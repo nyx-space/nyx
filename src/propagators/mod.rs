@@ -57,10 +57,10 @@ pub struct Propagator<'a> {
     stages: usize,
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
+    fixed_step: bool,
 }
 
 /// The `Propagator` trait defines the functions of a propagator.
-/// TODO: Add examples
 impl<'a> Propagator<'a> {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(opts: &Options) -> Propagator<'a> {
@@ -75,9 +75,12 @@ impl<'a> Propagator<'a> {
             order: T::order(),
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
+            fixed_step: T::stages() == usize::from(T::order()),
         }
     }
 
+    /// This method integrates whichever function is provided as `d_xdt`.
+    ///
     /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
     /// then derives the dynamics at that time (i.e. propagates for one time step). The `d_xdt` parameter is the derivative
     /// function which take a time t of type f64 and a reference to a state of type VectorN<f64, N>, and returns the
@@ -127,8 +130,10 @@ impl<'a> Propagator<'a> {
             let mut error_est = VectorN::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
-                let b_i_star = self.b_coeffs[i + self.stages];
-                error_est += b_i_star * ki;
+                if !self.fixed_step {
+                    let b_i_star = self.b_coeffs[i + self.stages];
+                    error_est += b_i_star * ki;
+                }
                 next_state += self.details.step * b_i * ki;
             }
 
@@ -163,7 +168,7 @@ impl<'a> Propagator<'a> {
                 // Error is too high and using adaptive step size
                 let proposed_step = 0.9 * self.details.step
                     * (self.opts.tolerance / self.details.error)
-                        .powf(1.0 / (self.order as f64 - 1.0));
+                        .powf(1.0 / (f64::from(self.order) - 1.0));
                 self.details.step = if proposed_step < self.opts.min_step {
                     self.opts.min_step
                 } else {
@@ -172,8 +177,10 @@ impl<'a> Propagator<'a> {
             }
         }
     }
-    pub fn latest_details(self) -> IntegrationDetails {
-        self.details
+
+    /// Borrow the details of the latest integration step.
+    pub fn latest_details(&self) -> &IntegrationDetails {
+        &self.details
     }
 }
 

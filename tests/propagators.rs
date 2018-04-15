@@ -6,7 +6,7 @@ use self::na::{U1, U3, Vector6};
 fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
     let radius = state.fixed_slice::<U3, U1>(0, 0);
     let velocity = state.fixed_slice::<U3, U1>(3, 0);
-    let body_acceleration = (-398_600.441500000015366822 / radius.norm().powi(3)) * radius;
+    let body_acceleration = (-398_600.4415 / radius.norm().powi(3)) * radius;
     Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
 }
 
@@ -108,7 +108,7 @@ fn geo_day_prop() {
             init_state = state;
             if cur_t >= 3600.0 * 24.0 {
                 if p_id > 0 {
-                    let details = prop.clone().latest_details();
+                    let details = prop.latest_details();
                     if details.error > 1e-2 {
                         assert!(
                         details.step - 1e-1 < f64::EPSILON,
