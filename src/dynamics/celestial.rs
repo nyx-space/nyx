@@ -1,5 +1,5 @@
 use super::Dynamics;
-use celestia::{Body, Planet};
+use celestia::CelestialBody;
 
 extern crate nalgebra as na;
 use std::f64;
@@ -15,7 +15,7 @@ pub struct TwoBody {
 
 impl TwoBody {
     /// Initialize TwoBody dynamics given a provided gravitional parameter (as `mu`)
-    pub fn with_gm(state: &Vector6<f64>, mu: f64) -> TwoBody {
+    pub fn from_state_vec_with_gm(state: &Vector6<f64>, mu: f64) -> TwoBody {
         TwoBody {
             time: 0.0,
             pos_vel: *state,
@@ -23,12 +23,12 @@ impl TwoBody {
         }
     }
 
-    /// Initialize TwoBody dynamics given a provided a reference to a `Planet` (cf. nyx::celestia).
-    pub fn around(state: &Vector6<f64>, obj: &Planet) -> TwoBody {
+    /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided state vector (cf. nyx::celestia).
+    pub fn from_state_vec<P: CelestialBody>(state: &Vector6<f64>) -> TwoBody {
         TwoBody {
             time: 0.0,
             pos_vel: *state,
-            mu: obj.gm(),
+            mu: P::gm(),
         }
     }
 }

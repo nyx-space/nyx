@@ -175,11 +175,14 @@ pub mod propagators;
 /// // Let's initialize our combined dynamics.
 ///
 /// fn main(){
-///     let dyn_twobody = TwoBody::around(
-///         &Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]),
-///         &EARTH,
-///     );
-///
+///     let dyn_twobody = TwoBody::from_state_vec::<EARTH>(&Vector6::new(
+///         -2436.45,
+///         -2436.45,
+///         6891.037,
+///         5.088611,
+///         -5.088611,
+///         0.0,
+///     ));///
 ///     let omega = Vector3::new(0.1, 0.4, -0.2);
 ///     let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);
 ///     let dyn_mom = AngularMom::from_tensor_matrix(&tensor, &omega);
@@ -226,6 +229,3 @@ pub mod celestia;
 
 /// Include utility functions shared by different modules, and which may be useful to engineers.
 pub mod utils;
-
-#[macro_use]
-extern crate lazy_static;
