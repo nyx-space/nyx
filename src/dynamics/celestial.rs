@@ -24,11 +24,11 @@ impl TwoBody {
     }
 
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided state vector (cf. nyx::celestia).
-    pub fn from_state_vec<P: CelestialBody>(state: &Vector6<f64>) -> TwoBody {
+    pub fn from_state_vec<B: CelestialBody>(state: &Vector6<f64>) -> TwoBody {
         TwoBody {
             time: 0.0,
             pos_vel: *state,
-            mu: P::gm(),
+            mu: B::gm(),
         }
     }
 }

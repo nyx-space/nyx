@@ -1,3 +1,4 @@
+extern crate nalgebra as na;
 /// `CelestialBody` represents a celestial body.
 ///
 /// Note that all planets are defined as types. This leverages higher speed of execution via monomorphism.
@@ -27,10 +28,14 @@ pub trait NAIF {
     /// **Warning:** the logic here is based entirely on the NAIF ID of the main planet. No guarantee is made that the requested satellite number exists,
     /// or is present in the loaded SPK files.
     fn satellite(pos: i32) -> i32 {
-        Self::id() - 98
+        Self::id() - 99 + pos
     }
 }
 
 // Re-Export the planets
 mod planets;
 pub use self::planets::*;
+
+// Re-Export state
+mod state;
+pub use self::state::State;

@@ -23,7 +23,7 @@ fn naif_ids() {
 
     assert_eq!(JUPITER::id(), 599);
     assert_eq!(JUPITER::barycenter(), 5);
-    assert_eq!(JUPITER::satellite(1), 501);
+    assert_eq!(JUPITER::satellite(10), 510);
 
     assert_eq!(SATURN::id(), 699);
     assert_eq!(SATURN::barycenter(), 6);
