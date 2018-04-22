@@ -24,9 +24,9 @@ The following table corresponds to the errors between the `nyx` computations and
 
 Scenario  | leo  | geo  | circular inclined  | circular equatorial  | polar |  
 --|---|---|---|---|---|---|--
-Earth.Energy  | 0.0 |   |   |   |
-Earth.OrbitPeriod |  9e-13 |   |   |   |
-Earth.SMA  | 9e-13  |   |   |   |
+Earth.Energy  | 3e-15 |   |   |   |
+Earth.OrbitPeriod | 0.0 |   |   |   |
+Earth.SMA  | 0.0  |   |   |   |
 Earth.ECC  |   |   |   |   |
 EarthMJ2000Eq.INC  |   |   |   |   |
 EarthMJ2000Eq.RAAN  |   |   |   |   |

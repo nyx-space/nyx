@@ -57,11 +57,19 @@ impl State {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
+    /// Returns the magnitude of the radius vector
+    pub fn rmag(self) -> f64 {
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+    }
+
+    /// Returns the magnitude of the velocity vector
+    pub fn vmag(self) -> f64 {
+        (self.vx.powi(2) + self.vy.powi(2) + self.vz.powi(2)).sqrt()
+    }
+
     /// Returns the specific mechanical energy
     pub fn energy(self) -> f64 {
-        let r = (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt();
-        let v2 = self.vx.powi(2) + self.vy.powi(2) + self.vz.powi(2);
-        v2 / 2.0 - self.gm / r
+        self.vmag().powi(2) / 2.0 - self.gm / self.rmag()
     }
 
     /// Returns the semi-major axis in kilometers

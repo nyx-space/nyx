@@ -12,9 +12,9 @@ fn state_def_leo() {
     assert_eq!(leo.vx, 5.088611, "vx");
     assert_eq!(leo.vy, -5.088611, "vy");
     assert_eq!(leo.vz, 0.0, "vz");
-    assert_eq!(leo.energy(), -25.84224728284914, "energy");
-    assert_eq!(leo.period(), 6740.269063643044, "period");
-    assert_eq!(leo.sma(), 7712.186117895042, "sma");
+    assert_eq!(leo.energy(), -25.842247282849137, "energy");
+    assert_eq!(leo.period(), 6740.269063643045, "period");
+    assert_eq!(leo.sma(), 7712.186117895043, "sma");
     assert_eq!(leo.ecc(), 0.0009995828314320525, "ecc"); // XXX: Error is 1e-3!! Must check how it's computed in GMAT
 
     //-25.84224728284914        6740.269063643045             7712.186117895043         0.0009995828314320525     63.43400340775114             135                            90                            0
