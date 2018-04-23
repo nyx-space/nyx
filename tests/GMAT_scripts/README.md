@@ -28,7 +28,7 @@ Earth.Energy  | 3e-15 |   |   |   |
 Earth.OrbitPeriod | 0.0 |   |   |   |
 Earth.SMA  | 0.0  |   |   |   |
 Earth.ECC  |   |   |   |   |
-EarthMJ2000Eq.INC  |   |   |   |   |
+EarthMJ2000Eq.INC  | 0.0 |   |   |   |
 EarthMJ2000Eq.RAAN  |   |   |   |   |
 EarthMJ2000Eq.AOP  |   |   |   |   |
 Earth.TA  |   |   |   |   |

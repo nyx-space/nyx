@@ -229,3 +229,7 @@ pub mod celestia;
 
 /// Include utility functions shared by different modules, and which may be useful to engineers.
 pub mod utils;
+
+#[macro_use]
+extern crate log;
+extern crate pretty_env_logger;

@@ -1,5 +1,8 @@
 use super::na::{Vector3, Vector6};
 use super::CelestialBody;
+use super::pretty_env_logger;
+
+use std::f64::consts::PI;
 
 /// State defines an orbital state in the Celestial Reference frame of the parameterized CelestialBody.
 ///
@@ -28,6 +31,7 @@ impl State {
         vy: f64,
         vz: f64,
     ) -> State {
+        pretty_env_logger::init_custom_env("NYX_LOG");
         State {
             gm: B::gm(),
             x,
@@ -41,6 +45,7 @@ impl State {
 
     /// Creates a new State around the provided CelestialBody from the borrowed state vector
     pub fn from_cartesian_vec<B: CelestialBody>(state: &Vector6<f64>) -> State {
+        pretty_env_logger::init_custom_env("NYX_LOG");
         State {
             gm: B::gm(),
             x: state[(0, 0)],
@@ -52,19 +57,31 @@ impl State {
         }
     }
 
-    /// Returns this state as a Cartesian Vector6
+    /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
     pub fn to_cartsian_vec(self) -> Vector6<f64> {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
-    /// Returns the magnitude of the radius vector
+    /// Returns the magnitude of the radius vector in km
     pub fn rmag(self) -> f64 {
         (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
     }
 
-    /// Returns the magnitude of the velocity vector
+    /// Returns the magnitude of the velocity vector in km/s
     pub fn vmag(self) -> f64 {
         (self.vx.powi(2) + self.vy.powi(2) + self.vz.powi(2)).sqrt()
+    }
+
+    /// Returns the orbital momentum vector
+    pub fn hvec(self) -> Vector3<f64> {
+        let r = Vector3::new(self.x, self.y, self.z);
+        let v = Vector3::new(self.vx, self.vy, self.vz);
+        r.cross(&v)
+    }
+
+    /// Returns the norm of the orbital momentum
+    pub fn hmag(self) -> f64 {
+        self.hvec().norm()
     }
 
     /// Returns the specific mechanical energy
@@ -72,24 +89,44 @@ impl State {
         self.vmag().powi(2) / 2.0 - self.gm / self.rmag()
     }
 
-    /// Returns the semi-major axis in kilometers
+    /// Returns the semi-major axis in km
     pub fn sma(self) -> f64 {
         -self.gm / (2.0 * self.energy())
     }
 
     /// Returns the period in seconds
     pub fn period(self) -> f64 {
-        use std::f64::consts::PI;
-        println!("a = {} ==> {}", self.sma(), self.sma().powi(3));
         2.0 * PI * (self.sma().powi(3) / self.gm).sqrt()
     }
 
-    pub fn ecc(self) -> f64 {
-        // Ugh, this is a bit of a heavy computation, so I should probably find a way to cache this? Or does Rust handle that by itself
-        // if the state is immutable?
+    /// Returns the eccentricity vector (no unit)
+    pub fn evec(self) -> Vector3<f64> {
         let r = Vector3::new(self.x, self.y, self.z);
         let v = Vector3::new(self.vx, self.vy, self.vz);
-        let e = ((v.norm().powi(2) - self.gm / r.norm()) * v - (r.dot(&v)) * v) / self.gm;
-        e.norm()
+        ((v.norm().powi(2) - self.gm / r.norm()) * v - (r.dot(&v)) * v) / self.gm
+    }
+
+    /// Returns the eccentricity (no unit)
+    pub fn ecc(self) -> f64 {
+        self.evec().norm()
+    }
+
+    /// Returns the inclination in degrees
+    pub fn inc(self) -> f64 {
+        (self.hvec()[(2, 0)] / self.hmag()).acos().to_degrees()
+    }
+
+    /// Returns the argument of periapsis in degrees
+    pub fn aop(self) -> f64 {
+        let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
+        let mut aop = (n.dot(&self.evec()) / (n.norm() * self.ecc())).acos();
+        if aop.is_nan() {
+            warn!("AoP is NaN");
+            return 0.0;
+        }
+        if self.evec()[(2, 0)] < 0.0 {
+            aop = 2.0 * PI - aop
+        }
+        aop.to_degrees()
     }
 }
