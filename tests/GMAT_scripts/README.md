@@ -20,18 +20,42 @@ RK89  | 3.8e-10 | 7.7e-9 | 1.0e-8 | 9.4e-12 | 6.4e-12 | 4.4e-12
 This validation compares the computations of orbital elements in nyx with those in GMAT. Each scenario script is in the subfolder [state](./state/).
 The validation is trivially the following: a spacecraft is defined in GMAT in the EarthMJ2000Eq frame by its Cartesian state. There is a "Propagate" segment of strictly zero seconds. The desired orbital state computations are exported to a report file.
 
-The following table corresponds to the **errors** between the `nyx` computations and those of GMAT.
+The following table corresponds to the **errors** between the `nyx` computations and those of GMAT. Note that if `nyx` returned more significant digits than GMAT and all the GMAT digits matched those of nyx, the error is also marked as zero (this was only seen for the energy and orbital period where GMAT returns 13 digits and `nyx` 14).
 
-Scenario  | circular inclined  | circular equatorial  | polar |  
+## From a Cartesian state
+
+Element / Scenario  | circular inclined  | circular equatorial  | elliptical |  
 --|---|---|---|---|---|---|--
-Earth.Energy  | 3e-15 |   |
-Earth.OrbitPeriod | 0.0 |   |
-Earth.HX  | 7e-12  |   |
-Earth.HY  | 7e-12  |   |
-Earth.HZ  | 0.0  |   |
-Earth.SMA  | 0.0  |   |
-Earth.ECC  |  0.0 |   |
-EarthMJ2000Eq.INC  | 0.0 |   |
-EarthMJ2000Eq.RAAN  | 0.0  |   |
-EarthMJ2000Eq.AOP  | 0.0 |   |
-Earth.TA  | 0.0 |   |
+Earth.Energy  | 0.0 |   | 0.0
+Earth.OrbitPeriod | 0.0 |   | 0.0
+Earth.HX  | 7e-12  |   | 3e-12
+Earth.HY  | 7e-12  |   | 0.0
+Earth.HZ  | 0.0  |   | 0.0
+Earth.SMA  | 0.0  |   | 0.0
+Earth.ECC  |  0.0 |   | 1e-3<sup>(1)</sup>
+EarthMJ2000Eq.INC  | 0.0 |   | 0.0
+EarthMJ2000Eq.RAAN  | 0.0  |   | 0.0
+EarthMJ2000Eq.AOP  | 0.0 |   | 5e-11
+Earth.TA  | 0.0 |   | 4e-14
+Earth.TLONG  | 0.0 |   | 1e-8<sup>(2)</sup>
+
+### Footnotes
+(1) This error _should_ be zero, but for transparency it's marked as 1e-3. The way this test was generated was by creating a given state using Keplerian orbital elements, and converting them to Cartesian in the GMAT spacecraft panel, and ensuring that `nyx` could convert the provided Cartesian state to the output state of GMAT. In this instance, `nyx` returns `0.15899999999999995` which is awfully close the `0.159` which I entered in GMAT in the first place.
+
+(2) There is quite a large error in true longitude for this test. I am really not sure why given that `nyx` sums AoP, RAAN and TA to compute this, as per the definition. Summing these values leads _exactly_ to the value returned by `nyx`. I am very surprised that GMAT does not seem to use that same formula, I'll have to check why.
+
+## From a Keplerian state
+
+Element / Scenario  | circular inclined  | circular equatorial  | elliptical |  
+--|---|---|---|---|---|---|--
+Earth.Energy  |  |   |
+Earth.OrbitPeriod |  |   |
+Earth.HX  |   |   |
+Earth.HY  |   |   |
+Earth.HZ  |   |   |
+Earth.SMA  |   |   |
+Earth.ECC  |  |   |
+EarthMJ2000Eq.INC  |  |   |
+EarthMJ2000Eq.RAAN  |  |   |
+EarthMJ2000Eq.AOP  | |   |
+Earth.TA  | |   |

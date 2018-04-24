@@ -1,20 +1,8 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-extern crate pretty_env_logger;
-//
-// #[test]
-// fn state_def_geo() {
-//     use nyx::celestia::{State, EARTH};
-//     let geo =
-//         State::from_cartesian::<EARTH>(6524.834, 6862.875, 6448.296, 4.901327, 5.533756, -1.976341);
-//     // oT := NewOrbitFromOE(36127.343, 0.832853, 87.869126, 227.898260, 53.384931, 92.335157, Earth)
-//     // assert_eq!(geo.aop(), 53.384931, "aop");
-// }
-
 #[test]
-fn state_def_leo() {
-    pretty_env_logger::init();
+fn state_def_circ_inc() {
     use nyx::celestia::{State, EARTH};
     let leo =
         State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
@@ -36,4 +24,29 @@ fn state_def_leo() {
     assert_eq!(leo.raan(), 135.0, "raan");
     assert_eq!(leo.ta(), 0.0, "ta");
     assert_eq!(leo.tlong(), 225.0, "tlong");
+}
+
+#[test]
+fn state_def_elliptical() {
+    use nyx::celestia::{State, EARTH};
+    let leo = State::from_cartesian::<EARTH>(
+        5946.673548288958,
+        1656.154606023661,
+        2259.012129598249,
+        -3.098683050943824,
+        4.579534132135011,
+        6.246541551539432,
+    );
+    assert_eq!(leo.energy(), -25.842247282849144, "energy");
+    assert_eq!(leo.period(), 6740.2690636430425, "period");
+    assert_eq!(leo.hx(), 0.015409898034704383, "HX");
+    assert_eq!(leo.hy(), -44146.10601069001, "HY");
+    assert_eq!(leo.hz(), 32364.892694481765, "HZ");
+    assert_eq!(leo.sma(), 7712.186117895041, "sma");
+    assert_eq!(leo.inc(), 53.75369, "inc");
+    assert_eq!(leo.ecc(), 0.15899999999999995, "ecc");
+    assert_eq!(leo.aop(), 359.787880000004, "aop");
+    assert_eq!(leo.raan(), 1.99863286421117e-05, "raan");
+    assert_eq!(leo.ta(), 25.434003407751188, "ta");
+    assert_eq!(leo.tlong(), 25.221903394083824, "tlong");
 }
