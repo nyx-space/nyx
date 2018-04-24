@@ -26,23 +26,25 @@ The following table corresponds to the **errors** between the `nyx` computations
 
 Element / Scenario  | circular inclined  | circular equatorial  | elliptical |  
 --|---|---|---|---|---|---|--
-Earth.Energy  | 0.0 |   | 0.0
-Earth.OrbitPeriod | 0.0 |   | 0.0
-Earth.HX  | 7e-12  |   | 3e-12
-Earth.HY  | 7e-12  |   | 0.0
-Earth.HZ  | 0.0  |   | 0.0
-Earth.SMA  | 0.0  |   | 0.0
-Earth.ECC  |  0.0 |   | 1e-3<sup>(1)</sup>
-EarthMJ2000Eq.INC  | 0.0 |   | 0.0
-EarthMJ2000Eq.RAAN  | 0.0  |   | 0.0
-EarthMJ2000Eq.AOP  | 0.0 |   | 5e-11
-Earth.TA  | 0.0 |   | 4e-14
-Earth.TLONG  | 0.0 |   | 1e-8<sup>(2)</sup>
+Earth.Energy  | 0.0 | 0.0 | 0.0
+Earth.OrbitPeriod | 0.0 | 0.0 | 0.0
+Earth.HX  | 7e-12  | 0.0 | 3e-12
+Earth.HY  | 7e-12  | 1e-16 | 0.0
+Earth.HZ  | 0.0  | 0.0 | 0.0
+Earth.SMA  | 0.0  | 0.0 | 0.0
+Earth.ECC  |  0.0 | 1e-17 | 1e-3<sup>(1)</sup>
+EarthMJ2000Eq.INC  | 0.0 | 0.0  | 0.0
+EarthMJ2000Eq.RAAN  | 0.0  | 0.0  | 0.0
+EarthMJ2000Eq.AOP  | 0.0 | 3e-7 | 5e-11
+Earth.TA  | 0.0 | 3e-7 | 4e-14
+Earth.TLONG  | 0.0 | 3e-1<sup>(3)</sup> | 1e-8<sup>(2)</sup>
 
 ### Footnotes
 (1) This error _should_ be zero, but for transparency it's marked as 1e-3. The way this test was generated was by creating a given state using Keplerian orbital elements, and converting them to Cartesian in the GMAT spacecraft panel, and ensuring that `nyx` could convert the provided Cartesian state to the output state of GMAT. In this instance, `nyx` returns `0.15899999999999995` which is awfully close the `0.159` which I entered in GMAT in the first place.
 
 (2) There is quite a large error in true longitude for this test. I am really not sure why given that `nyx` sums AoP, RAAN and TA to compute this, as per the definition. Summing these values leads _exactly_ to the value returned by `nyx`. I am very surprised that GMAT does not seem to use that same formula, I'll have to check why.
+
+(3) This error _should_ be zero, but for transparency it's marked as 1e-1. Using the same methodology as (1), the script was created using specific angles. These angles were all defined to within `1e-1`, and switching between a Keplerian and a Cartesian definition created rounding errors themselves within in the GMAT GUI. I admit being surprised that the TLONG returned by GMAT is precisely `159.6` since GMAT has a tendency to not round even floating-point computational errors.
 
 ## From a Keplerian state
 

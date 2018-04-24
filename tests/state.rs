@@ -50,3 +50,28 @@ fn state_def_elliptical() {
     assert_eq!(leo.ta(), 25.434003407751188, "ta");
     assert_eq!(leo.tlong(), 25.221903394083824, "tlong");
 }
+
+#[test]
+fn state_def_circ_eq() {
+    use nyx::celestia::{State, EARTH};
+    let geo = State::from_cartesian::<EARTH>(
+        -38892.72444914902,
+        16830.38477289186,
+        0.7226599291355622,
+        -1.2180083338466,
+        -2.81465117260598,
+        1.140294223185661e-05,
+    );
+    assert_eq!(geo.energy(), -4.702902670552006, "energy");
+    assert_eq!(geo.period(), 86820.7761529861, "period");
+    assert_eq!(geo.hx(), 2.2259515222419695, "HX");
+    assert_eq!(geo.hy(), -0.4367143260909446, "HY");
+    assert_eq!(geo.hz(), 129969.00139186575, "HZ");
+    assert_eq!(geo.sma(), 42378.12999999998, "sma");
+    assert_eq!(geo.inc(), 0.0010000004015645386, "inc");
+    assert_eq!(geo.ecc(), 9.999999809555511e-09, "ecc");
+    assert_eq!(geo.aop(), 65.39999984718678, "aop");
+    assert_eq!(geo.raan(), 78.90000000000001, "raan");
+    assert_eq!(geo.ta(), 12.300000152813197, "ta");
+    assert_eq!(geo.tlong(), 156.59999999999997, "tlong");
+}
