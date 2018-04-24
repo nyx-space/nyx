@@ -6,7 +6,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
 The tests in [`propagators.rs`](../propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./propagators/) and is named after the propagator used.
 
-The following table corresponds to the errors between the `nyx` output for the one day GEO propagation in two body dynamics and the GMAT output using the same step configuration.
+The following table corresponds to the **errors** between the `nyx` output for the one day GEO propagation in two body dynamics and the GMAT output using the same step configuration.
 
 Propagator  | x | y | z | vx | vy |  vz
 --|---|---|---|---|---|--
@@ -20,18 +20,18 @@ RK89  | 3.8e-10 | 7.7e-9 | 1.0e-8 | 9.4e-12 | 6.4e-12 | 4.4e-12
 This validation compares the computations of orbital elements in nyx with those in GMAT. Each scenario script is in the subfolder [state](./state/).
 The validation is trivially the following: a spacecraft is defined in GMAT in the EarthMJ2000Eq frame by its Cartesian state. There is a "Propagate" segment of strictly zero seconds. The desired orbital state computations are exported to a report file.
 
-The following table corresponds to the errors between the `nyx` computations and those of GMAT.
+The following table corresponds to the **errors** between the `nyx` computations and those of GMAT.
 
-Scenario  | leo  | geo  | circular inclined  | circular equatorial  | polar |  
+Scenario  | circular inclined  | circular equatorial  | polar |  
 --|---|---|---|---|---|---|--
-Earth.Energy  | 3e-15 |   |   |   |
-Earth.OrbitPeriod | 0.0 |   |   |   |
-Earth.SMA  | 0.0  |   |   |   |
-Earth.ECC  |   |   |   |   |
-EarthMJ2000Eq.INC  | 0.0 |   |   |   |
-EarthMJ2000Eq.RAAN  |   |   |   |   |
-EarthMJ2000Eq.AOP  |   |   |   |   |
-Earth.TA  |   |   |   |   |
-
-DefaultSC.Earth.Energy    DefaultSC.Earth.OrbitPeriod   DefaultSC.Earth.SMA       DefaultSC.Earth.ECC       DefaultSC.EarthMJ2000Eq.INC   DefaultSC.EarthMJ2000Eq.RAAN   DefaultSC.EarthMJ2000Eq.AOP   DefaultSC.Earth.TA        
--25.84224728284914        6740.269063643045             7712.186117895043         0.0009995828314320525     63.43400340775114             135                            90                            0                         
+Earth.Energy  | 3e-15 |   |
+Earth.OrbitPeriod | 0.0 |   |
+Earth.HX  | 7e-12  |   |
+Earth.HY  | 7e-12  |   |
+Earth.HZ  | 0.0  |   |
+Earth.SMA  | 0.0  |   |
+Earth.ECC  |  0.0 |   |
+EarthMJ2000Eq.INC  | 0.0 |   |
+EarthMJ2000Eq.RAAN  | 0.0  |   |
+EarthMJ2000Eq.AOP  | 0.0 |   |
+Earth.TA  | 0.0 |   |

@@ -1,5 +1,4 @@
 extern crate nalgebra as na;
-use super::pretty_env_logger;
 /// `CelestialBody` represents a celestial body.
 ///
 /// Note that all planets are defined as types. This leverages higher speed of execution via monomorphism.

@@ -50,6 +50,7 @@ GMAT DefaultSC.EulerAngleSequence = '321';
 
 
 
+
 %----------------------------------------
 %---------- ForceModels
 %----------------------------------------
@@ -84,11 +85,11 @@ Create ReportFile ReportFile1;
 GMAT ReportFile1.SolverIterations = Current;
 GMAT ReportFile1.UpperLeft = [ 0.1458333333333333 0.03414634146341464 ];
 GMAT ReportFile1.Size = [ 0.9940476190476191 0.9634146341463414 ];
-GMAT ReportFile1.RelativeZOrder = 36;
+GMAT ReportFile1.RelativeZOrder = 48;
 GMAT ReportFile1.Maximized = true;
 GMAT ReportFile1.Filename = 'ReportFile1.txt';
 GMAT ReportFile1.Precision = 16;
-GMAT ReportFile1.Add = {DefaultSC.A1ModJulian, DefaultSC.EarthMJ2000Eq.X, DefaultSC.EarthMJ2000Eq.Y, DefaultSC.EarthMJ2000Eq.Z, DefaultSC.EarthMJ2000Eq.VX, DefaultSC.EarthMJ2000Eq.VY, DefaultSC.EarthMJ2000Eq.VZ, DefaultSC.Earth.Energy, DefaultSC.Earth.OrbitPeriod, DefaultSC.Earth.SMA, DefaultSC.Earth.ECC, DefaultSC.EarthMJ2000Eq.INC, DefaultSC.EarthMJ2000Eq.RAAN, DefaultSC.EarthMJ2000Eq.AOP, DefaultSC.Earth.TA};
+GMAT ReportFile1.Add = {DefaultSC.A1ModJulian, DefaultSC.EarthMJ2000Eq.X, DefaultSC.EarthMJ2000Eq.Y, DefaultSC.EarthMJ2000Eq.Z, DefaultSC.EarthMJ2000Eq.VX, DefaultSC.EarthMJ2000Eq.VY, DefaultSC.EarthMJ2000Eq.VZ, DefaultSC.EarthMJ2000Eq.HX, DefaultSC.EarthMJ2000Eq.HY, DefaultSC.EarthMJ2000Eq.HZ, DefaultSC.Earth.Energy, DefaultSC.Earth.OrbitPeriod, DefaultSC.Earth.SMA, DefaultSC.Earth.ECC, DefaultSC.EarthMJ2000Eq.INC, DefaultSC.EarthMJ2000Eq.RAAN, DefaultSC.EarthMJ2000Eq.AOP, DefaultSC.Earth.TA, DefaultSC.EarthMJ2000Eq.TLONG};
 GMAT ReportFile1.WriteHeaders = true;
 GMAT ReportFile1.LeftJustify = On;
 GMAT ReportFile1.ZeroFill = Off;
