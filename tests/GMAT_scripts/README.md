@@ -37,8 +37,12 @@ EarthMJ2000Eq.INC  | 0.0 | 0.0  | 0.0
 EarthMJ2000Eq.RAAN  | 0.0  | 0.0  | 0.0
 EarthMJ2000Eq.AOP  | 0.0 | 3e-7 | 5e-11
 Earth.TA  | 0.0 | 3e-7 | 4e-14
-Earth.TLONG  | 0.0 | 3e-1<sup>(3)</sup> | 1e-8<sup>(2)</sup>
-
+Earth.TLONG | 0.0 | 3e-1<sup>(3)</sup> | 1e-8<sup>(2)</sup>
+Earth.EA | 0.0 | 0.0 | 0.0
+Earth.MA |  |  |
+Earth.RadApo | 0.0 | 0.0 | 0.0
+Earth.RadPer | 0.0 | 0.0 | 0.0
+Earth.SemilatusRectum | 2e-12 | 0.0 | 2e-12
 ### Footnotes
 (1) This error _should_ be zero, but for transparency it's marked as 1e-3. The way this test was generated was by creating a given state using Keplerian orbital elements, and converting them to Cartesian in the GMAT spacecraft panel, and ensuring that `nyx` could convert the provided Cartesian state to the output state of GMAT. In this instance, `nyx` returns `0.15899999999999995` which is awfully close the `0.159` which I entered in GMAT in the first place.
 
