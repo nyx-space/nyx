@@ -23,7 +23,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.2"
+//! nyx-space = "0.0.3"
 //! ```
 //!
 //! And add the following to your crate root:
