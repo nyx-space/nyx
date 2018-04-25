@@ -11,8 +11,9 @@ pub const ECC_EPSILON: f64 = 1e-4;
 // A warning will be logged if a division operation is planned with a value smaller than this following value.
 const ZERO_DIV_TOL: f64 = 1e-15;
 
-/// State defines an orbital state in the Celestial Reference frame of the parameterized `CelestialBody`.
+/// State defines an orbital state parameterized  by a `CelestialBody`.
 ///
+/// Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/StateConversionUtil.cpp).
 /// Regardless of the constructor used, this struct stores all the state information in Cartesian coordinates
 /// as these are always non singular.
 /// _Note:_ although not yet supported, this struct may change once True of Date or other nutation frames
@@ -45,7 +46,7 @@ impl PartialEq for State {
 impl State {
     /// Creates a new State around the provided CelestialBody
     ///
-    /// Units: km, km, km, km/s, km/s, km/s
+    /// **Units:** km, km, km, km/s, km/s, km/s
     pub fn from_cartesian<B: CelestialBody>(
         x: f64,
         y: f64,
@@ -83,7 +84,8 @@ impl State {
 
     /// Creates a new State around the provided CelestialBody from the Keplerian orbital elements.
     ///
-    /// Units: km, none, degrees, degrees, degrees, degrees
+    /// **Units:** km, none, degrees, degrees, degrees, degrees
+    ///
     /// WARNING: This function will panic if the singularities in the conversion are expected.
     /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
@@ -215,7 +217,7 @@ impl State {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
-    /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees, degrees]
+    /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
     pub fn to_keplerian_vec(self) -> Vector6<f64> {
         Vector6::new(
             self.sma(),
@@ -412,7 +414,7 @@ impl State {
                 .asinh()
                 .to_degrees()
         } else {
-            warn!("parabolic orbit: setting mean anomaly to 0.0");
+            error!("parabolic orbit: setting mean anomaly to 0.0");
             0.0
         }
     }

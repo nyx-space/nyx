@@ -224,7 +224,45 @@ pub mod propagators;
 /// ```
 pub mod dynamics;
 
-/// Provides the solar system planets, and (eventually) ephemeride management.
+/// Provides the solar system planets, and state and (later) ephemeride management.
+///
+/// # State creation and management
+/// ```
+/// extern crate nyx_space as nyx;
+///
+/// fn main(){
+///     use nyx::celestia::{State, EARTH};
+///     // The parameter is anything which implements `CelestialBody`.
+///     // In this case, we're creating these states around Earth.
+///     let cart = State::from_cartesian::<EARTH>(
+///         5946.673548288958,
+///         1656.154606023661,
+///         2259.012129598249,
+///         -3.098683050943824,
+///         4.579534132135011,
+///         6.246541551539432,
+///     );
+///     let kep = State::from_keplerian::<EARTH>(
+///         7712.186117895041,
+///         0.15899999999999995,
+///         53.75369,
+///         1.99863286421117e-05,
+///         359.787880000004,
+///         25.434003407751188,
+///     );
+///     // We can check whether two states are equal.
+///     if cart != kep {
+///         panic!("This won't happen");
+///     }
+///     // Of more interest, we can fetch specific orbital elements.
+///     println!("sma = {} km   inc = {} degrees", cart.sma(), cart.inc());
+///     // Note that the state data is stored as X, Y, Z, VX, VY, VZ.
+///     // Hence, the following print statement may display some rounded values despite
+///     // being created with fixed values. GMAT has the same "issue"
+///     // (but `nyx` won't change your script).
+///     println!("ecc = {} km   RAAN = {} degrees", kep.ecc(), cart.raan());
+/// }
+/// ```
 pub mod celestia;
 
 /// Include utility functions shared by different modules, and which may be useful to engineers.
