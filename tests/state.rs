@@ -1,5 +1,11 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger as pel;
+
+#[test]
+fn state_def_() {
+    pel::init();
+}
 
 #[test]
 fn state_def_circ_inc() {
@@ -114,6 +120,31 @@ fn state_def_circ_eq() {
     assert_eq!(cart.apoapsis(), 42378.13042378127, "apo");
     assert_eq!(cart.periapsis(), 42378.12957621869, "peri");
     assert_eq!(cart.semi_parameter(), 42378.129999999976, "semi parameter");
+
+    let kep = State::from_keplerian::<EARTH>(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765);
+    assert_eq!(kep.x, 18190.717357886369, "x");
+    assert_eq!(kep.y, -118.10716253921869, "y");
+    assert_eq!(kep.z, 0.00025384564763305335, "z");
+    assert_eq!(kep.vx, 0.03039644013026488, "vx");
+    assert_eq!(kep.vy, 4.680909107924576, "vy");
+    assert_eq!(kep.vz, 4.907089816726583e-8, "vz");
+    assert_eq!(kep.sma(), 18191.098000000013, "sma");
+    assert_eq!(kep.ecc(), 9.999999997416087e-7, "ecc");
+    assert_eq!(kep.inc(), 1.2074182697257333e-06, "inc");
+    assert_eq!(kep.raan(), 306.543, "raan");
+    assert_eq!(kep.aop(), 314.32000002540366, "aop");
+    assert_eq!(kep.ta(), 98.76499997459628, "ta");
+    assert_eq!(kep.energy(), -10.955920349063035, "energy");
+    assert_eq!(kep.period(), 24417.396242570256, "period");
+    assert_eq!(kep.hx(), -0.0011940240285583587, "HX");
+    assert_eq!(kep.hy(), -0.0008849188350277506, "HY");
+    assert_eq!(kep.hz(), 85152.68459750706, "HZ");
+    assert_eq!(kep.tlong(), 359.62799999999993, "tlong");
+    assert_eq!(kep.ea(), 98.76494334793257, "ea");
+    assert_eq!(kep.ma(), 98.76488672126456, "ma");
+    assert_eq!(kep.apoapsis(), 18191.116191098008, "apo");
+    assert_eq!(kep.periapsis(), 18191.079808902017, "peri");
+    assert_eq!(kep.semi_parameter(), 18191.097999981823, "semi parameter");
 }
 
 #[test]
