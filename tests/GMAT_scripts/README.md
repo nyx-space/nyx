@@ -51,29 +51,29 @@ Earth.SemilatusRectum | 2e-12 | 0.0 | 2e-12
 
 Element / Scenario  | circular inclined  | circular equatorial  | elliptical |  
 --|---|---|---|---|---|---|--
-Earth.X  |  | 0.0 | 0.0
-Earth.Y  |  | 1e-14 | 4e-13
-Earth.Z  |  | **5e-5**<sup>(1)</sup> | 3e-12
-Earth.VX  |   | 1e-15 | 1e-15
-Earth.VY  |   | 1e-8<sup>(2)</sup> | 2e-15
-Earth.VZ  | | 0.0 | 1e-15
-Earth.Energy  |  | 0.0 | 1e-14
-Earth.OrbitPeriod | | 1e-11 | 5e-12
-Earth.HX  |   | **2e-4**<sup>(3)</sup> | 0.0
-Earth.HY  |   | **1e-3**<sup>(3)</sup> | 1e-11
-Earth.HZ  |   | **0.0** | 2e-11
-Earth.SMA  |  | 1e-11 | 3e-12
-Earth.ECC  |  | 2e-16 | 3e-16
-EarthMJ2000Eq.INC  |  | 0.0 | 1e-14
-EarthMJ2000Eq.RAAN  |   | 0.0 | 0.0
-EarthMJ2000Eq.AOP  |  | 3e-8 | 1e-12
-Earth.TA  |  |  | 1e-12
-Earth.TLONG |  | 0.0 | 1e-13
-Earth.EA |  | 3e-8 | 1e-12
-Earth.MA |  | 3e-8 | 1e-12
-Earth.RadApo |  | 2e-11 | 1e-12
-Earth.RadPer |  | 0.0 | 7e-12
-Earth.SemilatusRectum |  | 0.0 | 0.0
+Earth.X  | 0.0 | 0.0 | 0.0
+Earth.Y  | 0.0 | 1e-14 | 4e-13
+Earth.Z  | 0.0 | **5e-5**<sup>(1)</sup> | 3e-12
+Earth.VX  | 0.0 | 1e-15 | 1e-15
+Earth.VY  | 0.0 | 1e-8<sup>(2)</sup> | 2e-15
+Earth.VZ  | 0.0 | 0.0 | 1e-15
+Earth.Energy  | 0.0 | 0.0 | 1e-14
+Earth.OrbitPeriod | 0.0 | 1e-11 | 5e-12
+Earth.HX  | 0.0 | **2e-4**<sup>(3)</sup> | 0.0
+Earth.HY  | 0.0 | **1e-3**<sup>(3)</sup> | 1e-11
+Earth.HZ  | 0.0 | **0.0**<sup>(3)</sup> | 2e-11
+Earth.SMA  | 0.0 | 1e-11 | 3e-12
+Earth.ECC  | 0.0 | 2e-16 | 3e-16
+EarthMJ2000Eq.INC | 3e-15 | 0.0 | 1e-14
+EarthMJ2000Eq.RAAN | 0.0 | 0.0 | 0.0
+EarthMJ2000Eq.AOP | 0.0 | 3e-8 | 1e-12
+Earth.TA  | 0.0 | 0.0 | 1e-12
+Earth.TLONG | 9e-14 | 0.0 | 1e-13
+Earth.EA | 0.0 | 3e-8 | 1e-12
+Earth.MA | 0.0 | 3e-8 | 1e-12
+Earth.RadApo | 0.0 | 2e-11 | 1e-12
+Earth.RadPer | 0.0 | 0.0 | 7e-12
+Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 
 ### Footnotes
 (1) This is one heck of an oddity! The error is quite large, although the algorithm used here is strictly a conversion of GMAT's C++ code to Rust. I _suspect_ this error is due to the orbit being circular equatorial with a value of Z of **2.5 meters** according to `nyx` and **3.0 meters** according to GMAT. As noted above, `nyx` often returns one to two additional digits than GMAT does in its report files, so maybe does GMAT suffer from multiplying several rounding errors, or could it be some shortcuts that Rust/`nyx` make?

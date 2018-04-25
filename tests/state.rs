@@ -35,6 +35,31 @@ fn state_def_circ_inc() {
     assert_eq!(cart.apoapsis(), 7719.895086731299, "apo");
     assert_eq!(cart.periapsis(), 7704.477149058786, "peri");
     assert_eq!(cart.semi_parameter(), 7712.178412142147, "semi parameter");
+
+    let kep = State::from_keplerian::<EARTH>(8191.93, 1e-6, 12.85, 306.614, 314.19, 99.8877);
+    assert_eq!(kep.x, 8057.976452202976, "x");
+    assert_eq!(kep.y, -0.1967403702908889, "y");
+    assert_eq!(kep.z, 1475.383214274138, "z");
+    assert_eq!(kep.vx, -0.16647048858407631, "vx");
+    assert_eq!(kep.vy, 6.9138686382756465, "vy");
+    assert_eq!(kep.vz, 0.9101579814432791, "vz");
+    assert_eq!(kep.sma(), 8191.929999999999, "sma");
+    assert_eq!(kep.ecc(), 1.00000000038851e-06, "ecc");
+    assert_eq!(kep.inc(), 12.849999999999987, "inc");
+    assert_eq!(kep.raan(), 306.614, "raan");
+    assert_eq!(kep.aop(), 314.1899999946181, "aop");
+    assert_eq!(kep.ta(), 99.8877000053819, "ta");
+    assert_eq!(kep.energy(), -24.32884811637795, "energy");
+    assert_eq!(kep.period(), 7378.877993957958, "period");
+    assert_eq!(kep.hx(), -10200.784799426574, "HX");
+    assert_eq!(kep.hy(), -7579.639346783497, "HY");
+    assert_eq!(kep.hz(), 55711.75792938425, "HZ");
+    assert_eq!(kep.tlong(), 0.6917000000000826, "tlong");
+    assert_eq!(kep.ea(), 99.88764356065685, "ea");
+    assert_eq!(kep.ma(), 99.88758711592696, "ma");
+    assert_eq!(kep.apoapsis(), 8191.938191930002, "apo");
+    assert_eq!(kep.periapsis(), 8191.921808069997, "peri");
+    assert_eq!(kep.semi_parameter(), 8191.929999991808, "semi parameter");
 }
 
 #[test]
