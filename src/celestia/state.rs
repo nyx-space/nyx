@@ -4,6 +4,7 @@ use utils::between_0_360;
 
 use std::f64::consts::PI;
 use std::f64::EPSILON;
+use std::fmt;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-4;
@@ -213,7 +214,7 @@ impl State {
     }
 
     /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
-    pub fn to_cartsian_vec(self) -> Vector6<f64> {
+    pub fn to_cartesian_vec(self) -> Vector6<f64> {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
@@ -445,5 +446,28 @@ impl State {
         } else {
             true
         }
+    }
+}
+
+impl fmt::Display for State {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "position = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
+            self.x, self.y, self.z, self.vx, self.vy, self.vz
+        )
+    }
+}
+
+impl fmt::Octal for State {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "sma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg", self.sma(),
+        self.ecc(),
+        self.inc(),
+        self.raan(),
+        self.aop(),
+        self.ta())
     }
 }

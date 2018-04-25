@@ -23,6 +23,7 @@ reaches production-level quality.
 # Features
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
 - [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/lib.rs](tests/lib.rs))
+- [x] Orbital state manipulation (from GMAT source code and validated in GMAT)
 - [ ] Multibody dynamics using SPICE Kernels
 - [ ] Planetary and Solar eclipse and visibility computation
 - [ ] Statistical Orbital Determination: Classical and Extended Kalman Filter (SRIF?)
