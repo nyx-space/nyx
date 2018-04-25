@@ -85,6 +85,9 @@ impl State {
     ///
     /// Units: km, none, degrees, degrees, degrees, degrees
     /// WARNING: This function will panic if the singularities in the conversion are expected.
+    /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
+    /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
+    /// One should expect these errors to be on the order of 1e-12.
     pub fn from_keplerian<B: CelestialBody>(
         sma: f64,
         ecc: f64,

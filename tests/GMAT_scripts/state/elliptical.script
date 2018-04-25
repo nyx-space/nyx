@@ -6,45 +6,87 @@
 %---------- Spacecraft
 %----------------------------------------
 
-Create Spacecraft DefaultSC;
-GMAT DefaultSC.DateFormat = TAIModJulian;
-GMAT DefaultSC.Epoch = '21545';
-GMAT DefaultSC.CoordinateSystem = EarthMJ2000Eq;
-GMAT DefaultSC.DisplayStateType = Cartesian;
-GMAT DefaultSC.X = 5946.673548288958;
-GMAT DefaultSC.Y = 1656.154606023661;
-GMAT DefaultSC.Z = 2259.012129598249;
-GMAT DefaultSC.VX = -3.098683050943824;
-GMAT DefaultSC.VY = 4.579534132135011;
-GMAT DefaultSC.VZ = 6.246541551539432;
-GMAT DefaultSC.DryMass = 850;
-GMAT DefaultSC.Cd = 2.2;
-GMAT DefaultSC.Cr = 1.8;
-GMAT DefaultSC.DragArea = 15;
-GMAT DefaultSC.SRPArea = 1;
-GMAT DefaultSC.NAIFId = -10000001;
-GMAT DefaultSC.NAIFIdReferenceFrame = -9000001;
-GMAT DefaultSC.OrbitColor = Red;
-GMAT DefaultSC.TargetColor = Teal;
-GMAT DefaultSC.EstimationStateType = 'Cartesian';
-GMAT DefaultSC.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
-GMAT DefaultSC.CdSigma = 1e+70;
-GMAT DefaultSC.CrSigma = 1e+70;
-GMAT DefaultSC.Id = 'SatId';
-GMAT DefaultSC.Attitude = CoordinateSystemFixed;
-GMAT DefaultSC.SPADSRPScaleFactor = 1;
-GMAT DefaultSC.ModelFile = 'aura.3ds';
-GMAT DefaultSC.ModelOffsetX = 0;
-GMAT DefaultSC.ModelOffsetY = 0;
-GMAT DefaultSC.ModelOffsetZ = 0;
-GMAT DefaultSC.ModelRotationX = 0;
-GMAT DefaultSC.ModelRotationY = 0;
-GMAT DefaultSC.ModelRotationZ = 0;
-GMAT DefaultSC.ModelScale = 1;
-GMAT DefaultSC.AttitudeDisplayStateType = 'Quaternion';
-GMAT DefaultSC.AttitudeRateDisplayStateType = 'AngularVelocity';
-GMAT DefaultSC.AttitudeCoordinateSystem = EarthMJ2000Eq;
-GMAT DefaultSC.EulerAngleSequence = '321';
+Create Spacecraft FromCart;
+GMAT FromCart.DateFormat = TAIModJulian;
+GMAT FromCart.Epoch = '21545';
+GMAT FromCart.CoordinateSystem = EarthMJ2000Eq;
+GMAT FromCart.DisplayStateType = Cartesian;
+GMAT FromCart.X = 5946.673548288958;
+GMAT FromCart.Y = 1656.154606023661;
+GMAT FromCart.Z = 2259.012129598249;
+GMAT FromCart.VX = -3.098683050943824;
+GMAT FromCart.VY = 4.579534132135011;
+GMAT FromCart.VZ = 6.246541551539432;
+GMAT FromCart.DryMass = 850;
+GMAT FromCart.Cd = 2.2;
+GMAT FromCart.Cr = 1.8;
+GMAT FromCart.DragArea = 15;
+GMAT FromCart.SRPArea = 1;
+GMAT FromCart.NAIFId = -10000001;
+GMAT FromCart.NAIFIdReferenceFrame = -9000001;
+GMAT FromCart.OrbitColor = Red;
+GMAT FromCart.TargetColor = Teal;
+GMAT FromCart.EstimationStateType = 'Cartesian';
+GMAT FromCart.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
+GMAT FromCart.CdSigma = 1e+70;
+GMAT FromCart.CrSigma = 1e+70;
+GMAT FromCart.Id = 'SatId';
+GMAT FromCart.Attitude = CoordinateSystemFixed;
+GMAT FromCart.SPADSRPScaleFactor = 1;
+GMAT FromCart.ModelFile = 'aura.3ds';
+GMAT FromCart.ModelOffsetX = 0;
+GMAT FromCart.ModelOffsetY = 0;
+GMAT FromCart.ModelOffsetZ = 0;
+GMAT FromCart.ModelRotationX = 0;
+GMAT FromCart.ModelRotationY = 0;
+GMAT FromCart.ModelRotationZ = 0;
+GMAT FromCart.ModelScale = 1;
+GMAT FromCart.AttitudeDisplayStateType = 'Quaternion';
+GMAT FromCart.AttitudeRateDisplayStateType = 'AngularVelocity';
+GMAT FromCart.AttitudeCoordinateSystem = EarthMJ2000Eq;
+GMAT FromCart.EulerAngleSequence = '321';
+
+Create Spacecraft FromKep;
+GMAT FromKep.DateFormat = TAIModJulian;
+GMAT FromKep.Epoch = '21545';
+GMAT FromKep.CoordinateSystem = EarthMJ2000Eq;
+GMAT FromKep.DisplayStateType = Keplerian;
+GMAT FromKep.SMA = 8191.930000000003;
+GMAT FromKep.ECC = 0.02450000000000035;
+GMAT FromKep.INC = 12.85000000000002;
+GMAT FromKep.RAAN = 306.614;
+GMAT FromKep.AOP = 314.1900000000004;
+GMAT FromKep.TA = 99.88769999999958;
+GMAT FromKep.DryMass = 850;
+GMAT FromKep.Cd = 2.2;
+GMAT FromKep.Cr = 1.8;
+GMAT FromKep.DragArea = 15;
+GMAT FromKep.SRPArea = 1;
+GMAT FromKep.NAIFId = -10002001;
+GMAT FromKep.NAIFIdReferenceFrame = -9002001;
+GMAT FromKep.OrbitColor = Green;
+GMAT FromKep.TargetColor = LightGray;
+GMAT FromKep.EstimationStateType = 'Cartesian';
+GMAT FromKep.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
+GMAT FromKep.CdSigma = 1e+70;
+GMAT FromKep.CrSigma = 1e+70;
+GMAT FromKep.Id = 'SatId';
+GMAT FromKep.Attitude = CoordinateSystemFixed;
+GMAT FromKep.SPADSRPScaleFactor = 1;
+GMAT FromKep.ModelFile = 'aura.3ds';
+GMAT FromKep.ModelOffsetX = 0;
+GMAT FromKep.ModelOffsetY = 0;
+GMAT FromKep.ModelOffsetZ = 0;
+GMAT FromKep.ModelRotationX = 0;
+GMAT FromKep.ModelRotationY = 0;
+GMAT FromKep.ModelRotationZ = 0;
+GMAT FromKep.ModelScale = 1;
+GMAT FromKep.AttitudeDisplayStateType = 'Quaternion';
+GMAT FromKep.AttitudeRateDisplayStateType = 'AngularVelocity';
+GMAT FromKep.AttitudeCoordinateSystem = EarthMJ2000Eq;
+GMAT FromKep.EulerAngleSequence = '321';
+
+
 
 
 
@@ -81,27 +123,43 @@ GMAT DefaultProp.StopIfAccuracyIsViolated = true;
 %---------- Subscribers
 %----------------------------------------
 
-Create ReportFile ReportFile1;
-GMAT ReportFile1.SolverIterations = Current;
-GMAT ReportFile1.UpperLeft = [ 0.1458333333333333 0.03414634146341464 ];
-GMAT ReportFile1.Size = [ 0.9940476190476191 0.9634146341463414 ];
-GMAT ReportFile1.RelativeZOrder = 64;
-GMAT ReportFile1.Maximized = true;
-GMAT ReportFile1.Filename = 'ReportFile1.txt';
-GMAT ReportFile1.Precision = 16;
-GMAT ReportFile1.Add = {DefaultSC.EarthMJ2000Eq.HX, DefaultSC.EarthMJ2000Eq.HY, DefaultSC.EarthMJ2000Eq.HZ, DefaultSC.Earth.Energy, DefaultSC.Earth.OrbitPeriod, DefaultSC.Earth.SMA, DefaultSC.Earth.ECC, DefaultSC.EarthMJ2000Eq.INC, DefaultSC.EarthMJ2000Eq.RAAN, DefaultSC.EarthMJ2000Eq.AOP, DefaultSC.Earth.TA, DefaultSC.EarthMJ2000Eq.TLONG, DefaultSC.Earth.EA, DefaultSC.Earth.MA, DefaultSC.Earth.RadApo, DefaultSC.Earth.RadPer, DefaultSC.Earth.SemilatusRectum};
-GMAT ReportFile1.WriteHeaders = true;
-GMAT ReportFile1.LeftJustify = On;
-GMAT ReportFile1.ZeroFill = Off;
-GMAT ReportFile1.FixedWidth = true;
-GMAT ReportFile1.Delimiter = ' ';
-GMAT ReportFile1.ColumnWidth = 23;
-GMAT ReportFile1.WriteReport = true;
+Create ReportFile ReportFromCart;
+GMAT ReportFromCart.SolverIterations = Current;
+GMAT ReportFromCart.UpperLeft = [ 0.1458333333333333 0.03414634146341464 ];
+GMAT ReportFromCart.Size = [ 0.9940476190476191 0.9634146341463414 ];
+GMAT ReportFromCart.RelativeZOrder = 1;
+GMAT ReportFromCart.Maximized = true;
+GMAT ReportFromCart.Filename = 'ReportFromCart.txt';
+GMAT ReportFromCart.Precision = 16;
+GMAT ReportFromCart.Add = {FromCart.EarthMJ2000Eq.HX, FromCart.EarthMJ2000Eq.HY, FromCart.EarthMJ2000Eq.HZ, FromCart.Earth.Energy, FromCart.Earth.OrbitPeriod, FromCart.Earth.SMA, FromCart.Earth.ECC, FromCart.EarthMJ2000Eq.INC, FromCart.EarthMJ2000Eq.RAAN, FromCart.EarthMJ2000Eq.AOP, FromCart.Earth.TA, FromCart.EarthMJ2000Eq.TLONG, FromCart.Earth.EA, FromCart.Earth.MA, FromCart.Earth.RadApo, FromCart.Earth.RadPer, FromCart.Earth.SemilatusRectum};
+GMAT ReportFromCart.WriteHeaders = true;
+GMAT ReportFromCart.LeftJustify = On;
+GMAT ReportFromCart.ZeroFill = Off;
+GMAT ReportFromCart.FixedWidth = true;
+GMAT ReportFromCart.Delimiter = ' ';
+GMAT ReportFromCart.ColumnWidth = 23;
+GMAT ReportFromCart.WriteReport = true;
 
+Create ReportFile ReportFromKep;
+GMAT ReportFromKep.SolverIterations = Current;
+GMAT ReportFromKep.UpperLeft = [ 0.1458333333333333 0.03414634146341464 ];
+GMAT ReportFromKep.Size = [ 0.9940476190476191 0.9634146341463414 ];
+GMAT ReportFromKep.RelativeZOrder = 1;
+GMAT ReportFromKep.Maximized = true;
+GMAT ReportFromKep.Filename = 'ReportFromKep.txt';
+GMAT ReportFromKep.Precision = 16;
+GMAT ReportFromKep.Add = {FromKep.EarthMJ2000Eq.X, FromKep.EarthMJ2000Eq.Y, FromKep.EarthMJ2000Eq.Z, FromKep.EarthMJ2000Eq.VX, FromKep.EarthMJ2000Eq.VY, FromKep.EarthMJ2000Eq.VZ, FromKep.EarthMJ2000Eq.HX, FromKep.EarthMJ2000Eq.HY, FromKep.EarthMJ2000Eq.HZ, FromKep.Earth.Energy, FromKep.Earth.OrbitPeriod, FromKep.Earth.SMA, FromKep.Earth.ECC, FromKep.EarthMJ2000Eq.INC, FromKep.EarthMJ2000Eq.RAAN, FromKep.EarthMJ2000Eq.AOP, FromKep.Earth.TA, FromKep.EarthMJ2000Eq.TLONG, FromKep.Earth.EA, FromKep.Earth.MA, FromKep.Earth.RadApo, FromKep.Earth.RadPer, FromKep.Earth.SemilatusRectum};
+GMAT ReportFromKep.WriteHeaders = true;
+GMAT ReportFromKep.LeftJustify = On;
+GMAT ReportFromKep.ZeroFill = Off;
+GMAT ReportFromKep.FixedWidth = true;
+GMAT ReportFromKep.Delimiter = ' ';
+GMAT ReportFromKep.ColumnWidth = 23;
+GMAT ReportFromKep.WriteReport = true;
 
 %----------------------------------------
 %---------- Mission Sequence
 %----------------------------------------
 
 BeginMissionSequence;
-Propagate DefaultProp(DefaultSC) {DefaultSC.ElapsedSecs = 0.0};
+Propagate Synchronized DefaultProp(FromCart) DefaultProp(FromKep) {FromCart.ElapsedSecs = 0.0};

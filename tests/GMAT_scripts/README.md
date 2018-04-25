@@ -32,21 +32,19 @@ Earth.HX  | 7e-12  | 0.0 | 3e-12
 Earth.HY  | 7e-12  | 1e-16 | 0.0
 Earth.HZ  | 0.0  | 0.0 | 0.0
 Earth.SMA  | 0.0  | 0.0 | 0.0
-Earth.ECC  |  0.0 | 1e-17 | 1e-3<sup>(1)</sup>
+Earth.ECC  |  0.0 | 1e-17 | 5e-17
 EarthMJ2000Eq.INC  | 0.0 | 0.0  | 0.0
 EarthMJ2000Eq.RAAN  | 0.0  | 0.0  | 0.0
 EarthMJ2000Eq.AOP  | 0.0 | 3e-7 | 5e-11
 Earth.TA  | 0.0 | 3e-7 | 4e-14
-Earth.TLONG | 0.0 | 3e-1<sup>(3)</sup> | 1e-8<sup>(2)</sup>
+Earth.TLONG | 0.0 | 3e-1<sup>(3)</sup> | 1e-8<sup>(1)</sup>
 Earth.EA | 0.0 | 0.0 | 0.0
-Earth.MA |  |  |
+Earth.MA | 0.0 | 0.0 | 0.0
 Earth.RadApo | 0.0 | 0.0 | 0.0
 Earth.RadPer | 0.0 | 0.0 | 0.0
 Earth.SemilatusRectum | 2e-12 | 0.0 | 2e-12
 ### Footnotes
-(1) This error _should_ be zero, but for transparency it's marked as 1e-3. The way this test was generated was by creating a given state using Keplerian orbital elements, and converting them to Cartesian in the GMAT spacecraft panel, and ensuring that `nyx` could convert the provided Cartesian state to the output state of GMAT. In this instance, `nyx` returns `0.15899999999999995` which is awfully close the `0.159` which I entered in GMAT in the first place.
-
-(2) There is quite a large error in true longitude for this test. I am really not sure why given that `nyx` sums AoP, RAAN and TA to compute this, as per the definition. Summing these values leads _exactly_ to the value returned by `nyx`. I am very surprised that GMAT does not seem to use that same formula, I'll have to check why.
+(1) There is quite a large error in true longitude for this test. I am really not sure why given that `nyx` sums AoP, RAAN and TA to compute this, as per the definition. Summing these values leads _exactly_ to the value returned by `nyx`. I am very surprised that GMAT does not seem to use that same formula, I'll have to check why.
 
 (3) This error _should_ be zero, but for transparency it's marked as 1e-1. Using the same methodology as (1), the script was created using specific angles. These angles were all defined to within `1e-1`, and switching between a Keplerian and a Cartesian definition created rounding errors themselves within in the GMAT GUI. I admit being surprised that the TLONG returned by GMAT is precisely `159.6` since GMAT has a tendency to not round even floating-point computational errors.
 
@@ -54,14 +52,26 @@ Earth.SemilatusRectum | 2e-12 | 0.0 | 2e-12
 
 Element / Scenario  | circular inclined  | circular equatorial  | elliptical |  
 --|---|---|---|---|---|---|--
-Earth.Energy  |  |   |
-Earth.OrbitPeriod |  |   |
-Earth.HX  |   |   |
-Earth.HY  |   |   |
-Earth.HZ  |   |   |
-Earth.SMA  |   |   |
-Earth.ECC  |  |   |
-EarthMJ2000Eq.INC  |  |   |
-EarthMJ2000Eq.RAAN  |  |   |
-EarthMJ2000Eq.AOP  | |   |
-Earth.TA  | |   |
+Earth.X  |  |  | 0.0
+Earth.Y  |  |  | 4e-13
+Earth.Z  |  |  | 3e-12
+Earth.VX  |   |  | 1e-15
+Earth.VY  |   |  | 2e-15
+Earth.VZ  | |  | 1e-15
+Earth.Energy  |  |  | 1e-14
+Earth.OrbitPeriod |  |  | 5e-12
+Earth.HX  |   |  | 0.0
+Earth.HY  |   |  | 1e-11
+Earth.HZ  |   |  | 2e-11
+Earth.SMA  |  |  | 3e-12
+Earth.ECC  |  |  | 3e-16
+EarthMJ2000Eq.INC  |  |  | 1e-14
+EarthMJ2000Eq.RAAN  |   |  | 0.0
+EarthMJ2000Eq.AOP  |  |  | 1e-12
+Earth.TA  |  |  | 1e-12
+Earth.TLONG |  | | 1e-13
+Earth.EA |  |  | 1e-12
+Earth.MA |  |  | 1e-12
+Earth.RadApo |  |  | 1e-12
+Earth.RadPer |  |  | 7e-12
+Earth.SemilatusRectum |  |  | 0.0
