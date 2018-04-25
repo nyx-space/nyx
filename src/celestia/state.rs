@@ -11,7 +11,7 @@ pub const ECC_EPSILON: f64 = 1e-4;
 // A warning will be logged if a division operation is planned with a value smaller than this following value.
 const ZERO_DIV_TOL: f64 = 1e-15;
 
-/// State defines an orbital state in the Celestial Reference frame of the parameterized CelestialBody.
+/// State defines an orbital state in the Celestial Reference frame of the parameterized `CelestialBody`.
 ///
 /// Regardless of the constructor used, this struct stores all the state information in Cartesian coordinates
 /// as these are always non singular.
