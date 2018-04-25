@@ -23,7 +23,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.2"
+//! nyx-space = "0.0.3"
 //! ```
 //!
 //! And add the following to your crate root:
@@ -91,6 +91,62 @@
 pub mod propagators;
 
 /// Provides several dynamics used for orbital mechanics and attitude dynamics, which can be elegantly combined.
+///
+/// # Simple two body propagation
+/// ```
+/// extern crate nalgebra;
+/// extern crate nyx_space as nyx;
+///
+/// fn main() {
+///     use nyx::propagators::{Dormand45, Options, Propagator};
+///     use nyx::dynamics::Dynamics;
+///     use nyx::dynamics::celestial::TwoBody;
+///     use nyx::celestia::{State, EARTH};
+///     use nalgebra::Vector6;
+///     use std::f64;
+///
+///     let initial_state =
+///         State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+///
+///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
+///
+///     let rslt = State::from_cartesian::<EARTH>(
+///         -5971.194191668567,
+///         3945.5066531626767,
+///         2864.636618498951,
+///         0.04909695770740798,
+///         -4.185093318527218,
+///         5.848940867713008,
+///     );
+///
+///     let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+///
+///     let mut dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
+///     let final_state: State;
+///     loop {
+///         let (t, state) = prop.derive(
+///             dyn.time(),
+///             &dyn.state(),
+///             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+///         );
+///         dyn.set_state(t, &state);
+///         if dyn.time() >= 3600.0 * 24.0 {
+///             let details = prop.latest_details();
+///             if details.error > 1e-2 {
+///                 assert!(
+///                         details.step - 1e-1 < f64::EPSILON,
+///                         "step size should be at its minimum because error is higher than tolerance: {:?}",
+///                         details
+///                     );
+///             }
+///             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
+///             assert_eq!(final_state, rslt, "two body prop failed",);
+///             break;
+///         }
+///     }
+///     println!("Final state:\n{0}\n{0:o}", final_state);
+/// }
+/// ```
 ///
 /// # Combining dynamics in a full spacecraft model.
 /// ```
@@ -175,11 +231,14 @@ pub mod propagators;
 /// // Let's initialize our combined dynamics.
 ///
 /// fn main(){
-///     let dyn_twobody = TwoBody::around(
-///         &Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]),
-///         &EARTH,
-///     );
-///
+///     let dyn_twobody = TwoBody::from_state_vec::<EARTH>(&Vector6::new(
+///         -2436.45,
+///         -2436.45,
+///         6891.037,
+///         5.088611,
+///         -5.088611,
+///         0.0,
+///     ));///
 ///     let omega = Vector3::new(0.1, 0.4, -0.2);
 ///     let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);
 ///     let dyn_mom = AngularMom::from_tensor_matrix(&tensor, &omega);
@@ -221,11 +280,49 @@ pub mod propagators;
 /// ```
 pub mod dynamics;
 
-/// Provides the solar system planets, and (eventually) ephemeride management.
+/// Provides the solar system planets, and state and (later) ephemeride management.
+///
+/// # State creation and management
+/// ```
+/// extern crate nyx_space as nyx;
+///
+/// fn main(){
+///     use nyx::celestia::{State, EARTH};
+///     // The parameter is anything which implements `CelestialBody`.
+///     // In this case, we're creating these states around Earth.
+///     let cart = State::from_cartesian::<EARTH>(
+///         5946.673548288958,
+///         1656.154606023661,
+///         2259.012129598249,
+///         -3.098683050943824,
+///         4.579534132135011,
+///         6.246541551539432,
+///     );
+///     let kep = State::from_keplerian::<EARTH>(
+///         7712.186117895041,
+///         0.15899999999999995,
+///         53.75369,
+///         1.99863286421117e-05,
+///         359.787880000004,
+///         25.434003407751188,
+///     );
+///     // We can check whether two states are equal.
+///     if cart != kep {
+///         panic!("This won't happen");
+///     }
+///     // Of more interest, we can fetch specific orbital elements.
+///     println!("sma = {} km   inc = {} degrees", cart.sma(), cart.inc());
+///     // Note that the state data is stored as X, Y, Z, VX, VY, VZ.
+///     // Hence, the following print statement may display some rounded values despite
+///     // being created with fixed values. GMAT has the same "issue"
+///     // (but `nyx` won't change your script).
+///     println!("ecc = {} km   RAAN = {} degrees", kep.ecc(), cart.raan());
+/// }
+/// ```
 pub mod celestia;
 
 /// Include utility functions shared by different modules, and which may be useful to engineers.
 pub mod utils;
 
 #[macro_use]
-extern crate lazy_static;
+extern crate log;
