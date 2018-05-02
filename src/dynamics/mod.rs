@@ -10,6 +10,11 @@ use self::na::allocator::Allocator;
 /// from this module match, or perform the appropriate coordinate transformations.
 pub mod celestial;
 
+/// The gravity module handles spherical harmonics only. It _must_ be combined with a TwoBody dynamics
+///
+/// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/) and from [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/).
+pub mod gravity;
+
 /// The angular momentum module handles all angular momentum dynamics.
 ///
 /// Note that this module does not handle attitude parameters or control. Refer to the relevant modules.
@@ -21,7 +26,7 @@ pub mod momentum;
 /// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
 ///  parameters), it is up to the implementor to handle time and state organization correctly.
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
-pub trait Dynamics: Copy
+pub trait Dynamics
 where
     Self: Sized,
 {
