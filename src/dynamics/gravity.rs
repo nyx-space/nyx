@@ -95,7 +95,7 @@ impl Dynamics for Harmonics {
         let t_ = radius[(1, 0)] / radius.norm();
         let u_ = radius[(2, 0)] / radius.norm();
         // Create the associated Legendre polynomials using a DMatrix (for runtime flexibility).
-        let mut A_ = [[0f64; self.order + 1]; self.order];
+        let mut A_ = Vec::with_capacity(((self.degree - 1) * self.order) as usize);
         let mut Re = Vec::with_capacity(self.degree as usize);
         let mut Im = Vec::with_capacity(self.degree as usize);
 
@@ -107,6 +107,7 @@ impl Dynamics for Harmonics {
 
         for m in 0..self.degree {
             for n in (m + 2)..self.order {
+                // XX: This looks like a hack to avoid J<2 because they don't exist (but I do not store them)
                 // normalization factors
                 let N1 = f64::from(((2 * n + 1) * (2 * n - 1)) / ((n - m) * (n + m))).sqrt();
                 let N2 = f64::from(
