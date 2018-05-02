@@ -1,9 +1,8 @@
 // use super::hifitime::SECONDS_PER_DAY;
 use super::Dynamics;
-use super::na::{DMatrix, DVector, U1, U3, U6, Vector6, VectorN};
+use super::na::{U1, U3, U6, Vector6, VectorN};
 use celestia::{CelestialBody, EARTH};
 use std::collections::HashMap;
-use num_traits::real::Real;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
 pub struct Harmonics {
@@ -96,36 +95,36 @@ impl Dynamics for Harmonics {
         let t_ = radius[(1, 0)] / radius.norm();
         let u_ = radius[(2, 0)] / radius.norm();
         // Create the associated Legendre polynomials using a DMatrix (for runtime flexibility).
-        let mut A_ = DMatrix::zeros(usize::from(self.order + 1), usize::from(self.order));
-        let mut Re = DVector::zeros(usize::from(self.order));
-        let mut Im = DVector::zeros(usize::from(self.order));
+        let mut A_ = [[0f64; self.order + 1]; self.order];
+        let mut Re = Vec::with_capacity(self.degree as usize);
+        let mut Im = Vec::with_capacity(self.degree as usize);
 
         // Populate the off-diagonal elements
-        A_[(1, 0)] = u_ * (3.0.sqrt());
+        A_[(1, 0)] = u_ * (3.0f64).sqrt();
         for i in 1..self.order {
-            A_[(i + 1, i)] = u_ * (2 * f64::from(i) + 3).sqrt() * A_[(i, i)];
+            A_[(i + 1, i)] = u_ * (2.0 * f64::from(i) + 3.0).sqrt() * A_[(i, i)];
         }
 
         for m in 0..self.degree {
             for n in (m + 2)..self.order {
                 // normalization factors
-                let N1 = (((2 * n + 1) * (2 * n - 1)) / ((n - m) * (n + m))).sqrt();
-                let N2 = (((2 * n + 1) * (n - m - 1) * (n + m - 1))
-                    / ((2 * n - 3) * (n + m) * (n - m)))
-                    .sqrt();
+                let N1 = f64::from(((2 * n + 1) * (2 * n - 1)) / ((n - m) * (n + m))).sqrt();
+                let N2 = f64::from(
+                    ((2 * n + 1) * (n - m - 1) * (n + m - 1)) / ((2 * n - 3) * (n + m) * (n - m)),
+                ).sqrt();
                 A_[(n, m)] = u_ * N1 * A_[(n - 1, m)] - N2 * A_[(n - 2, m)];
             }
-            Re[(m, 0)] = if m == 0 {
+            Re.push(if m == 0 {
                 1.0
             } else {
-                s_ * Re[(m - 1, 0)] - t_ * Im[(m - 1, 0)]
-            }; // real part of (s + i*t)^m
+                s_ * Re[(m - 1) as usize] - t_ * Im[(m - 1) as usize]
+            }); // real part of (s + i*t)^m
 
-            Im[(m, 0)] = if m == 0 {
+            Im.push(if m == 0 {
                 0.0
             } else {
-                s_ * Im[(m - 1, 0)] + t_ * Re[(m - 1, 0)]
-            }; // imaginary part of (s + i*t)^m
+                s_ * Im[(m - 1) as usize] + t_ * Re[(m - 1) as usize]
+            }); // imaginary part of (s + i*t)^m
         }
 
         // Now do summation ------------------------------------------------
@@ -137,7 +136,7 @@ impl Dynamics for Harmonics {
         let mut a2 = 0.0;
         let mut a3 = 0.0;
         let mut a4 = 0.0;
-        let mut sqrt2 = 2.0.sqrt();
+        let mut sqrt2 = 2.0f64.sqrt();
         for n in 1..self.order {
             rho_np1 *= rho;
             rho_np2 *= rho;
@@ -152,25 +151,25 @@ impl Dynamics for Harmonics {
                                                                      // let Cval = self.Cnm(self.julian_days, n, m);
                                                                      // let Sval = self.Snm(self.julian_days, n, m);
                                                                      // Pines Equation 27 (Part of)
-                let D = (Cval * Re[(m, 0)] + Sval * Im[(m, 0)]) * sqrt2;
+                let D = (Cval * Re[m as usize] + Sval * Im[m as usize]) * sqrt2;
                 let E = if m == 0 {
                     0.0
                 } else {
-                    (Cval * Re[(m - 1, 0)] + Sval * Im[(m - 1, 0)]) * sqrt2
+                    (Cval * Re[(m - 1) as usize] + Sval * Im[(m - 1) as usize]) * sqrt2
                 };
                 let F = if m == 0 {
                     0.0
                 } else {
-                    (Sval * Re[(m - 1, 0)] - Cval * Im[(m - 1, 0)]) * sqrt2
+                    (Sval * Re[(m - 1) as usize] - Cval * Im[(m - 1) as usize]) * sqrt2
                 };
                 // Correct for normalization
-                let mut VR01 = (f64::from(n - m) * f64::from(n + m + 1)).sqrt();
+                let mut VR01 = f64::from((n - m) * (n + m + 1)).sqrt();
                 let mut VR11 = (f64::from((2 * n + 1) * (n + m + 2) * (n + m + 1))
                     / (2.0 * f64::from(n) + 3.0))
                     .sqrt();
                 if m == 0 {
-                    VR01 /= (2.0).sqrt();
-                    VR11 /= (2.0).sqrt();
+                    VR01 /= (2.0f64).sqrt();
+                    VR11 /= (2.0f64).sqrt();
                 }
 
                 let Avv01 = VR01 * A_[(n, m + 1)];
