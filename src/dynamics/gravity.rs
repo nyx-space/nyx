@@ -1,72 +1,34 @@
 // use super::hifitime::SECONDS_PER_DAY;
 use super::Dynamics;
 use super::na::{U1, U3, U6, Vector6, VectorN};
-use celestia::{CelestialBody, EARTH};
-use std::collections::HashMap;
+use celestia::CelestialBody;
+use io::gravity::GravityPotentialStor;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
-pub struct Harmonics {
-    julian_days: f64, // XXX: This is not actually used in GMAT
+pub struct Harmonics<S>
+where
+    S: GravityPotentialStor,
+{
     mu: f64,
     radius: f64,
-    order: u16,
-    degree: u16,
-    // data is (degree, order) -> (C_nm, S_nm)
-    data: HashMap<(u16, u16), (f64, f64)>,
+    stor: S,
 }
 
-impl Harmonics {
-    /// Initialize `Harmonics` as J<sub>2</sub> only using the JGM3 model (available in GMAT)
-    ///
-    /// Use the embedded Earth parameter. If others are needed, low from `from_gunzip`.
-    /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn J2_JGM3(start_julian_days: f64) -> Harmonics {
-        let mut data = HashMap::new();
-        data.insert((2, 0), (-4.84165374886470e-04, 0.0));
+impl<S> Harmonics<S>
+where
+    S: GravityPotentialStor,
+{
+    /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
+    pub fn from_stor<B: CelestialBody>(stor: S) -> Harmonics<S> {
         Harmonics {
-            julian_days: start_julian_days,
-            mu: EARTH::gm(),
-            radius: EARTH::eq_radius(),
-            order: 2,
-            degree: 0,
-            data: data,
+            mu: B::gm(),
+            radius: B::eq_radius(),
+            stor: stor,
         }
-    }
-
-    /// Initialize `Harmonics` as J<sub>2</sub> only using the EGM2008 model (from the GRACE mission, best model as of 2018)
-    ///
-    /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn J2_EGM2008(start_julian_days: f64) -> Harmonics {
-        let mut data = HashMap::new();
-        data.insert((2, 0), (-0.484165143790815e-03, 0.0));
-        Harmonics {
-            julian_days: start_julian_days,
-            mu: EARTH::gm(),
-            radius: EARTH::eq_radius(),
-            order: 2,
-            degree: 0,
-            data: data,
-        }
-    }
-
-    /// Initialize `Harmonics` from the file path (must be a gunzipped file)
-    ///
-    /// Gravity models provided by `nyx`: TODO: add github links and examples
-    /// + EMG2008 to 2190 for Earth (tide free)
-    /// + Moon to 1500 (from SHADR file)
-    /// + Mars to 120 (from SHADR file)
-    /// + Venus to 150 (from SHADR file)
-    pub fn from_gunzip(
-        start_julian_days: f64,
-        degree: u16,
-        order: u16,
-        filepath: String,
-    ) -> Harmonics {
-        unimplemented!();
     }
 }
 
-impl Dynamics for Harmonics {
+impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
     type StateSize = U6;
 
     fn time(&self) -> f64 {
@@ -95,18 +57,19 @@ impl Dynamics for Harmonics {
         let t_ = radius[(1, 0)] / radius.norm();
         let u_ = radius[(2, 0)] / radius.norm();
         // Create the associated Legendre polynomials using a DMatrix (for runtime flexibility).
-        let mut A_ = Vec::with_capacity(((self.degree - 1) * self.order) as usize);
-        let mut Re = Vec::with_capacity(self.degree as usize);
-        let mut Im = Vec::with_capacity(self.degree as usize);
+        let mut A_ =
+            Vec::with_capacity(((self.stor.max_degree() - 1) * self.stor.max_order()) as usize);
+        let mut Re = Vec::with_capacity(self.stor.max_degree() as usize);
+        let mut Im = Vec::with_capacity(self.stor.max_degree() as usize);
 
         // Populate the off-diagonal elements
         A_[(1, 0)] = u_ * (3.0f64).sqrt();
-        for i in 1..self.order {
+        for i in 1..self.stor.max_order() {
             A_[(i + 1, i)] = u_ * (2.0 * f64::from(i) + 3.0).sqrt() * A_[(i, i)];
         }
 
-        for m in 0..self.degree {
-            for n in (m + 2)..self.order {
+        for m in 0..self.stor.max_degree() {
+            for n in (m + 2)..self.stor.max_order() {
                 // XX: This looks like a hack to avoid J<2 because they don't exist (but I do not store them)
                 // normalization factors
                 let N1 = f64::from(((2 * n + 1) * (2 * n - 1)) / ((n - m) * (n + m))).sqrt();
@@ -138,7 +101,7 @@ impl Dynamics for Harmonics {
         let mut a3 = 0.0;
         let mut a4 = 0.0;
         let mut sqrt2 = 2.0f64.sqrt();
-        for n in 1..self.order {
+        for n in 1..self.stor.max_order() {
             rho_np1 *= rho;
             rho_np2 *= rho;
             let mut sum1 = 0.0;
@@ -147,11 +110,11 @@ impl Dynamics for Harmonics {
             let mut sum4 = 0.0;
 
             let mut m = 0;
-            while m <= n && m <= self.degree {
-                let &(Cval, Sval) = self.data.get(&(n, m)).unwrap(); // We expect the data to be there
-                                                                     // let Cval = self.Cnm(self.julian_days, n, m);
-                                                                     // let Sval = self.Snm(self.julian_days, n, m);
-                                                                     // Pines Equation 27 (Part of)
+            while m <= n && m <= self.stor.max_degree() {
+                let &(Cval, Sval) = self.stor.CS(n, m);
+                // let Cval = self.Cnm(self.julian_days, n, m);
+                // let Sval = self.Snm(self.julian_days, n, m);
+                // Pines Equation 27 (Part of)
                 let D = (Cval * Re[m as usize] + Sval * Im[m as usize]) * sqrt2;
                 let E = if m == 0 {
                     0.0

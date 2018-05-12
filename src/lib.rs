@@ -324,5 +324,8 @@ pub mod celestia;
 /// Include utility functions shared by different modules, and which may be useful to engineers.
 pub mod utils;
 
+/// Provides all the input/output needs for this library, including loading of SPICE kernels, and gravity potential files.
+pub mod io;
+
 #[macro_use]
 extern crate log;
