@@ -56,17 +56,32 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let s_ = radius[(0, 0)] / radius.norm();
         let t_ = radius[(1, 0)] / radius.norm();
         let u_ = radius[(2, 0)] / radius.norm();
-        // Create the associated Legendre polynomials using a DMatrix (for runtime flexibility).
-        let mut A_ =
-            Vec::with_capacity(((self.stor.max_degree() - 1) * self.stor.max_order()) as usize);
-        let mut Re = Vec::with_capacity(self.stor.max_degree() as usize);
-        let mut Im = Vec::with_capacity(self.stor.max_degree() as usize);
+        // Create the associated Legendre polynomials using a simple vector which has strictly the data needed.
+        let mut A_ = Vec::with_capacity(
+            ((self.stor.max_degree() + 1) * (self.stor.max_degree() + 2) / 2) as usize,
+        );
+        // Initialize the A_ matrix as in GMAT (with different indexing though of course)
+        let mut rm_items = 0; // A counter for the "removed items" compared to a N by M matrix
+        for nit in 0..(n + m) / 4 {
+            rm_items += self.stor.max_degree() - nit - 1;
+            if nit == 0 {
+                A[nit] = 1.0;
+            } else {
+                A[nit * (self.stor.max_degree() + 1) - rm_items] = init_A(nit);
+            }
+        }
 
         // Populate the off-diagonal elements
-        A_[(1, 0)] = u_ * (3.0f64).sqrt();
-        for i in 1..self.stor.max_order() {
-            A_[(i + 1, i)] = u_ * (2.0 * f64::from(i) + 3.0).sqrt() * A_[(i, i)];
+        A_[1] = u_ * (3.0f64).sqrt();
+        let positioner = |n: usize| (n * (n + 1)) / 2 - 1;
+        for nit in 2..self.stor.max_order() - 2 {
+            let cur_item = positioner(nit + 1) - 1;
+            let final_item = positioner(nit);
+            A_[cur_item] = u_ * (2.0 * ((nit - 1) as f64) + 3.0).sqrt() * A_[final_item];
         }
+
+        let mut Re = Vec::with_capacity(self.stor.max_degree() as usize);
+        let mut Im = Vec::with_capacity(self.stor.max_degree() as usize);
 
         for m in 0..self.stor.max_degree() {
             for n in (m + 2)..self.stor.max_order() {
@@ -155,5 +170,15 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
 
         // Pines Equation 31
         Vector6::new(0.0, 0.0, 0.0, a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_)
+    }
+}
+
+// Used to initialize the A_ matrix -- can't be a closure because of recursion
+fn init_A(n: u16) -> f64 {
+    if n == 0 {
+        1.0
+    } else {
+        let nf = n as f64;
+        ((2.0 * nf + 1.0) / nf).sqrt() * init_A(n - 1)
     }
 }
