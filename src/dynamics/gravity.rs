@@ -5,6 +5,7 @@ use celestia::CelestialBody;
 use io::gravity::GravityPotentialStor;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
+#[derive(Clone, Copy)]
 pub struct Harmonics<S>
 where
     S: GravityPotentialStor,
@@ -44,6 +45,7 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
     /// This is likely a bad assumption (breaks back prop unless new_t is negative) -- I will need to clarify that in the docs.
     fn set_state(&mut self, new_t: f64, _new_state: &VectorN<f64, Self::StateSize>) {
         // self.time += new_t / SECONDS_PER_DAY;
+        unimplemented!();
     }
 
     /// WARNING: This provides a DELTA of the state, which must be added to the result of the TwoBody propagator being used.
@@ -56,54 +58,59 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let s_ = radius[(0, 0)] / radius.norm();
         let t_ = radius[(1, 0)] / radius.norm();
         let u_ = radius[(2, 0)] / radius.norm();
-        // Create the associated Legendre polynomials using a simple vector which has strictly the data needed.
-        let mut A_ = Vec::with_capacity(
-            ((self.stor.max_degree() + 1) * (self.stor.max_degree() + 2) / 2) as usize,
-        );
-        // Initialize the A_ matrix as in GMAT (with different indexing though of course)
-        let mut rm_items = 0; // A counter for the "removed items" compared to a N by M matrix
-        for nit in 0..(n + m) / 4 {
-            rm_items += self.stor.max_degree() - nit - 1;
-            if nit == 0 {
-                A[nit] = 1.0;
-            } else {
-                A[nit * (self.stor.max_degree() + 1) - rm_items] = init_A(nit);
+        let max_order = self.stor.max_order() as usize;
+        let max_degree = self.stor.max_degree() as usize;
+        // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
+        let mut a_matrix: Vec<Vec<f64>> = (0..max_order + 3)
+            .map(|_| Vec::with_capacity(max_degree + 3))
+            .collect();
+        // Now that we have requested that capacity, let's set everything to zero so we can populate with [n][m].
+        for n in 0..max_order + 3 {
+            for _m in 0..max_degree + 3 {
+                a_matrix[n].push(0.0);
             }
         }
 
-        // Populate the off-diagonal elements
-        A_[1] = u_ * (3.0f64).sqrt();
-        let positioner = |n: usize| (n * (n + 1)) / 2 - 1;
-        for nit in 2..self.stor.max_order() - 2 {
-            let cur_item = positioner(nit + 1) - 1;
-            let final_item = positioner(nit);
-            A_[cur_item] = u_ * (2.0 * ((nit - 1) as f64) + 3.0).sqrt() * A_[final_item];
+        // initialize the diagonal elements (not a function of the input)
+        a_matrix[0][0] = 1.0; // Temp value for this first initialization
+        for n in 1..max_degree {
+            let nf64 = n as f64;
+            a_matrix[n][n] = ((2.0 * nf64 + 1.0).sqrt() / (2.0 * nf64)) * a_matrix[n - 1][n - 1];
         }
 
-        let mut Re = Vec::with_capacity(self.stor.max_degree() as usize);
-        let mut Im = Vec::with_capacity(self.stor.max_degree() as usize);
+        // generate the off-diagonal elements
+        a_matrix[1][0] = u_ * 3.0f64.sqrt();
+        for n in 1..max_degree + 1 {
+            a_matrix[n + 1][n] = u_ * ((2 * n + 3) as f64).sqrt() * a_matrix[n][n];
+        }
 
-        for m in 0..self.stor.max_degree() {
-            for n in (m + 2)..self.stor.max_order() {
+        let mut re = Vec::with_capacity(max_degree);
+        let mut im = Vec::with_capacity(max_degree);
+
+        for m in 0..max_degree + 1 {
+            for n in (m + 2)..max_order + 1 {
                 // XX: This looks like a hack to avoid J<2 because they don't exist (but I do not store them)
                 // normalization factors
-                let N1 = f64::from(((2 * n + 1) * (2 * n - 1)) / ((n - m) * (n + m))).sqrt();
-                let N2 = f64::from(
-                    ((2 * n + 1) * (n - m - 1) * (n + m - 1)) / ((2 * n - 3) * (n + m) * (n - m)),
-                ).sqrt();
-                A_[(n, m)] = u_ * N1 * A_[(n - 1, m)] - N2 * A_[(n - 2, m)];
+                let n1 = ((((2 * n + 1) * (2 * n - 1)) / ((n - m) * (n + m))) as f64).sqrt();
+                let n2 = ((((2 * n + 1) * (n - m - 1) * (n + m - 1))
+                    / ((2 * n - 3) * (n + m) * (n - m))) as f64)
+                    .sqrt();
+                a_matrix[n][m] = u_ * n1 * a_matrix[n - 1][m] - n2 * a_matrix[n - 2][m];
             }
-            Re.push(if m == 0 {
-                1.0
+            // real part of (s + i*t)^m -- note, we can't borrow mutability, so we can't use clever Rust notation here
+            if m == 0 {
+                re.push(1.0);
             } else {
-                s_ * Re[(m - 1) as usize] - t_ * Im[(m - 1) as usize]
-            }); // real part of (s + i*t)^m
+                let re_m = re[(m - 1)];
+                re.push(s_ * re_m - t_ * im[(m - 1)]);
+            }
 
-            Im.push(if m == 0 {
-                0.0
+            if m == 0 {
+                im.push(0.0);
             } else {
-                s_ * Im[(m - 1) as usize] + t_ * Re[(m - 1) as usize]
-            }); // imaginary part of (s + i*t)^m
+                let im_m = im[(m - 1)];
+                im.push(s_ * im_m + t_ * re[(m - 1)]);
+            }; // imaginary part of (s + i*t)^m
         }
 
         // Now do summation ------------------------------------------------
@@ -115,8 +122,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let mut a2 = 0.0;
         let mut a3 = 0.0;
         let mut a4 = 0.0;
-        let mut sqrt2 = 2.0f64.sqrt();
-        for n in 1..self.stor.max_order() {
+        let sqrt2 = 2.0f64.sqrt();
+        for n in 1..max_order {
             rho_np1 *= rho;
             rho_np2 *= rho;
             let mut sum1 = 0.0;
@@ -125,39 +132,39 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             let mut sum4 = 0.0;
 
             let mut m = 0;
-            while m <= n && m <= self.stor.max_degree() {
-                let &(Cval, Sval) = self.stor.CS(n, m);
-                // let Cval = self.Cnm(self.julian_days, n, m);
-                // let Sval = self.Snm(self.julian_days, n, m);
+            while m <= n && m <= max_degree {
+                let (c_val, s_val) = self.stor.cs_nm(n as u16, m as u16);
+                // let c_val = self.Cnm(self.julian_days, n, m);
+                // let s_val = self.Snm(self.julian_days, n, m);
                 // Pines Equation 27 (Part of)
-                let D = (Cval * Re[m as usize] + Sval * Im[m as usize]) * sqrt2;
-                let E = if m == 0 {
+                let d_ = (c_val * re[m] + s_val * im[m]) * sqrt2;
+                let e_ = if m == 0 {
                     0.0
                 } else {
-                    (Cval * Re[(m - 1) as usize] + Sval * Im[(m - 1) as usize]) * sqrt2
+                    (c_val * re[(m - 1)] + s_val * im[(m - 1)]) * sqrt2
                 };
-                let F = if m == 0 {
+                let f_ = if m == 0 {
                     0.0
                 } else {
-                    (Sval * Re[(m - 1) as usize] - Cval * Im[(m - 1) as usize]) * sqrt2
+                    (s_val * re[(m - 1)] - c_val * im[(m - 1)]) * sqrt2
                 };
                 // Correct for normalization
-                let mut VR01 = f64::from((n - m) * (n + m + 1)).sqrt();
-                let mut VR11 = (f64::from((2 * n + 1) * (n + m + 2) * (n + m + 1))
-                    / (2.0 * f64::from(n) + 3.0))
+                let mut vr01 = (((n - m) * (n + m + 1)) as f64).sqrt();
+                let mut vr11 = (((2 * n + 1) * (n + m + 2) * (n + m + 1)) as f64
+                    / ((2 * n + 3) as f64))
                     .sqrt();
                 if m == 0 {
-                    VR01 /= (2.0f64).sqrt();
-                    VR11 /= (2.0f64).sqrt();
+                    vr01 /= (2.0f64).sqrt();
+                    vr11 /= (2.0f64).sqrt();
                 }
 
-                let Avv01 = VR01 * A_[(n, m + 1)];
-                let Avv11 = VR11 * A_[(n + 1, m + 1)];
+                let avv01 = vr01 * a_matrix[n][m + 1];
+                let avv11 = vr11 * a_matrix[n + 1][m + 1];
                 // Pines Equation 30 and 30b (Part of)
-                sum1 += m * A_[(n, m)] * E;
-                sum2 += m * A_[(n, m)] * F;
-                sum3 += Avv01 * D;
-                sum4 += Avv11 * D;
+                sum1 += (m as f64) * a_matrix[n][m] * e_;
+                sum2 += (m as f64) * a_matrix[n][m] * f_;
+                sum3 += avv01 * d_;
+                sum4 += avv11 * d_;
                 m += 1;
             }
             // Pines Equation 30 and 30b (Part of)
@@ -170,15 +177,5 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
 
         // Pines Equation 31
         Vector6::new(0.0, 0.0, 0.0, a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_)
-    }
-}
-
-// Used to initialize the A_ matrix -- can't be a closure because of recursion
-fn init_A(n: u16) -> f64 {
-    if n == 0 {
-        1.0
-    } else {
-        let nf = n as f64;
-        ((2.0 * nf + 1.0) / nf).sqrt() * init_A(n - 1)
     }
 }

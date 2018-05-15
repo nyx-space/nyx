@@ -157,14 +157,15 @@ fn two_body_j2_JGM3_state_parametrized() {
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
+    use nyx::io::gravity::{GravityPotentialStor, MemoryBackend};
     use nyx::celestia::{State, EARTH};
-    use self::na::{U1, U3, U6, Vector6, Vector6, VectorN};
+    use self::na::{U1, U3, U6, Vector6, VectorN};
 
     // TODO: Provide a cleaner way to wrap these, probably by implementing the std::ops::Add.
-    #[derive(Copy, Clone)]
+    #[derive(Clone)]
     pub struct J2Dyn {
         pub twobody: TwoBody,
-        pub harmonics: Harmonics,
+        pub harmonics: Harmonics<MemoryBackend>,
     }
 
     impl Dynamics for J2Dyn {
@@ -187,7 +188,7 @@ fn two_body_j2_JGM3_state_parametrized() {
             _t: f64,
             state: &VectorN<f64, Self::StateSize>,
         ) -> VectorN<f64, Self::StateSize> {
-            self.twobody.eom(_t, state) + self.harmonics.eom(_t, state);
+            self.twobody.eom(_t, state) + self.harmonics.eom(_t, state)
         }
     }
 

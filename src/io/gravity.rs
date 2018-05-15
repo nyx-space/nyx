@@ -16,12 +16,13 @@ where
     ///
     /// WARNING: It's up to the caller to ensure that no degree or order greater than stored
     /// in this `GravityPotentialStor` is requested. Depending on the implementor, this call might `panic!`.
-    fn CS(&self, order: u16, degree: u16) -> (f64, f64);
+    fn cs_nm(&self, order: u16, degree: u16) -> (f64, f64);
 }
 
 /// `MemoryBackend` loads the requested gravity potential files and stores them in memory (in a HashMap).
 ///
 /// WARNING: This memory backend may require a lot of RAM (e.g. EMG2008 2190x2190 requires nearly 400 MB of RAM).
+#[derive(Clone)]
 pub struct MemoryBackend {
     order: u16,
     degree: u16,
@@ -34,7 +35,7 @@ impl MemoryBackend {
     ///
     /// Use the embedded Earth parameter. If others are needed, load from `from_gunzip` or `from_uncompressed`.
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn J2_JGM3(start_julian_days: f64) -> MemoryBackend {
+    pub fn j2_jgm3() -> MemoryBackend {
         let mut data = HashMap::new();
         data.insert((2, 0), (-4.84165374886470e-04, 0.0));
         MemoryBackend {
@@ -47,7 +48,7 @@ impl MemoryBackend {
     /// Initialize `MemoryBackend` as J<sub>2</sub> only using the EGM2008 model (from the GRACE mission, best model as of 2018)
     ///
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn J2_EGM2008(start_julian_days: f64) -> MemoryBackend {
+    pub fn j2_egm2008() -> MemoryBackend {
         let mut data = HashMap::new();
         data.insert((2, 0), (-0.484165143790815e-03, 0.0));
         MemoryBackend {
@@ -64,8 +65,8 @@ impl MemoryBackend {
     /// + Moon to 1500 (from SHADR file)
     /// + Mars to 120 (from SHADR file)
     /// + Venus to 150 (from SHADR file)
-    pub fn from_SHADR(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
-        let f = File::open(filepath).expect("could not open file");
+    pub fn from_shadr(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+        let mut f = File::open(filepath.clone()).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
@@ -83,8 +84,8 @@ impl MemoryBackend {
         )
     }
 
-    pub fn from_EGM(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
-        let f = File::open(filepath).expect("could not open file");
+    pub fn from_egm(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+        let mut f = File::open(filepath.clone()).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
@@ -207,7 +208,7 @@ impl GravityPotentialStor for MemoryBackend {
         self.degree
     }
 
-    fn CS(&self, order: u16, degree: u16) -> (f64, f64) {
+    fn cs_nm(&self, order: u16, degree: u16) -> (f64, f64) {
         let &(c, s) = self.data.get(&(order, degree)).unwrap();
         (c, s)
     }
