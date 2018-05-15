@@ -151,15 +151,15 @@ fn two_body_state_parametrized() {
 }
 
 #[test]
-fn two_body_j2_JGM3_state_parametrized() {
+fn two_body_j2_jgm3_state_parametrized() {
     extern crate nalgebra as na;
     use nyx::propagators::{Dormand45, Options, Propagator};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
-    use nyx::io::gravity::{GravityPotentialStor, MemoryBackend};
+    use nyx::io::gravity::MemoryBackend;
     use nyx::celestia::{State, EARTH};
-    use self::na::{U1, U3, U6, Vector6, VectorN};
+    use self::na::{U6, VectorN};
 
     // TODO: Provide a cleaner way to wrap these, probably by implementing the std::ops::Add.
     #[derive(Clone)]
@@ -208,13 +208,18 @@ fn two_body_j2_JGM3_state_parametrized() {
 
     let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
 
-    let mut dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
+    let tb_dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
+    let sh_dyn: Harmonics<MemoryBackend> = Harmonics::from_stor::<EARTH>(MemoryBackend::j2_jgm3());
+    let mut dyn = J2Dyn {
+        twobody: tb_dyn,
+        harmonics: sh_dyn,
+    };
     let final_state: State;
     loop {
         let (t, state) = prop.derive(
             dyn.time(),
             &dyn.state(),
-            |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+            |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {

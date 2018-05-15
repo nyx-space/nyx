@@ -116,8 +116,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         // Now do summation ------------------------------------------------
         // initialize recursion
         let rho = self.radius / r_;
+        // NOTE: There currently is no rho_np2 because that's only used when computing the STM
         let mut rho_np1 = -self.mu / r_ * rho; // rho(0) ,Ref[3], Eq 26 , factor = mu for gravity
-        let mut rho_np2 = rho_np1 * rho;
         let mut a1 = 0.0;
         let mut a2 = 0.0;
         let mut a3 = 0.0;
@@ -125,7 +125,6 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let sqrt2 = 2.0f64.sqrt();
         for n in 1..max_order {
             rho_np1 *= rho;
-            rho_np2 *= rho;
             let mut sum1 = 0.0;
             let mut sum2 = 0.0;
             let mut sum3 = 0.0;
