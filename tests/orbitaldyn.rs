@@ -232,9 +232,13 @@ fn two_body_j2_jgm3_state_parametrized() {
                     );
             }
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
-            println!("Final state:\n{0}\n{0:o}", final_state);
-            println!("Expected:\n{0}\n{0:o}", rslt);
-            assert_eq!(final_state, rslt, "two body prop failed",);
+            assert_eq!(
+                final_state,
+                rslt,
+                "two body prop failed\nexpected: {0:o}\ncomputed: {1:o}",
+                rslt,
+                final_state
+            );
             break;
         }
     }

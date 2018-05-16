@@ -71,13 +71,6 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             }
         }
 
-        // initialize the diagonal elements (not a function of the input)
-        a_matrix[0][0] = 1.0; // Temp value for this first initialization
-        for n in 1..max_degree + 3 {
-            let nf64 = n as f64;
-            a_matrix[n][n] = ((2.0 * nf64 + 1.0).sqrt() / (2.0 * nf64)) * a_matrix[n - 1][n - 1];
-        }
-
         // generate the off-diagonal elements
         a_matrix[1][0] = u_ * 3.0f64.sqrt();
         for n in 1..max_degree + 2 {
