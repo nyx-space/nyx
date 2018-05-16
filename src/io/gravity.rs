@@ -3,20 +3,19 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::str::FromStr;
 use std::collections::HashMap;
-
 pub trait GravityPotentialStor
 where
     Self: Sized,
 {
-    /// Returns the maximum order of this gravity potential storage
-    fn max_order(&self) -> u16;
-    /// Returns the maximum degree of this gravity potential storage
+    /// Returns the maximum degree of this gravity potential storage (Jn=J2,J3...)
     fn max_degree(&self) -> u16;
+    /// Returns the maximum order of this gravity potential storage (Jnm=Jn2,Jn3...)
+    fn max_order(&self) -> u16;
     /// Returns the C_nm and S_nm for the provided order and degree.
     ///
     /// WARNING: It's up to the caller to ensure that no degree or order greater than stored
     /// in this `GravityPotentialStor` is requested. Depending on the implementor, this call might `panic!`.
-    fn cs_nm(&self, order: u16, degree: u16) -> (f64, f64);
+    fn cs_nm(&self, degree: u16, order: u16) -> (f64, f64);
 }
 
 /// `MemoryBackend` loads the requested gravity potential files and stores them in memory (in a HashMap).
@@ -24,8 +23,8 @@ where
 /// WARNING: This memory backend may require a lot of RAM (e.g. EMG2008 2190x2190 requires nearly 400 MB of RAM).
 #[derive(Clone)]
 pub struct MemoryBackend {
-    order: u16,
     degree: u16,
+    order: u16,
     // data is (degree, order) -> (C_nm, S_nm)
     data: HashMap<(u16, u16), (f64, f64)>,
 }
@@ -40,9 +39,12 @@ impl MemoryBackend {
         data.insert((0, 0), (0.0, 0.0));
         data.insert((1, 0), (0.0, 0.0));
         data.insert((2, 0), (-4.84165374886470e-04, 0.0));
+        data.insert((2, 1), (-1.86987640000000e-10, 1.19528010000000e-09));
+        data.insert((2, 1), (2.43926074865630e-06, -1.40026639758800e-06));
+
         MemoryBackend {
-            order: 2,
-            degree: 0,
+            degree: 2,
+            order: 0,
             data: data,
         }
     }
@@ -57,8 +59,8 @@ impl MemoryBackend {
         data.insert((1, 0), (0.0, 0.0));
         data.insert((2, 0), (-4.8416539e-04, 0.0));
         MemoryBackend {
-            order: 2,
-            degree: 0,
+            degree: 2,
+            order: 0,
             data: data,
         }
     }
@@ -72,8 +74,8 @@ impl MemoryBackend {
         data.insert((1, 0), (0.0, 0.0));
         data.insert((2, 0), (-0.484165143790815e-03, 0.0));
         MemoryBackend {
-            order: 2,
-            degree: 0,
+            degree: 2,
+            order: 0,
             data: data,
         }
     }
@@ -152,24 +154,24 @@ impl MemoryBackend {
             // println!("{:?}", lparts);
             // These variables need to be declared as mutable because rustc does not know
             // we nwon't match each ino more than once.
-            let mut cur_order: u16 = 0;
             let mut cur_degree: u16 = 0;
+            let mut cur_order: u16 = 0;
             let mut c_nm: f64 = 0.0;
             let mut s_nm: f64 = 0.0;
             for (ino, item) in line.split_whitespace().enumerate() {
                 match ino {
                     0 => continue, // We need this so we don't break at every first item
                     1 => match u16::from_str(item) {
-                        Ok(val) => cur_order = val,
+                        Ok(val) => cur_degree = val,
                         Err(_) => {
-                            println!("could not parse order on line {} -- ignoring line", lno);
+                            println!("could not parse degree on line {} -- ignoring line", lno);
                             break;
                         }
                     },
                     2 => match u16::from_str(item) {
-                        Ok(val) => cur_degree = val,
+                        Ok(val) => cur_order = val,
                         Err(_) => {
-                            println!("could not parse degree on line {} -- ignoring line", lno);
+                            println!("could not parse order on line {} -- ignoring line", lno);
                             break;
                         }
                     },
@@ -275,15 +277,15 @@ impl MemoryBackend {
                 }
             }
 
-            if cur_order > order {
-                // The file is organized by order, so once we've passed the maximum order we want,
+            if cur_degree > degree {
+                // The file is organized by degree, so once we've passed the maximum degree we want,
                 // we can safely stop reading the file.
                 break;
             }
 
-            // Only insert this data into the hashmap if it's within the required degree as well
-            if cur_degree <= degree {
-                data.insert((cur_order, cur_degree), (c_nm, s_nm));
+            // Only insert this data into the hashmap if it's within the required order as well
+            if cur_order <= order {
+                data.insert((cur_degree, cur_order), (c_nm, s_nm));
             }
             // This serves as a warning.
             max_order = if cur_order > max_order {
@@ -309,8 +311,8 @@ impl MemoryBackend {
             );
         }
         MemoryBackend {
-            order: max_order,
             degree: max_degree,
+            order: max_order,
             data: data,
         }
     }
@@ -325,8 +327,8 @@ impl MemoryBackend {
     ) -> MemoryBackend {
         let mut data: HashMap<(u16, u16), (f64, f64)>;
         data = HashMap::new();
-        let mut max_order: u16 = 0;
         let mut max_degree: u16 = 0;
+        let mut max_order: u16 = 0;
         for (lno, line) in data_as_str.split("\n").enumerate() {
             if lno == 0 && skip_first_line {
                 continue;
@@ -340,16 +342,16 @@ impl MemoryBackend {
             for (ino, item) in line.split_whitespace().enumerate() {
                 match ino {
                     0 => match u16::from_str(item) {
-                        Ok(val) => cur_order = val,
+                        Ok(val) => cur_degree = val,
                         Err(_) => {
-                            println!("could not parse order on line {} -- ignoring line", lno);
+                            println!("could not parse degree on line {} -- ignoring line", lno);
                             break;
                         }
                     },
                     1 => match u16::from_str(item) {
-                        Ok(val) => cur_degree = val,
+                        Ok(val) => cur_order = val,
                         Err(_) => {
-                            println!("could not parse degree on line {} -- ignoring line", lno);
+                            println!("could not parse order on line {} -- ignoring line", lno);
                             break;
                         }
                     },
@@ -374,15 +376,15 @@ impl MemoryBackend {
                 }
             }
 
-            if cur_order > order {
-                // The file is organized by order, so once we've passed the maximum order we want,
+            if cur_degree > degree {
+                // The file is organized by degree, so once we've passed the maximum degree we want,
                 // we can safely stop reading the file.
                 break;
             }
 
-            // Only insert this data into the hashmap if it's within the required degree as well
-            if cur_degree <= degree {
-                data.insert((cur_order, cur_degree), (c_nm, s_nm));
+            // Only insert this data into the hashmap if it's within the required order as well
+            if cur_order <= order {
+                data.insert((cur_degree, cur_order), (c_nm, s_nm));
             }
             // This serves as a warning.
             max_order = if cur_order > max_order {
@@ -424,8 +426,8 @@ impl GravityPotentialStor for MemoryBackend {
         self.degree
     }
 
-    fn cs_nm(&self, order: u16, degree: u16) -> (f64, f64) {
-        let &(c, s) = self.data.get(&(order, degree)).unwrap();
+    fn cs_nm(&self, degree: u16, order: u16) -> (f64, f64) {
+        let &(c, s) = self.data.get(&(degree, order)).unwrap();
         (c, s)
     }
 }

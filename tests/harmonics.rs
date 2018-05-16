@@ -85,8 +85,8 @@ fn two_body_j2_state_parametrized() {
             }
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
             assert_eq!(
-                final_state,
                 rslt,
+                final_state,
                 "two body prop failed\nexpected: {0:o}\ncomputed: {1:o}",
                 rslt,
                 final_state
