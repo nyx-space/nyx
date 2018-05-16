@@ -32,23 +32,20 @@ where
 impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
     type StateSize = U6;
 
+    /// NOTE: No state is associated with Harmonics, always return zero time
     fn time(&self) -> f64 {
         0.0
     }
 
+    /// NOTE: No state is associated with Harmonics, always return zero
     fn state(&self) -> VectorN<f64, Self::StateSize> {
-        // No state is associated with Harmonics, always return zero
         Vector6::zeros()
     }
 
-    /// WARNING: The *new_t* parameter is considered a TIME INCREASE from the initial julian days.
-    /// This is likely a bad assumption (breaks back prop unless new_t is negative) -- I will need to clarify that in the docs.
-    fn set_state(&mut self, new_t: f64, _new_state: &VectorN<f64, Self::StateSize>) {
-        // self.time += new_t / SECONDS_PER_DAY;
-        unimplemented!();
-    }
+    /// NOTE: Nothing happens in this `set_state` since there is no state of spherical harmonics.
+    fn set_state(&mut self, _new_t: f64, _new_state: &VectorN<f64, Self::StateSize>) {}
 
-    /// WARNING: This provides a DELTA of the state, which must be added to the result of the TwoBody propagator being used.
+    /// This provides a **DELTA** of the state, which must be added to the result of the TwoBody propagator being used.
     /// However, the provided `state` must be the position and velocity.
     fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         // NOTE: All this code is a conversion from GMAT's CalculateField1
@@ -114,7 +111,7 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let mut a3 = 0.0;
         let mut a4 = 0.0;
         let sqrt2 = 2.0f64.sqrt();
-        // BUG? cs_nm is called HUNDREDS of times!
+
         for n in 1..max_order + 1 {
             rho_np1 *= rho;
             let mut sum1 = 0.0;

@@ -33,13 +33,29 @@ pub struct MemoryBackend {
 impl MemoryBackend {
     /// Initialize `MemoryBackend` as an EARTH J<sub>2</sub> only using the JGM3 model (available in GMAT)
     ///
-    /// Use the embedded Earth parameter. If others are needed, load from `from_gunzip` or `from_uncompressed`.
+    /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
     pub fn j2_jgm3() -> MemoryBackend {
         let mut data = HashMap::new();
         data.insert((0, 0), (0.0, 0.0));
         data.insert((1, 0), (0.0, 0.0));
         data.insert((2, 0), (-4.84165374886470e-04, 0.0));
+        MemoryBackend {
+            order: 2,
+            degree: 0,
+            data: data,
+        }
+    }
+
+    /// Initialize `MemoryBackend` as an EARTH J<sub>2</sub> only using the JGM2 model (available in GMAT)
+    ///
+    /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
+    /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
+    pub fn j2_jgm2() -> MemoryBackend {
+        let mut data = HashMap::new();
+        data.insert((0, 0), (0.0, 0.0));
+        data.insert((1, 0), (0.0, 0.0));
+        data.insert((2, 0), (-4.8416539e-04, 0.0));
         MemoryBackend {
             order: 2,
             degree: 0,
