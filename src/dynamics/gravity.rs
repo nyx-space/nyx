@@ -10,7 +10,7 @@ pub struct Harmonics<S>
 where
     S: GravityPotentialStor,
 {
-    mu: f64,
+    neg_mu: f64,
     body_radius: f64,
     stor: S,
 }
@@ -22,7 +22,7 @@ where
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
     pub fn from_stor<B: CelestialBody>(stor: S) -> Harmonics<S> {
         Harmonics {
-            mu: B::gm(),
+            neg_mu: -B::gm(),
             body_radius: B::eq_radius(),
             stor: stor,
         }
@@ -119,7 +119,7 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         // initialize recursion
         let rho = self.body_radius / r_;
         // NOTE: There currently is no rho_np2 because that's only used when computing the STM
-        let mut rho_np1 = -self.mu / r_ * rho;
+        let mut rho_np1 = -self.neg_mu / r_ * rho;
         let mut a1 = 0.0;
         let mut a2 = 0.0;
         let mut a3 = 0.0;

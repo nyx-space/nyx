@@ -42,7 +42,7 @@ fn two_body_j2_state_parametrized() {
             _t: f64,
             state: &VectorN<f64, Self::StateSize>,
         ) -> VectorN<f64, Self::StateSize> {
-            self.twobody.eom(_t, state) - self.harmonics.eom(_t, state)
+            self.twobody.eom(_t, state) + self.harmonics.eom(_t, state)
         }
     }
 
@@ -85,11 +85,9 @@ fn two_body_j2_state_parametrized() {
             }
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
             assert_eq!(
-                rslt,
-                final_state,
+                rslt, final_state,
                 "two body prop failed\nexpected: {0:o}\ncomputed: {1:o}",
-                rslt,
-                final_state
+                rslt, final_state
             );
             break;
         }

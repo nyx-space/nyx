@@ -39,8 +39,6 @@ impl MemoryBackend {
         data.insert((0, 0), (0.0, 0.0));
         data.insert((1, 0), (0.0, 0.0));
         data.insert((2, 0), (-4.84165374886470e-04, 0.0));
-        data.insert((2, 1), (-1.86987640000000e-10, 1.19528010000000e-09));
-        data.insert((2, 1), (2.43926074865630e-06, -1.40026639758800e-06));
 
         MemoryBackend {
             degree: 2,
@@ -150,8 +148,6 @@ impl MemoryBackend {
             if line.len() == 0 || line.chars().nth(0).unwrap() != 'R' {
                 continue; // This is either a comment, a header or "END"
             }
-            // let lparts: Vec<&str> = line.split_whitespace().collect();
-            // println!("{:?}", lparts);
             // These variables need to be declared as mutable because rustc does not know
             // we nwon't match each ino more than once.
             let mut cur_degree: u16 = 0;
@@ -287,6 +283,15 @@ impl MemoryBackend {
             if cur_order <= order {
                 data.insert((cur_degree, cur_order), (c_nm, s_nm));
             }
+            if max_degree == 0 {
+                // Let's populate with zeros.
+                for n in 0..degree {
+                    for m in 0..n {
+                        data.insert((n, m), (0.0, 0.0));
+                    }
+                }
+            }
+
             // This serves as a warning.
             max_order = if cur_order > max_order {
                 cur_order
