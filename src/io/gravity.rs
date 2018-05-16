@@ -37,6 +37,8 @@ impl MemoryBackend {
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
     pub fn j2_jgm3() -> MemoryBackend {
         let mut data = HashMap::new();
+        data.insert((0, 0), (0.0, 0.0));
+        data.insert((1, 0), (0.0, 0.0));
         data.insert((2, 0), (-4.84165374886470e-04, 0.0));
         MemoryBackend {
             order: 2,
@@ -50,6 +52,8 @@ impl MemoryBackend {
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
     pub fn j2_egm2008() -> MemoryBackend {
         let mut data = HashMap::new();
+        data.insert((0, 0), (0.0, 0.0));
+        data.insert((1, 0), (0.0, 0.0));
         data.insert((2, 0), (-0.484165143790815e-03, 0.0));
         MemoryBackend {
             order: 2,

@@ -73,24 +73,22 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
 
         // initialize the diagonal elements (not a function of the input)
         a_matrix[0][0] = 1.0; // Temp value for this first initialization
-        for n in 1..max_degree {
+        for n in 1..max_degree + 3 {
             let nf64 = n as f64;
             a_matrix[n][n] = ((2.0 * nf64 + 1.0).sqrt() / (2.0 * nf64)) * a_matrix[n - 1][n - 1];
         }
 
         // generate the off-diagonal elements
         a_matrix[1][0] = u_ * 3.0f64.sqrt();
-        for n in 1..max_degree + 1 {
+        for n in 1..max_degree + 2 {
             a_matrix[n + 1][n] = u_ * ((2 * n + 3) as f64).sqrt() * a_matrix[n][n];
         }
 
         let mut re = Vec::with_capacity(max_degree);
         let mut im = Vec::with_capacity(max_degree);
 
-        for m in 0..max_degree + 1 {
-            for n in (m + 2)..max_order + 1 {
-                // XX: This looks like a hack to avoid J<2 because they don't exist (but I do not store them)
-                // normalization factors
+        for m in 0..max_degree + 2 {
+            for n in (m + 2)..max_order + 2 {
                 let n1 = ((((2 * n + 1) * (2 * n - 1)) / ((n - m) * (n + m))) as f64).sqrt();
                 let n2 = ((((2 * n + 1) * (n - m - 1) * (n + m - 1))
                     / ((2 * n - 3) * (n + m) * (n - m))) as f64)
@@ -123,7 +121,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let mut a3 = 0.0;
         let mut a4 = 0.0;
         let sqrt2 = 2.0f64.sqrt();
-        for n in 1..max_order {
+        // BUG? cs_nm is called HUNDREDS of times!
+        for n in 1..max_order + 1 {
             rho_np1 *= rho;
             let mut sum1 = 0.0;
             let mut sum2 = 0.0;
@@ -133,19 +132,17 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             let mut m = 0;
             while m <= n && m <= max_degree {
                 let (c_val, s_val) = self.stor.cs_nm(n as u16, m as u16);
-                // let c_val = self.Cnm(self.julian_days, n, m);
-                // let s_val = self.Snm(self.julian_days, n, m);
                 // Pines Equation 27 (Part of)
                 let d_ = (c_val * re[m] + s_val * im[m]) * sqrt2;
                 let e_ = if m == 0 {
                     0.0
                 } else {
-                    (c_val * re[(m - 1)] + s_val * im[(m - 1)]) * sqrt2
+                    (c_val * re[m - 1] + s_val * im[m - 1]) * sqrt2
                 };
                 let f_ = if m == 0 {
                     0.0
                 } else {
-                    (s_val * re[(m - 1)] - c_val * im[(m - 1)]) * sqrt2
+                    (s_val * re[m - 1] - c_val * im[m - 1]) * sqrt2
                 };
                 // Correct for normalization
                 let mut vr01 = (((n - m) * (n + m + 1)) as f64).sqrt();
@@ -153,8 +150,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
                     / ((2 * n + 3) as f64))
                     .sqrt();
                 if m == 0 {
-                    vr01 /= (2.0f64).sqrt();
-                    vr11 /= (2.0f64).sqrt();
+                    vr01 /= sqrt2;
+                    vr11 /= sqrt2;
                 }
 
                 let avv01 = vr01 * a_matrix[n][m + 1];
@@ -173,7 +170,6 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             a3 += rr * sum3;
             a4 -= rr * sum4;
         }
-
         // Pines Equation 31
         Vector6::new(0.0, 0.0, 0.0, a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_)
     }
