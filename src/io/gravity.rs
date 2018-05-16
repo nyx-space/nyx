@@ -123,6 +123,198 @@ impl MemoryBackend {
         )
     }
 
+    pub fn from_cof(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+        let mut f = File::open(filepath.clone()).expect("could not open file");
+        let mut buffer = vec![0; 0];
+        if gunzipped {
+            let mut d = GzDecoder::new(f);
+            d.read_to_end(&mut buffer)
+                .expect("could not read the full file");
+        } else {
+            f.read_to_end(&mut buffer).expect("to end");
+        }
+
+        // Since the COF files are so specific, we just code everything up in here.
+
+        let mut data: HashMap<(u16, u16), (f64, f64)>;
+        data = HashMap::new();
+        let mut max_order: u16 = 0;
+        let mut max_degree: u16 = 0;
+        for (lno, line) in String::from_utf8(buffer)
+            .expect("error decoding utf8")
+            .split("\n")
+            .enumerate()
+        {
+            if line.len() == 0 || line.chars().nth(0).unwrap() != 'R' {
+                continue; // This is either a comment, a header or "END"
+            }
+            // let lparts: Vec<&str> = line.split_whitespace().collect();
+            // println!("{:?}", lparts);
+            // These variables need to be declared as mutable because rustc does not know
+            // we nwon't match each ino more than once.
+            let mut cur_order: u16 = 0;
+            let mut cur_degree: u16 = 0;
+            let mut c_nm: f64 = 0.0;
+            let mut s_nm: f64 = 0.0;
+            for (ino, item) in line.split_whitespace().enumerate() {
+                match ino {
+                    0 => continue, // We need this so we don't break at every first item
+                    1 => match u16::from_str(item) {
+                        Ok(val) => cur_order = val,
+                        Err(_) => {
+                            println!("could not parse order on line {} -- ignoring line", lno);
+                            break;
+                        }
+                    },
+                    2 => match u16::from_str(item) {
+                        Ok(val) => cur_degree = val,
+                        Err(_) => {
+                            println!("could not parse degree on line {} -- ignoring line", lno);
+                            break;
+                        }
+                    },
+                    3 => {
+                        // If we are at degree zero, then there is only one item, so we can parse that and
+                        // set the S_nm to zero.
+                        if degree == 0 {
+                            s_nm = 0.0;
+                            match f64::from_str(item) {
+                                Ok(val) => c_nm = val,
+                                Err(_) => {
+                                    println!(
+                                        "could not parse C_nm `{}` on line {} -- ignoring line",
+                                        item, lno
+                                    );
+                                    break;
+                                }
+                            }
+                        } else {
+                            // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
+                            // is a positive number, otherwise, they are continuous (what a great format).
+                            if (item.matches("-").count() == 3
+                                && item.chars().nth(0).unwrap() != '-')
+                                || item.matches("-").count() == 4
+                            {
+                                // Now we have two items concatenated into one... great
+                                let parts: Vec<&str> = item.split("-").collect();
+                                if parts.len() == 5 {
+                                    // That mean we have five minus signs, so both the C and S are negative.
+                                    let c_nm_str = "-".to_owned() + parts[1] + "-" + parts[2];
+                                    match f64::from_str(&c_nm_str) {
+                                        Ok(val) => c_nm = val,
+                                        Err(_) => {
+                                            println!(
+                                            "could not parse C_nm `{}` on line {} -- ignoring line",
+                                            item, lno
+                                        );
+                                            break;
+                                        }
+                                    }
+                                    // That mean we have five minus signs, so both the C and S are negative.
+                                    let s_nm_str = "-".to_owned() + parts[3] + "-" + parts[4];
+                                    match f64::from_str(&s_nm_str) {
+                                        Ok(val) => s_nm = val,
+                                        Err(_) => {
+                                            println!(
+                                            "could not parse S_nm `{}` on line {} -- ignoring line",
+                                            item, lno
+                                        );
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // That mean we have fouve minus signs, and since both values are concatenated, C_nm is positive and S_nm is negative
+                                    let c_nm_str = parts[0].to_owned() + "-" + parts[1];
+                                    match f64::from_str(&c_nm_str) {
+                                        Ok(val) => c_nm = val,
+                                        Err(_) => {
+                                            println!(
+                                            "could not parse C_nm `{}` on line {} -- ignoring line",
+                                            item, lno
+                                        );
+                                            break;
+                                        }
+                                    }
+                                    // That mean we have five minus signs, so both the C and S are negative.
+                                    let s_nm_str = "-".to_owned() + parts[2] + "-" + parts[3];
+                                    match f64::from_str(&s_nm_str) {
+                                        Ok(val) => s_nm = val,
+                                        Err(_) => {
+                                            println!(
+                                            "could not parse S_nm `{}` on line {} -- ignoring line",
+                                            item, lno
+                                        );
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else {
+                                // We only have the first item, and that's the C_nm
+                                match f64::from_str(item) {
+                                    Ok(val) => c_nm = val,
+                                    Err(_) => {
+                                        println!(
+                                            "could not parse C_nm `{}` on line {} -- ignoring line",
+                                            item, lno
+                                        );
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    4 => match f64::from_str(item) {
+                        // If this exists, then the S_nm is positive.
+                        Ok(val) => s_nm = val,
+                        Err(_) => {
+                            println!("could not parse S_nm on line {} -- ignoring line", lno);
+                            break;
+                        }
+                    },
+                    _ => break, // We aren't storing the covariance of these harmonics
+                }
+            }
+
+            if cur_order > order {
+                // The file is organized by order, so once we've passed the maximum order we want,
+                // we can safely stop reading the file.
+                break;
+            }
+
+            // Only insert this data into the hashmap if it's within the required degree as well
+            if cur_degree <= degree {
+                data.insert((cur_order, cur_degree), (c_nm, s_nm));
+            }
+            // This serves as a warning.
+            max_order = if cur_order > max_order {
+                cur_order
+            } else {
+                max_order
+            };
+            max_degree = if cur_degree > max_degree {
+                cur_degree
+            } else {
+                max_degree
+            };
+        }
+        if max_degree < degree || max_order < order {
+            warn!(
+                "{} only contained (degree, order) of ({}, {}) instead of requested ({}, {})",
+                filepath, max_degree, max_order, degree, order
+            );
+        } else {
+            info!(
+                "{} loaded with (degree, order) = ({}, {})",
+                filepath, degree, order
+            );
+        }
+        MemoryBackend {
+            order: max_order,
+            degree: max_degree,
+            data: data,
+        }
+    }
+
     /// `load` handles the actual loading in memory.
     fn load(
         skip_first_line: bool,
@@ -193,9 +385,13 @@ impl MemoryBackend {
                 data.insert((cur_order, cur_degree), (c_nm, s_nm));
             }
             // This serves as a warning.
-            max_order = if order > max_order { order } else { max_order };
-            max_degree = if degree > max_degree {
-                degree
+            max_order = if cur_order > max_order {
+                cur_order
+            } else {
+                max_order
+            };
+            max_degree = if cur_degree > max_degree {
+                cur_degree
             } else {
                 max_degree
             };
