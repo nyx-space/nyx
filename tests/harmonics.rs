@@ -4,7 +4,7 @@ use std::f64;
 
 #[test]
 fn two_body_j2_state_parametrized() {
-    /* NOTE: We only test the J2 paramaters here for the JGM3 and JGM2 models. */
+    /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
     use nyx::propagators::{Dormand45, Options, Propagator};
     use nyx::dynamics::Dynamics;
@@ -42,7 +42,7 @@ fn two_body_j2_state_parametrized() {
             _t: f64,
             state: &VectorN<f64, Self::StateSize>,
         ) -> VectorN<f64, Self::StateSize> {
-            self.twobody.eom(_t, state) - self.harmonics.eom(_t, state)
+            self.twobody.eom(_t, state) + self.harmonics.eom(_t, state)
         }
     }
 
@@ -52,12 +52,12 @@ fn two_body_j2_state_parametrized() {
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
     let rslt = State::from_cartesian::<EARTH>(
-        -5971.194191668567,
-        3945.5066531626767,
-        2864.636618498951,
-        0.04909695770740798,
-        -4.185093318527218,
-        5.848940867713008,
+        -5751.473991026703,
+        4721.214036506542,
+        2045.947766308757,
+        -0.797740263736765,
+        -3.656451982107864,
+        6.139637922282735,
     );
 
     let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
