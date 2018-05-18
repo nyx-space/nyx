@@ -143,9 +143,14 @@ impl<'a> Propagator<'a> {
                 // Using a fixed step, no adaptive step necessary
                 return ((t + self.details.step), next_state);
             } else {
-                // Let's now compute the error estimate.
+                // Compute the error estimate.
                 let err = err_estimator(&error_est, &(next_state.clone() - state));
-                self.details.error = if err > self.details.error { err } else { self.details.error };
+                self.details.error = if err > self.details.error {
+                    warn!("integration details error: {}", err);
+                    err
+                } else {
+                    self.details.error
+                };
 
                 if self.details.error <= self.opts.tolerance || self.details.step <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
