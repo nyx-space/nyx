@@ -39,17 +39,12 @@ fn two_body_j2_state_parametrized() {
             self.count += 1;
         }
 
-        fn eom(
-            &self,
-            _t: f64,
-            state: &VectorN<f64, Self::StateSize>,
-        ) -> VectorN<f64, Self::StateSize> {
+        fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
             self.twobody.eom(_t, state) + self.harmonics.eom(_t, state)
         }
     }
 
-    let initial_state =
-        State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+    let initial_state = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
@@ -145,16 +140,15 @@ fn two_body_j2_state_parametrized() {
             let details = prop.latest_details();
             if details.error > 1e-2 {
                 assert!(
-                        details.step - 1e-1 < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance: {:?}",
-                        details
-                    );
+                    details.step - 1e-1 < f64::EPSILON,
+                    "step size should be at its minimum because error is higher than tolerance: {:?}",
+                    details
+                );
             }
             println!("{} ==> {:?}", dyn.count, details);
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
-            let rss_pos = ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2)
-                + (rslt.z - final_state.z).powi(2))
-                .sqrt();
+            let rss_pos =
+                ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
             assert_eq!(
                 rslt,
                 final_state,

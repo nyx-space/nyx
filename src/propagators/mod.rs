@@ -89,12 +89,7 @@ impl<'a> Propagator<'a> {
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive<F, N: Dim + DimName>(
-        &mut self,
-        t: f64,
-        state: &VectorN<f64, N>,
-        d_xdt: F,
-    ) -> (f64, VectorN<f64, N>)
+    pub fn derive<F, N: Dim + DimName>(&mut self, t: f64, state: &VectorN<f64, N>, d_xdt: F) -> (f64, VectorN<f64, N>)
     where
         F: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
         DefaultAllocator: Allocator<f64, N>,
@@ -166,8 +161,7 @@ impl<'a> Propagator<'a> {
                 // Using a fixed step, no adaptive step necessary
                 return ((t + self.details.step), next_state);
             } else {
-                if self.details.error <= self.opts.tolerance
-                    || self.details.step <= self.opts.min_step
+                if self.details.error <= self.opts.tolerance || self.details.step <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {
@@ -196,8 +190,7 @@ impl<'a> Propagator<'a> {
                     // So let's adapt the step size.
                     self.details.attempts += 1;
                     let proposed_step = 0.9 * self.details.step
-                        * (self.opts.tolerance / self.details.error)
-                            .powf(1.0 / f64::from(self.order - 1));
+                        * (self.opts.tolerance / self.details.error).powf(1.0 / f64::from(self.order - 1));
                     self.details.step = if proposed_step < self.opts.min_step {
                         self.opts.min_step
                     } else {

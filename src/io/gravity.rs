@@ -186,8 +186,7 @@ impl MemoryBackend {
                         } else {
                             // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
                             // is a positive number, otherwise, they are continuous (what a great format).
-                            if (item.matches("-").count() == 3
-                                && item.chars().nth(0).unwrap() != '-')
+                            if (item.matches("-").count() == 3 && item.chars().nth(0).unwrap() != '-')
                                 || item.matches("-").count() == 4
                             {
                                 // Now we have two items concatenated into one... great
@@ -199,9 +198,9 @@ impl MemoryBackend {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
                                             println!(
-                                            "could not parse C_nm `{}` on line {} -- ignoring line",
-                                            item, lno
-                                        );
+                                                "could not parse C_nm `{}` on line {} -- ignoring line",
+                                                item, lno
+                                            );
                                             break;
                                         }
                                     }
@@ -211,9 +210,9 @@ impl MemoryBackend {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
                                             println!(
-                                            "could not parse S_nm `{}` on line {} -- ignoring line",
-                                            item, lno
-                                        );
+                                                "could not parse S_nm `{}` on line {} -- ignoring line",
+                                                item, lno
+                                            );
                                             break;
                                         }
                                     }
@@ -224,9 +223,9 @@ impl MemoryBackend {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
                                             println!(
-                                            "could not parse C_nm `{}` on line {} -- ignoring line",
-                                            item, lno
-                                        );
+                                                "could not parse C_nm `{}` on line {} -- ignoring line",
+                                                item, lno
+                                            );
                                             break;
                                         }
                                     }
@@ -236,9 +235,9 @@ impl MemoryBackend {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
                                             println!(
-                                            "could not parse S_nm `{}` on line {} -- ignoring line",
-                                            item, lno
-                                        );
+                                                "could not parse S_nm `{}` on line {} -- ignoring line",
+                                                item, lno
+                                            );
                                             break;
                                         }
                                     }
@@ -320,13 +319,7 @@ impl MemoryBackend {
     }
 
     /// `load` handles the actual loading in memory.
-    fn load(
-        skip_first_line: bool,
-        degree: u16,
-        order: u16,
-        data_as_str: String,
-        filepath: String,
-    ) -> MemoryBackend {
+    fn load(skip_first_line: bool, degree: u16, order: u16, data_as_str: String, filepath: String) -> MemoryBackend {
         let mut data: HashMap<(u16, u16), (f64, f64)>;
         data = HashMap::new();
         let mut max_degree: u16 = 0;

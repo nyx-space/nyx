@@ -60,12 +60,9 @@ impl Dynamics for AngularMom {
     ///
     /// Source: Schaub & Junkins, 3th ed., eq. 4.32.
     fn eom(&self, _t: f64, omega: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
-        let omega_dot_x = (self.tensor[(1, 1)] - self.tensor[(2, 2)]) / self.tensor[(0, 0)]
-            * omega[(1, 0)] * omega[(2, 0)];
-        let omega_dot_y = (self.tensor[(2, 2)] - self.tensor[(0, 0)]) / self.tensor[(1, 1)]
-            * omega[(2, 0)] * omega[(0, 0)];
-        let omega_dot_z = (self.tensor[(0, 0)] - self.tensor[(1, 1)]) / self.tensor[(2, 2)]
-            * omega[(0, 0)] * omega[(1, 0)];
+        let omega_dot_x = (self.tensor[(1, 1)] - self.tensor[(2, 2)]) / self.tensor[(0, 0)] * omega[(1, 0)] * omega[(2, 0)];
+        let omega_dot_y = (self.tensor[(2, 2)] - self.tensor[(0, 0)]) / self.tensor[(1, 1)] * omega[(2, 0)] * omega[(0, 0)];
+        let omega_dot_z = (self.tensor[(0, 0)] - self.tensor[(1, 1)]) / self.tensor[(2, 2)] * omega[(0, 0)] * omega[(1, 0)];
         Vector3::new(omega_dot_x, omega_dot_y, omega_dot_z)
     }
 }

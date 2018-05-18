@@ -92,12 +92,10 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         // apply column-fill recursion formula (Table 2, Row I, Ref.[1])
         for m in 0..max_order + 2 {
             for n in (m + 2)..max_degree + 2 {
-                let n1 =
-                    ((((2 * n + 1) * (2 * n - 1)) as f64) / (((n - m) * (n + m)) as f64)).sqrt();
+                let n1 = ((((2 * n + 1) * (2 * n - 1)) as f64) / (((n - m) * (n + m)) as f64)).sqrt();
 
-                let n2 = ((((2 * n + 1) * (n - m - 1) * (n + m - 1)) as f64)
-                    / (((2 * n - 3) * (n + m) * (n - m)) as f64))
-                    .sqrt();
+                let n2 =
+                    ((((2 * n + 1) * (n - m - 1) * (n + m - 1)) as f64) / (((2 * n - 3) * (n + m) * (n - m)) as f64)).sqrt();
 
                 a_matrix[n][m] = u_ * n1 * a_matrix[n - 1][m] - n2 * a_matrix[n - 2][m];
             }
@@ -150,9 +148,7 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
                 };
                 // Correct for normalization
                 let mut vr01 = (((n - m) * (n + m + 1)) as f64).sqrt();
-                let mut vr11 = (((2 * n + 1) * (n + m + 2) * (n + m + 1)) as f64
-                    / ((2 * n + 3) as f64))
-                    .sqrt();
+                let mut vr11 = (((2 * n + 1) * (n + m + 2) * (n + m + 1)) as f64 / ((2 * n + 3) as f64)).sqrt();
                 if m == 0 {
                     vr01 /= sqrt2;
                     vr11 /= sqrt2;

@@ -41,10 +41,10 @@ fn two_body_parametrized() {
             let details = prop.latest_details();
             if details.error > 1e-2 {
                 assert!(
-                        details.step - 1e-1 < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance: {:?}",
-                        details
-                    );
+                    details.step - 1e-1 < f64::EPSILON,
+                    "step size should be at its minimum because error is higher than tolerance: {:?}",
+                    details
+                );
             }
             println!("{:?}", prop.latest_details());
             assert_eq!(dyn.state(), rslt, "two body prop failed",);
@@ -87,10 +87,10 @@ fn two_body_custom() {
             let details = prop.latest_details();
             if details.error > 1e-2 {
                 assert!(
-                        details.step - 1e-1 < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance: {:?}",
-                        details
-                    );
+                    details.step - 1e-1 < f64::EPSILON,
+                    "step size should be at its minimum because error is higher than tolerance: {:?}",
+                    details
+                );
             }
             println!("{:?}", prop.latest_details());
             assert_eq!(dyn.state(), rslt, "two body prop failed",);
@@ -108,8 +108,7 @@ fn two_body_state_parametrized() {
     use nyx::celestia::{State, EARTH};
     use self::na::Vector6;
 
-    let initial_state =
-        State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+    let initial_state = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
@@ -137,10 +136,10 @@ fn two_body_state_parametrized() {
             let details = prop.latest_details();
             if details.error > 1e-2 {
                 assert!(
-                        details.step - 1e-1 < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance: {:?}",
-                        details
-                    );
+                    details.step - 1e-1 < f64::EPSILON,
+                    "step size should be at its minimum because error is higher than tolerance: {:?}",
+                    details
+                );
             }
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
             assert_eq!(final_state, rslt, "two body prop failed",);

@@ -86,8 +86,7 @@ fn leo_day_prop() {
 
     let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
     for mut prop in all_props {
-        let mut init_state =
-            Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
+        let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
@@ -100,11 +99,11 @@ fn leo_day_prop() {
                     let details = prop.latest_details();
                     if details.error > 1e-2 {
                         assert!(
-                        details.step - 1e-1 < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
-                        p_id,
-                        details
-                    );
+                            details.step - 1e-1 < f64::EPSILON,
+                            "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
+                            p_id,
+                            details
+                        );
                     }
                     println!("p_id={} => {:?}", p_id, prop.latest_details());
                 }
