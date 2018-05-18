@@ -6,15 +6,17 @@ GMAT is validated on flown missions. It was also validated against other softwar
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
 The tests in [`propagators.rs`](../propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./propagators/) and is named after the propagator used.
 
-The following table corresponds to the **errors** between the `nyx` output for the one day GEO propagation in two body dynamics and the GMAT output using the same step configuration.
+The following table corresponds to the **errors** between the `nyx` output for the one day LEO propagation in two body dynamics and the GMAT output using the same step configuration.
+
+## Without the automatic step increase computation
 
 Propagator  | x | y | z | vx | vy |  vz
 --|---|---|---|---|---|--
 RK4Fixed  | 1.4e-9 | 3.0e-8 | 4.0e-8 | 3.6e-11 | 2.4e-11 | 1.7e-11
-Dormand45  | 2.1e-9 | 3.1e-7 | 4.5e-7 | 3.9e-10 | 2.6e-10 | 1.9e-10
-Verner56  | 2.5e-9 | 8.6e-7 | 1.2e-6 | 1.1e-9 | 7.1e-10 | 5.2e-10
-Dormand87  | 2.5e-9 | 9.6e-9 | 1.3e-8 | 1.2e-11 | 7.9e-12 | 5.6e-12
-RK89  | 3.8e-10 | 7.7e-9 | 1.0e-8 | 9.4e-12 | 6.4e-12 | 4.4e-12
+Dormand45  | 2.7e-9 | 3.4e-7 | 4.8e-7 | 4.3e-10 | 2.8e-10 | 2.1e-10
+Verner56  | 3.8e-9 | 8.2e-7 | 1.2e-6 | 1.0e-9 | 6.8e-10 | 5.0e-10
+Dormand87  | 3.6e-9 | 1.1e-7 | 1.6e-7 | 1.4e-10 | 9.5e-11 | 6.8e-11
+RK89  | 1.9e-9 | 3.1e-8 | 4.8e-8 | 4.1e-11 | 2.5e-11 | 2.2e-11
 
 # Orbital state
 This validation compares the computations of orbital elements in nyx with those in GMAT. Each scenario script is in the subfolder [state](./state/).
@@ -24,7 +26,7 @@ The following table corresponds to the **absolute errors** between the `nyx` com
 
 ## From a Cartesian state
 
-Element / Scenario  | circular inclined  | circular equatorial  | elliptical 
+Element / Scenario  | circular inclined  | circular equatorial  | elliptical
 --|---|---|---|---|---|---|--
 Earth.Energy  | 0.0 | 0.0 | 0.0
 Earth.OrbitPeriod | 0.0 | 0.0 | 0.0

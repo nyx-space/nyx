@@ -131,12 +131,12 @@ impl<'a> Propagator<'a> {
             // RK error estimation from https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L520
             let mut error_est = VectorN::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
-                let b_i = self.b_coeffs[i];
+                let b_i_star = self.b_coeffs[i + self.stages];
                 if !self.fixed_step {
-                    let b_i_star = self.b_coeffs[i + self.stages];
-                    error_est += self.details.step * b_i_star * ki;
+                    let b_i = self.b_coeffs[i];
+                    error_est += self.details.step * (b_i - b_i_star) * ki;
                 }
-                next_state += self.details.step * b_i * ki;
+                next_state += self.details.step * b_i_star * ki;
             }
 
             if !self.opts.fixed_step {
@@ -170,20 +170,20 @@ impl<'a> Propagator<'a> {
                 // Using a fixed step, no adaptive step necessary, or
                 // Error is within the desired tolerance, or it isn't but we've already reach the minimum step allowed
                 let step_taken = self.details.step;
-                if !self.opts.fixed_step && self.details.error <= self.opts.tolerance {
-                    // Error is less than tolerance, let's attempt to increase the step for the next iteration.
-                    let proposed_step = 0.9 * step_taken
-                        * (self.opts.tolerance / self.details.error)
-                            .powf(1.0 / (f64::from(self.order + 1)));
-                    self.details.step = if proposed_step > self.opts.max_step {
-                        self.opts.max_step
-                    } else if proposed_step < self.opts.min_step {
-                        // This is at best an edge case where the initial step is tiny but the tolerance very large.
-                        self.opts.min_step
-                    } else {
-                        proposed_step
-                    };
-                }
+                // if !self.opts.fixed_step && self.details.error < self.opts.tolerance {
+                //     // Error is less than tolerance, let's attempt to increase the step for the next iteration.
+                //     let proposed_step = 0.9 * step_taken
+                //         * (self.opts.tolerance / self.details.error)
+                //             .powf(1.0 / (f64::from(self.order + 1)));
+                //     self.details.step = if proposed_step > self.opts.max_step {
+                //         self.opts.max_step
+                //     } else if proposed_step < self.opts.min_step {
+                //         // This is at best an edge case where the initial step is tiny but the tolerance very large.
+                //         self.opts.min_step
+                //     } else {
+                //         proposed_step
+                //     };
+                // }
                 return ((t + step_taken), next_state);
             } else if !self.opts.fixed_step {
                 self.details.attempts += 1;

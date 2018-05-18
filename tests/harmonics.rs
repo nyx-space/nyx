@@ -6,7 +6,7 @@ use std::f64;
 fn two_body_j2_state_parametrized() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
-    use nyx::propagators::{Dormand45GMAT, Options, Propagator};
+    use nyx::propagators::{Dormand45, Options, Propagator};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -115,7 +115,7 @@ fn two_body_j2_state_parametrized() {
         5.246167325614458,
     );*/
 
-    let mut prop = Propagator::new::<Dormand45GMAT>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+    let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
 
     let mut dyn = J2Dyn {
         count: 0,
@@ -133,13 +133,13 @@ fn two_body_j2_state_parametrized() {
 
         //21545.20660150781         -2728.982473620118          5828.204100235614           -4283.011993532577          -4.908655003219503           1.396985776507358            5.044885333154066
         //21545.20669915102         -2770.309550926466          5839.810621220687           -4240.320168935513          -4.88865090424546            1.354542470065089            5.075958201048959
-        if dyn.time() >= 17850.335892650764 && dyn.time() <= 17858.772265934385 {
-            println!(
-                "NOW @ {} : {}",
-                dyn.time(),
-                State::from_cartesian_vec::<EARTH>(&dyn.state())
-            );
-        }
+        // if dyn.time() >= 17850.335892650764 && dyn.time() <= 17858.772265934385 {
+        //     println!(
+        //         "NOW @ {} : {}",
+        //         dyn.time(),
+        //         State::from_cartesian_vec::<EARTH>(&dyn.state())
+        //     );
+        // }
         if dyn.time() >= 86400.0 {
             println!("{:?}", 21545.00000039794 + dyn.time() / 86400.0);
             let details = prop.latest_details();
