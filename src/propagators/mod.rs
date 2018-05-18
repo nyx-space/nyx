@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use std::f64;
-use self::na::{DefaultAllocator, Dim, DimName, U1, U3, VectorN};
+use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
 
 // Re-Export
@@ -89,9 +89,16 @@ impl<'a> Propagator<'a> {
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive<F, N: Dim + DimName>(&mut self, t: f64, state: &VectorN<f64, N>, d_xdt: F) -> (f64, VectorN<f64, N>)
+    pub fn derive<D, E, N: Dim + DimName>(
+        &mut self,
+        t: f64,
+        state: &VectorN<f64, N>,
+        d_xdt: D,
+        err_estimator: E,
+    ) -> (f64, VectorN<f64, N>)
     where
-        F: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
+        D: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
+        E: Fn(&VectorN<f64, N>, &VectorN<f64, N>) -> f64,
         DefaultAllocator: Allocator<f64, N>,
     {
         // Reset the number of attempts used
@@ -136,48 +143,14 @@ impl<'a> Propagator<'a> {
             }
 
             if !self.opts.fixed_step {
-                // Let's now compute the physical model error.
-                let err_radius = error_est.fixed_slice::<U3, U1>(0, 0).norm();
-                let delta_radius = (next_state.fixed_slice::<U3, U1>(0, 0) - state.fixed_slice::<U3, U1>(0, 0)).norm();
-                let err = if delta_radius > 0.1 {
-                    err_radius / delta_radius
-                } else {
-                    err_radius
-                };
+                // Let's now compute the error estimate.
+                let err = err_estimator(&error_est, &(next_state.clone() - state));
                 self.details.error = if err > self.details.error {
                     println!("new radius err {:?}", err);
                     err
                 } else {
                     self.details.error
                 };
-
-                let err_vel = error_est.fixed_slice::<U3, U1>(3, 0).norm();
-                let delta_vel = (next_state.fixed_slice::<U3, U1>(3, 0) - state.fixed_slice::<U3, U1>(3, 0)).norm();
-                let err = if delta_vel > 0.1 {
-                    err_vel / delta_vel
-                } else {
-                    err_vel
-                };
-                self.details.error = if err > self.details.error {
-                    println!("new velocity err {:?}", err);
-                    err
-                } else {
-                    self.details.error
-                };
-
-                // The following computes the "physical model" error, as per https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L938.
-                // In GMAT, the relative error threshold has a default value of 0.1. Although there is a
-                // function to change it (https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L429),
-                // it is considered readonly, https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L316.
-
-                for i in 0..3 {
-                    let err = error_est[(i, 0)] / state[(i, 0)];
-                    self.details.error = if err > self.details.error {
-                        err
-                    } else {
-                        self.details.error
-                    };
-                }
             }
             if self.opts.fixed_step {
                 // Using a fixed step, no adaptive step necessary

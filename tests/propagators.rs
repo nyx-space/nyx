@@ -10,6 +10,51 @@ fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
     Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
 }
 
+fn two_body_error_estimator(prop_err: &Vector6<f64>, state_delta: &Vector6<f64>) -> f64 {
+    // This error estimator is from the point mass force estimator of GMAT
+    // https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PointMassForce.cpp#L664
+    let delta_radius = state_delta.fixed_slice::<U3, U1>(0, 0).norm();
+    let prop_err_radius = state_delta.fixed_slice::<U3, U1>(0, 0).norm();
+    let err_radius = if delta_radius > 0.0 {
+        prop_err_radius / delta_radius
+    } else {
+        prop_err_radius
+    };
+
+    let delta_velocity = state_delta.fixed_slice::<U3, U1>(3, 0).norm();
+    let prop_err_velocity = state_delta.fixed_slice::<U3, U1>(3, 0).norm();
+    let err_velocity = if delta_velocity > 0.0 {
+        prop_err_velocity / delta_velocity
+    } else {
+        prop_err_velocity
+    };
+
+    // Always return the largest of both errors
+    if err_radius > err_velocity {
+        err_radius
+    } else {
+        err_velocity
+    }
+}
+
+fn default_error_estimator(prop_err: &Vector6<f64>, state_delta: &Vector6<f64>) -> f64 {
+    // This error estimator is from the physical model estimator of GMAT
+    // https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987
+    let mut max_err = 0.0;
+    let rel_threshold = 0.1;
+    for (i, prop_err_i) in prop_err.iter().enumerate() {
+        let err = if state_delta[(i, 0)] > rel_threshold {
+            (prop_err_i / state_delta[(i, 0)]).abs()
+        } else {
+            prop_err_i.abs()
+        };
+        if err > max_err {
+            max_err = err;
+        }
+    }
+    max_err
+}
+
 #[test]
 fn leo_day_prop() {
     extern crate nalgebra as na;
@@ -90,7 +135,12 @@ fn leo_day_prop() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
+            let (t, state) = prop.derive(
+                cur_t,
+                &init_state,
+                two_body_dynamics,
+                default_error_estimator,
+            );
             iterations += 1;
             cur_t = t;
             init_state = state;

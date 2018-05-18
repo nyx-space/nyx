@@ -35,6 +35,7 @@ fn two_body_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+            dyn.error_estimator,
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {

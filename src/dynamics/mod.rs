@@ -57,4 +57,29 @@ where
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
+
+    /// This is the default error estimator.
+    ///
+    /// It calculates the largest local estimate of the error from the integration (`prop_err`)
+    /// given the difference in the candidate state and the previous state (`state_delta`).
+    /// This error estimator is from the physical model estimator of GMAT
+    /// https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987
+    fn error_estimator(prop_err: &VectorN<f64, Self::StateSize>, state_delta: &VectorN<f64, Self::StateSize>) -> f64
+    where
+        DefaultAllocator: Allocator<f64, Self::StateSize>,
+    {
+        let mut max_err = 0.0;
+        let rel_threshold = 0.1;
+        for (i, prop_err_i) in prop_err.iter().enumerate() {
+            let err = if state_delta[(i, 0)] > rel_threshold {
+                (prop_err_i / state_delta[(i, 0)]).abs()
+            } else {
+                prop_err_i.abs()
+            };
+            if err > max_err {
+                max_err = err;
+            }
+        }
+        max_err
+    }
 }
