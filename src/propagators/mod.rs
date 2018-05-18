@@ -3,6 +3,7 @@ extern crate nalgebra as na;
 use std::f64;
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
+// use super::dynamics::Dynamics;
 
 // Re-Export
 mod rk;
@@ -78,6 +79,21 @@ impl<'a> Propagator<'a> {
             fixed_step: T::stages() == usize::from(T::order()),
         }
     }
+    //
+    // pub fn derive_dynamics<D, E, N: Dim + DimName>(&mut self, t: f64, state: &VectorN<f64, N>, dyn: D) -> (f64, VectorN<f64, N>)
+    // where
+    //     D: Dynamics,
+    //     DefaultAllocator: Allocator<f64, N>,
+    // {
+    //     self.derive(
+    //         t,
+    //         state,
+    //         |t_: f64, state_: &VectorN<f64, <Type as dynamics::Dynamics>::StateSize>| dyn.eom(t_, state_),
+    //         |prop_err: &VectorN<f64, Dynamics::StateSize>, state_delta: &VectorN<f64, dyn::StateSize>| {
+    //             Dynamics::error_estimator(prop_err, state_delta)
+    //         },
+    //     )
+    // }
 
     /// This method integrates whichever function is provided as `d_xdt`.
     ///
@@ -122,10 +138,7 @@ impl<'a> Propagator<'a> {
                     a_idx += 1;
                 }
 
-                let ki = d_xdt(
-                    t + ci * self.details.step,
-                    &(state + self.details.step * wi),
-                );
+                let ki = d_xdt(t + ci * self.details.step, &(state + self.details.step * wi));
                 k.push(ki);
             }
             // Compute the next state and the error
@@ -160,10 +173,7 @@ impl<'a> Propagator<'a> {
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {
-                        warn!(
-                            "maximum number of attempts reached ({})",
-                            self.details.attempts
-                        );
+                        warn!("maximum number of attempts reached ({})", self.details.attempts);
                     }
 
                     let step_taken = self.details.step;

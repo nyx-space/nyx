@@ -14,7 +14,7 @@ fn two_body_error_estimator(prop_err: &Vector6<f64>, state_delta: &Vector6<f64>)
     // This error estimator is from the point mass force estimator of GMAT
     // https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PointMassForce.cpp#L664
     let delta_radius = state_delta.fixed_slice::<U3, U1>(0, 0).norm();
-    let prop_err_radius = state_delta.fixed_slice::<U3, U1>(0, 0).norm();
+    let prop_err_radius = prop_err.fixed_slice::<U3, U1>(0, 0).norm();
     let err_radius = if delta_radius > 0.0 {
         prop_err_radius / delta_radius
     } else {
@@ -135,12 +135,7 @@ fn leo_day_prop() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(
-                cur_t,
-                &init_state,
-                two_body_dynamics,
-                default_error_estimator,
-            );
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, default_error_estimator);
             iterations += 1;
             cur_t = t;
             init_state = state;
@@ -160,18 +155,8 @@ fn leo_day_prop() {
                     }
                     println!("p_id={} => {:?}", p_id, prop.latest_details());
                 }
-                assert_eq!(
-                    state,
-                    all_rslts[p_id],
-                    "geo prop failed for p_id = {}",
-                    p_id
-                );
-                assert_eq!(
-                    iterations,
-                    all_it_cnt[p_id],
-                    "wrong number of iterations (p_id = {})",
-                    p_id
-                );
+                assert_eq!(state, all_rslts[p_id], "geo prop failed for p_id = {}", p_id);
+                assert_eq!(iterations, all_it_cnt[p_id], "wrong number of iterations (p_id = {})", p_id);
                 break;
             }
         }

@@ -123,6 +123,7 @@ fn two_body_j2_state_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
+            |prop_err: &VectorN<f64, U6>, state_delta: &VectorN<f64, U6>| dyn.twobody.error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
 
@@ -150,12 +151,9 @@ fn two_body_j2_state_parametrized() {
             let rss_pos =
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
             assert_eq!(
-                rslt,
-                final_state,
+                rslt, final_state,
                 "J2 JGM3 prop failed: RSS = {} km\nexpected: {:o}\ncomputed: {:o}",
-                rss_pos,
-                rslt,
-                final_state
+                rss_pos, rslt, final_state
             );
             break;
         }

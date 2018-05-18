@@ -64,7 +64,7 @@ where
     /// given the difference in the candidate state and the previous state (`state_delta`).
     /// This error estimator is from the physical model estimator of GMAT
     /// https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987
-    fn error_estimator(prop_err: &VectorN<f64, Self::StateSize>, state_delta: &VectorN<f64, Self::StateSize>) -> f64
+    fn error_estimator(self, prop_err: &VectorN<f64, Self::StateSize>, state_delta: &VectorN<f64, Self::StateSize>) -> f64
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>,
     {

@@ -22,20 +22,13 @@ fn two_body_parametrized() {
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
 
-    let mut dyn = TwoBody::from_state_vec::<EARTH>(&Vector6::new(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088611,
-        -5.088611,
-        0.0,
-    ));
+    let mut dyn = TwoBody::from_state_vec::<EARTH>(&Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0));
     loop {
         let (t, state) = prop.derive(
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
-            dyn.error_estimator,
+            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| dyn.error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {
@@ -82,6 +75,7 @@ fn two_body_custom() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| dyn.error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {
@@ -131,6 +125,7 @@ fn two_body_state_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| dyn.error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {
