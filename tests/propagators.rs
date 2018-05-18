@@ -94,6 +94,9 @@ fn leo_day_prop() {
             iterations += 1;
             cur_t = t;
             init_state = state;
+            if p_id > 0 {
+                println!("{:?}", prop.latest_details());
+            }
             if cur_t >= 3600.0 * 24.0 {
                 if p_id > 0 {
                     let details = prop.latest_details();

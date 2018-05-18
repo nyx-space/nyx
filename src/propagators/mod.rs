@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use std::f64;
-use self::na::{DefaultAllocator, Dim, DimName, VectorN};
+use self::na::{DefaultAllocator, Dim, DimName, U1, U3, VectorN};
 use self::na::allocator::Allocator;
 
 // Re-Export
@@ -123,7 +123,8 @@ impl<'a> Propagator<'a> {
             }
             // Compute the next state and the error
             let mut next_state = state.clone();
-            // RK error estimation from https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L520
+            // State error estimation from https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Adaptive_Runge%E2%80%93Kutta_methods
+            // This is consistent with GMAT https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L537
             let mut error_est = VectorN::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
@@ -135,28 +136,49 @@ impl<'a> Propagator<'a> {
             }
 
             if !self.opts.fixed_step {
+                // Let's now compute the physical model error.
+                let err_radius = error_est.fixed_slice::<U3, U1>(0, 0).norm();
+                let delta_radius = (next_state.fixed_slice::<U3, U1>(0, 0) - state.fixed_slice::<U3, U1>(0, 0)).norm();
+                let err = if delta_radius > 0.1 {
+                    err_radius / delta_radius
+                } else {
+                    err_radius
+                };
+                self.details.error = if err > self.details.error {
+                    println!("new radius err {:?}", err);
+                    err
+                } else {
+                    self.details.error
+                };
+
+                let err_vel = error_est.fixed_slice::<U3, U1>(3, 0).norm();
+                let delta_vel = (next_state.fixed_slice::<U3, U1>(3, 0) - state.fixed_slice::<U3, U1>(3, 0)).norm();
+                let err = if delta_vel > 0.1 {
+                    err_vel / delta_vel
+                } else {
+                    err_vel
+                };
+                self.details.error = if err > self.details.error {
+                    println!("new velocity err {:?}", err);
+                    err
+                } else {
+                    self.details.error
+                };
+
                 // The following computes the "physical model" error, as per https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L938.
                 // In GMAT, the relative error threshold has a default value of 0.1. Although there is a
                 // function to change it (https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L429),
                 // it is considered readonly, https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L316.
-                let rel_err = 0.1; // If I read GMAT source code correclty,
-                let model_state = state.clone();
-                for (i, error_est_i) in error_est.iter().enumerate() {
-                    let delta = (next_state[(i, 0)] - model_state[(i, 0)]).abs();
-                    let err = if delta > rel_err {
-                        // If greater than the relative tolerance, then we normalize it by the difference.
-                        (error_est_i / delta).abs()
-                    } else {
-                        error_est_i.abs()
-                    };
-                    if err > self.details.error {
-                        self.details.error = err;
-                    }
-                }
-            } else {
-                self.details.error = 0.0;
-            }
 
+                for i in 0..3 {
+                    let err = error_est[(i, 0)] / state[(i, 0)];
+                    self.details.error = if err > self.details.error {
+                        err
+                    } else {
+                        self.details.error
+                    };
+                }
+            }
             if self.opts.fixed_step {
                 // Using a fixed step, no adaptive step necessary
                 return ((t + self.details.step), next_state);
@@ -172,18 +194,17 @@ impl<'a> Propagator<'a> {
                     }
 
                     let step_taken = self.details.step;
-                    // if self.details.error <= self.opts.tolerance {
-                    //     // Let's increase the step size for the next iteration.
-                    //     // Error is less than tolerance, let's attempt to increase the step for the next iteration.
-                    //     let proposed_step = 0.9 * step_taken
-                    //         * (self.opts.tolerance / self.details.error)
-                    //             .powf(1.0 / f64::from(self.order));
-                    //     self.details.step = if proposed_step > self.opts.max_step {
-                    //         self.opts.max_step
-                    //     } else {
-                    //         proposed_step
-                    //     };
-                    // }
+                    if self.details.error <= self.opts.tolerance {
+                        // Let's increase the step size for the next iteration.
+                        // Error is less than tolerance, let's attempt to increase the step for the next iteration.
+                        let proposed_step =
+                            0.9 * step_taken * (self.opts.tolerance / self.details.error).powf(1.0 / f64::from(self.order));
+                        self.details.step = if proposed_step > self.opts.max_step {
+                            self.opts.max_step
+                        } else {
+                            proposed_step
+                        };
+                    }
                     return ((t + step_taken), next_state);
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.

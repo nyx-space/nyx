@@ -6,7 +6,7 @@ use std::f64;
 fn two_body_j2_state_parametrized() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
-    use nyx::propagators::{Dormand45, Options, Propagator};
+    use nyx::propagators::{Options, Propagator, Verner56};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -82,12 +82,12 @@ fn two_body_j2_state_parametrized() {
 
     // One day:
     let rslt = State::from_cartesian::<EARTH>(
-        -5751.47399154785,
-        4721.214034143153,
-        2045.947770285066,
-        -0.7977402605029352,
-        -3.656451984758527,
-        6.139637921125921,
+        -5751.473991035841,
+        4721.214036464772,
+        2045.947766378647,
+        -0.7977402636799741,
+        -3.656451982153709,
+        6.139637922263264,
     );
     // 10 days:
     /*
@@ -110,7 +110,7 @@ fn two_body_j2_state_parametrized() {
         5.246167325614458,
     );*/
 
-    let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+    let mut prop = Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 60.0, 1e-12));
 
     let mut dyn = J2Dyn {
         count: 0,

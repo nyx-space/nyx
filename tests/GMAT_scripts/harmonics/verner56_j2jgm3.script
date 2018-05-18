@@ -72,11 +72,11 @@ GMAT DefaultProp_ForceModel.GravityField.Earth.EarthTideModel = 'None';
 
 Create Propagator DefaultProp;
 GMAT DefaultProp.FM = DefaultProp_ForceModel;
-GMAT DefaultProp.Type = PrinceDormand45;
-GMAT DefaultProp.InitialStepSize = 30;
+GMAT DefaultProp.Type = RungeKutta56;
+GMAT DefaultProp.InitialStepSize = 60;
 GMAT DefaultProp.Accuracy = 1e-12;
 GMAT DefaultProp.MinStep = 0.1;
-GMAT DefaultProp.MaxStep = 30;
+GMAT DefaultProp.MaxStep = 60;
 GMAT DefaultProp.MaxStepAttempts = 50;
 GMAT DefaultProp.StopIfAccuracyIsViolated = true;
 
@@ -108,7 +108,7 @@ Create ReportFile ReportFile1;
 GMAT ReportFile1.SolverIterations = Current;
 GMAT ReportFile1.UpperLeft = [ 0.1458333333333333 0.03414634146341464 ];
 GMAT ReportFile1.Size = [ 0.9940476190476191 0.9634146341463414 ];
-GMAT ReportFile1.RelativeZOrder = 27;
+GMAT ReportFile1.RelativeZOrder = 51;
 GMAT ReportFile1.Maximized = true;
 GMAT ReportFile1.Filename = 'ReportFile1.txt';
 GMAT ReportFile1.Precision = 16;
