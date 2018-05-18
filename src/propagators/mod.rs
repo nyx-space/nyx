@@ -131,12 +131,12 @@ impl<'a> Propagator<'a> {
             // RK error estimation from https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L520
             let mut error_est = VectorN::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
-                let b_i_star = self.b_coeffs[i + self.stages];
+                let b_i = self.b_coeffs[i];
                 if !self.fixed_step {
-                    let b_i = self.b_coeffs[i];
+                    let b_i_star = self.b_coeffs[i + self.stages];
                     error_est += self.details.step * (b_i - b_i_star) * ki;
                 }
-                next_state += self.details.step * b_i_star * ki;
+                next_state += self.details.step * b_i * ki;
             }
 
             if !self.opts.fixed_step {
@@ -178,18 +178,18 @@ impl<'a> Propagator<'a> {
                     }
 
                     let step_taken = self.details.step;
-                    if self.details.error <= self.opts.tolerance {
-                        // Let's increase the step size for the next iteration.
-                        // Error is less than tolerance, let's attempt to increase the step for the next iteration.
-                        let proposed_step = 0.9 * step_taken
-                            * (self.opts.tolerance / self.details.error)
-                                .powf(1.0 / f64::from(self.order));
-                        self.details.step = if proposed_step > self.opts.max_step {
-                            self.opts.max_step
-                        } else {
-                            proposed_step
-                        };
-                    }
+                    // if self.details.error <= self.opts.tolerance {
+                    //     // Let's increase the step size for the next iteration.
+                    //     // Error is less than tolerance, let's attempt to increase the step for the next iteration.
+                    //     let proposed_step = 0.9 * step_taken
+                    //         * (self.opts.tolerance / self.details.error)
+                    //             .powf(1.0 / f64::from(self.order));
+                    //     self.details.step = if proposed_step > self.opts.max_step {
+                    //         self.opts.max_step
+                    //     } else {
+                    //         proposed_step
+                    //     };
+                    // }
                     return ((t + step_taken), next_state);
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.

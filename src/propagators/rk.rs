@@ -217,25 +217,6 @@ impl RK for RK89 {
     }
     fn b_coeffs() -> &'static [f64] {
         &[
-            // NOTE: The b_i_star are defined here as a subtraction since the coefficients come from GMAT,
-            // and GMAT actually hard codes the b_i (as `cj[]`) and the errors.
-            -7.0 / 400.0 - 23.0 / 525.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            63.0 / 200.0 - 171.0 / 1400.0,
-            -14.0 / 25.0 - 86.0 / 525.0,
-            21.0 / 20.0 - 93.0 / 280.0,
-            -1024.0 / 975.0 - -2048.0 / 6825.0,
-            -21.0 / 36400.0 - -3.0 / 18200.0,
-            -3.0 / 25.0 - 39.0 / 175.0,
-            -9.0 / 280.0 - 0.0,
-            9.0 / 25.0 - 9.0 / 25.0,
-            233.0 / 4200.0 - 233.0 / 4200.0,
-            // Now here are the b_i
             23.0 / 525.0,
             0.0,
             0.0,
@@ -252,6 +233,24 @@ impl RK for RK89 {
             0.0,
             9.0 / 25.0,
             233.0 / 4200.0,
+            // NOTE: The b_i_star are defined here as a subtraction since the coefficients come from GMAT,
+            // and GMAT actually hard codes the b_i (as `cj[]`) and the errors.
+            23.0 / 525.0 + 7.0 / 400.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            171.0 / 1400.0 - 63.0 / 200.0,
+            86.0 / 525.0 + 14.0 / 25.0,
+            93.0 / 280.0 - 21.0 / 20.0,
+            -2048.0 / 6825.0 + 1024.0 / 975.0,
+            -3.0 / 18200.0 + 21.0 / 36400.0,
+            39.0 / 175.0 + 3.0 / 25.0,
+            9.0 / 280.0,
+            0.0,
+            0.0,
         ]
     }
 }
