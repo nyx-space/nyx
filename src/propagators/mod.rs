@@ -162,42 +162,48 @@ impl<'a> Propagator<'a> {
                 self.details.error = 0.0;
             }
 
-            if self.opts.fixed_step
-                || (self.details.error <= self.opts.tolerance
-                    || self.details.step <= self.opts.min_step)
-                || self.details.attempts >= self.opts.attempts
-            {
-                // Using a fixed step, no adaptive step necessary, or
-                // Error is within the desired tolerance, or it isn't but we've already reach the minimum step allowed
-                let step_taken = self.details.step;
-                // if !self.opts.fixed_step && self.details.error < self.opts.tolerance {
-                //     // Error is less than tolerance, let's attempt to increase the step for the next iteration.
-                //     let proposed_step = 0.9 * step_taken
-                //         * (self.opts.tolerance / self.details.error)
-                //             .powf(1.0 / (f64::from(self.order + 1)));
-                //     self.details.step = if proposed_step > self.opts.max_step {
-                //         self.opts.max_step
-                //     } else if proposed_step < self.opts.min_step {
-                //         // This is at best an edge case where the initial step is tiny but the tolerance very large.
-                //         self.opts.min_step
-                //     } else {
-                //         proposed_step
-                //     };
-                // }
-                return ((t + step_taken), next_state);
-            } else if !self.opts.fixed_step {
-                self.details.attempts += 1;
-                // Error is too high and using adaptive step size
-                let proposed_step = 0.9 * self.details.step
-                    * (self.opts.tolerance / self.details.error)
-                        .powf(1.0 / (f64::from(self.order - 1)));
-                self.details.step = if proposed_step > self.opts.max_step {
-                    self.opts.max_step
-                } else if proposed_step < self.opts.min_step {
-                    self.opts.min_step
+            if self.opts.fixed_step {
+                // Using a fixed step, no adaptive step necessary
+                return ((t + self.details.step), next_state);
+            } else {
+                if self.details.error <= self.opts.tolerance
+                    || self.details.step <= self.opts.min_step
+                    || self.details.attempts >= self.opts.attempts
+                {
+                    if self.details.attempts >= self.opts.attempts {
+                        warn!(
+                            "maximum number of attempts reached ({})",
+                            self.details.attempts
+                        );
+                    }
+
+                    let step_taken = self.details.step;
+                    if self.details.error <= self.opts.tolerance {
+                        // Let's increase the step size for the next iteration.
+                        // Error is less than tolerance, let's attempt to increase the step for the next iteration.
+                        let proposed_step = 0.9 * step_taken
+                            * (self.opts.tolerance / self.details.error)
+                                .powf(1.0 / f64::from(self.order));
+                        self.details.step = if proposed_step > self.opts.max_step {
+                            self.opts.max_step
+                        } else {
+                            proposed_step
+                        };
+                    }
+                    return ((t + step_taken), next_state);
                 } else {
-                    proposed_step
-                };
+                    // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
+                    // So let's adapt the step size.
+                    self.details.attempts += 1;
+                    let proposed_step = 0.9 * self.details.step
+                        * (self.opts.tolerance / self.details.error)
+                            .powf(1.0 / f64::from(self.order - 1));
+                    self.details.step = if proposed_step < self.opts.min_step {
+                        self.opts.min_step
+                    } else {
+                        proposed_step
+                    };
+                }
             }
         }
     }
