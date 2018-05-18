@@ -21,7 +21,7 @@ fn const_mom() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector3<f64>| dyn.eom(t_, state_),
-            |prop_err: &Vector3<f64>, state_delta: &Vector3<f64>| dyn.error_estimator(prop_err, state_delta),
+            |prop_err: &Vector3<f64>, state_delta: &Vector3<f64>| AngularMom::error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 5.0 {

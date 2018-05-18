@@ -28,7 +28,7 @@ fn two_body_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
-            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| dyn.error_estimator(prop_err, state_delta),
+            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| TwoBody::error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {
@@ -75,7 +75,7 @@ fn two_body_custom() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
-            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| dyn.error_estimator(prop_err, state_delta),
+            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| TwoBody::error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {
@@ -125,7 +125,7 @@ fn two_body_state_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
-            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| dyn.error_estimator(prop_err, state_delta),
+            |prop_err: &Vector6<f64>, state_delta: &Vector6<f64>| TwoBody::error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 3600.0 * 24.0 {

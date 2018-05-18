@@ -123,7 +123,7 @@ fn two_body_j2_state_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            |prop_err: &VectorN<f64, U6>, state_delta: &VectorN<f64, U6>| dyn.twobody.error_estimator(prop_err, state_delta),
+            |prop_err: &VectorN<f64, U6>, state_delta: &VectorN<f64, U6>| J2Dyn::error_estimator(prop_err, state_delta),
         );
         dyn.set_state(t, &state);
 
