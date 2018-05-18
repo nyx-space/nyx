@@ -145,21 +145,17 @@ impl<'a> Propagator<'a> {
                 // function to change it (https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L429),
                 // it is considered readonly, https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L316.
                 let rel_err = 0.1; // If I read GMAT source code correclty,
-                let mut retval = 0.0;
-                let mut err = 0.0;
-                let mut delta = 0.0;
                 let model_state = state.clone();
                 for (i, error_est_i) in error_est.iter().enumerate() {
-                    delta = next_state[(i, 0)] - model_state[(i, 0)];
-                    println!("delta[{}] = {}", i, delta);
+                    let delta = (next_state[(i, 0)] - model_state[(i, 0)]).abs();
                     let err = if delta > rel_err {
                         // If greater than the relative tolerance, then we normalize it by the difference.
                         (error_est_i / delta).abs()
                     } else {
                         error_est_i.abs()
                     };
-                    if err > retval {
-                        retval = err;
+                    if err > self.details.error {
+                        self.details.error = err;
                     }
                 }
             } else {
@@ -168,20 +164,36 @@ impl<'a> Propagator<'a> {
 
             if self.opts.fixed_step
                 || (self.details.error <= self.opts.tolerance
-                    || (self.details.step - self.opts.min_step).abs() <= f64::EPSILON)
+                    || self.details.step <= self.opts.min_step)
                 || self.details.attempts >= self.opts.attempts
             {
                 // Using a fixed step, no adaptive step necessary, or
                 // Error is within the desired tolerance, or it isn't but we've already reach the minimum step allowed
-                return ((t + self.details.step), next_state);
+                let step_taken = self.details.step;
+                if !self.opts.fixed_step && self.details.error <= self.opts.tolerance {
+                    // Error is less than tolerance, let's attempt to increase the step for the next iteration.
+                    let proposed_step = 0.9 * step_taken
+                        * (self.opts.tolerance / self.details.error)
+                            .powf(1.0 / (f64::from(self.order + 1)));
+                    self.details.step = if proposed_step > self.opts.max_step {
+                        self.opts.max_step
+                    } else if proposed_step < self.opts.min_step {
+                        // This is at best an edge case where the initial step is tiny but the tolerance very large.
+                        self.opts.min_step
+                    } else {
+                        proposed_step
+                    };
+                }
+                return ((t + step_taken), next_state);
             } else if !self.opts.fixed_step {
-                // TODO: Implement increasing the step size so that `max_step` serves a purpose.
                 self.details.attempts += 1;
                 // Error is too high and using adaptive step size
                 let proposed_step = 0.9 * self.details.step
                     * (self.opts.tolerance / self.details.error)
                         .powf(1.0 / (f64::from(self.order - 1)));
-                self.details.step = if proposed_step < self.opts.min_step {
+                self.details.step = if proposed_step > self.opts.max_step {
+                    self.opts.max_step
+                } else if proposed_step < self.opts.min_step {
                     self.opts.min_step
                 } else {
                     proposed_step

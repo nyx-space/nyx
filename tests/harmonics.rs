@@ -6,7 +6,7 @@ use std::f64;
 fn two_body_j2_state_parametrized() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
-    use nyx::propagators::{Dormand45, Options, Propagator};
+    use nyx::propagators::{Dormand45GMAT, Options, Propagator};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -64,6 +64,7 @@ fn two_body_j2_state_parametrized() {
     );*/
 
     // One minute
+    /*
     let rslt = State::from_cartesian::<EARTH>(
         -2127.483782786232,
         -2737.798886616517,
@@ -71,10 +72,11 @@ fn two_body_j2_state_parametrized() {
         5.207578930784956,
         -4.953733998024182,
         -0.3597773824106297,
-    );
+    );*/
 
     // Ten thousand seconds
-    /*let rslt = State::from_cartesian::<EARTH>(
+    /*
+    let rslt = State::from_cartesian::<EARTH>(
         3075.869682748079,
         1776.782315795178,
         -6870.826570868569,
@@ -82,7 +84,7 @@ fn two_body_j2_state_parametrized() {
         5.320693700850615,
         -0.7495049625159994,
     );*/
-    /*
+
     // One day:
     let rslt = State::from_cartesian::<EARTH>(
         -5751.47399154785,
@@ -91,7 +93,7 @@ fn two_body_j2_state_parametrized() {
         -0.7977402605029352,
         -3.656451984758527,
         6.139637921125921,
-    );*/
+    );
     // 10 days:
     /*
     let rslt = State::from_cartesian::<EARTH>(
@@ -113,7 +115,7 @@ fn two_body_j2_state_parametrized() {
         5.246167325614458,
     );*/
 
-    let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+    let mut prop = Propagator::new::<Dormand45GMAT>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
 
     let mut dyn = J2Dyn {
         count: 0,
@@ -128,7 +130,17 @@ fn two_body_j2_state_parametrized() {
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
         );
         dyn.set_state(t, &state);
-        if dyn.time() >= 60.0 {
+
+        //21545.20660150781         -2728.982473620118          5828.204100235614           -4283.011993532577          -4.908655003219503           1.396985776507358            5.044885333154066
+        //21545.20669915102         -2770.309550926466          5839.810621220687           -4240.320168935513          -4.88865090424546            1.354542470065089            5.075958201048959
+        if dyn.time() >= 17850.335892650764 && dyn.time() <= 17858.772265934385 {
+            println!(
+                "NOW @ {} : {}",
+                dyn.time(),
+                State::from_cartesian_vec::<EARTH>(&dyn.state())
+            );
+        }
+        if dyn.time() >= 86400.0 {
             println!("{:?}", 21545.00000039794 + dyn.time() / 86400.0);
             let details = prop.latest_details();
             if details.error > 1e-2 {
@@ -144,9 +156,12 @@ fn two_body_j2_state_parametrized() {
                 + (rslt.z - final_state.z).powi(2))
                 .sqrt();
             assert_eq!(
-                rslt, final_state,
+                rslt,
+                final_state,
                 "J2 JGM3 prop failed: RSS = {} km\nexpected: {:o}\ncomputed: {:o}",
-                rss_pos, rslt, final_state
+                rss_pos,
+                rslt,
+                final_state
             );
             break;
         }
