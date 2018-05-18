@@ -24,7 +24,7 @@ The following table corresponds to the **absolute errors** between the `nyx` com
 
 ## From a Cartesian state
 
-Element / Scenario  | circular inclined  | circular equatorial  | elliptical |  
+Element / Scenario  | circular inclined  | circular equatorial  | elliptical 
 --|---|---|---|---|---|---|--
 Earth.Energy  | 0.0 | 0.0 | 0.0
 Earth.OrbitPeriod | 0.0 | 0.0 | 0.0
@@ -49,7 +49,7 @@ Earth.SemilatusRectum | 2e-12 | 0.0 | 2e-12
 
 ## From a Keplerian state
 
-Element / Scenario  | circular inclined  | circular equatorial  | elliptical |  
+Element / Scenario  | circular inclined  | circular equatorial  | elliptical
 --|---|---|---|---|---|---|--
 Earth.X  | 0.0 | 0.0 | 0.0
 Earth.Y  | 0.0 | 1e-14 | 4e-13

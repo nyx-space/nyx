@@ -101,6 +101,7 @@ impl<'a> Propagator<'a> {
     {
         // Reset the number of attempts used
         self.details.attempts = 1;
+        self.details.error = 0.0;
         loop {
             let mut k = Vec::with_capacity(self.stages + 1); // Will store all the k_i.
             let ki = d_xdt(t, state);
@@ -127,27 +128,38 @@ impl<'a> Propagator<'a> {
             }
             // Compute the next state and the error
             let mut next_state = state.clone();
+            // RK error estimation from https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L520
             let mut error_est = VectorN::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
                 if !self.fixed_step {
                     let b_i_star = self.b_coeffs[i + self.stages];
-                    error_est += b_i_star * ki;
+                    error_est += self.details.step * b_i_star * ki;
                 }
                 next_state += self.details.step * b_i * ki;
             }
 
             if !self.opts.fixed_step {
-                for (i, error_est_i) in error_est.clone().iter().enumerate() {
-                    let delta = next_state[(i, 0)] - state.clone()[(i, 0)];
-                    let err = if delta > self.opts.tolerance {
+                // The following computes the "physical model" error, as per https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L938.
+                // In GMAT, the relative error threshold has a default value of 0.1. Although there is a
+                // function to change it (https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L429),
+                // it is considered readonly, https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/Integrator.cpp#L316.
+                let rel_err = 0.1; // If I read GMAT source code correclty,
+                let mut retval = 0.0;
+                let mut err = 0.0;
+                let mut delta = 0.0;
+                let model_state = state.clone();
+                for (i, error_est_i) in error_est.iter().enumerate() {
+                    delta = next_state[(i, 0)] - model_state[(i, 0)];
+                    println!("delta[{}] = {}", i, delta);
+                    let err = if delta > rel_err {
                         // If greater than the relative tolerance, then we normalize it by the difference.
                         (error_est_i / delta).abs()
                     } else {
                         error_est_i.abs()
                     };
-                    if i == 0 || err > self.details.error {
-                        self.details.error = err;
+                    if err > retval {
+                        retval = err;
                     }
                 }
             } else {
@@ -155,7 +167,7 @@ impl<'a> Propagator<'a> {
             }
 
             if self.opts.fixed_step
-                || (self.details.error < self.opts.tolerance
+                || (self.details.error <= self.opts.tolerance
                     || (self.details.step - self.opts.min_step).abs() <= f64::EPSILON)
                 || self.details.attempts >= self.opts.attempts
             {
@@ -168,7 +180,7 @@ impl<'a> Propagator<'a> {
                 // Error is too high and using adaptive step size
                 let proposed_step = 0.9 * self.details.step
                     * (self.opts.tolerance / self.details.error)
-                        .powf(1.0 / (f64::from(self.order) - 1.0));
+                        .powf(1.0 / (f64::from(self.order - 1)));
                 self.details.step = if proposed_step < self.opts.min_step {
                     self.opts.min_step
                 } else {

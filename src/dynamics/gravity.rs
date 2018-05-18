@@ -105,13 +105,13 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             re[m] = if m == 0 {
                 1.0
             } else {
-                s_ * re[(m - 1)] - t_ * im[(m - 1)]
+                s_ * re[m - 1] - t_ * im[m - 1]
             };
 
             im[m] = if m == 0 {
                 0.0
             } else {
-                s_ * im[(m - 1)] + t_ * re[(m - 1)]
+                s_ * im[m - 1] + t_ * re[m - 1]
             }; // imaginary part of (s + i*t)^m
         }
 
