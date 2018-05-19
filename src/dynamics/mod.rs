@@ -3,7 +3,6 @@ extern crate nalgebra as na;
 
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
-use super::propagators::error_ctrl::largest_error;
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -13,7 +12,7 @@ pub mod celestial;
 
 /// The gravity module handles spherical harmonics only. It _must_ be combined with a TwoBody dynamics
 ///
-/// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/) and from [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/).
+/// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
 pub mod gravity;
 
 /// The angular momentum module handles all angular momentum dynamics.
@@ -58,21 +57,4 @@ where
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
-
-    /// This is the default error estimator.
-    ///
-    /// It calculates the largest local estimate of the error from the integration (`prop_err`)
-    /// given the difference in the candidate state and the previous state (`state_delta`).
-    /// This error estimator is from the physical model estimator of GMAT
-    /// https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987
-    fn error_estimator(
-        prop_err: &VectorN<f64, Self::StateSize>,
-        candidate: &VectorN<f64, Self::StateSize>,
-        cur_state: &VectorN<f64, Self::StateSize>,
-    ) -> f64
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize>,
-    {
-        largest_error(prop_err, candidate, cur_state)
-    }
 }

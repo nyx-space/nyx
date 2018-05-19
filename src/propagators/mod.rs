@@ -4,6 +4,7 @@ use std::f64;
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
 
+/// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
 
 // Re-Export

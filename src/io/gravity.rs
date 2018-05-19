@@ -3,6 +3,10 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::str::FromStr;
 use std::collections::HashMap;
+
+/// All gravity potential storage backends must implement this trait in order to be used in the provided dynamics.
+/// Currently, only a HashMap based storage is provided. However, the use of this trait enables any application
+/// from storing the gravity potential in another way, such as a remote database.
 pub trait GravityPotentialStor
 where
     Self: Sized,
