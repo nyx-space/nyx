@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn const_mom() {
-    use nyx::propagators::{CashKarp45, Options, Propagator};
+    use nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::momentum::AngularMom;
     use self::na::{Matrix3, Vector3};
@@ -21,7 +21,7 @@ fn const_mom() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector3<f64>| dyn.eom(t_, state_),
-            |prop_err: &Vector3<f64>, state_delta: &Vector3<f64>| AngularMom::error_estimator(prop_err, state_delta),
+            error_ctrl::largest_step,
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 5.0 {

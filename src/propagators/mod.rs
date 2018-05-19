@@ -100,7 +100,7 @@ impl<'a> Propagator<'a> {
     ) -> (f64, VectorN<f64, N>)
     where
         D: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
-        E: Fn(&VectorN<f64, N>, &VectorN<f64, N>) -> f64,
+        E: Fn(&VectorN<f64, N>, &VectorN<f64, N>, &VectorN<f64, N>) -> f64,
         DefaultAllocator: Allocator<f64, N>,
     {
         // Reset the number of attempts used
@@ -149,7 +149,7 @@ impl<'a> Propagator<'a> {
                 return ((t + self.details.step), next_state);
             } else {
                 // Compute the error estimate.
-                let err = err_estimator(&error_est, &(next_state.clone() - state));
+                let err = err_estimator(&error_est, &next_state.clone(), state);
                 self.details.error = if err > self.details.error {
                     warn!("integration details error: {}", err);
                     err

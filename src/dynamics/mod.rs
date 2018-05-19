@@ -3,6 +3,7 @@ extern crate nalgebra as na;
 
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
+use super::propagators::error_ctrl::largest_error;
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -64,22 +65,14 @@ where
     /// given the difference in the candidate state and the previous state (`state_delta`).
     /// This error estimator is from the physical model estimator of GMAT
     /// https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987
-    fn error_estimator(prop_err: &VectorN<f64, Self::StateSize>, state_delta: &VectorN<f64, Self::StateSize>) -> f64
+    fn error_estimator(
+        prop_err: &VectorN<f64, Self::StateSize>,
+        candidate: &VectorN<f64, Self::StateSize>,
+        cur_state: &VectorN<f64, Self::StateSize>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>,
     {
-        let mut max_err = 0.0;
-        let rel_threshold = 0.1;
-        for (i, prop_err_i) in prop_err.iter().enumerate() {
-            let err = if state_delta[(i, 0)] > rel_threshold {
-                (prop_err_i / state_delta[(i, 0)]).abs()
-            } else {
-                prop_err_i.abs()
-            };
-            if err > max_err {
-                max_err = err;
-            }
-        }
-        max_err
+        largest_error(prop_err, candidate, cur_state)
     }
 }

@@ -6,7 +6,7 @@ use std::f64;
 fn two_body_j2_state_parametrized() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
-    use nyx::propagators::{Options, Propagator, Verner56};
+    use nyx::propagators::{error_ctrl, Options, Propagator, Verner56};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -123,7 +123,7 @@ fn two_body_j2_state_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            |prop_err: &VectorN<f64, U6>, state_delta: &VectorN<f64, U6>| J2Dyn::error_estimator(prop_err, state_delta),
+            error_ctrl::largest_step_pos_vel,
         );
         dyn.set_state(t, &state);
 
@@ -151,9 +151,12 @@ fn two_body_j2_state_parametrized() {
             let rss_pos =
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
             assert_eq!(
-                rslt, final_state,
+                rslt,
+                final_state,
                 "J2 JGM3 prop failed: RSS = {} km\nexpected: {:o}\ncomputed: {:o}",
-                rss_pos, rslt, final_state
+                rss_pos,
+                rslt,
+                final_state
             );
             break;
         }
