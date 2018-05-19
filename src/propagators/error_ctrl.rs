@@ -55,6 +55,23 @@ where
     }
 }
 
+/// A largest state error control
+///
+/// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3018]
+pub fn largest_state(prop_err: &VectorN<f64, U3>, candidate: &VectorN<f64, U3>, cur_state: &VectorN<f64, U3>) -> f64
+where
+    DefaultAllocator: Allocator<f64, U3>,
+{
+    let sum_state = candidate + cur_state;
+    let mag = (sum_state[(0, 0)].abs() + sum_state[(1, 0)].abs() + sum_state[(2, 0)].abs()) * 0.5;
+    let err = prop_err[(0, 0)].abs() + prop_err[(1, 0)].abs() + prop_err[(2, 0)].abs();
+    if mag > REL_ERR_THRESH {
+        err / mag
+    } else {
+        err
+    }
+}
+
 /// An RSS step error control which effectively computes the L2 norm of the provided Vector of size 3
 ///
 /// Note that this error controller should be preferrably be used only with slices of a state with the same units.
@@ -86,7 +103,7 @@ pub fn rss_state(prop_err: &VectorN<f64, U3>, candidate: &VectorN<f64, U3>, cur_
 where
     DefaultAllocator: Allocator<f64, U3>,
 {
-    let mag = (candidate - cur_state).norm();
+    let mag = 0.5 * (candidate + cur_state).norm();
     let err = prop_err.norm();
     if mag > REL_ERR_THRESH {
         err / mag
@@ -140,6 +157,62 @@ where
         &Vector3::from_row_slice(&state_radius),
     );
     let err_velocity = largest_step(
+        &Vector3::from_row_slice(&prop_err_velocity),
+        &Vector3::from_row_slice(&candidate_velocity),
+        &Vector3::from_row_slice(&state_velocity),
+    );
+    if err_radius > err_velocity {
+        err_radius
+    } else {
+        err_velocity
+    }
+}
+
+/// An RSS state error control which effectively for the provided vector
+/// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+///
+/// TODO: generalize this to any controller via a macro (if done as a function, this will require a closure when use in `derive`).
+pub fn rss_state_pos_vel(prop_err: &VectorN<f64, U6>, candidate: &VectorN<f64, U6>, cur_state: &VectorN<f64, U6>) -> f64
+where
+    DefaultAllocator: Allocator<f64, U6>,
+{
+    // HACK: I'm sure there's an easier way than this, cf. [nalgebra#issue-341](https://github.com/sebcrozet/nalgebra/issues/341).
+    let mut prop_err_radius = [0.0; 3];
+    let mut prop_err_velocity = [0.0; 3];
+    for (i, val) in prop_err.iter().enumerate() {
+        if i < 3 {
+            prop_err_radius[i] = *val;
+        } else {
+            prop_err_velocity[i - 3] = *val;
+        }
+    }
+
+    let mut candidate_radius = [0.0; 3];
+    let mut candidate_velocity = [0.0; 3];
+    for (i, val) in candidate.iter().enumerate() {
+        if i < 3 {
+            candidate_radius[i] = *val;
+        } else {
+            candidate_velocity[i - 3] = *val;
+        }
+    }
+
+    let mut state_radius = [0.0; 3];
+    let mut state_velocity = [0.0; 3];
+    for (i, val) in cur_state.iter().enumerate() {
+        if i < 3 {
+            state_radius[i] = *val;
+        } else {
+            state_velocity[i - 3] = *val;
+        }
+    }
+
+    let err_radius = rss_state(
+        &Vector3::from_row_slice(&prop_err_radius),
+        &Vector3::from_row_slice(&candidate_radius),
+        &Vector3::from_row_slice(&state_radius),
+    );
+    let err_velocity = rss_state(
         &Vector3::from_row_slice(&prop_err_velocity),
         &Vector3::from_row_slice(&candidate_velocity),
         &Vector3::from_row_slice(&state_velocity),

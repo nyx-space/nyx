@@ -94,7 +94,7 @@ fn leo_day_prop() {
                 cur_t,
                 &init_state,
                 two_body_dynamics,
-                error_ctrl::largest_step_pos_vel,
+                error_ctrl::rss_state_pos_vel,
             );
             iterations += 1;
             cur_t = t;
