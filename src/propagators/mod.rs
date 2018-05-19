@@ -4,6 +4,8 @@ use std::f64;
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
 
+pub mod error_ctrl;
+
 // Re-Export
 mod rk;
 pub use self::rk::*;
@@ -122,7 +124,10 @@ impl<'a> Propagator<'a> {
                     a_idx += 1;
                 }
 
-                let ki = d_xdt(t + ci * self.details.step, &(state + self.details.step * wi));
+                let ki = d_xdt(
+                    t + ci * self.details.step,
+                    &(state + self.details.step * wi),
+                );
                 k.push(ki);
             }
             // Compute the next state and the error
@@ -156,7 +161,10 @@ impl<'a> Propagator<'a> {
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {
-                        warn!("maximum number of attempts reached ({})", self.details.attempts);
+                        warn!(
+                            "maximum number of attempts reached ({})",
+                            self.details.attempts
+                        );
                     }
 
                     let step_taken = self.details.step;
