@@ -139,7 +139,7 @@ fn gmat_val_leo_day_fixed() {
     extern crate nalgebra as na;
     use nyx::propagators::*;
     use self::na::Vector6;
-    let all_props = vec![
+    let mut all_props = vec![
         Propagator::new::<Verner56>(&Options::with_fixed_step(10.0)),
         Propagator::new::<Dormand45>(&Options::with_fixed_step(10.0)),
         Propagator::new::<Dormand78>(&Options::with_fixed_step(10.0)),
@@ -171,17 +171,17 @@ fn gmat_val_leo_day_fixed() {
             5.848940867741533,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191670772,
-            3945.506653235525,
-            2864.636618399048,
-            0.04909695761716017,
-            -4.185093318467335,
-            5.848940867755242,
+            -5971.19419167081,
+            3945.5066532332503,
+            2864.6366184022418,
+            0.049096957620019005,
+            -4.185093318469214,
+            5.848940867753748,
         ]),
     ];
 
-    let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
-    for mut prop in all_props {
+    // let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
+    for (p_id, prop) in all_props.iter_mut().enumerate() {
         let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
         let mut cur_t = 0.0;
         loop {
@@ -193,22 +193,18 @@ fn gmat_val_leo_day_fixed() {
             );
             cur_t = t;
             init_state = state;
-            if p_id > 0 {
-                // println!("{:?}", prop.latest_details());
-            }
             if cur_t >= 3600.0 * 24.0 {
-                if p_id > 0 {
-                    let details = prop.latest_details();
-                    if details.error > 1e-2 {
-                        assert!(
-                            details.step - 1e-1 < f64::EPSILON,
-                            "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
-                            p_id,
-                            details
-                        );
-                    }
-                    println!("p_id={} => {:?}", p_id, prop.latest_details());
+                let details = prop.latest_details();
+                if details.error > 1e-2 {
+                    assert!(
+                        details.step - 1e-1 < f64::EPSILON,
+                        "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
+                        p_id,
+                        details
+                    );
                 }
+                println!("p_id={} => {:?}", p_id, prop.latest_details());
+
                 assert_eq!(
                     state,
                     all_rslts[p_id],
@@ -219,6 +215,5 @@ fn gmat_val_leo_day_fixed() {
                 break;
             }
         }
-        p_id += 1;
     }
 }

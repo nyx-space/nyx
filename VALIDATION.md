@@ -1,4 +1,6 @@
 # Validation
+The validation process ensures that the dynamics are correctly implemented.
+
 Many of the features of this library are validated against [GMAT](https://software.nasa.gov/software/GSC-17177-1) ([wiki](http://gmatcentral.org/display/GW/GMAT+Wiki+Home)), version 2017a.
 GMAT is validated on flown missions. It was also validated against other software, cf. [this PDF](./tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf).
 
@@ -28,7 +30,7 @@ The following table corresponds to the **absolute errors** between the `nyx` com
 ## From a Cartesian state
 
 Element / Scenario  | circular inclined  | circular equatorial  | elliptical
---|---|---|---|---|---|---|--
+--|---|---|--
 Earth.Energy  | 0.0 | 0.0 | 0.0
 Earth.OrbitPeriod | 0.0 | 0.0 | 0.0
 Earth.HX  | 7e-12  | 0.0 | 3e-12
@@ -53,7 +55,7 @@ Earth.SemilatusRectum | 2e-12 | 0.0 | 2e-12
 ## From a Keplerian state
 
 Element / Scenario  | circular inclined  | circular equatorial  | elliptical
---|---|---|---|---|---|---|--
+--|---|---|--
 Earth.X  | 0.0 | 0.0 | 0.0
 Earth.Y  | 0.0 | 1e-14 | 4e-13
 Earth.Z  | 0.0 | **5e-5**<sup>(1)</sup> | 3e-12
