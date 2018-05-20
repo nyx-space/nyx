@@ -4,6 +4,12 @@ The validation process ensures that the dynamics are correctly implemented.
 Many of the features of this library are validated against [GMAT](https://software.nasa.gov/software/GSC-17177-1) ([wiki](http://gmatcentral.org/display/GW/GMAT+Wiki+Home)), version 2017a.
 GMAT is validated on flown missions. It was also validated against other software, cf. [this PDF](./tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf).
 
+- [Propagators](#propagators)
+  * [With a fixed step](#with-a-fixed-step)
+- [Orbital state](#orbital-state)
+  * [From a Cartesian state](#from-a-cartesian-state)
+  * [From a Keplerian state](#from-a-keplerian-state)
+
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
 The tests in [`propagators.rs`](./tests/propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./tests/GMAT_scripts/propagators/) and is named after the propagator used.
