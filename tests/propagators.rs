@@ -17,10 +17,10 @@ fn leo_day_prop() {
     use self::na::Vector6;
     let all_props = vec![
         Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
+        Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
         Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
         Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
         Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
-        Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
         Propagator::new::<Dormand78>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
         Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
     ];
@@ -127,6 +127,95 @@ fn leo_day_prop() {
                     "wrong number of iterations (p_id = {})",
                     p_id
                 );
+                break;
+            }
+        }
+        p_id += 1;
+    }
+}
+
+#[test]
+fn gmat_val_leo_day_fixed() {
+    extern crate nalgebra as na;
+    use nyx::propagators::*;
+    use self::na::Vector6;
+    let all_props = vec![
+        Propagator::new::<Verner56>(&Options::with_fixed_step(10.0)),
+        Propagator::new::<Dormand45>(&Options::with_fixed_step(10.0)),
+        Propagator::new::<Dormand78>(&Options::with_fixed_step(10.0)),
+        Propagator::new::<RK89>(&Options::with_fixed_step(10.0)),
+    ];
+    let all_rslts = vec![
+        Vector6::from_row_slice(&[
+            -5971.194191670203,
+            3945.5066532190967,
+            2864.636618421618,
+            0.04909695763733907,
+            -4.185093318480867,
+            5.848940867745654,
+        ]),
+        Vector6::from_row_slice(&[
+            -5971.194191699656,
+            3945.50665408017,
+            2864.63661724545,
+            0.04909695658406228,
+            -4.185093317777894,
+            5.848940868241106,
+        ]),
+        Vector6::from_row_slice(&[
+            -5971.194191670044,
+            3945.5066532117953,
+            2864.636618431374,
+            0.049096957645996114,
+            -4.185093318486724,
+            5.848940867741533,
+        ]),
+        Vector6::from_row_slice(&[
+            -5971.194191670772,
+            3945.506653235525,
+            2864.636618399048,
+            0.04909695761716017,
+            -4.185093318467335,
+            5.848940867755242,
+        ]),
+    ];
+
+    let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
+    for mut prop in all_props {
+        let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
+        let mut cur_t = 0.0;
+        loop {
+            let (t, state) = prop.derive(
+                cur_t,
+                &init_state,
+                two_body_dynamics,
+                error_ctrl::rss_state_pos_vel,
+            );
+            cur_t = t;
+            init_state = state;
+            if p_id > 0 {
+                // println!("{:?}", prop.latest_details());
+            }
+            if cur_t >= 3600.0 * 24.0 {
+                if p_id > 0 {
+                    let details = prop.latest_details();
+                    if details.error > 1e-2 {
+                        assert!(
+                            details.step - 1e-1 < f64::EPSILON,
+                            "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
+                            p_id,
+                            details
+                        );
+                    }
+                    println!("p_id={} => {:?}", p_id, prop.latest_details());
+                }
+                assert_eq!(
+                    state,
+                    all_rslts[p_id],
+                    "leo fixed prop failed for p_id = {}",
+                    p_id
+                );
+
                 break;
             }
         }

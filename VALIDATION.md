@@ -1,25 +1,26 @@
-# GMAT_Script
+# Validation
 Many of the features of this library are validated against [GMAT](https://software.nasa.gov/software/GSC-17177-1) ([wiki](http://gmatcentral.org/display/GW/GMAT+Wiki+Home)), version 2017a.
-GMAT is validated on flown missions. It was also validated against other software, cf. [this PDF](./GMAT_V&V_ProcessAndResults.pdf).
+GMAT is validated on flown missions. It was also validated against other software, cf. [this PDF](./tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf).
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
-The tests in [`propagators.rs`](../propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./propagators/) and is named after the propagator used.
+The tests in [`propagators.rs`](./tests/propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./tests/GMAT_scripts/propagators/) and is named after the propagator used.
 
+The validation scenario is simply a two body propagation around Earth.
 The following table corresponds to the **errors** between the `nyx` output for the one day LEO propagation in two body dynamics and the GMAT output using the same step configuration.
 
-## Without the automatic step increase computation
+## With a fixed step
 
 Propagator  | x | y | z | vx | vy |  vz
 --|---|---|---|---|---|--
 RK4Fixed  | 1.4e-9 | 3.0e-8 | 4.0e-8 | 3.6e-11 | 2.4e-11 | 1.7e-11
-Dormand45  | 2.1e-9 | 3.1e-7 | 4.5e-7 | 3.9e-10 | 2.6e-10 | 1.9e-10
-Verner56  | 3.8e-9 | 8.3e-7 | 1.1e-6 | 1.0e-9 | 6.8e-10 | 5.0e-10
-Dormand87  | 2.5e-9 | 9.6e-9 | 1.3e-8 | 1.2e-11 | 7.9e-12 | 5.6e-12
-RK89  | 3.8e-10 | 7.7e-9 | 1.0e-8 | 9.4e-12 | 6.4e-12 | 4.4e-12
+Dormand45  | 2.9e-08 | 8.5e-07 | 1.2e-06 | 1.0e-09 | 7.0e-10 | 4.9e-10
+Verner56  | 3.8e-10 | 3.9e-09 | 5.3e-09 | 4.8e-12 | 3.4e-12 | 2.1e-12
+Dormand78  | 3.9e-10 | 1.2e-08 | 1.7e-08 | 1.5e-11 | 1.0e-11 | 7.0e-12
+RK89  | 3.8e-11 | 2.3e-09 | 3.2e-09 | 2.9e-12 | 1.9e-12 | 1.5e-12
 
 # Orbital state
-This validation compares the computations of orbital elements in nyx with those in GMAT. Each scenario script is in the subfolder [state](./state/).
+This validation compares the computations of orbital elements in nyx with those in GMAT. Each scenario script is in the subfolder [state](./tests/GMAT_scripts/state/).
 The validation is trivially the following: a spacecraft is defined in GMAT in the EarthMJ2000Eq frame by its Cartesian state. There is a "Propagate" segment of strictly zero seconds. The desired orbital state computations are exported to a report file.
 
 The following table corresponds to the **absolute errors** between the `nyx` computations and those of GMAT. Note that if `nyx` returned more significant digits than GMAT and all the GMAT digits matched those of nyx, the error is also marked as zero (this was only seen for the energy and orbital period where GMAT returns 13 digits and `nyx` 14).

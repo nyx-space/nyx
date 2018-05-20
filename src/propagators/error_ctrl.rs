@@ -223,3 +223,59 @@ where
         err_velocity
     }
 }
+
+/// A largest step error control which effectively computes the L1 norm of the provided vector
+/// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+///
+/// TODO: generalize this to any controller via a macro (if done as a function, this will require a closure when use in `derive`).
+pub fn rss_step_pos_vel(prop_err: &VectorN<f64, U6>, candidate: &VectorN<f64, U6>, cur_state: &VectorN<f64, U6>) -> f64
+where
+    DefaultAllocator: Allocator<f64, U6>,
+{
+    // HACK: I'm sure there's an easier way than this, cf. [nalgebra#issue-341](https://github.com/sebcrozet/nalgebra/issues/341).
+    let mut prop_err_radius = [0.0; 3];
+    let mut prop_err_velocity = [0.0; 3];
+    for (i, val) in prop_err.iter().enumerate() {
+        if i < 3 {
+            prop_err_radius[i] = *val;
+        } else {
+            prop_err_velocity[i - 3] = *val;
+        }
+    }
+
+    let mut candidate_radius = [0.0; 3];
+    let mut candidate_velocity = [0.0; 3];
+    for (i, val) in candidate.iter().enumerate() {
+        if i < 3 {
+            candidate_radius[i] = *val;
+        } else {
+            candidate_velocity[i - 3] = *val;
+        }
+    }
+
+    let mut state_radius = [0.0; 3];
+    let mut state_velocity = [0.0; 3];
+    for (i, val) in cur_state.iter().enumerate() {
+        if i < 3 {
+            state_radius[i] = *val;
+        } else {
+            state_velocity[i - 3] = *val;
+        }
+    }
+
+    let err_radius = rss_step(
+        &Vector3::from_row_slice(&prop_err_radius),
+        &Vector3::from_row_slice(&candidate_radius),
+        &Vector3::from_row_slice(&state_radius),
+    );
+    let err_velocity = rss_step(
+        &Vector3::from_row_slice(&prop_err_velocity),
+        &Vector3::from_row_slice(&candidate_velocity),
+        &Vector3::from_row_slice(&state_velocity),
+    );
+    if err_radius > err_velocity {
+        err_radius
+    } else {
+        err_velocity
+    }
+}

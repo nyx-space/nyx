@@ -104,9 +104,8 @@ impl<'a> Propagator<'a> {
         E: Fn(&VectorN<f64, N>, &VectorN<f64, N>, &VectorN<f64, N>) -> f64,
         DefaultAllocator: Allocator<f64, N>,
     {
-        // Reset the number of attempts used
+        // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
-        self.details.error = 0.0;
         loop {
             let mut k = Vec::with_capacity(self.stages + 1); // Will store all the k_i.
             let ki = d_xdt(t, state);
@@ -145,19 +144,12 @@ impl<'a> Propagator<'a> {
                 next_state += self.details.step * b_i * ki;
             }
 
-            if self.opts.fixed_step {
+            if self.fixed_step {
                 // Using a fixed step, no adaptive step necessary
                 return ((t + self.details.step), next_state);
             } else {
                 // Compute the error estimate.
-                let err = err_estimator(&error_est, &next_state.clone(), state);
-                self.details.error = if err > self.details.error {
-                    warn!("integration details error: {}", err);
-                    err
-                } else {
-                    self.details.error
-                };
-
+                self.details.error = err_estimator(&error_est, &next_state.clone(), state);
                 if self.details.error <= self.opts.tolerance || self.details.step <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
@@ -169,7 +161,7 @@ impl<'a> Propagator<'a> {
                     }
 
                     let step_taken = self.details.step;
-                    if self.details.error <= self.opts.tolerance {
+                    if self.details.error < self.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
                         let proposed_step =
