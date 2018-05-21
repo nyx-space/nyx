@@ -54,10 +54,11 @@ pub struct IntegrationDetails {
 /// the set of coefficients used for the monomorphic instance. **WARNING:** must be stored in a mutuable variable.
 #[derive(Clone, Debug)]
 pub struct Propagator<'a> {
-    opts: Options,
-    details: IntegrationDetails,
-    order: u8,
-    stages: usize,
+    opts: Options,               // Stores the integration options (tolerance, min/max step, init step, etc.)
+    details: IntegrationDetails, // Stores the details of the previous integration step
+    step_size: f64,              // Stores the adapted step for the _next_ call
+    order: u8,                   // Order of the integrator
+    stages: usize,               // Number of stages, i.e. how many times the derivatives will be called
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
     fixed_step: bool,
@@ -70,16 +71,22 @@ impl<'a> Propagator<'a> {
         Propagator {
             opts: opts.clone(),
             details: IntegrationDetails {
-                step: opts.init_step,
+                step: 0.0,
                 error: 0.0,
                 attempts: 1,
             },
+            step_size: opts.init_step,
             stages: T::stages(),
             order: T::order(),
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
             fixed_step: T::stages() == usize::from(T::order()),
         }
+    }
+
+    pub fn set_fixed_step(&mut self, step_size: f64) {
+        self.step_size = step_size;
+        self.fixed_step = true;
     }
 
     /// This method integrates whichever function is provided as `d_xdt`.
@@ -124,10 +131,7 @@ impl<'a> Propagator<'a> {
                     a_idx += 1;
                 }
 
-                let ki = d_xdt(
-                    t + ci * self.details.step,
-                    &(state + self.details.step * wi),
-                );
+                let ki = d_xdt(t + ci * self.step_size, &(state + self.step_size * wi));
                 k.push(ki);
             }
             // Compute the next state and the error
@@ -139,18 +143,19 @@ impl<'a> Propagator<'a> {
                 let b_i = self.b_coeffs[i];
                 if !self.fixed_step {
                     let b_i_star = self.b_coeffs[i + self.stages];
-                    error_est += self.details.step * (b_i - b_i_star) * ki;
+                    error_est += self.step_size * (b_i - b_i_star) * ki;
                 }
-                next_state += self.details.step * b_i * ki;
+                next_state += self.step_size * b_i * ki;
             }
 
             if self.fixed_step {
                 // Using a fixed step, no adaptive step necessary
+                self.details.step = self.step_size;
                 return ((t + self.details.step), next_state);
             } else {
                 // Compute the error estimate.
                 self.details.error = err_estimator(&error_est, &next_state.clone(), state);
-                if self.details.error <= self.opts.tolerance || self.details.step <= self.opts.min_step
+                if self.details.error <= self.opts.tolerance || self.step_size <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {
@@ -160,26 +165,26 @@ impl<'a> Propagator<'a> {
                         );
                     }
 
-                    let step_taken = self.details.step;
+                    self.details.step = self.step_size;
                     if self.details.error < self.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
                         let proposed_step =
-                            0.9 * step_taken * (self.opts.tolerance / self.details.error).powf(1.0 / f64::from(self.order));
-                        self.details.step = if proposed_step > self.opts.max_step {
+                            0.9 * self.step_size * (self.opts.tolerance / self.details.error).powf(1.0 / f64::from(self.order));
+                        self.step_size = if proposed_step > self.opts.max_step {
                             self.opts.max_step
                         } else {
                             proposed_step
                         };
                     }
-                    return ((t + step_taken), next_state);
+                    return ((t + self.details.step), next_state);
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
                     // So let's adapt the step size.
                     self.details.attempts += 1;
-                    let proposed_step = 0.9 * self.details.step
-                        * (self.opts.tolerance / self.details.error).powf(1.0 / f64::from(self.order - 1));
-                    self.details.step = if proposed_step < self.opts.min_step {
+                    let proposed_step =
+                        0.9 * self.step_size * (self.opts.tolerance / self.details.error).powf(1.0 / f64::from(self.order - 1));
+                    self.step_size = if proposed_step < self.opts.min_step {
                         self.opts.min_step
                     } else {
                         proposed_step

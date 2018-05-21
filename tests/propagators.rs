@@ -16,7 +16,6 @@ fn leo_day_prop() {
     use nyx::propagators::*;
     use self::na::Vector6;
     let all_props = vec![
-        Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
         Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
         Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
         Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
@@ -25,14 +24,6 @@ fn leo_day_prop() {
         Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-12)),
     ];
     let all_rslts = vec![
-        Vector6::from_row_slice(&[
-            -5971.194191670768,
-            3945.506653227154,
-            2864.6366184109706,
-            0.04909695762764177,
-            -4.18509331847428,
-            5.8489408677500965,
-        ]),
         Vector6::from_row_slice(&[
             -5971.194191669716,
             3945.506653225098,
@@ -97,24 +88,41 @@ fn leo_day_prop() {
                 error_ctrl::rss_state_pos_vel,
             );
             iterations += 1;
-            cur_t = t;
-            init_state = state;
-            if p_id > 0 {
-                // println!("{:?}", prop.latest_details());
-            }
-            if cur_t >= 3600.0 * 24.0 {
-                if p_id > 0 {
-                    let details = prop.latest_details();
-                    if details.error > 1e-2 {
-                        assert!(
-                            details.step - 1e-1 < f64::EPSILON,
-                            "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
-                            p_id,
-                            details
-                        );
-                    }
-                    println!("p_id={} => {:?}", p_id, prop.latest_details());
+            if t < 3600.0 * 24.0 {
+                // We haven't passed the time based stopping condition.
+                cur_t = t;
+                init_state = state;
+            } else {
+                // We've passed the condition, so let's switch to a fixed step of _exactly_ the
+                // previous time step minus the amount by which we overshot.
+                let prev_step = prop.latest_details().step;
+                let overshot = t - 24.0 * 3600.0;
+                println!(
+                    "overshot by {} -- setting next step to {}",
+                    overshot,
+                    prev_step - overshot
+                );
+                prop.set_fixed_step(prev_step - overshot);
+                // Take one final step
+                let (t, state) = prop.derive(
+                    cur_t,
+                    &init_state,
+                    two_body_dynamics,
+                    error_ctrl::rss_state_pos_vel,
+                );
+                println!("final prop time = {}", t);
+
+                let details = prop.latest_details();
+                if details.error > 1e-2 {
+                    assert!(
+                        details.step - 1e-1 < f64::EPSILON,
+                        "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
+                        p_id,
+                        details
+                    );
                 }
+                println!("p_id={} => {:?}", p_id, prop.latest_details());
+
                 assert_eq!(
                     state,
                     all_rslts[p_id],
@@ -140,12 +148,21 @@ fn gmat_val_leo_day_fixed() {
     use nyx::propagators::*;
     use self::na::Vector6;
     let mut all_props = vec![
+        Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
         Propagator::new::<Verner56>(&Options::with_fixed_step(10.0)),
         Propagator::new::<Dormand45>(&Options::with_fixed_step(10.0)),
         Propagator::new::<Dormand78>(&Options::with_fixed_step(10.0)),
         Propagator::new::<RK89>(&Options::with_fixed_step(10.0)),
     ];
     let all_rslts = vec![
+        Vector6::from_row_slice(&[
+            -5971.194191670768,
+            3945.506653227154,
+            2864.6366184109706,
+            0.04909695762764177,
+            -4.18509331847428,
+            5.8489408677500965,
+        ]),
         Vector6::from_row_slice(&[
             -5971.194191670203,
             3945.5066532190967,
