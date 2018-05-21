@@ -3,7 +3,7 @@ use celestia::CelestialBody;
 
 extern crate nalgebra as na;
 use std::f64;
-use self::na::{U1, U3, U6, Vector6, VectorN};
+use self::na::{U3, U6, Vector6, VectorN};
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]
@@ -31,40 +31,6 @@ impl TwoBody {
             mu: B::gm(),
         }
     }
-
-    /// This is a state error estimator.
-    ///
-    /// It returns the largest error between the position and the velocity errors using the step error from the integration (`prop_err`)
-    /// given the difference in the candidate state and the previous state (`state_delta`).
-    /// This error estimator is from the physical model estimator of GMAT
-    /// https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987
-    pub fn max_pos_vel_error_estimator(
-        prop_err: &VectorN<f64, <TwoBody as Dynamics>::StateSize>,
-        state_delta: &VectorN<f64, <TwoBody as Dynamics>::StateSize>,
-    ) -> f64 {
-        let delta_radius = state_delta.fixed_slice::<U3, U1>(0, 0).norm();
-        let prop_err_radius = prop_err.fixed_slice::<U3, U1>(0, 0).norm();
-        let err_radius = if delta_radius > 0.0 {
-            prop_err_radius / delta_radius
-        } else {
-            prop_err_radius
-        };
-
-        let delta_velocity = state_delta.fixed_slice::<U3, U1>(3, 0).norm();
-        let prop_err_velocity = state_delta.fixed_slice::<U3, U1>(3, 0).norm();
-        let err_velocity = if delta_velocity > 0.0 {
-            prop_err_velocity / delta_velocity
-        } else {
-            prop_err_velocity
-        };
-
-        // Always return the largest of both errors
-        if err_radius > err_velocity {
-            err_radius
-        } else {
-            err_velocity
-        }
-    }
 }
 
 impl Dynamics for TwoBody {
@@ -83,8 +49,8 @@ impl Dynamics for TwoBody {
     }
 
     fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
-        let radius = state.fixed_slice::<U3, U1>(0, 0);
-        let velocity = state.fixed_slice::<U3, U1>(3, 0);
+        let radius = state.fixed_rows::<U3>(0).into_owned();
+        let velocity = state.fixed_rows::<U3>(3).into_owned();
         let body_acceleration = (-self.mu / radius.norm().powi(3)) * radius;
         Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
     }

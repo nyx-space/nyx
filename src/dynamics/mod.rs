@@ -15,6 +15,9 @@ pub mod celestial;
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
 pub mod gravity;
 
+/// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
+pub mod drag;
+
 /// The angular momentum module handles all angular momentum dynamics.
 ///
 /// Note that this module does not handle attitude parameters or control. Refer to the relevant modules.
