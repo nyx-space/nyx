@@ -6,7 +6,7 @@ use std::f64;
 fn two_body_j2_state_parametrized() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
-    use nyx::propagators::{error_ctrl, Options, Propagator, Verner56};
+    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -63,20 +63,21 @@ fn two_body_j2_state_parametrized() {
     let min_step = 0.1;
     let max_step = 60.0;
 
-    let mut prop = Propagator::new::<Verner56>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = J2Dyn {
         count: 0,
         twobody: TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec()),
         harmonics: Harmonics::from_stor::<EARTH>(MemoryBackend::j2_jgm3()),
     };
+
     let final_state: State;
     loop {
         let (t, state) = prop.derive(
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::largest_step_pos_vel,
+            error_ctrl::rss_step_pos_vel,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -90,8 +91,11 @@ fn two_body_j2_state_parametrized() {
                 dyn.time(),
                 &dyn.state(),
                 |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                error_ctrl::largest_step_pos_vel,
+                error_ctrl::rss_step_pos_vel,
             );
+
+            println!("prop time = {:?}", t);
+
             dyn.set_state(t, &state);
 
             if prev_details.error > accuracy {
@@ -106,6 +110,13 @@ fn two_body_j2_state_parametrized() {
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
             let rss_pos =
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
+
+            assert_eq!(
+                rslt.to_cartesian_vec(),
+                final_state.to_cartesian_vec(),
+                "J2 JGM3 failed",
+            );
+
             assert_eq!(
                 rslt,
                 final_state,
