@@ -152,7 +152,7 @@ fn two_body_custom() {
 #[test]
 fn two_body_state_parametrized() {
     extern crate nalgebra as na;
-    use nyx::propagators::{error_ctrl, Dormand45, Options, Propagator};
+    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::celestia::{State, EARTH};
@@ -162,36 +162,62 @@ fn two_body_state_parametrized() {
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
+    let prop_time = 24.0 * 3_600.0;
+    let accuracy = 1e-12;
+    let min_step = 0.1;
+    let max_step = 60.0;
+
     let rslt = State::from_cartesian::<EARTH>(
-        -5971.194191668567,
-        3945.5066531626767,
-        2864.636618498951,
-        0.04909695770740798,
-        -4.185093318527218,
-        5.848940867713008,
+        -5971.1941916712285,
+        3945.5066532419537,
+        2864.636618390466,
+        0.04909695760948815,
+        -4.1850933184621315,
+        5.848940867758592,
     );
 
-    let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
     let final_state: State;
+
     loop {
         let (t, state) = prop.derive(
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
-            error_ctrl::largest_step_pos_vel,
+            error_ctrl::rss_step_pos_vel,
         );
-        dyn.set_state(t, &state);
-        if dyn.time() >= 3600.0 * 24.0 {
-            let details = prop.latest_details();
-            if details.error > 1e-2 {
+
+        if t < prop_time {
+            // We haven't passed the time based stopping condition.
+            dyn.set_state(t, &state);
+        } else {
+            let prev_details = prop.latest_details().clone();
+            let overshot = t - prop_time;
+            if overshot > 0.0 {
+                println!("overshot by {} seconds", overshot);
+                prop.set_fixed_step(prev_details.step - overshot);
+                // Take one final step
+                let (t, state) = prop.derive(
+                    dyn.time(),
+                    &dyn.state(),
+                    |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+                    error_ctrl::rss_step_pos_vel,
+                );
+                dyn.set_state(t, &state);
+            } else {
+                dyn.set_state(t, &state);
+            }
+
+            if prev_details.error > accuracy {
                 assert!(
-                    details.step - 1e-1 < f64::EPSILON,
+                    prev_details.step - min_step < f64::EPSILON,
                     "step size should be at its minimum because error is higher than tolerance: {:?}",
-                    details
+                    prev_details
                 );
             }
+
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
             assert_eq!(final_state, rslt, "two body prop failed",);
             break;

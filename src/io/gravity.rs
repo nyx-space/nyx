@@ -139,6 +139,9 @@ impl MemoryBackend {
 
         let mut data: HashMap<(u16, u16), (f64, f64)>;
         data = HashMap::new();
+        // Immediately add data which will be requested but may not exist (will be overwritten if it does)
+        data.insert((1, 0), (0.0, 0.0));
+        data.insert((1, 1), (0.0, 0.0));
         let mut max_order: u16 = 0;
         let mut max_degree: u16 = 0;
         for (lno, line) in String::from_utf8(buffer)
@@ -326,6 +329,9 @@ impl MemoryBackend {
     fn load(skip_first_line: bool, degree: u16, order: u16, data_as_str: String, filepath: String) -> MemoryBackend {
         let mut data: HashMap<(u16, u16), (f64, f64)>;
         data = HashMap::new();
+        // Immediately add data which will be requested but may not exist (will be overwritten if it does)
+        data.insert((1, 0), (0.0, 0.0));
+        data.insert((1, 1), (0.0, 0.0));
         let mut max_degree: u16 = 0;
         let mut max_order: u16 = 0;
         for (lno, line) in data_as_str.split("\n").enumerate() {
