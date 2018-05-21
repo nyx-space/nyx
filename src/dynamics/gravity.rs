@@ -1,6 +1,5 @@
-// use super::hifitime::SECONDS_PER_DAY;
 use super::Dynamics;
-use super::na::{U1, U3, U6, Vector6, VectorN};
+use super::na::{U3, U6, Vector6, VectorN};
 use celestia::CelestialBody;
 use io::gravity::GravityPotentialStor;
 
@@ -49,7 +48,7 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
     /// However, the provided `state` must be the position and velocity.
     fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         // NOTE: All this code is a conversion from GMAT's CalculateField1
-        let radius = state.fixed_slice::<U3, U1>(0, 0);
+        let radius = state.fixed_rows::<U3>(0).into_owned();
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = radius.norm();
         let s_ = radius[(0, 0)] / radius.norm();
@@ -58,17 +57,19 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let max_degree = self.stor.max_degree() as usize; // In GMAT, the order is NN
         let max_order = self.stor.max_order() as usize; // In GMAT, the order is MM
 
+        let matrix_size = max_degree + 2;
+
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
-        let mut a_matrix: Vec<Vec<f64>> = (0..max_degree + 3)
-            .map(|_| Vec::with_capacity(max_degree + 3))
+        let mut a_matrix: Vec<Vec<f64>> = (0..matrix_size)
+            .map(|_| Vec::with_capacity(matrix_size))
             .collect();
 
-        let mut re = Vec::with_capacity(max_degree + 3);
-        let mut im = Vec::with_capacity(max_degree + 3);
+        let mut re = Vec::with_capacity(matrix_size);
+        let mut im = Vec::with_capacity(matrix_size);
 
-        // Now that we have requested that capacity, let's set everything to zero so we can populate with [n][m].
-        for n in 0..max_degree + 3 {
-            for _m in 0..max_degree + 3 {
+        // Now that we have requested that capacity, let's set everything to zero so we can populate as a_matrix[n][m] (instead of pushing values).
+        for n in 0..matrix_size {
+            for _m in 0..matrix_size {
                 // NOTE: We made the a_matrix square, like in GMAT
                 a_matrix[n].push(0.0);
             }
@@ -78,9 +79,9 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
 
         // initialize the diagonal elements (not a function of the input)
         a_matrix[0][0] = 1.0; // Temp value for this first initialization
-        for n in 1..max_degree + 3 {
+        for n in 1..matrix_size {
             let nf64 = n as f64;
-            a_matrix[n][n] = ((2.0 * nf64 + 1.0) / (2.0 * nf64)).sqrt() * a_matrix[n - 1][n - 1]
+            a_matrix[n][n] = ((2.0 * nf64 + 1.0) / (2.0 * nf64)).sqrt() * a_matrix[n - 1][n - 1];
         }
 
         // generate the off-diagonal elements
@@ -90,8 +91,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         }
 
         // apply column-fill recursion formula (Table 2, Row I, Ref.[1])
-        for m in 0..max_order + 2 {
-            for n in (m + 2)..max_degree + 2 {
+        for m in 0..=max_order + 1 {
+            for n in (m + 2)..=max_degree + 1 {
                 let n1 = ((((2 * n + 1) * (2 * n - 1)) as f64) / (((n - m) * (n + m)) as f64)).sqrt();
 
                 let n2 =
