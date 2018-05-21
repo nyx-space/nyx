@@ -73,7 +73,7 @@ GMAT DefaultProp_ForceModel.GravityField.Earth.EarthTideModel = 'None';
 
 Create Propagator DefaultProp;
 GMAT DefaultProp.FM = DefaultProp_ForceModel;
-GMAT DefaultProp.Type = PrinceDormand45;
+GMAT DefaultProp.Type = RungeKutta89;
 GMAT DefaultProp.InitialStepSize = 30;
 GMAT DefaultProp.Accuracy = 1e-12;
 GMAT DefaultProp.MinStep = 0.1;

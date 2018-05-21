@@ -6,10 +6,11 @@ GMAT is validated on flown missions. It was also validated against other softwar
 
 - [Propagators](#propagators)
   * [With a fixed step](#fixed-step)
-  * [With a fixed step](#adaptive-step)
+  * [Adaptive step](#adaptive-step)
 - [Orbital state](#orbital-state)
   * [From a Cartesian state](#from-a-cartesian-state)
   * [From a Keplerian state](#from-a-keplerian-state)
+- [Harmonics](#harmonics)
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
@@ -112,3 +113,28 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 (2) Similarly to (1), we get a large error in the velocity Z component. In this case, GMAT reports 5.9e-8 km/s and `nyx` computes 4.9e-8 km/s.
 
 (3) Similarly to (1), we get a very significant error in the orbital momentum computation of both HX and HY. These components are small for the orbital momentum (both on the order of 1e-3 in GMAT and in `nyx`). I am not too concerned about these differences given that the orbital momentum component of the Z axis is exactly that returned by GMAT (all 16 digits are equal).
+
+# Harmonics
+
+Spherical harmonics allow for high fidelity gravity fields. `nyx` supports the PDS, EGM2008 and COF file formats. For now, `nyx` stores all the coefficients in memory (which is a HashMap). As such, it may use up quite some RAM if enabling all the orders and degrees of the provided files. The validation is done using the JGM3 model around Earth whose coefficients are delivered in GMAT and in `nyx` (cf. the [data](./data/) folder).
+
+## Propagator configuration
+
++ Method: RK89
++ Step configuration:
+  - Minimum step: 0.1 seconds
+  - Maximum step: 30.0 seconds
+  - Accuracy: 1e-12
+  - Max attempts: 50
+
+Fidelity  | x | y | z | vx | vy | vz
+--|---|---|---|---|---|--
+J(2,0)  | 1.5e-07 | 4.8e-06 | 6.6e-06 | 5.9e-09 | 3.9e-09 | 2.8e-09
+J(21,21)  | 3.2e-09 | 4.0e-07 | 5.7e-07 | 5.1e-10 | 3.3e-10 | 2.5e-10
+J(70,70)  | 2.5e-10 | 9.7e-09 | 1.3e-08 | 1.2e-11 | 7.9e-12 | 5.6e-12
+
+## J(2,0) from JGM3 model
+
+## J(21,21) from JGM3 model
+
+## J(70,70) from JGM3 model

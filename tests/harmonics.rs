@@ -48,69 +48,22 @@ fn two_body_j2_state_parametrized() {
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
-    // One second
-    /*let rslt = State::from_cartesian::<EARTH>(
-        -2431.360331498824,
-        -2441.537552025363,
-        6891.034000290618,
-        5.090725265477195,
-        -5.086492314158094,
-        -0.00599941833051744,
-    );*/
-
-    // One minute
-    /*
-    let rslt = State::from_cartesian::<EARTH>(
-        -2127.483782786232,
-        -2737.798886616517,
-        6880.240862171737,
-        5.207578930784956,
-        -4.953733998024182,
-        -0.3597773824106297,
-    );*/
-
-    // Ten thousand seconds
-    /*
-    let rslt = State::from_cartesian::<EARTH>(
-        3075.869682748079,
-        1776.782315795178,
-        -6870.826570868569,
-        -4.744831035692495,
-        5.320693700850615,
-        -0.7495049625159994,
-    );*/
-
     // One day:
     let rslt = State::from_cartesian::<EARTH>(
-        -5751.473991035841,
-        4721.214036464772,
-        2045.947766378647,
-        -0.7977402636799741,
-        -3.656451982153709,
-        6.139637922263264,
+        -5751.473991328457,
+        4721.214035131441,
+        2045.947768616195,
+        -0.7977402618536559,
+        -3.656451983641397,
+        6.139637921618609,
     );
-    // 10 days:
-    /*
-    let rslt = State::from_cartesian::<EARTH>(
-        -3453.82913576055,
-        -613.1058873700827,
-        6859.70170958988,
-        2.418815931304214,
-        -6.749934134121439,
-        0.6126057059401954,
-    );*/
-    // 100 days:
-    /*
-    let rslt = State::from_cartesian::<EARTH>(
-        1616.297423706993,
-        -6402.348787298117,
-        3984.68419222919,
-        2.861916092325618,
-        4.003867304278716,
-        5.246167325614458,
-    );*/
 
-    let mut prop = Propagator::new::<Verner56>(&Options::with_adaptive_step(0.1, 60.0, 1e-12));
+    let prop_time = 24.0 * 3_600.0;
+    let accuracy = 1e-12;
+    let min_step = 0.1;
+    let max_step = 60.0;
+
+    let mut prop = Propagator::new::<Verner56>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = J2Dyn {
         count: 0,
@@ -125,28 +78,31 @@ fn two_body_j2_state_parametrized() {
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
             error_ctrl::largest_step_pos_vel,
         );
-        dyn.set_state(t, &state);
+        if t < prop_time {
+            // We haven't passed the time based stopping condition.
+            dyn.set_state(t, &state);
+        } else {
+            let prev_details = prop.latest_details().clone();
+            let overshot = t - prop_time;
+            prop.set_fixed_step(prev_details.step - overshot);
+            // Take one final step
+            let (t, state) = prop.derive(
+                dyn.time(),
+                &dyn.state(),
+                |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
+                error_ctrl::largest_step_pos_vel,
+            );
+            dyn.set_state(t, &state);
 
-        //21545.20660150781         -2728.982473620118          5828.204100235614           -4283.011993532577          -4.908655003219503           1.396985776507358            5.044885333154066
-        //21545.20669915102         -2770.309550926466          5839.810621220687           -4240.320168935513          -4.88865090424546            1.354542470065089            5.075958201048959
-        // if dyn.time() >= 17850.335892650764 && dyn.time() <= 17858.772265934385 {
-        //     println!(
-        //         "NOW @ {} : {}",
-        //         dyn.time(),
-        //         State::from_cartesian_vec::<EARTH>(&dyn.state())
-        //     );
-        // }
-        if dyn.time() >= 86400.0 {
-            println!("{:?}", 21545.00000039794 + dyn.time() / 86400.0);
-            let details = prop.latest_details();
-            if details.error > 1e-2 {
+            if prev_details.error > accuracy {
                 assert!(
-                    details.step - 1e-1 < f64::EPSILON,
+                    prev_details.step - min_step < f64::EPSILON,
                     "step size should be at its minimum because error is higher than tolerance: {:?}",
-                    details
+                    prev_details
                 );
             }
-            println!("{} ==> {:?}", dyn.count, details);
+
+            println!("{} ==> {:?}", dyn.count, prev_details);
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
             let rss_pos =
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
