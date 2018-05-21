@@ -3,7 +3,6 @@ extern crate nyx_space as nyx;
 use std::f64;
 
 #[test]
-#[ignore]
 fn gmat_val_harmonics_j2jgm3() {
     // WARNING: This test shows a significant difference between GMAT and `nyx`. Refer to the VALIDATION.md file for a discussion.
     extern crate nalgebra as na;
