@@ -49,40 +49,66 @@
 ///
 /// fn main() {
 ///     use std::f64;
-///     use nyx::propagators::{Dormand45, Options, Propagator};
+///     use nyx::propagators::{Dormand45, error_ctrl, Options, Propagator};
+///     let prop_time = 24.0 * 3_600.0;
+///     let accuracy = 1e-12;
+///     let min_step = 0.1;
+///     let max_step = 30.0;
 ///     // Initial spacecraft state
-///     let mut state =
+///     let mut init_state =
 ///         Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
 ///     // Final expected spaceraft state
 ///     let rslt = Vector6::from_row_slice(&[
-///         -5971.194191668567,
-///         3945.5066531626767,
-///         2864.636618498951,
-///         0.04909695770740798,
-///         -4.185093318527218,
-///         5.848940867713008,
+///         -5971.194191821826,
+///         3945.506657649147,
+///         2864.636612371127,
+///         0.049096952217479194,
+///         -4.1850933148636145,
+///         5.848940870294863,
 ///     ]);
 ///
 ///     let mut cur_t = 0.0;
-///     let mut iterations = 0;
 ///     let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
 ///     loop {
-///         let (t, state_t) = prop.derive(cur_t, &state, two_body_dynamics);
-///         iterations += 1;
-///         cur_t = t;
-///         state = state_t;
-///         if cur_t >= 3600.0 * 24.0 {
-///             let details = prop.latest_details();
-///             if details.error > 1e-2 {
-///                 assert!(
-///                              details.step - 1e-1 < f64::EPSILON,
-///                              "step size should be at its minimum because error is higher than tolerance: {:?}",
-///                              details
-///                          );
+///         let (t, state) = prop.derive(
+///             cur_t,
+///             &init_state,
+///             two_body_dynamics,
+///             error_ctrl::rss_state_pos_vel,
+///         );
+///         if t < prop_time {
+///             // We haven't passed the time based stopping condition.
+///             cur_t = t;
+///             init_state = state;
+///         } else {
+///             // At this point, we've passed the condition, so let's switch to a fixed step of _exactly_ the
+///             // previous time step minus the amount by which we overshot. This allows us to propagate in time for
+///             // _exactly_ the time we want to propagate for.
+///             let prev_details = prop.latest_details().clone();
+///             let overshot = t - prop_time;
+///             prop.set_fixed_step(prev_details.step - overshot);
+///             // Take one final step
+///             let (t, state) = prop.derive(
+///                 cur_t,
+///                 &init_state,
+///                 two_body_dynamics,
+///                 error_ctrl::rss_state_pos_vel,
+///             );
+///
+///             assert!(
+///                 (t - prop_time).abs() < 1e-12,
+///                 "propagated for {} instead of {}",
+///                 t,
+///                 prop_time
+///             );
+///
+///             // Let's check that, prior to the refined step, we either hit the accuracy wanted,
+///             // or we are using the minimum step size.
+///             if prev_details.error > accuracy {
+///                 assert!(prev_details.step - min_step < f64::EPSILON);
 ///             }
-///             println!("{:?}", prop.latest_details());
-///             assert_eq!(state, rslt, "geo prop failed");
-///             assert_eq!(iterations, 864_000, "wrong number of iterations");
+///
+///             assert_eq!(state, rslt, "leo prop failed");
 ///             break;
 ///         }
 ///     }
@@ -94,16 +120,21 @@ pub mod propagators;
 ///
 /// # Simple two body propagation
 /// ```
-/// extern crate nalgebra;
+/// extern crate nalgebra as na;
 /// extern crate nyx_space as nyx;
 ///
 /// fn main() {
-///     use nyx::propagators::{Dormand45, Options, Propagator};
+///     use nyx::propagators::*;
+///     use nyx::celestia::{State, EARTH};
 ///     use nyx::dynamics::Dynamics;
 ///     use nyx::dynamics::celestial::TwoBody;
-///     use nyx::celestia::{State, EARTH};
-///     use nalgebra::Vector6;
+///     use self::na::Vector6;
 ///     use std::f64;
+///
+///     let prop_time = 24.0 * 3_600.0;
+///     let accuracy = 1e-12;
+///     let min_step = 0.1;
+///     let max_step = 60.0;
 ///
 ///     let initial_state =
 ///         State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
@@ -111,15 +142,16 @@ pub mod propagators;
 ///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
 ///     let rslt = State::from_cartesian::<EARTH>(
-///         -5971.194191668567,
-///         3945.5066531626767,
-///         2864.636618498951,
-///         0.04909695770740798,
-///         -4.185093318527218,
-///         5.848940867713008,
+///         -5971.1941916712285,
+///         3945.5066532419537,
+///         2864.636618390466,
+///         0.04909695760948815,
+///         -4.1850933184621315,
+///         5.848940867758592,
 ///     );
 ///
-///     let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+///     let mut prop =
+///         Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 ///
 ///     let mut dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
 ///     let final_state: State;
@@ -128,17 +160,38 @@ pub mod propagators;
 ///             dyn.time(),
 ///             &dyn.state(),
 ///             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+///             error_ctrl::rss_step_pos_vel,
 ///         );
-///         dyn.set_state(t, &state);
-///         if dyn.time() >= 3600.0 * 24.0 {
-///             let details = prop.latest_details();
-///             if details.error > 1e-2 {
-///                 assert!(
-///                         details.step - 1e-1 < f64::EPSILON,
-///                         "step size should be at its minimum because error is higher than tolerance: {:?}",
-///                         details
-///                     );
+///
+///         if t < prop_time {
+///             // We haven't passed the time based stopping condition.
+///             dyn.set_state(t, &state);
+///         } else {
+///             let prev_details = prop.latest_details().clone();
+///             let overshot = t - prop_time;
+///             if overshot > 0.0 {
+///                 println!("overshot by {} seconds", overshot);
+///                 prop.set_fixed_step(prev_details.step - overshot);
+///                 // Take one final step
+///                 let (t, state) = prop.derive(
+///                     dyn.time(),
+///                     &dyn.state(),
+///                     |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+///                     error_ctrl::rss_step_pos_vel,
+///                 );
+///                 dyn.set_state(t, &state);
+///             } else {
+///                 dyn.set_state(t, &state);
 ///             }
+///
+///             if prev_details.error > accuracy {
+///                 assert!(
+///                     prev_details.step - min_step < f64::EPSILON,
+///                     "step size should be at its minimum because error is higher than tolerance: {:?}",
+///                     prev_details
+///                 );
+///             }
+///
 ///             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
 ///             assert_eq!(final_state, rslt, "two body prop failed",);
 ///             break;
@@ -152,15 +205,19 @@ pub mod propagators;
 /// ```
 /// extern crate nalgebra as na;
 /// extern crate nyx_space as nyx;
+///
 /// // Warning: this is arguably a bad example: attitude dynamics very significantly
 /// // faster than orbital mechanics. Hence you really should use different propagators
 /// // for the attitude and orbital position and velocity.
+/// // If you run this example, you'll notice that the step size used ends up being absolutely tiny
+/// // which is needed for the attitude, but not for the astrodynamics (on my machine I'm at 0.04376 seconds).
 /// use self::nyx::dynamics::Dynamics;
 /// use self::nyx::dynamics::celestial::TwoBody;
 /// use self::nyx::dynamics::momentum::AngularMom;
-/// use self::nyx::celestia::EARTH;
-/// use self::nyx::propagators::{CashKarp45, Options, Propagator};
-/// use self::na::{Matrix3, U9, Vector3, Vector6, VectorN};
+/// use self::nyx::celestia::{State, EARTH};
+/// use self::nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
+/// use self::na::{Matrix3, U3, U6, U9, Vector3, Vector6, VectorN};
+/// use std::f64;
 ///
 /// // In the following struct, we only store the dynamics because this is only a proof
 /// // of concept. An engineer could add more useful information to this struct, such
@@ -189,48 +246,29 @@ pub mod propagators;
 ///     }
 ///
 ///     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-///         // HACK: Reconstructing the Vector6 from scratch because for some reason it isn't the correct type when using `fixed_slice`.
-///         // No doubt there's a more clever way to handle this, I just haven't figured it out yet.
-///         let mut pos_vel_vals = [0.0; 6];
-///         let mut mom_vals = [0.0; 3];
-///         for (i, val) in new_state.iter().enumerate() {
-///             if i < 6 {
-///                 pos_vel_vals[i] = *val;
-///             } else {
-///                 mom_vals[i - 6] = *val;
-///             }
-///         }
 ///         self.twobody
-///             .set_state(new_t, &Vector6::from_row_slice(&pos_vel_vals));
+///             .set_state(new_t, &new_state.fixed_rows::<U6>(0).into_owned());
 ///         self.momentum
-///             .set_state(new_t, &Vector3::from_row_slice(&mom_vals));
+///             .set_state(new_t, &new_state.fixed_rows::<U3>(6).into_owned());
 ///     }
 ///
-///     fn eom(
-///         &self,
-///         _t: f64,
-///         state: &VectorN<f64, Self::StateSize>,
-///     ) -> VectorN<f64, Self::StateSize> {
-///         // Same issue as in `set_state`.
-///         let mut pos_vel_vals = [0.0; 6];
-///         let mut mom_vals = [0.0; 3];
-///         for (i, val) in state.iter().enumerate() {
-///             if i < 6 {
-///                 pos_vel_vals[i] = *val;
-///             } else {
-///                 mom_vals[i - 6] = *val;
-///             }
-///         }
+///     fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
 ///         let dpos_vel_dt = self.twobody
-///             .eom(_t, &Vector6::from_row_slice(&pos_vel_vals));
-///         let domega_dt = self.momentum.eom(_t, &Vector3::from_row_slice(&mom_vals));
+///             .eom(_t, &state.fixed_rows::<U6>(0).into_owned());
+///         let domega_dt = self.momentum
+///             .eom(_t, &state.fixed_rows::<U3>(6).into_owned());
 ///         <VectorN<f64, U9>>::from_iterator(dpos_vel_dt.iter().chain(domega_dt.iter()).cloned())
 ///     }
 /// }
 ///
 /// // Let's initialize our combined dynamics.
 ///
-/// fn main(){
+/// fn main() {
+///     let prop_time = 3_600.0;
+///     let accuracy = 1e-13;
+///     let min_step = 0.01;
+///     let max_step = 60.0;
+///
 ///     let dyn_twobody = TwoBody::from_state_vec::<EARTH>(&Vector6::new(
 ///         -2436.45,
 ///         -2436.45,
@@ -238,7 +276,7 @@ pub mod propagators;
 ///         5.088611,
 ///         -5.088611,
 ///         0.0,
-///     ));///
+///     ));
 ///     let omega = Vector3::new(0.1, 0.4, -0.2);
 ///     let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);
 ///     let dyn_mom = AngularMom::from_tensor_matrix(&tensor, &omega);
@@ -252,7 +290,8 @@ pub mod propagators;
 ///     let mom_tolerance = 1e-8;
 ///
 ///     // And now let's define the propagator and propagate for a short amount of time.
-///     let mut prop = Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.01, 30.0, 1e-12));
+///     let mut prop =
+///         Propagator::new::<CashKarp45>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 ///
 ///     // And propagate
 ///     loop {
@@ -260,11 +299,37 @@ pub mod propagators;
 ///             full_model.time(),
 ///             &full_model.state(),
 ///             |t_: f64, state_: &VectorN<f64, U9>| full_model.eom(t_, state_),
+///             error_ctrl::largest_error::<U9>,
 ///         );
-///         full_model.set_state(t, &state);
-///         if full_model.time() >= 3600.0 {
-///             println!("{:?}", prop.latest_details());
-///             println!("{}", full_model.state());
+///         if t < prop_time {
+///             // We haven't passed the time based stopping condition.
+///             full_model.set_state(t, &state);
+///         } else {
+///             let prev_details = prop.latest_details().clone();
+///             let overshot = t - prop_time;
+///             if overshot > 0.0 {
+///                 println!("overshot by {} seconds with {:?}", overshot, prev_details);
+///                 prop.set_fixed_step(prev_details.step - overshot);
+///                 // Take one final step
+///                 let (t, state) = prop.derive(
+///                     full_model.time(),
+///                     &full_model.state(),
+///                     |t_: f64, state_: &VectorN<f64, U9>| full_model.eom(t_, state_),
+///                     error_ctrl::largest_error::<U9>,
+///                 );
+///                 full_model.set_state(t, &state);
+///             } else {
+///                 full_model.set_state(t, &state);
+///             }
+///
+///             if prev_details.error > accuracy {
+///                 assert!(
+///                     prev_details.step - min_step < f64::EPSILON,
+///                     "step size should be at its minimum because error is higher than tolerance: {:?}",
+///                     prev_details
+///                 );
+///             }
+///
 ///             let delta_mom =
 ///                 ((full_model.momentum.momentum().norm() - init_momentum) / init_momentum).abs();
 ///             if delta_mom > mom_tolerance {
@@ -273,6 +338,13 @@ pub mod propagators;
 ///                     delta_mom, mom_tolerance
 ///                 );
 ///             }
+///
+///             println!("Final momentum: {:?}", full_model.momentum.momentum());
+///
+///             println!(
+///                 "Final orbital state:\n{0}\n{0:o}",
+///                 State::from_cartesian_vec::<EARTH>(&full_model.twobody.state())
+///             );
 ///             break;
 ///         }
 ///     }
