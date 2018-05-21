@@ -5,7 +5,8 @@ Many of the features of this library are validated against [GMAT](https://softwa
 GMAT is validated on flown missions. It was also validated against other software, cf. [this PDF](./tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf).
 
 - [Propagators](#propagators)
-  * [With a fixed step](#with-a-fixed-step)
+  * [With a fixed step](#fixed-step)
+  * [With a fixed step](#adaptive-step)
 - [Orbital state](#orbital-state)
   * [From a Cartesian state](#from-a-cartesian-state)
   * [From a Keplerian state](#from-a-keplerian-state)
@@ -14,10 +15,29 @@ GMAT is validated on flown missions. It was also validated against other softwar
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
 The tests in [`propagators.rs`](./tests/propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./tests/GMAT_scripts/propagators/) and is named after the propagator used.
 
-The validation scenario is simply a two body propagation around Earth.
+The validation scenario is simply a two body propagation around Earth for one day.
 The following table corresponds to the **errors** between the `nyx` output for the one day LEO propagation in two body dynamics and the GMAT output using the same step configuration.
 
-## With a fixed step
+## Adaptive step
+
+Step size configured as follows:
++ Minimum step: 0.1 seconds
++ Maximum step: 30.0 seconds
++ Accuracy: 1e-12
++ Max attempts: 50
+
+*Note:* GMAT uses the secant method to determine the final step to take (as a fixed step). In this validation effort, we compute the exact number of seconds by which we overshot the expected elapsed time, and set the final step size to precisely that value. As such, the following table has the extra column `Δtime` which shows the difference in the propagation duration between GMAT and `nyx`. As explained, the latter will propagate for _exactly_ 86400 seconds (to machine precision), but GMAT doesn't, and this is mostly to blame for the (slight) differences in final states.
+
+Propagator  | x | y | z | vx | vy | vz | Δtime
+--|---|---|---|---|---|---|--
+Dormand45  | 1.5e-07 | 4.8e-06 | 6.6e-06 | 5.9e-09 | 3.9e-09 | 2.8e-09 | 0.0
+Verner56  | 3.2e-09 | 4.0e-07 | 5.7e-07 | 5.1e-10 | 3.3e-10 | 2.5e-10 | 1e-11
+Dormand78  | 2.5e-10 | 9.7e-09 | 1.3e-08 | 1.2e-11 | 7.9e-12 | 5.6e-12 | 1e-11
+RK89  | 3.9e-10 | 7.7e-09 | 1.0e-08 | 2.9e-12 | 6.4e-12 | 4.4e-12 | 0.0
+
+## Fixed step
+
+Step size set to 10.0 seconds.
 
 Propagator  | x | y | z | vx | vy |  vz
 --|---|---|---|---|---|--

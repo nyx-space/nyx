@@ -17,7 +17,7 @@ fn regress_leo_day_adaptive() {
     use nyx::propagators::*;
     use self::na::Vector6;
 
-    let prop_time = 24.0 * 3600.0;
+    let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
@@ -29,7 +29,7 @@ fn regress_leo_day_adaptive() {
         Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
     ];
 
-    let all_it_cnt = vec![5178, 6817]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
+    let all_it_cnt = vec![5_178, 6_817]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -128,7 +128,7 @@ fn gmat_val_leo_day_adaptive() {
     use nyx::propagators::*;
     use self::na::Vector6;
 
-    let prop_time = 24.0 * 3600.0;
+    let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
@@ -136,48 +136,48 @@ fn gmat_val_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
     let mut all_props = vec![
-        Propagator::new::<Verner56>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        // Propagator::new::<CashKarp45>(&Options::with_adaptive_step(min_step, max_step, 1e-12)),
-        // Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(min_step, max_step, 1e-12)),
         Propagator::new::<Dormand45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
+        Propagator::new::<Verner56>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
         Propagator::new::<Dormand78>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
         Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
     ];
+
+    let all_it_cnt = vec![6_216, 3_346, 2_880, 2_880]; // This number of iterations does not include the final refined fixed step.
+
     let all_rslts = vec![
         Vector6::from_row_slice(&[
-            -5971.194191669716,
-            3945.506653225098,
-            2864.6366184126337,
-            0.04909695762959668,
-            -4.185093318476122,
-            5.848940867749713,
+            -5971.194191821826,
+            3945.506657649147,
+            2864.636612371127,
+            0.049096952217479194,
+            -4.1850933148636145,
+            5.848940870294863,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191673688,
-            3945.506653306904,
-            2864.636618302827,
-            0.04909695753042703,
-            -4.185093318409565,
-            5.848940867795624,
+            -5971.194191675742,
+            3945.506653644173,
+            2864.636617828102,
+            0.049096957110642894,
+            -4.185093318133072,
+            5.848940867998776,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191668567,
-            3945.5066531626767,
-            2864.636618498951,
-            0.04909695770740798,
-            -4.185093318527218,
-            5.848940867713008,
+            -5971.194191670392,
+            3945.506653218658,
+            2864.63661842225,
+            0.049096957637897856,
+            -4.185093318481106,
+            5.8489408677453,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191668705,
-            3945.5066532187348,
-            2864.636618421759,
-            0.04909695763815305,
-            -4.185093318482125,
-            5.84894086774621,
+            -5971.194191670676,
+            3945.506653225158,
+            2864.6366184134445,
+            0.04909695762999346,
+            -4.185093318475795,
+            5.848940867748944,
         ]),
     ];
-    let all_it_cnt = vec![3347, 864_000, 864_000, 864_000, 864_000, 2_880, 2_880];
 
     for (p_id, prop) in all_props.iter_mut().enumerate() {
         let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
@@ -319,7 +319,7 @@ fn gmat_val_leo_day_fixed() {
             );
             cur_t = t;
             init_state = state;
-            if cur_t >= 3600.0 * 24.0 {
+            if cur_t >= 3_600.0 * 24.0 {
                 let details = prop.latest_details();
                 if details.error > 1e-2 {
                     assert!(
