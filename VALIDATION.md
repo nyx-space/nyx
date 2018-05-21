@@ -10,7 +10,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
 - [Orbital state](#orbital-state)
   * [From a Cartesian state](#from-a-cartesian-state)
   * [From a Keplerian state](#from-a-keplerian-state)
-- [Harmonics](#harmonics)
+- [Harmonics - UNSUCCESSFUL](#harmonics)
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
@@ -114,7 +114,9 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 
 (3) Similarly to (1), we get a very significant error in the orbital momentum computation of both HX and HY. These components are small for the orbital momentum (both on the order of 1e-3 in GMAT and in `nyx`). I am not too concerned about these differences given that the orbital momentum component of the Z axis is exactly that returned by GMAT (all 16 digits are equal).
 
-# Harmonics
+# Harmonics - UNSUCCESSFUL
+
+**WARNING:** Despite triple checking the Harmonics code (in dynamics/gravity.rs), it is clear that the results are significantly different from GMAT. Use with **extra** caution. The RSS error grows over time with a J<sub>2,0</sub> dynamics (reaching up to **9.315 km** for a 100 days propagation).
 
 Spherical harmonics allow for high fidelity gravity fields. `nyx` supports the PDS, EGM2008 and COF file formats. For now, `nyx` stores all the coefficients in memory (which is a HashMap). As such, it may use up quite some RAM if enabling all the orders and degrees of the provided files. The validation is done using the JGM3 model around Earth whose coefficients are delivered in GMAT and in `nyx` (cf. the [data](./data/) folder).
 
@@ -127,14 +129,8 @@ Spherical harmonics allow for high fidelity gravity fields. `nyx` supports the P
   - Accuracy: 1e-12
   - Max attempts: 50
 
-Fidelity  | x | y | z | vx | vy | vz
---|---|---|---|---|---|--
-J(2,0)  | 1.5e-07 | 4.8e-06 | 6.6e-06 | 5.9e-09 | 3.9e-09 | 2.8e-09
-J(21,21)  | 3.2e-09 | 4.0e-07 | 5.7e-07 | 5.1e-10 | 3.3e-10 | 2.5e-10
-J(70,70)  | 2.5e-10 | 9.7e-09 | 1.3e-08 | 1.2e-11 | 7.9e-12 | 5.6e-12
-
-## J(2,0) from JGM3 model
-
-## J(21,21) from JGM3 model
-
-## J(70,70) from JGM3 model
+Fidelity  | x | y | z | vx | vy | vz | RSS (km)
+--|---|---|---|---|---|---|--
+J(2,0)    | 4.0e-04 | 4.0e-02 | 8.9e-02 | 6.3e-05 | 5.7e-05 | 2.6e-05 | **9.7e-2**
+J(21,21)  |  |  |  |  |  | |
+J(70,70)  |  |  |  |  |  | |
