@@ -11,16 +11,21 @@ fn two_body_parametrized() {
     use nyx::celestia::EARTH;
     use self::na::Vector6;
 
+    let prop_time = 24.0 * 3_600.0;
+    let accuracy = 1e-12;
+    let min_step = 0.1;
+    let max_step = 60.0;
+
     let rslt = Vector6::from_row_slice(&[
-        -5971.194191670676,
-        3945.506653225158,
-        2864.6366184134445,
-        0.04909695762999346,
-        -4.185093318475795,
-        5.848940867748944,
+        -5971.1941916712285,
+        3945.5066532419537,
+        2864.636618390466,
+        0.04909695760948815,
+        -4.1850933184621315,
+        5.848940867758592,
     ]);
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = TwoBody::from_state_vec::<EARTH>(&Vector6::new(
         -2436.45,
@@ -35,19 +40,38 @@ fn two_body_parametrized() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
-            error_ctrl::largest_step_pos_vel,
+            error_ctrl::rss_step_pos_vel,
         );
-        dyn.set_state(t, &state);
-        if dyn.time() >= 3600.0 * 24.0 {
-            let details = prop.latest_details();
-            if details.error > 1e-2 {
+
+        if t < prop_time {
+            // We haven't passed the time based stopping condition.
+            dyn.set_state(t, &state);
+        } else {
+            let prev_details = prop.latest_details().clone();
+            let overshot = t - prop_time;
+            if overshot > 0.0 {
+                println!("overshot by {} seconds", overshot);
+                prop.set_fixed_step(prev_details.step - overshot);
+                // Take one final step
+                let (t, state) = prop.derive(
+                    dyn.time(),
+                    &dyn.state(),
+                    |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+                    error_ctrl::rss_step_pos_vel,
+                );
+                dyn.set_state(t, &state);
+            } else {
+                dyn.set_state(t, &state);
+            }
+
+            if prev_details.error > accuracy {
                 assert!(
-                    details.step - 1e-1 < f64::EPSILON,
+                    prev_details.step - min_step < f64::EPSILON,
                     "step size should be at its minimum because error is higher than tolerance: {:?}",
-                    details
+                    prev_details
                 );
             }
-            println!("{:?}", prop.latest_details());
+
             assert_eq!(dyn.state(), rslt, "two body prop failed",);
             break;
         }
@@ -62,39 +86,63 @@ fn two_body_custom() {
     use nyx::dynamics::celestial::TwoBody;
     use self::na::Vector6;
 
+    let prop_time = 24.0 * 3_600.0;
+    let accuracy = 1e-12;
+    let min_step = 0.1;
+    let max_step = 60.0;
+
     let rslt = Vector6::from_row_slice(&[
-        -5971.194191670676,
-        3945.506653225158,
-        2864.6366184134445,
-        0.04909695762999346,
-        -4.185093318475795,
-        5.848940867748944,
+        -5971.1941916712285,
+        3945.5066532419537,
+        2864.636618390466,
+        0.04909695760948815,
+        -4.1850933184621315,
+        5.848940867758592,
     ]);
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = TwoBody::from_state_vec_with_gm(
         &Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0),
-        398_600.4415,
+        398600.4415,
     );
     loop {
         let (t, state) = prop.derive(
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
-            error_ctrl::largest_step_pos_vel,
+            error_ctrl::rss_step_pos_vel,
         );
-        dyn.set_state(t, &state);
-        if dyn.time() >= 3600.0 * 24.0 {
-            let details = prop.latest_details();
-            if details.error > 1e-2 {
+
+        if t < prop_time {
+            // We haven't passed the time based stopping condition.
+            dyn.set_state(t, &state);
+        } else {
+            let prev_details = prop.latest_details().clone();
+            let overshot = t - prop_time;
+            if overshot > 0.0 {
+                println!("overshot by {} seconds", overshot);
+                prop.set_fixed_step(prev_details.step - overshot);
+                // Take one final step
+                let (t, state) = prop.derive(
+                    dyn.time(),
+                    &dyn.state(),
+                    |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+                    error_ctrl::rss_step_pos_vel,
+                );
+                dyn.set_state(t, &state);
+            } else {
+                dyn.set_state(t, &state);
+            }
+
+            if prev_details.error > accuracy {
                 assert!(
-                    details.step - 1e-1 < f64::EPSILON,
+                    prev_details.step - min_step < f64::EPSILON,
                     "step size should be at its minimum because error is higher than tolerance: {:?}",
-                    details
+                    prev_details
                 );
             }
-            println!("{:?}", prop.latest_details());
+
             assert_eq!(dyn.state(), rslt, "two body prop failed",);
             break;
         }
