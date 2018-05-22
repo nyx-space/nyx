@@ -69,30 +69,28 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let mut im = Vec::with_capacity(matrix_size);
 
         // Now that we have requested that capacity, let's set everything to zero so we can populate as a_matrix[n][m] (instead of pushing values).
-        for n in 0..=(max_degree + 1) {
-            for _m in 0..=(max_degree + 1) {
-                // NOTE: We made the a_matrix square, like in GMAT
+        for n in 0..=max_degree + 1 {
+            for _m in 0..=(n + 1) {
                 a_matrix[n].push(0.0);
             }
         }
 
-        for _m in 0..=(max_degree + 1) {
+        for _m in 0..=max_order + 1 {
             re.push(0.0);
             im.push(0.0);
         }
 
-        // initialize the A matrix elements (not a function of the input)
+        let b_mn = |n: f64, m: f64| (((2.0 * n + 1.0) * (2.0 * n - 1.0)) / ((n + m) * (n - m))).sqrt();
+
         a_matrix[0][0] = 1.0;
         a_matrix[1][0] = u_ * 3.0f64.sqrt();
         a_matrix[1][1] = 3.0f64.sqrt();
 
-        let b_mn = |n: f64, m: f64| (((2.0 * n + 1.0) * (2.0 * n - 1.0)) / ((n + m) * (n - m))).sqrt();
-
-        for nu16 in 2..=(max_degree + 1) {
+        for nu16 in 2..=max_degree {
             let n = nu16 as f64;
-            for mu16 in 0..=(max_degree + 1) {
+            for mu16 in 0..=nu16 {
                 let m = mu16 as f64;
-                if m == n {
+                if mu16 == nu16 {
                     a_matrix[nu16][nu16] = ((2.0 * n + 1.0) / (2.0 * n)).sqrt() * a_matrix[nu16 - 1][nu16 - 1];
                 } else {
                     a_matrix[nu16][mu16] =
@@ -101,7 +99,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             }
         }
 
-        for m in 0..=(max_degree + 1) {
+        // apply column-fill recursion formula (Table 2, Row I, Ref.[1])
+        for m in 0..=max_order + 1 {
             re[m] = if m == 0 { 1.0 } else { s_ * re[m - 1] - t_ * im[m - 1] };
             im[m] = if m == 0 { 0.0 } else { s_ * im[m - 1] + t_ * re[m - 1] };
         }
@@ -111,11 +110,11 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let rho = self.body_radius / r_;
         // NOTE: There currently is no rho_np2 because that's only used when computing the STM
         let common_fact = -self.neg_mu / (self.body_radius * r_); // TODO: I'm taking the negative of the negative, remove this
-        let mut rho_np1 = rho;
         let mut a1 = 0.0;
         let mut a2 = 0.0;
         let mut a3 = 0.0;
         let mut a4 = 0.0;
+        let mut rho_np1 = rho;
 
         for n in 0..=max_degree {
             rho_np1 *= rho;
@@ -123,8 +122,7 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             let mut sum2 = 0.0;
             let mut sum3 = 0.0;
             let mut sum4 = 0.0;
-
-            for m in 0..=n {
+            for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n as u16, m as u16);
                 // Pines Equation 27 (Part of)
                 let d_ = c_val * re[m] + s_val * im[m];
@@ -133,17 +131,16 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
 
                 let nf64 = n as f64;
                 let mf64 = m as f64;
-                let pi_frac_1 = (((nf64 + mf64 + 2.0) * (nf64 - mf64 - 1.0) * (2.0 - kronecker(0.0, mf64 + 1.0)))
-                    / ((nf64 + mf64 + 1.0) * (nf64 - mf64) * (2.0 - kronecker(0.0, mf64))))
+                let pi_frac_1 = (((nf64 + mf64 + 1.0) * (2.0 - kronecker(0.0, mf64)))
+                    / ((nf64 - mf64) * (2.0 - kronecker(0.0, mf64 + 1.0))))
                     .sqrt();
 
-                let pi_frac_2 = (((nf64 + mf64 + 3.0) * (2.0 - kronecker(0.0, mf64 + 1.0)))
-                    / ((nf64 + mf64 + 1.0) * (2.0 - kronecker(0.0, mf64))))
+                let pi_frac_2 = (((2.0 * nf64 + 1.0) * (nf64 + mf64 + 1.0) * (nf64 + mf64 + 2.0) * (2.0 - kronecker(0.0, mf64)))
+                    / ((2.0 * nf64 + 2.0) * (2.0 - kronecker(0.0, mf64 + 1.0))))
                     .sqrt();
 
-                // Pines Equation 30 and 30b (Part of)
-                sum1 += (m as f64) * a_matrix[n][m] * e_;
-                sum2 += (m as f64) * a_matrix[n][m] * f_;
+                sum1 += mf64 * a_matrix[n][m] * e_;
+                sum2 += mf64 * a_matrix[n][m] * f_;
                 sum3 += a_matrix[n][m + 1] * d_ * pi_frac_1;
                 sum4 += a_matrix[n + 1][m + 1] * d_ * pi_frac_2;
             }
