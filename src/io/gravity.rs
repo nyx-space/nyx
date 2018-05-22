@@ -272,7 +272,7 @@ impl MemoryBackend {
             if max_degree == 0 {
                 // Let's populate with zeros.
                 for n in 0..degree {
-                    for m in 0..n {
+                    for m in 0..order {
                         data.insert((n, m), (0.0, 0.0));
                     }
                 }

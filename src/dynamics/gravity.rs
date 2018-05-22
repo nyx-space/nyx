@@ -63,6 +63,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_matrix: Vec<Vec<f64>> = (0..matrix_size).map(|_| Vec::with_capacity(matrix_size)).collect();
+        let mut vr01: Vec<Vec<f64>> = (0..matrix_size).map(|_| Vec::with_capacity(matrix_size)).collect();
+        let mut vr11: Vec<Vec<f64>> = (0..matrix_size).map(|_| Vec::with_capacity(matrix_size)).collect();
 
         // NOTE: In Jones 2009, the re are referred to as p_m and im as q_m.
         let mut re = Vec::with_capacity(matrix_size);
@@ -72,6 +74,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         for n in 0..=max_degree + 1 {
             for _m in 0..=(n + 1) {
                 a_matrix[n].push(0.0);
+                vr01[n].push(0.0);
+                vr11[n].push(0.0);
             }
         }
 
@@ -86,13 +90,19 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         a_matrix[1][0] = u_ * 3.0f64.sqrt();
         a_matrix[1][1] = 3.0f64.sqrt();
 
-        for nu16 in 2..=max_degree {
+        for nu16 in 0..=max_degree {
             let n = nu16 as f64;
             for mu16 in 0..=nu16 {
                 let m = mu16 as f64;
-                if mu16 == nu16 {
+                vr01[nu16][mu16] = ((n - m) * (n + m + 1.0)).sqrt();
+                vr11[nu16][mu16] = (((2.0 * n + 1.0) * (n + m + 2.0) * (n + m + 1.0)) / (2.0 * n + 3.0)).sqrt();
+                if mu16 == 0 {
+                    vr01[nu16][mu16] /= 2.0f64.sqrt();
+                    vr11[nu16][mu16] /= 2.0f64.sqrt();
+                }
+                if nu16 >= 1 && mu16 == nu16 {
                     a_matrix[nu16][nu16] = ((2.0 * n + 1.0) / (2.0 * n)).sqrt() * a_matrix[nu16 - 1][nu16 - 1];
-                } else {
+                } else if nu16 >= 2 {
                     a_matrix[nu16][mu16] =
                         u_ * b_mn(n, m) * a_matrix[nu16 - 1][mu16] - (b_mn(n, m) / b_mn(n - 1.0, m)) * a_matrix[nu16 - 2][mu16];
                 }
@@ -108,15 +118,16 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         // Now do summation ------------------------------------------------
         // initialize recursion
         let rho = self.body_radius / r_;
+        let mut rho_np1 = -self.neg_mu / r_ * rho;
         // NOTE: There currently is no rho_np2 because that's only used when computing the STM
         let common_fact = -self.neg_mu / (self.body_radius * r_); // TODO: I'm taking the negative of the negative, remove this
         let mut a1 = 0.0;
         let mut a2 = 0.0;
         let mut a3 = 0.0;
         let mut a4 = 0.0;
-        let mut rho_np1 = rho;
+        let sqrt2 = 2.0f64.sqrt();
 
-        for n in 0..=max_degree {
+        for n in 1..=max_degree {
             rho_np1 *= rho;
             let mut sum1 = 0.0;
             let mut sum2 = 0.0;
@@ -125,35 +136,30 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n as u16, m as u16);
                 // Pines Equation 27 (Part of)
-                let d_ = c_val * re[m] + s_val * im[m];
-                let e_ = if m == 0 { 0.0 } else { c_val * re[m - 1] + s_val * im[m - 1] };
-                let f_ = if m == 0 { 0.0 } else { s_val * re[m - 1] - c_val * im[m - 1] };
+                let d_ = (c_val * re[m] + s_val * im[m]) * sqrt2;
+                let e_ = if m == 0 {
+                    0.0
+                } else {
+                    (c_val * re[m - 1] + s_val * im[m - 1]) * sqrt2
+                };
+                let f_ = if m == 0 {
+                    0.0
+                } else {
+                    (s_val * re[m - 1] - c_val * im[m - 1]) * sqrt2
+                };
 
-                let nf64 = n as f64;
-                let mf64 = m as f64;
-                let pi_frac_1 = (((nf64 + mf64 + 1.0) * (2.0 - kronecker(0.0, mf64)))
-                    / ((nf64 - mf64) * (2.0 - kronecker(0.0, mf64 + 1.0))))
-                    .sqrt();
-
-                let pi_frac_2 = (((2.0 * nf64 + 1.0) * (nf64 + mf64 + 1.0) * (nf64 + mf64 + 2.0) * (2.0 - kronecker(0.0, mf64)))
-                    / ((2.0 * nf64 + 2.0) * (2.0 - kronecker(0.0, mf64 + 1.0))))
-                    .sqrt();
-
-                sum1 += mf64 * a_matrix[n][m] * e_;
-                sum2 += mf64 * a_matrix[n][m] * f_;
-                sum3 += a_matrix[n][m + 1] * d_ * pi_frac_1;
-                sum4 += a_matrix[n + 1][m + 1] * d_ * pi_frac_2;
+                sum1 += (m as f64) * a_matrix[n][m] * e_;
+                sum2 += (m as f64) * a_matrix[n][m] * f_;
+                sum3 += vr01[n][m] * a_matrix[n][m + 1] * d_;
+                sum4 += vr11[n][m] * a_matrix[n + 1][m + 1] * d_;
             }
-            a1 += rho_np1 * sum1;
-            a2 += rho_np1 * sum2;
-            a3 += rho_np1 * sum3;
-            a4 -= rho_np1 * sum4;
+            let rr = rho_np1 / self.body_radius;
+            a1 += rr * sum1;
+            a2 += rr * sum2;
+            a3 += rr * sum3;
+            a4 -= rr * sum4;
         }
-        a1 *= common_fact;
-        a2 *= common_fact;
-        a3 *= common_fact;
-        a4 *= -common_fact;
-        // Pines Equation 31
+
         Vector6::new(0.0, 0.0, 0.0, a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_)
     }
 }

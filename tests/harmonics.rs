@@ -6,13 +6,13 @@ use std::f64;
 fn gmat_val_harmonics_j2jgm3() {
     // WARNING: This test shows a significant difference between GMAT and `nyx`. Refer to the VALIDATION.md file for a discussion.
     extern crate nalgebra as na;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use self::na::{U6, VectorN};
+    use nyx::celestia::{State, EARTH};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
     use nyx::io::gravity::MemoryBackend;
-    use nyx::celestia::{State, EARTH};
-    use self::na::{U6, VectorN};
+    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     // TODO: Provide a cleaner way to wrap these, probably by implementing the std::ops::Add.
     // Or at the very least provide some template scenario which already has the dynamics included.
@@ -113,12 +113,9 @@ fn gmat_val_harmonics_j2jgm3() {
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
 
             assert_eq!(
-                rslt,
-                final_state,
+                rslt, final_state,
                 "J2 JGM3 prop failed: RSS = {} km\nexpected: {:o}\ncomputed: {:o}",
-                rss_pos,
-                rslt,
-                final_state
+                rss_pos, rslt, final_state
             );
             break;
         }
@@ -127,17 +124,16 @@ fn gmat_val_harmonics_j2jgm3() {
 }
 
 #[test]
-#[ignore]
 fn gmat_val_harmonics_21x21() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use self::na::{U6, VectorN};
+    use nyx::celestia::{State, EARTH};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
     use nyx::io::gravity::MemoryBackend;
-    use nyx::celestia::{State, EARTH};
-    use self::na::{U6, VectorN};
+    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     let filepath = "./data/JGM3.cof.gz";
 
@@ -240,12 +236,9 @@ fn gmat_val_harmonics_21x21() {
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
 
             assert_eq!(
-                rslt,
-                final_state,
+                rslt, final_state,
                 "21x21 prop failed: RSS = {} km\nexpected: {:o}\ncomputed: {:o}",
-                rss_pos,
-                rslt,
-                final_state
+                rss_pos, rslt, final_state
             );
             break;
         }
@@ -254,16 +247,15 @@ fn gmat_val_harmonics_21x21() {
 }
 
 #[test]
-#[ignore]
 fn gmat_val_harmonics_70x70() {
     extern crate nalgebra as na;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use self::na::{U6, VectorN};
+    use nyx::celestia::{State, EARTH};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
     use nyx::io::gravity::MemoryBackend;
-    use nyx::celestia::{State, EARTH};
-    use self::na::{U6, VectorN};
+    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     let filepath = "./data/JGM3.cof.gz";
 
@@ -366,12 +358,9 @@ fn gmat_val_harmonics_70x70() {
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
 
             assert_eq!(
-                rslt,
-                final_state,
+                rslt, final_state,
                 "70x70 prop failed: RSS = {} km\nexpected: {:o}\ncomputed: {:o}",
-                rss_pos,
-                rslt,
-                final_state
+                rss_pos, rslt, final_state
             );
             break;
         }
