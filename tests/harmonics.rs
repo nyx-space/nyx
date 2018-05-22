@@ -107,7 +107,7 @@ fn gmat_val_harmonics_j2jgm3() {
                 );
             }
 
-            println!("{} ==> {:?}", dyn.count, prev_details);
+            println!("{} ==> {:?}", dyn.time(), prev_details);
             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
             let rss_pos =
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
