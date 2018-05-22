@@ -1,8 +1,8 @@
 use super::flate2::read::GzDecoder;
-use std::io::prelude::*;
-use std::fs::File;
-use std::str::FromStr;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
+use std::str::FromStr;
 
 /// All gravity potential storage backends must implement this trait in order to be used in the provided dynamics.
 /// Currently, only a HashMap based storage is provided. However, the use of this trait enables any application
@@ -40,8 +40,12 @@ impl MemoryBackend {
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
     pub fn j2_jgm3() -> MemoryBackend {
         let mut data = HashMap::new();
+        data.insert((0, 0), (0.0, 0.0));
         data.insert((1, 0), (0.0, 0.0));
+        data.insert((1, 1), (0.0, 0.0));
         data.insert((2, 0), (-4.84165374886470e-04, 0.0));
+        data.insert((2, 1), (0.0, 0.0));
+        data.insert((2, 2), (0.0, 0.0));
 
         MemoryBackend {
             degree: 2,
@@ -91,8 +95,7 @@ impl MemoryBackend {
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer)
-                .expect("could not read the full file");
+            d.read_to_end(&mut buffer).expect("could not read the full file");
         } else {
             f.read_to_end(&mut buffer).expect("to end");
         }
@@ -110,8 +113,7 @@ impl MemoryBackend {
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer)
-                .expect("could not read the full file");
+            d.read_to_end(&mut buffer).expect("could not read the full file");
         } else {
             f.read_to_end(&mut buffer).expect("to end");
         }
@@ -129,8 +131,7 @@ impl MemoryBackend {
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer)
-                .expect("could not read the full file");
+            d.read_to_end(&mut buffer).expect("could not read the full file");
         } else {
             f.read_to_end(&mut buffer).expect("to end");
         }
@@ -183,10 +184,7 @@ impl MemoryBackend {
                             match f64::from_str(item) {
                                 Ok(val) => c_nm = val,
                                 Err(_) => {
-                                    println!(
-                                        "could not parse C_nm `{}` on line {} -- ignoring line",
-                                        item, lno
-                                    );
+                                    println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
                                     break;
                                 }
                             }
@@ -204,10 +202,7 @@ impl MemoryBackend {
                                     match f64::from_str(&c_nm_str) {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
-                                            println!(
-                                                "could not parse C_nm `{}` on line {} -- ignoring line",
-                                                item, lno
-                                            );
+                                            println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
                                             break;
                                         }
                                     }
@@ -216,10 +211,7 @@ impl MemoryBackend {
                                     match f64::from_str(&s_nm_str) {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
-                                            println!(
-                                                "could not parse S_nm `{}` on line {} -- ignoring line",
-                                                item, lno
-                                            );
+                                            println!("could not parse S_nm `{}` on line {} -- ignoring line", item, lno);
                                             break;
                                         }
                                     }
@@ -229,10 +221,7 @@ impl MemoryBackend {
                                     match f64::from_str(&c_nm_str) {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
-                                            println!(
-                                                "could not parse C_nm `{}` on line {} -- ignoring line",
-                                                item, lno
-                                            );
+                                            println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
                                             break;
                                         }
                                     }
@@ -241,10 +230,7 @@ impl MemoryBackend {
                                     match f64::from_str(&s_nm_str) {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
-                                            println!(
-                                                "could not parse S_nm `{}` on line {} -- ignoring line",
-                                                item, lno
-                                            );
+                                            println!("could not parse S_nm `{}` on line {} -- ignoring line", item, lno);
                                             break;
                                         }
                                     }
@@ -254,10 +240,7 @@ impl MemoryBackend {
                                 match f64::from_str(item) {
                                     Ok(val) => c_nm = val,
                                     Err(_) => {
-                                        println!(
-                                            "could not parse C_nm `{}` on line {} -- ignoring line",
-                                            item, lno
-                                        );
+                                        println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
                                         break;
                                     }
                                 }
@@ -296,16 +279,8 @@ impl MemoryBackend {
             }
 
             // This serves as a warning.
-            max_order = if cur_order > max_order {
-                cur_order
-            } else {
-                max_order
-            };
-            max_degree = if cur_degree > max_degree {
-                cur_degree
-            } else {
-                max_degree
-            };
+            max_order = if cur_order > max_order { cur_order } else { max_order };
+            max_degree = if cur_degree > max_degree { cur_degree } else { max_degree };
         }
         if max_degree < degree || max_order < order {
             warn!(
@@ -313,10 +288,7 @@ impl MemoryBackend {
                 filepath, max_degree, max_order, degree, order
             );
         } else {
-            info!(
-                "{} loaded with (degree, order) = ({}, {})",
-                filepath, degree, order
-            );
+            info!("{} loaded with (degree, order) = ({}, {})", filepath, degree, order);
         }
         MemoryBackend {
             degree: max_degree,
@@ -363,10 +335,7 @@ impl MemoryBackend {
                     2 => match f64::from_str(&item.replace("D", "E")) {
                         Ok(val) => c_nm = val,
                         Err(_) => {
-                            println!(
-                                "could not parse C_nm `{}` on line {} -- ignoring line",
-                                item, lno
-                            );
+                            println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
                             break;
                         }
                     },
@@ -392,16 +361,8 @@ impl MemoryBackend {
                 data.insert((cur_degree, cur_order), (c_nm, s_nm));
             }
             // This serves as a warning.
-            max_order = if cur_order > max_order {
-                cur_order
-            } else {
-                max_order
-            };
-            max_degree = if cur_degree > max_degree {
-                cur_degree
-            } else {
-                max_degree
-            };
+            max_order = if cur_order > max_order { cur_order } else { max_order };
+            max_degree = if cur_degree > max_degree { cur_degree } else { max_degree };
         }
         if max_degree < degree || max_order < order {
             warn!(
@@ -409,10 +370,7 @@ impl MemoryBackend {
                 filepath, max_degree, max_order, degree, order
             );
         } else {
-            info!(
-                "{} loaded with (degree, order) = ({}, {})",
-                filepath, degree, order
-            );
+            info!("{} loaded with (degree, order) = ({}, {})", filepath, degree, order);
         }
         MemoryBackend {
             order: max_order,
