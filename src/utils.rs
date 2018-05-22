@@ -54,3 +54,19 @@ pub fn between_pm_180(angle: f64) -> f64 {
     }
     bounded
 }
+
+pub fn factorial(num: f64) -> f64 {
+    if num <= f64::EPSILON || (num - 1.0).abs() <= f64::EPSILON {
+        1.0
+    } else {
+        num * factorial(num - 1.0)
+    }
+}
+
+pub fn kronecker(a: f64, b: f64) -> f64 {
+    if (a - b).abs() <= f64::EPSILON {
+        1.0
+    } else {
+        0.0
+    }
+}
