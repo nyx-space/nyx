@@ -2,8 +2,7 @@ use super::Dynamics;
 use super::na::{U3, U6, Vector6, VectorN};
 use celestia::CelestialBody;
 use io::gravity::GravityPotentialStor;
-use std::cmp::min;
-use utils::{factorial, kronecker};
+use std::cmp::{max, min};
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
 #[derive(Clone, Copy)]
@@ -59,7 +58,7 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let max_degree = self.stor.max_degree() as usize; // In GMAT, the order is NN
         let max_order = self.stor.max_order() as usize; // In GMAT, the order is MM
 
-        let matrix_size = max_degree + 2;
+        let matrix_size = max_degree + 3;
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_matrix: Vec<Vec<f64>> = (0..matrix_size).map(|_| Vec::with_capacity(matrix_size)).collect();
@@ -67,75 +66,90 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let mut vr11: Vec<Vec<f64>> = (0..matrix_size).map(|_| Vec::with_capacity(matrix_size)).collect();
 
         // NOTE: In Jones 2009, the re are referred to as p_m and im as q_m.
-        let mut re = Vec::with_capacity(matrix_size);
-        let mut im = Vec::with_capacity(matrix_size);
+        let mut re = Vec::with_capacity(max(max_degree, max_order + 1));
+        let mut im = Vec::with_capacity(max(max_degree, max_order + 1));
 
         // Now that we have requested that capacity, let's set everything to zero so we can populate as a_matrix[n][m] (instead of pushing values).
-        for n in 0..=max_degree + 1 {
-            for _m in 0..=(n + 1) {
+        for n in 0..matrix_size {
+            for _m in 0..=matrix_size {
                 a_matrix[n].push(0.0);
                 vr01[n].push(0.0);
                 vr11[n].push(0.0);
             }
         }
 
-        for _m in 0..=max_order + 1 {
+        for _m in 0..=max(max_degree, max_order + 1) {
             re.push(0.0);
             im.push(0.0);
         }
 
-        let b_mn = |n: f64, m: f64| (((2.0 * n + 1.0) * (2.0 * n - 1.0)) / ((n + m) * (n - m))).sqrt();
-
-        a_matrix[0][0] = 1.0;
-        a_matrix[1][0] = u_ * 3.0f64.sqrt();
-        a_matrix[1][1] = 3.0f64.sqrt();
+        // Done with the allocation
+        let sqrt2 = 2.0f64.sqrt();
 
         for nu16 in 0..=max_degree {
             let n = nu16 as f64;
-            for mu16 in 0..=nu16 {
+            for mu16 in 0..=min(nu16, max_order) {
                 let m = mu16 as f64;
                 vr01[nu16][mu16] = ((n - m) * (n + m + 1.0)).sqrt();
                 vr11[nu16][mu16] = (((2.0 * n + 1.0) * (n + m + 2.0) * (n + m + 1.0)) / (2.0 * n + 3.0)).sqrt();
                 if mu16 == 0 {
-                    vr01[nu16][mu16] /= 2.0f64.sqrt();
-                    vr11[nu16][mu16] /= 2.0f64.sqrt();
-                }
-                if nu16 >= 1 && mu16 == nu16 {
-                    a_matrix[nu16][nu16] = ((2.0 * n + 1.0) / (2.0 * n)).sqrt() * a_matrix[nu16 - 1][nu16 - 1];
-                } else if nu16 >= 2 {
-                    a_matrix[nu16][mu16] =
-                        u_ * b_mn(n, m) * a_matrix[nu16 - 1][mu16] - (b_mn(n, m) / b_mn(n - 1.0, m)) * a_matrix[nu16 - 2][mu16];
+                    vr01[nu16][mu16] /= sqrt2;
+                    vr11[nu16][mu16] /= sqrt2;
                 }
             }
         }
 
-        // apply column-fill recursion formula (Table 2, Row I, Ref.[1])
-        for m in 0..=max_order + 1 {
-            re[m] = if m == 0 { 1.0 } else { s_ * re[m - 1] - t_ * im[m - 1] };
-            im[m] = if m == 0 { 0.0 } else { s_ * im[m - 1] + t_ * re[m - 1] };
+        // This is a single B_nm function which is slightly more complicated than the N1 and N2 of GMAT, but does JIT computation
+        // These depend only on the degree and order, so arguably, they could be cached in the harmonics struct.
+        let b_mn = |n: f64, m: f64| (((2.0 * n + 1.0) * (2.0 * n - 1.0)) / ((n + m) * (n - m))).sqrt();
+
+        a_matrix[0][0] = 1.0;
+
+        // XXX: In the following, A_{1,1} != 3.0f64.sqrt() as in Jones 2009
+        for nu16 in 1..=max_degree + 2 {
+            let n = nu16 as f64;
+            a_matrix[nu16][nu16] = ((2.0 * n + 1.0) / (2.0 * n)).sqrt() * a_matrix[nu16 - 1][nu16 - 1];
         }
 
-        // Now do summation ------------------------------------------------
-        // initialize recursion
+        a_matrix[1][0] = u_ * 3.0f64.sqrt();
+        for nu16 in 1..=max_degree + 1 {
+            a_matrix[nu16 + 1][nu16] = u_ * (2.0 * (nu16 as f64) + 3.0).sqrt() * a_matrix[nu16][nu16];
+        }
+
+        for mu16 in 0..=max_order + 1 {
+            let m = mu16 as f64;
+            for nu16 in mu16 + 2..=max_degree + 1 {
+                let n = nu16 as f64;
+                u_ * b_mn(n, m) * a_matrix[nu16 - 1][mu16] - (b_mn(n, m) / b_mn(n - 1.0, m)) * a_matrix[nu16 - 2][mu16];
+            }
+            re[mu16] = if mu16 == 0 {
+                1.0
+            } else {
+                s_ * re[mu16 - 1] - t_ * im[mu16 - 1]
+            };
+            im[mu16] = if mu16 == 0 {
+                0.0
+            } else {
+                s_ * im[mu16 - 1] + t_ * re[mu16 - 1]
+            };
+        }
+
         let rho = self.body_radius / r_;
         let mut rho_np1 = -self.neg_mu / r_ * rho;
-        // NOTE: There currently is no rho_np2 because that's only used when computing the STM
-        let common_fact = -self.neg_mu / (self.body_radius * r_); // TODO: I'm taking the negative of the negative, remove this
         let mut a1 = 0.0;
         let mut a2 = 0.0;
         let mut a3 = 0.0;
         let mut a4 = 0.0;
-        let sqrt2 = 2.0f64.sqrt();
-
         for n in 1..=max_degree {
             rho_np1 *= rho;
             let mut sum1 = 0.0;
             let mut sum2 = 0.0;
             let mut sum3 = 0.0;
             let mut sum4 = 0.0;
-            for m in 0..=min(n, max_order) {
+
+            for m in 0..=n {
                 let (c_val, s_val) = self.stor.cs_nm(n as u16, m as u16);
-                // Pines Equation 27 (Part of)
+
                 let d_ = (c_val * re[m] + s_val * im[m]) * sqrt2;
                 let e_ = if m == 0 {
                     0.0
