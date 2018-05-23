@@ -2,6 +2,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
 
+#[cfg(feature = "broken-harmonics")]
 #[test]
 fn gmat_val_harmonics_j2jgm3() {
     // WARNING: This test shows a significant difference between GMAT and `nyx`. Refer to the VALIDATION.md file for a discussion.
@@ -123,6 +124,7 @@ fn gmat_val_harmonics_j2jgm3() {
     println!("Final state:\n{0}\n{0:o}", final_state);
 }
 
+#[cfg(feature = "broken-harmonics")]
 #[test]
 fn gmat_val_harmonics_21x21() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
@@ -246,6 +248,7 @@ fn gmat_val_harmonics_21x21() {
     println!("Final state:\n{0}\n{0:o}", final_state);
 }
 
+#[cfg(feature = "broken-harmonics")]
 #[test]
 fn gmat_val_harmonics_70x70() {
     extern crate nalgebra as na;

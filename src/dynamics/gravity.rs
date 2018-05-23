@@ -5,7 +5,7 @@ use celestia::CelestialBody;
 use io::gravity::GravityPotentialStor;
 use std::cmp::min;
 
-/// `TwoBody` exposes the equations of motion for a simple two body propagation.
+#[cfg(feature = "broken-harmonics")]
 #[derive(Clone, Copy)]
 pub struct Harmonics<S>
 where
@@ -16,6 +16,7 @@ where
     stor: S,
 }
 
+#[cfg(feature = "broken-harmonics")]
 impl<S> Harmonics<S>
 where
     S: GravityPotentialStor,
@@ -30,6 +31,7 @@ where
     }
 }
 
+#[cfg(feature = "broken-harmonics")]
 impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
     type StateSize = U6;
 
