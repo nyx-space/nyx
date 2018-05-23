@@ -3,12 +3,12 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn const_mom() {
-    use nyx::propagators::{Options, Propagator, RK4Fixed};
+    use nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::momentum::AngularMom;
     use self::na::{Matrix3, Vector3};
 
-    let mut prop = Propagator::new::<RK4Fixed>(&Options::with_fixed_step(0.1));
+    let mut prop = Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 5.0, 1e-8));
 
     let omega = Vector3::new(0.1, 0.4, -0.2);
     let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);
@@ -21,6 +21,7 @@ fn const_mom() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector3<f64>| dyn.eom(t_, state_),
+            error_ctrl::largest_step,
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 5.0 {

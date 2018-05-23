@@ -19,6 +19,12 @@ travis-ci = { repository = "ChristopherRabotin/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.14.0"
 log = "0.4"
+hifitime = "0.1"
+flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 
 [dev-dependencies]
 pretty_env_logger = "0.2"
+
+[features]
+default = []
+unvalidated = [] # Enable to run unvalidated parts of the code

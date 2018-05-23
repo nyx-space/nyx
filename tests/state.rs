@@ -16,8 +16,7 @@ fn state_def_() {
 #[test]
 fn state_def_circ_inc() {
     use nyx::celestia::{State, EARTH};
-    let cart =
-        State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+    let cart = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
     f64_eq!(cart.x, -2436.45, "x");
     f64_eq!(cart.y, -2436.45, "y");
     f64_eq!(cart.z, 6891.037, "z");

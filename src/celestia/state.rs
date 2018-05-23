@@ -35,12 +35,9 @@ impl PartialEq for State {
     fn eq(&self, other: &State) -> bool {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol
-            && (self.vz - other.vz).abs() < velocity_tol
+        (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol && (self.y - other.y).abs() < distance_tol
+            && (self.z - other.z).abs() < distance_tol && (self.vx - other.vx).abs() < velocity_tol
+            && (self.vy - other.vy).abs() < velocity_tol && (self.vz - other.vz).abs() < velocity_tol
     }
 }
 
@@ -48,14 +45,7 @@ impl State {
     /// Creates a new State around the provided CelestialBody
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    pub fn from_cartesian<B: CelestialBody>(
-        x: f64,
-        y: f64,
-        z: f64,
-        vx: f64,
-        vy: f64,
-        vz: f64,
-    ) -> State {
+    pub fn from_cartesian<B: CelestialBody>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64) -> State {
         State {
             gm: B::gm(),
             x,
@@ -91,14 +81,7 @@ impl State {
     /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
-    pub fn from_keplerian<B: CelestialBody>(
-        sma: f64,
-        ecc: f64,
-        inc: f64,
-        raan: f64,
-        aop: f64,
-        ta: f64,
-    ) -> State {
+    pub fn from_keplerian<B: CelestialBody>(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64) -> State {
         if B::gm().abs() < ZERO_DIV_TOL {
             warn!(
                 "GM very low ({}): expect math errors in Keplerian to Cartesian conversion",
@@ -337,8 +320,7 @@ impl State {
                 self.ecc()
             );
         }
-        let cos_nu =
-            self.evec().dot(&Vector3::new(self.x, self.y, self.z)) / (self.ecc() * self.rmag());
+        let cos_nu = self.evec().dot(&Vector3::new(self.x, self.y, self.z)) / (self.ecc() * self.rmag());
         if (cos_nu.abs() - 1.0).abs() < EPSILON {
             // This bug drove me crazy when writing SMD in Go in 2017.
             if cos_nu > 1.0 {
@@ -404,9 +386,7 @@ impl State {
     /// This is a conversion from GMAT's StateConversionUtil::TrueToMeanAnomaly
     pub fn ma(self) -> f64 {
         if self.ecc() < 1.0 {
-            between_0_360(
-                (self.ea().to_radians() - self.ecc() * self.ea().to_radians().sin()).to_degrees(),
-            )
+            between_0_360((self.ea().to_radians() - self.ecc() * self.ea().to_radians().sin()).to_degrees())
         } else if self.ecc() > 1.0 {
             info!("computing the hyperbolic anomaly");
             // From GMAT's TrueToHyperbolicAnomaly
@@ -463,11 +443,15 @@ impl fmt::Display for State {
 impl fmt::Octal for State {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "sma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg", self.sma(),
-        self.ecc(),
-        self.inc(),
-        self.raan(),
-        self.aop(),
-        self.ta())
+        write!(
+            f,
+            "sma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
+            self.sma(),
+            self.ecc(),
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta()
+        )
     }
 }
