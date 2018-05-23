@@ -27,4 +27,4 @@ pretty_env_logger = "0.2"
 
 [features]
 default = []
-broken-harmonics = [] # Do not use the harmonics, they are broken
+unvalidated = [] # Enable to run unvalidated parts of the code

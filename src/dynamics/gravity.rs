@@ -1,76 +1,10 @@
-// use super::hifitime::SECONDS_PER_DAY;
 use super::Dynamics;
 use super::na::{U3, U6, Vector6, VectorN};
 use celestia::{CelestialBody, EARTH};
 use io::gravity::GravityPotentialStor;
 use std::cmp::min;
 
-#[derive(Clone, Copy)]
-pub struct BasicJ2 {
-    j2: f64,
-    mu: f64,
-    body_radius: f64,
-}
-
-impl BasicJ2 {
-    /// Create a new J2 dynamical model with the provided J2 value and aroudn the given body.
-    pub fn with_j2_value<B: CelestialBody>(j2: f64) -> BasicJ2 {
-        BasicJ2 {
-            j2: j2,
-            mu: B::gm(),
-            body_radius: B::eq_radius(),
-        }
-    }
-
-    pub fn around_earth() -> BasicJ2 {
-        BasicJ2 {
-            j2: 0.0010826266905978163,
-            mu: EARTH::gm(),
-            body_radius: EARTH::eq_radius(),
-        }
-    }
-}
-
-impl Dynamics for BasicJ2 {
-    type StateSize = U6;
-
-    /// NOTE: No state is associated with Harmonics, always return zero time
-    fn time(&self) -> f64 {
-        0.0
-    }
-
-    /// NOTE: No state is associated with Harmonics, always return zero
-    fn state(&self) -> VectorN<f64, Self::StateSize> {
-        Vector6::zeros()
-    }
-
-    /// NOTE: Nothing happens in this `set_state` since there is no state of spherical harmonics.
-    fn set_state(&mut self, _new_t: f64, _new_state: &VectorN<f64, Self::StateSize>) {}
-
-    /// This provides a **DELTA** of the state, which must be added to the result of the TwoBody propagator being used.
-    /// However, the provided `state` must be the position and velocity.
-    fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
-        let radius = state.fixed_rows::<U3>(0).into_owned();
-        let x_ = radius[(0, 0)];
-        let y_ = radius[(1, 0)];
-        let z_ = radius[(2, 0)];
-        let acc_j2 = (3.0f64 / 2.0f64) * self.j2 * self.body_radius.powi(2) * self.mu;
-        let r252 = radius.norm_squared().powf(5.0 / 2.0);
-        let r272 = radius.norm_squared().powf(7.0 / 2.0);
-        let out = Vector6::new(
-            0.0,
-            0.0,
-            0.0,
-            acc_j2 * (5.0 * x_ * z_.powi(2) / r272 - x_ / r252),
-            acc_j2 * (5.0 * y_ * z_.powi(2) / r272 - y_ / r252),
-            acc_j2 * (5.0 * z_.powi(3) / r272 - 3.0 * z_ / r252),
-        );
-        println!("{}", out);
-        out
-    }
-}
-
-#[cfg(feature = "broken-harmonics")]
+#[cfg(feature = "unvalidated")]
 #[derive(Clone, Copy)]
 pub struct Harmonics<S>
 where
@@ -81,7 +15,7 @@ where
     stor: S,
 }
 
-#[cfg(feature = "broken-harmonics")]
+#[cfg(feature = "unvalidated")]
 impl<S> Harmonics<S>
 where
     S: GravityPotentialStor,
@@ -96,7 +30,7 @@ where
     }
 }
 
-#[cfg(feature = "broken-harmonics")]
+#[cfg(feature = "unvalidated")]
 impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
     type StateSize = U6;
 

@@ -11,6 +11,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
   * [From a Cartesian state](#from-a-cartesian-state)
   * [From a Keplerian state](#from-a-keplerian-state)
 - [Harmonics](#harmonics)
+- [Drag](#drag)
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
@@ -117,6 +118,12 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 # Harmonics
 Spherical harmonics allow for high fidelity gravity fields. `nyx` supports the PDS, EGM2008 and COF file formats. For now, `nyx` stores all the coefficients in memory (which is a HashMap). As such, it may use up quite some RAM if enabling all the orders and degrees of the provided files. The validation is done using the JGM3 model around Earth whose coefficients are delivered in GMAT and in `nyx` (cf. the [data](./data/) folder).
 
+## Status: not validated
+After quite some debugging, the algorithm is correct **but** it is applied in the **wrong** frame. In fact, it needs to be applied in a Body Fixed frame instead of an ICRF frame. Frame transformations are not yet supported. In the case of the J<sub>2</sub> effects, the frame conversion _should not_ matter. However, when validating against GMAT, which does perform that transformation all the time, some rounding happens when converting between frames, and as such, there is an RSS error between `nyx` and GMAT of 0.097177 km after one day propagation in LEO. The higher harmonics are very dependent on the frame transformation.
+
+If you _only_ need J2 and do not mind a growing rounding error between GMAT and `nyx`, you may enable the spherical harmonics by enabling the `unvalidated` feature of the library.
+
+
 ## Propagator configuration
 
 + Method: RK89
@@ -131,3 +138,6 @@ Fidelity  | x | y | z | vx | vy | vz | RSS (km)
 J(2,0)    |  |  |  |  |  |  |
 J(21,21)  |  |  |  |  |  |  |
 J(70,70)  |  |  |  |  |  |  |
+
+# Drag
+There currently is a basic drag model which is implemented as in Vallado. Its fidelity isn't good enough to be considered validated. Hence, it can be used only with the `unvalidated` feature enabled.

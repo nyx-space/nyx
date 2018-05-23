@@ -5,6 +5,7 @@ use super::na::{U3, U6, Vector3, Vector6, VectorN};
 ///
 /// **WARNING:** This basic model assumes that the velocity of the spacecraft is identical to the velocity of the upper atmosphere,
 /// This is a **bad** assumption. **Do not** use this model for high fidelity simulations.
+#[cfg(feature = "unvalidated")]
 #[derive(Copy, Clone)]
 pub struct BasicDrag {
     pub rho: f64,  // atmospheric density in kg/m^3
@@ -13,6 +14,7 @@ pub struct BasicDrag {
     pub mass: f64, // in kg
 }
 
+#[cfg(feature = "unvalidated")]
 impl Dynamics for BasicDrag {
     type StateSize = U6;
     /// NOTE: No state is associated with BasicDrag, always return zero time

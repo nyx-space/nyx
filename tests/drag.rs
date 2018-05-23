@@ -2,15 +2,16 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
 
+#[cfg(feature = "unvalidated")]
 #[test]
 fn basic_drag() {
     extern crate nalgebra as na;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use self::na::{U6, VectorN};
+    use nyx::celestia::{State, EARTH};
     use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::drag::BasicDrag;
-    use nyx::celestia::{State, EARTH};
-    use self::na::{U6, VectorN};
+    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     #[derive(Clone)]
     pub struct SimpleDrag {
@@ -109,12 +110,9 @@ fn basic_drag() {
                 ((rslt.x - final_state.x).powi(2) + (rslt.y - final_state.y).powi(2) + (rslt.z - final_state.z).powi(2)).sqrt();
 
             assert_eq!(
-                rslt,
-                final_state,
+                rslt, final_state,
                 "Drag: RSS = {} km\nexpected: {:o}\ncomputed: {:o}",
-                rss_pos,
-                rslt,
-                final_state
+                rss_pos, rslt, final_state
             );
             break;
         }
