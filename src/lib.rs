@@ -121,6 +121,7 @@ pub mod propagators;
 /// # Simple two body propagation
 /// ```
 /// extern crate nalgebra as na;
+/// extern crate hifitime;
 /// extern crate nyx_space as nyx;
 ///
 /// fn main() {
@@ -130,14 +131,17 @@ pub mod propagators;
 ///     use nyx::dynamics::celestial::TwoBody;
 ///     use self::na::Vector6;
 ///     use std::f64;
+///     use hifitime::SECONDS_PER_DAY;
+///     use hifitime::julian::ModifiedJulian;
 ///
 ///     let prop_time = 24.0 * 3_600.0;
 ///     let accuracy = 1e-12;
 ///     let min_step = 0.1;
 ///     let max_step = 60.0;
 ///
+///     let dt = ModifiedJulian { days: 21545.0 };
 ///     let initial_state =
-///         State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+///         State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
 ///
 ///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
@@ -148,13 +152,14 @@ pub mod propagators;
 ///         0.04909695760948815,
 ///         -4.1850933184621315,
 ///         5.848940867758592,
+///         ModifiedJulian { days: 21546.0 }
 ///     );
 ///
 ///     let mut prop =
 ///         Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 ///
 ///     let mut dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
-///     let final_state: State;
+///     let final_state: State<ModifiedJulian>;
 ///     loop {
 ///         let (t, state) = prop.derive(
 ///             dyn.time(),
@@ -192,7 +197,10 @@ pub mod propagators;
 ///                 );
 ///             }
 ///
-///             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
+///             let final_dt = ModifiedJulian {
+///                 days: dt.days + t / SECONDS_PER_DAY,
+///             };
+///             final_state = State::from_cartesian_vec::<EARTH>(&dyn.state(), final_dt);
 ///             assert_eq!(final_state, rslt, "two body prop failed",);
 ///             break;
 ///         }
@@ -204,6 +212,7 @@ pub mod propagators;
 /// # Combining dynamics in a full spacecraft model.
 /// ```
 /// extern crate nalgebra as na;
+/// extern crate hifitime;
 /// extern crate nyx_space as nyx;
 ///
 /// // Warning: this is arguably a bad example: attitude dynamics very significantly
@@ -218,6 +227,7 @@ pub mod propagators;
 /// use self::nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
 /// use self::na::{Matrix3, U3, U6, U9, Vector3, Vector6, VectorN};
 /// use std::f64;
+/// use hifitime::julian::ModifiedJulian;
 ///
 /// // In the following struct, we only store the dynamics because this is only a proof
 /// // of concept. An engineer could add more useful information to this struct, such
@@ -343,7 +353,7 @@ pub mod propagators;
 ///
 ///             println!(
 ///                 "Final orbital state:\n{0}\n{0:o}",
-///                 State::from_cartesian_vec::<EARTH>(&full_model.twobody.state())
+///                 State::from_cartesian_vec::<EARTH>(&full_model.twobody.state(), ModifiedJulian { days: 21545.0 })
 ///             );
 ///             break;
 ///         }
@@ -356,10 +366,13 @@ pub mod dynamics;
 ///
 /// # State creation and management
 /// ```
+/// extern crate hifitime;
 /// extern crate nyx_space as nyx;
 ///
 /// fn main(){
+///     use hifitime::julian::ModifiedJulian;
 ///     use nyx::celestia::{State, EARTH};
+///     let dt = ModifiedJulian { days: 21545.0 };
 ///     // The parameter is anything which implements `CelestialBody`.
 ///     // In this case, we're creating these states around Earth.
 ///     let cart = State::from_cartesian::<EARTH>(
@@ -369,6 +382,7 @@ pub mod dynamics;
 ///         -3.098683050943824,
 ///         4.579534132135011,
 ///         6.246541551539432,
+///         dt,
 ///     );
 ///     let kep = State::from_keplerian::<EARTH>(
 ///         7712.186117895041,
@@ -377,6 +391,7 @@ pub mod dynamics;
 ///         1.99863286421117e-05,
 ///         359.787880000004,
 ///         25.434003407751188,
+///         dt,
 ///     );
 ///     // We can check whether two states are equal.
 ///     if cart != kep {
