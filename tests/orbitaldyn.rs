@@ -1,3 +1,4 @@
+extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
@@ -157,8 +158,11 @@ fn two_body_state_parametrized() {
     use nyx::dynamics::celestial::TwoBody;
     use nyx::celestia::{State, EARTH};
     use self::na::Vector6;
+    use hifitime::SECONDS_PER_DAY;
+    use hifitime::julian::ModifiedJulian;
 
-    let initial_state = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+    let dt = ModifiedJulian { days: 21545.0 };
+    let initial_state = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
@@ -174,12 +178,13 @@ fn two_body_state_parametrized() {
         0.04909695760948815,
         -4.1850933184621315,
         5.848940867758592,
+        ModifiedJulian { days: 21546.0 },
     );
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
-    let final_state: State;
+    let final_state: State<ModifiedJulian>;
 
     loop {
         let (t, state) = prop.derive(
@@ -217,8 +222,10 @@ fn two_body_state_parametrized() {
                     prev_details
                 );
             }
-
-            final_state = State::from_cartesian_vec::<EARTH>(&dyn.state());
+            let final_dt = ModifiedJulian {
+                days: dt.days + t / SECONDS_PER_DAY,
+            };
+            final_state = State::from_cartesian_vec::<EARTH>(&dyn.state(), final_dt);
             assert_eq!(final_state, rslt, "two body prop failed",);
             break;
         }
