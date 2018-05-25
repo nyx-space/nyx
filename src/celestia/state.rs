@@ -1,3 +1,6 @@
+extern crate hifitime;
+use self::hifitime::TimeSystem;
+
 use super::na::{Vector3, Vector6};
 use super::CelestialBody;
 use utils::between_0_360;
@@ -20,7 +23,10 @@ const ZERO_DIV_TOL: f64 = 1e-15;
 /// _Note:_ although not yet supported, this struct may change once True of Date or other nutation frames
 /// are added to the toolkit.
 #[derive(Copy, Clone, Debug)]
-pub struct State {
+pub struct State<T>
+where
+    T: TimeSystem,
+{
     gm: f64,
     pub x: f64,
     pub y: f64,
@@ -28,24 +34,36 @@ pub struct State {
     pub vx: f64,
     pub vy: f64,
     pub vz: f64,
+    pub dt: T,
 }
 
-impl PartialEq for State {
+impl<T: TimeSystem> PartialEq for State<T> {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    fn eq(&self, other: &State) -> bool {
+    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
+    fn eq(&self, other: &State<T>) -> bool
+    where
+        T: TimeSystem,
+    {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol && (self.y - other.y).abs() < distance_tol
+        self.dt.into_instant() == other.dt.into_instant() && (self.gm - other.gm).abs() < 1e-4
+            && (self.x - other.x).abs() < distance_tol && (self.y - other.y).abs() < distance_tol
             && (self.z - other.z).abs() < distance_tol && (self.vx - other.vx).abs() < velocity_tol
             && (self.vy - other.vy).abs() < velocity_tol && (self.vz - other.vz).abs() < velocity_tol
     }
 }
 
-impl State {
+impl<T> State<T>
+where
+    T: TimeSystem,
+{
     /// Creates a new State around the provided CelestialBody
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    pub fn from_cartesian<B: CelestialBody>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64) -> State {
+    pub fn from_cartesian<B: CelestialBody>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T) -> State<T>
+    where
+        T: TimeSystem,
+    {
         State {
             gm: B::gm(),
             x,
@@ -54,6 +72,7 @@ impl State {
             vx,
             vy,
             vz,
+            dt,
         }
     }
 
@@ -61,7 +80,10 @@ impl State {
     ///
     /// The state vector **must** be x, y, z, dx, dy, dz. This function is a shortcut to `from_cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_cartesian_vec<B: CelestialBody>(state: &Vector6<f64>) -> State {
+    pub fn from_cartesian_vec<B: CelestialBody>(state: &Vector6<f64>, dt: T) -> State<T>
+    where
+        T: TimeSystem,
+    {
         State {
             gm: B::gm(),
             x: state[(0, 0)],
@@ -70,6 +92,7 @@ impl State {
             vx: state[(3, 0)],
             vy: state[(4, 0)],
             vz: state[(5, 0)],
+            dt,
         }
     }
 
@@ -81,7 +104,10 @@ impl State {
     /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
-    pub fn from_keplerian<B: CelestialBody>(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64) -> State {
+    pub fn from_keplerian<B: CelestialBody>(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64, dt: T) -> State<T>
+    where
+        T: TimeSystem,
+    {
         if B::gm().abs() < ZERO_DIV_TOL {
             warn!(
                 "GM very low ({}): expect math errors in Keplerian to Cartesian conversion",
@@ -178,6 +204,7 @@ impl State {
             vx,
             vy,
             vz,
+            dt,
         }
     }
 
@@ -185,7 +212,10 @@ impl State {
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `from_cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_keplerian_vec<B: CelestialBody>(state: &Vector6<f64>) -> State {
+    pub fn from_keplerian_vec<B: CelestialBody>(state: &Vector6<f64>, dt: T) -> State<T>
+    where
+        T: TimeSystem,
+    {
         Self::from_keplerian::<B>(
             state[(0, 0)],
             state[(1, 0)],
@@ -193,15 +223,20 @@ impl State {
             state[(3, 0)],
             state[(4, 0)],
             state[(5, 0)],
+            dt,
         )
     }
 
     /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
+    ///
+    /// Note that the time is **not** returned in the vector.
     pub fn to_cartesian_vec(self) -> Vector6<f64> {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
     /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
+    ///
+    /// Note that the time is **not** returned in the vector.
     pub fn to_keplerian_vec(self) -> Vector6<f64> {
         Vector6::new(
             self.sma(),
@@ -429,23 +464,30 @@ impl State {
     }
 }
 
-impl fmt::Display for State {
+impl<T> fmt::Display for State<T>
+where
+    T: TimeSystem,
+{
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "position = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
-            self.x, self.y, self.z, self.vx, self.vy, self.vz
+            "{}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
+            self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
         )
     }
 }
 
-impl fmt::Octal for State {
+impl<T> fmt::Octal for State<T>
+where
+    T: TimeSystem,
+{
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "sma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
+            "{}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
+            self.dt,
             self.sma(),
             self.ecc(),
             self.inc(),

@@ -1,7 +1,9 @@
+extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
+use hifitime::julian::ModifiedJulian;
 use std::f64::EPSILON;
 
 macro_rules! f64_eq {
@@ -16,7 +18,8 @@ fn state_def_() {
 #[test]
 fn state_def_circ_inc() {
     use nyx::celestia::{State, EARTH};
-    let cart = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+    let dt = ModifiedJulian { days: 21545.0 };
+    let cart = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
     f64_eq!(cart.x, -2436.45, "x");
     f64_eq!(cart.y, -2436.45, "y");
     f64_eq!(cart.z, 6891.037, "z");
@@ -41,7 +44,7 @@ fn state_def_circ_inc() {
     f64_eq!(cart.periapsis(), 7704.477149058786, "peri");
     f64_eq!(cart.semi_parameter(), 7712.178412142147, "semi parameter");
 
-    let kep = State::from_keplerian::<EARTH>(8191.93, 1e-6, 12.85, 306.614, 314.19, 99.8877);
+    let kep = State::from_keplerian::<EARTH>(8191.93, 1e-6, 12.85, 306.614, 314.19, 99.8877, dt);
     f64_eq!(kep.x, 8057.976452202976, "x");
     f64_eq!(kep.y, -0.1967403702908889, "y");
     f64_eq!(kep.z, 1475.383214274138, "z");
@@ -70,6 +73,7 @@ fn state_def_circ_inc() {
 #[test]
 fn state_def_elliptical() {
     use nyx::celestia::{State, EARTH};
+    let dt = ModifiedJulian { days: 21545.0 };
     let cart = State::from_cartesian::<EARTH>(
         5946.673548288958,
         1656.154606023661,
@@ -77,6 +81,7 @@ fn state_def_elliptical() {
         -3.098683050943824,
         4.579534132135011,
         6.246541551539432,
+        dt,
     );
     f64_eq!(cart.energy(), -25.842247282849144, "energy");
     f64_eq!(cart.period(), 6740.2690636430425, "period");
@@ -96,7 +101,7 @@ fn state_def_elliptical() {
     f64_eq!(cart.periapsis(), 6485.94852514973, "peri");
     f64_eq!(cart.semi_parameter(), 7517.214340648537, "semi parameter");
 
-    let kep = State::from_keplerian::<EARTH>(8191.93, 0.0245, 12.85, 306.614, 314.19, 99.8877);
+    let kep = State::from_keplerian::<EARTH>(8191.93, 0.0245, 12.85, 306.614, 314.19, 99.8877, dt);
     f64_eq!(kep.x, 8087.1616180485225, "x");
     f64_eq!(kep.y, -0.19745294377252073, "y");
     f64_eq!(kep.z, 1480.726901246883, "z");
@@ -125,6 +130,7 @@ fn state_def_elliptical() {
 #[test]
 fn state_def_circ_eq() {
     use nyx::celestia::{State, EARTH};
+    let dt = ModifiedJulian { days: 21545.0 };
     let cart = State::from_cartesian::<EARTH>(
         -38892.72444914902,
         16830.38477289186,
@@ -132,6 +138,7 @@ fn state_def_circ_eq() {
         -1.2180083338466,
         -2.81465117260598,
         1.140294223185661e-05,
+        dt,
     );
     f64_eq!(cart.energy(), -4.702902670552006, "energy");
     f64_eq!(cart.period(), 86820.7761529861, "period");
@@ -151,7 +158,7 @@ fn state_def_circ_eq() {
     f64_eq!(cart.periapsis(), 42378.12957621869, "peri");
     f64_eq!(cart.semi_parameter(), 42378.129999999976, "semi parameter");
 
-    let kep = State::from_keplerian::<EARTH>(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765);
+    let kep = State::from_keplerian::<EARTH>(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt);
     f64_eq!(kep.x, 18190.717357886369, "x");
     f64_eq!(kep.y, -118.10716253921869, "y");
     f64_eq!(kep.z, 0.00025384564763305335, "z");
@@ -180,6 +187,7 @@ fn state_def_circ_eq() {
 #[test]
 fn state_def_reciprocity() {
     use nyx::celestia::{State, EARTH};
+    let dt = ModifiedJulian { days: 21545.0 };
 
     assert_eq!(
         State::from_cartesian::<EARTH>(
@@ -189,6 +197,7 @@ fn state_def_reciprocity() {
             -1.2180083338466,
             -2.81465117260598,
             1.140294223185661e-05,
+            dt,
         ),
         State::from_keplerian::<EARTH>(
             42378.12999999998,
@@ -197,6 +206,7 @@ fn state_def_reciprocity() {
             78.90000000000001,
             65.39999984718678,
             12.300000152813197,
+            dt,
         ),
         "circ_eq"
     );
@@ -209,6 +219,7 @@ fn state_def_reciprocity() {
             -3.098683050943824,
             4.579534132135011,
             6.246541551539432,
+            dt,
         ),
         State::from_keplerian::<EARTH>(
             7712.186117895041,
@@ -217,12 +228,13 @@ fn state_def_reciprocity() {
             1.99863286421117e-05,
             359.787880000004,
             25.434003407751188,
+            dt,
         ),
         "elliptical"
     );
 
     assert_eq!(
-        State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0),
+        State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt),
         State::from_keplerian::<EARTH>(
             7712.186117895043,
             0.0009995828314320525,
@@ -230,6 +242,7 @@ fn state_def_reciprocity() {
             135.0,
             90.0,
             0.0,
+            dt,
         ),
         "circ_inc"
     );
