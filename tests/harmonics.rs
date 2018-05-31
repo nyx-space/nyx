@@ -8,9 +8,9 @@ fn gmat_val_harmonics_j2jgm3() {
     extern crate nalgebra as na;
     use self::na::{U6, VectorN};
     use nyx::celestia::{State, EARTH};
-    use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
+    use nyx::dynamics::Dynamics;
     use nyx::io::gravity::MemoryBackend;
     use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
@@ -130,9 +130,9 @@ fn gmat_val_harmonics_21x21() {
     extern crate nalgebra as na;
     use self::na::{U6, VectorN};
     use nyx::celestia::{State, EARTH};
-    use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
+    use nyx::dynamics::Dynamics;
     use nyx::io::gravity::MemoryBackend;
     use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
@@ -253,9 +253,9 @@ fn gmat_val_harmonics_70x70() {
     extern crate nalgebra as na;
     use self::na::{U6, VectorN};
     use nyx::celestia::{State, EARTH};
-    use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
+    use nyx::dynamics::Dynamics;
     use nyx::io::gravity::MemoryBackend;
     use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 

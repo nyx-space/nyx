@@ -2,8 +2,8 @@ use super::Dynamics;
 use celestia::CelestialBody;
 
 extern crate nalgebra as na;
-use std::f64;
 use self::na::{U3, U6, Vector6, VectorN};
+use std::f64;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]

@@ -3,10 +3,10 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn const_mom() {
-    use nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
-    use nyx::dynamics::Dynamics;
-    use nyx::dynamics::momentum::AngularMom;
     use self::na::{Matrix3, Vector3};
+    use nyx::dynamics::momentum::AngularMom;
+    use nyx::dynamics::Dynamics;
+    use nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
 
     let mut prop = Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 5.0, 1e-8));
 

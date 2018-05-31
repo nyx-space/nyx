@@ -92,6 +92,13 @@ impl<'a> Propagator<'a> {
         self.fixed_step = true;
     }
 
+    /// This method propagates the provided Dynamics `dyn` for `elapsed_seconds` seconds. WARNING: This function has many caveats (please read detailed docs).
+    ///
+    /// ### IMPORTANT CAVEATS of `prop_for`
+    /// - It is **assumed** that `dyn.time()` returns a time in seconds.
+    /// - Although mutuable, the original dynamics struct are **COPIED** to this function. This means that calling `dyn.state()` after passing
+    /// that same variable `dyn` to the `prop_for` function will return the **original** state. One **must** therefore call `prop_for` and then
+    /// call `dyn.set_state(final_t, &final_state)` with the final time and state returned by `prop_for`.
     pub fn prop_for<D: Dynamics, E: Copy>(
         &mut self,
         elapsed_seconds: f64,

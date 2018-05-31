@@ -7,7 +7,9 @@ use hifitime::julian::ModifiedJulian;
 use std::f64::EPSILON;
 
 macro_rules! f64_eq {
-    ($x:expr, $val:expr, $msg:expr) => (assert!(($x - $val).abs() < EPSILON, $msg));
+    ($x:expr, $val:expr, $msg:expr) => {
+        assert!(($x - $val).abs() < EPSILON, $msg)
+    };
 }
 
 #[test]
