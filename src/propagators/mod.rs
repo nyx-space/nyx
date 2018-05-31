@@ -92,16 +92,16 @@ impl<'a> Propagator<'a> {
         self.fixed_step = true;
     }
 
-    /// This method propagates the provided Dynamics `dyn` for `elapsed_seconds` seconds. WARNING: This function has many caveats (please read detailed docs).
+    /// This method propagates the provided Dynamics `dyn` for `elapsed_time` seconds. WARNING: This function has many caveats (please read detailed docs).
     ///
-    /// ### IMPORTANT CAVEATS of `prop_for`
-    /// - It is **assumed** that `dyn.time()` returns a time in seconds.
+    /// ### IMPORTANT CAVEATS of `until_time_elapsed`
+    /// - It is **assumed** that `dyn.time()` returns a time in the same units as elapsed_time.
     /// - Although mutuable, the original dynamics struct are **COPIED** to this function. This means that calling `dyn.state()` after passing
-    /// that same variable `dyn` to the `prop_for` function will return the **original** state. One **must** therefore call `prop_for` and then
-    /// call `dyn.set_state(final_t, &final_state)` with the final time and state returned by `prop_for`.
-    pub fn prop_for<D: Dynamics, E: Copy>(
+    /// that same variable `dyn` to the `until_time_elapsed` function will return the **original** state. One **must** therefore call `until_time_elapsed` and then
+    /// call `dyn.set_state(final_t, &final_state)` with the final time and state returned by `until_time_elapsed`.
+    pub fn until_time_elapsed<D: Dynamics, E: Copy>(
         &mut self,
-        elapsed_seconds: f64,
+        elapsed_time: f64,
         mut dyn: D,
         err_estimator: E,
     ) -> (f64, VectorN<f64, D::StateSize>)
@@ -109,7 +109,7 @@ impl<'a> Propagator<'a> {
         E: Fn(&VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>) -> f64,
         DefaultAllocator: Allocator<f64, D::StateSize>,
     {
-        if elapsed_seconds < 0.0 {
+        if elapsed_time < 0.0 {
             panic!("backprop not yet supported");
         }
         let init_seconds = dyn.time();
@@ -121,12 +121,12 @@ impl<'a> Propagator<'a> {
                 err_estimator,
             );
 
-            if (t - init_seconds) < elapsed_seconds {
+            if (t - init_seconds) < elapsed_time {
                 // We haven't passed the time based stopping condition.
                 dyn.set_state(t, &state);
             } else {
                 let prev_details = self.latest_details().clone();
-                let overshot = t - elapsed_seconds;
+                let overshot = t - elapsed_time;
                 if overshot > 0.0 {
                     debug!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);
