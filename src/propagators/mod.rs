@@ -5,6 +5,8 @@ use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use std::f64;
 use std::time::Duration;
 
+use dynamics::Dynamics;
+
 /// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
 
@@ -90,31 +92,31 @@ impl<'a> Propagator<'a> {
         self.fixed_step = true;
     }
 
-    pub fn prop_for<D: Copy, E: Copy, N: Dim + DimName, S>(
+    pub fn prop_for<D: Dynamics, E: Copy>(
         &mut self,
         elapsed_seconds: f64,
-        init_seconds: f64,
-        state: &VectorN<f64, N>,
-        d_xdt: D,
-        set_state: S,
+        mut dyn: D,
         err_estimator: E,
-    ) -> (f64, VectorN<f64, N>)
+    ) -> (f64, VectorN<f64, D::StateSize>)
     where
-        D: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
-        E: Fn(&VectorN<f64, N>, &VectorN<f64, N>, &VectorN<f64, N>) -> f64,
-        S: Fn(f64, &VectorN<f64, N>),
-        DefaultAllocator: Allocator<f64, N>,
+        E: Fn(&VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>) -> f64,
+        DefaultAllocator: Allocator<f64, D::StateSize>,
     {
         if elapsed_seconds < 0.0 {
             panic!("backprop not yet supported");
         }
-        let t = init_seconds;
+        let init_seconds = dyn.time();
         loop {
-            let (t, state) = self.derive(t, &state, d_xdt, err_estimator);
+            let (t, state) = self.derive(
+                dyn.time(),
+                &dyn.state(),
+                |t_: f64, state_: &VectorN<f64, D::StateSize>| dyn.eom(t_, state_),
+                err_estimator,
+            );
 
             if (t - init_seconds) < elapsed_seconds {
                 // We haven't passed the time based stopping condition.
-                set_state(t, &state);
+                dyn.set_state(t, &state);
             } else {
                 let prev_details = self.latest_details().clone();
                 let overshot = t - elapsed_seconds;
@@ -122,10 +124,15 @@ impl<'a> Propagator<'a> {
                     debug!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);
                     // Take one final step
-                    let (t, state) = self.derive(t, &state, d_xdt, err_estimator);
-                    set_state(t, &state);
+                    let (t, state) = self.derive(
+                        dyn.time(),
+                        &dyn.state(),
+                        |t_: f64, state_: &VectorN<f64, D::StateSize>| dyn.eom(t_, state_),
+                        err_estimator,
+                    );
+                    dyn.set_state(t, &state);
                 } else {
-                    set_state(t, &state);
+                    dyn.set_state(t, &state);
                 }
                 return (t, state);
             }
