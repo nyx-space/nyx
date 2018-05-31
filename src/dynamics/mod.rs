@@ -1,8 +1,8 @@
 extern crate hifitime;
 extern crate nalgebra as na;
 
-use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
+use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 
 /// The celestial module handles all Cartesian based dynamics.
 ///

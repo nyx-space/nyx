@@ -1,8 +1,9 @@
 extern crate nalgebra as na;
 
-use std::f64;
-use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
+use self::na::{DefaultAllocator, Dim, DimName, VectorN};
+use std::f64;
+use std::time::Duration;
 
 /// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
@@ -89,6 +90,48 @@ impl<'a> Propagator<'a> {
         self.fixed_step = true;
     }
 
+    pub fn prop_for<D: Copy, E: Copy, N: Dim + DimName, S>(
+        &mut self,
+        elapsed_seconds: f64,
+        init_seconds: f64,
+        state: &VectorN<f64, N>,
+        d_xdt: D,
+        set_state: S,
+        err_estimator: E,
+    ) -> (f64, VectorN<f64, N>)
+    where
+        D: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
+        E: Fn(&VectorN<f64, N>, &VectorN<f64, N>, &VectorN<f64, N>) -> f64,
+        S: Fn(f64, &VectorN<f64, N>),
+        DefaultAllocator: Allocator<f64, N>,
+    {
+        if elapsed_seconds < 0.0 {
+            panic!("backprop not yet supported");
+        }
+        let t = init_seconds;
+        loop {
+            let (t, state) = self.derive(t, &state, d_xdt, err_estimator);
+
+            if (t - init_seconds) < elapsed_seconds {
+                // We haven't passed the time based stopping condition.
+                set_state(t, &state);
+            } else {
+                let prev_details = self.latest_details().clone();
+                let overshot = t - elapsed_seconds;
+                if overshot > 0.0 {
+                    debug!("overshot by {} seconds", overshot);
+                    self.set_fixed_step(prev_details.step - overshot);
+                    // Take one final step
+                    let (t, state) = self.derive(t, &state, d_xdt, err_estimator);
+                    set_state(t, &state);
+                } else {
+                    set_state(t, &state);
+                }
+                return (t, state);
+            }
+        }
+    }
+
     /// This method integrates whichever function is provided as `d_xdt`.
     ///
     /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
@@ -155,14 +198,12 @@ impl<'a> Propagator<'a> {
             } else {
                 // Compute the error estimate.
                 self.details.error = err_estimator(&error_est, &next_state.clone(), state);
-                if self.details.error <= self.opts.tolerance || self.step_size <= self.opts.min_step
+                if self.details.error <= self.opts.tolerance
+                    || self.step_size <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {
-                        warn!(
-                            "maximum number of attempts reached ({})",
-                            self.details.attempts
-                        );
+                        warn!("maximum number of attempts reached ({})", self.details.attempts);
                     }
 
                     self.details.step = self.step_size;

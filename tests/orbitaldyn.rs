@@ -6,11 +6,11 @@ use std::f64;
 #[test]
 fn two_body_parametrized() {
     extern crate nalgebra as na;
-    use nyx::propagators::*;
-    use nyx::dynamics::Dynamics;
-    use nyx::dynamics::celestial::TwoBody;
-    use nyx::celestia::EARTH;
     use self::na::Vector6;
+    use nyx::celestia::EARTH;
+    use nyx::dynamics::celestial::TwoBody;
+    use nyx::dynamics::Dynamics;
+    use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -28,15 +28,17 @@ fn two_body_parametrized() {
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 
-    let mut dyn = TwoBody::from_state_vec::<EARTH>(&Vector6::new(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088611,
-        -5.088611,
-        0.0,
-    ));
-    loop {
+    let mut dyn = TwoBody::from_state_vec::<EARTH>(&Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0));
+    let (final_t, final_state) = prop.prop_for(
+        prop_time,
+        dyn.time(),
+        &dyn.state(),
+        |t_: f64, state_: &Vector6<f64>| dyn.eom(t_, state_),
+        |t_: f64, state_: &Vector6<f64>| dyn.set_state(t_, state_),
+        error_ctrl::rss_step_pos_vel,
+    );
+    assert_eq!(dyn.state(), rslt, "two body prop failed",);
+    /*loop {
         let (t, state) = prop.derive(
             dyn.time(),
             &dyn.state(),
@@ -76,16 +78,16 @@ fn two_body_parametrized() {
             assert_eq!(dyn.state(), rslt, "two body prop failed",);
             break;
         }
-    }
+    }*/
 }
 
 #[test]
 fn two_body_custom() {
     extern crate nalgebra as na;
-    use nyx::propagators::*;
-    use nyx::dynamics::Dynamics;
-    use nyx::dynamics::celestial::TwoBody;
     use self::na::Vector6;
+    use nyx::dynamics::celestial::TwoBody;
+    use nyx::dynamics::Dynamics;
+    use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -153,13 +155,13 @@ fn two_body_custom() {
 #[test]
 fn two_body_state_parametrized() {
     extern crate nalgebra as na;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
-    use nyx::dynamics::Dynamics;
-    use nyx::dynamics::celestial::TwoBody;
-    use nyx::celestia::{State, EARTH};
     use self::na::Vector6;
-    use hifitime::SECONDS_PER_DAY;
     use hifitime::julian::ModifiedJulian;
+    use hifitime::SECONDS_PER_DAY;
+    use nyx::celestia::{State, EARTH};
+    use nyx::dynamics::celestial::TwoBody;
+    use nyx::dynamics::Dynamics;
+    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     let dt = ModifiedJulian { days: 21545.0 };
     let initial_state = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
