@@ -56,7 +56,8 @@ impl CelestialBody for EARTH {
         6378.1363
     }
     fn flatenning() -> f64 {
-        0.00335270
+        // From [EMG2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/egm08_wgs84.html)
+        0.0033528106647474805
     }
 }
 
@@ -65,6 +66,9 @@ impl NAIF for EARTH {
         399
     }
 }
+
+/// In radians per second
+pub const EARTH_ROTATION_RATE: f64 = 7.292115900231276e-5;
 
 /// Planet Mars as defined in [GMAT 2016a](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/GmatDefaults.hpp).
 pub struct MARS;

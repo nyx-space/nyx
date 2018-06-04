@@ -1,10 +1,10 @@
 extern crate hifitime;
-use self::hifitime::instant::Instant;
+use self::hifitime::instant::{Duration, Instant};
 use self::hifitime::TimeSystem;
 use self::hifitime::{datetime, julian};
 
 use super::na::{Vector3, Vector6};
-use super::{CelestialBody, CoordinateFrame, DummyECEF, EARTH, ECI};
+use super::{CelestialBody, CoordinateFrame, EARTH, EARTH_ROTATION_RATE, ECEF, ECI};
 use utils::between_0_360;
 
 use std::f64::consts::PI;
@@ -263,6 +263,40 @@ where
     /// Returns the date time as its UTC representation
     pub fn dt_as_utc(self) -> datetime::Datetime {
         datetime::Datetime::from_instant(self.dt)
+    }
+
+    /// Converts this state to a state in the destination frame (`other`).
+    ///
+    /// Reference: Vallado, 4th Ed., page 167, equation 3-27.
+    /// Note that we compute the derivative of the DCM by taking the difference between
+    /// said DCMs at a 0.1 second interval.
+    pub fn in_frame<G: CoordinateFrame>(self, other: G) -> State<G>
+    where
+        F: CoordinateFrame,
+    {
+        // if self.frame.Center != other.Center {
+        //     unimplemented!("transformations between differently centered frames depends on #4");
+        // }
+        let radius = Vector3::new(self.x, self.y, self.z);
+        let velocity = Vector3::new(self.vx, self.vy, self.vz);
+        // Convert from our frame to the destination frame via their inertial frames.
+        let dest_radius = G::from_inertial(self.dt) * F::to_inertial(self.dt) * radius;
+        // We need to compute the derivate of the DCM for the velocity.
+        let h = Duration::from_millis(100);
+        let frame_dt = (F::from_inertial(self.dt + h) - F::from_inertial(self.dt)) / 0.1;
+        let other_dt = (G::from_inertial(self.dt + h) - G::from_inertial(self.dt)) / 0.1;
+        let dest_velocity = G::from_inertial(self.dt) * F::to_inertial(self.dt) * velocity + other_dt * frame_dt * radius;
+        State {
+            gm: self.gm,
+            x: dest_radius[(0, 0)],
+            y: dest_radius[(1, 0)],
+            z: dest_radius[(2, 0)],
+            vx: dest_velocity[(0, 0)],
+            vy: dest_velocity[(1, 0)],
+            vz: dest_velocity[(2, 0)],
+            dt: self.dt,
+            frame: other,
+        }
     }
 
     /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
@@ -547,5 +581,28 @@ impl State<ECI> {
     /// **Units:** km, none, degrees, degrees, degrees, degrees
     pub fn from_keplerian_eci<T: TimeSystem>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T) -> State<ECI> {
         State::from_keplerian::<EARTH, T>(x, y, z, vx, vy, vz, dt, ECI {})
+    }
+}
+
+impl State<ECEF> {
+    /// Creates a new State on the surface of Earth in geodesic. WARNING: unvalidated because of bad Earth model (for now)
+    ///
+    /// **Units:** km, degrees, degrees
+    pub fn from_geodesic<T: TimeSystem>(altitude: f64, latitude: f64, longitude: f64, dt: T) -> State<ECEF> {
+        let (sin_long, cos_long) = longitude.sin_cos();
+        let (sin_lat, cos_lat) = latitude.sin_cos();
+        let r = EARTH::eq_radius() + altitude;
+        let radius = Vector3::new(r * cos_lat * cos_long, r * cos_lat * sin_long, r * sin_lat);
+        let velocity = Vector3::new(0.0, 0.0, EARTH_ROTATION_RATE).cross(&radius);
+        State::from_cartesian::<EARTH, T>(
+            radius[(0, 0)],
+            radius[(1, 0)],
+            radius[(2, 0)],
+            velocity[(0, 0)],
+            velocity[(1, 0)],
+            velocity[(2, 0)],
+            dt,
+            ECEF {},
+        )
     }
 }
