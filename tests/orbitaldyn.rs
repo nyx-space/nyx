@@ -69,13 +69,13 @@ fn two_body_state_parametrized() {
     extern crate nalgebra as na;
     use hifitime::julian::ModifiedJulian;
     use hifitime::SECONDS_PER_DAY;
-    use nyx::celestia::{State, EARTH};
+    use nyx::celestia::{State, EARTH, ECI};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
     use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     let dt = ModifiedJulian { days: 21545.0 };
-    let initial_state = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
+    let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
@@ -84,7 +84,7 @@ fn two_body_state_parametrized() {
     let min_step = 0.1;
     let max_step = 60.0;
 
-    let rslt = State::from_cartesian::<EARTH>(
+    let rslt = State::from_cartesian_eci(
         -5971.1941916712285,
         3945.5066532419537,
         2864.636618390466,
@@ -102,7 +102,7 @@ fn two_body_state_parametrized() {
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
     };
-    let final_state = State::from_cartesian_vec::<EARTH>(&dyn.state(), final_dt);
+    let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&dyn.state(), final_dt, ECI {});
     assert_eq!(final_state, rslt, "two body prop failed",);
 
     println!("Final state:\n{0}\n{0:o}", final_state);

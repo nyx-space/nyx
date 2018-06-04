@@ -32,13 +32,22 @@ pub trait NAIF {
     }
 }
 
+/// Solar system barycenter
+pub struct SSB;
+
+impl NAIF for SSB {
+    fn id() -> i32 {
+        0
+    }
+}
+
 // Re-Export the planets
 mod planets;
 pub use self::planets::*;
 
 // Re-Export state
 mod state;
-pub use self::state::State;
+pub use self::state::*;
 
 // Re-Export frames
 mod frames;
