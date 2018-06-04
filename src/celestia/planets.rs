@@ -48,6 +48,18 @@ impl NAIF for VENUS {
 /// Planet Earth as defined in [GMAT 2016a](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/GmatDefaults.hpp).
 pub struct EARTH;
 
+impl EARTH {
+    /// Defines the semi major radius of the ellipsoid of Earth, as per WGS84, in km.
+    pub fn semi_major_radius() -> f64 {
+        6378.1370
+    }
+
+    /// The rotation rate of Earth, in radians per seconds; [source](http://hpiers.obspm.fr/eop-pc/models/constants.html).
+    pub fn rotation_rate() -> f64 {
+        7.292_115_146_706_4e-5
+    }
+}
+
 impl CelestialBody for EARTH {
     fn gm() -> f64 {
         398_600.4415
@@ -66,9 +78,6 @@ impl NAIF for EARTH {
         399
     }
 }
-
-/// In radians per second
-pub const EARTH_ROTATION_RATE: f64 = 7.292115900231276e-5;
 
 /// Planet Mars as defined in [GMAT 2016a](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/GmatDefaults.hpp).
 pub struct MARS;

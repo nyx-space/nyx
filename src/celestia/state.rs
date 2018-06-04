@@ -4,7 +4,7 @@ use self::hifitime::TimeSystem;
 use self::hifitime::{datetime, julian};
 
 use super::na::{Vector3, Vector6};
-use super::{CelestialBody, CoordinateFrame, EARTH, EARTH_ROTATION_RATE, ECEF, ECI};
+use super::{CelestialBody, CoordinateFrame, EARTH, ECEF, ECI};
 use utils::between_0_360;
 
 use std::f64::consts::PI;
@@ -585,15 +585,21 @@ impl State<ECI> {
 }
 
 impl State<ECEF> {
-    /// Creates a new State on the surface of Earth in geodesic. WARNING: unvalidated because of bad Earth model (for now)
+    /// Creates a new State from the geodetic latitude (φ), longitude (λ) and height with respect to Earth's ellipsoid.
     ///
-    /// **Units:** km, degrees, degrees
-    pub fn from_geodesic<T: TimeSystem>(altitude: f64, latitude: f64, longitude: f64, dt: T) -> State<ECEF> {
+    /// **Units:** degrees, degrees, km
+    /// NOTE: This computation differs from the spherical coordinates because we consider the flatenning of Earth.
+    /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
+    pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T) -> State<ECEF> {
         let (sin_long, cos_long) = longitude.sin_cos();
         let (sin_lat, cos_lat) = latitude.sin_cos();
-        let r = EARTH::eq_radius() + altitude;
-        let radius = Vector3::new(r * cos_lat * cos_long, r * cos_lat * sin_long, r * sin_lat);
-        let velocity = Vector3::new(0.0, 0.0, EARTH_ROTATION_RATE).cross(&radius);
+        // NOTE: In order to avoid computing `e`, I've rewritten the math with `f`.
+        let radius = Vector3::new(
+            (height + EARTH::semi_major_radius()) * cos_lat * cos_long,
+            (height + EARTH::semi_major_radius()) * cos_lat * sin_long,
+            (height + EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) * sin_lat,
+        );
+        let velocity = Vector3::new(0.0, 0.0, EARTH::rotation_rate()).cross(&radius);
         State::from_cartesian::<EARTH, T>(
             radius[(0, 0)],
             radius[(1, 0)],
@@ -604,5 +610,10 @@ impl State<ECEF> {
             dt,
             ECEF {},
         )
+    }
+
+    /// Returns the geodetic longitude in degrees
+    pub fn geodetic_longitude(&self) -> f64 {
+        self.y.atan2(self.x)
     }
 }
