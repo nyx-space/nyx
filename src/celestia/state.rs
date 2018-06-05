@@ -1,14 +1,14 @@
 extern crate hifitime;
-use self::hifitime::instant::{Duration, Instant};
 use self::hifitime::TimeSystem;
+use self::hifitime::instant::{Duration, Instant};
 use self::hifitime::{datetime, julian};
 
 use super::na::{Vector3, Vector6};
 use super::{CelestialBody, CoordinateFrame, EARTH, ECEF, ECI};
-use utils::between_0_360;
+use utils::{between_0_360, between_pm_180};
 
-use std::f64::consts::PI;
 use std::f64::EPSILON;
+use std::f64::consts::PI;
 use std::fmt;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -51,13 +51,9 @@ impl<F: CoordinateFrame> PartialEq for State<F> {
     {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        self.dt == other.dt
-            && (self.gm - other.gm).abs() < 1e-4
-            && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol
+        self.dt == other.dt && (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol
+            && (self.y - other.y).abs() < distance_tol && (self.z - other.z).abs() < distance_tol
+            && (self.vx - other.vx).abs() < velocity_tol && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
     }
 }
@@ -591,12 +587,16 @@ impl State<ECEF> {
     /// NOTE: This computation differs from the spherical coordinates because we consider the flatenning of Earth.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T) -> State<ECEF> {
+        let e2 = 2.0 * EARTH::flatenning() - EARTH::flatenning().powi(2);
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
-        let ri = (EARTH::semi_major_radius() + height) * cos_lat * cos_long;
-        let rj = (EARTH::semi_major_radius() + height) * cos_lat * sin_long;
-        let e2 = 2.0 * EARTH::flatenning() - EARTH::flatenning().powi(2);
-        let rk = (EARTH::semi_major_radius() * (1.0 - e2) + height) * sin_lat;
+        // page 144
+        let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+        let s_earth =
+            (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+        let ri = (c_earth + height) * cos_lat * cos_long;
+        let rj = (c_earth + height) * cos_lat * sin_long;
+        let rk = (s_earth + height) * sin_lat;
         let radius = Vector3::new(ri, rj, rk);
         let velocity = Vector3::new(0.0, 0.0, EARTH::rotation_rate()).cross(&radius);
         State::from_cartesian::<EARTH, T>(
@@ -638,7 +638,7 @@ impl State<ECEF> {
     /// Although the reference is not Vallado, the math from Vallado proves to be equivalent.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn geodetic_longitude(&self) -> f64 {
-        self.y.atan2(self.x).to_degrees()
+        between_0_360(self.y.atan2(self.x).to_degrees())
     }
 
     /// Returns the geodetic latitude (φ) in degrees
@@ -656,13 +656,13 @@ impl State<ECEF> {
             let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
             let new_latitude = (self.z + c_earth * e2 * (latitude).sin()).atan2(r_delta);
             if (latitude - new_latitude).abs() < eps {
-                return new_latitude.to_degrees();
+                return between_pm_180(new_latitude.to_degrees());
             } else if attempt_no >= max_attempts {
                 warn!(
                     "geodetic latitude failed to converge -- error = {}",
                     (latitude - new_latitude).abs()
                 );
-                return new_latitude.to_degrees();
+                return between_pm_180(new_latitude.to_degrees());
             }
             latitude = new_latitude;
         }
@@ -674,13 +674,14 @@ impl State<ECEF> {
     pub fn geodetic_height(&self) -> f64 {
         let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
         let latitude = self.geodetic_latitude().to_radians();
+        let sin_lat = latitude.sin();
         if (latitude - 1.0).abs() < 0.1 {
             // We are near poles, let's use another formulation.
-            let s_earth = (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2))
-                / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
+            let s_earth =
+                (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
             self.z / latitude.sin() - s_earth
         } else {
-            let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
+            let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
             let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
             r_delta / latitude.cos() - c_earth
         }

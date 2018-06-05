@@ -19,8 +19,8 @@ fn state_def_() {
 
 #[test]
 fn state_def_circ_inc() {
-    use hifitime::datetime::Datetime;
     use hifitime::TimeSystem;
+    use hifitime::datetime::Datetime;
     use nyx::celestia::State;
     let dt = ModifiedJulian { days: 21545.0 };
     let cart = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
@@ -266,25 +266,43 @@ fn state_def_reciprocity() {
 }
 
 #[test]
-fn geodetic() {
+fn geodetic_vallado() {
     use nyx::celestia::{State, ECEF};
     let dt = ModifiedJulian { days: 51545.0 };
-    // Test case from Vallado, 4th Ed., page 173.
+    // Test case from Vallado, 4th Ed., page 173, Example 3-3
     let ri = 6524.834;
+    let ri_val = 6524.833999999999;
     let rj = 6862.875;
+    let rj_val = 6862.874999999999;
     let rk = 6448.296;
+    let rk_val = 6448.295999999998;
     let lat = 34.352495150861564;
     let long = 46.44641685678996;
     let height = 5085.218731091624;
     let r = State::<ECEF>::from_position(ri, rj, rk, dt);
-    println!("{:?}", r.geodetic_latitude());
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height, "height");
-    // BUG: reciprocity fails -- I asked experts in geodesy why, Will fix later.
-    // let r = State::<ECEF>::from_geodesic(lat, long, height, dt);
-    // println!("{}", r);
-    // f64_eq!(r.ri(), ri, "r_i");
-    // f64_eq!(r.rj(), rj, "r_j");
-    // f64_eq!(r.rk(), rk, "r_k");
+    let r = State::<ECEF>::from_geodesic(lat, long, height, dt);
+    f64_eq!(r.ri(), ri_val, "r_i");
+    f64_eq!(r.rj(), rj_val, "r_j");
+    f64_eq!(r.rk(), rk_val, "r_k");
+
+    // Test case from Vallado, 4th Ed., page 173, Example 3-4
+    let lat = -7.906_635_7;
+    let lat_val = -7.906_635_699_999_994_5;
+    let long = 345.5975;
+    let height = 56.0e-3;
+    let height_val = 0.056000000000494765;
+    let ri = 6119.400259009384;
+    let rj = -1571.4795528014297;
+    let rk = -871.5612575789334;
+    let r = State::<ECEF>::from_geodesic(lat, long, height, dt);
+    f64_eq!(r.ri(), ri, "r_i");
+    f64_eq!(r.rj(), rj, "r_j");
+    f64_eq!(r.rk(), rk, "r_k");
+    let r = State::<ECEF>::from_position(ri, rj, rk, dt);
+    f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
+    f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
+    f64_eq!(r.geodetic_height(), height_val, "height");
 }
