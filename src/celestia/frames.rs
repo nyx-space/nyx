@@ -85,6 +85,6 @@ impl CoordinateFrame for ECEF {
 impl fmt::Display for ECEF {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "dECEF")
+        write!(f, "ECEF")
     }
 }

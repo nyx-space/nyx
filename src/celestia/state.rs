@@ -593,13 +593,11 @@ impl State<ECEF> {
     pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T) -> State<ECEF> {
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
-        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
-        // NOTE: In order to avoid computing `e`, I've rewritten the math with `f`.
-        let radius = Vector3::new(
-            (height + EARTH::semi_major_radius()) * cos_lat * cos_long,
-            (height + EARTH::semi_major_radius()) * cos_lat * sin_long,
-            (height + EARTH::semi_major_radius() * (1.0 - e2)) * sin_lat,
-        );
+        let ri = (EARTH::semi_major_radius() + height) * cos_lat * cos_long;
+        let rj = (EARTH::semi_major_radius() + height) * cos_lat * sin_long;
+        let e2 = 2.0 * EARTH::flatenning() - EARTH::flatenning().powi(2);
+        let rk = (EARTH::semi_major_radius() * (1.0 - e2) + height) * sin_lat;
+        let radius = Vector3::new(ri, rj, rk);
         let velocity = Vector3::new(0.0, 0.0, EARTH::rotation_rate()).cross(&radius);
         State::from_cartesian::<EARTH, T>(
             radius[(0, 0)],
