@@ -4,7 +4,7 @@ use self::hifitime::instant::{Era, Instant};
 use self::hifitime::julian::ModifiedJulian;
 use self::hifitime::TimeSystem;
 use self::na::Matrix3;
-use super::{EARTH, EARTH_ROTATION_RATE, NAIF, SSB};
+use super::{EARTH, NAIF, SSB};
 use std::fmt;
 
 /// Defines a coordinate frame trait around the body B which implements the trait NAIF
@@ -76,7 +76,7 @@ impl CoordinateFrame for ECEF {
         let theta_gmst = Self::theta_gmst(at);
         let delta_secs = at - Instant::new(0, 0, Era::Present);
         // Compute theta GST
-        let (s, c) = (EARTH_ROTATION_RATE * delta_secs).sin_cos();
+        let (s, c) = (EARTH::rotation_rate() * delta_secs).sin_cos();
         // It's an R3 rotation to go from ECI to ECEF, so let's take the transpose to go from ECEF to ECI.
         Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0).transpose()
     }

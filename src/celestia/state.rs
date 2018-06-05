@@ -591,13 +591,14 @@ impl State<ECEF> {
     /// NOTE: This computation differs from the spherical coordinates because we consider the flatenning of Earth.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T) -> State<ECEF> {
-        let (sin_long, cos_long) = longitude.sin_cos();
-        let (sin_lat, cos_lat) = latitude.sin_cos();
+        let (sin_long, cos_long) = longitude.to_radians().sin_cos();
+        let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
+        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
         // NOTE: In order to avoid computing `e`, I've rewritten the math with `f`.
         let radius = Vector3::new(
             (height + EARTH::semi_major_radius()) * cos_lat * cos_long,
             (height + EARTH::semi_major_radius()) * cos_lat * sin_long,
-            (height + EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) * sin_lat,
+            (height + EARTH::semi_major_radius() * (1.0 - e2)) * sin_lat,
         );
         let velocity = Vector3::new(0.0, 0.0, EARTH::rotation_rate()).cross(&radius);
         State::from_cartesian::<EARTH, T>(
@@ -612,8 +613,78 @@ impl State<ECEF> {
         )
     }
 
-    /// Returns the geodetic longitude in degrees
+    /// Creates a new ECEF state at the provided position.
+    ///
+    /// NOTE: This has the same container as the normal State. Hence, we set the velocity at zero.
+    pub fn from_position<T: TimeSystem>(i: f64, j: f64, k: f64, dt: T) -> State<ECEF> {
+        State::from_cartesian::<EARTH, T>(i, j, k, 0.0, 0.0, 0.0, dt, ECEF {})
+    }
+
+    /// Returns the I component of this ECEF frame
+    pub fn ri(&self) -> f64 {
+        self.x
+    }
+
+    /// Returns the J component of this ECEF frame
+    pub fn rj(&self) -> f64 {
+        self.y
+    }
+
+    /// Returns the K component of this ECEF frame
+    pub fn rk(&self) -> f64 {
+        self.z
+    }
+
+    /// Returns the geodetic longitude (λ) in degrees
+    ///
+    /// Although the reference is not Vallado, the math from Vallado proves to be equivalent.
+    /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn geodetic_longitude(&self) -> f64 {
-        self.y.atan2(self.x)
+        self.y.atan2(self.x).to_degrees()
+    }
+
+    /// Returns the geodetic latitude (φ) in degrees
+    ///
+    /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
+    pub fn geodetic_latitude(&self) -> f64 {
+        let eps = 1e-12;
+        let max_attempts = 20;
+        let mut attempt_no = 0;
+        let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
+        let mut latitude = (self.z / self.rmag()).asin();
+        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
+        loop {
+            attempt_no += 1;
+            let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
+            let new_latitude = (self.z + c_earth * e2 * (latitude).sin()).atan2(r_delta);
+            if (latitude - new_latitude).abs() < eps {
+                return new_latitude.to_degrees();
+            } else if attempt_no >= max_attempts {
+                warn!(
+                    "geodetic latitude failed to converge -- error = {}",
+                    (latitude - new_latitude).abs()
+                );
+                return new_latitude.to_degrees();
+            }
+            latitude = new_latitude;
+        }
+    }
+
+    /// Returns the geodetic height in km.
+    ///
+    /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
+    pub fn geodetic_height(&self) -> f64 {
+        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
+        let latitude = self.geodetic_latitude().to_radians();
+        if (latitude - 1.0).abs() < 0.1 {
+            // We are near poles, let's use another formulation.
+            let s_earth = (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2))
+                / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
+            self.z / latitude.sin() - s_earth
+        } else {
+            let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
+            let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
+            r_delta / latitude.cos() - c_earth
+        }
     }
 }
