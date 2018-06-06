@@ -420,7 +420,7 @@ where
         if self.ecc() < ECC_EPSILON {
             warn!("true anomaly ill-defined (eccentricity too low, e = {})", self.ecc());
         }
-        let cos_nu = self.evec().dot(&self.velocity()) / (self.ecc() * self.rmag());
+        let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag());
         if (cos_nu.abs() - 1.0).abs() < EPSILON {
             // This bug drove me crazy when writing SMD in Go in 2017.
             if cos_nu > 1.0 {
