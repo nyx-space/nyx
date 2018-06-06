@@ -70,3 +70,21 @@ pub fn kronecker(a: f64, b: f64) -> f64 {
         0.0
     }
 }
+
+/// Returns a rotation about the X axis. The angle must be provided in radians.
+pub fn r1(angle: f64) -> Matrix3<f64> {
+    let (s, c) = angle.sin_cos();
+    Matrix3::new(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c)
+}
+
+/// Returns a rotation about the Y axis. The angle must be provided in radians.
+pub fn r2(angle: f64) -> Matrix3<f64> {
+    let (s, c) = angle.sin_cos();
+    Matrix3::new(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c)
+}
+
+/// Returns a rotation about the Z axis. The angle must be provided in radians.
+pub fn r3(angle: f64) -> Matrix3<f64> {
+    let (s, c) = angle.sin_cos();
+    Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
+}

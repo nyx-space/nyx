@@ -15,15 +15,31 @@ fn eci() {
 }
 
 #[test]
-fn theta_gmst() {
+fn ecef_2_eci() {
+    use hifitime::datetime::*;
+    use nyx::celestia::State;
+    let dt = Datetime::new(1992, 8, 20, 12, 14, 0, 0).expect("wut?");
+    let eci = State::from_cartesian_eci(
+        -38892.72444914902,
+        16830.38477289186,
+        0.7226599291355622,
+        -1.2180083338466,
+        -2.81465117260598,
+        1.140294223185661e-05,
+        dt,
+    );
+    assert_eq!(eci.in_ecef().in_eci(), eci, "reciprocity failed");
+}
+
+#[test]
+fn ecef_theta_gmst() {
     // Vallado's example
-    use hifitime::datetime::Datetime;
-    use hifitime::TimeSystem;
+    use hifitime::datetime::*;
     use nyx::celestia::ECEF;
     use std::f64::EPSILON;
     let dt = Datetime::new(1992, 8, 20, 12, 14, 0, 0).expect("wut?");
     assert!(
-        (ECEF::theta_gmst(dt.into_instant()) - 152.5787878104796).abs() < EPSILON,
+        (ECEF::gmst(dt.into_instant()) - 152.5787878104796).abs() < EPSILON,
         "wrong θ GMST computed"
     );
 }

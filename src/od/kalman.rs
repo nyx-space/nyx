@@ -1,48 +1,46 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, Dim, DimName, MatrixNM, VectorN};
+use self::na::{DefaultAllocator, Dim, DimName, MatrixMN, VectorN};
 use std::fmt;
+use std::ops::Mul;
 pub struct KF<S, M>
 where
     S: Dim + DimName,
     M: Dim + DimName,
+    DefaultAllocator: Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S>,
+    // S::Value: Mul<S::Value>,
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: Estimate<S>,
     /// Sets the Measurement noise (usually noted R)
-    pub measurement_noise: MatrixNM<f64, M, M>,
+    pub measurement_noise: MatrixMN<f64, M, M>,
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
-    h_tilde: MatrixNM<f64, M, S>,
-    stm: MatrixNM<f64, S, S>,
+    h_tilde: MatrixMN<f64, M, S>,
+    stm: MatrixMN<f64, S, S>,
     stm_updated: bool,
     h_tilde_updated: bool,
 }
 
-impl<S, N> KF<S, M>
+impl<S, M> KF<S, M>
 where
     S: Dim + DimName,
     M: Dim + DimName,
+    DefaultAllocator: Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S> + Allocator<f64, M>,
 {
-    pub fn update_stm<S: Dim + DimName>(&mut self, new_stm: MatrixNM<f, S, S>)
-    where
-        DefaultAllocator: Allocator<f64, S>,
-    {
+    pub fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
         self.stm = new_stm;
         self.stm_updated = true;
     }
 
-    pub fn update_h_tilde<S: Dim + DimName>(&mut self, h_tilde: MatrixNM<f, S, S>)
-    where
-        DefaultAllocator: Allocator<f64, S>,
-    {
+    pub fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, S, S>) {
         self.h_tilde = h_tilde;
         self.h_tilde_updated = true;
     }
 
-    pub fn time_update(&mut self) -> Result<Estimate, FilterError> {
+    pub fn time_update(&mut self) -> Result<Estimate<S>, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::STM_NOT_UPDATED);
         }
@@ -66,8 +64,8 @@ where
     pub fn measurement_update(
         &mut self,
         real_obs: VectorN<f64, M>,
-        computed_obs: VectorN<f64, N>,
-    ) -> Result<Estimate, FilterError> {
+        computed_obs: VectorN<f64, M>,
+    ) -> Result<Estimate<S>, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::STM_NOT_UPDATED);
         }
@@ -76,7 +74,7 @@ where
         }
         // Compute Kalman gain
         let covar_bar = self.stm * self.prev_estimate.covar * self.stm.transpose();
-        let mut invertible_part = (self.h_tilde * covar_bar * self.h_tilde.transpose() + self.measurement_noise);
+        let mut invertible_part = self.h_tilde * covar_bar * self.h_tilde.transpose() + self.measurement_noise;
         if !invertible_part.try_inverse_mut() {
             return Err(FilterError::GAIN_COMP_SINGULAR);
         }
@@ -96,7 +94,7 @@ where
         };
 
         // Compute the covariance (Jacobi formulation)
-        let covar = (MatrixNM::identity() - gain * self.h_tilde) * covar_bar;
+        let covar = (MatrixMN::identity() - gain * self.h_tilde) * covar_bar;
 
         // And wrap up
         let estimate = Estimate {
@@ -115,15 +113,16 @@ where
 pub struct Estimate<S>
 where
     S: Dim + DimName,
+    DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
 {
     /// The estimated state
     pub state: VectorN<f64, S>,
     /// The Covariance of this estimate
-    pub covar: MatrixNM<f64, S, S>,
+    pub covar: MatrixMN<f64, S, S>,
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     pub predicted: bool,
     /// The STM used to compute this Estimate
-    pub stm: MatrixNM<f64, S, S>,
+    pub stm: MatrixMN<f64, S, S>,
 }
 
 pub enum FilterError {
