@@ -93,7 +93,7 @@ impl Measurement for StdMeasurement {
     type StateSize = U6;
     type MeasurementSize = U2;
 
-    fn new(dt: Instant, tx: State<ECEF>, rx: State<ECEF>, obs: Vector2<f64>, visible: bool) -> StdMeasurement {
+    fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, obs: Vector2<f64>, visible: bool) -> StdMeasurement {
         // Compute the H tilde matrix
         // Let's define some helper variables.
         let range = obs[(0, 0)];
@@ -128,5 +128,13 @@ impl Measurement for StdMeasurement {
 
     fn sensitivity(&self) -> &Matrix6x2<f64> {
         &self.h_tilde
+    }
+
+    fn visible(&self) -> bool {
+        self.visible
+    }
+
+    fn at(&self) -> Instant {
+        self.dt
     }
 }

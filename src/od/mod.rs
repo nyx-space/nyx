@@ -24,6 +24,7 @@ where
 pub trait Measurement
 where
     Self: Sized,
+    DefaultAllocator: Allocator<f64, Self::MeasurementSize> + Allocator<f64, Self::StateSize, Self::MeasurementSize>,
 {
     /// Defines the state size of the estimated state
     type StateSize: Dim + DimName;
@@ -31,7 +32,13 @@ where
     type MeasurementSize: Dim + DimName;
 
     /// Computes a new measurement from the provided information.
-    fn new<F: CoordinateFrame>(tx: State<F>, rx: State<F>, obs: VectorN<f64, Self::MeasurementSize>, visible: bool) -> Self;
+    fn new<F: CoordinateFrame>(
+        dt: Instant,
+        tx: State<F>,
+        rx: State<F>,
+        obs: VectorN<f64, Self::MeasurementSize>,
+        visible: bool,
+    ) -> Self;
 
     /// Returns the measurement/observation as a vector.
     fn observation(&self) -> &VectorN<f64, Self::MeasurementSize>
@@ -39,9 +46,9 @@ where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> &MatrixMN<f64, Self::MeasurementSize, Self::StateSize>
+    fn sensitivity(&self) -> &MatrixMN<f64, Self::StateSize, Self::MeasurementSize>
     where
-        DefaultAllocator: Allocator<f64, Self::MeasurementSize, Self::StateSize>;
+        DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
 
     /// Returns whether the transmitter and receiver where in line of sight.
     fn visible(&self) -> bool;

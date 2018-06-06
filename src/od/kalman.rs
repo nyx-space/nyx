@@ -8,8 +8,8 @@ pub struct KF<S, M>
 where
     S: Dim + DimName,
     M: Dim + DimName,
-    DefaultAllocator: Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S>,
-    // S::Value: Mul<S::Value>,
+    DefaultAllocator:
+        Allocator<f64, M> + Allocator<f64, S> + Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S>,
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: Estimate<S>,
@@ -28,7 +28,8 @@ impl<S, M> KF<S, M>
 where
     S: Dim + DimName,
     M: Dim + DimName,
-    DefaultAllocator: Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S> + Allocator<f64, M>,
+    DefaultAllocator:
+        Allocator<f64, M> + Allocator<f64, S> + Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S>,
 {
     pub fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
         self.stm = new_stm;
@@ -113,7 +114,7 @@ where
 pub struct Estimate<S>
 where
     S: Dim + DimName,
-    DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     /// The estimated state
     pub state: VectorN<f64, S>,
