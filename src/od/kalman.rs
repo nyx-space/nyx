@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, Dim, DimName, MatrixMN, VectorN};
 use std::fmt;
-use std::ops::Mul;
+
 pub struct KF<S, M>
 where
     S: Dim + DimName,
@@ -28,15 +28,19 @@ impl<S, M> KF<S, M>
 where
     S: Dim + DimName,
     M: Dim + DimName,
-    DefaultAllocator:
-        Allocator<f64, M> + Allocator<f64, S> + Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S>,
+    DefaultAllocator: Allocator<f64, M>
+        + Allocator<f64, S>
+        + Allocator<f64, M, M>
+        + Allocator<f64, M, S>
+        + Allocator<f64, S, M>
+        + Allocator<f64, S, S>,
 {
     pub fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
         self.stm = new_stm;
         self.stm_updated = true;
     }
 
-    pub fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, S, S>) {
+    pub fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>) {
         self.h_tilde = h_tilde;
         self.h_tilde_updated = true;
     }
@@ -47,9 +51,9 @@ where
         }
         let covar_bar = self.stm * self.prev_estimate.covar * self.stm.transpose();
         let state_bar = if self.ekf {
-            VectorN::zeros()
+            VectorN::<f64, S>::zeros()
         } else {
-            self.stm * self.prev_estimate.state()
+            self.stm * self.prev_estimate.state
         };
         let estimate = Estimate {
             state: state_bar,
@@ -75,11 +79,13 @@ where
         }
         // Compute Kalman gain
         let covar_bar = self.stm * self.prev_estimate.covar * self.stm.transpose();
-        let mut invertible_part = self.h_tilde * covar_bar * self.h_tilde.transpose() + self.measurement_noise;
+        let h_tilde_t: MatrixMN<f64, S, M>;
+        self.h_tilde.transpose_to(&mut h_tilde_t);
+        let mut invertible_part = self.h_tilde * covar_bar * h_tilde_t + self.measurement_noise;
         if !invertible_part.try_inverse_mut() {
             return Err(FilterError::GAIN_COMP_SINGULAR);
         }
-        let gain = covar_bar * self.h_tilde.transpose() * invertible_part;
+        let gain = covar_bar * h_tilde_t * invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
         let delta_obs = real_obs - computed_obs;
@@ -89,13 +95,13 @@ where
             gain * delta_obs
         } else {
             // Must do a time update first
-            let state_bar = self.stm * self.prev_estimate.state();
+            let state_bar = self.stm * self.prev_estimate.state;
             let innovation = delta_obs - (self.h_tilde * state_bar);
             state_bar + gain * innovation
         };
 
         // Compute the covariance (Jacobi formulation)
-        let covar = (MatrixMN::identity() - gain * self.h_tilde) * covar_bar;
+        let covar = (MatrixMN::<f64, S, S>::identity() - gain * self.h_tilde) * covar_bar;
 
         // And wrap up
         let estimate = Estimate {

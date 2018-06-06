@@ -3,11 +3,12 @@ extern crate nalgebra as na;
 extern crate rand;
 
 use self::hifitime::instant::Instant;
+use self::hifitime::julian::*;
 use self::na::{Matrix6x2, U2, U6, Vector2};
-use self::rand::distributions::Normal;
+use self::rand::distributions::{Distribution, Normal};
 use self::rand::thread_rng;
 use super::Measurement;
-use celestia::{CoordinateFrame, State, ECEF, ECI};
+use celestia::{CoordinateFrame, State, ECEF};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
@@ -47,12 +48,13 @@ impl GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     pub fn measure<F: CoordinateFrame>(self, rx: State<F>, dt: Instant) -> StdMeasurement {
         use std::f64::consts::PI;
-        let tx_ecef = State::<ECEF>::from_geodesic(self.latitude, self.longitude, self.height);
+        let tx_ecef =
+            State::<ECEF>::from_geodesic(self.latitude, self.longitude, self.height, ModifiedJulian::from_instant(dt));
         let rx_ecef = rx.in_frame(ECEF {});
         // Let's start by computing the range and range rate
         let rho_ecef = rx_ecef.radius() - tx_ecef.radius();
         let delta_v_ecef = (rx_ecef.velocity() - tx_ecef.velocity()) / rho_ecef.norm();
-        let rho_dot = rho_ecef.dot(delta_v_ecef);
+        let rho_dot = rho_ecef.dot(&delta_v_ecef);
 
         // Convert to SEZ to compute elevation
         let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
@@ -63,8 +65,8 @@ impl GroundStation {
             tx_ecef,
             rx_ecef,
             Vector2::new(
-                rho_ecef.norm() + self.range_noise.ind_sample(&mut thread_rng()),
-                rho_dot + self.range_rate_noise.ind_sample(&mut thread_rng()),
+                rho_ecef.norm() + self.range_noise.sample(&mut thread_rng()),
+                rho_dot + self.range_rate_noise.sample(&mut thread_rng()),
             ),
             elevation >= self.elevation_mask,
         )
