@@ -4,6 +4,7 @@ use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, Dim, DimName, MatrixMN, VectorN};
 use std::fmt;
 
+#[derive(Debug, Clone)]
 pub struct KF<S, M>
 where
     S: Dim + DimName,
@@ -49,20 +50,20 @@ where
         if !self.stm_updated {
             return Err(FilterError::STM_NOT_UPDATED);
         }
-        let covar_bar = self.stm * self.prev_estimate.covar * self.stm.transpose();
+        let covar_bar = self.stm.clone() * self.prev_estimate.covar.clone() * self.stm.transpose();
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
         } else {
-            self.stm * self.prev_estimate.state
+            self.stm.clone() * self.prev_estimate.state.clone()
         };
         let estimate = Estimate {
             state: state_bar,
             covar: covar_bar,
-            stm: self.stm,
+            stm: self.stm.clone(),
             predicted: true,
         };
         self.stm_updated = false;
-        self.prev_estimate = estimate;
+        self.prev_estimate = estimate.clone();
         Ok(estimate)
     }
 
@@ -78,45 +79,46 @@ where
             return Err(FilterError::H_TILDE_NOT_UPDATED);
         }
         // Compute Kalman gain
-        let covar_bar = self.stm * self.prev_estimate.covar * self.stm.transpose();
-        let h_tilde_t: MatrixMN<f64, S, M>;
+        let covar_bar = self.stm.clone() * self.prev_estimate.covar.clone() * self.stm.transpose();
+        let mut h_tilde_t = MatrixMN::<f64, S, M>::zeros();
         self.h_tilde.transpose_to(&mut h_tilde_t);
-        let mut invertible_part = self.h_tilde * covar_bar * h_tilde_t + self.measurement_noise;
+        let mut invertible_part = self.h_tilde.clone() * covar_bar.clone() * h_tilde_t.clone() + self.measurement_noise.clone();
         if !invertible_part.try_inverse_mut() {
             return Err(FilterError::GAIN_COMP_SINGULAR);
         }
-        let gain = covar_bar * h_tilde_t * invertible_part;
+        let gain = covar_bar.clone() * h_tilde_t * invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
         let delta_obs = real_obs - computed_obs;
 
         // Compute the state estimate
         let state_hat = if self.ekf {
-            gain * delta_obs
+            gain.clone() * delta_obs
         } else {
             // Must do a time update first
-            let state_bar = self.stm * self.prev_estimate.state;
-            let innovation = delta_obs - (self.h_tilde * state_bar);
-            state_bar + gain * innovation
+            let state_bar = self.stm.clone() * self.prev_estimate.state.clone();
+            let innovation = delta_obs - (self.h_tilde.clone() * state_bar.clone());
+            state_bar + gain.clone() * innovation
         };
 
         // Compute the covariance (Jacobi formulation)
-        let covar = (MatrixMN::<f64, S, S>::identity() - gain * self.h_tilde) * covar_bar;
+        let covar = (MatrixMN::<f64, S, S>::identity() - gain * self.h_tilde.clone()) * covar_bar;
 
         // And wrap up
         let estimate = Estimate {
             state: state_hat,
             covar: covar,
-            stm: self.stm,
+            stm: self.stm.clone(),
             predicted: false,
         };
         self.stm_updated = false;
         self.h_tilde_updated = false;
-        self.prev_estimate = estimate;
+        self.prev_estimate = estimate.clone();
         Ok(estimate)
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Estimate<S>
 where
     S: Dim + DimName,
