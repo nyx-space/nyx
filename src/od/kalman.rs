@@ -118,7 +118,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Estimate<S>
 where
     S: Dim + DimName,

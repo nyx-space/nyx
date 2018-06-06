@@ -40,8 +40,8 @@ impl GroundStation {
             latitude,
             longitude,
             height,
-            range_noise: Normal::new(1.0, range_noise),
-            range_rate_noise: Normal::new(1.0, range_rate_noise),
+            range_noise: Normal::new(0.0, range_noise),
+            range_rate_noise: Normal::new(0.0, range_rate_noise),
         }
     }
 
@@ -58,7 +58,7 @@ impl GroundStation {
 
         // Convert to SEZ to compute elevation
         let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
-        let elevation = (rho_sez[(0, 2)] / rho_ecef.norm()).asin().to_degrees();
+        let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
         StdMeasurement::new(
             dt,
@@ -74,7 +74,7 @@ impl GroundStation {
 }
 
 /// Stores a standard measurement of range and range rate
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {
     dt: Instant,
     obs: Vector2<f64>,
@@ -103,15 +103,15 @@ impl Measurement for StdMeasurement {
         let mut h_tilde = Matrix6x2::zeros();
         // \partial \rho / \partial {x,y,z}
         h_tilde[(0, 0)] = (rx.x - tx.x) / range;
-        h_tilde[(0, 1)] = (rx.y - tx.y) / range;
-        h_tilde[(0, 2)] = (rx.z - tx.z) / range;
+        h_tilde[(1, 0)] = (rx.y - tx.y) / range;
+        h_tilde[(2, 0)] = (rx.z - tx.z) / range;
         // \partial \dot\rho / \partial {x,y,z}
-        h_tilde[(1, 0)] = (rx.vx - tx.vx) / range + (range_rate / range.powi(2)) * (rx.x - tx.x);
+        h_tilde[(0, 1)] = (rx.vx - tx.vx) / range + (range_rate / range.powi(2)) * (rx.x - tx.x);
         h_tilde[(1, 1)] = (rx.vy - tx.vy) / range + (range_rate / range.powi(2)) * (rx.y - tx.y);
-        h_tilde[(1, 2)] = (rx.vz - tx.vz) / range + (range_rate / range.powi(2)) * (rx.z - tx.z);
-        h_tilde[(1, 3)] = (rx.x - tx.x) / range;
-        h_tilde[(1, 4)] = (rx.y - tx.y) / range;
-        h_tilde[(1, 5)] = (rx.z - tx.z) / range;
+        h_tilde[(2, 1)] = (rx.vz - tx.vz) / range + (range_rate / range.powi(2)) * (rx.z - tx.z);
+        h_tilde[(3, 1)] = (rx.x - tx.x) / range;
+        h_tilde[(4, 1)] = (rx.y - tx.y) / range;
+        h_tilde[(5, 1)] = (rx.z - tx.z) / range;
 
         StdMeasurement {
             dt,
