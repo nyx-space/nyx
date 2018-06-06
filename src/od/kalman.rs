@@ -48,7 +48,7 @@ where
 
     pub fn time_update(&mut self) -> Result<Estimate<S>, FilterError> {
         if !self.stm_updated {
-            return Err(FilterError::STM_NOT_UPDATED);
+            return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
         let covar_bar = self.stm.clone() * self.prev_estimate.covar.clone() * self.stm.transpose();
         let state_bar = if self.ekf {
@@ -73,10 +73,10 @@ where
         computed_obs: VectorN<f64, M>,
     ) -> Result<Estimate<S>, FilterError> {
         if !self.stm_updated {
-            return Err(FilterError::STM_NOT_UPDATED);
+            return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
         if !self.h_tilde_updated {
-            return Err(FilterError::H_TILDE_NOT_UPDATED);
+            return Err(FilterError::SensitivityNotUpdated);
         }
         // Compute Kalman gain
         let covar_bar = self.stm.clone() * self.prev_estimate.covar.clone() * self.stm.transpose();
@@ -84,7 +84,7 @@ where
         self.h_tilde.transpose_to(&mut h_tilde_t);
         let mut invertible_part = self.h_tilde.clone() * covar_bar.clone() * h_tilde_t.clone() + self.measurement_noise.clone();
         if !invertible_part.try_inverse_mut() {
-            return Err(FilterError::GAIN_COMP_SINGULAR);
+            return Err(FilterError::GainIsSingular);
         }
         let gain = covar_bar.clone() * h_tilde_t * invertible_part;
 
@@ -135,20 +135,22 @@ where
 }
 
 pub enum FilterError {
-    STM_NOT_UPDATED,
-    H_TILDE_NOT_UPDATED,
-    GAIN_COMP_SINGULAR,
+    StateTransitionMatrixNotUpdated,
+    SensitivityNotUpdated,
+    GainIsSingular,
 }
 
 impl fmt::Display for FilterError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FilterError::STM_NOT_UPDATED => write!(f, "STM was not updated prior to time or measurement update"),
-            FilterError::H_TILDE_NOT_UPDATED => write!(
+            FilterError::StateTransitionMatrixNotUpdated => {
+                write!(f, "STM was not updated prior to time or measurement update")
+            }
+            FilterError::SensitivityNotUpdated => write!(
                 f,
                 "The measurement matrix H_tilde was not updated prior to measurement update"
             ),
-            FilterError::GAIN_COMP_SINGULAR => write!(f, "Gain could not be computed because H*P_bar*H + R is singular"),
+            FilterError::GainIsSingular => write!(f, "Gain could not be computed because H*P_bar*H + R is singular"),
         }
     }
 }
