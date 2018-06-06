@@ -8,19 +8,19 @@ use celestia::{CoordinateFrame, State, ECEF, ECI};
 use hifitime::instant::Instant;
 use na::{Matrix2x6, U2, U6, Vector2};
 
-/// TWRanging defines a Two Way ranging equipment.
+/// GroundStation defines a Two Way ranging equipment.
 #[derive(Debug, Clone, Copy)]
-pub struct TWRanging {
+pub struct GroundStation {
     pub name: String,
     pub elevation_mask: f64,
     range_noise: Normal,
     range_rate_noise: Normal,
 }
 
-impl TWRanging {
+impl GroundStation {
     /// Initializes a new Two Way ranging equipment from the noise values.
-    pub fn from_noise_values(name: String, elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> TWRanging {
-        TWRanging {
+    pub fn from_noise_values(name: String, elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+        GroundStation {
             name,
             elevation_mask,
             range_noise: Normal::new(1.0, range_noise),
@@ -29,8 +29,8 @@ impl TWRanging {
     }
 
     /// Perform a measurement from the transmitter (tx) to the receiver (rx).
-    pub fn measure(self, tx: State, rx: State, dt: Instant) -> RangeRangeRateMeas {
-        RangeRangeRateMeas::new(
+    pub fn measure(self, tx: State, rx: State, dt: Instant) -> GroundMeasurement {
+        GroundMeasurement::new(
             tx,
             rx,
             self.elevation_mask,
@@ -44,14 +44,14 @@ impl TWRanging {
 
 /// Implements the Range and Range Rate measurement.
 #[derive(Debug, Clone, Copy)]
-pub struct RangeRangeRateMeas {
+pub struct GroundMeasurement {
     visible: bool,
     obs: Vector2<f64>,
     h_tilde: Matrix2x6<f64>,
     dt: Instant,
 }
 
-impl RangeRangeRateMeas {
+impl GroundMeasurement {
     pub fn range(&self) -> f64 {
         self.obs[(0, 0)]
     }
@@ -60,15 +60,15 @@ impl RangeRangeRateMeas {
     }
 }
 
-impl Measurement for RangeRangeRateMeas {
+impl Measurement for GroundMeasurement {
     type StateSize = U6;
     type MeasurementSize = U2;
 
-    pub fn new(tx: State, rx: State, elevation_mask: f64, noise: Vector2<f64>) -> RangeRangeRateMeas {
+    pub fn new(tx: State<ECI>, rx: State<ECI>, elevation_mask: f64, noise: Vector2<f64>) -> GroundMeasurement {
         // Let's start by computing the range and range rate
         // Ensure both are in the ECEF frame
-        let tx_ecef = tx.in_frame(ECEF);
-        let rx_ecef = rx.in_frame(ECEF);
+        let tx_ecef = tx.in_frame(ECEF {});
+        let rx_ecef = rx.in_frame(ECEF {});
         let rho_ecef = rx_ecef - tx_ecef;
         // Convert to SEZ frame to compute the elevation.
 
