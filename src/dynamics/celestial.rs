@@ -144,8 +144,8 @@ impl<'a> Linearization for TwoBodyWithStm<'a> {
     fn gradient(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize> {
         let mut grad = MatrixMN::<f64, U6, U6>::zeros();
         // Top right is Identity 3x3
-        grad[(3, 0)] = 1.0;
-        grad[(4, 1)] = 1.0;
+        grad[(0, 3)] = 1.0;
+        grad[(1, 4)] = 1.0;
         grad[(2, 5)] = 1.0;
         // Bottom left is where the magic happens.
         let x = state[(0, 0)];
@@ -169,15 +169,15 @@ impl<'a> Linearization for TwoBodyWithStm<'a> {
         let daz_dz = 3.0 * self.two_body_dyn.mu * z2 / r252 - self.two_body_dyn.mu / r232;
 
         // Let the gradient
-        grad[(0, 3)] = dax_dx;
-        grad[(0, 4)] = day_dx;
-        grad[(0, 5)] = daz_dx;
-        grad[(1, 3)] = dax_dy;
-        grad[(1, 4)] = day_dy;
-        grad[(1, 5)] = daz_dy;
-        grad[(2, 3)] = dax_dz;
-        grad[(2, 4)] = day_dz;
-        grad[(2, 5)] = daz_dz;
+        grad[(3, 0)] = dax_dx;
+        grad[(4, 0)] = day_dx;
+        grad[(5, 0)] = daz_dx;
+        grad[(3, 1)] = dax_dy;
+        grad[(4, 1)] = day_dy;
+        grad[(5, 1)] = daz_dy;
+        grad[(3, 2)] = dax_dz;
+        grad[(4, 2)] = day_dz;
+        grad[(5, 2)] = daz_dz;
 
         grad
     }

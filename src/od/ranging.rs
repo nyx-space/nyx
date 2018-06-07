@@ -45,6 +45,42 @@ impl GroundStation {
         }
     }
 
+    pub fn dss65_madrid(elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+        GroundStation::from_noise_values(
+            "Madrid",
+            elevation_mask,
+            40.427222,
+            4.250556,
+            0.834939,
+            range_noise,
+            range_rate_noise,
+        )
+    }
+
+    pub fn dss34_canberra(elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+        GroundStation::from_noise_values(
+            "Canberra",
+            elevation_mask,
+            -35.398333,
+            148.981944,
+            0.691750,
+            range_noise,
+            range_rate_noise,
+        )
+    }
+
+    pub fn dss13_goldstone(elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+        GroundStation::from_noise_values(
+            "Goldstone",
+            elevation_mask,
+            35.247164,
+            243.205,
+            1.07114904,
+            range_noise,
+            range_rate_noise,
+        )
+    }
+
     /// Perform a measurement from the ground station to the receiver (rx).
     pub fn measure<F: CoordinateFrame>(self, rx: State<F>, dt: Instant) -> StdMeasurement {
         use std::f64::consts::PI;

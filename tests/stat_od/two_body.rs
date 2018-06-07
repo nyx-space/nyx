@@ -19,12 +19,14 @@ use std::sync::mpsc::{Receiver, Sender};
 #[test]
 fn fixed_step_perfect_stations() {
     use std::thread;
-    // Tests that we can generate measurements on one side and get a proper estimate on the other.
 
     // Define the ground stations.
-    let dss65_madrid = GroundStation::from_noise_values("Madrid", 0.0, 40.427222, 4.250556, 0.834939, 0.0, 0.0);
-    let dss34_canberra = GroundStation::from_noise_values("Canberra", 0.0, -35.398333, 148.981944, 0.691750, 0.0, 0.0);
-    let dss13_goldstone = GroundStation::from_noise_values("Goldstone", 0.0, 35.247164, 243.205, 1.07114904, 0.0, 0.0);
+    let elevation_mask = 0.0;
+    let range_noise = 0.0;
+    let range_rate_noise = 0.0;
+    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
+    let dss34_canberra = GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+    let dss13_goldstone = GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -80,8 +82,8 @@ fn fixed_step_perfect_stations() {
     // the measurements, and the same time step.
     let mut prop_est = Propagator::new::<RK4Fixed>(&opts);
     let mut tb_estimator = TwoBodyWithStm::from_state::<EARTH, ECI>(initial_state);
-    let covar_radius = 1.0;
-    let covar_velocity = 1.0e-3;
+    let covar_radius = 1.0e-6;
+    let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
         covar_radius,
@@ -131,7 +133,7 @@ fn fixed_step_perfect_stations() {
             latest_est = ckf.time_update().expect("huh?");
         }
         println!(
-            "=== #{} PREDICTED: {} ===\nEstState {} State {} Covariance {}\n=====================",
+            "=== #{} PREDICTED: {} ===\nEstState {} State {} Covariance {}",
             meas_no,
             latest_est.predicted,
             latest_est.state,
@@ -139,5 +141,4 @@ fn fixed_step_perfect_stations() {
             latest_est.covar
         );
     }
-    println!("out of everything");
 }
