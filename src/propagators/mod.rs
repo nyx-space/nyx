@@ -3,7 +3,6 @@ extern crate nalgebra as na;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use std::f64;
-use std::time::Duration;
 
 use dynamics::Dynamics;
 
@@ -212,8 +211,7 @@ impl<'a> Propagator<'a> {
             } else {
                 // Compute the error estimate.
                 self.details.error = err_estimator(&error_est, &next_state.clone(), state);
-                if self.details.error <= self.opts.tolerance
-                    || self.step_size <= self.opts.min_step
+                if self.details.error <= self.opts.tolerance || self.step_size <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {

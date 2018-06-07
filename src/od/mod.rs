@@ -1,10 +1,10 @@
 extern crate hifitime;
 extern crate nalgebra as na;
 
+use self::hifitime::instant::Instant;
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, Dim, DimName, MatrixNM, VectorN};
-use celestia::State;
-use hifitime::instant::Instant;
+use self::na::{DefaultAllocator, Dim, DimName, MatrixMN, VectorN};
+use celestia::{CoordinateFrame, State};
 
 pub mod kalman;
 pub mod ranging;
@@ -16,14 +16,15 @@ where
     /// Defines the state size of the estimated state
     type StateSize: Dim + DimName;
     /// Defines the gradient of the equations of motion for these dynamics.
-    fn gradient(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixNM<f64, Self::StateSize, Self::StateSize>
+    fn gradient(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
     where
-        DefaultAllocator: Allocator<f64, Self::StateSize>;
+        DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>;
 }
 
 pub trait Measurement
 where
     Self: Sized,
+    DefaultAllocator: Allocator<f64, Self::MeasurementSize> + Allocator<f64, Self::StateSize, Self::MeasurementSize>,
 {
     /// Defines the state size of the estimated state
     type StateSize: Dim + DimName;
@@ -31,13 +32,23 @@ where
     type MeasurementSize: Dim + DimName;
 
     /// Computes a new measurement from the provided information.
-    fn new(tx: State, rx: State, elevation_mask: f64, noise: Vector<f64, Self::MeasurementSize>) -> Self;
+    fn new<F: CoordinateFrame>(
+        dt: Instant,
+        tx: State<F>,
+        rx: State<F>,
+        obs: VectorN<f64, Self::MeasurementSize>,
+        visible: bool,
+    ) -> Self;
 
     /// Returns the measurement/observation as a vector.
-    fn observation(&self) -> &Vector<f64, Self::MeasurementSize>;
+    fn observation(&self) -> &VectorN<f64, Self::MeasurementSize>
+    where
+        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> &MatrixNM<f64, Self::MeasurementSize, Self::StateSize>;
+    fn sensitivity(&self) -> &MatrixMN<f64, Self::StateSize, Self::MeasurementSize>
+    where
+        DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
 
     /// Returns whether the transmitter and receiver where in line of sight.
     fn visible(&self) -> bool;

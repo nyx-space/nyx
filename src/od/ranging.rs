@@ -1,57 +1,88 @@
 extern crate hifitime;
 extern crate nalgebra as na;
+extern crate rand;
 
-use self::rand::distributions::{IndependentSample, Normal};
+use self::hifitime::instant::Instant;
+use self::hifitime::julian::*;
+use self::na::{Matrix6x2, U2, U6, Vector2};
+use self::rand::distributions::{Distribution, Normal};
 use self::rand::thread_rng;
 use super::Measurement;
-use celestia::{CoordinateFrame, State, ECEF, ECI};
-use hifitime::instant::Instant;
-use na::{Matrix2x6, U2, U6, Vector2};
+use celestia::{CoordinateFrame, State, ECEF};
+use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GroundStation {
     pub name: String,
     pub elevation_mask: f64,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub height: f64,
     range_noise: Normal,
     range_rate_noise: Normal,
 }
 
 impl GroundStation {
     /// Initializes a new Two Way ranging equipment from the noise values.
-    pub fn from_noise_values(name: String, elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+    pub fn from_noise_values(
+        name: String,
+        elevation_mask: f64,
+        latitude: f64,
+        longitude: f64,
+        height: f64,
+        range_noise: f64,
+        range_rate_noise: f64,
+    ) -> GroundStation {
         GroundStation {
             name,
             elevation_mask,
-            range_noise: Normal::new(1.0, range_noise),
-            range_rate_noise: Normal::new(1.0, range_rate_noise),
+            latitude,
+            longitude,
+            height,
+            range_noise: Normal::new(0.0, range_noise),
+            range_rate_noise: Normal::new(0.0, range_rate_noise),
         }
     }
 
-    /// Perform a measurement from the transmitter (tx) to the receiver (rx).
-    pub fn measure(self, tx: State, rx: State, dt: Instant) -> GroundMeasurement {
-        GroundMeasurement::new(
-            tx,
-            rx,
-            self.elevation_mask,
+    /// Perform a measurement from the ground station to the receiver (rx).
+    pub fn measure<F: CoordinateFrame>(self, rx: State<F>, dt: Instant) -> StdMeasurement {
+        use std::f64::consts::PI;
+        let tx_ecef =
+            State::<ECEF>::from_geodesic(self.latitude, self.longitude, self.height, ModifiedJulian::from_instant(dt));
+        let rx_ecef = rx.in_frame(ECEF {});
+        // Let's start by computing the range and range rate
+        let rho_ecef = rx_ecef.radius() - tx_ecef.radius();
+        let delta_v_ecef = (rx_ecef.velocity() - tx_ecef.velocity()) / rho_ecef.norm();
+        let rho_dot = rho_ecef.dot(&delta_v_ecef);
+
+        // Convert to SEZ to compute elevation
+        let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
+        let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
+
+        StdMeasurement::new(
+            dt,
+            tx_ecef,
+            rx_ecef,
             Vector2::new(
-                self.range_noise.ind_sample(&mut thread_rng()),
-                self.range_rate_noise.ind_sample(&mut thread_rng()),
+                rho_ecef.norm() + self.range_noise.sample(&mut thread_rng()),
+                rho_dot + self.range_rate_noise.sample(&mut thread_rng()),
             ),
+            elevation >= self.elevation_mask,
         )
     }
 }
 
-/// Implements the Range and Range Rate measurement.
-#[derive(Debug, Clone, Copy)]
-pub struct GroundMeasurement {
-    visible: bool,
-    obs: Vector2<f64>,
-    h_tilde: Matrix2x6<f64>,
+/// Stores a standard measurement of range and range rate
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StdMeasurement {
     dt: Instant,
+    obs: Vector2<f64>,
+    visible: bool,
+    h_tilde: Matrix6x2<f64>,
 }
 
-impl GroundMeasurement {
+impl StdMeasurement {
     pub fn range(&self) -> f64 {
         self.obs[(0, 0)]
     }
@@ -60,54 +91,52 @@ impl GroundMeasurement {
     }
 }
 
-impl Measurement for GroundMeasurement {
+impl Measurement for StdMeasurement {
     type StateSize = U6;
     type MeasurementSize = U2;
 
-    pub fn new(tx: State<ECI>, rx: State<ECI>, elevation_mask: f64, noise: Vector2<f64>) -> GroundMeasurement {
-        // Let's start by computing the range and range rate
-        // Ensure both are in the ECEF frame
-        let tx_ecef = tx.in_frame(ECEF {});
-        let rx_ecef = rx.in_frame(ECEF {});
-        let rho_ecef = rx_ecef - tx_ecef;
-        // Convert to SEZ frame to compute the elevation.
+    fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, obs: Vector2<f64>, visible: bool) -> StdMeasurement {
+        // Compute the H tilde matrix
+        // Let's define some helper variables.
+        let range = obs[(0, 0)];
+        let range_rate = obs[(1, 0)];
+        let mut h_tilde = Matrix6x2::zeros();
+        // \partial \rho / \partial {x,y,z}
+        h_tilde[(0, 0)] = (rx.x - tx.x) / range;
+        h_tilde[(1, 0)] = (rx.y - tx.y) / range;
+        h_tilde[(2, 0)] = (rx.z - tx.z) / range;
+        // \partial \dot\rho / \partial {x,y,z}
+        h_tilde[(0, 1)] = (rx.vx - tx.vx) / range + (range_rate / range.powi(2)) * (rx.x - tx.x);
+        h_tilde[(1, 1)] = (rx.vy - tx.vy) / range + (range_rate / range.powi(2)) * (rx.y - tx.y);
+        h_tilde[(2, 1)] = (rx.vz - tx.vz) / range + (range_rate / range.powi(2)) * (rx.z - tx.z);
+        h_tilde[(3, 1)] = (rx.x - tx.x) / range;
+        h_tilde[(4, 1)] = (rx.y - tx.y) / range;
+        h_tilde[(5, 1)] = (rx.z - tx.z) / range;
 
-        /*
-        ρECEF = make([]float64, 3)
-	for i := 0; i < 3; i++ {
-		ρECEF[i] = rECEF[i] - s.R[i]
-	}
-	ρ = Norm(ρECEF)
-	rSEZ := MxV33(R3(s.Longθ), ρECEF)
-	rSEZ = MxV33(R2(math.Pi/2-s.LatΦ), rSEZ)
-	el = math.Asin(rSEZ[2]/ρ) * r2d
-	az = (2*math.Pi + math.Atan2(rSEZ[1], -rSEZ[0])) * r2d
-return*/
-
-        /*
-        // The station vectors are in ECEF, so let's convert the state to ECEF.
-	rECEF := ECI2ECEF(state.Orbit.R(), θgst)
-	vECEF := ECI2ECEF(state.Orbit.V(), θgst)
-	// Compute visibility for each station.
-	ρECEF, ρ, el, _ := s.RangeElAz(rECEF)
-	vDiffECEF := make([]float64, 3)
-	for i := 0; i < 3; i++ {
-		vDiffECEF[i] = (vECEF[i] - s.V[i]) / ρ
-	}
-	ρDot := mat64.Dot(mat64.NewVector(3, ρECEF), mat64.NewVector(3, vDiffECEF))
-	ρNoisy := ρ + s.RangeNoise.Rand(nil)[0]
-ρDotNoisy := ρDot + s.RangeRateNoise.Rand(nil)[0]
-*/
+        StdMeasurement {
+            dt,
+            obs,
+            visible,
+            h_tilde,
+        }
     }
 
     /// Returns this measurement as a vector of Range and Range Rate
     ///
     /// **Units:** km, km/s
-    pub fn observation(&self) -> &Vector2<f64> {
+    fn observation(&self) -> &Vector2<f64> {
         &self.obs
     }
 
-    pub fn sensitivity(&self) -> &Matrix2x6<f64> {
+    fn sensitivity(&self) -> &Matrix6x2<f64> {
         &self.h_tilde
+    }
+
+    fn visible(&self) -> bool {
+        self.visible
+    }
+
+    fn at(&self) -> Instant {
+        self.dt
     }
 }

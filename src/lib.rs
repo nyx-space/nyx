@@ -344,5 +344,8 @@ pub mod utils;
 /// Provides all the input/output needs for this library, including loading of SPICE kernels, and gravity potential files.
 pub mod io;
 
+/// Provides all the orbital determination tools.
+pub mod od;
+
 #[macro_use]
 extern crate log;

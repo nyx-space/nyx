@@ -273,15 +273,14 @@ where
         // if self.frame.Center != other.Center {
         //     unimplemented!("transformations between differently centered frames depends on #4");
         // }
-        let radius = Vector3::new(self.x, self.y, self.z);
-        let velocity = Vector3::new(self.vx, self.vy, self.vz);
         // Convert from our frame to the destination frame via their inertial frames.
-        let dest_radius = G::from_inertial(self.dt) * F::to_inertial(self.dt) * radius;
+        let dest_radius = G::from_inertial(self.dt) * F::to_inertial(self.dt) * self.radius();
         // We need to compute the derivate of the DCM for the velocity.
         let h = Duration::from_millis(100);
         let frame_dt = (F::from_inertial(self.dt + h) - F::from_inertial(self.dt)) / 0.1;
         let other_dt = (G::from_inertial(self.dt + h) - G::from_inertial(self.dt)) / 0.1;
-        let dest_velocity = G::from_inertial(self.dt) * F::to_inertial(self.dt) * velocity + other_dt * frame_dt * radius;
+        let dest_velocity =
+            G::from_inertial(self.dt) * F::to_inertial(self.dt) * self.velocity() + other_dt * frame_dt * self.radius();
         State {
             gm: self.gm,
             x: dest_radius[(0, 0)],
@@ -300,6 +299,16 @@ where
     /// Note that the time is **not** returned in the vector.
     pub fn to_cartesian_vec(self) -> Vector6<f64> {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
+    }
+
+    /// Returns the radius vector of this State in [km, km, km]
+    pub fn radius(self) -> Vector3<f64> {
+        Vector3::new(self.x, self.y, self.z)
+    }
+
+    /// Returns the radius vector of this State in [km, km, km]
+    pub fn velocity(self) -> Vector3<f64> {
+        Vector3::new(self.vx, self.vy, self.vz)
     }
 
     /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
@@ -321,9 +330,7 @@ where
 
     /// Returns the orbital momentum vector
     pub fn hvec(self) -> Vector3<f64> {
-        let r = Vector3::new(self.x, self.y, self.z);
-        let v = Vector3::new(self.vx, self.vy, self.vz);
-        r.cross(&v)
+        self.radius().cross(&self.velocity())
     }
 
     /// Returns the orbital momentum value on the X axis
@@ -363,8 +370,8 @@ where
 
     /// Returns the eccentricity vector (no unit)
     pub fn evec(self) -> Vector3<f64> {
-        let r = Vector3::new(self.x, self.y, self.z);
-        let v = Vector3::new(self.vx, self.vy, self.vz);
+        let r = self.radius();
+        let v = self.velocity();
         ((v.norm().powi(2) - self.gm / r.norm()) * r - (r.dot(&v)) * v) / self.gm
     }
 
@@ -413,7 +420,7 @@ where
         if self.ecc() < ECC_EPSILON {
             warn!("true anomaly ill-defined (eccentricity too low, e = {})", self.ecc());
         }
-        let cos_nu = self.evec().dot(&Vector3::new(self.x, self.y, self.z)) / (self.ecc() * self.rmag());
+        let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag());
         if (cos_nu.abs() - 1.0).abs() < EPSILON {
             // This bug drove me crazy when writing SMD in Go in 2017.
             if cos_nu > 1.0 {
@@ -578,6 +585,10 @@ impl State<ECI> {
     pub fn from_keplerian_eci<T: TimeSystem>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T) -> State<ECI> {
         State::from_keplerian::<EARTH, T>(x, y, z, vx, vy, vz, dt, ECI {})
     }
+
+    pub fn in_ecef(&self) -> State<ECEF> {
+        self.in_frame(ECEF {})
+    }
 }
 
 impl State<ECEF> {
@@ -633,7 +644,7 @@ impl State<ECEF> {
         self.z
     }
 
-    /// Returns the geodetic longitude (λ) in degrees
+    /// Returns the geodetic longitude (λ) in degrees. Value is between 0 and 360 degrees.
     ///
     /// Although the reference is not Vallado, the math from Vallado proves to be equivalent.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
@@ -641,7 +652,7 @@ impl State<ECEF> {
         between_0_360(self.y.atan2(self.x).to_degrees())
     }
 
-    /// Returns the geodetic latitude (φ) in degrees
+    /// Returns the geodetic latitude (φ) in degrees. Value is between -180 and +180 degrees.
     ///
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
     pub fn geodetic_latitude(&self) -> f64 {
@@ -685,5 +696,9 @@ impl State<ECEF> {
             let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
             r_delta / latitude.cos() - c_earth
         }
+    }
+
+    pub fn in_eci(&self) -> State<ECI> {
+        self.in_frame(ECI {})
     }
 }
