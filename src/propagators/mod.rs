@@ -109,6 +109,7 @@ impl<'a> Propagator<'a> {
             panic!("backprop not yet supported");
         }
         let init_seconds = dyn.time();
+        let stop_time = init_seconds + elapsed_time;
         loop {
             let (t, state) = self.derive(
                 dyn.time(),
@@ -116,13 +117,12 @@ impl<'a> Propagator<'a> {
                 |t_: f64, state_: &VectorN<f64, D::StateSize>| dyn.eom(t_, state_),
                 err_estimator,
             );
-
-            if (t - init_seconds) < elapsed_time {
+            if t < stop_time {
                 // We haven't passed the time based stopping condition.
                 dyn.set_state(t, &state);
             } else {
                 let prev_details = self.latest_details().clone();
-                let overshot = t - elapsed_time;
+                let overshot = t - stop_time;
                 if overshot > 0.0 {
                     debug!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);

@@ -103,17 +103,10 @@ fn fixed_step_perfect_stations() {
 
     println!("Will process {} measurements", measurements.len());
 
-    let mut prev_time = tb_estimator.time();
-
     for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        print!("propagating for {:?} (until {})", delta_time, prev_time + delta_time);
-        let (final_t, final_state) =
-            prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
-        tb_estimator.set_state(final_t, &final_state);
-        prev_time = final_t;
-        println!("...done (now at {} == {})", final_t, tb_estimator.time());
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
@@ -124,16 +117,11 @@ fn fixed_step_perfect_stations() {
         let mut latest_est = Estimate::<U6>::empty();
         let mut still_empty = true;
         for station in all_stations.iter() {
-            println!("checking visibility from {}", station.name);
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
-                println!("visible!");
-                // We've got a visible measurement, so let's do a KF measurement update and stop searching for measurements.
-                println!("{}", computed_meas.sensitivity());
                 ckf.update_h_tilde(*computed_meas.sensitivity());
                 latest_est = ckf.measurement_update(*real_meas.observation(), *computed_meas.observation())
                     .expect("wut?");
-                println!("got estimate");
                 still_empty = false;
                 break; // We know that only one station is in visibility at each time.
             }
@@ -143,8 +131,12 @@ fn fixed_step_perfect_stations() {
             latest_est = ckf.time_update().expect("huh?");
         }
         println!(
-            "=== #{} PREDICTED: {} ===\nState {}Covariance {}\n=====================",
-            meas_no, latest_est.predicted, latest_est.state, latest_est.covar
+            "=== #{} PREDICTED: {} ===\nEstState {} State {} Covariance {}\n=====================",
+            meas_no,
+            latest_est.predicted,
+            latest_est.state,
+            tb_estimator.two_body_dyn.state(),
+            latest_est.covar
         );
     }
     println!("out of everything");
