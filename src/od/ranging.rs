@@ -12,9 +12,9 @@ use celestia::{CoordinateFrame, State, ECEF};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct GroundStation {
-    pub name: String,
+    pub name: &'static str,
     pub elevation_mask: f64,
     pub latitude: f64,
     pub longitude: f64,
@@ -26,7 +26,7 @@ pub struct GroundStation {
 impl GroundStation {
     /// Initializes a new Two Way ranging equipment from the noise values.
     pub fn from_noise_values(
-        name: String,
+        name: &'static str,
         elevation_mask: f64,
         latitude: f64,
         longitude: f64,

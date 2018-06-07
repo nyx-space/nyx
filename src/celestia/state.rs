@@ -1,14 +1,14 @@
 extern crate hifitime;
-use self::hifitime::TimeSystem;
 use self::hifitime::instant::{Duration, Instant};
+use self::hifitime::TimeSystem;
 use self::hifitime::{datetime, julian};
 
 use super::na::{Vector3, Vector6};
 use super::{CelestialBody, CoordinateFrame, EARTH, ECEF, ECI};
 use utils::{between_0_360, between_pm_180};
 
-use std::f64::EPSILON;
 use std::f64::consts::PI;
+use std::f64::EPSILON;
 use std::fmt;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -51,9 +51,13 @@ impl<F: CoordinateFrame> PartialEq for State<F> {
     {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        self.dt == other.dt && (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol && (self.vy - other.vy).abs() < velocity_tol
+        self.dt == other.dt
+            && (self.gm - other.gm).abs() < 1e-4
+            && (self.x - other.x).abs() < distance_tol
+            && (self.y - other.y).abs() < distance_tol
+            && (self.z - other.z).abs() < distance_tol
+            && (self.vx - other.vx).abs() < velocity_tol
+            && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
     }
 }

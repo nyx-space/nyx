@@ -6,8 +6,8 @@ extern crate nyx_space as nyx;
 fn nil_measurement() {
     use hifitime::julian::*;
     use nyx::celestia::{State, ECEF};
-    use nyx::od::Measurement;
     use nyx::od::ranging::GroundStation;
+    use nyx::od::Measurement;
     use std::f64::EPSILON;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 
@@ -16,7 +16,7 @@ fn nil_measurement() {
     let height = 56.0e-3;
     let dt = ModifiedJulian::j2000();
 
-    let station = GroundStation::from_noise_values("nil".to_string(), 0.0, lat, long, height, 0.0, 0.0);
+    let station = GroundStation::from_noise_values("nil", 0.0, lat, long, height, 0.0, 0.0);
 
     let at_station = State::<ECEF>::from_geodesic(lat, long, height, dt);
 

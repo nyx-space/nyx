@@ -4,36 +4,40 @@ use super::Dynamics;
 use celestia::{CelestialBody, CoordinateFrame, State};
 use od::Linearization;
 use std::f64;
+use std::sync::mpsc::Sender;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
-#[derive(Copy, Clone)]
-pub struct TwoBody {
+#[derive(Clone)]
+pub struct TwoBody<'a> {
     pub mu: f64,
+    pub tx_chan: Option<&'a Sender<(f64, Vector6<f64>)>>,
     time: f64,
     pos_vel: Vector6<f64>,
 }
 
-impl TwoBody {
+impl<'a> TwoBody<'a> {
     /// Initialize TwoBody dynamics given a provided gravitional parameter (as `mu`)
-    pub fn from_state_vec_with_gm(state: &Vector6<f64>, mu: f64) -> TwoBody {
+    pub fn from_state_vec_with_gm(state: Vector6<f64>, mu: f64) -> TwoBody<'a> {
         TwoBody {
-            time: 0.0,
-            pos_vel: *state,
             mu: mu,
+            tx_chan: None,
+            time: 0.0,
+            pos_vel: state,
         }
     }
 
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided state vector (cf. nyx::celestia).
-    pub fn from_state_vec<B: CelestialBody>(state: &Vector6<f64>) -> TwoBody {
+    pub fn from_state_vec<B: CelestialBody>(state: Vector6<f64>) -> TwoBody<'a> {
         TwoBody {
-            time: 0.0,
-            pos_vel: *state,
             mu: B::gm(),
+            tx_chan: None,
+            time: 0.0,
+            pos_vel: state,
         }
     }
 }
 
-impl Dynamics for TwoBody {
+impl<'a> Dynamics for TwoBody<'a> {
     type StateSize = U6;
     fn time(&self) -> f64 {
         self.time
@@ -46,6 +50,13 @@ impl Dynamics for TwoBody {
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
         self.time = new_t;
         self.pos_vel = *new_state;
+        match self.tx_chan {
+            Some(ref chan) => match chan.send((new_t, new_state.clone())) {
+                Err(e) => warn!("could not publish to channel: {}", e),
+                Ok(_) => {}
+            },
+            _ => {}
+        }
     }
 
     fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
@@ -58,23 +69,23 @@ impl Dynamics for TwoBody {
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation. It inherently supports
 /// the State Transition Matrix for orbital determination.
-#[derive(Copy, Clone)]
-pub struct TwoBodyWithStm {
+#[derive(Clone)]
+pub struct TwoBodyWithStm<'a> {
     pub stm: Matrix6<f64>,
-    pub two_body_dyn: TwoBody,
+    pub two_body_dyn: TwoBody<'a>,
 }
 
-impl TwoBodyWithStm {
+impl<'a> TwoBodyWithStm<'a> {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
-    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithStm {
+    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithStm<'a> {
         TwoBodyWithStm {
             stm: Matrix6::identity(),
-            two_body_dyn: TwoBody::from_state_vec::<B>(&state.to_cartesian_vec()),
+            two_body_dyn: TwoBody::from_state_vec::<B>(state.to_cartesian_vec()),
         }
     }
 }
 
-impl Dynamics for TwoBodyWithStm {
+impl<'a> Dynamics for TwoBodyWithStm<'a> {
     type StateSize = U42;
     fn time(&self) -> f64 {
         self.two_body_dyn.time()
@@ -101,7 +112,7 @@ impl Dynamics for TwoBodyWithStm {
     }
 }
 
-impl Linearization for TwoBodyWithStm {
+impl<'a> Linearization for TwoBodyWithStm<'a> {
     type StateSize = U6;
 
     fn gradient(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize> {

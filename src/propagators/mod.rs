@@ -101,7 +101,7 @@ impl<'a> Propagator<'a> {
     pub fn until_time_elapsed<D: Dynamics, E: Copy>(
         &mut self,
         elapsed_time: f64,
-        mut dyn: D,
+        mut dyn: &mut D,
         err_estimator: E,
     ) -> (f64, VectorN<f64, D::StateSize>)
     where
@@ -211,7 +211,8 @@ impl<'a> Propagator<'a> {
             } else {
                 // Compute the error estimate.
                 self.details.error = err_estimator(&error_est, &next_state.clone(), state);
-                if self.details.error <= self.opts.tolerance || self.step_size <= self.opts.min_step
+                if self.details.error <= self.opts.tolerance
+                    || self.step_size <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {
