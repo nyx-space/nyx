@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 use self::hifitime::instant::*;
 use self::hifitime::julian::*;
 use self::hifitime::SECONDS_PER_DAY;
-use self::na::Vector6;
+use self::na::{Matrix2, Matrix6, U42, U6, Vector2, Vector6};
 use self::nyx::celestia::{State, EARTH, ECI};
 use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithStm};
 use self::nyx::dynamics::Dynamics;
@@ -13,6 +13,7 @@ use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::{GroundStation, StdMeasurement};
 use self::nyx::od::{Linearization, Measurement};
 use self::nyx::propagators::{error_ctrl, Options, Propagator, RK4Fixed};
+use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -32,9 +33,9 @@ fn fixed_step_perfect_stations() {
     let step_size = 10.0;
     let opts = Options::with_fixed_step(step_size);
 
-    // Define the information for the channels.
+    // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
-    let (meas_tx, meas_rx): (Sender<StdMeasurement>, Receiver<StdMeasurement>) = mpsc::channel();
+    let mut measurements = BTreeMap::new();
 
     // Define state information.
     let dt = ModifiedJulian { days: 21545.0 };
@@ -42,7 +43,7 @@ fn fixed_step_perfect_stations() {
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let mut prop = Propagator::new::<RK4Fixed>(&opts);
+        let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
         let (final_t, final_state_vec) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
@@ -60,7 +61,9 @@ fn fixed_step_perfect_stations() {
                 for station in all_stations.iter() {
                     let meas = station.measure(rx_state, this_dt.into_instant());
                     if meas.visible() {
-                        meas_tx.send(meas).unwrap();
+                        // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
+                        measurements.insert(this_dt.into_instant().duration(), meas);
+                        break; // We know that only one station is in visibility at each time.
                     }
                 }
             }
@@ -68,5 +71,56 @@ fn fixed_step_perfect_stations() {
                 break;
             }
         }
+    }
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
+    // the measurements, and the same time step.
+    let mut prop_est = Propagator::new::<RK4Fixed>(&opts);
+    let mut tb_estimator = TwoBodyWithStm::from_state::<EARTH, ECI>(initial_state);
+    let covar_radius = 1.0;
+    let covar_velocity = 1.0e-3;
+    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+        covar_radius,
+        covar_radius,
+        covar_radius,
+        covar_velocity,
+        covar_velocity,
+        covar_velocity,
+    ));
+
+    let initial_estimate = Estimate {
+        state: tb_estimator.two_body_dyn.state(),
+        covar: init_covar,
+        stm: tb_estimator.stm.clone(),
+        predicted: false,
+    };
+
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-3, 1e-3));
+    let mut ckf = KF::initialize(initial_estimate, measurement_noise);
+
+    for (duration, real_meas) in measurements.iter() {
+        // Propagate the dynamics to the measurement, and then start the filter.
+        let delta_time = (dt.into_instant() - *duration).duration().as_secs() as f64;
+        let (final_t, final_state) =
+            prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
+        tb_estimator.set_state(final_t, &final_state);
+        // Update the STM of the KF
+        ckf.update_stm(tb_estimator.stm.clone());
+        // Get the computed observation
+        let this_dt = ModifiedJulian::from_instant(dt.into_instant() + *duration);
+        let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.two_body_dyn.state(), this_dt, ECI {});
+        let mut latest_est = Estimate::<U6>::empty();
+        for station in all_stations.iter() {
+            let computed_meas = station.measure(rx_state, this_dt.into_instant());
+            if computed_meas.visible() {
+                // We've got a visible measurement, so let's do a KF measurement update and stop searching for measurements.
+                latest_est = ckf
+                    .measurement_update(*real_meas.observation(), *computed_meas.observation())
+                    .expect("wut?");
+                break; // We know that only one station is in visibility at each time.
+            }
+        }
+        println!("{:?}", latest_est);
     }
 }

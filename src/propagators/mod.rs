@@ -101,7 +101,7 @@ impl<'a> Propagator<'a> {
     pub fn until_time_elapsed<D: Dynamics, E: Copy>(
         &mut self,
         elapsed_time: f64,
-        mut dyn: &mut D,
+        dyn: &mut D,
         err_estimator: E,
     ) -> (f64, VectorN<f64, D::StateSize>)
     where
@@ -261,7 +261,7 @@ impl<'a> Propagator<'a> {
 /// methods. To use a fixed step integrator, initialize the options using `with_fixed_step`, and
 /// use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
 /// fixed step options will lead to an RK4 being used instead of an RK45.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Options {
     init_step: f64,
     min_step: f64,

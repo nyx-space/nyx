@@ -36,6 +36,17 @@ where
         + Allocator<f64, S, M>
         + Allocator<f64, S, S>,
 {
+    pub fn initialize(initial_estimate: Estimate<S>, measurement_noise: MatrixMN<f64, M, M>) -> KF<S, M> {
+        KF {
+            prev_estimate: initial_estimate,
+            measurement_noise,
+            ekf: false,
+            h_tilde: MatrixMN::<f64, M, S>::zeros(),
+            stm: MatrixMN::<f64, S, S>::identity(),
+            stm_updated: false,
+            h_tilde_updated: false,
+        }
+    }
     pub fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
         self.stm = new_stm;
         self.stm_updated = true;
@@ -134,6 +145,22 @@ where
     pub stm: MatrixMN<f64, S, S>,
 }
 
+impl<S> Estimate<S>
+where
+    S: Dim + DimName,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+{
+    pub fn empty() -> Estimate<S> {
+        Estimate {
+            state: VectorN::<f64, S>::zeros(),
+            covar: MatrixMN::<f64, S, S>::zeros(),
+            predicted: true,
+            stm: MatrixMN::<f64, S, S>::zeros(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum FilterError {
     StateTransitionMatrixNotUpdated,
     SensitivityNotUpdated,
