@@ -51,6 +51,7 @@ fn fixed_step_perfect_stations() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
+    let mut prev_dt = dt.into_instant();
     loop {
         match truth_rx.recv() {
             Ok((t, state_vec)) => {
@@ -62,7 +63,9 @@ fn fixed_step_perfect_stations() {
                     let meas = station.measure(rx_state, this_dt.into_instant());
                     if meas.visible() {
                         // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                        measurements.insert(this_dt.into_instant().duration(), meas);
+                        let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
+                        measurements.insert(delta, meas);
+                        prev_dt = this_dt.into_instant();
                         break; // We know that only one station is in visibility at each time.
                     }
                 }
@@ -99,18 +102,25 @@ fn fixed_step_perfect_stations() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-3, 1e-3));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    for (duration, real_meas) in measurements.iter() {
+    println!("Will process {} measurements", measurements.keys().len());
+
+    for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = (dt.into_instant() - *duration).duration().as_secs() as f64;
+        let delta_time = (*duration) as f64;
+        print!("propagating for {:?}", delta_time);
         let (final_t, final_state) =
             prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
         tb_estimator.set_state(final_t, &final_state);
+        println!("...done",);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
-        let this_dt = ModifiedJulian::from_instant(dt.into_instant() + *duration);
+        let this_dt = ModifiedJulian::from_instant(
+            dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
+        );
         let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.two_body_dyn.state(), this_dt, ECI {});
         let mut latest_est = Estimate::<U6>::empty();
+        let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
@@ -119,9 +129,17 @@ fn fixed_step_perfect_stations() {
                 latest_est = ckf
                     .measurement_update(*real_meas.observation(), *computed_meas.observation())
                     .expect("wut?");
+                still_empty = false;
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        println!("{:?}", latest_est);
+        if still_empty {
+            // Do a time update instead
+            latest_est = ckf.time_update().expect("huh?");
+        }
+        println!(
+            "=== #{} PREDICTED: {} ===\nState {}Covariance {}\n=====================",
+            meas_no, latest_est.predicted, latest_est.state, latest_est.covar
+        );
     }
 }
