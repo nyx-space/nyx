@@ -93,11 +93,8 @@ impl<'a> Propagator<'a> {
 
     /// This method propagates the provided Dynamics `dyn` for `elapsed_time` seconds. WARNING: This function has many caveats (please read detailed docs).
     ///
-    /// ### IMPORTANT CAVEATS of `until_time_elapsed`
+    /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `dyn.time()` returns a time in the same units as elapsed_time.
-    /// - Although mutuable, the original dynamics struct are **COPIED** to this function. This means that calling `dyn.state()` after passing
-    /// that same variable `dyn` to the `until_time_elapsed` function will return the **original** state. One **must** therefore call `until_time_elapsed` and then
-    /// call `dyn.set_state(final_t, &final_state)` with the final time and state returned by `until_time_elapsed`.
     pub fn until_time_elapsed<D: Dynamics, E: Copy>(
         &mut self,
         elapsed_time: f64,
@@ -211,8 +208,7 @@ impl<'a> Propagator<'a> {
             } else {
                 // Compute the error estimate.
                 self.details.error = err_estimator(&error_est, &next_state.clone(), state);
-                if self.details.error <= self.opts.tolerance
-                    || self.step_size <= self.opts.min_step
+                if self.details.error <= self.opts.tolerance || self.step_size <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {

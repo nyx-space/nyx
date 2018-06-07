@@ -1,14 +1,14 @@
 extern crate hifitime;
-use self::hifitime::instant::{Duration, Instant};
 use self::hifitime::TimeSystem;
+use self::hifitime::instant::{Duration, Instant};
 use self::hifitime::{datetime, julian};
 
 use super::na::{Vector3, Vector6};
 use super::{CelestialBody, CoordinateFrame, EARTH, ECEF, ECI};
 use utils::{between_0_360, between_pm_180};
 
-use std::f64::consts::PI;
 use std::f64::EPSILON;
+use std::f64::consts::PI;
 use std::fmt;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -51,13 +51,9 @@ impl<F: CoordinateFrame> PartialEq for State<F> {
     {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        self.dt == other.dt
-            && (self.gm - other.gm).abs() < 1e-4
-            && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol
+        self.dt == other.dt && (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol
+            && (self.y - other.y).abs() < distance_tol && (self.z - other.z).abs() < distance_tol
+            && (self.vx - other.vx).abs() < velocity_tol && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
     }
 }
@@ -586,8 +582,8 @@ impl State<ECI> {
     /// Creates a new State around Earth in the ECI frame from the Keplerian orbital elements.
     ///
     /// **Units:** km, none, degrees, degrees, degrees, degrees
-    pub fn from_keplerian_eci<T: TimeSystem>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T) -> State<ECI> {
-        State::from_keplerian::<EARTH, T>(x, y, z, vx, vy, vz, dt, ECI {})
+    pub fn from_keplerian_eci<T: TimeSystem>(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64, dt: T) -> State<ECI> {
+        State::from_keplerian::<EARTH, T>(sma, ecc, inc, raan, aop, ta, dt, ECI {})
     }
 
     pub fn in_ecef(&self) -> State<ECEF> {

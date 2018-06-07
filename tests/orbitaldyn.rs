@@ -7,8 +7,8 @@ fn two_body_parametrized() {
     extern crate nalgebra as na;
     use self::na::Vector6;
     use nyx::celestia::EARTH;
-    use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
+    use nyx::dynamics::celestial::TwoBody;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -27,8 +27,7 @@ fn two_body_parametrized() {
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0));
-    let (final_t, final_state) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    dyn.set_state(final_t, &final_state);
+    prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
 }
 
@@ -36,8 +35,8 @@ fn two_body_parametrized() {
 fn two_body_custom() {
     extern crate nalgebra as na;
     use self::na::Vector6;
-    use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
+    use nyx::dynamics::celestial::TwoBody;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -59,19 +58,18 @@ fn two_body_custom() {
         Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0),
         398600.4415,
     );
-    let (final_t, final_state) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    dyn.set_state(final_t, &final_state);
+    prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
 }
 
 #[test]
 fn two_body_state_parametrized() {
     extern crate nalgebra as na;
-    use hifitime::julian::ModifiedJulian;
     use hifitime::SECONDS_PER_DAY;
+    use hifitime::julian::ModifiedJulian;
     use nyx::celestia::{State, EARTH, ECI};
-    use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
+    use nyx::dynamics::celestial::TwoBody;
     use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     let dt = ModifiedJulian { days: 21545.0 };
@@ -96,8 +94,7 @@ fn two_body_state_parametrized() {
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-    let (final_t, final_state_vec) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    dyn.set_state(final_t, &final_state_vec);
+    let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
 
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
