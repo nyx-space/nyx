@@ -92,23 +92,49 @@ impl<'a> Dynamics for TwoBodyWithStm<'a> {
     }
 
     fn state(&self) -> VectorN<f64, Self::StateSize> {
-        let stm_as_vec = self.stm.fixed_resize::<U1, U36>(0.0);
+        let mut stm_as_vec = VectorN::<f64, U36>::zeros();
+        let mut stm_idx = 0;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_as_vec[(stm_idx, 0)] = self.stm[(i, j)];
+                stm_idx += 1;
+            }
+        }
         VectorN::<f64, Self::StateSize>::from_iterator(self.two_body_dyn.state().iter().chain(stm_as_vec.iter()).cloned())
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
         self.two_body_dyn
             .set_state(new_t, &new_state.fixed_rows::<U6>(0).into_owned());
-        self.stm = new_state.fixed_rows::<U36>(6).fixed_resize::<U6, U6>(0.0);
+        let mut stm_k_to_0 = Matrix6::zeros();
+        let mut stm_idx = 6;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_k_to_0[(i, j)] = new_state[(stm_idx, 0)];
+                stm_idx += 1;
+            }
+        }
+        let mut stm_prev = self.stm.clone();
+        if !stm_prev.try_inverse_mut() {
+            panic!("STM not invertible");
+        }
+        self.stm = stm_k_to_0 * stm_prev;
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
         let two_body_dt = self.two_body_dyn.eom(t, &pos_vel);
         let stm_dt = self.stm * self.gradient(t, &pos_vel);
-        VectorN::<f64, Self::StateSize>::from_iterator(
-            two_body_dt.iter().chain(stm_dt.fixed_resize::<U1, U36>(0.0).iter()).cloned(),
-        )
+        // Rebuild the STM as a vector.
+        let mut stm_as_vec = VectorN::<f64, U36>::zeros();
+        let mut stm_idx = 0;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
+                stm_idx += 1;
+            }
+        }
+        VectorN::<f64, Self::StateSize>::from_iterator(two_body_dt.iter().chain(stm_as_vec.iter()).cloned())
     }
 }
 
