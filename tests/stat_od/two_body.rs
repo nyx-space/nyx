@@ -25,6 +25,7 @@ fn fixed_step_perfect_stations() {
     let dss65_madrid = GroundStation::from_noise_values("Madrid", 0.0, 40.427222, 4.250556, 0.834939, 0.0, 0.0);
     let dss34_canberra = GroundStation::from_noise_values("Canberra", 0.0, -35.398333, 148.981944, 0.691750, 0.0, 0.0);
     let dss13_goldstone = GroundStation::from_noise_values("Goldstone", 0.0, 35.247164, 243.205, 1.07114904, 0.0, 0.0);
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
@@ -50,13 +51,22 @@ fn fixed_step_perfect_stations() {
 
     // Receive the states on the main thread, and populate the measurement channel.
     loop {
-        if let Ok((t, state_vec)) = truth_rx.recv() {
-            // Convert the state to ECI.
-            let this_dt =
-                ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
-            let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&state_vec, this_dt, ECI {});
-            let meas_dss13 = dss13_goldstone.measure(rx_state, this_dt.into_instant());
-            if meas_dss13.visible() {}
+        match truth_rx.recv() {
+            Ok((t, state_vec)) => {
+                // Convert the state to ECI.
+                let this_dt =
+                    ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
+                let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&state_vec, this_dt, ECI {});
+                for station in all_stations.iter() {
+                    let meas = station.measure(rx_state, this_dt.into_instant());
+                    if meas.visible() {
+                        meas_tx.send(meas).unwrap();
+                    }
+                }
+            }
+            Err(_) => {
+                break;
+            }
         }
     }
 }

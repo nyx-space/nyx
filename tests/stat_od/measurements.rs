@@ -4,10 +4,10 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn nil_measurement() {
-    use hifitime::julian::*;
-    use nyx::celestia::{State, ECEF};
-    use nyx::od::ranging::GroundStation;
-    use nyx::od::Measurement;
+    use self::hifitime::julian::*;
+    use self::nyx::celestia::{State, ECEF};
+    use self::nyx::od::ranging::GroundStation;
+    use self::nyx::od::Measurement;
     use std::f64::EPSILON;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 
