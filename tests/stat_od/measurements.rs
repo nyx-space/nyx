@@ -24,14 +24,14 @@ fn nil_measurement() {
 
     let h_tilde = *meas.sensitivity();
     assert!(h_tilde[(0, 0)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 0)].is_nan(), "expected NaN");
-    assert!(h_tilde[(2, 0)].is_nan(), "expected NaN");
     assert!(h_tilde[(0, 1)].is_nan(), "expected NaN");
+    assert!(h_tilde[(0, 2)].is_nan(), "expected NaN");
+    assert!(h_tilde[(1, 0)].is_nan(), "expected NaN");
     assert!(h_tilde[(1, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(2, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(3, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(4, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(5, 1)].is_nan(), "expected NaN");
+    assert!(h_tilde[(1, 2)].is_nan(), "expected NaN");
+    assert!(h_tilde[(1, 3)].is_nan(), "expected NaN");
+    assert!(h_tilde[(1, 4)].is_nan(), "expected NaN");
+    assert!(h_tilde[(1, 5)].is_nan(), "expected NaN");
 
     assert!(meas.observation()[(0, 0)] - 0.0 < EPSILON, "observation is not range=0");
     assert!(meas.observation()[(1, 0)].is_nan(), "observation is not range=0");

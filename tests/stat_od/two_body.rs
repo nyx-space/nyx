@@ -115,6 +115,7 @@ fn fixed_step_perfect_stations() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
                 // We've got a visible measurement, so let's do a KF measurement update and stop searching for measurements.
+                ckf.update_h_tilde(*computed_meas.sensitivity());
                 latest_est = ckf
                     .measurement_update(*real_meas.observation(), *computed_meas.observation())
                     .expect("wut?");

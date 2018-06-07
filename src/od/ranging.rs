@@ -4,7 +4,7 @@ extern crate rand;
 
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
-use self::na::{Matrix6x2, U2, U6, Vector2};
+use self::na::{Matrix2x6, U2, U6, Vector2};
 use self::rand::distributions::{Distribution, Normal};
 use self::rand::thread_rng;
 use super::Measurement;
@@ -79,7 +79,7 @@ pub struct StdMeasurement {
     dt: Instant,
     obs: Vector2<f64>,
     visible: bool,
-    h_tilde: Matrix6x2<f64>,
+    h_tilde: Matrix2x6<f64>,
 }
 
 impl StdMeasurement {
@@ -100,18 +100,18 @@ impl Measurement for StdMeasurement {
         // Let's define some helper variables.
         let range = obs[(0, 0)];
         let range_rate = obs[(1, 0)];
-        let mut h_tilde = Matrix6x2::zeros();
+        let mut h_tilde = Matrix2x6::zeros();
         // \partial \rho / \partial {x,y,z}
         h_tilde[(0, 0)] = (rx.x - tx.x) / range;
-        h_tilde[(1, 0)] = (rx.y - tx.y) / range;
-        h_tilde[(2, 0)] = (rx.z - tx.z) / range;
+        h_tilde[(0, 1)] = (rx.y - tx.y) / range;
+        h_tilde[(0, 2)] = (rx.z - tx.z) / range;
         // \partial \dot\rho / \partial {x,y,z}
-        h_tilde[(0, 1)] = (rx.vx - tx.vx) / range + (range_rate / range.powi(2)) * (rx.x - tx.x);
+        h_tilde[(1, 0)] = (rx.vx - tx.vx) / range + (range_rate / range.powi(2)) * (rx.x - tx.x);
         h_tilde[(1, 1)] = (rx.vy - tx.vy) / range + (range_rate / range.powi(2)) * (rx.y - tx.y);
-        h_tilde[(2, 1)] = (rx.vz - tx.vz) / range + (range_rate / range.powi(2)) * (rx.z - tx.z);
-        h_tilde[(3, 1)] = (rx.x - tx.x) / range;
-        h_tilde[(4, 1)] = (rx.y - tx.y) / range;
-        h_tilde[(5, 1)] = (rx.z - tx.z) / range;
+        h_tilde[(1, 2)] = (rx.vz - tx.vz) / range + (range_rate / range.powi(2)) * (rx.z - tx.z);
+        h_tilde[(1, 3)] = (rx.x - tx.x) / range;
+        h_tilde[(1, 4)] = (rx.y - tx.y) / range;
+        h_tilde[(1, 5)] = (rx.z - tx.z) / range;
 
         StdMeasurement {
             dt,
@@ -128,7 +128,7 @@ impl Measurement for StdMeasurement {
         &self.obs
     }
 
-    fn sensitivity(&self) -> &Matrix6x2<f64> {
+    fn sensitivity(&self) -> &Matrix2x6<f64> {
         &self.h_tilde
     }
 

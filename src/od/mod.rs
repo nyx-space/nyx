@@ -24,7 +24,7 @@ where
 pub trait Measurement
 where
     Self: Sized,
-    DefaultAllocator: Allocator<f64, Self::MeasurementSize> + Allocator<f64, Self::StateSize, Self::MeasurementSize>,
+    DefaultAllocator: Allocator<f64, Self::MeasurementSize> + Allocator<f64, Self::MeasurementSize, Self::StateSize>,
 {
     /// Defines the state size of the estimated state
     type StateSize: Dim + DimName;
@@ -46,7 +46,7 @@ where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> &MatrixMN<f64, Self::StateSize, Self::MeasurementSize>
+    fn sensitivity(&self) -> &MatrixMN<f64, Self::MeasurementSize, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
 
