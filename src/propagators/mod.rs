@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, Dim, DimName, VectorN};
+use self::na::{DefaultAllocator, DimName, VectorN};
 use std::f64;
 
 use dynamics::Dynamics;
@@ -152,7 +152,7 @@ impl<'a> Propagator<'a> {
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive<D, E, N: Dim + DimName>(
+    pub fn derive<D, E, N: DimName>(
         &mut self,
         t: f64,
         state: &VectorN<f64, N>,

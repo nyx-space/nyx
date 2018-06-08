@@ -1,14 +1,14 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, Dim, DimName, MatrixMN, VectorN};
+use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct KF<S, M>
 where
-    S: Dim + DimName,
-    M: Dim + DimName,
+    S: DimName,
+    M: DimName,
     DefaultAllocator:
         Allocator<f64, M> + Allocator<f64, S> + Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S>,
 {
@@ -27,8 +27,8 @@ where
 
 impl<S, M> KF<S, M>
 where
-    S: Dim + DimName,
-    M: Dim + DimName,
+    S: DimName,
+    M: DimName,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -132,7 +132,7 @@ where
 #[derive(Debug, Clone, PartialEq)]
 pub struct Estimate<S>
 where
-    S: Dim + DimName,
+    S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     /// The estimated state
@@ -147,7 +147,7 @@ where
 
 impl<S> Estimate<S>
 where
-    S: Dim + DimName,
+    S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     pub fn empty() -> Estimate<S> {
@@ -157,6 +157,20 @@ where
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
         }
+    }
+}
+
+impl<S> fmt::Display for Estimate<S>
+where
+    S: DimName,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "=== PREDICTED: {} ===\nEstState {} Covariance {}\n=====================",
+            &self.predicted, &self.state, &self.covar
+        )
     }
 }
 

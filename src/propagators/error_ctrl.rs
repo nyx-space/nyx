@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, Dim, DimName, U3, Vector3, Vector6, VectorN};
+use self::na::{DefaultAllocator, DimName, U3, Vector3, Vector6, VectorN};
 
 // This determines when to take into consideration the magnitude of the state_delta -- prevents dividing by too small of a number.
 const REL_ERR_THRESH: f64 = 0.1;
@@ -13,11 +13,7 @@ const REL_ERR_THRESH: f64 = 0.1;
 /// given the difference in the candidate state and the previous state (`state_delta`).
 /// This error estimator is from the physical model estimator of GMAT
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987]
-pub fn largest_error<N: Dim + DimName>(
-    prop_err: &VectorN<f64, N>,
-    candidate: &VectorN<f64, N>,
-    cur_state: &VectorN<f64, N>,
-) -> f64
+pub fn largest_error<N: DimName>(prop_err: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
 where
     DefaultAllocator: Allocator<f64, N>,
 {

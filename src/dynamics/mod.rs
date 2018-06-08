@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, Dim, DimName, VectorN};
+use self::na::{DefaultAllocator, DimName, VectorN};
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -33,7 +33,7 @@ where
     Self: Sized,
 {
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
-    type StateSize: Dim + DimName;
+    type StateSize: DimName;
     /// Returns the time of the current state
     fn time(&self) -> f64;
 
