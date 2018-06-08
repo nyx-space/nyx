@@ -1,12 +1,14 @@
 extern crate hifitime;
 use self::hifitime::TimeSystem;
+use self::hifitime::instant::{Duration, Instant};
+use self::hifitime::{datetime, julian};
 
 use super::na::{Vector3, Vector6};
-use super::CelestialBody;
-use utils::between_0_360;
+use super::{CelestialBody, CoordinateFrame, EARTH, ECEF, ECI};
+use utils::{between_0_360, between_pm_180};
 
-use std::f64::consts::PI;
 use std::f64::EPSILON;
+use std::f64::consts::PI;
 use std::fmt;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -23,9 +25,9 @@ const ZERO_DIV_TOL: f64 = 1e-15;
 /// _Note:_ although not yet supported, this struct may change once True of Date or other nutation frames
 /// are added to the toolkit.
 #[derive(Copy, Clone, Debug)]
-pub struct State<T>
+pub struct State<F>
 where
-    T: TimeSystem,
+    F: CoordinateFrame,
 {
     gm: f64,
     pub x: f64,
@@ -34,35 +36,47 @@ where
     pub vx: f64,
     pub vy: f64,
     pub vz: f64,
-    pub dt: T,
+    /// The date time is stored as a a hifitime::instant::Instant, which is the NTP representation of time.
+    pub dt: Instant,
+    /// The frame will later allow for coordinate frame transformations.
+    pub frame: F,
 }
 
-impl<T: TimeSystem> PartialEq for State<T> {
+impl<F: CoordinateFrame> PartialEq for State<F> {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
     /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
-    fn eq(&self, other: &State<T>) -> bool
+    fn eq(&self, other: &State<F>) -> bool
     where
-        T: TimeSystem,
+        F: CoordinateFrame,
     {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        self.dt.into_instant() == other.dt.into_instant() && (self.gm - other.gm).abs() < 1e-4
-            && (self.x - other.x).abs() < distance_tol && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol && (self.vz - other.vz).abs() < velocity_tol
+        self.dt == other.dt && (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol
+            && (self.y - other.y).abs() < distance_tol && (self.z - other.z).abs() < distance_tol
+            && (self.vx - other.vx).abs() < velocity_tol && (self.vy - other.vy).abs() < velocity_tol
+            && (self.vz - other.vz).abs() < velocity_tol
     }
 }
 
-impl<T> State<T>
+impl<F> State<F>
 where
-    T: TimeSystem,
+    F: CoordinateFrame,
 {
     /// Creates a new State around the provided CelestialBody
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    pub fn from_cartesian<B: CelestialBody>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T) -> State<T>
+    pub fn from_cartesian<B: CelestialBody, T: TimeSystem>(
+        x: f64,
+        y: f64,
+        z: f64,
+        vx: f64,
+        vy: f64,
+        vz: f64,
+        dt: T,
+        frame: F,
+    ) -> State<F>
     where
-        T: TimeSystem,
+        F: CoordinateFrame,
     {
         State {
             gm: B::gm(),
@@ -72,7 +86,8 @@ where
             vx,
             vy,
             vz,
-            dt,
+            dt: dt.into_instant(),
+            frame,
         }
     }
 
@@ -80,9 +95,9 @@ where
     ///
     /// The state vector **must** be x, y, z, dx, dy, dz. This function is a shortcut to `from_cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_cartesian_vec<B: CelestialBody>(state: &Vector6<f64>, dt: T) -> State<T>
+    pub fn from_cartesian_vec<B: CelestialBody, T: TimeSystem>(state: &Vector6<f64>, dt: T, frame: F) -> State<F>
     where
-        T: TimeSystem,
+        F: CoordinateFrame,
     {
         State {
             gm: B::gm(),
@@ -92,7 +107,8 @@ where
             vx: state[(3, 0)],
             vy: state[(4, 0)],
             vz: state[(5, 0)],
-            dt,
+            dt: dt.into_instant(),
+            frame,
         }
     }
 
@@ -104,9 +120,18 @@ where
     /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
-    pub fn from_keplerian<B: CelestialBody>(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64, dt: T) -> State<T>
+    pub fn from_keplerian<B: CelestialBody, T: TimeSystem>(
+        sma: f64,
+        ecc: f64,
+        inc: f64,
+        raan: f64,
+        aop: f64,
+        ta: f64,
+        dt: T,
+        frame: F,
+    ) -> State<F>
     where
-        T: TimeSystem,
+        F: CoordinateFrame,
     {
         if B::gm().abs() < ZERO_DIV_TOL {
             warn!(
@@ -144,10 +169,7 @@ where
         if ecc > 1.0 {
             let ta = between_0_360(ta);
             if ta > (PI - (1.0 / ecc).acos()).to_degrees() {
-                panic!(
-                    "true anomaly value ({}) physically impossible for a hyperbolic orbit",
-                    ta
-                );
+                panic!("true anomaly value ({}) physically impossible for a hyperbolic orbit", ta);
             }
         }
 
@@ -204,7 +226,8 @@ where
             vx,
             vy,
             vz,
-            dt,
+            dt: dt.into_instant(),
+            frame,
         }
     }
 
@@ -212,11 +235,11 @@ where
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `from_cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_keplerian_vec<B: CelestialBody>(state: &Vector6<f64>, dt: T) -> State<T>
+    pub fn from_keplerian_vec<B: CelestialBody, T: TimeSystem>(state: &Vector6<f64>, dt: T, frame: F) -> State<F>
     where
-        T: TimeSystem,
+        F: CoordinateFrame,
     {
-        Self::from_keplerian::<B>(
+        Self::from_keplerian::<B, T>(
             state[(0, 0)],
             state[(1, 0)],
             state[(2, 0)],
@@ -224,7 +247,51 @@ where
             state[(4, 0)],
             state[(5, 0)],
             dt,
+            frame,
         )
+    }
+
+    /// Returns the date time as its Modified Julian time representation
+    pub fn dt_as_modified_julian(self) -> julian::ModifiedJulian {
+        julian::ModifiedJulian::from_instant(self.dt)
+    }
+
+    /// Returns the date time as its UTC representation
+    pub fn dt_as_utc(self) -> datetime::Datetime {
+        datetime::Datetime::from_instant(self.dt)
+    }
+
+    /// Converts this state to a state in the destination frame (`other`).
+    ///
+    /// Reference: Vallado, 4th Ed., page 167, equation 3-27.
+    /// Note that we compute the derivative of the DCM by taking the difference between
+    /// said DCMs at a 0.1 second interval.
+    pub fn in_frame<G: CoordinateFrame>(self, other: G) -> State<G>
+    where
+        F: CoordinateFrame,
+    {
+        // if self.frame.Center != other.Center {
+        //     unimplemented!("transformations between differently centered frames depends on #4");
+        // }
+        // Convert from our frame to the destination frame via their inertial frames.
+        let dest_radius = G::from_inertial(self.dt) * F::to_inertial(self.dt) * self.radius();
+        // We need to compute the derivate of the DCM for the velocity.
+        let h = Duration::from_millis(100);
+        let frame_dt = (F::from_inertial(self.dt + h) - F::from_inertial(self.dt)) / 0.1;
+        let other_dt = (G::from_inertial(self.dt + h) - G::from_inertial(self.dt)) / 0.1;
+        let dest_velocity =
+            G::from_inertial(self.dt) * F::to_inertial(self.dt) * self.velocity() + other_dt * frame_dt * self.radius();
+        State {
+            gm: self.gm,
+            x: dest_radius[(0, 0)],
+            y: dest_radius[(1, 0)],
+            z: dest_radius[(2, 0)],
+            vx: dest_velocity[(0, 0)],
+            vy: dest_velocity[(1, 0)],
+            vz: dest_velocity[(2, 0)],
+            dt: self.dt,
+            frame: other,
+        }
     }
 
     /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
@@ -234,18 +301,21 @@ where
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
+    /// Returns the radius vector of this State in [km, km, km]
+    pub fn radius(self) -> Vector3<f64> {
+        Vector3::new(self.x, self.y, self.z)
+    }
+
+    /// Returns the radius vector of this State in [km, km, km]
+    pub fn velocity(self) -> Vector3<f64> {
+        Vector3::new(self.vx, self.vy, self.vz)
+    }
+
     /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
     ///
     /// Note that the time is **not** returned in the vector.
     pub fn to_keplerian_vec(self) -> Vector6<f64> {
-        Vector6::new(
-            self.sma(),
-            self.ecc(),
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
-        )
+        Vector6::new(self.sma(), self.ecc(), self.inc(), self.raan(), self.aop(), self.ta())
     }
 
     /// Returns the magnitude of the radius vector in km
@@ -260,9 +330,7 @@ where
 
     /// Returns the orbital momentum vector
     pub fn hvec(self) -> Vector3<f64> {
-        let r = Vector3::new(self.x, self.y, self.z);
-        let v = Vector3::new(self.vx, self.vy, self.vz);
-        r.cross(&v)
+        self.radius().cross(&self.velocity())
     }
 
     /// Returns the orbital momentum value on the X axis
@@ -302,8 +370,8 @@ where
 
     /// Returns the eccentricity vector (no unit)
     pub fn evec(self) -> Vector3<f64> {
-        let r = Vector3::new(self.x, self.y, self.z);
-        let v = Vector3::new(self.vx, self.vy, self.vz);
+        let r = self.radius();
+        let v = self.velocity();
         ((v.norm().powi(2) - self.gm / r.norm()) * r - (r.dot(&v)) * v) / self.gm
     }
 
@@ -350,12 +418,9 @@ where
     /// NOTE: This function will emit a warning stating that the TA should be avoided if in a very near circular orbit
     pub fn ta(self) -> f64 {
         if self.ecc() < ECC_EPSILON {
-            warn!(
-                "true anomaly ill-defined (eccentricity too low, e = {})",
-                self.ecc()
-            );
+            warn!("true anomaly ill-defined (eccentricity too low, e = {})", self.ecc());
         }
-        let cos_nu = self.evec().dot(&Vector3::new(self.x, self.y, self.z)) / (self.ecc() * self.rmag());
+        let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag());
         if (cos_nu.abs() - 1.0).abs() < EPSILON {
             // This bug drove me crazy when writing SMD in Go in 2017.
             if cos_nu > 1.0 {
@@ -464,30 +529,38 @@ where
     }
 }
 
-impl<T> fmt::Display for State<T>
+impl<F> fmt::Display for State<F>
 where
-    T: TimeSystem,
+    F: CoordinateFrame,
 {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
-            self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
+            "[{}] {}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
+            self.frame,
+            self.dt_as_utc(),
+            self.x,
+            self.y,
+            self.z,
+            self.vx,
+            self.vy,
+            self.vz
         )
     }
 }
 
-impl<T> fmt::Octal for State<T>
+impl<F> fmt::Octal for State<F>
 where
-    T: TimeSystem,
+    F: CoordinateFrame,
 {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
-            self.dt,
+            "[{}] {}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
+            self.frame,
+            self.dt_as_utc(),
             self.sma(),
             self.ecc(),
             self.inc(),
@@ -495,5 +568,137 @@ where
             self.aop(),
             self.ta()
         )
+    }
+}
+
+impl State<ECI> {
+    /// Creates a new State around Earth in the ECI frame
+    ///
+    /// **Units:** km, km, km, km/s, km/s, km/s
+    pub fn from_cartesian_eci<T: TimeSystem>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T) -> State<ECI> {
+        State::from_cartesian::<EARTH, T>(x, y, z, vx, vy, vz, dt, ECI {})
+    }
+
+    /// Creates a new State around Earth in the ECI frame from the Keplerian orbital elements.
+    ///
+    /// **Units:** km, none, degrees, degrees, degrees, degrees
+    pub fn from_keplerian_eci<T: TimeSystem>(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64, dt: T) -> State<ECI> {
+        State::from_keplerian::<EARTH, T>(sma, ecc, inc, raan, aop, ta, dt, ECI {})
+    }
+
+    pub fn in_ecef(&self) -> State<ECEF> {
+        self.in_frame(ECEF {})
+    }
+}
+
+impl State<ECEF> {
+    /// Creates a new State from the geodetic latitude (φ), longitude (λ) and height with respect to Earth's ellipsoid.
+    ///
+    /// **Units:** degrees, degrees, km
+    /// NOTE: This computation differs from the spherical coordinates because we consider the flatenning of Earth.
+    /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
+    pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T) -> State<ECEF> {
+        let e2 = 2.0 * EARTH::flatenning() - EARTH::flatenning().powi(2);
+        let (sin_long, cos_long) = longitude.to_radians().sin_cos();
+        let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
+        // page 144
+        let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+        let s_earth =
+            (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+        let ri = (c_earth + height) * cos_lat * cos_long;
+        let rj = (c_earth + height) * cos_lat * sin_long;
+        let rk = (s_earth + height) * sin_lat;
+        let radius = Vector3::new(ri, rj, rk);
+        let velocity = Vector3::new(0.0, 0.0, EARTH::rotation_rate()).cross(&radius);
+        State::from_cartesian::<EARTH, T>(
+            radius[(0, 0)],
+            radius[(1, 0)],
+            radius[(2, 0)],
+            velocity[(0, 0)],
+            velocity[(1, 0)],
+            velocity[(2, 0)],
+            dt,
+            ECEF {},
+        )
+    }
+
+    /// Creates a new ECEF state at the provided position.
+    ///
+    /// NOTE: This has the same container as the normal State. Hence, we set the velocity at zero.
+    pub fn from_position<T: TimeSystem>(i: f64, j: f64, k: f64, dt: T) -> State<ECEF> {
+        State::from_cartesian::<EARTH, T>(i, j, k, 0.0, 0.0, 0.0, dt, ECEF {})
+    }
+
+    /// Returns the I component of this ECEF frame
+    pub fn ri(&self) -> f64 {
+        self.x
+    }
+
+    /// Returns the J component of this ECEF frame
+    pub fn rj(&self) -> f64 {
+        self.y
+    }
+
+    /// Returns the K component of this ECEF frame
+    pub fn rk(&self) -> f64 {
+        self.z
+    }
+
+    /// Returns the geodetic longitude (λ) in degrees. Value is between 0 and 360 degrees.
+    ///
+    /// Although the reference is not Vallado, the math from Vallado proves to be equivalent.
+    /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
+    pub fn geodetic_longitude(&self) -> f64 {
+        between_0_360(self.y.atan2(self.x).to_degrees())
+    }
+
+    /// Returns the geodetic latitude (φ) in degrees. Value is between -180 and +180 degrees.
+    ///
+    /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
+    pub fn geodetic_latitude(&self) -> f64 {
+        let eps = 1e-12;
+        let max_attempts = 20;
+        let mut attempt_no = 0;
+        let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
+        let mut latitude = (self.z / self.rmag()).asin();
+        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
+        loop {
+            attempt_no += 1;
+            let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
+            let new_latitude = (self.z + c_earth * e2 * (latitude).sin()).atan2(r_delta);
+            if (latitude - new_latitude).abs() < eps {
+                return between_pm_180(new_latitude.to_degrees());
+            } else if attempt_no >= max_attempts {
+                warn!(
+                    "geodetic latitude failed to converge -- error = {}",
+                    (latitude - new_latitude).abs()
+                );
+                return between_pm_180(new_latitude.to_degrees());
+            }
+            latitude = new_latitude;
+        }
+    }
+
+    /// Returns the geodetic height in km.
+    ///
+    /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
+    pub fn geodetic_height(&self) -> f64 {
+        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
+        let latitude = self.geodetic_latitude().to_radians();
+        let sin_lat = latitude.sin();
+        if (latitude - 1.0).abs() < 0.1 {
+            // We are near poles, let's use another formulation.
+            let s_earth =
+                (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+            self.z / latitude.sin() - s_earth
+        } else {
+            let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+            let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
+            r_delta / latitude.cos() - c_earth
+        }
+    }
+
+    pub fn in_eci(&self) -> State<ECI> {
+        self.in_frame(ECI {})
     }
 }

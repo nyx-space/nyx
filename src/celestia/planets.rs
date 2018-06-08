@@ -48,6 +48,18 @@ impl NAIF for VENUS {
 /// Planet Earth as defined in [GMAT 2016a](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/GmatDefaults.hpp).
 pub struct EARTH;
 
+impl EARTH {
+    /// Defines the semi major radius of the ellipsoid of Earth, as per WGS84, in km.
+    pub fn semi_major_radius() -> f64 {
+        6378.1370
+    }
+
+    /// The rotation rate of Earth, in radians per seconds; [source](http://hpiers.obspm.fr/eop-pc/models/constants.html).
+    pub fn rotation_rate() -> f64 {
+        7.292_115_146_706_4e-5
+    }
+}
+
 impl CelestialBody for EARTH {
     fn gm() -> f64 {
         398_600.4415
@@ -56,7 +68,8 @@ impl CelestialBody for EARTH {
         6378.1363
     }
     fn flatenning() -> f64 {
-        0.00335270
+        // From [EMG2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/egm08_wgs84.html)
+        0.0033528106647474805
     }
 }
 

@@ -1,5 +1,5 @@
-use super::Dynamics;
 use super::na::{U3, U6, Vector6, VectorN};
+use super::Dynamics;
 use celestia::{CelestialBody, EARTH};
 use io::gravity::GravityPotentialStor;
 use std::cmp::min;

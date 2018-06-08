@@ -1,8 +1,7 @@
-extern crate hifitime;
 extern crate nalgebra as na;
 
-use self::na::{DefaultAllocator, Dim, DimName, VectorN};
 use self::na::allocator::Allocator;
+use self::na::{DefaultAllocator, DimName, VectorN};
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -34,7 +33,7 @@ where
     Self: Sized,
 {
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
-    type StateSize: Dim + DimName;
+    type StateSize: DimName;
     /// Returns the time of the current state
     fn time(&self) -> f64;
 
@@ -43,20 +42,12 @@ where
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 
-    /// Defines the equations of motion for these dynamics, or a combination of provided dynamics. XXX: Is this going to work in `derive`?!
+    /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 
     /// Updates the internal state of the dynamics.
-    ///
-    /// NOTE: I do not think that this should be a Box<Self> because my understanding is that it
-    /// would invalidate the previous state entirely. That would also mean that `fn state` would
-    /// return a Box<VectorN> which would then transfer the ownership to whoever calls it. I do not
-    /// think this is a good idea in this case. In fact, we can assume that when integrating the
-    /// attitude of two instruments, we might need to "read" the attitude of the spacecraft, "read"
-    /// that of an instrument, and compute the DCM between both. If the first attitude lost ownership
-    /// of its state, it wouldn't be able to integrate it anymore.
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;

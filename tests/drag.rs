@@ -8,9 +8,9 @@ fn basic_drag() {
     extern crate nalgebra as na;
     use self::na::{U6, VectorN};
     use nyx::celestia::{State, EARTH};
-    use nyx::dynamics::Dynamics;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::drag::BasicDrag;
+    use nyx::dynamics::Dynamics;
     use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 
     #[derive(Clone)]
