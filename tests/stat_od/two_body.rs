@@ -47,8 +47,7 @@ fn fixed_step_perfect_stations() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        let (final_t, final_state_vec) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-        dyn.set_state(final_t, &final_state_vec);
+        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -94,17 +93,19 @@ fn fixed_step_perfect_stations() {
     ));
 
     let initial_estimate = Estimate {
-        state: tb_estimator.two_body_dyn.state(),
+        // state: tb_estimator.two_body_dyn.state(),
+        state: Vector6::zeros(),
         covar: init_covar,
         stm: tb_estimator.stm.clone(),
         predicted: false,
     };
 
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-3, 1e-3));
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
     println!("Will process {} measurements", measurements.len());
 
+    let mut prev_dt = dt;
     for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
@@ -113,8 +114,12 @@ fn fixed_step_perfect_stations() {
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
         let this_dt = ModifiedJulian::from_instant(
-            dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
+            prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
         );
+        if prev_dt == this_dt {
+            panic!("already handled that time: {}", prev_dt);
+        }
+        prev_dt = this_dt;
         let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.two_body_dyn.state(), this_dt, ECI {});
         let mut latest_est = Estimate::<U6>::empty();
         let mut still_empty = true;
@@ -130,15 +135,18 @@ fn fixed_step_perfect_stations() {
         }
         if still_empty {
             // Do a time update instead
+            println!("T+{} : not in visibility", this_dt);
             latest_est = ckf.time_update().expect("huh?");
         }
-        println!(
-            "=== #{} PREDICTED: {} ===\nEstState {} State {} Covariance {}",
-            meas_no,
-            latest_est.predicted,
-            latest_est.state,
-            tb_estimator.two_body_dyn.state(),
-            latest_est.covar
-        );
+        if meas_no % 1000 == 0 {
+            println!(
+                "=== #{} PREDICTED: {} ===\nEstState {} State {} Covariance {}",
+                meas_no,
+                latest_est.predicted,
+                latest_est.state,
+                tb_estimator.two_body_dyn.state(),
+                latest_est.covar.norm()
+            );
+        }
     }
 }
