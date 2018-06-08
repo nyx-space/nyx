@@ -126,7 +126,7 @@ pub mod propagators;
 ///
 /// fn main() {
 ///     use nyx::propagators::*;
-///     use nyx::celestia::{State, EARTH};
+///     use nyx::celestia::{State, EARTH, ECI};
 ///     use nyx::dynamics::Dynamics;
 ///     use nyx::dynamics::celestial::TwoBody;
 ///     use self::na::Vector6;
@@ -140,11 +140,11 @@ pub mod propagators;
 ///     let max_step = 60.0;
 ///
 ///     let dt = ModifiedJulian { days: 21545.0 };
-///     let initial_state = State::from_cartesian::<EARTH>(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
+///     let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
 ///
 ///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
-///     let rslt = State::from_cartesian::<EARTH>(
+///     let rslt = State::from_cartesian_eci(
 ///         -5971.1941916712285,
 ///         3945.5066532419537,
 ///         2864.636618390466,
@@ -155,14 +155,13 @@ pub mod propagators;
 ///     );
 ///
 ///     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
-///     let mut dyn = TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec());
-///     let (final_t, final_state_vec) = prop.until_time_elapsed(prop_time, dyn, error_ctrl::rss_step_pos_vel);
-///     dyn.set_state(final_t, &final_state_vec);
+///     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
+///     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
 ///
 ///     let final_dt = ModifiedJulian {
-///         days: dt.days + final_t / SECONDS_PER_DAY,
+///         days: dt.days + dyn.time() / SECONDS_PER_DAY,
 ///     };
-///     let final_state = State::from_cartesian_vec::<EARTH>(&dyn.state(), final_dt);
+///     let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&dyn.state(), final_dt, ECI {});
 ///     assert_eq!(final_state, rslt, "two body prop failed",);
 ///
 ///     println!("Final state:\n{0}\n{0:o}", final_state);
@@ -183,7 +182,7 @@ pub mod propagators;
 /// use self::nyx::dynamics::Dynamics;
 /// use self::nyx::dynamics::celestial::TwoBody;
 /// use self::nyx::dynamics::momentum::AngularMom;
-/// use self::nyx::celestia::{State, EARTH};
+/// use self::nyx::celestia::{State, EARTH, ECI};
 /// use self::nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
 /// use self::na::{Matrix3, U3, U6, U9, Vector3, Vector6, VectorN};
 /// use std::f64;
@@ -192,13 +191,13 @@ pub mod propagators;
 /// // In the following struct, we only store the dynamics because this is only a proof
 /// // of concept. An engineer could add more useful information to this struct, such
 /// // as a short cut to the position or an attitude.
-/// #[derive(Copy, Clone)]
-/// pub struct PosVelAttMom {
-///     pub twobody: TwoBody,
+/// #[derive(Clone)]
+/// pub struct PosVelAttMom<'a> {
+///     pub twobody: TwoBody<'a>,
 ///     pub momentum: AngularMom,
 /// }
 ///
-/// impl Dynamics for PosVelAttMom {
+/// impl<'a> Dynamics for PosVelAttMom<'a> {
 ///     type StateSize = U9;
 ///     fn time(&self) -> f64 {
 ///         // Both dynamical models have the same time because they share the propagator.
@@ -238,7 +237,7 @@ pub mod propagators;
 ///     let min_step = 0.01;
 ///     let max_step = 60.0;
 ///
-///     let dyn_twobody = TwoBody::from_state_vec::<EARTH>(&Vector6::new(
+///     let dyn_twobody = TwoBody::from_state_vec::<EARTH>(Vector6::new(
 ///         -2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0,
 ///     ));
 ///     let omega = Vector3::new(0.1, 0.4, -0.2);
@@ -257,9 +256,7 @@ pub mod propagators;
 ///     let mut prop =
 ///         Propagator::new::<CashKarp45>(&Options::with_adaptive_step(min_step, max_step, accuracy));
 ///
-///     let (final_t, final_state) =
-///         prop.until_time_elapsed(prop_time, full_model, error_ctrl::largest_error::<U9>);
-///     full_model.set_state(final_t, &final_state);
+///     prop.until_time_elapsed(prop_time, &mut full_model, error_ctrl::largest_error::<U9>);
 ///
 ///     let prev_details = prop.latest_details().clone();
 ///     println!("{:?}", prev_details);
@@ -283,9 +280,10 @@ pub mod propagators;
 ///
 ///     println!(
 ///         "Final orbital state:\n{0}\n{0:o}",
-///         State::from_cartesian_vec::<EARTH>(
+///         State::from_cartesian_vec::<EARTH, ModifiedJulian>(
 ///             &full_model.twobody.state(),
-///             ModifiedJulian { days: 21545.0 }
+///             ModifiedJulian { days: 21545.0 },
+///             ECI {}
 ///         )
 ///     );
 /// }
@@ -301,11 +299,21 @@ pub mod dynamics;
 ///
 /// fn main(){
 ///     use hifitime::julian::ModifiedJulian;
-///     use nyx::celestia::{State, EARTH};
+///     use nyx::celestia::{State, EARTH, ECI};
 ///     let dt = ModifiedJulian { days: 21545.0 };
 ///     // The parameter is anything which implements `CelestialBody`.
 ///     // In this case, we're creating these states around Earth.
-///     let cart = State::from_cartesian::<EARTH>(
+///     let cart = State::from_cartesian::<EARTH, ModifiedJulian>(
+///         5946.673548288958,
+///         1656.154606023661,
+///         2259.012129598249,
+///         -3.098683050943824,
+///         4.579534132135011,
+///         6.246541551539432,
+///         dt,
+///         ECI {},
+///     );
+///     let cart_simple = State::from_cartesian_eci(
 ///         5946.673548288958,
 ///         1656.154606023661,
 ///         2259.012129598249,
@@ -314,7 +322,7 @@ pub mod dynamics;
 ///         6.246541551539432,
 ///         dt,
 ///     );
-///     let kep = State::from_keplerian::<EARTH>(
+///     let kep = State::from_keplerian::<EARTH, ModifiedJulian>(
 ///         7712.186117895041,
 ///         0.15899999999999995,
 ///         53.75369,
@@ -322,10 +330,14 @@ pub mod dynamics;
 ///         359.787880000004,
 ///         25.434003407751188,
 ///         dt,
+///         ECI {},
 ///     );
 ///     // We can check whether two states are equal.
 ///     if cart != kep {
 ///         panic!("This won't happen");
+///     }
+///     if cart != cart_simple {
+///         panic!("This won't happen either");
 ///     }
 ///     // Of more interest, we can fetch specific orbital elements.
 ///     println!("sma = {} km   inc = {} degrees", cart.sma(), cart.inc());
