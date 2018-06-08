@@ -5,16 +5,70 @@ extern crate nyx_space as nyx;
 use self::hifitime::SECONDS_PER_DAY;
 use self::hifitime::instant::*;
 use self::hifitime::julian::*;
-use self::na::{Matrix2, Matrix6, U42, U6, Vector2, Vector6};
+use self::na::{Matrix2, Matrix2x6, Matrix6, U42, U6, Vector2, Vector6};
 use self::nyx::celestia::{State, EARTH, ECI};
 use self::nyx::dynamics::Dynamics;
 use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithStm};
+use self::nyx::od::Measurement;
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
-use self::nyx::od::ranging::{GroundStation, StdMeasurement};
-use self::nyx::od::{Linearization, Measurement};
+use self::nyx::od::ranging::GroundStation;
 use self::nyx::propagators::{error_ctrl, Options, Propagator, RK4Fixed};
+use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
+
+macro_rules! f64_nil {
+    ($x:expr, $msg:expr) => {
+        assert!($x.abs() < EPSILON, $msg)
+    };
+}
+
+#[test]
+fn empty_estimate() {
+    let empty = Estimate::<U6>::empty();
+    f64_nil!(empty.state.norm(), "expected state norm to be nil");
+    f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
+    f64_nil!(empty.stm.norm(), "expected STM norm to be nil");
+    assert_eq!(empty.predicted, true, "expected predicted to be true");
+}
+
+#[test]
+fn filter_errors() {
+    let initial_estimate = Estimate::<U6>::empty();
+    let measurement_noise = Matrix2::zeros();
+    let real_obs = Vector2::zeros();
+    let computed_obs = Vector2::zeros();
+    let sensitivity = Matrix2x6::zeros();
+    let stm = Matrix6::zeros();
+
+    let mut ckf = KF::initialize(initial_estimate, measurement_noise);
+    match ckf.time_update() {
+        Ok(_) => panic!("expected the time update to fail"),
+        Err(e) => {
+            assert_eq!(e, FilterError::StateTransitionMatrixNotUpdated);
+        }
+    }
+    match ckf.measurement_update(real_obs, computed_obs) {
+        Ok(_) => panic!("expected the measurement update to fail"),
+        Err(e) => {
+            assert_eq!(e, FilterError::StateTransitionMatrixNotUpdated);
+        }
+    }
+    ckf.update_stm(stm);
+    match ckf.measurement_update(real_obs, computed_obs) {
+        Ok(_) => panic!("expected the measurement update to fail"),
+        Err(e) => {
+            assert_eq!(e, FilterError::SensitivityNotUpdated);
+        }
+    }
+    ckf.update_h_tilde(sensitivity);
+    match ckf.measurement_update(real_obs, computed_obs) {
+        Ok(_) => panic!("expected the measurement update to fail"),
+        Err(e) => {
+            assert_eq!(e, FilterError::GainIsSingular);
+        }
+    }
+}
 
 #[test]
 fn fixed_step_perfect_stations() {
@@ -106,7 +160,7 @@ fn fixed_step_perfect_stations() {
     println!("Will process {} measurements", measurements.len());
 
     let mut prev_dt = dt;
-    for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
+    for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
         prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
@@ -121,32 +175,25 @@ fn fixed_step_perfect_stations() {
         }
         prev_dt = this_dt;
         let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.two_body_dyn.state(), this_dt, ECI {});
-        let mut latest_est = Estimate::<U6>::empty();
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
                 ckf.update_h_tilde(*computed_meas.sensitivity());
-                latest_est = ckf.measurement_update(*real_meas.observation(), *computed_meas.observation())
+                let latest_est = ckf.measurement_update(*real_meas.observation(), *computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
+                assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
+                assert!(
+                    latest_est.state.norm() < EPSILON,
+                    "estimate error should be zero (perfect dynamics)"
+                );
                 break; // We know that only one station is in visibility at each time.
             }
         }
         if still_empty {
-            // Do a time update instead
-            println!("T+{} : not in visibility", this_dt);
-            latest_est = ckf.time_update().expect("huh?");
-        }
-        if meas_no % 1000 == 0 {
-            println!(
-                "=== #{} PREDICTED: {} ===\nEstState {} State {} Covariance {}",
-                meas_no,
-                latest_est.predicted,
-                latest_est.state,
-                tb_estimator.two_body_dyn.state(),
-                latest_est.covar.norm()
-            );
+            // We're doing perfect everything, so we should always be in visibility
+            panic!("T+{} : not in visibility", this_dt);
         }
     }
 }
