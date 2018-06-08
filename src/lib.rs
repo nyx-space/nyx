@@ -16,6 +16,7 @@
 //!  * Two Body dynamics with planets defined as in GMAT / STK.
 //!  * Angular momentum dynamics for a rigid body
 //!  * Convenient and explicit definition of the dynamics for a simulation (cf. the [dynamics documentation](./dynamics/index.html))
+//!  * Orbital state definition with transformations to other frames
 //!
 //! ## Usage
 //!

@@ -24,14 +24,14 @@ reaches production-level quality.
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
 - [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/lib.rs](tests/lib.rs))
 - [x] Orbital state manipulation (from GMAT source code and validated in GMAT)
+- [x] Statistical Orbital Determination: Classical and Extended Kalman Filter
 - [ ] Multibody dynamics using SPICE Kernels
 - [ ] Planetary and Solar eclipse and visibility computation
-- [ ] Statistical Orbital Determination: Classical and Extended Kalman Filter (SRIF?)
 - [ ] Finite burns with fuel depletion (including low thrust / ion propulsion)
 - [ ] Monte Carlo simulations on different parameters
 - [ ] Sub-Optimal Control of continuous thrust (Ruggerio, Naasz, Petropoulos)
 - [ ] Link budget computations
-- [ ] Spacecraft attitude control and some useful optimal algorithms
+- [ ] Spacecraft attitude control and some useful optimal control algorithms
 
 _Note:_ Some of these features may only be made available only through a commercial license in the future.
 

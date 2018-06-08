@@ -1,5 +1,5 @@
 extern crate nalgebra as na;
-use self::na::{Matrix6, MatrixMN, U1, U3, U36, U42, U6, Vector6, VectorN};
+use self::na::{Matrix6, MatrixMN, U3, U36, U42, U6, Vector6, VectorN};
 use super::Dynamics;
 use celestia::{CelestialBody, CoordinateFrame, State};
 use od::Linearization;
