@@ -2,17 +2,18 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::hifitime::instant::*;
+use self::hifitime::datetime::*;
 use self::hifitime::julian::*;
 use self::hifitime::SECONDS_PER_DAY;
 use self::na::{Matrix2, Matrix6, U42, Vector2, Vector6};
 use self::nyx::celestia::{State, EARTH, ECI};
 use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithStm};
 use self::nyx::dynamics::Dynamics;
+use self::nyx::io::cosmo::Cosmographia;
 use self::nyx::od::kalman::{Estimate, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
-use self::nyx::propagators::{error_ctrl, Options, Propagator, RK4Fixed};
+use self::nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -39,12 +40,15 @@ fn main() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = ModifiedJulian::from_instant(Datetime::new(2018, 2, 27, 0, 0, 0, 0).expect("ugh?").into_instant());
     let initial_state = State::from_keplerian_eci(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt);
+
+    // Initialize the XYZV exporter
+    let mut outfile = Cosmographia::from_path("truth.xyzv".to_owned());
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
+        let mut prop = Propagator::new::<RK89>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
@@ -59,6 +63,9 @@ fn main() {
                 let this_dt =
                     ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
                 let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&state_vec, this_dt, ECI {});
+                // Export state
+                outfile.append(rx_state);
+                // Check visibility
                 for station in all_stations.iter() {
                     let meas = station.measure(rx_state, this_dt.into_instant());
                     if meas.visible() {
@@ -79,7 +86,7 @@ fn main() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut prop_est = Propagator::new::<RK4Fixed>(&opts);
+    let mut prop_est = Propagator::new::<RK89>(&opts);
     let mut tb_estimator = TwoBodyWithStm::from_state::<EARTH, ECI>(initial_state);
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
