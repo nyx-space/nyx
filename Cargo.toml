@@ -1,6 +1,6 @@
 [package]
 name = "nyx-space"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://github.com/ChristopherRabotin/nyx"
@@ -10,7 +10,7 @@ keywords = ["space", "mission", "design", "orbit", "propagator"]
 categories = ["science", "simulation"]
 readme = "README.md"
 license = "Apache-2.0"
-exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf"]
+exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data", "rustfmt.toml"]
 
 [badges]
 maintenance = { status = "actively-developed" }
