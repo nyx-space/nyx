@@ -1,14 +1,18 @@
 extern crate hifitime;
-use self::hifitime::TimeSystem;
+extern crate serde;
+
 use self::hifitime::instant::{Duration, Instant};
+use self::hifitime::TimeSystem;
 use self::hifitime::{datetime, julian};
+use self::serde::ser::SerializeStruct;
+use self::serde::{Serialize, Serializer};
 
 use super::na::{Vector3, Vector6};
 use super::{CelestialBody, CoordinateFrame, EARTH, ECEF, ECI};
 use utils::{between_0_360, between_pm_180};
 
-use std::f64::EPSILON;
 use std::f64::consts::PI;
+use std::f64::EPSILON;
 use std::fmt;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -51,10 +55,35 @@ impl<F: CoordinateFrame> PartialEq for State<F> {
     {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        self.dt == other.dt && (self.gm - other.gm).abs() < 1e-4 && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol && (self.vy - other.vy).abs() < velocity_tol
+        self.dt == other.dt
+            && (self.gm - other.gm).abs() < 1e-4
+            && (self.x - other.x).abs() < distance_tol
+            && (self.y - other.y).abs() < distance_tol
+            && (self.z - other.z).abs() < distance_tol
+            && (self.vx - other.vx).abs() < velocity_tol
+            && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
+    }
+}
+
+impl<F> Serialize for State<F>
+where
+    F: CoordinateFrame,
+{
+    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("State", 7)?;
+        state.serialize_field("dt", &julian::ModifiedJulian::from_instant(self.dt).julian_days())?;
+        state.serialize_field("x", &self.x)?;
+        state.serialize_field("y", &self.y)?;
+        state.serialize_field("z", &self.z)?;
+        state.serialize_field("vx", &self.vx)?;
+        state.serialize_field("vy", &self.vy)?;
+        state.serialize_field("vz", &self.vz)?;
+        state.end()
     }
 }
 

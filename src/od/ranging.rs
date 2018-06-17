@@ -7,6 +7,8 @@ use self::hifitime::julian::*;
 use self::na::{Matrix2x6, U2, U6, Vector2};
 use self::rand::distributions::{Distribution, Normal};
 use self::rand::thread_rng;
+use super::serde::ser::SerializeSeq;
+use super::serde::{Serialize, Serializer};
 use super::Measurement;
 use celestia::{CoordinateFrame, State, ECEF};
 use utils::{r2, r3};
@@ -109,7 +111,7 @@ impl GroundStation {
     }
 }
 
-/// Stores a standard measurement of range and range rate
+/// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {
     dt: Instant,
@@ -174,5 +176,20 @@ impl Measurement for StdMeasurement {
 
     fn at(&self) -> Instant {
         self.dt
+    }
+}
+
+impl Serialize for StdMeasurement {
+    /// Serializes the observation vector at the given time.
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(3))?;
+        seq.serialize_element(&ModifiedJulian::from_instant(self.dt).days)?;
+        let obs = self.observation();
+        seq.serialize_element(&obs[(0, 0)])?;
+        seq.serialize_element(&obs[(1, 0)])?;
+        seq.end()
     }
 }

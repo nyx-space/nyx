@@ -1,17 +1,18 @@
+extern crate csv;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::hifitime::SECONDS_PER_DAY;
 use self::hifitime::instant::*;
 use self::hifitime::julian::*;
+use self::hifitime::SECONDS_PER_DAY;
 use self::na::{Matrix2, Matrix2x6, Matrix6, U42, U6, Vector2, Vector6};
 use self::nyx::celestia::{State, EARTH, ECI};
-use self::nyx::dynamics::Dynamics;
 use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithStm};
-use self::nyx::od::Measurement;
+use self::nyx::dynamics::Dynamics;
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
+use self::nyx::od::Measurement;
 use self::nyx::propagators::{error_ctrl, Options, Propagator, RK4Fixed};
 use std::f64::EPSILON;
 use std::sync::mpsc;
@@ -30,6 +31,14 @@ fn empty_estimate() {
     f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
     f64_nil!(empty.stm.norm(), "expected STM norm to be nil");
     assert_eq!(empty.predicted, true, "expected predicted to be true");
+}
+
+#[test]
+fn csv_serialize_empty_estimate() {
+    use std::io;
+    let empty = Estimate::<U6>::empty();
+    let mut wtr = csv::Writer::from_writer(io::stdout());
+    wtr.serialize(empty).expect("could not write to stdout");
 }
 
 #[test]
@@ -72,7 +81,7 @@ fn filter_errors() {
 
 #[test]
 fn ckf_fixed_step_perfect_stations() {
-    use std::thread;
+    use std::{io, thread};
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -160,6 +169,10 @@ fn ckf_fixed_step_perfect_stations() {
     println!("Will process {} measurements", measurements.len());
 
     let mut prev_dt = dt;
+    let mut printed = false;
+
+    let mut wtr = csv::Writer::from_writer(io::stdout());
+
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
@@ -180,7 +193,8 @@ fn ckf_fixed_step_perfect_stations() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
                 ckf.update_h_tilde(*computed_meas.sensitivity());
-                let latest_est = ckf.measurement_update(*real_meas.observation(), *computed_meas.observation())
+                let latest_est = ckf
+                    .measurement_update(*real_meas.observation(), *computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
@@ -188,6 +202,10 @@ fn ckf_fixed_step_perfect_stations() {
                     latest_est.state.norm() < EPSILON,
                     "estimate error should be zero (perfect dynamics)"
                 );
+                if !printed {
+                    wtr.serialize(latest_est).expect("could not write to stdout");
+                    printed = true;
+                }
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -313,7 +331,8 @@ fn ekf_fixed_step_perfect_stations() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
                 kf.update_h_tilde(*computed_meas.sensitivity());
-                let latest_est = kf.measurement_update(*real_meas.observation(), *computed_meas.observation())
+                let latest_est = kf
+                    .measurement_update(*real_meas.observation(), *computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");

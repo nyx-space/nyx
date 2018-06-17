@@ -19,8 +19,8 @@ fn state_def_() {
 
 #[test]
 fn state_def_circ_inc() {
-    use hifitime::TimeSystem;
     use hifitime::datetime::Datetime;
+    use hifitime::TimeSystem;
     use nyx::celestia::State;
     let dt = ModifiedJulian { days: 21545.0 };
     let cart = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);

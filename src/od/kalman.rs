@@ -2,8 +2,11 @@ extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use super::serde::ser::SerializeSeq;
+use super::serde::{Serialize, Serializer};
 use std::fmt;
 
+/// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
 pub struct KF<S, M>
 where
@@ -36,6 +39,7 @@ where
         + Allocator<f64, S, M>
         + Allocator<f64, S, S>,
 {
+    /// Initializes this KF with an initial estimate and measurement noise.
     pub fn initialize(initial_estimate: Estimate<S>, measurement_noise: MatrixMN<f64, M, M>) -> KF<S, M> {
         KF {
             prev_estimate: initial_estimate,
@@ -47,16 +51,23 @@ where
             h_tilde_updated: false,
         }
     }
+    /// Update the State Transition Matrix (STM). This function **must** be called in between each
+    /// call to `time_update` or `measurement_update`.
     pub fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
         self.stm = new_stm;
         self.stm_updated = true;
     }
 
+    /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
+    /// call to `measurement_update`.
     pub fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>) {
         self.h_tilde = h_tilde;
         self.h_tilde_updated = true;
     }
 
+    /// Computes a time update (i.e. advances the filter estimate with the updated STM).
+    ///
+    /// May return a FilterError if the STM was not updated.
     pub fn time_update(&mut self) -> Result<Estimate<S>, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
@@ -78,6 +89,9 @@ where
         Ok(estimate)
     }
 
+    /// Computes the measurement update with a provided real observation and computed observation.
+    ///
+    /// May return a FilterError if the STM or sensitivity matrices were not updated.
     pub fn measurement_update(
         &mut self,
         real_obs: VectorN<f64, M>,
@@ -129,6 +143,7 @@ where
     }
 }
 
+/// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Estimate<S>
 where
@@ -150,6 +165,7 @@ where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
+    /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     pub fn empty() -> Estimate<S> {
         Estimate {
             state: VectorN::<f64, S>::zeros(),
@@ -174,6 +190,32 @@ where
     }
 }
 
+impl<S> Serialize for Estimate<S>
+where
+    S: DimName,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+{
+    /// Serializes the estimate
+    fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
+    where
+        O: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(S::dim() * 3))?;
+        // Serialize the state
+        for i in 0..S::dim() {
+            seq.serialize_element(&self.state[(i, 0)])?;
+        }
+        // Serialize the covariance
+        for i in 0..S::dim() {
+            for j in 0..S::dim() {
+                seq.serialize_element(&self.covar[(i, j)])?;
+            }
+        }
+        seq.end()
+    }
+}
+
+/// Stores the different kinds of filter errors.
 #[derive(Debug, PartialEq)]
 pub enum FilterError {
     StateTransitionMatrixNotUpdated,
