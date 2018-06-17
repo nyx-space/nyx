@@ -7,9 +7,15 @@ use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use celestia::{CoordinateFrame, State};
 
+/// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.
 pub mod kalman;
+
+/// Provides a range and range rate measuring models.
 pub mod ranging;
 
+/// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
+///
+/// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
 pub trait Linearization
 where
     Self: Sized,
@@ -22,6 +28,7 @@ where
         DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>;
 }
 
+/// A trait defining a measurement of size `MeasurementSize`
 pub trait Measurement
 where
     Self: Sized,

@@ -111,7 +111,7 @@ impl GroundStation {
     }
 }
 
-/// Stores a standard measurement of range and range rate
+/// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {
     dt: Instant,
