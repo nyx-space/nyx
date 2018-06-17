@@ -2,6 +2,8 @@ extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use super::serde::ser::SerializeSeq;
+use super::serde::{Serialize, Serializer};
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -171,6 +173,31 @@ where
             "=== PREDICTED: {} ===\nEstState {} Covariance {}\n=====================",
             &self.predicted, &self.state, &self.covar
         )
+    }
+}
+
+impl<S> Serialize for Estimate<S>
+where
+    S: DimName,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+{
+    /// Serializes the estimate
+    fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
+    where
+        O: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(S::dim() * 3))?;
+        // Serialize the state
+        for i in 0..S::dim() {
+            seq.serialize_element(&self.state[(i, 0)])?;
+        }
+        // Serialize the covariance
+        for i in 0..S::dim() {
+            for j in 0..S::dim() {
+                seq.serialize_element(&self.covar[(i, j)])?;
+            }
+        }
+        seq.end()
     }
 }
 

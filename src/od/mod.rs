@@ -1,5 +1,6 @@
 extern crate hifitime;
 extern crate nalgebra as na;
+extern crate serde;
 
 use self::hifitime::instant::Instant;
 use self::na::allocator::Allocator;
