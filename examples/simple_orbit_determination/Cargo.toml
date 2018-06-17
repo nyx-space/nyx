@@ -7,3 +7,4 @@ authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 nyx-space = {path = "../../"}
 nalgebra = "0.15"
 hifitime = "0.1.4"
+csv ="1.0"

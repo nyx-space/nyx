@@ -1,3 +1,4 @@
+extern crate csv;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
@@ -20,6 +21,9 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 
 fn main() {
+    // Define the output file with all the estimates and covariance
+    let mut est_csv = csv::Writer::from_path("estimation.csv").expect("could not open estimation.csv for writing");
+
     // Define the ground stations.
     let num_meas_for_ekf = 15;
     let elevation_mask = 0.0;
@@ -55,7 +59,6 @@ fn main() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_dt = dt.into_instant();
     loop {
         match truth_rx.recv() {
             Ok((t, state_vec)) => {
@@ -70,9 +73,7 @@ fn main() {
                     let meas = station.measure(rx_state, this_dt.into_instant());
                     if meas.visible() {
                         // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                        let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
-                        measurements.push((delta, meas));
-                        prev_dt = this_dt.into_instant();
+                        measurements.push((t, meas));
                         break; // We know that only one station is in visibility at each time.
                     }
                 }
@@ -87,7 +88,17 @@ fn main() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let mut prop_est = Propagator::new::<RK89>(&opts);
+    let (est_tx, est_rx): (
+        Sender<(f64, Vector6<f64>, Matrix6<f64>)>,
+        Receiver<(f64, Vector6<f64>, Matrix6<f64>)>,
+    ) = mpsc::channel();
+    // WARNING: The dynamics must be created after the channel is created due to lifetime issues.
     let mut tb_estimator = TwoBodyWithStm::from_state::<EARTH, ECI>(initial_state);
+    tb_estimator.tx_chan = Some(&est_tx);
+
+    // And propagate
+    prop_est.until_time_elapsed(prop_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
+
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -113,49 +124,79 @@ fn main() {
     println!("Will process {} measurements", measurements.len());
 
     let mut prev_dt = dt;
-    for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
-        // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
-        if meas_no > num_meas_for_ekf && !kf.ekf {
-            println!("switched to EKF");
-            kf.ekf = true;
-        }
-        // Update the STM of the KF
-        kf.update_stm(tb_estimator.stm.clone());
-        // Get the computed observation
-        let this_dt = ModifiedJulian::from_instant(
-            prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
-        );
-        if prev_dt == this_dt {
-            panic!("already handled that time: {}", prev_dt);
-        }
-        prev_dt = this_dt;
-        let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.two_body_dyn.state(), this_dt, ECI {});
-        let mut still_empty = true;
-        for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state, this_dt.into_instant());
-            if computed_meas.visible() {
-                kf.update_h_tilde(*computed_meas.sensitivity());
-                let latest_est = kf
-                    .measurement_update(*real_meas.observation(), *computed_meas.observation())
-                    .expect("wut?");
-                still_empty = false;
-                assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
-                assert!(
-                    latest_est.state.norm() < EPSILON,
-                    "estimate error should be zero (perfect dynamics)"
+    let mut meas_no = 0;
+    loop {
+        match est_rx.recv() {
+            Ok((t, state_vec, stm)) => {
+                // Update the time
+                let this_dt = ModifiedJulian::from_instant(
+                    prev_dt.into_instant() + Instant::from_precise_seconds(step_size, Era::Present).duration(),
                 );
-                // It's an EKF, so let's update the state in the dynamics.
-                let now = tb_estimator.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
-                let new_state = tb_estimator.two_body_dyn.state() + latest_est.state;
-                tb_estimator.two_body_dyn.set_state(now, &new_state);
-                break; // We know that only one station is in visibility at each time.
+                if prev_dt == this_dt {
+                    panic!("already handled that time: {}", prev_dt);
+                }
+                prev_dt = this_dt;
+
+                // Start by setting the next STM
+                kf.update_stm(stm.clone());
+                // Check to see if we have a measurement at this time
+                let (meas_time, real_meas) = measurements[meas_no];
+
+                if t == meas_time {
+                    // We've got a measurement here, so let's get ready to move onto the next measurement
+                    meas_no += 1;
+                    // Get the computed observation
+                    let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&state_vec, this_dt, ECI {});
+                    let mut still_empty = true;
+                    for station in all_stations.iter() {
+                        let computed_meas = station.measure(rx_state, this_dt.into_instant());
+                        if computed_meas.visible() {
+                            kf.update_h_tilde(*computed_meas.sensitivity());
+                            let mut latest_est = kf
+                                .measurement_update(*real_meas.observation(), *computed_meas.observation())
+                                .expect("wut?");
+                            still_empty = false;
+                            assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
+                            assert!(
+                                latest_est.state.norm() < EPSILON,
+                                "estimate error should be zero (perfect dynamics)"
+                            );
+                            // It's an EKF, so let's update the state in the dynamics.
+                            let now = tb_estimator.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
+                            let new_state = tb_estimator.two_body_dyn.state() + latest_est.state;
+                            tb_estimator.two_body_dyn.set_state(now, &new_state);
+                            // We want to show the 3 sigma covariance, so le'ts multiply the covariance by 3
+                            latest_est.covar *= 3.0;
+                            // Let's export this estimation to the CSV file
+                            est_csv.serialize(latest_est).expect("could not write to stdout");
+                            break; // We know that only one station is in visibility at each time.
+                        }
+                    }
+                    if still_empty {
+                        // We're doing perfect everything, so we should always be in visibility if there is a measurement
+                        panic!("T+{} : not in visibility", this_dt);
+                    }
+                    // If we've reached the last measurement, let's break this loop.
+                    if meas_no == measurements.len() {
+                        break;
+                    }
+                } else {
+                    // No measurement, so let's do a time update only.
+                    let mut latest_est = kf.time_update().expect("time update failed");
+                    // We want to show the 3 sigma covariance, so le'ts multiply the covariance by 3
+                    latest_est.covar *= 3.0;
+                    // Let's export this estimation to the CSV file
+                    est_csv.serialize(latest_est).expect("could not write to stdout");
+                }
+                if meas_no > num_meas_for_ekf && !kf.ekf {
+                    println!("switched to EKF");
+                    kf.ekf = true;
+                }
+            }
+            Err(_) => {
+                break;
             }
         }
-        if still_empty {
-            // We're doing perfect everything, so we should always be in visibility
-            panic!("T+{} : not in visibility", this_dt);
-        }
     }
+    println!("DONE");
 }

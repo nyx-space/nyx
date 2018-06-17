@@ -73,6 +73,7 @@ impl<'a> Dynamics for TwoBody<'a> {
 pub struct TwoBodyWithStm<'a> {
     pub stm: Matrix6<f64>,
     pub two_body_dyn: TwoBody<'a>,
+    pub tx_chan: Option<&'a Sender<(f64, Vector6<f64>, Matrix6<f64>)>>,
 }
 
 impl<'a> TwoBodyWithStm<'a> {
@@ -81,6 +82,7 @@ impl<'a> TwoBodyWithStm<'a> {
         TwoBodyWithStm {
             stm: Matrix6::identity(),
             two_body_dyn: TwoBody::from_state_vec::<B>(state.to_cartesian_vec()),
+            tx_chan: None,
         }
     }
 }
@@ -104,8 +106,8 @@ impl<'a> Dynamics for TwoBodyWithStm<'a> {
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        self.two_body_dyn
-            .set_state(new_t, &new_state.fixed_rows::<U6>(0).into_owned());
+        let pos_vel = new_state.fixed_rows::<U6>(0).into_owned();
+        self.two_body_dyn.set_state(new_t, &pos_vel);
         let mut stm_k_to_0 = Matrix6::zeros();
         let mut stm_idx = 6;
         for i in 0..6 {
@@ -119,6 +121,14 @@ impl<'a> Dynamics for TwoBodyWithStm<'a> {
             panic!("STM not invertible");
         }
         self.stm = stm_k_to_0 * stm_prev;
+
+        match self.tx_chan {
+            Some(ref chan) => match chan.send((new_t, pos_vel.clone(), self.stm.clone())) {
+                Err(e) => warn!("could not publish to channel: {}", e),
+                Ok(_) => {}
+            },
+            _ => {}
+        }
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
