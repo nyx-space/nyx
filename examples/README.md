@@ -18,3 +18,20 @@ In this example, we generate a truth orbit, and estimate its position using the 
 
 ## Explanation
 The error estimation (in green) is plotted with the 3σ covariance for each component (in red). The covariance does not collapse immediately because we've set it to a non zero initial value, and it takes a certain number of measurements to nearly collapse.
+
+## Extra plots
+### Low noise
+Dynamics are identical with the following exceptions:
+- Elevation mask: 10 degrees
+- Range noise: 0.05 km
+- Range rate noise: 0.0005 km/s
+![perfect_est](./simple_orbit_determination/low_noise_estimation.png)
+
+
+### High noise
+Dynamics are identical with the following exceptions:
+- Elevation mask: 10 degrees
+- Range noise: 0.5 km
+- Range rate noise: 0.005 km/s
+![perfect_est](./simple_orbit_determination/high_noise_estimation.png)
+![perfect_est](./simple_orbit_determination/high_noise_estimation_zoom.png)

@@ -3,17 +3,17 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
+use self::hifitime::SECONDS_PER_DAY;
 use self::hifitime::datetime::*;
 use self::hifitime::julian::*;
-use self::hifitime::SECONDS_PER_DAY;
 use self::na::{Matrix2, Matrix6, U42, Vector2, Vector6};
 use self::nyx::celestia::{State, EARTH, ECI};
-use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithStm};
 use self::nyx::dynamics::Dynamics;
+use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithStm};
 use self::nyx::io::cosmo::Cosmographia;
+use self::nyx::od::Measurement;
 use self::nyx::od::kalman::{Estimate, KF};
 use self::nyx::od::ranging::GroundStation;
-use self::nyx::od::Measurement;
 use self::nyx::propagators::{error_ctrl, Options, Propagator, RK89};
 use std::f64::EPSILON;
 use std::sync::mpsc;
@@ -152,8 +152,7 @@ fn main() {
                         let computed_meas = station.measure(rx_state, this_dt.into_instant());
                         if computed_meas.visible() {
                             kf.update_h_tilde(*computed_meas.sensitivity());
-                            let mut latest_est = kf
-                                .measurement_update(*real_meas.observation(), *computed_meas.observation())
+                            let mut latest_est = kf.measurement_update(*real_meas.observation(), *computed_meas.observation())
                                 .expect("wut?");
                             still_empty = false;
                             assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
@@ -161,10 +160,12 @@ fn main() {
                                 latest_est.state.norm() < EPSILON,
                                 "estimate error should be zero (perfect dynamics)"
                             );
-                            // It's an EKF, so let's update the state in the dynamics.
-                            let now = tb_estimator.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
-                            let new_state = tb_estimator.two_body_dyn.state() + latest_est.state;
-                            tb_estimator.two_body_dyn.set_state(now, &new_state);
+                            if kf.ekf {
+                                // It's an EKF, so let's update the state in the dynamics.
+                                let now = tb_estimator.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
+                                let new_state = tb_estimator.two_body_dyn.state() + latest_est.state;
+                                tb_estimator.two_body_dyn.set_state(now, &new_state);
+                            }
                             // We want to show the 3 sigma covariance, so le'ts multiply the covariance by 3
                             latest_est.covar *= 3.0;
                             // Let's export this estimation to the CSV file
