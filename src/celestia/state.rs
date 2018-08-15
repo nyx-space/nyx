@@ -624,16 +624,16 @@ impl State<ECEF> {
     /// Creates a new State from the geodetic latitude (φ), longitude (λ) and height with respect to Earth's ellipsoid.
     ///
     /// **Units:** degrees, degrees, km
-    /// NOTE: This computation differs from the spherical coordinates because we consider the flatenning of Earth.
+    /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of Earth.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T) -> State<ECEF> {
-        let e2 = 2.0 * EARTH::flatenning() - EARTH::flatenning().powi(2);
+        let e2 = 2.0 * EARTH::flattening() - EARTH::flattening().powi(2);
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
         // page 144
         let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
         let s_earth =
-            (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+            (EARTH::semi_major_radius() * (1.0 - EARTH::flattening()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
         let ri = (c_earth + height) * cos_lat * cos_long;
         let rj = (c_earth + height) * cos_lat * sin_long;
         let rk = (s_earth + height) * sin_lat;
@@ -690,7 +690,7 @@ impl State<ECEF> {
         let mut attempt_no = 0;
         let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
         let mut latitude = (self.z / self.rmag()).asin();
-        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
+        let e2 = EARTH::flattening() * (2.0 - EARTH::flattening());
         loop {
             attempt_no += 1;
             let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
@@ -712,13 +712,13 @@ impl State<ECEF> {
     ///
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
     pub fn geodetic_height(&self) -> f64 {
-        let e2 = EARTH::flatenning() * (2.0 - EARTH::flatenning());
+        let e2 = EARTH::flattening() * (2.0 - EARTH::flattening());
         let latitude = self.geodetic_latitude().to_radians();
         let sin_lat = latitude.sin();
         if (latitude - 1.0).abs() < 0.1 {
             // We are near poles, let's use another formulation.
             let s_earth =
-                (EARTH::semi_major_radius() * (1.0 - EARTH::flatenning()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+                (EARTH::semi_major_radius() * (1.0 - EARTH::flattening()).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
             self.z / latitude.sin() - s_earth
         } else {
             let c_earth = EARTH::semi_major_radius() / ((1.0 - e2 * sin_lat.powi(2)).sqrt());

@@ -13,7 +13,7 @@ impl CelestialBody for MERCURY {
     fn eq_radius() -> f64 {
         2439.7
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         0.0
     }
 }
@@ -34,7 +34,7 @@ impl CelestialBody for VENUS {
     fn eq_radius() -> f64 {
         6051.9
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         0.0
     }
 }
@@ -67,7 +67,7 @@ impl CelestialBody for EARTH {
     fn eq_radius() -> f64 {
         6378.1363
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         // From [EMG2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/egm08_wgs84.html)
         0.0033528106647474805
     }
@@ -89,7 +89,7 @@ impl CelestialBody for MARS {
     fn eq_radius() -> f64 {
         3.397e3
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         0.00647630
     }
 }
@@ -110,7 +110,7 @@ impl CelestialBody for JUPITER {
     fn eq_radius() -> f64 {
         7.1492e4
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         0.06487439
     }
 }
@@ -131,7 +131,7 @@ impl CelestialBody for SATURN {
     fn eq_radius() -> f64 {
         6.0268e4
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         0.09796243
     }
 }
@@ -152,7 +152,7 @@ impl CelestialBody for URANUS {
     fn eq_radius() -> f64 {
         2.5559e4
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         0.02292734
     }
 }
@@ -173,7 +173,7 @@ impl CelestialBody for NEPTUNE {
     fn eq_radius() -> f64 {
         2.5269e4
     }
-    fn flatenning() -> f64 {
+    fn flattening() -> f64 {
         0.01856029
     }
 }
