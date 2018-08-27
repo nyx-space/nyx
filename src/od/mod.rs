@@ -1,7 +1,9 @@
+extern crate dual_num;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate serde;
 
+use self::dual_num::{partials_t, Dual};
 use self::hifitime::instant::Instant;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
@@ -63,4 +65,42 @@ where
 
     /// Returns the time at which the measurement was performed.
     fn at(&self) -> Instant;
+}
+
+/// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
+///
+/// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
+pub trait AutoDiff
+where
+    Self: Sized,
+{
+    /// Defines the state size of the estimated state
+    type HyperStateSize: DimName;
+
+    /// Defines the equations of motion for Dual numbers for these dynamics.
+    fn dual_eom(
+        &self,
+        t: f64,
+        state: &MatrixMN<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>,
+    ) -> MatrixMN<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
+    where
+        DefaultAllocator: Allocator<Dual<f64>, Self::HyperStateSize>
+            + Allocator<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
+            + Allocator<f64, Self::HyperStateSize>
+            + Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>;
+}
+
+impl<T: AutoDiff> Linearization for T {
+    type StateSize = T::HyperStateSize;
+
+    fn gradient(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
+    where
+        DefaultAllocator: Allocator<Dual<f64>, Self::StateSize>
+            + Allocator<Dual<f64>, Self::StateSize, Self::StateSize>
+            + Allocator<f64, Self::StateSize>
+            + Allocator<f64, Self::StateSize, Self::StateSize>,
+    {
+        let (_, grad) = partials_t(t, *state, Self::dual_eom);
+        grad
+    }
 }
