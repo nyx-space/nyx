@@ -79,7 +79,6 @@ where
 
     /// Defines the equations of motion for Dual numbers for these dynamics.
     fn dual_eom(
-        &self,
         t: f64,
         state: &MatrixMN<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>,
     ) -> MatrixMN<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
@@ -90,17 +89,17 @@ where
             + Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>;
 }
 
-impl<T: AutoDiff> Linearization for T {
+impl<T: AutoDiff> Linearization for T
+where
+    DefaultAllocator: Allocator<Dual<f64>, T::HyperStateSize> + Allocator<Dual<f64>, T::HyperStateSize, T::HyperStateSize>,
+{
     type StateSize = T::HyperStateSize;
 
     fn gradient(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
     where
-        DefaultAllocator: Allocator<Dual<f64>, Self::StateSize>
-            + Allocator<Dual<f64>, Self::StateSize, Self::StateSize>
-            + Allocator<f64, Self::StateSize>
-            + Allocator<f64, Self::StateSize, Self::StateSize>,
+        DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
     {
-        let (_, grad) = partials_t(t, *state, Self::dual_eom);
+        let (_, grad) = partials_t(t, state.clone(), Self::dual_eom);
         grad
     }
 }
