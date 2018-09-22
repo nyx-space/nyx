@@ -462,7 +462,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
             panic!("already handled that time: {}", prev_dt);
         }
         prev_dt = this_dt;
-        let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.two_body_dyn.state(), this_dt, ECI {});
+        let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.pos_vel, this_dt, ECI {});
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
@@ -475,7 +475,8 @@ fn ckf_fixed_step_perfect_stations_dual() {
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
                 assert!(
                     latest_est.state.norm() < EPSILON,
-                    "estimate error should be zero (perfect dynamics)"
+                    "estimate error should be zero (perfect dynamics) ({})",
+                    latest_est.state.norm()
                 );
                 if !printed {
                     wtr.serialize(latest_est).expect("could not write to stdout");

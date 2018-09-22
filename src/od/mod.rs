@@ -90,29 +90,16 @@ where
             + Allocator<f64, Self::HyperStateSize>
             + Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>;
 
-    /// Returns the state of the dynamics (does **not** include the STM, use Dynamics::state() for that)
-    fn dynamics_state(&self) -> VectorN<f64, Self::HyperStateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize>;
-
-    /// Set the state of the dynamics (does **not** include the STM, use Dynamics::set_state() for that)
-    fn set_dynamics_state(&mut self, state: VectorN<f64, Self::HyperStateSize>)
-    where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize>;
-
-    /// Returns the gradient of the dynamics.
-    fn dynamics_gradient(&self) -> MatrixMN<f64, Self::HyperStateSize, Self::HyperStateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>;
-
-    /// Set the gradient of the dynamics
-    fn set_dynamics_gradient(&mut self, gradient: MatrixMN<f64, Self::HyperStateSize, Self::HyperStateSize>)
-    where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>;
-
     /// Computes both the state and the gradient of the dynamics. These may be accessed by the related
     /// getters.
-    fn compute(&mut self, t: f64, state: &VectorN<f64, Self::HyperStateSize>)
+    fn compute(
+        &self,
+        t: f64,
+        state: &VectorN<f64, Self::HyperStateSize>,
+    ) -> (
+        VectorN<f64, Self::HyperStateSize>,
+        MatrixMN<f64, Self::HyperStateSize, Self::HyperStateSize>,
+    )
     where
         DefaultAllocator: Allocator<Dual<f64>, Self::HyperStateSize>
             + Allocator<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
@@ -148,20 +135,7 @@ where
                 grad[(i, j)] = state_n_grad[(i, j)].dual();
             }
         }
-        self.set_dynamics_state(state);
-        self.set_dynamics_gradient(grad);
-    }
-
-    /// Returns the real part of the equations of motion for these dynamics.
-    fn real_eom(&mut self, t: f64, state: &VectorN<f64, Self::HyperStateSize>) -> VectorN<f64, Self::HyperStateSize>
-    where
-        DefaultAllocator: Allocator<Dual<f64>, Self::HyperStateSize>
-            + Allocator<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
-            + Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>,
-    {
-        self.compute(t, state);
-        self.dynamics_state()
+        (state, grad)
     }
 }
 
@@ -178,6 +152,6 @@ where
     where
         DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
     {
-        self.dynamics_gradient()
+        panic!("retrieve the gradient by calling self.compute(...)");
     }
 }
