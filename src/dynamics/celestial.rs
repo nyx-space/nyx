@@ -199,18 +199,26 @@ impl<'a> Linearization for TwoBodyWithStm<'a> {
 
 #[derive(Clone)]
 pub struct TwoBodyWithDualStm<'a> {
+    pub mu: f64,
     pub stm: Matrix6<f64>,
-    pub two_body_dyn: TwoBody<'a>,
     pub tx_chan: Option<&'a Sender<(f64, Vector6<f64>, Matrix6<f64>)>>,
+    time: f64,
+    pos_vel: Vector6<f64>,
+    latest_state: Vector6<f64>,
+    latest_grad: Matrix6<f64>, // pub two_body_dyn: TwoBody<'a>
 }
 
 impl<'a> TwoBodyWithDualStm<'a> {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
     pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithDualStm<'a> {
         TwoBodyWithDualStm {
+            mu: B::gm(),
             stm: Matrix6::identity(),
-            two_body_dyn: TwoBody::from_state_vec::<B>(state.to_cartesian_vec()),
             tx_chan: None,
+            time: 0.0,
+            pos_vel: state.to_cartesian_vec(),
+            latest_state: Vector6::zeros(),
+            latest_grad: Matrix6::zeros(),
         }
     }
 }
@@ -228,7 +236,7 @@ impl<'a> AutoDiffDynamics for TwoBodyWithDualStm<'a> {
         for i in 0..3 {
             let this_radius = Vector3::new(radius[(0, i)], radius[(1, i)], radius[(2, i)]);
             let this_norm = norm(&this_radius);
-            let this_body_acceleration = this_radius * Dual::from_real(self.two_body_dyn.mu) / this_norm.powi(3);
+            let this_body_acceleration = this_radius * Dual::from_real(self.mu) / this_norm.powi(3);
             body_acceleration.set_column(i, &this_body_acceleration);
         }
 
@@ -243,12 +251,32 @@ impl<'a> AutoDiffDynamics for TwoBodyWithDualStm<'a> {
         }
         rtn
     }
+
+    /// Returns the state of the dynamics (does **not** include the STM, use Dynamics::state() for that)
+    fn dynamics_state(&self) -> Vector6<f64> {
+        self.latest_state.clone()
+    }
+
+    /// Set the state of the dynamics (does **not** include the STM, use Dynamics::set_state() for that)
+    fn set_dynamics_state(&mut self, state: Vector6<f64>) {
+        self.latest_state = state;
+    }
+
+    /// Returns the gradient of the dynamics.
+    fn dynamics_gradient(&self) -> Matrix6<f64> {
+        self.latest_grad.clone()
+    }
+
+    /// Set the gradient of the dynamics
+    fn set_dynamics_gradient(&mut self, gradient: Matrix6<f64>) {
+        self.latest_grad = gradient;
+    }
 }
 
 impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
     type StateSize = U42;
     fn time(&self) -> f64 {
-        self.two_body_dyn.time()
+        self.time
     }
 
     fn state(&self) -> VectorN<f64, Self::StateSize> {
@@ -260,12 +288,13 @@ impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
                 stm_idx += 1;
             }
         }
-        VectorN::<f64, Self::StateSize>::from_iterator(self.two_body_dyn.state().iter().chain(stm_as_vec.iter()).cloned())
+        VectorN::<f64, Self::StateSize>::from_iterator(self.pos_vel.iter().chain(stm_as_vec.iter()).cloned())
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        let pos_vel = new_state.fixed_rows::<U6>(0).into_owned();
-        self.two_body_dyn.set_state(new_t, &pos_vel);
+        self.time = new_t;
+        self.pos_vel = new_state.fixed_rows::<U6>(0).into_owned();
+
         let mut stm_k_to_0 = Matrix6::zeros();
         let mut stm_idx = 6;
         for i in 0..6 {
@@ -274,6 +303,7 @@ impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
                 stm_idx += 1;
             }
         }
+
         let mut stm_prev = self.stm.clone();
         if !stm_prev.try_inverse_mut() {
             panic!("STM not invertible");
@@ -281,7 +311,7 @@ impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
         self.stm = stm_k_to_0 * stm_prev;
 
         match self.tx_chan {
-            Some(ref chan) => match chan.send((new_t, pos_vel.clone(), self.stm.clone())) {
+            Some(ref chan) => match chan.send((new_t, self.pos_vel.clone(), self.stm.clone())) {
                 Err(e) => warn!("could not publish to channel: {}", e),
                 Ok(_) => {}
             },
@@ -291,7 +321,8 @@ impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
-        let two_body_dt = self.two_body_dyn.eom(t, &pos_vel);
+        self.compute(t, &pos_vel);
+        let two_body_dt = self.dynamics_state();
         let stm_dt = self.stm * self.gradient(t, &pos_vel);
         // Rebuild the STM as a vector.
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
