@@ -232,7 +232,7 @@ impl<'a> AutoDiffDynamics for TwoBodyWithDualStm<'a> {
         for i in 0..3 {
             let this_radius = Vector3::new(radius[(0, i)], radius[(1, i)], radius[(2, i)]);
             let this_norm = norm(&this_radius);
-            let this_body_acceleration = this_radius * Dual::from_real(self.mu) / this_norm.powi(3);
+            let this_body_acceleration = this_radius * Dual::from_real(-self.mu) / this_norm.powi(3);
             body_acceleration.set_column(i, &this_body_acceleration);
         }
 

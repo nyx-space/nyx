@@ -294,7 +294,6 @@ fn ekf_fixed_step_perfect_stations() {
     ));
 
     let initial_estimate = Estimate {
-        // state: tb_estimator.two_body_dyn.state(),
         state: Vector6::zeros(),
         covar: init_covar,
         stm: tb_estimator.stm.clone(),
@@ -431,7 +430,6 @@ fn ckf_fixed_step_perfect_stations_dual() {
     ));
 
     let initial_estimate = Estimate {
-        // state: tb_estimator.two_body_dyn.state(),
         state: Vector6::zeros(),
         covar: init_covar,
         stm: tb_estimator.stm.clone(),
