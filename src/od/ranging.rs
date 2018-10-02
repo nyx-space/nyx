@@ -1,10 +1,13 @@
+extern crate dual_num;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate rand;
 
+use self::dual_num::linalg::norm;
+use self::dual_num::{partials, Dual};
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
-use self::na::{Matrix2x6, U2, U6, Vector2};
+use self::na::{Matrix2x6, Matrix6, U2, U3, U6, Vector2, Vector3, Vector6};
 use self::rand::distributions::{Distribution, Normal};
 use self::rand::thread_rng;
 use super::serde::ser::SerializeSeq;
@@ -91,23 +94,12 @@ impl GroundStation {
         let rx_ecef = rx.in_frame(ECEF {});
         // Let's start by computing the range and range rate
         let rho_ecef = rx_ecef.radius() - tx_ecef.radius();
-        let delta_v_ecef = (rx_ecef.velocity() - tx_ecef.velocity()) / rho_ecef.norm();
-        let rho_dot = rho_ecef.dot(&delta_v_ecef);
 
         // Convert to SEZ to compute elevation
         let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::new(
-            dt,
-            tx_ecef,
-            rx_ecef,
-            Vector2::new(
-                rho_ecef.norm() + self.range_noise.sample(&mut thread_rng()),
-                rho_dot + self.range_rate_noise.sample(&mut thread_rng()),
-            ),
-            elevation >= self.elevation_mask,
-        )
+        StdMeasurement::new(dt, tx_ecef, rx_ecef, elevation >= self.elevation_mask)
     }
 }
 
@@ -133,23 +125,8 @@ impl Measurement for StdMeasurement {
     type StateSize = U6;
     type MeasurementSize = U2;
 
-    fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, obs: Vector2<f64>, visible: bool) -> StdMeasurement {
-        // Compute the H tilde matrix
-        // Let's define some helper variables.
-        let range = obs[(0, 0)];
-        let range_rate = obs[(1, 0)];
-        let mut h_tilde = Matrix2x6::zeros();
-        // \partial \rho / \partial {x,y,z}
-        h_tilde[(0, 0)] = (rx.x - tx.x) / range;
-        h_tilde[(0, 1)] = (rx.y - tx.y) / range;
-        h_tilde[(0, 2)] = (rx.z - tx.z) / range;
-        // \partial \dot\rho / \partial {x,y,z}
-        h_tilde[(1, 0)] = (rx.vx - tx.vx) / range + (range_rate / range.powi(2)) * (rx.x - tx.x);
-        h_tilde[(1, 1)] = (rx.vy - tx.vy) / range + (range_rate / range.powi(2)) * (rx.y - tx.y);
-        h_tilde[(1, 2)] = (rx.vz - tx.vz) / range + (range_rate / range.powi(2)) * (rx.z - tx.z);
-        h_tilde[(1, 3)] = (rx.x - tx.x) / range;
-        h_tilde[(1, 4)] = (rx.y - tx.y) / range;
-        h_tilde[(1, 5)] = (rx.z - tx.z) / range;
+    fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
+        let (obs, h_tilde) = partials((rx - tx).to_cartesian_vec(), compute_dual_sensitivity);
 
         StdMeasurement {
             dt,
@@ -192,4 +169,28 @@ impl Serialize for StdMeasurement {
         seq.serialize_element(&obs[(1, 0)])?;
         seq.end()
     }
+}
+
+// This is an example of the sensitivity matrix (H tilde) of a ranging method.
+fn compute_dual_sensitivity(state: &Matrix6<Dual<f64>>) -> Matrix2x6<Dual<f64>> {
+    let range_mat = state.fixed_slice::<U3, U6>(0, 0).into_owned();
+    let velocity_mat = state.fixed_slice::<U3, U6>(3, 0).into_owned();
+    let mut range_slice = Vec::with_capacity(6);
+    let mut range_rate_slice = Vec::with_capacity(6);
+
+    for j in 0..6 {
+        let rho_vec = Vector3::new(range_mat[(0, j)], range_mat[(1, j)], range_mat[(2, j)]);
+        let range = norm(&rho_vec);
+        let delta_v_vec = (Vector3::new(velocity_mat[(0, j)], velocity_mat[(1, j)], velocity_mat[(2, j)])) / range;
+        let rho_dot = rho_vec.dot(&delta_v_vec);
+
+        range_slice.push(range);
+        range_rate_slice.push(rho_dot);
+    }
+
+    let mut rtn = Matrix2x6::zeros();
+
+    rtn.set_row(0, &Vector6::from_row_slice(&range_slice).transpose());
+    rtn.set_row(1, &Vector6::from_row_slice(&range_rate_slice).transpose());
+    rtn
 }

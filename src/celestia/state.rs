@@ -14,6 +14,7 @@ use utils::{between_0_360, between_pm_180};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
+use std::ops::Sub;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-4;
@@ -63,6 +64,29 @@ impl<F: CoordinateFrame> PartialEq for State<F> {
             && (self.vx - other.vx).abs() < velocity_tol
             && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
+    }
+}
+
+impl<F: CoordinateFrame> Sub for State<F> {
+    type Output = State<F>;
+
+    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
+    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
+    fn sub(self, other: State<F>) -> State<F>
+    where
+        F: CoordinateFrame,
+    {
+        State {
+            gm: self.gm,
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+            vx: self.vx - other.vx,
+            vy: self.vy - other.vy,
+            vz: self.vz - other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
     }
 }
 

@@ -43,13 +43,7 @@ where
     type MeasurementSize: DimName;
 
     /// Computes a new measurement from the provided information.
-    fn new<F: CoordinateFrame>(
-        dt: Instant,
-        tx: State<F>,
-        rx: State<F>,
-        obs: VectorN<f64, Self::MeasurementSize>,
-        visible: bool,
-    ) -> Self;
+    fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> Self;
 
     /// Returns the measurement/observation as a vector.
     fn observation(&self) -> &VectorN<f64, Self::MeasurementSize>
@@ -148,7 +142,7 @@ where
     /// Returns the gradient of the dynamics at the given state.
     ///
     /// **WARNING:** Requires a prior call to self.compute() ! This is where the auto-differentiation happens.
-    fn gradient(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
+    fn gradient(&self, _t: f64, _state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
     {
