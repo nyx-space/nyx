@@ -8,8 +8,7 @@ use self::dual_num::{partials, Dual};
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
 use self::na::{Matrix2x6, Matrix6, U2, U3, U6, Vector2, Vector3, Vector6};
-use self::rand::distributions::{Distribution, Normal};
-use self::rand::thread_rng;
+use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::Measurement;
@@ -119,6 +118,30 @@ impl StdMeasurement {
     pub fn range_rate(&self) -> f64 {
         self.obs[(1, 0)]
     }
+
+    // This is an example of the sensitivity matrix (H tilde) of a ranging method.
+    pub fn compute_dual_sensitivity(state: &Matrix6<Dual<f64>>) -> Matrix2x6<Dual<f64>> {
+        let range_mat = state.fixed_slice::<U3, U6>(0, 0).into_owned();
+        let velocity_mat = state.fixed_slice::<U3, U6>(3, 0).into_owned();
+        let mut range_slice = Vec::with_capacity(6);
+        let mut range_rate_slice = Vec::with_capacity(6);
+
+        for j in 0..6 {
+            let rho_vec = Vector3::new(range_mat[(0, j)], range_mat[(1, j)], range_mat[(2, j)]);
+            let range = norm(&rho_vec);
+            let delta_v_vec = (Vector3::new(velocity_mat[(0, j)], velocity_mat[(1, j)], velocity_mat[(2, j)])) / range;
+            let rho_dot = rho_vec.dot(&delta_v_vec);
+
+            range_slice.push(range);
+            range_rate_slice.push(rho_dot);
+        }
+
+        let mut rtn = Matrix2x6::zeros();
+
+        rtn.set_row(0, &Vector6::from_row_slice(&range_slice).transpose());
+        rtn.set_row(1, &Vector6::from_row_slice(&range_rate_slice).transpose());
+        rtn
+    }
 }
 
 impl Measurement for StdMeasurement {
@@ -126,7 +149,7 @@ impl Measurement for StdMeasurement {
     type MeasurementSize = U2;
 
     fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
-        let (obs, h_tilde) = partials((rx - tx).to_cartesian_vec(), compute_dual_sensitivity);
+        let (obs, h_tilde) = partials((rx - tx).to_cartesian_vec(), StdMeasurement::compute_dual_sensitivity);
 
         StdMeasurement {
             dt,
@@ -169,28 +192,4 @@ impl Serialize for StdMeasurement {
         seq.serialize_element(&obs[(1, 0)])?;
         seq.end()
     }
-}
-
-// This is an example of the sensitivity matrix (H tilde) of a ranging method.
-fn compute_dual_sensitivity(state: &Matrix6<Dual<f64>>) -> Matrix2x6<Dual<f64>> {
-    let range_mat = state.fixed_slice::<U3, U6>(0, 0).into_owned();
-    let velocity_mat = state.fixed_slice::<U3, U6>(3, 0).into_owned();
-    let mut range_slice = Vec::with_capacity(6);
-    let mut range_rate_slice = Vec::with_capacity(6);
-
-    for j in 0..6 {
-        let rho_vec = Vector3::new(range_mat[(0, j)], range_mat[(1, j)], range_mat[(2, j)]);
-        let range = norm(&rho_vec);
-        let delta_v_vec = (Vector3::new(velocity_mat[(0, j)], velocity_mat[(1, j)], velocity_mat[(2, j)])) / range;
-        let rho_dot = rho_vec.dot(&delta_v_vec);
-
-        range_slice.push(range);
-        range_rate_slice.push(rho_dot);
-    }
-
-    let mut rtn = Matrix2x6::zeros();
-
-    rtn.set_row(0, &Vector6::from_row_slice(&range_slice).transpose());
-    rtn.set_row(1, &Vector6::from_row_slice(&range_rate_slice).transpose());
-    rtn
 }
