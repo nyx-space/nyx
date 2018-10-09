@@ -9,8 +9,8 @@ pub trait CelestialBody {
     fn gm() -> f64;
     /// Returns the equatorial radius of this celestial object.
     fn eq_radius() -> f64;
-    /// Returns the flatenning of this celestial object.
-    fn flatenning() -> f64;
+    /// Returns the flattening of this celestial object.
+    fn flattening() -> f64;
 }
 
 /// `NAIF` represents an object which has a NAIF ID and can be loaded from an SPK file.

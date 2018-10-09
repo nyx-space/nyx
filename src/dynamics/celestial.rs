@@ -1,8 +1,12 @@
+extern crate dual_num;
 extern crate nalgebra as na;
-use self::na::{Matrix6, MatrixMN, U3, U36, U42, U6, Vector6, VectorN};
+
+use self::dual_num::linalg::norm;
+use self::dual_num::{Dual, Float};
+use self::na::{Matrix3x6, Matrix6, MatrixMN, U3, U36, U42, U6, Vector3, Vector6, VectorN};
 use super::Dynamics;
 use celestia::{CelestialBody, CoordinateFrame, State};
-use od::Linearization;
+use od::{AutoDiffDynamics, Linearization};
 use std::f64;
 use std::sync::mpsc::Sender;
 
@@ -67,7 +71,7 @@ impl<'a> Dynamics for TwoBody<'a> {
     }
 }
 
-/// `TwoBody` exposes the equations of motion for a simple two body propagation. It inherently supports
+/// `TwoBodyWithStm` exposes the equations of motion for a simple two body propagation. It inherently supports
 /// the State Transition Matrix for orbital determination.
 #[derive(Clone)]
 pub struct TwoBodyWithStm<'a> {
@@ -190,5 +194,121 @@ impl<'a> Linearization for TwoBodyWithStm<'a> {
         grad[(5, 2)] = daz_dz;
 
         grad
+    }
+}
+
+#[derive(Clone)]
+pub struct TwoBodyWithDualStm<'a> {
+    pub mu: f64,
+    pub stm: Matrix6<f64>,
+    pub tx_chan: Option<&'a Sender<(f64, Vector6<f64>, Matrix6<f64>)>>,
+    pub pos_vel: Vector6<f64>,
+    time: f64,
+}
+
+impl<'a> TwoBodyWithDualStm<'a> {
+    /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
+    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithDualStm<'a> {
+        TwoBodyWithDualStm {
+            mu: B::gm(),
+            stm: Matrix6::identity(),
+            tx_chan: None,
+            pos_vel: state.to_cartesian_vec(),
+            time: 0.0,
+        }
+    }
+}
+
+impl<'a> AutoDiffDynamics for TwoBodyWithDualStm<'a> {
+    type HyperStateSize = U6;
+
+    /// Defines the equations of motion for Dual numbers for these dynamics.
+    fn dual_eom(&self, _t: f64, state: &Matrix6<Dual<f64>>) -> Matrix6<Dual<f64>> {
+        let radius = state.fixed_slice::<U3, U6>(0, 0).into_owned();
+        let velocity = state.fixed_slice::<U3, U6>(3, 0).into_owned();
+
+        let mut body_acceleration = Matrix3x6::zeros();
+
+        for i in 0..3 {
+            let this_radius = Vector3::new(radius[(0, i)], radius[(1, i)], radius[(2, i)]);
+            let this_norm = norm(&this_radius);
+            let this_body_acceleration = this_radius * Dual::from_real(-self.mu) / this_norm.powi(3);
+            body_acceleration.set_column(i, &this_body_acceleration);
+        }
+
+        let mut rtn = Matrix6::zeros();
+
+        for i in 0..6 {
+            if i < 3 {
+                rtn.set_row(i, &velocity.row(i));
+            } else {
+                rtn.set_row(i, &body_acceleration.row(i - 3));
+            }
+        }
+        rtn
+    }
+}
+
+impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
+    type StateSize = U42;
+    fn time(&self) -> f64 {
+        self.time
+    }
+
+    fn state(&self) -> VectorN<f64, Self::StateSize> {
+        let mut stm_as_vec = VectorN::<f64, U36>::zeros();
+        let mut stm_idx = 0;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_as_vec[(stm_idx, 0)] = self.stm[(i, j)];
+                stm_idx += 1;
+            }
+        }
+        VectorN::<f64, Self::StateSize>::from_iterator(self.pos_vel.iter().chain(stm_as_vec.iter()).cloned())
+    }
+
+    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+        self.time = new_t;
+        self.pos_vel = new_state.fixed_rows::<U6>(0).into_owned();
+
+        let mut stm_k_to_0 = Matrix6::zeros();
+        let mut stm_idx = 6;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_k_to_0[(i, j)] = new_state[(stm_idx, 0)];
+                stm_idx += 1;
+            }
+        }
+
+        let mut stm_prev = self.stm.clone();
+        if !stm_prev.try_inverse_mut() {
+            panic!("STM not invertible");
+        }
+        self.stm = stm_k_to_0 * stm_prev;
+
+        match self.tx_chan {
+            Some(ref chan) => match chan.send((new_t, self.pos_vel.clone(), self.stm.clone())) {
+                Err(e) => warn!("could not publish to channel: {}", e),
+                Ok(_) => {}
+            },
+            _ => {}
+        }
+    }
+
+    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
+        let pos_vel = state.fixed_rows::<U6>(0).into_owned();
+        let (state, grad) = self.compute(t, &pos_vel);
+        let two_body_dt = state;
+        let stm_dt = self.stm * grad;
+        // Rebuild the STM as a vector.
+        let mut stm_as_vec = VectorN::<f64, U36>::zeros();
+        let mut stm_idx = 0;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
+                stm_idx += 1;
+            }
+        }
+        VectorN::<f64, Self::StateSize>::from_iterator(two_body_dt.iter().chain(stm_as_vec.iter()).cloned())
     }
 }
