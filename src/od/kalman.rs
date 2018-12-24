@@ -132,7 +132,7 @@ where
         // And wrap up
         let estimate = Estimate {
             state: state_hat,
-            covar: covar,
+            covar,
             stm: self.stm.clone(),
             predicted: false,
         };

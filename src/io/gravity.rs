@@ -50,7 +50,7 @@ impl MemoryBackend {
         MemoryBackend {
             degree: 2,
             order: 0,
-            data: data,
+            data,
         }
     }
 
@@ -65,7 +65,7 @@ impl MemoryBackend {
         MemoryBackend {
             degree: 2,
             order: 0,
-            data: data,
+            data,
         }
     }
 
@@ -79,7 +79,7 @@ impl MemoryBackend {
         MemoryBackend {
             degree: 2,
             order: 0,
-            data: data,
+            data,
         }
     }
 
@@ -91,7 +91,7 @@ impl MemoryBackend {
     /// + Mars to 120 (from SHADR file)
     /// + Venus to 150 (from SHADR file)
     pub fn from_shadr(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
-        let mut f = File::open(filepath.clone()).expect("could not open file");
+        let mut f = File::open(filepath).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
@@ -109,7 +109,7 @@ impl MemoryBackend {
     }
 
     pub fn from_egm(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
-        let mut f = File::open(filepath.clone()).expect("could not open file");
+        let mut f = File::open(filepath).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
@@ -127,7 +127,7 @@ impl MemoryBackend {
     }
 
     pub fn from_cof(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
-        let mut f = File::open(filepath.clone()).expect("could not open file");
+        let mut f = File::open(filepath).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
@@ -293,7 +293,7 @@ impl MemoryBackend {
         MemoryBackend {
             degree: max_degree,
             order: max_order,
-            data: data,
+            data,
         }
     }
 
@@ -375,7 +375,7 @@ impl MemoryBackend {
         MemoryBackend {
             order: max_order,
             degree: max_degree,
-            data: data,
+            data,
         }
     }
 }

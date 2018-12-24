@@ -105,7 +105,7 @@ pub struct JUPITER;
 
 impl CelestialBody for JUPITER {
     fn gm() -> f64 {
-        126_712_767.85_780
+        126_712_767.857_80
     }
     fn eq_radius() -> f64 {
         7.1492e4

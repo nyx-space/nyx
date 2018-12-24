@@ -1,4 +1,4 @@
-use super::na::{U3, U6, Vector6, VectorN};
+use super::na::{Vector6, VectorN, U3, U6};
 use super::Dynamics;
 use celestia::{CelestialBody, EARTH};
 use io::gravity::GravityPotentialStor;
@@ -25,7 +25,7 @@ where
         Harmonics {
             neg_mu: -B::gm(),
             body_radius: B::eq_radius(),
-            stor: stor,
+            stor,
         }
     }
 }

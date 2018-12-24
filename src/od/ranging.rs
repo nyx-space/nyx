@@ -79,7 +79,7 @@ impl GroundStation {
             elevation_mask,
             35.247_164,
             243.205,
-            1.07_114_904,
+            1.071_149_04,
             range_noise,
             range_rate_noise,
         )

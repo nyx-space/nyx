@@ -288,9 +288,9 @@ impl Options {
     pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64) -> Options {
         Options {
             init_step: max_step,
-            min_step: min_step,
-            max_step: max_step,
-            tolerance: tolerance,
+            min_step,
+            max_step,
+            tolerance,
             attempts: 50,
             fixed_step: false,
         }

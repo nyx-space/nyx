@@ -23,7 +23,7 @@ impl<'a> TwoBody<'a> {
     /// Initialize TwoBody dynamics given a provided gravitional parameter (as `mu`)
     pub fn from_state_vec_with_gm(state: Vector6<f64>, mu: f64) -> TwoBody<'a> {
         TwoBody {
-            mu: mu,
+            mu,
             tx_chan: None,
             time: 0.0,
             pos_vel: state,
@@ -55,13 +55,10 @@ impl<'a> Dynamics for TwoBody<'a> {
         self.time = new_t;
         self.pos_vel = *new_state;
 
-        match self.tx_chan {
-            Some(ref chan) => {
-                if let Err(e) = chan.send((new_t, *new_state)) {
-                    warn!("could not publish to channel: {}", e)
-                }
+        if let Some(ref chan) = self.tx_chan {
+            if let Err(e) = chan.send((new_t, *new_state)) {
+                warn!("could not publish to channel: {}", e)
             }
-            _ => {}
         }
     }
 
@@ -128,13 +125,10 @@ impl<'a> Dynamics for TwoBodyWithStm<'a> {
         }
         self.stm = stm_k_to_0 * stm_prev;
 
-        match self.tx_chan {
-            Some(ref chan) => {
-                if let Err(e) = chan.send((new_t, pos_vel, self.stm)) {
-                    warn!("could not publish to channel: {}", e)
-                }
+        if let Some(ref chan) = self.tx_chan {
+            if let Err(e) = chan.send((new_t, pos_vel, self.stm)) {
+                warn!("could not publish to channel: {}", e)
             }
-            _ => {}
         }
     }
 
@@ -289,13 +283,10 @@ impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
         }
         self.stm = stm_k_to_0 * stm_prev;
 
-        match self.tx_chan {
-            Some(ref chan) => {
-                if let Err(e) = chan.send((new_t, self.pos_vel, self.stm)) {
-                    warn!("could not publish to channel: {}", e)
-                }
+        if let Some(ref chan) = self.tx_chan {
+            if let Err(e) = chan.send((new_t, self.pos_vel, self.stm)) {
+                warn!("could not publish to channel: {}", e)
             }
-            _ => {}
         }
     }
 
