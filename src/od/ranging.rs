@@ -7,7 +7,7 @@ use self::dual_num::linalg::norm;
 use self::dual_num::{partials, Dual};
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
-use self::na::{Matrix2x6, Matrix6, U2, U3, U6, Vector2, Vector3, Vector6};
+use self::na::{Matrix2x6, Matrix6, Vector2, Vector3, Vector6, U2, U3, U6};
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
@@ -53,9 +53,9 @@ impl GroundStation {
         GroundStation::from_noise_values(
             "Madrid",
             elevation_mask,
-            40.427222,
-            4.250556,
-            0.834939,
+            40.427_222,
+            4.250_556,
+            0.834_939,
             range_noise,
             range_rate_noise,
         )
@@ -65,9 +65,9 @@ impl GroundStation {
         GroundStation::from_noise_values(
             "Canberra",
             elevation_mask,
-            -35.398333,
-            148.981944,
-            0.691750,
+            -35.398_333,
+            148.981_944,
+            0.691_750,
             range_noise,
             range_rate_noise,
         )
@@ -77,9 +77,9 @@ impl GroundStation {
         GroundStation::from_noise_values(
             "Goldstone",
             elevation_mask,
-            35.247164,
+            35.247_164,
             243.205,
-            1.07114904,
+            1.071_149_04,
             range_noise,
             range_rate_noise,
         )

@@ -2,6 +2,15 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
+use self::na::{Vector6, U3};
+fn backprop_rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
+    let err_radius = (&prop_err.fixed_rows::<U3>(0).into_owned() - &cur_state.fixed_rows::<U3>(0).into_owned()).norm();
+
+    let err_velocity = (&prop_err.fixed_rows::<U3>(3).into_owned() - &cur_state.fixed_rows::<U3>(3).into_owned()).norm();
+
+    (err_radius, err_velocity)
+}
+
 #[test]
 fn two_body_parametrized() {
     extern crate nalgebra as na;
@@ -16,6 +25,8 @@ fn two_body_parametrized() {
     let min_step = 0.1;
     let max_step = 60.0;
 
+    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+
     let rslt = Vector6::from_row_slice(&[
         -5971.1941916712285,
         3945.5066532419537,
@@ -26,9 +37,20 @@ fn two_body_parametrized() {
     ]);
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
-    let mut dyn = TwoBody::from_state_vec::<EARTH>(Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0));
+    let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
+    // And now do the backprop
+    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    assert!(
+        err_r < 1e-5,
+        "two body back prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back prop failed to return to the initial state in velocity"
+    );
 }
 
 #[test]
@@ -44,6 +66,8 @@ fn two_body_custom() {
     let min_step = 0.1;
     let max_step = 60.0;
 
+    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+
     let rslt = Vector6::new(
         -5971.1941916712285,
         3945.5066532419537,
@@ -54,12 +78,20 @@ fn two_body_custom() {
     );
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
-    let mut dyn = TwoBody::from_state_vec_with_gm(
-        Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0),
-        398600.4415,
-    );
+    let mut dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
+    // And now do the backprop
+    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    assert!(
+        err_r < 1e-5,
+        "two body back prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back prop failed to return to the initial state in velocity"
+    );
 }
 
 #[test]
@@ -103,6 +135,18 @@ fn two_body_state_parametrized() {
     assert_eq!(final_state, rslt, "two body prop failed",);
 
     println!("Final state:\n{0}\n{0:o}", final_state);
+
+    // And now do the backprop
+    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &initial_state.to_cartesian_vec());
+    assert!(
+        err_r < 1e-5,
+        "two body back prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back prop failed to return to the initial state in velocity"
+    );
 }
 
 #[test]

@@ -1,8 +1,8 @@
 extern crate hifitime;
 extern crate nalgebra as na;
-use self::hifitime::TimeSystem;
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::ModifiedJulian;
+use self::hifitime::TimeSystem;
 use self::na::Matrix3;
 use super::{EARTH, NAIF, SSB};
 use std::fmt;
@@ -68,9 +68,10 @@ impl ECEF {
     pub fn gmst(at: Instant) -> f64 {
         use utils::between_0_360;
 
-        let t_ut1 = (ModifiedJulian::from_instant(at).julian_days() - 2451545.0) / 36_525.0;
+        let t_ut1 = (ModifiedJulian::from_instant(at).julian_days() - 2_451_545.0) / 36_525.0;
         let theta_gmst_secs = (67_310.548_41 + (876_600.0 * 3_600.0 + 8_640_184.812_866) * t_ut1 + 0.093_104 * t_ut1.powi(2)
-            - 6.2e-6 * t_ut1.powi(3)) % 86_400.0;
+            - 6.2e-6 * t_ut1.powi(3))
+            % 86_400.0;
         between_0_360(theta_gmst_secs / 240.0)
     }
 
@@ -83,7 +84,7 @@ impl ECEF {
     pub fn gast(at: Instant) -> f64 {
         use std::f64::consts::PI;
         let tu = ModifiedJulian::from_instant(at).days - 51_544.5;
-        2.0 * PI * (0.7790572732640 + 1.00273781191135448 * tu)
+        2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_48 * tu)
     }
 }
 
