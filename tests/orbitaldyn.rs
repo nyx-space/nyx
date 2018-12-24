@@ -50,6 +50,8 @@ fn two_body_custom() {
     let min_step = 0.1;
     let max_step = 60.0;
 
+    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+
     let rslt = Vector6::new(
         -5971.1941916712285,
         3945.5066532419537,
@@ -60,12 +62,13 @@ fn two_body_custom() {
     );
 
     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
-    let mut dyn = TwoBody::from_state_vec_with_gm(
-        Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0),
-        398600.4415,
-    );
+    let mut dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
+    // And now do the backprop
+    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+    let delta = (dyn.state() - init).norm();
+    assert!(delta < 1e-5, "two body back prop failed to return to the initial state");
 }
 
 #[test]
@@ -109,6 +112,11 @@ fn two_body_state_parametrized() {
     assert_eq!(final_state, rslt, "two body prop failed",);
 
     println!("Final state:\n{0}\n{0:o}", final_state);
+
+    // And now do the backprop
+    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+    let delta = (dyn.state() - initial_state.to_cartesian_vec()).norm();
+    assert!(delta < 1e-5, "two body back prop failed to return to the initial state");
 }
 
 #[test]
