@@ -105,8 +105,9 @@ impl<'a> Propagator<'a> {
         E: Fn(&VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>) -> f64,
         DefaultAllocator: Allocator<f64, D::StateSize>,
     {
-        if elapsed_time < 0.0 {
-            panic!("backprop not yet supported");
+        let backprop = elapsed_time < 0.0;
+        if backprop {
+            self.step_size *= -1.0; // Invert the step size
         }
         let init_seconds = dyn.time();
         let stop_time = init_seconds + elapsed_time;
@@ -117,13 +118,13 @@ impl<'a> Propagator<'a> {
                 |t_: f64, state_: &VectorN<f64, D::StateSize>| dyn.eom(t_, state_),
                 err_estimator,
             );
-            if t < stop_time {
+            if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
                 // We haven't passed the time based stopping condition.
                 dyn.set_state(t, &state);
             } else {
                 let prev_details = self.latest_details().clone();
                 let overshot = t - stop_time;
-                if overshot > 0.0 {
+                if (!backprop && overshot > 0.0) || (backprop && overshot < 0.0) {
                     debug!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);
                     // Take one final step
@@ -208,7 +209,8 @@ impl<'a> Propagator<'a> {
             } else {
                 // Compute the error estimate.
                 self.details.error = err_estimator(&error_est, &next_state.clone(), state);
-                if self.details.error <= self.opts.tolerance || self.step_size <= self.opts.min_step
+                if self.details.error <= self.opts.tolerance
+                    || self.step_size <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
                 {
                     if self.details.attempts >= self.opts.attempts {

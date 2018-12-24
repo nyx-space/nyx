@@ -19,7 +19,7 @@ travis-ci = { repository = "ChristopherRabotin/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.15"
 log = "0.4"
-hifitime = "0.1.4"
+hifitime = "0.1"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 rand = "0.5"
 serde = "1.0"
@@ -32,3 +32,7 @@ pretty_env_logger = "0.2"
 [features]
 default = []
 unvalidated = [] # Enable to run unvalidated parts of the code
+
+[profile.dev]
+opt-level = 0
+debug = true
