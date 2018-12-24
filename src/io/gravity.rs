@@ -90,7 +90,7 @@ impl MemoryBackend {
     /// + Moon to 1500 (from SHADR file)
     /// + Mars to 120 (from SHADR file)
     /// + Venus to 150 (from SHADR file)
-    pub fn from_shadr(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+    pub fn from_shadr(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
         let mut f = File::open(filepath.clone()).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -108,7 +108,7 @@ impl MemoryBackend {
         )
     }
 
-    pub fn from_egm(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+    pub fn from_egm(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
         let mut f = File::open(filepath.clone()).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -126,7 +126,7 @@ impl MemoryBackend {
         )
     }
 
-    pub fn from_cof(filepath: String, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+    pub fn from_cof(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
         let mut f = File::open(filepath.clone()).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -147,10 +147,10 @@ impl MemoryBackend {
         let mut max_degree: u16 = 0;
         for (lno, line) in String::from_utf8(buffer)
             .expect("error decoding utf8")
-            .split("\n")
+            .split('\n')
             .enumerate()
         {
-            if line.len() == 0 || line.chars().nth(0).unwrap() != 'R' {
+            if line.is_empty() || line.chars().nth(0).unwrap() != 'R' {
                 continue; // This is either a comment, a header or "END"
             }
             // These variables need to be declared as mutable because rustc does not know
@@ -191,11 +191,11 @@ impl MemoryBackend {
                         } else {
                             // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
                             // is a positive number, otherwise, they are continuous (what a great format).
-                            if (item.matches("-").count() == 3 && item.chars().nth(0).unwrap() != '-')
-                                || item.matches("-").count() == 4
+                            if (item.matches('-').count() == 3 && item.chars().nth(0).unwrap() != '-')
+                                || item.matches('-').count() == 4
                             {
                                 // Now we have two items concatenated into one... great
-                                let parts: Vec<&str> = item.split("-").collect();
+                                let parts: Vec<&str> = item.split('-').collect();
                                 if parts.len() == 5 {
                                     // That mean we have five minus signs, so both the C and S are negative.
                                     let c_nm_str = "-".to_owned() + parts[1] + "-" + parts[2];
@@ -298,7 +298,7 @@ impl MemoryBackend {
     }
 
     /// `load` handles the actual loading in memory.
-    fn load(skip_first_line: bool, degree: u16, order: u16, data_as_str: String, filepath: String) -> MemoryBackend {
+    fn load(skip_first_line: bool, degree: u16, order: u16, data_as_str: String, filepath: &str) -> MemoryBackend {
         let mut data: HashMap<(u16, u16), (f64, f64)>;
         data = HashMap::new();
         // Immediately add data which will be requested but may not exist (will be overwritten if it does)
@@ -306,7 +306,7 @@ impl MemoryBackend {
         data.insert((1, 1), (0.0, 0.0));
         let mut max_degree: u16 = 0;
         let mut max_order: u16 = 0;
-        for (lno, line) in data_as_str.split("\n").enumerate() {
+        for (lno, line) in data_as_str.split('\n').enumerate() {
             if lno == 0 && skip_first_line {
                 continue;
             }
@@ -390,7 +390,7 @@ impl GravityPotentialStor for MemoryBackend {
     }
 
     fn cs_nm(&self, degree: u16, order: u16) -> (f64, f64) {
-        let &(c, s) = self.data.get(&(degree, order)).unwrap();
+        let &(c, s) = &self.data[&(degree, order)];
         (c, s)
     }
 }

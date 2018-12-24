@@ -71,7 +71,7 @@ impl<'a> Propagator<'a> {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(opts: &Options) -> Propagator<'a> {
         Propagator {
-            opts: opts.clone(),
+            opts: *opts,
             details: IntegrationDetails {
                 step: 0.0,
                 error: 0.0,

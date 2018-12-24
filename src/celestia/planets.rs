@@ -8,7 +8,7 @@ pub struct MERCURY;
 
 impl CelestialBody for MERCURY {
     fn gm() -> f64 {
-        22_032.080486418
+        22_032.080_486_418
     }
     fn eq_radius() -> f64 {
         2439.7
@@ -29,10 +29,10 @@ pub struct VENUS;
 
 impl CelestialBody for VENUS {
     fn gm() -> f64 {
-        324_858.59882646
+        324_858.598_826_46
     }
     fn eq_radius() -> f64 {
-        6051.9
+        6_051.9
     }
     fn flattening() -> f64 {
         0.0
@@ -62,14 +62,14 @@ impl EARTH {
 
 impl CelestialBody for EARTH {
     fn gm() -> f64 {
-        398_600.4415
+        398_600.441_5
     }
     fn eq_radius() -> f64 {
-        6378.1363
+        6_378.136_3
     }
     fn flattening() -> f64 {
         // From [EMG2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/egm08_wgs84.html)
-        0.0033528106647474805
+        0.003_352_810_664_747_480_5
     }
 }
 
@@ -84,13 +84,13 @@ pub struct MARS;
 
 impl CelestialBody for MARS {
     fn gm() -> f64 {
-        42_828.314258067
+        42_828.314_258_067
     }
     fn eq_radius() -> f64 {
         3.397e3
     }
     fn flattening() -> f64 {
-        0.00647630
+        0.006_476_30
     }
 }
 
@@ -105,13 +105,13 @@ pub struct JUPITER;
 
 impl CelestialBody for JUPITER {
     fn gm() -> f64 {
-        126_712_767.85780
+        126_712_767.85_780
     }
     fn eq_radius() -> f64 {
         7.1492e4
     }
     fn flattening() -> f64 {
-        0.06487439
+        0.064_874_39
     }
 }
 
@@ -126,13 +126,13 @@ pub struct SATURN;
 
 impl CelestialBody for SATURN {
     fn gm() -> f64 {
-        37_940_626.061137
+        37_940_626.061_137
     }
     fn eq_radius() -> f64 {
         6.0268e4
     }
     fn flattening() -> f64 {
-        0.09796243
+        0.097_962_43
     }
 }
 
@@ -147,13 +147,13 @@ pub struct URANUS;
 
 impl CelestialBody for URANUS {
     fn gm() -> f64 {
-        5_794_549.0070719
+        5_794_549.007_071_9
     }
     fn eq_radius() -> f64 {
         2.5559e4
     }
     fn flattening() -> f64 {
-        0.02292734
+        0.022_927_34
     }
 }
 
@@ -168,13 +168,13 @@ pub struct NEPTUNE;
 
 impl CelestialBody for NEPTUNE {
     fn gm() -> f64 {
-        6_836_534.0638793
+        6_836_534.063_879_3
     }
     fn eq_radius() -> f64 {
         2.5269e4
     }
     fn flattening() -> f64 {
-        0.01856029
+        0.018_560_29
     }
 }
 

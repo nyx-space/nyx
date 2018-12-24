@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 
 use self::dual_num::linalg::norm;
 use self::dual_num::{Dual, Float};
-use self::na::{Matrix3x6, Matrix6, MatrixMN, U3, U36, U42, U6, Vector3, Vector6, VectorN};
+use self::na::{Matrix3x6, Matrix6, MatrixMN, Vector3, Vector6, VectorN, U3, U36, U42, U6};
 use super::Dynamics;
 use celestia::{CelestialBody, CoordinateFrame, State};
 use od::{AutoDiffDynamics, Linearization};
@@ -54,11 +54,13 @@ impl<'a> Dynamics for TwoBody<'a> {
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
         self.time = new_t;
         self.pos_vel = *new_state;
+
         match self.tx_chan {
-            Some(ref chan) => match chan.send((new_t, new_state.clone())) {
-                Err(e) => warn!("could not publish to channel: {}", e),
-                Ok(_) => {}
-            },
+            Some(ref chan) => {
+                if let Err(e) = chan.send((new_t, *new_state)) {
+                    warn!("could not publish to channel: {}", e)
+                }
+            }
             _ => {}
         }
     }
@@ -120,17 +122,18 @@ impl<'a> Dynamics for TwoBodyWithStm<'a> {
                 stm_idx += 1;
             }
         }
-        let mut stm_prev = self.stm.clone();
+        let mut stm_prev = self.stm;
         if !stm_prev.try_inverse_mut() {
             panic!("STM not invertible");
         }
         self.stm = stm_k_to_0 * stm_prev;
 
         match self.tx_chan {
-            Some(ref chan) => match chan.send((new_t, pos_vel.clone(), self.stm.clone())) {
-                Err(e) => warn!("could not publish to channel: {}", e),
-                Ok(_) => {}
-            },
+            Some(ref chan) => {
+                if let Err(e) = chan.send((new_t, pos_vel, self.stm)) {
+                    warn!("could not publish to channel: {}", e)
+                }
+            }
             _ => {}
         }
     }
@@ -280,17 +283,18 @@ impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
             }
         }
 
-        let mut stm_prev = self.stm.clone();
+        let mut stm_prev = self.stm;
         if !stm_prev.try_inverse_mut() {
             panic!("STM not invertible");
         }
         self.stm = stm_k_to_0 * stm_prev;
 
         match self.tx_chan {
-            Some(ref chan) => match chan.send((new_t, self.pos_vel.clone(), self.stm.clone())) {
-                Err(e) => warn!("could not publish to channel: {}", e),
-                Ok(_) => {}
-            },
+            Some(ref chan) => {
+                if let Err(e) = chan.send((new_t, self.pos_vel, self.stm)) {
+                    warn!("could not publish to channel: {}", e)
+                }
+            }
             _ => {}
         }
     }

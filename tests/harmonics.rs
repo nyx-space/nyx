@@ -6,7 +6,7 @@ use std::f64;
 #[test]
 fn gmat_val_harmonics_j2jgm3() {
     extern crate nalgebra as na;
-    use self::na::{U6, VectorN};
+    use self::na::{VectorN, U6};
     use nyx::celestia::{State, EARTH};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -128,7 +128,7 @@ fn gmat_val_harmonics_j2jgm3() {
 fn gmat_val_harmonics_21x21() {
     /* NOTE: We only test the J2 paramaters here for the JGM3 models. */
     extern crate nalgebra as na;
-    use self::na::{U6, VectorN};
+    use self::na::{VectorN, U6};
     use nyx::celestia::{State, EARTH};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -191,7 +191,7 @@ fn gmat_val_harmonics_21x21() {
     let mut dyn = J2Dyn {
         count: 0,
         twobody: TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec()),
-        harmonics: Harmonics::from_stor::<EARTH>(MemoryBackend::from_cof(filepath.to_owned(), 21, 21, true)),
+        harmonics: Harmonics::from_stor::<EARTH>(MemoryBackend::from_cof(filepath, 21, 21, true)),
     };
 
     let final_state: State;
@@ -251,7 +251,7 @@ fn gmat_val_harmonics_21x21() {
 #[test]
 fn gmat_val_harmonics_70x70() {
     extern crate nalgebra as na;
-    use self::na::{U6, VectorN};
+    use self::na::{VectorN, U6};
     use nyx::celestia::{State, EARTH};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::gravity::Harmonics;
@@ -314,7 +314,7 @@ fn gmat_val_harmonics_70x70() {
     let mut dyn = J2Dyn {
         count: 0,
         twobody: TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec()),
-        harmonics: Harmonics::from_stor::<EARTH>(MemoryBackend::from_cof(filepath.to_owned(), 70, 70, true)),
+        harmonics: Harmonics::from_stor::<EARTH>(MemoryBackend::from_cof(filepath, 70, 70, true)),
     };
 
     let final_state: State;
