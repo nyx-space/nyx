@@ -2,6 +2,15 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
+use self::na::{Vector6, U3};
+fn backprop_rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
+    let err_radius = (&prop_err.fixed_rows::<U3>(0).into_owned() - &cur_state.fixed_rows::<U3>(0).into_owned()).norm();
+
+    let err_velocity = (&prop_err.fixed_rows::<U3>(3).into_owned() - &cur_state.fixed_rows::<U3>(3).into_owned()).norm();
+
+    (err_radius, err_velocity)
+}
+
 #[test]
 fn two_body_parametrized() {
     extern crate nalgebra as na;
@@ -33,8 +42,15 @@ fn two_body_parametrized() {
     assert_eq!(dyn.state(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    let delta = (dyn.state() - init).norm();
-    assert!(delta < 1e-5, "two body back prop failed to return to the initial state");
+    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    assert!(
+        err_r < 1e-5,
+        "two body back prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back prop failed to return to the initial state in velocity"
+    );
 }
 
 #[test]
@@ -67,8 +83,15 @@ fn two_body_custom() {
     assert_eq!(dyn.state(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    let delta = (dyn.state() - init).norm();
-    assert!(delta < 1e-5, "two body back prop failed to return to the initial state");
+    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    assert!(
+        err_r < 1e-5,
+        "two body back prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back prop failed to return to the initial state in velocity"
+    );
 }
 
 #[test]
@@ -115,8 +138,15 @@ fn two_body_state_parametrized() {
 
     // And now do the backprop
     prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    let delta = (dyn.state() - initial_state.to_cartesian_vec()).norm();
-    assert!(delta < 1e-5, "two body back prop failed to return to the initial state");
+    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &initial_state.to_cartesian_vec());
+    assert!(
+        err_r < 1e-5,
+        "two body back prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back prop failed to return to the initial state in velocity"
+    );
 }
 
 #[test]

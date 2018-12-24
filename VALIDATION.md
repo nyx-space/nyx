@@ -15,10 +15,10 @@ GMAT is validated on flown missions. It was also validated against other softwar
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
-The tests in [`propagators.rs`](./tests/propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./tests/GMAT_scripts/propagators/) and is named after the propagator used.
+The tests in [`propagators.rs`](./tests/propagators.rs) we executed in GMAT as well. Each script is in the subfolder [propagators](./tests/GMAT_scripts/propagators/) and is named after the propagator used. In addition to the GMAT tests, backward propagation is confirmed for two body dynamics using an adaptive step-size: all propagation tests are verified to return to their initial states with an error in position less than 1e-5 km and an error in velocity less than 1e-8 km/s.
 
 The validation scenario is simply a two body propagation around Earth for one day.
-The following table corresponds to the **errors** between the `nyx` output for the one day LEO propagation in two body dynamics and the GMAT output using the same step configuration.
+The following tables corresponds to the **errors** between the `nyx` output for the one day LEO propagation in two body dynamics and the GMAT output using the same step configuration.
 
 ## Adaptive step
 
