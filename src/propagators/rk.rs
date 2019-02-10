@@ -77,6 +77,32 @@ impl RK for RK4Fixed {
     }
 }
 
+/// `RK2Fixed` is a fixed step RK4 (or midpoint method).
+///
+/// If initialized with an `Options.with_adaptive_step`, the variable step will **not** be taken into consideration.
+pub struct RK2Fixed {}
+
+impl RK for RK2Fixed {
+    fn order() -> u8 {
+        2
+    }
+    fn stages() -> usize {
+        2
+    }
+    fn a_coeffs() -> &'static [f64] {
+        &[2.0 / 3.0]
+    }
+    fn b_coeffs() -> &'static [f64] {
+        &[
+            1.0 / 4.0,
+            3.0 / 4.0,
+            // NOTE: Duplicating the B coefficients for force the error to zero.
+            1.0 / 4.0,
+            3.0 / 4.0,
+        ]
+    }
+}
+
 const SQRT6: f64 = 2.449_489_742_783_178;
 
 /// `RK89` is a Runge Kutta 8-9 integrator.
