@@ -1,6 +1,6 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
-use self::na::{U1, U3, Vector6};
+use self::na::{Vector6, U1, U3};
 use std::f64;
 
 fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
@@ -25,13 +25,22 @@ fn regress_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
     let mut all_props = vec![
+        Propagator::new::<RK2Fixed>(&Options::with_fixed_step(1.0)),
         Propagator::new::<CashKarp45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
         Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
     ];
 
-    let all_it_cnt = vec![5_178, 6_817]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
+    let all_it_cnt = vec![86_400, 5_178, 6_817]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
 
     let all_rslts = vec![
+        Vector6::from_row_slice(&[
+            -5971.198524908157,
+            3945.7755093263054,
+            2864.262542023422,
+            0.04876621287986919,
+            -4.184873956982518,
+            5.849098380963502,
+        ]),
         Vector6::from_row_slice(&[
             -5971.194190251459,
             3945.5066108335227,
