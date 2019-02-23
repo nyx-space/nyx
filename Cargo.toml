@@ -27,7 +27,7 @@ csv = "1"
 dual_num = "0.2.5"
 
 [dev-dependencies]
-pretty_env_logger = "0.2"
+pretty_env_logger = "0.3"
 
 [features]
 default = []
