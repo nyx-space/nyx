@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, U3, Vector3, Vector6, VectorN};
+use self::na::{DefaultAllocator, DimName, Vector3, Vector6, VectorN, U3};
 
 // This determines when to take into consideration the magnitude of the state_delta -- prevents dividing by too small of a number.
 const REL_ERR_THRESH: f64 = 0.1;
@@ -122,7 +122,7 @@ pub fn largest_step_pos_vel(prop_err: &Vector6<f64>, candidate: &Vector6<f64>, c
 pub fn rss_state_pos_vel(prop_err: &Vector6<f64>, candidate: &Vector6<f64>, cur_state: &Vector6<f64>) -> f64 {
     let err_radius = rss_state(
         &prop_err.fixed_rows::<U3>(0).into_owned(),
-        &candidate.fixed_rows::<U3>(3).into_owned(),
+        &candidate.fixed_rows::<U3>(0).into_owned(),
         &cur_state.fixed_rows::<U3>(0).into_owned(),
     );
     let err_velocity = rss_state(
@@ -143,7 +143,7 @@ pub fn rss_state_pos_vel(prop_err: &Vector6<f64>, candidate: &Vector6<f64>, cur_
 pub fn rss_step_pos_vel(prop_err: &Vector6<f64>, candidate: &Vector6<f64>, cur_state: &Vector6<f64>) -> f64 {
     let err_radius = rss_step(
         &prop_err.fixed_rows::<U3>(0).into_owned(),
-        &candidate.fixed_rows::<U3>(3).into_owned(),
+        &candidate.fixed_rows::<U3>(0).into_owned(),
         &cur_state.fixed_rows::<U3>(0).into_owned(),
     );
     let err_velocity = rss_step(
