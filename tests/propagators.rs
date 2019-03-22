@@ -30,7 +30,7 @@ fn regress_leo_day_adaptive() {
         Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
     ];
 
-    let all_it_cnt = vec![86_400, 5_178, 6_817]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
+    let all_it_cnt = vec![86_400, 5_178, 5_935]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -50,12 +50,12 @@ fn regress_leo_day_adaptive() {
             5.848940843324859,
         ]),
         Vector6::from_row_slice(&[
-            -5971.1941909881425,
-            3945.506632794103,
-            2864.6366463408517,
-            0.04909698263114359,
-            -4.185093335151727,
-            5.848940855975827,
+            -5971.194190305514,
+            3945.5066123572196,
+            2864.6366742764963,
+            0.04909700763937082,
+            -4.185093351832398,
+            5.848940844199317,
         ]),
     ];
 
@@ -126,24 +126,24 @@ fn gmat_val_leo_day_adaptive() {
         Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
     ];
 
-    let all_it_cnt = vec![6_216, 3_346, 2_880, 2_880]; // This number of iterations does not include the final refined fixed step.
+    let all_it_cnt = vec![5_412, 3_130, 2_880, 2_880]; // This number of iterations does not include the final refined fixed step.
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
-            -5971.194191821826,
-            3945.506657649147,
-            2864.636612371127,
-            0.049096952217479194,
-            -4.1850933148636145,
-            5.848940870294863,
+            -5971.194191972316,
+            3945.5066620394823,
+            2864.636606375189,
+            0.049096946846225495,
+            -4.185093311278742,
+            5.848940872821119,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191675742,
-            3945.506653644173,
-            2864.636617828102,
-            0.049096957110642894,
-            -4.185093318133072,
-            5.848940867998776,
+            -5971.19419167894,
+            3945.5066538720525,
+            2864.6366175103476,
+            0.049096956828390714,
+            -4.1850933179466505,
+            5.848940868134205,
         ]),
         Vector6::from_row_slice(&[
             -5971.194191670392,
