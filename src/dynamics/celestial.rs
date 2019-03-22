@@ -2,8 +2,8 @@ extern crate dual_num;
 extern crate nalgebra as na;
 
 use self::dual_num::linalg::norm;
-use self::dual_num::{Dual, Float};
-use self::na::{Matrix3x6, Matrix6, MatrixMN, Vector3, Vector6, VectorN, U3, U36, U42, U6};
+use self::dual_num::{Float, Hyperdual};
+use self::na::{DimName, Matrix3x6, Matrix6, MatrixMN, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
 use celestia::{CelestialBody, CoordinateFrame, State};
 use od::{AutoDiffDynamics, Linearization};
@@ -217,32 +217,33 @@ impl<'a> TwoBodyWithDualStm<'a> {
 }
 
 impl<'a> AutoDiffDynamics for TwoBodyWithDualStm<'a> {
-    type HyperStateSize = U6;
+    type HyperStateSize = U7;
+    type STMSize = U6;
 
-    /// Defines the equations of motion for Dual numbers for these dynamics.
-    fn dual_eom(&self, _t: f64, state: &Matrix6<Dual<f64>>) -> Matrix6<Dual<f64>> {
-        let radius = state.fixed_slice::<U3, U6>(0, 0).into_owned();
-        let velocity = state.fixed_slice::<U3, U6>(3, 0).into_owned();
+    fn dual_eom(&self, _t: f64, state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector6<f64>, Matrix6<f64>) {
+        // Extract data from hyperspace
+        let radius = state.fixed_rows::<U3>(0).into_owned();
+        let velocity = state.fixed_rows::<U3>(3).into_owned();
 
-        let mut body_acceleration = Matrix3x6::zeros();
+        // Code up math as usual
+        let rmag = norm(&radius);
+        let body_acceleration = radius * (Hyperdual::<f64, U7>::from_real(-398_600.4415) / rmag.powi(3));
 
-        for i in 0..3 {
-            let this_radius = Vector3::new(radius[(0, i)], radius[(1, i)], radius[(2, i)]);
-            let this_norm = norm(&this_radius);
-            let this_body_acceleration = this_radius * Dual::from_real(-self.mu) / this_norm.powi(3);
-            body_acceleration.set_column(i, &this_body_acceleration);
-        }
-
-        let mut rtn = Matrix6::zeros();
-
-        for i in 0..6 {
-            if i < 3 {
-                rtn.set_row(i, &velocity.row(i));
+        // Extract result into Vector6 and Matrix6
+        let mut fx = Vector6::zeros();
+        let mut grad = Matrix6::zeros();
+        for i in 0..U6::dim() {
+            fx[i] = if i < 3 {
+                velocity[i].real()
             } else {
-                rtn.set_row(i, &body_acceleration.row(i - 3));
+                body_acceleration[i - 3].real()
+            };
+            for j in 1..U7::dim() {
+                grad[(i, j - 1)] = if i < 3 { velocity[i][j] } else { body_acceleration[i - 3][j] };
             }
         }
-        rtn
+
+        (fx, grad)
     }
 }
 

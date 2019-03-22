@@ -3,7 +3,7 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate serde;
 
-use self::dual_num::Dual;
+use self::dual_num::{hyperspace_from_vector, Dual, DualN, Float, FloatConst, Hyperdual, Owned};
 use self::hifitime::instant::Instant;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
@@ -67,68 +67,39 @@ where
 /// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
 pub trait AutoDiffDynamics: Dynamics
 where
-    Self: Sized,
+    Self: Copy + Sized,
 {
     /// Defines the state size of the estimated state
     type HyperStateSize: DimName;
+    type STMSize: DimName;
 
     /// Defines the equations of motion for Dual numbers for these dynamics.
     fn dual_eom(
         &self,
         t: f64,
-        state: &MatrixMN<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>,
-    ) -> MatrixMN<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
+        state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+    ) -> (VectorN<f64, Self::STMSize>, MatrixMN<f64, Self::STMSize, Self::STMSize>)
     where
-        DefaultAllocator: Allocator<Dual<f64>, Self::HyperStateSize>
-            + Allocator<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
-            + Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>;
+        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
+            + Allocator<f64, Self::STMSize>
+            + Allocator<f64, Self::STMSize, Self::STMSize>
+            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+        Owned<f64, Self::HyperStateSize>: Copy;
 
     /// Computes both the state and the gradient of the dynamics. These may be accessed by the related
     /// getters.
     fn compute(
         &self,
         t: f64,
-        state: &VectorN<f64, Self::HyperStateSize>,
-    ) -> (
-        VectorN<f64, Self::HyperStateSize>,
-        MatrixMN<f64, Self::HyperStateSize, Self::HyperStateSize>,
-    )
+        state: &VectorN<f64, Self::STMSize>,
+    ) -> (VectorN<f64, Self::STMSize>, MatrixMN<f64, Self::STMSize, Self::STMSize>)
     where
-        DefaultAllocator: Allocator<Dual<f64>, Self::HyperStateSize>
-            + Allocator<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>
-            + Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::HyperStateSize, Self::HyperStateSize>,
+        DefaultAllocator: Allocator<f64, Self::STMSize> + Allocator<f64, Self::STMSize, Self::STMSize>,
     {
-        // Create a Matrix for the hyperdual space
-        let mut hyperdual_space = MatrixMN::<Dual<f64>, Self::HyperStateSize, Self::HyperStateSize>::zeros();
+        let hyperstate = hyperspace_from_vector(&state);
 
-        for i in 0..Self::HyperStateSize::dim() {
-            let mut v_i = VectorN::<Dual<f64>, Self::HyperStateSize>::zeros();
+        let (state, grad) = self.dual_eom(t, &hyperstate);
 
-            for j in 0..Self::HyperStateSize::dim() {
-                v_i[(j, 0)] = Dual::new(state[(j, 0)], if i == j { 1.0 } else { 0.0 });
-            }
-
-            hyperdual_space.set_column(i, &v_i);
-        }
-
-        let state_n_grad = self.dual_eom(t, &hyperdual_space);
-
-        // Extract the dual part
-        let mut state = VectorN::<f64, Self::HyperStateSize>::zeros();
-        let mut grad = MatrixMN::<f64, Self::HyperStateSize, Self::HyperStateSize>::zeros();
-
-        for i in 0..Self::HyperStateSize::dim() {
-            for j in 0..Self::HyperStateSize::dim() {
-                if j == 0 {
-                    // The state is duplicated in every column
-                    state[(i, 0)] = state_n_grad[(i, 0)].real();
-                }
-
-                grad[(i, j)] = state_n_grad[(i, j)].dual();
-            }
-        }
         (state, grad)
     }
 }
