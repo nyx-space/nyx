@@ -56,7 +56,7 @@ pub struct IntegrationDetails {
 /// the set of coefficients used for the monomorphic instance. **WARNING:** must be stored in a mutuable variable.
 #[derive(Clone, Debug)]
 pub struct Propagator<'a> {
-    opts: Options,               // Stores the integration options (tolerance, min/max step, init step, etc.)
+    opts: PropOpts,              // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
     step_size: f64,              // Stores the adapted step for the _next_ call
     order: u8,                   // Order of the integrator
@@ -69,7 +69,7 @@ pub struct Propagator<'a> {
 /// The `Propagator` trait defines the functions of a propagator.
 impl<'a> Propagator<'a> {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(opts: &Options) -> Propagator<'a> {
+    pub fn new<T: RK>(opts: &PropOpts) -> Propagator<'a> {
         Propagator {
             opts: *opts,
             details: IntegrationDetails {
@@ -252,7 +252,7 @@ impl<'a> Propagator<'a> {
     }
 }
 
-/// Options stores the integrator options, including the minimum and maximum step sizes, and the
+/// PropOpts stores the integrator options, including the minimum and maximum step sizes, and the
 /// max error size.
 ///
 /// Note that different step sizes and max errors are only used for adaptive
@@ -260,7 +260,7 @@ impl<'a> Propagator<'a> {
 /// use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
 /// fixed step options will lead to an RK4 being used instead of an RK45.
 #[derive(Clone, Copy, Debug)]
-pub struct Options {
+pub struct PropOpts {
     init_step: f64,
     min_step: f64,
     max_step: f64,
@@ -269,11 +269,11 @@ pub struct Options {
     fixed_step: bool,
 }
 
-impl Options {
-    /// `with_fixed_step` initializes an `Options` such that the integrator is used with a fixed
+impl PropOpts {
+    /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
     ///  step size.
-    pub fn with_fixed_step(step: f64) -> Options {
-        Options {
+    pub fn with_fixed_step(step: f64) -> PropOpts {
+        PropOpts {
             init_step: step,
             min_step: step,
             max_step: step,
@@ -283,10 +283,10 @@ impl Options {
         }
     }
 
-    /// `with_adaptive_step` initializes an `Options` such that the integrator is used with an
+    /// `with_adaptive_step` initializes an `PropOpts` such that the integrator is used with an
     ///  adaptive step size. The number of attempts is currently fixed to 50 (as in GMAT).
-    pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64) -> Options {
-        Options {
+    pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64) -> PropOpts {
+        PropOpts {
             init_step: max_step,
             min_step,
             max_step,
@@ -297,10 +297,10 @@ impl Options {
     }
 }
 
-impl Default for Options {
+impl Default for PropOpts {
     /// `default` returns the same default options as GMAT.
-    fn default() -> Options {
-        Options {
+    fn default() -> PropOpts {
+        PropOpts {
             init_step: 60.0,
             min_step: 0.001,
             max_step: 2700.0,
@@ -313,19 +313,19 @@ impl Default for Options {
 
 #[test]
 fn test_options() {
-    let opts = Options::with_fixed_step(1e-1);
+    let opts = PropOpts::with_fixed_step(1e-1);
     assert_eq!(opts.min_step, 1e-1);
     assert_eq!(opts.max_step, 1e-1);
     assert_eq!(opts.tolerance, 0.0);
     assert_eq!(opts.fixed_step, true);
 
-    let opts = Options::with_adaptive_step(1e-2, 10.0, 1e-12);
+    let opts = PropOpts::with_adaptive_step(1e-2, 10.0, 1e-12);
     assert_eq!(opts.min_step, 1e-2);
     assert_eq!(opts.max_step, 10.0);
     assert_eq!(opts.tolerance, 1e-12);
     assert_eq!(opts.fixed_step, false);
 
-    let opts: Options = Default::default();
+    let opts: PropOpts = Default::default();
     assert_eq!(opts.init_step, 60.0);
     assert_eq!(opts.min_step, 0.001);
     assert_eq!(opts.max_step, 2700.0);

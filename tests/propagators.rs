@@ -25,9 +25,9 @@ fn regress_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
     let mut all_props = vec![
-        Propagator::new::<RK2Fixed>(&Options::with_fixed_step(1.0)),
-        Propagator::new::<CashKarp45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
+        Propagator::new::<RK2Fixed>(&PropOpts::with_fixed_step(1.0)),
+        Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy)),
+        Propagator::new::<Fehlberg45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy)),
     ];
 
     let all_it_cnt = vec![86_400, 5_178, 5_935]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
@@ -120,10 +120,10 @@ fn gmat_val_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
     let mut all_props = vec![
-        Propagator::new::<Dormand45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<Verner56>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<Dormand78>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
+        Propagator::new::<Dormand45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy)),
+        Propagator::new::<Verner56>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy)),
+        Propagator::new::<Dormand78>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy)),
+        Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy)),
     ];
 
     let all_it_cnt = vec![5_412, 3_130, 2_880, 2_880]; // This number of iterations does not include the final refined fixed step.
@@ -216,11 +216,11 @@ fn gmat_val_leo_day_fixed() {
     use self::na::Vector6;
     use nyx::propagators::*;
     let mut all_props = vec![
-        Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
-        Propagator::new::<Verner56>(&Options::with_fixed_step(10.0)),
-        Propagator::new::<Dormand45>(&Options::with_fixed_step(10.0)),
-        Propagator::new::<Dormand78>(&Options::with_fixed_step(10.0)),
-        Propagator::new::<RK89>(&Options::with_fixed_step(10.0)),
+        Propagator::new::<RK4Fixed>(&PropOpts::with_fixed_step(1.0)),
+        Propagator::new::<Verner56>(&PropOpts::with_fixed_step(10.0)),
+        Propagator::new::<Dormand45>(&PropOpts::with_fixed_step(10.0)),
+        Propagator::new::<Dormand78>(&PropOpts::with_fixed_step(10.0)),
+        Propagator::new::<RK89>(&PropOpts::with_fixed_step(10.0)),
     ];
     let all_rslts = vec![
         Vector6::from_row_slice(&[

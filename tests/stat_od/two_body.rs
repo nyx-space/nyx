@@ -13,7 +13,7 @@ use self::nyx::dynamics::Dynamics;
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
-use self::nyx::propagators::{error_ctrl, Options, Propagator, RK4Fixed};
+use self::nyx::propagators::{error_ctrl, PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -95,7 +95,7 @@ fn ckf_fixed_step_perfect_stations_std() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = Options::with_fixed_step(step_size);
+    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
@@ -233,7 +233,7 @@ fn ekf_fixed_step_perfect_stations() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = Options::with_fixed_step(step_size);
+    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
@@ -369,7 +369,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = Options::with_fixed_step(step_size);
+    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();

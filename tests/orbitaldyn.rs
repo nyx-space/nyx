@@ -36,7 +36,7 @@ fn two_body_parametrized() {
         5.848940867758592,
     ]);
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
@@ -77,7 +77,7 @@ fn two_body_custom() {
         5.848940867758592,
     );
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
@@ -102,7 +102,7 @@ fn two_body_state_parametrized() {
     use nyx::celestia::{State, EARTH, ECI};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use nyx::propagators::{error_ctrl, PropOpts, Propagator, RK89};
 
     let dt = ModifiedJulian { days: 21545.0 };
     let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
@@ -124,7 +124,7 @@ fn two_body_state_parametrized() {
         ModifiedJulian { days: 21546.0 },
     );
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
     let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
 

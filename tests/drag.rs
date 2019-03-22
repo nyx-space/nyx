@@ -11,7 +11,7 @@ fn basic_drag() {
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::drag::BasicDrag;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use nyx::propagators::{error_ctrl, PropOpts, Propagator, RK89};
 
     #[derive(Clone)]
     pub struct SimpleDrag {
@@ -57,7 +57,7 @@ fn basic_drag() {
     let min_step = 0.1;
     let max_step = 60.0;
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = SimpleDrag {
         twobody: TwoBody::from_state_vec::<EARTH>(&initial_state.to_cartesian_vec()),

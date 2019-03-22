@@ -50,7 +50,7 @@
 ///
 /// fn main() {
 ///     use std::f64;
-///     use nyx::propagators::{Dormand45, error_ctrl, Options, Propagator};
+///     use nyx::propagators::{Dormand45, error_ctrl, PropOpts, Propagator};
 ///     let prop_time = 24.0 * 3_600.0;
 ///     let accuracy = 1e-12;
 ///     let min_step = 0.1;
@@ -69,7 +69,7 @@
 ///     ]);
 ///
 ///     let mut cur_t = 0.0;
-///     let mut prop = Propagator::new::<Dormand45>(&Options::with_adaptive_step(0.1, 30.0, 1e-12));
+///     let mut prop = Propagator::new::<Dormand45>(&PropOpts::with_adaptive_step(0.1, 30.0, 1e-12));
 ///     loop {
 ///         let (t, state) = prop.derive(
 ///             cur_t,
@@ -155,7 +155,7 @@ pub mod propagators;
 ///         ModifiedJulian { days: 21546.0 }
 ///     );
 ///
-///     let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+///     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 ///     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
 ///     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
 ///
@@ -184,7 +184,7 @@ pub mod propagators;
 /// use self::nyx::dynamics::celestial::TwoBody;
 /// use self::nyx::dynamics::momentum::AngularMom;
 /// use self::nyx::celestia::{State, EARTH, ECI};
-/// use self::nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
+/// use self::nyx::propagators::{error_ctrl, CashKarp45, PropOpts, Propagator};
 /// use self::na::{Matrix3, U3, U6, U9, Vector3, Vector6, VectorN};
 /// use std::f64;
 /// use hifitime::julian::ModifiedJulian;
@@ -255,7 +255,7 @@ pub mod propagators;
 ///
 ///     // And now let's define the propagator and propagate for a short amount of time.
 ///     let mut prop =
-///         Propagator::new::<CashKarp45>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+///         Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 ///
 ///     prop.until_time_elapsed(prop_time, &mut full_model, error_ctrl::largest_error::<U9>);
 ///
