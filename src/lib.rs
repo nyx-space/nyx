@@ -50,7 +50,7 @@
 ///
 /// fn main() {
 ///     use std::f64;
-///     use nyx::propagators::{Dormand45, error_ctrl, PropOpts, Propagator};
+///     use nyx::propagators::{Dormand45, error_ctrl, error_ctrl::ErrorCtrl, PropOpts, Propagator};
 ///     let prop_time = 24.0 * 3_600.0;
 ///     let accuracy = 1e-12;
 ///     let min_step = 0.1;
@@ -75,7 +75,7 @@
 ///             cur_t,
 ///             &init_state,
 ///             two_body_dynamics,
-///             error_ctrl::rss_state_pos_vel,
+///             error_ctrl::RSSStatePV::estimate,
 ///         );
 ///         if t < prop_time {
 ///             // We haven't passed the time based stopping condition.
@@ -93,7 +93,7 @@
 ///                 cur_t,
 ///                 &init_state,
 ///                 two_body_dynamics,
-///                 error_ctrl::rss_state_pos_vel,
+///                 error_ctrl::RSSStatePV::estimate,
 ///             );
 ///
 ///             assert!(
@@ -126,6 +126,7 @@ pub mod propagators;
 /// extern crate nyx_space as nyx;
 ///
 /// fn main() {
+///     use nyx::propagators::error_ctrl::ErrorCtrl;
 ///     use nyx::propagators::*;
 ///     use nyx::celestia::{State, EARTH, ECI};
 ///     use nyx::dynamics::Dynamics;
@@ -157,7 +158,7 @@ pub mod propagators;
 ///
 ///     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 ///     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-///     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+///     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
 ///
 ///     let final_dt = ModifiedJulian {
 ///         days: dt.days + dyn.time() / SECONDS_PER_DAY,

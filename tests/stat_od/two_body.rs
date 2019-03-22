@@ -110,7 +110,7 @@ fn ckf_fixed_step_perfect_stations_std() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -249,7 +249,7 @@ fn ekf_fixed_step_perfect_stations() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -386,7 +386,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.

@@ -78,14 +78,25 @@ impl ErrorCtrl for LargestStep {
 /// A largest state error control
 ///
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3018]
-pub fn largest_state(error_est: &Vector3<f64>, candidate: &Vector3<f64>, cur_state: &Vector3<f64>) -> f64 {
-    let sum_state = candidate + cur_state;
-    let mag = (sum_state[(0, 0)].abs() + sum_state[(1, 0)].abs() + sum_state[(2, 0)].abs()) * 0.5;
-    let err = error_est[(0, 0)].abs() + error_est[(1, 0)].abs() + error_est[(2, 0)].abs();
-    if mag > REL_ERR_THRESH {
-        err / mag
-    } else {
-        err
+pub struct LargestState;
+impl ErrorCtrl for LargestState {
+    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    where
+        DefaultAllocator: Allocator<f64, N>,
+    {
+        let sum_state = candidate + cur_state;
+        let mut mag = 0.0f64;
+        let mut err = 0.0f64;
+        for i in 0..N::dim() {
+            mag += 0.5 * sum_state[i].abs();
+            err += error_est[i].abs();
+        }
+
+        if mag > REL_ERR_THRESH {
+            err / mag
+        } else {
+            err
+        }
     }
 }
 
@@ -94,13 +105,19 @@ pub fn largest_state(error_est: &Vector3<f64>, candidate: &Vector3<f64>, cur_sta
 /// Note that this error controller should be preferrably be used only with slices of a state with the same units.
 /// For example, one should probably use this for position independently of using it for the velocity.
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3045]
-pub fn rss_step(error_est: &Vector3<f64>, candidate: &Vector3<f64>, cur_state: &Vector3<f64>) -> f64 {
-    let mag = (candidate - cur_state).norm();
-    let err = error_est.norm();
-    if mag > REL_ERR_THRESH {
-        err / mag
-    } else {
-        err
+pub struct RSSStep;
+impl ErrorCtrl for RSSStep {
+    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    where
+        DefaultAllocator: Allocator<f64, N>,
+    {
+        let mag = (candidate - cur_state).norm();
+        let err = error_est.norm();
+        if mag > REL_ERR_THRESH {
+            err / mag
+        } else {
+            err
+        }
     }
 }
 
@@ -113,75 +130,74 @@ pub fn rss_step(error_est: &Vector3<f64>, candidate: &Vector3<f64>, cur_state: &
 /// For more best practices of these integrators (which clone those in GMAT), please refer to the
 /// [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3004]
-pub fn rss_state(error_est: &Vector3<f64>, candidate: &Vector3<f64>, cur_state: &Vector3<f64>) -> f64 {
-    let mag = 0.5 * (candidate + cur_state).norm();
-    let err = error_est.norm();
-    if mag > REL_ERR_THRESH {
-        err / mag
-    } else {
-        err
-    }
-}
-
-/// A largest step error control which effectively computes the L1 norm of the provided vector
-/// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
-pub fn largest_step_pos_vel(error_est: &Vector6<f64>, candidate: &Vector6<f64>, cur_state: &Vector6<f64>) -> f64 {
-    let err_radius = LargestStep::estimate(
-        &error_est.fixed_rows::<U3>(0).into_owned(),
-        &candidate.fixed_rows::<U3>(3).into_owned(),
-        &cur_state.fixed_rows::<U3>(0).into_owned(),
-    );
-    let err_velocity = LargestStep::estimate(
-        &error_est.fixed_rows::<U3>(3).into_owned(),
-        &candidate.fixed_rows::<U3>(3).into_owned(),
-        &cur_state.fixed_rows::<U3>(3).into_owned(),
-    );
-
-    if err_radius > err_velocity {
-        err_radius
-    } else {
-        err_velocity
+pub struct RSSState;
+impl ErrorCtrl for RSSState {
+    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    where
+        DefaultAllocator: Allocator<f64, N>,
+    {
+        let mag = 0.5 * (candidate + cur_state).norm();
+        let err = error_est.norm();
+        if mag > REL_ERR_THRESH {
+            err / mag
+        } else {
+            err
+        }
     }
 }
 
 /// An RSS state error control which effectively for the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
-pub fn rss_state_pos_vel(error_est: &Vector6<f64>, candidate: &Vector6<f64>, cur_state: &Vector6<f64>) -> f64 {
-    let err_radius = rss_state(
-        &error_est.fixed_rows::<U3>(0).into_owned(),
-        &candidate.fixed_rows::<U3>(0).into_owned(),
-        &cur_state.fixed_rows::<U3>(0).into_owned(),
-    );
-    let err_velocity = rss_state(
-        &error_est.fixed_rows::<U3>(3).into_owned(),
-        &candidate.fixed_rows::<U3>(3).into_owned(),
-        &cur_state.fixed_rows::<U3>(3).into_owned(),
-    );
+pub struct RSSStatePV;
+impl ErrorCtrl for RSSStatePV {
+    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    where
+        DefaultAllocator: Allocator<f64, N>,
+    {
+        let err_radius = RSSState::estimate::<U3>(
+            &error_est.fixed_rows::<U3>(0).into_owned(),
+            &candidate.fixed_rows::<U3>(0).into_owned(),
+            &cur_state.fixed_rows::<U3>(0).into_owned(),
+        );
+        let err_velocity = RSSState::estimate::<U3>(
+            &error_est.fixed_rows::<U3>(3).into_owned(),
+            &candidate.fixed_rows::<U3>(3).into_owned(),
+            &cur_state.fixed_rows::<U3>(3).into_owned(),
+        );
 
-    if err_radius > err_velocity {
-        err_radius
-    } else {
-        err_velocity
+        if err_radius > err_velocity {
+            err_radius
+        } else {
+            err_velocity
+        }
     }
 }
 
 /// A largest step error control which effectively computes the L1 norm of the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
-pub fn rss_step_pos_vel(error_est: &Vector6<f64>, candidate: &Vector6<f64>, cur_state: &Vector6<f64>) -> f64 {
-    let err_radius = rss_step(
-        &error_est.fixed_rows::<U3>(0).into_owned(),
-        &candidate.fixed_rows::<U3>(0).into_owned(),
-        &cur_state.fixed_rows::<U3>(0).into_owned(),
-    );
-    let err_velocity = rss_step(
-        &error_est.fixed_rows::<U3>(3).into_owned(),
-        &candidate.fixed_rows::<U3>(3).into_owned(),
-        &cur_state.fixed_rows::<U3>(3).into_owned(),
-    );
+/// An RSS state error control which effectively for the provided vector
+/// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+pub struct RSSStepPV;
+impl ErrorCtrl for RSSStepPV {
+    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    where
+        DefaultAllocator: Allocator<f64, N>,
+    {
+        let err_radius = RSSStep::estimate::<U3>(
+            &error_est.fixed_rows::<U3>(0).into_owned(),
+            &candidate.fixed_rows::<U3>(0).into_owned(),
+            &cur_state.fixed_rows::<U3>(0).into_owned(),
+        );
+        let err_velocity = RSSStep::estimate::<U3>(
+            &error_est.fixed_rows::<U3>(3).into_owned(),
+            &candidate.fixed_rows::<U3>(3).into_owned(),
+            &cur_state.fixed_rows::<U3>(3).into_owned(),
+        );
 
-    if err_radius > err_velocity {
-        err_radius
-    } else {
-        err_velocity
+        if err_radius > err_velocity {
+            err_radius
+        } else {
+            err_velocity
+        }
     }
 }

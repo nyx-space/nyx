@@ -15,6 +15,7 @@ fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
     extern crate nalgebra as na;
     use self::na::Vector6;
+    use nyx::propagators::error_ctrl::ErrorCtrl;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -64,7 +65,7 @@ fn regress_leo_day_adaptive() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::RSSStatePV::estimate);
             iterations += 1;
             if t < prop_time {
                 // We haven't passed the time based stopping condition.
@@ -82,7 +83,7 @@ fn regress_leo_day_adaptive() {
                 let overshot = t - prop_time;
                 prop.set_fixed_step(prev_details.step - overshot);
                 // Take one final step
-                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
+                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::RSSStatePV::estimate);
 
                 assert!((t - prop_time).abs() < 1e-12, "propagated for {} instead of {}", t, prop_time);
 
@@ -110,6 +111,7 @@ fn regress_leo_day_adaptive() {
 fn gmat_val_leo_day_adaptive() {
     extern crate nalgebra as na;
     use self::na::Vector6;
+    use nyx::propagators::error_ctrl::ErrorCtrl;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -168,7 +170,7 @@ fn gmat_val_leo_day_adaptive() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::RSSStatePV::estimate);
             iterations += 1;
             if t < prop_time {
                 // We haven't passed the time based stopping condition.
@@ -186,7 +188,7 @@ fn gmat_val_leo_day_adaptive() {
                 let overshot = t - prop_time;
                 prop.set_fixed_step(prev_details.step - overshot);
                 // Take one final step
-                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
+                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::RSSStatePV::estimate);
 
                 assert!((t - prop_time).abs() < 1e-12, "propagated for {} instead of {}", t, prop_time);
 
@@ -214,7 +216,9 @@ fn gmat_val_leo_day_adaptive() {
 fn gmat_val_leo_day_fixed() {
     extern crate nalgebra as na;
     use self::na::Vector6;
+    use nyx::propagators::error_ctrl::ErrorCtrl;
     use nyx::propagators::*;
+
     let mut all_props = vec![
         Propagator::new::<RK4Fixed>(&PropOpts::with_fixed_step(1.0)),
         Propagator::new::<Verner56>(&PropOpts::with_fixed_step(10.0)),
@@ -270,7 +274,7 @@ fn gmat_val_leo_day_fixed() {
         let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
         let mut cur_t = 0.0;
         loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::RSSStatePV::estimate);
             cur_t = t;
             init_state = state;
             if cur_t >= 3_600.0 * 24.0 {

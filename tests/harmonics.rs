@@ -76,7 +76,7 @@ fn gmat_val_harmonics_j2jgm3() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::rss_step_pos_vel,
+            error_ctrl::error_ctrl::RSSStepPV::estimate,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -92,7 +92,7 @@ fn gmat_val_harmonics_j2jgm3() {
                     dyn.time(),
                     &dyn.state(),
                     |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                    error_ctrl::rss_step_pos_vel,
+                    error_ctrl::error_ctrl::RSSStepPV::estimate,
                 );
                 dyn.set_state(t, &state);
             } else {
@@ -200,7 +200,7 @@ fn gmat_val_harmonics_21x21() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::rss_step_pos_vel,
+            error_ctrl::error_ctrl::RSSStepPV::estimate,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -216,7 +216,7 @@ fn gmat_val_harmonics_21x21() {
                     dyn.time(),
                     &dyn.state(),
                     |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                    error_ctrl::rss_step_pos_vel,
+                    error_ctrl::error_ctrl::RSSStepPV::estimate,
                 );
                 dyn.set_state(t, &state);
             } else {
@@ -323,7 +323,7 @@ fn gmat_val_harmonics_70x70() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::rss_step_pos_vel,
+            error_ctrl::error_ctrl::RSSStepPV::estimate,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -339,7 +339,7 @@ fn gmat_val_harmonics_70x70() {
                     dyn.time(),
                     &dyn.state(),
                     |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                    error_ctrl::rss_step_pos_vel,
+                    error_ctrl::error_ctrl::RSSStepPV::estimate,
                 );
                 dyn.set_state(t, &state);
             } else {

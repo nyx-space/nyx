@@ -75,7 +75,7 @@ fn basic_drag() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::rss_step_pos_vel,
+            error_ctrl::error_ctrl::RSSStepPV::estimate,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -90,7 +90,7 @@ fn basic_drag() {
                     dyn.time(),
                     &dyn.state(),
                     |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                    error_ctrl::rss_step_pos_vel,
+                    error_ctrl::error_ctrl::RSSStepPV::estimate,
                 );
                 dyn.set_state(t, &state);
             } else {
