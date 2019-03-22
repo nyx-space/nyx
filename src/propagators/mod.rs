@@ -4,6 +4,7 @@ use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, VectorN};
 use std::f64;
 
+use self::error_ctrl::{ErrorCtrl, RSSStep, RSSStepPV};
 use dynamics::Dynamics;
 
 /// Provides different methods for controlling the error computation of the integrator.
@@ -55,8 +56,11 @@ pub struct IntegrationDetails {
 /// Includes the options, the integrator details of the previous step, and
 /// the set of coefficients used for the monomorphic instance. **WARNING:** must be stored in a mutuable variable.
 #[derive(Clone, Debug)]
-pub struct Propagator<'a> {
-    opts: PropOpts,              // Stores the integration options (tolerance, min/max step, init step, etc.)
+pub struct Propagator<'a, E>
+where
+    E: ErrorCtrl,
+{
+    opts: PropOpts<E>,           // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
     step_size: f64,              // Stores the adapted step for the _next_ call
     order: u8,                   // Order of the integrator
@@ -67,9 +71,9 @@ pub struct Propagator<'a> {
 }
 
 /// The `Propagator` trait defines the functions of a propagator.
-impl<'a> Propagator<'a> {
+impl<'a, E: ErrorCtrl> Propagator<'a, E> {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(opts: &PropOpts) -> Propagator<'a> {
+    pub fn new<T: RK>(opts: &PropOpts<E>) -> Propagator<'a, E> {
         Propagator {
             opts: *opts,
             details: IntegrationDetails {
@@ -95,14 +99,14 @@ impl<'a> Propagator<'a> {
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `dyn.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed<D: Dynamics, E: Copy>(
+    pub fn until_time_elapsed<D: Dynamics, C: Copy>(
         &mut self,
         elapsed_time: f64,
         dyn: &mut D,
-        err_estimator: E,
+        err_estimator: C,
     ) -> (f64, VectorN<f64, D::StateSize>)
     where
-        E: Fn(&VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>) -> f64,
+        C: Fn(&VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>) -> f64,
         DefaultAllocator: Allocator<f64, D::StateSize>,
     {
         let backprop = elapsed_time < 0.0;
@@ -153,16 +157,16 @@ impl<'a> Propagator<'a> {
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive<D, E, N: DimName>(
+    pub fn derive<D, C, N: DimName>(
         &mut self,
         t: f64,
         state: &VectorN<f64, N>,
         d_xdt: D,
-        err_estimator: E,
+        err_estimator: C,
     ) -> (f64, VectorN<f64, N>)
     where
         D: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
-        E: Fn(&VectorN<f64, N>, &VectorN<f64, N>, &VectorN<f64, N>) -> f64,
+        C: Fn(&VectorN<f64, N>, &VectorN<f64, N>, &VectorN<f64, N>) -> f64,
         DefaultAllocator: Allocator<f64, N>,
     {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
@@ -261,19 +265,20 @@ impl<'a> Propagator<'a> {
 /// use whichever adaptive step integrator is desired.  For example, initializing an RK45 with
 /// fixed step options will lead to an RK4 being used instead of an RK45.
 #[derive(Clone, Copy, Debug)]
-pub struct PropOpts {
+pub struct PropOpts<E: ErrorCtrl> {
     init_step: f64,
     min_step: f64,
     max_step: f64,
     tolerance: f64,
     attempts: u8,
     fixed_step: bool,
+    errctrl: E,
 }
 
-impl PropOpts {
+impl<E: ErrorCtrl> PropOpts<E> {
     /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
     ///  step size.
-    pub fn with_fixed_step(step: f64) -> PropOpts {
+    pub fn with_fixed_step(step: f64, errctrl: E) -> PropOpts<E> {
         PropOpts {
             init_step: step,
             min_step: step,
@@ -281,12 +286,13 @@ impl PropOpts {
             tolerance: 0.0,
             fixed_step: true,
             attempts: 0,
+            errctrl: errctrl,
         }
     }
 
     /// `with_adaptive_step` initializes an `PropOpts` such that the integrator is used with an
     ///  adaptive step size. The number of attempts is currently fixed to 50 (as in GMAT).
-    pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64) -> PropOpts {
+    pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64, errctrl: E) -> PropOpts<E> {
         PropOpts {
             init_step: max_step,
             min_step,
@@ -294,13 +300,14 @@ impl PropOpts {
             tolerance,
             attempts: 50,
             fixed_step: false,
+            errctrl: errctrl,
         }
     }
 }
 
-impl Default for PropOpts {
+impl Default for PropOpts<RSSStepPV> {
     /// `default` returns the same default options as GMAT.
-    fn default() -> PropOpts {
+    fn default() -> PropOpts<RSSStepPV> {
         PropOpts {
             init_step: 60.0,
             min_step: 0.001,
@@ -308,25 +315,26 @@ impl Default for PropOpts {
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
+            errctrl: RSSStepPV {},
         }
     }
 }
 
 #[test]
 fn test_options() {
-    let opts = PropOpts::with_fixed_step(1e-1);
+    let opts = PropOpts::with_fixed_step(1e-1, RSSStep {});
     assert_eq!(opts.min_step, 1e-1);
     assert_eq!(opts.max_step, 1e-1);
     assert_eq!(opts.tolerance, 0.0);
     assert_eq!(opts.fixed_step, true);
 
-    let opts = PropOpts::with_adaptive_step(1e-2, 10.0, 1e-12);
+    let opts = PropOpts::with_adaptive_step(1e-2, 10.0, 1e-12, RSSStep {});
     assert_eq!(opts.min_step, 1e-2);
     assert_eq!(opts.max_step, 10.0);
     assert_eq!(opts.tolerance, 1e-12);
     assert_eq!(opts.fixed_step, false);
 
-    let opts: PropOpts = Default::default();
+    let opts: PropOpts<RSSStepPV> = Default::default();
     assert_eq!(opts.init_step, 60.0);
     assert_eq!(opts.min_step, 0.001);
     assert_eq!(opts.max_step, 2700.0);

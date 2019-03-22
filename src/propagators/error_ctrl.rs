@@ -8,7 +8,10 @@ use self::na::{DefaultAllocator, DimName, Vector3, Vector6, VectorN, U3};
 const REL_ERR_THRESH: f64 = 0.1;
 
 /// The Error Control trait manages how a propagator computes the error in the current step.
-pub trait ErrorCtrl {
+pub trait ErrorCtrl
+where
+    Self: Copy,
+{
     /// Computes the actual error of the current step.
     ///
     /// The `error_est` is the estimated error computed from the difference in the two stages of
@@ -26,6 +29,7 @@ pub trait ErrorCtrl {
 /// given the difference in the candidate state and the previous state (`state_delta`).
 /// This error estimator is from the physical model estimator of GMAT
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/PhysicalModel.cpp#L987]
+#[derive(Clone, Copy)]
 pub struct LargestError;
 impl ErrorCtrl for LargestError {
     fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
@@ -53,6 +57,7 @@ impl ErrorCtrl for LargestError {
 /// Note that this error controller should be preferrably be used only with slices of a state with the same units.
 /// For example, one should probably use this for position independently of using it for the velocity.
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3033]
+#[derive(Clone, Copy)]
 pub struct LargestStep;
 impl ErrorCtrl for LargestStep {
     fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
@@ -78,6 +83,7 @@ impl ErrorCtrl for LargestStep {
 /// A largest state error control
 ///
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3018]
+#[derive(Clone, Copy)]
 pub struct LargestState;
 impl ErrorCtrl for LargestState {
     fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
@@ -105,6 +111,7 @@ impl ErrorCtrl for LargestState {
 /// Note that this error controller should be preferrably be used only with slices of a state with the same units.
 /// For example, one should probably use this for position independently of using it for the velocity.
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3045]
+#[derive(Clone, Copy)]
 pub struct RSSStep;
 impl ErrorCtrl for RSSStep {
     fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
@@ -130,6 +137,7 @@ impl ErrorCtrl for RSSStep {
 /// For more best practices of these integrators (which clone those in GMAT), please refer to the
 /// [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3004]
+#[derive(Clone, Copy)]
 pub struct RSSState;
 impl ErrorCtrl for RSSState {
     fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
@@ -148,6 +156,7 @@ impl ErrorCtrl for RSSState {
 
 /// An RSS state error control which effectively for the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+#[derive(Clone, Copy)]
 pub struct RSSStatePV;
 impl ErrorCtrl for RSSStatePV {
     fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
@@ -177,6 +186,7 @@ impl ErrorCtrl for RSSStatePV {
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 /// An RSS state error control which effectively for the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+#[derive(Clone, Copy)]
 pub struct RSSStepPV;
 impl ErrorCtrl for RSSStepPV {
     fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64

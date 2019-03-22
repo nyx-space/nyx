@@ -18,7 +18,7 @@ fn two_body_parametrized() {
     use nyx::celestia::EARTH;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::error_ctrl::ErrorCtrl;
+    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -37,12 +37,12 @@ fn two_body_parametrized() {
         5.848940867758592,
     ]);
 
-    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
-    prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+    prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+    prop.until_time_elapsed(-prop_time, &mut dyn, RSSStepPV::estimate);
     let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
     assert!(
         err_r < 1e-5,
@@ -60,31 +60,28 @@ fn two_body_custom() {
     use self::na::Vector6;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::error_ctrl::ErrorCtrl;
+    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
-    let accuracy = 1e-12;
-    let min_step = 0.1;
-    let max_step = 60.0;
 
     let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
 
     let rslt = Vector6::new(
-        -5971.1941916712285,
-        3945.5066532419537,
-        2864.636618390466,
-        0.04909695760948815,
-        -4.1850933184621315,
-        5.848940867758592,
+        -5971.194191684024,
+        3945.5066536247373,
+        2864.6366178672706,
+        0.049096957141044464,
+        -4.185093318149689,
+        5.848940867979176,
     );
 
-    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::<RSSStepPV>::default());
     let mut dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
-    prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+    prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+    prop.until_time_elapsed(-prop_time, &mut dyn, RSSStepPV::estimate);
     let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
     assert!(
         err_r < 1e-5,
@@ -104,8 +101,8 @@ fn two_body_state_parametrized() {
     use nyx::celestia::{State, EARTH, ECI};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::error_ctrl::ErrorCtrl;
-    use nyx::propagators::{error_ctrl, PropOpts, Propagator, RK89};
+    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
+    use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let dt = ModifiedJulian { days: 21545.0 };
     let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
@@ -127,9 +124,9 @@ fn two_body_state_parametrized() {
         ModifiedJulian { days: 21546.0 },
     );
 
-    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-    let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+    let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
 
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
@@ -140,7 +137,7 @@ fn two_body_state_parametrized() {
     println!("Final state:\n{0}\n{0:o}", final_state);
 
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+    prop.until_time_elapsed(-prop_time, &mut dyn, RSSStepPV::estimate);
     let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &initial_state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,

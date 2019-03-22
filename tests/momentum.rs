@@ -6,9 +6,10 @@ fn const_mom() {
     use self::na::{Matrix3, Vector3};
     use nyx::dynamics::momentum::AngularMom;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::{error_ctrl, error_ctrl::ErrorCtrl, CashKarp45, PropOpts, Propagator};
+    use nyx::propagators::error_ctrl::{ErrorCtrl, LargestStep};
+    use nyx::propagators::{error_ctrl, CashKarp45, PropOpts, Propagator};
 
-    let mut prop = Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(0.1, 5.0, 1e-8));
+    let mut prop = Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}));
 
     let omega = Vector3::new(0.1, 0.4, -0.2);
     let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);

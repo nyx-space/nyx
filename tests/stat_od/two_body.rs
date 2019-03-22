@@ -13,7 +13,8 @@ use self::nyx::dynamics::Dynamics;
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
-use self::nyx::propagators::{error_ctrl, error_ctrl::ErrorCtrl, PropOpts, Propagator, RK4Fixed};
+use self::nyx::propagators::error_ctrl::{ErrorCtrl, LargestError, RSSStepPV};
+use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -95,7 +96,7 @@ fn ckf_fixed_step_perfect_stations_std() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
@@ -110,7 +111,7 @@ fn ckf_fixed_step_perfect_stations_std() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+        prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -176,8 +177,7 @@ fn ckf_fixed_step_perfect_stations_std() {
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        // prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::LargestError::estimate);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, LargestError::estimate);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
@@ -234,7 +234,7 @@ fn ekf_fixed_step_perfect_stations() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
@@ -249,7 +249,7 @@ fn ekf_fixed_step_perfect_stations() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+        prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -310,8 +310,7 @@ fn ekf_fixed_step_perfect_stations() {
     for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::LargestError::estimate);
-        // prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, LargestError::estimate);
         if meas_no > num_meas_for_ekf && !kf.ekf {
             println!("switched to EKF");
             kf.ekf = true;
@@ -371,7 +370,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = PropOpts::with_fixed_step(step_size);
+    let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
@@ -386,7 +385,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+        prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -451,7 +450,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::LargestError::estimate);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, LargestError::estimate);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
