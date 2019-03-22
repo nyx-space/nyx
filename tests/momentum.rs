@@ -6,7 +6,7 @@ fn const_mom() {
     use self::na::{Matrix3, Vector3};
     use nyx::dynamics::momentum::AngularMom;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::{error_ctrl, CashKarp45, PropOpts, Propagator};
+    use nyx::propagators::{error_ctrl, error_ctrl::ErrorCtrl, CashKarp45, PropOpts, Propagator};
 
     let mut prop = Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(0.1, 5.0, 1e-8));
 
@@ -21,7 +21,7 @@ fn const_mom() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &Vector3<f64>| dyn.eom(t_, state_),
-            error_ctrl::largest_step,
+            error_ctrl::LargestStep::estimate,
         );
         dyn.set_state(t, &state);
         if dyn.time() >= 5.0 {

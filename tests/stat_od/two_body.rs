@@ -6,14 +6,14 @@ extern crate nyx_space as nyx;
 use self::hifitime::instant::*;
 use self::hifitime::julian::*;
 use self::hifitime::SECONDS_PER_DAY;
-use self::na::{Matrix2, Matrix2x6, Matrix6, U42, U6, Vector2, Vector6};
+use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{State, EARTH, ECI};
 use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithDualStm, TwoBodyWithStm};
 use self::nyx::dynamics::Dynamics;
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
-use self::nyx::propagators::{error_ctrl, PropOpts, Propagator, RK4Fixed};
+use self::nyx::propagators::{error_ctrl, error_ctrl::ErrorCtrl, PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -176,7 +176,8 @@ fn ckf_fixed_step_perfect_stations_std() {
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
+        // prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::LargestError::estimate);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
@@ -309,7 +310,8 @@ fn ekf_fixed_step_perfect_stations() {
     for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::LargestError::estimate);
+        // prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
         if meas_no > num_meas_for_ekf && !kf.ekf {
             println!("switched to EKF");
             kf.ekf = true;
@@ -449,7 +451,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::largest_error::<U42>);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, error_ctrl::LargestError::estimate);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation

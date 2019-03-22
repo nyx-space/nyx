@@ -208,6 +208,7 @@ impl<'a> Propagator<'a> {
                 return ((t + self.details.step), next_state);
             } else {
                 // Compute the error estimate.
+                // self.details.error = self.opts.errctrl.estimate(&error_est, &next_state.clone(), state);
                 self.details.error = err_estimator(&error_est, &next_state.clone(), state);
                 if self.details.error <= self.opts.tolerance
                     || self.step_size <= self.opts.min_step

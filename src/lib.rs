@@ -184,7 +184,7 @@ pub mod propagators;
 /// use self::nyx::dynamics::celestial::TwoBody;
 /// use self::nyx::dynamics::momentum::AngularMom;
 /// use self::nyx::celestia::{State, EARTH, ECI};
-/// use self::nyx::propagators::{error_ctrl, CashKarp45, PropOpts, Propagator};
+/// use self::nyx::propagators::{error_ctrl, error_ctrl::ErrorCtrl, CashKarp45, PropOpts, Propagator};
 /// use self::na::{Matrix3, U3, U6, U9, Vector3, Vector6, VectorN};
 /// use std::f64;
 /// use hifitime::julian::ModifiedJulian;
@@ -257,7 +257,7 @@ pub mod propagators;
 ///     let mut prop =
 ///         Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 ///
-///     prop.until_time_elapsed(prop_time, &mut full_model, error_ctrl::largest_error::<U9>);
+///     prop.until_time_elapsed(prop_time, &mut full_model, error_ctrl::LargestError::estimate);
 ///
 ///     let prev_details = prop.latest_details().clone();
 ///     println!("{:?}", prev_details);
