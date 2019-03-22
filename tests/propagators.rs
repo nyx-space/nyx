@@ -15,7 +15,7 @@ fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
     extern crate nalgebra as na;
     use self::na::Vector6;
-    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStatePV};
+    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -111,7 +111,7 @@ fn regress_leo_day_adaptive() {
 fn gmat_val_leo_day_adaptive() {
     extern crate nalgebra as na;
     use self::na::Vector6;
-    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStatePV};
+    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -216,7 +216,7 @@ fn gmat_val_leo_day_adaptive() {
 fn gmat_val_leo_day_fixed() {
     extern crate nalgebra as na;
     use self::na::Vector6;
-    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStatePV};
+    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let mut all_props = vec![

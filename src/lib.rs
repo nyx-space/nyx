@@ -50,7 +50,8 @@
 ///
 /// fn main() {
 ///     use std::f64;
-///     use nyx::propagators::{Dormand45, error_ctrl, error_ctrl::ErrorCtrl, PropOpts, Propagator};
+///     use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStatePV};
+///     use nyx::propagators::{Dormand45, PropOpts, Propagator};
 ///     let prop_time = 24.0 * 3_600.0;
 ///     let accuracy = 1e-12;
 ///     let min_step = 0.1;
@@ -69,14 +70,9 @@
 ///     ]);
 ///
 ///     let mut cur_t = 0.0;
-///     let mut prop = Propagator::new::<Dormand45>(&PropOpts::with_adaptive_step(0.1, 30.0, 1e-12));
+///     let mut prop = Propagator::new::<Dormand45>(&PropOpts::with_adaptive_step(0.1, 30.0, 1e-12, RSSStatePV {}));
 ///     loop {
-///         let (t, state) = prop.derive(
-///             cur_t,
-///             &init_state,
-///             two_body_dynamics,
-///             error_ctrl::RSSStatePV::estimate,
-///         );
+///         let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
 ///         if t < prop_time {
 ///             // We haven't passed the time based stopping condition.
 ///             cur_t = t;
@@ -89,12 +85,7 @@
 ///             let overshot = t - prop_time;
 ///             prop.set_fixed_step(prev_details.step - overshot);
 ///             // Take one final step
-///             let (t, state) = prop.derive(
-///                 cur_t,
-///                 &init_state,
-///                 two_body_dynamics,
-///                 error_ctrl::RSSStatePV::estimate,
-///             );
+///             let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
 ///
 ///             assert!(
 ///                 (t - prop_time).abs() < 1e-12,
@@ -126,7 +117,7 @@ pub mod propagators;
 /// extern crate nyx_space as nyx;
 ///
 /// fn main() {
-///     use nyx::propagators::error_ctrl::ErrorCtrl;
+///     use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
 ///     use nyx::propagators::*;
 ///     use nyx::celestia::{State, EARTH, ECI};
 ///     use nyx::dynamics::Dynamics;
@@ -156,7 +147,7 @@ pub mod propagators;
 ///         ModifiedJulian { days: 21546.0 }
 ///     );
 ///
-///     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV{}));
+///     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
 ///     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
 ///     prop.until_time_elapsed(prop_time, &mut dyn);
 ///

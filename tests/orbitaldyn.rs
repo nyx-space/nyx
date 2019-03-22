@@ -18,7 +18,7 @@ fn two_body_parametrized() {
     use nyx::celestia::EARTH;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
+    use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -60,7 +60,7 @@ fn two_body_custom() {
     use self::na::Vector6;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
+    use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -101,7 +101,7 @@ fn two_body_state_parametrized() {
     use nyx::celestia::{State, EARTH, ECI};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
+    use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let dt = ModifiedJulian { days: 21545.0 };

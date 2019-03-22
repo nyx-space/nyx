@@ -4,7 +4,7 @@ use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, VectorN};
 use std::f64;
 
-use self::error_ctrl::{ErrorCtrl, RSSStep, RSSStepPV};
+use self::error_ctrl::{ErrorCtrl, RSSStepPV};
 use dynamics::Dynamics;
 
 /// Provides different methods for controlling the error computation of the integrator.
@@ -302,6 +302,8 @@ impl Default for PropOpts<RSSStepPV> {
 
 #[test]
 fn test_options() {
+    use self::error_ctrl::RSSStep;
+
     let opts = PropOpts::with_fixed_step(1e-1, RSSStep {});
     assert_eq!(opts.min_step, 1e-1);
     assert_eq!(opts.max_step, 1e-1);

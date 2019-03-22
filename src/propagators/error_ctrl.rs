@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, Vector3, Vector6, VectorN, U3};
+use self::na::{DefaultAllocator, DimName, VectorN, U3};
 
 // This determines when to take into consideration the magnitude of the state_delta and
 // prevents dividing by too small of a number.

@@ -13,7 +13,7 @@ use self::nyx::dynamics::Dynamics;
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
-use self::nyx::propagators::error_ctrl::{ErrorCtrl, LargestError, RSSStepPV};
+use self::nyx::propagators::error_ctrl::{LargestError, RSSStepPV};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
 use std::sync::mpsc;
