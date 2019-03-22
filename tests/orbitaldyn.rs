@@ -39,10 +39,10 @@ fn two_body_parametrized() {
 
     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
-    prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
+    prop.until_time_elapsed(prop_time, &mut dyn);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, RSSStepPV::estimate);
+    prop.until_time_elapsed(-prop_time, &mut dyn);
     let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
     assert!(
         err_r < 1e-5,
@@ -78,10 +78,10 @@ fn two_body_custom() {
 
     let mut prop = Propagator::new::<RK89>(&PropOpts::<RSSStepPV>::default());
     let mut dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
-    prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
+    prop.until_time_elapsed(prop_time, &mut dyn);
     assert_eq!(dyn.state(), rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, RSSStepPV::estimate);
+    prop.until_time_elapsed(-prop_time, &mut dyn);
     let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
     assert!(
         err_r < 1e-5,
@@ -126,7 +126,7 @@ fn two_body_state_parametrized() {
 
     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-    let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
+    let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn);
 
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
@@ -137,7 +137,7 @@ fn two_body_state_parametrized() {
     println!("Final state:\n{0}\n{0:o}", final_state);
 
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, RSSStepPV::estimate);
+    prop.until_time_elapsed(-prop_time, &mut dyn);
     let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &initial_state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,

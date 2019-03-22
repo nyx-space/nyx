@@ -99,14 +99,8 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `dyn.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed<D: Dynamics, C: Copy>(
-        &mut self,
-        elapsed_time: f64,
-        dyn: &mut D,
-        err_estimator: C,
-    ) -> (f64, VectorN<f64, D::StateSize>)
+    pub fn until_time_elapsed<D: Dynamics>(&mut self, elapsed_time: f64, dyn: &mut D) -> (f64, VectorN<f64, D::StateSize>)
     where
-        C: Fn(&VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>, &VectorN<f64, D::StateSize>) -> f64,
         DefaultAllocator: Allocator<f64, D::StateSize>,
     {
         let backprop = elapsed_time < 0.0;
@@ -116,12 +110,9 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
         let init_seconds = dyn.time();
         let stop_time = init_seconds + elapsed_time;
         loop {
-            let (t, state) = self.derive(
-                dyn.time(),
-                &dyn.state(),
-                |t_: f64, state_: &VectorN<f64, D::StateSize>| dyn.eom(t_, state_),
-                err_estimator,
-            );
+            let (t, state) = self.derive(dyn.time(), &dyn.state(), |t_: f64, state_: &VectorN<f64, D::StateSize>| {
+                dyn.eom(t_, state_)
+            });
             if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
                 // We haven't passed the time based stopping condition.
                 dyn.set_state(t, &state);
@@ -132,12 +123,9 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
                     debug!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);
                     // Take one final step
-                    let (t, state) = self.derive(
-                        dyn.time(),
-                        &dyn.state(),
-                        |t_: f64, state_: &VectorN<f64, D::StateSize>| dyn.eom(t_, state_),
-                        err_estimator,
-                    );
+                    let (t, state) = self.derive(dyn.time(), &dyn.state(), |t_: f64, state_: &VectorN<f64, D::StateSize>| {
+                        dyn.eom(t_, state_)
+                    });
                     dyn.set_state(t, &state);
                 } else {
                     dyn.set_state(t, &state);
@@ -157,16 +145,9 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive<D, C, N: DimName>(
-        &mut self,
-        t: f64,
-        state: &VectorN<f64, N>,
-        d_xdt: D,
-        err_estimator: C,
-    ) -> (f64, VectorN<f64, N>)
+    pub fn derive<D, N: DimName>(&mut self, t: f64, state: &VectorN<f64, N>, d_xdt: D) -> (f64, VectorN<f64, N>)
     where
         D: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
-        C: Fn(&VectorN<f64, N>, &VectorN<f64, N>, &VectorN<f64, N>) -> f64,
         DefaultAllocator: Allocator<f64, N>,
     {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)

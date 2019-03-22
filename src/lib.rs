@@ -156,9 +156,9 @@ pub mod propagators;
 ///         ModifiedJulian { days: 21546.0 }
 ///     );
 ///
-///     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
+///     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV{}));
 ///     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-///     prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::RSSStepPV::estimate);
+///     prop.until_time_elapsed(prop_time, &mut dyn);
 ///
 ///     let final_dt = ModifiedJulian {
 ///         days: dt.days + dyn.time() / SECONDS_PER_DAY,
@@ -185,7 +185,8 @@ pub mod propagators;
 /// use self::nyx::dynamics::celestial::TwoBody;
 /// use self::nyx::dynamics::momentum::AngularMom;
 /// use self::nyx::celestia::{State, EARTH, ECI};
-/// use self::nyx::propagators::{error_ctrl, error_ctrl::ErrorCtrl, CashKarp45, PropOpts, Propagator};
+/// use self::nyx::propagators::error_ctrl::{ErrorCtrl, LargestError};
+/// use self::nyx::propagators::{CashKarp45, PropOpts, Propagator};
 /// use self::na::{Matrix3, U3, U6, U9, Vector3, Vector6, VectorN};
 /// use std::f64;
 /// use hifitime::julian::ModifiedJulian;
@@ -256,9 +257,9 @@ pub mod propagators;
 ///
 ///     // And now let's define the propagator and propagate for a short amount of time.
 ///     let mut prop =
-///         Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
+///         Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, LargestError {}));
 ///
-///     prop.until_time_elapsed(prop_time, &mut full_model, error_ctrl::LargestError::estimate);
+///     prop.until_time_elapsed(prop_time, &mut full_model);
 ///
 ///     let prev_details = prop.latest_details().clone();
 ///     println!("{:?}", prev_details);

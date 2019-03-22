@@ -65,7 +65,7 @@ fn regress_leo_day_adaptive() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, RSSStatePV::estimate);
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
             iterations += 1;
             if t < prop_time {
                 // We haven't passed the time based stopping condition.
@@ -83,7 +83,7 @@ fn regress_leo_day_adaptive() {
                 let overshot = t - prop_time;
                 prop.set_fixed_step(prev_details.step - overshot);
                 // Take one final step
-                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, RSSStatePV::estimate);
+                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
 
                 assert!((t - prop_time).abs() < 1e-12, "propagated for {} instead of {}", t, prop_time);
 
@@ -170,7 +170,7 @@ fn gmat_val_leo_day_adaptive() {
         let mut cur_t = 0.0;
         let mut iterations = 0;
         loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, RSSStatePV::estimate);
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
             iterations += 1;
             if t < prop_time {
                 // We haven't passed the time based stopping condition.
@@ -188,7 +188,7 @@ fn gmat_val_leo_day_adaptive() {
                 let overshot = t - prop_time;
                 prop.set_fixed_step(prev_details.step - overshot);
                 // Take one final step
-                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, RSSStatePV::estimate);
+                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
 
                 assert!((t - prop_time).abs() < 1e-12, "propagated for {} instead of {}", t, prop_time);
 
@@ -274,7 +274,7 @@ fn gmat_val_leo_day_fixed() {
         let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
         let mut cur_t = 0.0;
         loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, RSSStatePV::estimate);
+            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
             cur_t = t;
             init_state = state;
             if cur_t >= 3_600.0 * 24.0 {

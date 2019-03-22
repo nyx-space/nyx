@@ -111,7 +111,7 @@ fn ckf_fixed_step_perfect_stations_std() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
+        prop.until_time_elapsed(prop_time, &mut dyn);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -143,7 +143,8 @@ fn ckf_fixed_step_perfect_stations_std() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut prop_est = Propagator::new::<RK4Fixed>(&opts);
+    let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
+    let mut prop_est = Propagator::new::<RK4Fixed>(&opts_est);
     let mut tb_estimator = TwoBodyWithStm::from_state::<EARTH, ECI>(initial_state);
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
@@ -177,7 +178,7 @@ fn ckf_fixed_step_perfect_stations_std() {
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, LargestError::estimate);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
@@ -249,7 +250,7 @@ fn ekf_fixed_step_perfect_stations() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
+        prop.until_time_elapsed(prop_time, &mut dyn);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -281,7 +282,8 @@ fn ekf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut prop_est = Propagator::new::<RK4Fixed>(&opts);
+    let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
+    let mut prop_est = Propagator::new::<RK4Fixed>(&opts_est);
     let mut tb_estimator = TwoBodyWithStm::from_state::<EARTH, ECI>(initial_state);
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
@@ -310,7 +312,7 @@ fn ekf_fixed_step_perfect_stations() {
     for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, LargestError::estimate);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator);
         if meas_no > num_meas_for_ekf && !kf.ekf {
             println!("switched to EKF");
             kf.ekf = true;
@@ -385,7 +387,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
         let mut prop = Propagator::new::<RK4Fixed>(&opts.clone());
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
         dyn.tx_chan = Some(&truth_tx);
-        prop.until_time_elapsed(prop_time, &mut dyn, RSSStepPV::estimate);
+        prop.until_time_elapsed(prop_time, &mut dyn);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -417,7 +419,8 @@ fn ckf_fixed_step_perfect_stations_dual() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut prop_est = Propagator::new::<RK4Fixed>(&opts);
+    let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
+    let mut prop_est = Propagator::new::<RK4Fixed>(&opts_est);
     let mut tb_estimator = TwoBodyWithDualStm::from_state::<EARTH, ECI>(initial_state);
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
@@ -450,7 +453,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time, &mut tb_estimator, LargestError::estimate);
+        prop_est.until_time_elapsed(delta_time, &mut tb_estimator);
         // Update the STM of the KF
         ckf.update_stm(tb_estimator.stm.clone());
         // Get the computed observation
