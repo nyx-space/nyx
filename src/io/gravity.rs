@@ -43,7 +43,7 @@ impl MemoryBackend {
         data.insert((0, 0), (0.0, 0.0));
         data.insert((1, 0), (0.0, 0.0));
         data.insert((1, 1), (0.0, 0.0));
-        data.insert((2, 0), (-4.84165374886470e-04, 0.0));
+        data.insert((2, 0), (-4.841_653_748_864_70e-04, 0.0));
         data.insert((2, 1), (0.0, 0.0));
         data.insert((2, 2), (0.0, 0.0));
 
@@ -61,7 +61,7 @@ impl MemoryBackend {
     pub fn j2_jgm2() -> MemoryBackend {
         let mut data = HashMap::new();
         data.insert((1, 0), (0.0, 0.0));
-        data.insert((2, 0), (-4.8416539e-04, 0.0));
+        data.insert((2, 0), (-4.841_653_9e-04, 0.0));
         MemoryBackend {
             degree: 2,
             order: 0,
@@ -75,7 +75,7 @@ impl MemoryBackend {
     pub fn j2_egm2008() -> MemoryBackend {
         let mut data = HashMap::new();
         data.insert((1, 0), (0.0, 0.0));
-        data.insert((2, 0), (-0.484165143790815e-03, 0.0));
+        data.insert((2, 0), (-0.484_165_143_790_815e-03, 0.0));
         MemoryBackend {
             degree: 2,
             order: 0,

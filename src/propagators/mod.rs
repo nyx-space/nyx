@@ -266,7 +266,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
             tolerance: 0.0,
             fixed_step: true,
             attempts: 0,
-            errctrl: errctrl,
+            errctrl,
         }
     }
 
@@ -280,7 +280,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
             tolerance,
             attempts: 50,
             fixed_step: false,
-            errctrl: errctrl,
+            errctrl,
         }
     }
 }
