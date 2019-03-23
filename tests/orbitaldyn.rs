@@ -37,13 +37,13 @@ fn two_body_parametrized() {
         5.848940867758592,
     ]);
 
-    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
-    let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
-    prop.until_time_elapsed(prop_time, &mut dyn);
-    assert_eq!(dyn.state(), rslt, "two body prop failed");
+    let dyn = TwoBody::from_state_vec::<EARTH>(init);
+    let mut prop = Propagator::new::<RK89>(dyn, &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
+    prop.until_time_elapsed(prop_time);
+    assert_eq!(prop.state, rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn);
-    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    prop.until_time_elapsed(-prop_time);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state, &init);
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -76,13 +76,13 @@ fn two_body_custom() {
         5.848940867979176,
     );
 
-    let mut prop = Propagator::new::<RK89>(&PropOpts::<RSSStepPV>::default());
-    let mut dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
-    prop.until_time_elapsed(prop_time, &mut dyn);
-    assert_eq!(dyn.state(), rslt, "two body prop failed");
+    let dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
+    let mut prop = Propagator::new::<RK89>(dyn, &PropOpts::<RSSStepPV>::default());
+    prop.until_time_elapsed(prop_time);
+    assert_eq!(prop.state, rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn);
-    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    prop.until_time_elapsed(-prop_time);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state, &init);
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -124,21 +124,21 @@ fn two_body_state_parametrized() {
         ModifiedJulian { days: 21546.0 },
     );
 
-    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
-    let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-    let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn);
+    let dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
+    let mut prop = Propagator::new::<RK89>(dyn, &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
+    let (final_t, _) = prop.until_time_elapsed(prop_time);
 
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
     };
-    let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&dyn.state(), final_dt, ECI {});
+    let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&prop.state, final_dt, ECI {});
     assert_eq!(final_state, rslt, "two body prop failed",);
 
     println!("Final state:\n{0}\n{0:o}", final_state);
 
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn);
-    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &initial_state.to_cartesian_vec());
+    prop.until_time_elapsed(-prop_time);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state, &initial_state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"

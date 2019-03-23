@@ -2,7 +2,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use self::na::{Vector6, U1, U3};
 use std::f64;
-
+/*
 fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
     let radius = state.fixed_slice::<U3, U1>(0, 0);
     let velocity = state.fixed_slice::<U3, U1>(3, 0);
@@ -296,3 +296,4 @@ fn gmat_val_leo_day_fixed() {
         }
     }
 }
+*/

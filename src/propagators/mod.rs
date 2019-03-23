@@ -3,6 +3,7 @@ extern crate nalgebra as na;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, VectorN};
 use std::f64;
+use std::sync::mpsc::Sender;
 
 use self::error_ctrl::{ErrorCtrl, RSSStepPV};
 use dynamics::Dynamics;
@@ -56,10 +57,16 @@ pub struct IntegrationDetails {
 /// Includes the options, the integrator details of the previous step, and
 /// the set of coefficients used for the monomorphic instance. **WARNING:** must be stored in a mutuable variable.
 #[derive(Clone, Debug)]
-pub struct Propagator<'a, E>
+pub struct Propagator<'a, M, E>
 where
+    M: Dynamics,
     E: ErrorCtrl,
+    DefaultAllocator: Allocator<f64, M::StateSize>,
 {
+    pub tx_chan: Option<&'a Sender<(f64, VectorN<f64, M::StateSize>)>>,
+    pub time: f64,
+    pub state: VectorN<f64, M::StateSize>,
+    dynamics: M,
     opts: PropOpts<E>,           // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
     step_size: f64,              // Stores the adapted step for the _next_ call
@@ -71,10 +78,17 @@ where
 }
 
 /// The `Propagator` trait defines the functions of a propagator.
-impl<'a, E: ErrorCtrl> Propagator<'a, E> {
+impl<'a, M: Dynamics, E: ErrorCtrl> Propagator<'a, M, E>
+where
+    DefaultAllocator: Allocator<f64, M::StateSize>,
+{
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(opts: &PropOpts<E>) -> Propagator<'a, E> {
+    pub fn new<T: RK>(dynamics: M, opts: &PropOpts<E>) -> Propagator<'a, M, E> {
         Propagator {
+            tx_chan: None,
+            time: dynamics.time(),
+            state: dynamics.state(),
+            dynamics,
             opts: *opts,
             details: IntegrationDetails {
                 step: 0.0,
@@ -98,24 +112,22 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
     /// This method propagates the provided Dynamics `dyn` for `elapsed_time` seconds. WARNING: This function has many caveats (please read detailed docs).
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
-    /// - It is **assumed** that `dyn.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed<D: Dynamics>(&mut self, elapsed_time: f64, dyn: &mut D) -> (f64, VectorN<f64, D::StateSize>)
-    where
-        DefaultAllocator: Allocator<f64, D::StateSize>,
-    {
+    /// - It is **assumed** that `self.dynamics.time()` returns a time in the same units as elapsed_time.
+    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> (f64, VectorN<f64, M::StateSize>) {
         let backprop = elapsed_time < 0.0;
         if backprop {
             self.step_size *= -1.0; // Invert the step size
         }
-        let init_seconds = dyn.time();
+        let init_seconds = self.time;
         let stop_time = init_seconds + elapsed_time;
         loop {
-            let (t, state) = self.derive(dyn.time(), &dyn.state(), |t_: f64, state_: &VectorN<f64, D::StateSize>| {
-                dyn.eom(t_, state_)
-            });
+            let dx = self.state.clone();
+            let dt = self.time;
+            let (t, state) = self.derive(dt, dx);
             if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
                 // We haven't passed the time based stopping condition.
-                dyn.set_state(t, &state);
+                self.time = t;
+                self.state = state;
             } else {
                 let prev_details = self.latest_details().clone();
                 let overshot = t - stop_time;
@@ -123,12 +135,14 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
                     debug!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);
                     // Take one final step
-                    let (t, state) = self.derive(dyn.time(), &dyn.state(), |t_: f64, state_: &VectorN<f64, D::StateSize>| {
-                        dyn.eom(t_, state_)
-                    });
-                    dyn.set_state(t, &state);
+                    let dx = self.state.clone();
+                    let dt = self.time;
+                    let (t, state) = self.derive(dt, dx);
+                    self.time = t;
+                    self.state = state.clone();
                 } else {
-                    dyn.set_state(t, &state);
+                    self.time = t;
+                    self.state = state.clone();
                 }
                 return (t, state);
             }
@@ -145,16 +159,12 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive<D, N: DimName>(&mut self, t: f64, state: &VectorN<f64, N>, d_xdt: D) -> (f64, VectorN<f64, N>)
-    where
-        D: Fn(f64, &VectorN<f64, N>) -> VectorN<f64, N>,
-        DefaultAllocator: Allocator<f64, N>,
-    {
+    pub fn derive(&mut self, t: f64, state: VectorN<f64, M::StateSize>) -> (f64, VectorN<f64, M::StateSize>) {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         loop {
             let mut k = Vec::with_capacity(self.stages + 1); // Will store all the k_i.
-            let ki = d_xdt(t, state);
+            let ki = self.dynamics.eom(t, &state.clone());
             k.push(ki);
             let mut a_idx: usize = 0;
             for _ in 0..(self.stages - 1) {
@@ -162,7 +172,7 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
                 // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
                 // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
-                let mut wi = VectorN::from_element(0.0);
+                let mut wi = VectorN::<f64, M::StateSize>::from_element(0.0);
                 for kj in &k {
                     let a_ij = self.a_coeffs[a_idx];
                     ci += a_ij;
@@ -170,14 +180,16 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
                     a_idx += 1;
                 }
 
-                let ki = d_xdt(t + ci * self.step_size, &(state + self.step_size * wi));
+                let ki = self
+                    .dynamics
+                    .eom(t + ci * self.step_size, &(state.clone() + self.step_size * wi));
                 k.push(ki);
             }
             // Compute the next state and the error
             let mut next_state = state.clone();
             // State error estimation from https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Adaptive_Runge%E2%80%93Kutta_methods
             // This is consistent with GMAT https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L537
-            let mut error_est = VectorN::from_element(0.0);
+            let mut error_est = VectorN::<f64, M::StateSize>::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
                 if !self.fixed_step {
@@ -193,7 +205,7 @@ impl<'a, E: ErrorCtrl> Propagator<'a, E> {
                 return ((t + self.details.step), next_state);
             } else {
                 // Compute the error estimate.
-                self.details.error = E::estimate(&error_est, &next_state.clone(), state);
+                self.details.error = E::estimate(&error_est, &next_state.clone(), &state.clone());
                 if self.details.error <= self.opts.tolerance
                     || self.step_size <= self.opts.min_step
                     || self.details.attempts >= self.opts.attempts
