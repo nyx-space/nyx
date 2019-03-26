@@ -477,7 +477,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
                 assert!(
-                    latest_est.state.norm() < 1e-9,
+                    latest_est.state.norm() < EPSILON,
                     "estimate error should be zero (perfect dynamics) ({:e})",
                     latest_est.state.norm()
                 );
