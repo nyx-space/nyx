@@ -49,7 +49,7 @@ impl RK for CashKarp45 {
 
 /// `RK4Fixed` is a fixed step RK4.
 ///
-/// If initialized with an `Options.with_adaptive_step`, the variable step will **not** be taken into consideration.
+/// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
 pub struct RK4Fixed {}
 
 impl RK for RK4Fixed {
@@ -79,7 +79,7 @@ impl RK for RK4Fixed {
 
 /// `RK2Fixed` is a fixed step RK4 (or midpoint method).
 ///
-/// If initialized with an `Options.with_adaptive_step`, the variable step will **not** be taken into consideration.
+/// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
 pub struct RK2Fixed {}
 
 impl RK for RK2Fixed {

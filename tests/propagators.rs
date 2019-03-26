@@ -1,36 +1,21 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
-use self::na::{Vector6, U1, U3};
 use std::f64;
-
-fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
-    let radius = state.fixed_slice::<U3, U1>(0, 0);
-    let velocity = state.fixed_slice::<U3, U1>(3, 0);
-    let body_acceleration = (-398_600.4415 / radius.norm().powi(3)) * radius;
-    Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
-}
 
 #[test]
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
-    extern crate nalgebra as na;
     use self::na::Vector6;
+    use nyx::celestia::EARTH;
+    use nyx::dynamics::celestial::TwoBody;
+    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-
-    // NOTE: In this test we only use the propagators which also exist in GMAT.
-    // Refer to `regress_leo_day_adaptive` for the additional propagators.
-    let mut all_props = vec![
-        Propagator::new::<RK2Fixed>(&Options::with_fixed_step(1.0)),
-        Propagator::new::<CashKarp45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<Fehlberg45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-    ];
-
-    let all_it_cnt = vec![86_400, 5_178, 5_935]; // NOTE: This is a decent estimate of which propagators to use depending if speed is important.
+    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -59,74 +44,74 @@ fn regress_leo_day_adaptive() {
         ]),
     ];
 
-    for (p_id, prop) in all_props.iter_mut().enumerate() {
-        let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
-        let mut cur_t = 0.0;
-        let mut iterations = 0;
-        loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
-            iterations += 1;
-            if t < prop_time {
-                // We haven't passed the time based stopping condition.
-                cur_t = t;
-                init_state = state;
-            } else {
-                // NOTE: The refined propagation time for here is different from what GMAT does.
-                // In fact, GMAT uses the [secant method](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/command/Propagate.cpp#L5450)
-                // even for time computation. This means there are several iterations over the derivatives, and a non-exact iteration time.
-                // GMAT still uses a fixed step propagation though.
-                // At this point, we've passed the condition, so let's switch to a fixed step of _exactly_ the
-                // previous time step minus the amount by which we overshot. This allows us to propagate in time for
-                // _exactly_ the time we want to propagate for.
-                let prev_details = prop.latest_details().clone();
-                let overshot = t - prop_time;
-                prop.set_fixed_step(prev_details.step - overshot);
-                // Take one final step
-                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<RK2Fixed>(&mut dyn, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
+        let prev_details = prop.latest_details();
+        if prev_details.error > accuracy {
+            assert!(
+                prev_details.step - min_step < f64::EPSILON,
+                "step size should be at its minimum because error is higher than tolerance: {:?}",
+                prev_details
+            );
+        }
+    }
 
-                assert!((t - prop_time).abs() < 1e-12, "propagated for {} instead of {}", t, prop_time);
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<CashKarp45>(
+            &mut dyn,
+            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+        );
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
+        let prev_details = prop.latest_details();
+        if prev_details.error > accuracy {
+            assert!(
+                prev_details.step - min_step < f64::EPSILON,
+                "step size should be at its minimum because error is higher than tolerance: {:?}",
+                prev_details
+            );
+        }
+    }
 
-                // Let's check that, prior to the refined step, we either hit the accuracy wanted,
-                // or we are using the minimum step size.
-                if prev_details.error > accuracy {
-                    assert!(
-                        prev_details.step - min_step < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
-                        p_id,
-                        prev_details
-                    );
-                }
-
-                assert_eq!(state, all_rslts[p_id], "leo prop failed for p_id = {}", p_id);
-
-                assert_eq!(iterations, all_it_cnt[p_id], "wrong number of iterations (p_id = {})", p_id);
-                break;
-            }
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<Fehlberg45>(
+            &mut dyn,
+            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+        );
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
+        let prev_details = prop.latest_details();
+        if prev_details.error > accuracy {
+            assert!(
+                prev_details.step - min_step < f64::EPSILON,
+                "step size should be at its minimum because error is higher than tolerance: {:?}",
+                prev_details
+            );
         }
     }
 }
 
 #[test]
 fn gmat_val_leo_day_adaptive() {
-    extern crate nalgebra as na;
+    // NOTE: In this test we only use the propagators which also exist in GMAT.
+    // Refer to `regress_leo_day_adaptive` for the additional propagators.
+
     use self::na::Vector6;
+    use nyx::celestia::EARTH;
+    use nyx::dynamics::celestial::TwoBody;
+    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-
-    // NOTE: In this test we only use the propagators which also exist in GMAT.
-    // Refer to `regress_leo_day_adaptive` for the additional propagators.
-    let mut all_props = vec![
-        Propagator::new::<Dormand45>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<Verner56>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<Dormand78>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-        Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy)),
-    ];
-
-    let all_it_cnt = vec![5_412, 3_130, 2_880, 2_880]; // This number of iterations does not include the final refined fixed step.
+    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -163,65 +148,90 @@ fn gmat_val_leo_day_adaptive() {
         ]),
     ];
 
-    for (p_id, prop) in all_props.iter_mut().enumerate() {
-        let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
-        let mut cur_t = 0.0;
-        let mut iterations = 0;
-        loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
-            iterations += 1;
-            if t < prop_time {
-                // We haven't passed the time based stopping condition.
-                cur_t = t;
-                init_state = state;
-            } else {
-                // NOTE: The refined propagation time for here is different from what GMAT does.
-                // In fact, GMAT uses the [secant method](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/command/Propagate.cpp#L5450)
-                // even for time computation. This means there are several iterations over the derivatives, and a non-exact iteration time.
-                // GMAT still uses a fixed step propagation though.
-                // At this point, we've passed the condition, so let's switch to a fixed step of _exactly_ the
-                // previous time step minus the amount by which we overshot. This allows us to propagate in time for
-                // _exactly_ the time we want to propagate for.
-                let prev_details = prop.latest_details().clone();
-                let overshot = t - prop_time;
-                prop.set_fixed_step(prev_details.step - overshot);
-                // Take one final step
-                let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<Dormand45>(
+            &mut dyn,
+            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+        );
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
+        let prev_details = prop.latest_details();
+        if prev_details.error > accuracy {
+            assert!(
+                prev_details.step - min_step < f64::EPSILON,
+                "step size should be at its minimum because error is higher than tolerance: {:?}",
+                prev_details
+            );
+        }
+    }
 
-                assert!((t - prop_time).abs() < 1e-12, "propagated for {} instead of {}", t, prop_time);
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<Verner56>(
+            &mut dyn,
+            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+        );
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
+        let prev_details = prop.latest_details();
+        if prev_details.error > accuracy {
+            assert!(
+                prev_details.step - min_step < f64::EPSILON,
+                "step size should be at its minimum because error is higher than tolerance: {:?}",
+                prev_details
+            );
+        }
+    }
 
-                // Let's check that, prior to the refined step, we either hit the accuracy wanted,
-                // or we are using the minimum step size.
-                if prev_details.error > accuracy {
-                    assert!(
-                        prev_details.step - min_step < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
-                        p_id,
-                        prev_details
-                    );
-                }
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<Dormand78>(
+            &mut dyn,
+            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+        );
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
+        let prev_details = prop.latest_details();
+        if prev_details.error > accuracy {
+            assert!(
+                prev_details.step - min_step < f64::EPSILON,
+                "step size should be at its minimum because error is higher than tolerance: {:?}",
+                prev_details
+            );
+        }
+    }
 
-                assert_eq!(state, all_rslts[p_id], "leo prop failed for p_id = {}", p_id);
-
-                assert_eq!(iterations, all_it_cnt[p_id], "wrong number of iterations (p_id = {})", p_id);
-                break;
-            }
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<RK89>(
+            &mut dyn,
+            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+        );
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[3], "two body prop failed");
+        let prev_details = prop.latest_details();
+        if prev_details.error > accuracy {
+            assert!(
+                prev_details.step - min_step < f64::EPSILON,
+                "step size should be at its minimum because error is higher than tolerance: {:?}",
+                prev_details
+            );
         }
     }
 }
 
 #[test]
 fn gmat_val_leo_day_fixed() {
-    extern crate nalgebra as na;
-    use self::na::Vector6;
+    use crate::na::Vector6;
+    use nyx::celestia::EARTH;
+    use nyx::dynamics::celestial::TwoBody;
+    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
-    let mut all_props = vec![
-        Propagator::new::<RK4Fixed>(&Options::with_fixed_step(1.0)),
-        Propagator::new::<Verner56>(&Options::with_fixed_step(10.0)),
-        Propagator::new::<Dormand45>(&Options::with_fixed_step(10.0)),
-        Propagator::new::<Dormand78>(&Options::with_fixed_step(10.0)),
-        Propagator::new::<RK89>(&Options::with_fixed_step(10.0)),
-    ];
+
+    let prop_time = 3_600.0 * 24.0;
+    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
+
     let all_rslts = vec![
         Vector6::from_row_slice(&[
             -5971.194191670768,
@@ -265,30 +275,38 @@ fn gmat_val_leo_day_fixed() {
         ]),
     ];
 
-    // let mut p_id: usize = 0; // We're using this as a propagation index in order to avoid modifying borrowed content
-    for (p_id, prop) in all_props.iter_mut().enumerate() {
-        let mut init_state = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
-        let mut cur_t = 0.0;
-        loop {
-            let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics, error_ctrl::rss_state_pos_vel);
-            cur_t = t;
-            init_state = state;
-            if cur_t >= 3_600.0 * 24.0 {
-                let details = prop.latest_details();
-                if details.error > 1e-2 {
-                    assert!(
-                        details.step - 1e-1 < f64::EPSILON,
-                        "step size should be at its minimum because error is higher than tolerance (p_id = {}): {:?}",
-                        p_id,
-                        details
-                    );
-                }
-                println!("p_id={} => {:?}", p_id, prop.latest_details());
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dyn, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
+    }
 
-                assert_eq!(state, all_rslts[p_id], "leo fixed prop failed for p_id = {}", p_id);
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<Verner56>(&mut dyn, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
+    }
 
-                break;
-            }
-        }
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<Dormand45>(&mut dyn, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
+    }
+
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<Dormand78>(&mut dyn, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[3], "two body prop failed");
+    }
+
+    {
+        let mut dyn = TwoBody::from_state_vec::<EARTH>(init.clone());
+        let mut prop = Propagator::new::<RK89>(&mut dyn, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        prop.until_time_elapsed(prop_time);
+        assert_eq!(prop.state(), all_rslts[4], "two body prop failed");
     }
 }

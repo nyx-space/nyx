@@ -14,7 +14,7 @@ use self::nyx::io::cosmo::Cosmographia;
 use self::nyx::od::Measurement;
 use self::nyx::od::kalman::{Estimate, KF};
 use self::nyx::od::ranging::GroundStation;
-use self::nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+use self::nyx::propagators::{error_ctrl, PropOpts, Propagator, RK89};
 use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -37,7 +37,7 @@ fn main() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = Options::with_fixed_step(step_size);
+    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();

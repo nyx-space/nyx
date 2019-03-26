@@ -6,9 +6,8 @@ fn const_mom() {
     use self::na::{Matrix3, Vector3};
     use nyx::dynamics::momentum::AngularMom;
     use nyx::dynamics::Dynamics;
-    use nyx::propagators::{error_ctrl, CashKarp45, Options, Propagator};
-
-    let mut prop = Propagator::new::<CashKarp45>(&Options::with_adaptive_step(0.1, 5.0, 1e-8));
+    use nyx::propagators::error_ctrl::LargestStep;
+    use nyx::propagators::{CashKarp45, PropOpts, Propagator};
 
     let omega = Vector3::new(0.1, 0.4, -0.2);
     let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);
@@ -16,25 +15,18 @@ fn const_mom() {
 
     let mut dyn = AngularMom::from_tensor_matrix(&tensor, &omega);
     let init_momentum = dyn.momentum().norm();
-    loop {
-        let (t, state) = prop.derive(
-            dyn.time(),
-            &dyn.state(),
-            |t_: f64, state_: &Vector3<f64>| dyn.eom(t_, state_),
-            error_ctrl::largest_step,
+
+    let mut prop = Propagator::new::<CashKarp45>(&mut dyn, &PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}));
+
+    prop.until_time_elapsed(5.0);
+
+    println!("{:?}", prop.latest_details());
+    let delta_mom = ((prop.dynamics.momentum().norm() - init_momentum) / init_momentum).abs();
+    if delta_mom > tolerance {
+        panic!(
+            "angular momentum prop failed: momentum changed by {:e} (> {:e})",
+            delta_mom, tolerance
         );
-        dyn.set_state(t, &state);
-        if dyn.time() >= 5.0 {
-            println!("{:?}", prop.latest_details());
-            let delta_mom = ((dyn.momentum().norm() - init_momentum) / init_momentum).abs();
-            if delta_mom > tolerance {
-                panic!(
-                    "angular momentum prop failed: momentum changed by {:e} (> {:e})",
-                    delta_mom, tolerance
-                );
-            }
-            break;
-        }
     }
 }
 

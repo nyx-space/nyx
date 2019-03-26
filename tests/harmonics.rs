@@ -12,7 +12,7 @@ fn gmat_val_harmonics_j2jgm3() {
     use nyx::dynamics::gravity::Harmonics;
     use nyx::dynamics::Dynamics;
     use nyx::io::gravity::MemoryBackend;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use nyx::propagators::{error_ctrl, PropOpts, Propagator, RK89};
 
     // TODO: Provide a cleaner way to wrap these, probably by implementing the std::ops::Add.
     // Or at the very least provide some template scenario which already has the dynamics included.
@@ -62,7 +62,7 @@ fn gmat_val_harmonics_j2jgm3() {
     let min_step = 0.1;
     let max_step = 60.0;
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = J2Dyn {
         count: 0,
@@ -76,7 +76,7 @@ fn gmat_val_harmonics_j2jgm3() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::rss_step_pos_vel,
+            error_ctrl::error_ctrl::RSSStepPV::estimate,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -92,7 +92,7 @@ fn gmat_val_harmonics_j2jgm3() {
                     dyn.time(),
                     &dyn.state(),
                     |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                    error_ctrl::rss_step_pos_vel,
+                    error_ctrl::error_ctrl::RSSStepPV::estimate,
                 );
                 dyn.set_state(t, &state);
             } else {
@@ -134,7 +134,7 @@ fn gmat_val_harmonics_21x21() {
     use nyx::dynamics::gravity::Harmonics;
     use nyx::dynamics::Dynamics;
     use nyx::io::gravity::MemoryBackend;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use nyx::propagators::{error_ctrl, PropOpts, Propagator, RK89};
 
     let filepath = "./data/JGM3.cof.gz";
 
@@ -186,7 +186,7 @@ fn gmat_val_harmonics_21x21() {
     let min_step = 0.1;
     let max_step = 60.0;
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = J2Dyn {
         count: 0,
@@ -200,7 +200,7 @@ fn gmat_val_harmonics_21x21() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::rss_step_pos_vel,
+            error_ctrl::error_ctrl::RSSStepPV::estimate,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -216,7 +216,7 @@ fn gmat_val_harmonics_21x21() {
                     dyn.time(),
                     &dyn.state(),
                     |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                    error_ctrl::rss_step_pos_vel,
+                    error_ctrl::error_ctrl::RSSStepPV::estimate,
                 );
                 dyn.set_state(t, &state);
             } else {
@@ -257,7 +257,7 @@ fn gmat_val_harmonics_70x70() {
     use nyx::dynamics::gravity::Harmonics;
     use nyx::dynamics::Dynamics;
     use nyx::io::gravity::MemoryBackend;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use nyx::propagators::{error_ctrl, PropOpts, Propagator, RK89};
 
     let filepath = "./data/JGM3.cof.gz";
 
@@ -309,7 +309,7 @@ fn gmat_val_harmonics_70x70() {
     let min_step = 0.1;
     let max_step = 60.0;
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
+    let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy));
 
     let mut dyn = J2Dyn {
         count: 0,
@@ -323,7 +323,7 @@ fn gmat_val_harmonics_70x70() {
             dyn.time(),
             &dyn.state(),
             |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-            error_ctrl::rss_step_pos_vel,
+            error_ctrl::error_ctrl::RSSStepPV::estimate,
         );
         if t < prop_time {
             // We haven't passed the time based stopping condition.
@@ -339,7 +339,7 @@ fn gmat_val_harmonics_70x70() {
                     dyn.time(),
                     &dyn.state(),
                     |t_: f64, state_: &VectorN<f64, U6>| dyn.eom(t_, state_),
-                    error_ctrl::rss_step_pos_vel,
+                    error_ctrl::error_ctrl::RSSStepPV::estimate,
                 );
                 dyn.set_state(t, &state);
             } else {

@@ -17,7 +17,7 @@ fn two_body_parametrized() {
     use self::na::Vector6;
     use nyx::celestia::EARTH;
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
+    use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
@@ -36,13 +36,16 @@ fn two_body_parametrized() {
         5.848940867758592,
     ]);
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
-    prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    assert_eq!(dyn.state(), rslt, "two body prop failed");
+    let mut prop = Propagator::new::<RK89>(
+        &mut dyn,
+        &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
+    );
+    prop.until_time_elapsed(prop_time);
+    assert_eq!(prop.state(), rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    prop.until_time_elapsed(-prop_time);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &init);
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -58,32 +61,29 @@ fn two_body_custom() {
     extern crate nalgebra as na;
     use self::na::Vector6;
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
+    use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
-    let accuracy = 1e-12;
-    let min_step = 0.1;
-    let max_step = 60.0;
 
     let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
 
     let rslt = Vector6::new(
-        -5971.1941916712285,
-        3945.5066532419537,
-        2864.636618390466,
-        0.04909695760948815,
-        -4.1850933184621315,
-        5.848940867758592,
+        -5971.194191684024,
+        3945.5066536247373,
+        2864.6366178672706,
+        0.049096957141044464,
+        -4.185093318149689,
+        5.848940867979176,
     );
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec_with_gm(init, 398600.4415);
-    prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    assert_eq!(dyn.state(), rslt, "two body prop failed");
+    let mut prop = Propagator::new::<RK89>(&mut dyn, &PropOpts::<RSSStepPV>::default());
+    prop.until_time_elapsed(prop_time);
+    assert_eq!(prop.state(), rslt, "two body prop failed");
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &init);
+    prop.until_time_elapsed(-prop_time);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &init);
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -101,8 +101,8 @@ fn two_body_state_parametrized() {
     use hifitime::SECONDS_PER_DAY;
     use nyx::celestia::{State, EARTH, ECI};
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
-    use nyx::propagators::{error_ctrl, Options, Propagator, RK89};
+    use nyx::propagators::error_ctrl::RSSStepPV;
+    use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let dt = ModifiedJulian { days: 21545.0 };
     let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
@@ -124,21 +124,25 @@ fn two_body_state_parametrized() {
         ModifiedJulian { days: 21546.0 },
     );
 
-    let mut prop = Propagator::new::<RK89>(&Options::with_adaptive_step(min_step, max_step, accuracy));
     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-    let (final_t, _) = prop.until_time_elapsed(prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
+    let mut prop = Propagator::new::<RK89>(
+        &mut dyn,
+        &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
+    );
+    let (final_t, final_state0) = prop.until_time_elapsed(prop_time);
 
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
     };
-    let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&dyn.state(), final_dt, ECI {});
-    assert_eq!(final_state, rslt, "two body prop failed",);
+    let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&prop.state(), final_dt, ECI {});
+    assert_eq!(final_state, rslt, "two body prop failed");
+    assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
 
     println!("Final state:\n{0}\n{0:o}", final_state);
 
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time, &mut dyn, error_ctrl::rss_step_pos_vel);
-    let (err_r, err_v) = backprop_rss_state_errors(&dyn.state(), &initial_state.to_cartesian_vec());
+    prop.until_time_elapsed(-prop_time);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &initial_state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
