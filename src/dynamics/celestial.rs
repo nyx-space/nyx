@@ -178,29 +178,27 @@ impl Linearization for TwoBodyWithStm {
     }
 }
 
-#[derive(Clone)]
-pub struct TwoBodyWithDualStm<'a> {
+#[derive(Copy, Clone)]
+pub struct TwoBodyWithDualStm {
     pub mu: f64,
     pub stm: Matrix6<f64>,
-    pub tx_chan: Option<&'a Sender<(f64, Vector6<f64>, Matrix6<f64>)>>,
     pub pos_vel: Vector6<f64>,
     time: f64,
 }
 
-impl<'a> TwoBodyWithDualStm<'a> {
+impl TwoBodyWithDualStm {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
-    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithDualStm<'a> {
+    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithDualStm {
         TwoBodyWithDualStm {
             mu: B::gm(),
             stm: Matrix6::identity(),
-            tx_chan: None,
             pos_vel: state.to_cartesian_vec(),
             time: 0.0,
         }
     }
 }
 
-impl<'a> AutoDiffDynamics for TwoBodyWithDualStm<'a> {
+impl AutoDiffDynamics for TwoBodyWithDualStm {
     type HyperStateSize = U7;
     type STMSize = U6;
 
@@ -231,7 +229,7 @@ impl<'a> AutoDiffDynamics for TwoBodyWithDualStm<'a> {
     }
 }
 
-impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
+impl Dynamics for TwoBodyWithDualStm {
     type StateSize = U42;
     fn time(&self) -> f64 {
         self.time
@@ -267,12 +265,6 @@ impl<'a> Dynamics for TwoBodyWithDualStm<'a> {
             panic!("STM not invertible");
         }
         self.stm = stm_k_to_0 * stm_prev;
-
-        if let Some(ref chan) = self.tx_chan {
-            if let Err(e) = chan.send((new_t, self.pos_vel, self.stm)) {
-                warn!("could not publish to channel: {}", e)
-            }
-        }
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {

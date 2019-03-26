@@ -357,8 +357,7 @@ fn ekf_fixed_step_perfect_stations() {
     }
 }
 
-/*
-// #[test]
+#[test]
 fn ckf_fixed_step_perfect_stations_dual() {
     use std::{io, thread};
 
@@ -372,7 +371,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY * 365.25;
     let step_size = 10.0;
     let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 
@@ -387,8 +386,8 @@ fn ckf_fixed_step_perfect_stations_dual() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-        let mut prop = Propagator::new::<RK4Fixed>(dyn, &opts.clone());
-        dyn.tx_chan = Some(&truth_tx);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dyn, &opts.clone());
+        prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -423,7 +422,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
     let mut tb_estimator = TwoBodyWithDualStm::from_state::<EARTH, ECI>(initial_state);
-    let mut prop_est = Propagator::new::<RK4Fixed>(tb_estimator, &opts_est);
+    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -438,7 +437,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     let initial_estimate = Estimate {
         state: Vector6::zeros(),
         covar: init_covar,
-        stm: tb_estimator.stm.clone(),
+        stm: prop_est.dynamics.stm.clone(),
         predicted: false,
     };
 
@@ -457,7 +456,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
         let delta_time = (*duration) as f64;
         prop_est.until_time_elapsed(delta_time);
         // Update the STM of the KF
-        ckf.update_stm(tb_estimator.stm.clone());
+        ckf.update_stm(prop_est.dynamics.stm.clone());
         // Get the computed observation
         let this_dt = ModifiedJulian::from_instant(
             prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
@@ -466,7 +465,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
             panic!("already handled that time: {}", prev_dt);
         }
         prev_dt = this_dt;
-        let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&tb_estimator.pos_vel, this_dt, ECI {});
+        let rx_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&prop_est.dynamics.pos_vel, this_dt, ECI {});
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
@@ -495,4 +494,3 @@ fn ckf_fixed_step_perfect_stations_dual() {
         }
     }
 }
-*/

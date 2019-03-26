@@ -3,7 +3,7 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate serde;
 
-use self::dual_num::{hyperspace_from_vector, Dual, DualN, Float, FloatConst, Hyperdual, Owned};
+use self::dual_num::{hyperspace_from_vector, Dual, Hyperdual, Owned};
 use self::hifitime::instant::Instant;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
@@ -94,7 +94,11 @@ where
         state: &VectorN<f64, Self::STMSize>,
     ) -> (VectorN<f64, Self::STMSize>, MatrixMN<f64, Self::STMSize, Self::STMSize>)
     where
-        DefaultAllocator: Allocator<f64, Self::STMSize> + Allocator<f64, Self::STMSize, Self::STMSize>,
+        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
+            + Allocator<f64, Self::STMSize>
+            + Allocator<f64, Self::STMSize, Self::STMSize>
+            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+        Owned<f64, Self::HyperStateSize>: Copy,
     {
         let hyperstate = hyperspace_from_vector(&state);
 
