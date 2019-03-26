@@ -63,8 +63,9 @@ where
     E: ErrorCtrl,
     DefaultAllocator: Allocator<f64, M::StateSize>,
 {
+    pub dynamics: &'a mut M, // Stores the dynamics used. *Must* use this to get the latest values
+    // An output channel for all of the states computed by this propagator
     pub tx_chan: Option<&'a Sender<(f64, VectorN<f64, M::StateSize>)>>,
-    pub dynamics: &'a mut M,
     opts: PropOpts<E>,           // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
     step_size: f64,              // Stores the adapted step for the _next_ call
