@@ -14,26 +14,20 @@ fn const_mom() {
     let tolerance = 1e-8;
 
     let mut dyn = AngularMom::from_tensor_matrix(&tensor, &omega);
-
-    let mut prop = Propagator::new::<CashKarp45>(dyn, &PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}));
-
     let init_momentum = dyn.momentum().norm();
+
+    let mut prop = Propagator::new::<CashKarp45>(&mut dyn, &PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}));
+
     prop.until_time_elapsed(5.0);
-    // loop {
-    //     let (t, state) = prop.derive(dyn.time(), &dyn.state(), |t_: f64, state_: &Vector3<f64>| dyn.eom(t_, state_));
-    //     dyn.set_state(t, &state);
-    //     if dyn.time() >= 5.0 {
-    //         println!("{:?}", prop.latest_details());
-    //         let delta_mom = ((dyn.momentum().norm() - init_momentum) / init_momentum).abs();
-    //         if delta_mom > tolerance {
-    //             panic!(
-    //                 "angular momentum prop failed: momentum changed by {:e} (> {:e})",
-    //                 delta_mom, tolerance
-    //             );
-    //         }
-    //         break;
-    //     }
-    // }
+
+    println!("{:?}", prop.latest_details());
+    let delta_mom = ((prop.dynamics.momentum().norm() - init_momentum) / init_momentum).abs();
+    if delta_mom > tolerance {
+        panic!(
+            "angular momentum prop failed: momentum changed by {:e} (> {:e})",
+            delta_mom, tolerance
+        );
+    }
 }
 
 #[test]

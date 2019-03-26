@@ -56,7 +56,7 @@ pub struct IntegrationDetails {
 
 /// Includes the options, the integrator details of the previous step, and
 /// the set of coefficients used for the monomorphic instance. **WARNING:** must be stored in a mutuable variable.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Propagator<'a, M, E>
 where
     M: Dynamics,
@@ -64,7 +64,7 @@ where
     DefaultAllocator: Allocator<f64, M::StateSize>,
 {
     pub tx_chan: Option<&'a Sender<(f64, VectorN<f64, M::StateSize>)>>,
-    dynamics: M,
+    pub dynamics: &'a mut M,
     opts: PropOpts<E>,           // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
     step_size: f64,              // Stores the adapted step for the _next_ call
@@ -81,7 +81,7 @@ where
     DefaultAllocator: Allocator<f64, M::StateSize>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: M, opts: &PropOpts<E>) -> Propagator<'a, M, E> {
+    pub fn new<T: RK>(dynamics: &'a mut M, opts: &PropOpts<E>) -> Propagator<'a, M, E> {
         Propagator {
             tx_chan: None,
             dynamics,

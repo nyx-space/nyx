@@ -108,7 +108,7 @@ impl Dynamics for TwoBodyWithStm {
                 stm_idx += 1;
             }
         }
-        // BUG: HOW DO I SUPPORT THE INVERTED STM?
+
         let mut stm_prev = self.stm;
         if !stm_prev.try_inverse_mut() {
             panic!("STM not invertible");
