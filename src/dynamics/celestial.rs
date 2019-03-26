@@ -11,37 +11,34 @@ use std::f64;
 use std::sync::mpsc::Sender;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
-#[derive(Clone)]
-pub struct TwoBody<'a> {
+#[derive(Copy, Clone)]
+pub struct TwoBody {
     pub mu: f64,
-    pub tx_chan: Option<&'a Sender<(f64, Vector6<f64>)>>,
     time: f64,
     pos_vel: Vector6<f64>,
 }
 
-impl<'a> TwoBody<'a> {
+impl TwoBody {
     /// Initialize TwoBody dynamics given a provided gravitional parameter (as `mu`)
-    pub fn from_state_vec_with_gm(state: Vector6<f64>, mu: f64) -> TwoBody<'a> {
+    pub fn from_state_vec_with_gm(state: Vector6<f64>, mu: f64) -> TwoBody {
         TwoBody {
             mu,
-            tx_chan: None,
             time: 0.0,
             pos_vel: state,
         }
     }
 
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided state vector (cf. nyx::celestia).
-    pub fn from_state_vec<B: CelestialBody>(state: Vector6<f64>) -> TwoBody<'a> {
+    pub fn from_state_vec<B: CelestialBody>(state: Vector6<f64>) -> TwoBody {
         TwoBody {
             mu: B::gm(),
-            tx_chan: None,
             time: 0.0,
             pos_vel: state,
         }
     }
 }
 
-impl<'a> Dynamics for TwoBody<'a> {
+impl Dynamics for TwoBody {
     type StateSize = U6;
     fn time(&self) -> f64 {
         self.time
@@ -54,12 +51,6 @@ impl<'a> Dynamics for TwoBody<'a> {
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
         self.time = new_t;
         self.pos_vel = *new_state;
-
-        if let Some(ref chan) = self.tx_chan {
-            if let Err(e) = chan.send((new_t, *new_state)) {
-                warn!("could not publish to channel: {}", e)
-            }
-        }
     }
 
     fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
@@ -72,25 +63,23 @@ impl<'a> Dynamics for TwoBody<'a> {
 
 /// `TwoBodyWithStm` exposes the equations of motion for a simple two body propagation. It inherently supports
 /// the State Transition Matrix for orbital determination.
-#[derive(Clone)]
-pub struct TwoBodyWithStm<'a> {
+#[derive(Copy, Clone)]
+pub struct TwoBodyWithStm {
     pub stm: Matrix6<f64>,
-    pub two_body_dyn: TwoBody<'a>,
-    pub tx_chan: Option<&'a Sender<(f64, Vector6<f64>, Matrix6<f64>)>>,
+    pub two_body_dyn: TwoBody,
 }
 
-impl<'a> TwoBodyWithStm<'a> {
+impl TwoBodyWithStm {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
-    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithStm<'a> {
+    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithStm {
         TwoBodyWithStm {
             stm: Matrix6::identity(),
             two_body_dyn: TwoBody::from_state_vec::<B>(state.to_cartesian_vec()),
-            tx_chan: None,
         }
     }
 }
 
-impl<'a> Dynamics for TwoBodyWithStm<'a> {
+impl Dynamics for TwoBodyWithStm {
     type StateSize = U42;
     fn time(&self) -> f64 {
         self.two_body_dyn.time()
@@ -115,21 +104,16 @@ impl<'a> Dynamics for TwoBodyWithStm<'a> {
         let mut stm_idx = 6;
         for i in 0..6 {
             for j in 0..6 {
-                stm_k_to_0[(i, j)] = new_state[(stm_idx, 0)];
+                stm_k_to_0[(i, j)] = new_state[stm_idx];
                 stm_idx += 1;
             }
         }
+        // BUG: HOW DO I SUPPORT THE INVERTED STM?
         let mut stm_prev = self.stm;
         if !stm_prev.try_inverse_mut() {
             panic!("STM not invertible");
         }
         self.stm = stm_k_to_0 * stm_prev;
-
-        if let Some(ref chan) = self.tx_chan {
-            if let Err(e) = chan.send((new_t, pos_vel, self.stm)) {
-                warn!("could not publish to channel: {}", e)
-            }
-        }
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
@@ -149,7 +133,7 @@ impl<'a> Dynamics for TwoBodyWithStm<'a> {
     }
 }
 
-impl<'a> Linearization for TwoBodyWithStm<'a> {
+impl Linearization for TwoBodyWithStm {
     type StateSize = U6;
 
     fn gradient(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize> {

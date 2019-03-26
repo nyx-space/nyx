@@ -64,8 +64,6 @@ where
     DefaultAllocator: Allocator<f64, M::StateSize>,
 {
     pub tx_chan: Option<&'a Sender<(f64, VectorN<f64, M::StateSize>)>>,
-    pub time: f64,
-    pub state: VectorN<f64, M::StateSize>,
     dynamics: M,
     opts: PropOpts<E>,           // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
@@ -86,8 +84,6 @@ where
     pub fn new<T: RK>(dynamics: M, opts: &PropOpts<E>) -> Propagator<'a, M, E> {
         Propagator {
             tx_chan: None,
-            time: dynamics.time(),
-            state: dynamics.state(),
             dynamics,
             opts: *opts,
             details: IntegrationDetails {
@@ -109,6 +105,20 @@ where
         self.fixed_step = true;
     }
 
+    /// Returns the time of the propagation
+    ///
+    /// WARNING: Do not use the dynamics to get the time, it will be the initial value!
+    pub fn time(&self) -> f64 {
+        self.dynamics.time()
+    }
+
+    /// Returns the state of the propagation
+    ///
+    /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
+    pub fn state(&self) -> VectorN<f64, M::StateSize> {
+        self.dynamics.state()
+    }
+
     /// This method propagates the provided Dynamics `dyn` for `elapsed_time` seconds. WARNING: This function has many caveats (please read detailed docs).
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
@@ -118,16 +128,15 @@ where
         if backprop {
             self.step_size *= -1.0; // Invert the step size
         }
-        let init_seconds = self.time;
+        let init_seconds = self.dynamics.time();
         let stop_time = init_seconds + elapsed_time;
         loop {
-            let dx = self.state.clone();
-            let dt = self.time;
+            let dx = self.dynamics.state().clone();
+            let dt = self.dynamics.time();
             let (t, state) = self.derive(dt, dx);
             if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
                 // We haven't passed the time based stopping condition.
-                self.time = t;
-                self.state = state;
+                self.dynamics.set_state(t, &state.clone());
             } else {
                 let prev_details = self.latest_details().clone();
                 let overshot = t - stop_time;
@@ -135,14 +144,22 @@ where
                     debug!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);
                     // Take one final step
-                    let dx = self.state.clone();
-                    let dt = self.time;
+                    let dx = self.dynamics.state().clone();
+                    let dt = self.dynamics.time();
                     let (t, state) = self.derive(dt, dx);
-                    self.time = t;
-                    self.state = state.clone();
+                    self.dynamics.set_state(t, &state.clone());
+                    if let Some(ref chan) = self.tx_chan {
+                        if let Err(e) = chan.send((t, state.clone())) {
+                            warn!("could not publish to channel: {}", e)
+                        }
+                    }
                 } else {
-                    self.time = t;
-                    self.state = state.clone();
+                    self.dynamics.set_state(t, &state.clone());
+                    if let Some(ref chan) = self.tx_chan {
+                        if let Err(e) = chan.send((t, state.clone())) {
+                            warn!("could not publish to channel: {}", e)
+                        }
+                    }
                 }
                 return (t, state);
             }
