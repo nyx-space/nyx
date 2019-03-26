@@ -17,7 +17,6 @@ fn two_body_parametrized() {
     use self::na::Vector6;
     use nyx::celestia::EARTH;
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
@@ -62,7 +61,6 @@ fn two_body_custom() {
     extern crate nalgebra as na;
     use self::na::Vector6;
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
@@ -103,7 +101,6 @@ fn two_body_state_parametrized() {
     use hifitime::SECONDS_PER_DAY;
     use nyx::celestia::{State, EARTH, ECI};
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 

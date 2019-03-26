@@ -24,7 +24,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.4"
+//! nyx-space = "0.0.7"
 //! ```
 //!
 //! And add the following to your crate root:
@@ -37,73 +37,39 @@
 ///
 /// # Custom derivative function example
 /// ```
-/// extern crate nalgebra;
+/// extern crate nalgebra as na;
 /// extern crate nyx_space as nyx;
-/// use nalgebra::{U1, U3, Vector6};
-///
-/// fn two_body_dynamics(_t: f64, state: &Vector6<f64>) -> Vector6<f64> {
-///     let radius = state.fixed_slice::<U3, U1>(0, 0);
-///     let velocity = state.fixed_slice::<U3, U1>(3, 0);
-///     let body_acceleration = (-398_600.441500000015366822 / radius.norm().powi(3)) * radius;
-///     Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
-/// }
+/// use self::na::Vector6;
+/// use nyx::celestia::EARTH;
+/// use nyx::dynamics::celestial::TwoBody;
+/// use nyx::dynamics::Dynamics;
+/// use nyx::propagators::error_ctrl::RSSStepPV;
+/// use nyx::propagators::*;
 ///
 /// fn main() {
-///     use std::f64;
-///     use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStatePV};
-///     use nyx::propagators::{Dormand45, PropOpts, Propagator};
 ///     let prop_time = 24.0 * 3_600.0;
 ///     let accuracy = 1e-12;
 ///     let min_step = 0.1;
-///     let max_step = 30.0;
-///     // Initial spacecraft state
-///     let mut init_state =
-///         Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
-///     // Final expected spaceraft state
+///     let max_step = 60.0;
+///
+///     let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
+///
 ///     let rslt = Vector6::from_row_slice(&[
-///         -5971.194191972316,
-///         3945.5066620394823,
-///         2864.636606375189,
-///         0.049096946846225495,
-///         -4.185093311278742,
-///         5.848940872821119,
+///         -5971.1941916712285,
+///         3945.5066532419537,
+///         2864.636618390466,
+///         0.04909695760948815,
+///         -4.1850933184621315,
+///         5.848940867758592,
 ///     ]);
 ///
-///     let mut cur_t = 0.0;
-///     let mut prop = Propagator::new::<Dormand45>(&PropOpts::with_adaptive_step(0.1, 30.0, 1e-12, RSSStatePV {}));
-///     loop {
-///         let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
-///         if t < prop_time {
-///             // We haven't passed the time based stopping condition.
-///             cur_t = t;
-///             init_state = state;
-///         } else {
-///             // At this point, we've passed the condition, so let's switch to a fixed step of _exactly_ the
-///             // previous time step minus the amount by which we overshot. This allows us to propagate in time for
-///             // _exactly_ the time we want to propagate for.
-///             let prev_details = prop.latest_details().clone();
-///             let overshot = t - prop_time;
-///             prop.set_fixed_step(prev_details.step - overshot);
-///             // Take one final step
-///             let (t, state) = prop.derive(cur_t, &init_state, two_body_dynamics);
-///
-///             assert!(
-///                 (t - prop_time).abs() < 1e-12,
-///                 "propagated for {} instead of {}",
-///                 t,
-///                 prop_time
-///             );
-///
-///             // Let's check that, prior to the refined step, we either hit the accuracy wanted,
-///             // or we are using the minimum step size.
-///             if prev_details.error > accuracy {
-///                 assert!(prev_details.step - min_step < f64::EPSILON);
-///             }
-///
-///             assert_eq!(state, rslt, "leo prop failed");
-///             break;
-///         }
-///     }
+///     let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
+///     let mut prop = Propagator::new::<RK89>(
+///         &mut dyn,
+///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
+///     );
+///     prop.until_time_elapsed(prop_time);
+///     assert_eq!(prop.state(), rslt, "two body prop failed");
 /// }
 /// ```
 pub mod propagators;
@@ -115,27 +81,24 @@ pub mod propagators;
 /// extern crate nalgebra as na;
 /// extern crate hifitime;
 /// extern crate nyx_space as nyx;
+/// use hifitime::julian::ModifiedJulian;
+/// use hifitime::SECONDS_PER_DAY;
+/// use nyx::celestia::{State, EARTH, ECI};
+/// use nyx::dynamics::celestial::TwoBody;
+/// use nyx::dynamics::Dynamics;
+/// use nyx::propagators::error_ctrl::RSSStepPV;
+/// use nyx::propagators::{PropOpts, Propagator, RK89};
 ///
 /// fn main() {
-///     use nyx::propagators::error_ctrl::{ErrorCtrl, RSSStepPV};
-///     use nyx::propagators::*;
-///     use nyx::celestia::{State, EARTH, ECI};
-///     use nyx::dynamics::Dynamics;
-///     use nyx::dynamics::celestial::TwoBody;
-///     use self::na::Vector6;
-///     use std::f64;
-///     use hifitime::SECONDS_PER_DAY;
-///     use hifitime::julian::ModifiedJulian;
+///     let dt = ModifiedJulian { days: 21545.0 };
+///     let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
+///
+///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
 ///     let prop_time = 24.0 * 3_600.0;
 ///     let accuracy = 1e-12;
 ///     let min_step = 0.1;
 ///     let max_step = 60.0;
-///
-///     let dt = ModifiedJulian { days: 21545.0 };
-///     let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
-///
-///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
 ///     let rslt = State::from_cartesian_eci(
 ///         -5971.1941916712285,
@@ -144,142 +107,24 @@ pub mod propagators;
 ///         0.04909695760948815,
 ///         -4.1850933184621315,
 ///         5.848940867758592,
-///         ModifiedJulian { days: 21546.0 }
+///         ModifiedJulian { days: 21546.0 },
 ///     );
 ///
-///     let mut prop = Propagator::new::<RK89>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}));
 ///     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
-///     prop.until_time_elapsed(prop_time, &mut dyn);
+///     let mut prop = Propagator::new::<RK89>(
+///         &mut dyn,
+///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
+///     );
+///     let (final_t, final_state0) = prop.until_time_elapsed(prop_time);
 ///
 ///     let final_dt = ModifiedJulian {
-///         days: dt.days + dyn.time() / SECONDS_PER_DAY,
+///         days: dt.days + final_t / SECONDS_PER_DAY,
 ///     };
-///     let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&dyn.state(), final_dt, ECI {});
-///     assert_eq!(final_state, rslt, "two body prop failed",);
+///     let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&prop.state(), final_dt, ECI {});
+///     assert_eq!(final_state, rslt, "two body prop failed");
+///     assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
 ///
 ///     println!("Final state:\n{0}\n{0:o}", final_state);
-/// }
-/// ```
-///
-/// # Combining dynamics in a full spacecraft model.
-/// ```
-/// extern crate nalgebra as na;
-/// extern crate hifitime;
-/// extern crate nyx_space as nyx;
-///
-/// // Warning: this is arguably a bad example: attitude dynamics very significantly
-/// // faster than orbital mechanics. Hence you really should use different propagators
-/// // for the attitude and orbital position and velocity.
-/// // If you run this example, you'll notice that the step size used ends up being absolutely tiny
-/// // which is needed for the attitude, but not for the astrodynamics (on my machine I'm at 0.04376 seconds).
-/// use self::nyx::dynamics::Dynamics;
-/// use self::nyx::dynamics::celestial::TwoBody;
-/// use self::nyx::dynamics::momentum::AngularMom;
-/// use self::nyx::celestia::{State, EARTH, ECI};
-/// use self::nyx::propagators::error_ctrl::{ErrorCtrl, LargestError};
-/// use self::nyx::propagators::{CashKarp45, PropOpts, Propagator};
-/// use self::na::{Matrix3, U3, U6, U9, Vector3, Vector6, VectorN};
-/// use std::f64;
-/// use hifitime::julian::ModifiedJulian;
-///
-/// // In the following struct, we only store the dynamics because this is only a proof
-/// // of concept. An engineer could add more useful information to this struct, such
-/// // as a short cut to the position or an attitude.
-/// #[derive(Clone)]
-/// pub struct PosVelAttMom<'a> {
-///     pub twobody: TwoBody<'a>,
-///     pub momentum: AngularMom,
-/// }
-///
-/// impl<'a> Dynamics for PosVelAttMom<'a> {
-///     type StateSize = U9;
-///     fn time(&self) -> f64 {
-///         // Both dynamical models have the same time because they share the propagator.
-///         self.twobody.time()
-///     }
-///
-///     fn state(&self) -> VectorN<f64, Self::StateSize> {
-///         let twobody_state = self.twobody.state();
-///         let momentum_state = self.momentum.state();
-///         // We're channing both states to create a combined state.
-///         // The most important part here is make sure that the `state` and `set_state` handle the state in the same order.
-///         <VectorN<f64, U9>>::from_iterator(
-///             twobody_state.iter().chain(momentum_state.iter()).cloned(),
-///         )
-///     }
-///
-///     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-///         self.twobody
-///             .set_state(new_t, &new_state.fixed_rows::<U6>(0).into_owned());
-///         self.momentum
-///             .set_state(new_t, &new_state.fixed_rows::<U3>(6).into_owned());
-///     }
-///
-///     fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
-///         let dpos_vel_dt = self.twobody
-///             .eom(_t, &state.fixed_rows::<U6>(0).into_owned());
-///         let domega_dt = self.momentum
-///             .eom(_t, &state.fixed_rows::<U3>(6).into_owned());
-///         <VectorN<f64, U9>>::from_iterator(dpos_vel_dt.iter().chain(domega_dt.iter()).cloned())
-///     }
-/// }
-///
-/// // Let's initialize our combined dynamics.
-/// fn main() {
-///     let prop_time = 3_600.0;
-///     let accuracy = 1e-13;
-///     let min_step = 0.01;
-///     let max_step = 60.0;
-///
-///     let dyn_twobody = TwoBody::from_state_vec::<EARTH>(Vector6::new(
-///         -2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0,
-///     ));
-///     let omega = Vector3::new(0.1, 0.4, -0.2);
-///     let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);
-///     let dyn_mom = AngularMom::from_tensor_matrix(&tensor, &omega);
-///
-///     let mut full_model = PosVelAttMom {
-///         twobody: dyn_twobody,
-///         momentum: dyn_mom,
-///     };
-///
-///     let init_momentum = full_model.momentum.momentum().norm();
-///     let mom_tolerance = 1e-8;
-///
-///     // And now let's define the propagator and propagate for a short amount of time.
-///     let mut prop =
-///         Propagator::new::<CashKarp45>(&PropOpts::with_adaptive_step(min_step, max_step, accuracy, LargestError {}));
-///
-///     prop.until_time_elapsed(prop_time, &mut full_model);
-///
-///     let prev_details = prop.latest_details().clone();
-///     println!("{:?}", prev_details);
-///     if prev_details.error > accuracy {
-///         assert!(
-///             prev_details.step - min_step < f64::EPSILON,
-///             "step size should be at its minimum because error is higher than tolerance: {:?}",
-///             prev_details
-///         );
-///     }
-///
-///     let delta_mom = ((full_model.momentum.momentum().norm() - init_momentum) / init_momentum).abs();
-///     if delta_mom > mom_tolerance {
-///         panic!(
-///             "angular momentum prop failed: momentum changed by {:e} (> {:e})",
-///             delta_mom, mom_tolerance
-///         );
-///     }
-///
-///     println!("Final momentum: {:?}", full_model.momentum.momentum());
-///
-///     println!(
-///         "Final orbital state:\n{0}\n{0:o}",
-///         State::from_cartesian_vec::<EARTH, ModifiedJulian>(
-///             &full_model.twobody.state(),
-///             ModifiedJulian { days: 21545.0 },
-///             ECI {}
-///         )
-///     );
 /// }
 /// ```
 pub mod dynamics;

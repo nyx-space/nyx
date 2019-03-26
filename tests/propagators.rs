@@ -8,7 +8,6 @@ fn regress_leo_day_adaptive() {
     use self::na::Vector6;
     use nyx::celestia::EARTH;
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
@@ -105,7 +104,6 @@ fn gmat_val_leo_day_adaptive() {
     use self::na::Vector6;
     use nyx::celestia::EARTH;
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
@@ -228,7 +226,6 @@ fn gmat_val_leo_day_fixed() {
     use crate::na::Vector6;
     use nyx::celestia::EARTH;
     use nyx::dynamics::celestial::TwoBody;
-    use nyx::dynamics::Dynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
