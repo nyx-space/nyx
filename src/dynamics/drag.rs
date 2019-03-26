@@ -1,4 +1,4 @@
-use super::na::{U3, U6, Vector3, Vector6, VectorN};
+use super::na::{Vector3, Vector6, VectorN, U3, U6};
 use super::Dynamics;
 
 /// `BasicDrag` implements the basic drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
