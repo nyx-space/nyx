@@ -4,10 +4,10 @@ extern crate nalgebra as na;
 extern crate rand;
 
 use self::dual_num::linalg::norm;
-use self::dual_num::{partials, Dual};
+use self::dual_num::{hyperspace_from_vector, Hyperdual};
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
-use self::na::{Matrix2x6, Matrix6, Vector2, Vector3, Vector6, U2, U3, U6};
+use self::na::{DimName, Matrix2x6, Vector2, VectorN, U2, U3, U6, U7};
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
@@ -119,28 +119,30 @@ impl StdMeasurement {
         self.obs[(1, 0)]
     }
 
-    // This is an example of the sensitivity matrix (H tilde) of a ranging method.
-    pub fn compute_dual_sensitivity(state: &Matrix6<Dual<f64>>) -> Matrix2x6<Dual<f64>> {
-        let range_mat = state.fixed_slice::<U3, U6>(0, 0).into_owned();
-        let velocity_mat = state.fixed_slice::<U3, U6>(3, 0).into_owned();
-        let mut range_slice = Vec::with_capacity(6);
-        let mut range_rate_slice = Vec::with_capacity(6);
+    fn compute_sensitivity(state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector2<f64>, Matrix2x6<f64>) {
+        // Extract data from hyperspace
+        let range_vec = state.fixed_rows::<U3>(0).into_owned();
+        let velocity_vec = state.fixed_rows::<U3>(3).into_owned();
 
-        for j in 0..6 {
-            let rho_vec = Vector3::new(range_mat[(0, j)], range_mat[(1, j)], range_mat[(2, j)]);
-            let range = norm(&rho_vec);
-            let delta_v_vec = (Vector3::new(velocity_mat[(0, j)], velocity_mat[(1, j)], velocity_mat[(2, j)])) / range;
-            let rho_dot = rho_vec.dot(&delta_v_vec);
+        // Code up math as usual
+        let delta_v_vec = velocity_vec / norm(&range_vec);
+        let range = norm(&range_vec);
+        let range_rate = range_vec.dot(&delta_v_vec);
 
-            range_slice.push(range);
-            range_rate_slice.push(rho_dot);
+        // Added for inspection only
+        println!("range = {}", range);
+        println!("range_rate = {}", range_rate);
+
+        // Extract result into Vector2 and Matrix2x6
+        let mut fx = Vector2::zeros();
+        let mut pmat = Matrix2x6::zeros();
+        for i in 0..U2::dim() {
+            fx[i] = if i == 0 { range.real() } else { range_rate.real() };
+            for j in 1..U7::dim() {
+                pmat[(i, j - 1)] = if i == 0 { range[j] } else { range_rate[j] };
+            }
         }
-
-        let mut rtn = Matrix2x6::zeros();
-
-        rtn.set_row(0, &Vector6::from_row_slice(&range_slice).transpose());
-        rtn.set_row(1, &Vector6::from_row_slice(&range_rate_slice).transpose());
-        rtn
+        (fx, pmat)
     }
 }
 
@@ -149,7 +151,8 @@ impl Measurement for StdMeasurement {
     type MeasurementSize = U2;
 
     fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
-        let (obs, h_tilde) = partials((rx - tx).to_cartesian_vec(), StdMeasurement::compute_dual_sensitivity);
+        let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
+        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 
         StdMeasurement {
             dt,
