@@ -371,7 +371,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY * 365.25;
+    let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
     let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 

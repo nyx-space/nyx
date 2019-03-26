@@ -86,8 +86,8 @@ where
             + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
         Owned<f64, Self::HyperStateSize>: Copy;
 
-    /// Computes both the state and the gradient of the dynamics. These may be accessed by the related
-    /// getters.
+    /// Computes both the state and the gradient of the dynamics. These may be accessed by the
+    /// related getters.
     fn compute(
         &self,
         t: f64,

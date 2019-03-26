@@ -209,7 +209,7 @@ impl AutoDiffDynamics for TwoBodyWithDualStm {
 
         // Code up math as usual
         let rmag = norm(&radius);
-        let body_acceleration = radius * (Hyperdual::<f64, U7>::from_real(-398_600.4415) / rmag.powi(3));
+        let body_acceleration = radius * (Hyperdual::<f64, U7>::from_real(-self.mu) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector6::zeros();
@@ -270,7 +270,6 @@ impl Dynamics for TwoBodyWithDualStm {
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
         let (state, grad) = self.compute(t, &pos_vel);
-        let two_body_dt = state;
         let stm_dt = self.stm * grad;
         // Rebuild the STM as a vector.
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
@@ -281,6 +280,6 @@ impl Dynamics for TwoBodyWithDualStm {
                 stm_idx += 1;
             }
         }
-        VectorN::<f64, Self::StateSize>::from_iterator(two_body_dt.iter().chain(stm_as_vec.iter()).cloned())
+        VectorN::<f64, Self::StateSize>::from_iterator(state.iter().chain(stm_as_vec.iter()).cloned())
     }
 }
