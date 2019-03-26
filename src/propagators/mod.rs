@@ -1,12 +1,11 @@
 extern crate nalgebra as na;
 
+use self::error_ctrl::{ErrorCtrl, RSSStepPV};
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, VectorN};
+use self::na::{DefaultAllocator, VectorN};
+use dynamics::Dynamics;
 use std::f64;
 use std::sync::mpsc::Sender;
-
-use self::error_ctrl::{ErrorCtrl, RSSStepPV};
-use dynamics::Dynamics;
 
 /// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
