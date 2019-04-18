@@ -137,6 +137,11 @@ where
             if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state.clone());
+                if let Some(ref chan) = self.tx_chan {
+                    if let Err(e) = chan.send((t, state.clone())) {
+                        warn!("could not publish to channel: {}", e)
+                    }
+                }
             } else {
                 let prev_details = self.latest_details().clone();
                 let overshot = t - stop_time;
