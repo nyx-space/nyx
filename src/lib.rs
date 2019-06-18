@@ -200,3 +200,5 @@ pub mod od;
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate prost_derive;
