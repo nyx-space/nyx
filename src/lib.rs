@@ -202,3 +202,4 @@ pub mod od;
 extern crate log;
 #[macro_use]
 extern crate prost_derive;
+extern crate hifitime;

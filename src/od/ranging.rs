@@ -12,7 +12,7 @@ use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::Measurement;
-use celestia::{CoordinateFrame, State, ECEF};
+use celestia::{Body, State, ECEF};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
@@ -86,7 +86,7 @@ impl GroundStation {
     }
 
     /// Perform a measurement from the ground station to the receiver (rx).
-    pub fn measure<F: CoordinateFrame>(self, rx: State<F>, dt: Instant) -> StdMeasurement {
+    pub fn measure<F: Body>(self, rx: State<F>, dt: Instant) -> StdMeasurement {
         use std::f64::consts::PI;
         let tx_ecef =
             State::<ECEF>::from_geodesic(self.latitude, self.longitude, self.height, ModifiedJulian::from_instant(dt));
@@ -150,7 +150,7 @@ impl Measurement for StdMeasurement {
     type StateSize = U6;
     type MeasurementSize = U2;
 
-    fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
+    fn new<F: Body>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 

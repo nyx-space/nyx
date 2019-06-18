@@ -2,6 +2,7 @@ extern crate bytes;
 extern crate prost;
 use self::bytes::IntoBuf;
 use self::prost::Message;
+use crate::hifitime::julian::ModifiedJulian;
 use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
 use celestia::exb::{Ephemeris, EphemerisContainer};
 use celestia::frames::*;
@@ -159,12 +160,14 @@ impl Cosm {
         // Get the Geoid associated with the ephemeris frame
         let storage_geoid = self.geoids.get(&(frame_center.number, frame_center.name)).unwrap();
 
+        let dt = ModifiedJulian { days: jde - 2_400_000.5 };
+
         // We now have the state of the body in its storage frame.
-        let storage_state = State::<Geoid>::from_position_velocity(x, y, z, vx, vy, vz, storage_geoid.clone());
+        let storage_state = State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid.clone());
         println!("{} {}", storage_state.rmag(), storage_state.vmag());
 
         // BUG: This does not perform any frame transformation
-        Ok(State::<B>::from_position_velocity(x, y, z, vx, vy, vz, frame))
+        Ok(State::<B>::from_cartesian(x, y, z, vx, vy, vz, dt, frame))
     }
 }
 

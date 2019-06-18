@@ -45,68 +45,6 @@ where
     pub frame: F,
 }
 
-impl<F: Body> PartialEq for State<F> {
-    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
-    fn eq(&self, other: &State<F>) -> bool
-    where
-        F: Body,
-    {
-        let distance_tol = 1e-5; // centimeter
-        let velocity_tol = 1e-5; // centimeter per second
-        self.dt == other.dt
-            && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol
-            && (self.vz - other.vz).abs() < velocity_tol
-    }
-}
-
-impl<F: Body> Sub for State<F> {
-    type Output = State<F>;
-
-    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
-    fn sub(self, other: State<F>) -> State<F>
-    where
-        F: Body,
-    {
-        State {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            vx: self.vx - other.vx,
-            vy: self.vy - other.vy,
-            vz: self.vz - other.vz,
-            dt: self.dt,
-            frame: self.frame,
-        }
-    }
-}
-
-impl<F> Serialize for State<F>
-where
-    F: Body,
-{
-    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("State", 7)?;
-        state.serialize_field("dt", &julian::ModifiedJulian::from_instant(self.dt).julian_days())?;
-        state.serialize_field("x", &self.x)?;
-        state.serialize_field("y", &self.y)?;
-        state.serialize_field("z", &self.z)?;
-        state.serialize_field("vx", &self.vx)?;
-        state.serialize_field("vy", &self.vy)?;
-        state.serialize_field("vz", &self.vz)?;
-        state.end()
-    }
-}
-
 impl<F> State<F>
 where
     F: Body,
@@ -187,6 +125,85 @@ where
     /// Returns the radius vector of this State in [km, km, km]
     pub fn velocity(self) -> Vector3<f64> {
         Vector3::new(self.vx, self.vy, self.vz)
+    }
+
+    /// Returns the date time as its Modified Julian time representation
+    pub fn dt_as_modified_julian(self) -> julian::ModifiedJulian {
+        julian::ModifiedJulian::from_instant(self.dt)
+    }
+
+    /// Returns the date time as its UTC representation
+    pub fn dt_as_utc(self) -> datetime::Datetime {
+        datetime::Datetime::from_instant(self.dt)
+    }
+
+    /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
+    ///
+    /// Note that the time is **not** returned in the vector.
+    pub fn to_cartesian_vec(self) -> Vector6<f64> {
+        Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
+    }
+}
+
+impl<F: Body> PartialEq for State<F> {
+    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
+    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
+    fn eq(&self, other: &State<F>) -> bool
+    where
+        F: Body,
+    {
+        let distance_tol = 1e-5; // centimeter
+        let velocity_tol = 1e-5; // centimeter per second
+        self.dt == other.dt
+            && (self.x - other.x).abs() < distance_tol
+            && (self.y - other.y).abs() < distance_tol
+            && (self.z - other.z).abs() < distance_tol
+            && (self.vx - other.vx).abs() < velocity_tol
+            && (self.vy - other.vy).abs() < velocity_tol
+            && (self.vz - other.vz).abs() < velocity_tol
+    }
+}
+
+impl<F: Body> Sub for State<F> {
+    type Output = State<F>;
+
+    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
+    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
+    fn sub(self, other: State<F>) -> State<F>
+    where
+        F: Body,
+    {
+        State {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+            vx: self.vx - other.vx,
+            vy: self.vy - other.vy,
+            vz: self.vz - other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl<F> Serialize for State<F>
+where
+    F: Body,
+{
+    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("State", 7)?;
+        state.serialize_field("dt", &julian::ModifiedJulian::from_instant(self.dt).julian_days())?;
+        state.serialize_field("x", &self.x)?;
+        state.serialize_field("y", &self.y)?;
+        state.serialize_field("z", &self.z)?;
+        state.serialize_field("vx", &self.vx)?;
+        state.serialize_field("vy", &self.vy)?;
+        state.serialize_field("vz", &self.vz)?;
+        state.end()
     }
 }
 
@@ -328,7 +345,7 @@ impl State<Geoid> {
     /// **Units:** degrees, degrees, km
     /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of Earth.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-    pub fn from_geodesic(latitude: f64, longitude: f64, height: f64, frame: Geoid) -> State<Geoid> {
+    pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, frame: Geoid, dt: T) -> State<Geoid> {
         let e2 = 2.0 * frame.flattening - frame.flattening.powi(2);
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
@@ -340,32 +357,16 @@ impl State<Geoid> {
         let rk = (s_earth + height) * sin_lat;
         let radius = Vector3::new(ri, rj, rk);
         let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
-        State::<Geoid>::from_position_velocity(
+        State::<Geoid>::from_cartesian(
             radius[(0, 0)],
             radius[(1, 0)],
             radius[(2, 0)],
             velocity[(0, 0)],
             velocity[(1, 0)],
             velocity[(2, 0)],
+            dt,
             frame,
         )
-    }
-
-    /// Returns the date time as its Modified Julian time representation
-    pub fn dt_as_modified_julian(self) -> julian::ModifiedJulian {
-        julian::ModifiedJulian::from_instant(self.dt)
-    }
-
-    /// Returns the date time as its UTC representation
-    pub fn dt_as_utc(self) -> datetime::Datetime {
-        datetime::Datetime::from_instant(self.dt)
-    }
-
-    /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
-    ///
-    /// Note that the time is **not** returned in the vector.
-    pub fn to_cartesian_vec(self) -> Vector6<f64> {
-        Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
     /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
@@ -402,24 +403,24 @@ impl State<Geoid> {
 
     /// Returns the specific mechanical energy
     pub fn energy(self) -> f64 {
-        self.vmag().powi(2) / 2.0 - self.gm / self.rmag()
+        self.vmag().powi(2) / 2.0 - self.frame.gm / self.rmag()
     }
 
     /// Returns the semi-major axis in km
     pub fn sma(self) -> f64 {
-        -self.gm / (2.0 * self.energy())
+        -self.frame.gm / (2.0 * self.energy())
     }
 
     /// Returns the period in seconds
     pub fn period(self) -> f64 {
-        2.0 * PI * (self.sma().powi(3) / self.gm).sqrt()
+        2.0 * PI * (self.sma().powi(3) / self.frame.gm).sqrt()
     }
 
     /// Returns the eccentricity vector (no unit)
     pub fn evec(self) -> Vector3<f64> {
         let r = self.radius();
         let v = self.velocity();
-        ((v.norm().powi(2) - self.gm / r.norm()) * r - (r.dot(&v)) * v) / self.gm
+        ((v.norm().powi(2) - self.frame.gm / r.norm()) * r - (r.dot(&v)) * v) / self.frame.gm
     }
 
     /// Returns the eccentricity (no unit)

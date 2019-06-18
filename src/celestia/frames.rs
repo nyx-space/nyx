@@ -1,7 +1,8 @@
 pub use celestia::exb::ephemeris::Identifier as EXBID;
 pub use celestia::fxb::frame::Identifier as FrameID;
+use std::fmt;
 
-pub trait Body {
+pub trait Body: fmt::Debug + fmt::Display {
     fn frame_id(&self) -> &FrameID;
 }
 
@@ -26,12 +27,20 @@ impl Geoid {
     }
 }
 
+impl fmt::Display for Geoid {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Geoid fxbid: {}", self.frame_id.number)
+    }
+}
+
 impl Body for Geoid {
     fn frame_id(&self) -> &FrameID {
         &self.frame_id
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Spacecraft {
     pub frame_id: FrameID,
 }
@@ -39,5 +48,12 @@ pub struct Spacecraft {
 impl Body for Spacecraft {
     fn frame_id(&self) -> &FrameID {
         &self.frame_id
+    }
+}
+
+impl fmt::Display for Spacecraft {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SC fxbid: {}", self.frame_id.number)
     }
 }
