@@ -19,6 +19,7 @@ fn two_body_parametrized() {
     use nyx::dynamics::celestial::TwoBody;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
+
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
