@@ -3,12 +3,12 @@ pub use celestia::fxb::frame::Identifier as FrameID;
 use std::fmt;
 
 pub trait Body: fmt::Debug + fmt::Display {
-    fn frame_id(&self) -> &FrameID;
+    fn frame_id(&self) -> &i32;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Geoid {
-    pub frame_id: FrameID,
+    pub frame_id: i32,
     pub gm: f64,
     pub flattening: f64,
     pub equatorial_radius: f64,
@@ -16,7 +16,7 @@ pub struct Geoid {
 }
 
 impl Geoid {
-    pub fn perfect_sphere(frame_id: FrameID, gm: f64) -> Geoid {
+    pub fn perfect_sphere(frame_id: i32, gm: f64) -> Geoid {
         Geoid {
             frame_id,
             gm,
@@ -30,23 +30,23 @@ impl Geoid {
 impl fmt::Display for Geoid {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Geoid fxbid: {}", self.frame_id.number)
+        write!(f, "Geoid fxbid: {}", self.frame_id)
     }
 }
 
 impl Body for Geoid {
-    fn frame_id(&self) -> &FrameID {
+    fn frame_id(&self) -> &i32 {
         &self.frame_id
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Spacecraft {
-    pub frame_id: FrameID,
+    pub frame_id: i32,
 }
 
 impl Body for Spacecraft {
-    fn frame_id(&self) -> &FrameID {
+    fn frame_id(&self) -> &i32 {
         &self.frame_id
     }
 }
@@ -54,6 +54,6 @@ impl Body for Spacecraft {
 impl fmt::Display for Spacecraft {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SC fxbid: {}", self.frame_id.number)
+        write!(f, "SC fxbid: {}", self.frame_id)
     }
 }

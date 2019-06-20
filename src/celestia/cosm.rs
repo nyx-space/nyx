@@ -55,7 +55,7 @@ impl Cosm {
                 if let Some(gm) = ephem.ephem_parameters.get("GM") {
                     // It's a geoid, and we assume everything else is there
                     let geoid = Geoid {
-                        frame_id: exb_id.clone(),
+                        frame_id: exb_id.number,
                         gm: gm.value,
                         flattening: ephem.ephem_parameters.get("Flattening").unwrap().value,
                         equatorial_radius: ephem.ephem_parameters.get("Equatorial radius").unwrap().value,
@@ -72,7 +72,7 @@ impl Cosm {
             } else if exb_id.number == 0 {
                 // Solar System Barycenter
                 cosm.geoids
-                    .insert(exb_tpl, Geoid::perfect_sphere(exb_id, 1.327_124_400_18e20));
+                    .insert(exb_tpl, Geoid::perfect_sphere(exb_id.number, 1.327_124_400_18e20));
             }
         }
 
