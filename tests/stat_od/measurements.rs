@@ -25,6 +25,7 @@ fn nil_measurement() {
     let meas = station.measure(at_station, dt.into_instant());
 
     let h_tilde = *meas.sensitivity();
+    println!("{}", h_tilde);
     assert!(h_tilde[(0, 0)].is_nan(), "expected NaN");
     assert!(h_tilde[(0, 1)].is_nan(), "expected NaN");
     assert!(h_tilde[(0, 2)].is_nan(), "expected NaN");
