@@ -89,9 +89,9 @@ impl GroundStation {
     pub fn measure(self, rx: State<Geoid>, dt: Instant) -> StdMeasurement {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosom instead of using the one from Rx!
-        let frame = rx.frame;
+        let frame = rx.frame.clone();
         let mjd_dt = ModifiedJulian::from_instant(dt);
-        let tx_ecef = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, frame);
+        let tx_ecef = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, frame.clone());
         let dcm_to_ecef = r3(gast(dt));
         let rx_ecef_r = dcm_to_ecef * rx.radius();
         // Use the transport theorem and finite differencing for the velocity DCM
