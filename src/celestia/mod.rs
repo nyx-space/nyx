@@ -55,6 +55,7 @@ pub use self::frames::*;
 
 mod axb;
 mod cosm;
+pub use self::cosm::*;
 mod exb;
 mod fxb;
 mod hermite;

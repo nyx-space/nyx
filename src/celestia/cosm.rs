@@ -22,7 +22,8 @@ pub struct Cosm {
 
 #[derive(Debug)]
 pub enum CosmError {
-    ObjectNotFound(i32, String),
+    ObjectIDNotFound(i32),
+    ObjectNameNotFound(String),
     NoInterpolationData(i32, String),
     NoStateData(i32, String),
 }
@@ -78,11 +79,29 @@ impl Cosm {
         cosm
     }
 
+    pub fn geoid_from_id(&self, id: i32) -> Result<Geoid, CosmError> {
+        for ((geoid_id, _), geoid) in &self.geoids {
+            if *geoid_id == id {
+                return Ok(geoid.clone());
+            }
+        }
+        Err(CosmError::ObjectIDNotFound(id))
+    }
+
+    pub fn geoid_from_name(&self, name: String) -> Result<Geoid, CosmError> {
+        for ((_, geoid_name), geoid) in &self.geoids {
+            if *geoid_name == name {
+                return Ok(geoid.clone());
+            }
+        }
+        Err(CosmError::ObjectNameNotFound(name))
+    }
+
     pub fn state<B: Body>(&self, exb: EXBID, jde: f64, frame: B) -> Result<State<B>, CosmError> {
         let ephem = self
             .ephemerides
             .get(&(exb.number, exb.name))
-            .ok_or(CosmError::ObjectNotFound(exb.number, "exb.name".to_string()))?;
+            .ok_or(CosmError::ObjectIDNotFound(exb.number))?;
 
         // Compute the position
         // TODO: Maybe should this cache the previous ephemeris retrieved?

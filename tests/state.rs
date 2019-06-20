@@ -267,7 +267,8 @@ fn state_def_reciprocity() {
 
 #[test]
 fn geodetic_vallado() {
-    use nyx::celestia::{State, ECEF};
+    use nyx::celestia::{Cosm, State};
+    let cosm = Cosm::from_xb("./de438s");
     let dt = ModifiedJulian { days: 51545.0 };
     // Test case from Vallado, 4th Ed., page 173, Example 3-3
     let ri = 6524.834;
