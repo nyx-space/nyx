@@ -345,7 +345,7 @@ impl State<Geoid> {
     /// **Units:** degrees, degrees, km
     /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of Earth.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-    pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, frame: Geoid, dt: T) -> State<Geoid> {
+    pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T, frame: Geoid) -> State<Geoid> {
         let e2 = 2.0 * frame.flattening - frame.flattening.powi(2);
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
