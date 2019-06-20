@@ -21,10 +21,21 @@ fn state_def_() {
 fn state_def_circ_inc() {
     use hifitime::datetime::Datetime;
     use hifitime::TimeSystem;
-    use nyx::celestia::State;
+    use nyx::celestia::{Cosm, Geoid, State};
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let dt = ModifiedJulian { days: 21545.0 };
-    let cart = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
-    let cart2 = State::from_cartesian_eci(
+    let cart = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088611,
+        -5.088611,
+        0.0,
+        dt,
+        earth_geoid.clone(),
+    );
+    let cart2 = State::<Geoid>::from_cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -32,6 +43,7 @@ fn state_def_circ_inc() {
         -5.088611,
         0.0,
         Datetime::from_instant(dt.into_instant()),
+        earth_geoid.clone(),
     );
     assert_eq!(
         cart, cart2,
@@ -61,7 +73,7 @@ fn state_def_circ_inc() {
     f64_eq!(cart.periapsis(), 7704.477149058786, "peri");
     f64_eq!(cart.semi_parameter(), 7712.178412142147, "semi parameter");
 
-    let kep = State::from_keplerian_eci(8191.93, 1e-6, 12.85, 306.614, 314.19, 99.8877, dt);
+    let kep = State::<Geoid>::from_keplerian(8191.93, 1e-6, 12.85, 306.614, 314.19, 99.8877, dt, earth_geoid.clone());
     f64_eq!(kep.x, 8057.976452202976, "x");
     f64_eq!(kep.y, -0.1967403702908889, "y");
     f64_eq!(kep.z, 1475.383214274138, "z");
@@ -89,9 +101,11 @@ fn state_def_circ_inc() {
 
 #[test]
 fn state_def_elliptical() {
-    use nyx::celestia::State;
+    use nyx::celestia::{Cosm, Geoid, State};
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let dt = ModifiedJulian { days: 21545.0 };
-    let cart = State::from_cartesian_eci(
+    let cart = State::<Geoid>::from_cartesian(
         5946.673548288958,
         1656.154606023661,
         2259.012129598249,
@@ -99,6 +113,7 @@ fn state_def_elliptical() {
         4.579534132135011,
         6.246541551539432,
         dt,
+        earth_geoid.clone(),
     );
     f64_eq!(cart.energy(), -25.842247282849144, "energy");
     f64_eq!(cart.period(), 6740.2690636430425, "period");
@@ -118,7 +133,7 @@ fn state_def_elliptical() {
     f64_eq!(cart.periapsis(), 6485.94852514973, "peri");
     f64_eq!(cart.semi_parameter(), 7517.214340648537, "semi parameter");
 
-    let kep = State::from_keplerian_eci(8191.93, 0.0245, 12.85, 306.614, 314.19, 99.8877, dt);
+    let kep = State::<Geoid>::from_keplerian(8191.93, 0.0245, 12.85, 306.614, 314.19, 99.8877, dt, earth_geoid.clone());
     f64_eq!(kep.x, 8087.1616180485225, "x");
     f64_eq!(kep.y, -0.19745294377252073, "y");
     f64_eq!(kep.z, 1480.726901246883, "z");
@@ -146,9 +161,11 @@ fn state_def_elliptical() {
 
 #[test]
 fn state_def_circ_eq() {
-    use nyx::celestia::State;
+    use nyx::celestia::{Cosm, Geoid, State};
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let dt = ModifiedJulian { days: 21545.0 };
-    let cart = State::from_cartesian_eci(
+    let cart = State::<Geoid>::from_cartesian(
         -38892.72444914902,
         16830.38477289186,
         0.7226599291355622,
@@ -156,6 +173,7 @@ fn state_def_circ_eq() {
         -2.81465117260598,
         1.140294223185661e-05,
         dt,
+        earth_geoid.clone(),
     );
     f64_eq!(cart.energy(), -4.702902670552006, "energy");
     f64_eq!(cart.period(), 86820.7761529861, "period");
@@ -175,7 +193,7 @@ fn state_def_circ_eq() {
     f64_eq!(cart.periapsis(), 42378.12957621869, "peri");
     f64_eq!(cart.semi_parameter(), 42378.129999999976, "semi parameter");
 
-    let kep = State::from_keplerian_eci(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt);
+    let kep = State::<Geoid>::from_keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, earth_geoid.clone());
     f64_eq!(kep.x, 18190.717357886369, "x");
     f64_eq!(kep.y, -118.10716253921869, "y");
     f64_eq!(kep.z, 0.00025384564763305335, "z");
@@ -203,11 +221,13 @@ fn state_def_circ_eq() {
 
 #[test]
 fn state_def_reciprocity() {
-    use nyx::celestia::State;
+    use nyx::celestia::{Cosm, Geoid, State};
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let dt = ModifiedJulian { days: 21545.0 };
 
     assert_eq!(
-        State::from_cartesian_eci(
+        State::<Geoid>::from_cartesian(
             -38892.72444914902,
             16830.38477289186,
             0.7226599291355622,
@@ -215,8 +235,9 @@ fn state_def_reciprocity() {
             -2.81465117260598,
             1.140294223185661e-05,
             dt,
+            earth_geoid.clone()
         ),
-        State::from_keplerian_eci(
+        State::<Geoid>::from_keplerian(
             42378.12999999998,
             9.999999809555511e-09,
             0.0010000004015645386,
@@ -224,12 +245,13 @@ fn state_def_reciprocity() {
             65.39999984718678,
             12.300000152813197,
             dt,
+            earth_geoid.clone()
         ),
         "circ_eq"
     );
 
     assert_eq!(
-        State::from_cartesian_eci(
+        State::<Geoid>::from_cartesian(
             5946.673548288958,
             1656.154606023661,
             2259.012129598249,
@@ -237,8 +259,9 @@ fn state_def_reciprocity() {
             4.579534132135011,
             6.246541551539432,
             dt,
+            earth_geoid.clone()
         ),
-        State::from_keplerian_eci(
+        State::<Geoid>::from_keplerian(
             7712.186117895041,
             0.15899999999999995,
             53.75369,
@@ -246,13 +269,23 @@ fn state_def_reciprocity() {
             359.787880000004,
             25.434003407751188,
             dt,
+            earth_geoid.clone()
         ),
         "elliptical"
     );
 
     assert_eq!(
-        State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt),
-        State::from_keplerian_eci(
+        State::<Geoid>::from_cartesian(
+            -2436.45,
+            -2436.45,
+            6891.037,
+            5.088611,
+            -5.088611,
+            0.0,
+            dt,
+            earth_geoid.clone()
+        ),
+        State::<Geoid>::from_keplerian(
             7712.186117895043,
             0.0009995828314320525,
             63.43400340775114,
@@ -260,6 +293,7 @@ fn state_def_reciprocity() {
             90.0,
             0.0,
             dt,
+            earth_geoid.clone()
         ),
         "circ_inc"
     );
@@ -267,8 +301,9 @@ fn state_def_reciprocity() {
 
 #[test]
 fn geodetic_vallado() {
-    use nyx::celestia::{Cosm, State};
+    use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let dt = ModifiedJulian { days: 51545.0 };
     // Test case from Vallado, 4th Ed., page 173, Example 3-3
     let ri = 6524.834;
@@ -280,14 +315,14 @@ fn geodetic_vallado() {
     let lat = 34.352495150861564;
     let long = 46.44641685678996;
     let height = 5085.218731091624;
-    let r = State::<ECEF>::from_position(ri, rj, rk, dt);
+    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid.clone());
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height, "height");
-    let r = State::<ECEF>::from_geodesic(lat, long, height, dt);
-    f64_eq!(r.ri(), ri_val, "r_i");
-    f64_eq!(r.rj(), rj_val, "r_j");
-    f64_eq!(r.rk(), rk_val, "r_k");
+    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid.clone());
+    f64_eq!(r.x, ri_val, "r_i");
+    f64_eq!(r.y, rj_val, "r_j");
+    f64_eq!(r.z, rk_val, "r_k");
 
     // Test case from Vallado, 4th Ed., page 173, Example 3-4
     let lat = -7.906_635_7;
@@ -298,11 +333,11 @@ fn geodetic_vallado() {
     let ri = 6119.400259009384;
     let rj = -1571.4795528014297;
     let rk = -871.5612575789334;
-    let r = State::<ECEF>::from_geodesic(lat, long, height, dt);
-    f64_eq!(r.ri(), ri, "r_i");
-    f64_eq!(r.rj(), rj, "r_j");
-    f64_eq!(r.rk(), rk, "r_k");
-    let r = State::<ECEF>::from_position(ri, rj, rk, dt);
+    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid.clone());
+    f64_eq!(r.x, ri, "r_i");
+    f64_eq!(r.y, rj, "r_j");
+    f64_eq!(r.z, rk, "r_k");
+    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid.clone());
     f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height_val, "height");

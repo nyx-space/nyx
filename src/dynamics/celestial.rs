@@ -188,7 +188,7 @@ pub struct TwoBodyWithDualStm {
 
 impl TwoBodyWithDualStm {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
-    pub fn from_state(state: State<Geoid>) -> TwoBodyWithDualStm {
+    pub fn from_state(state: &State<Geoid>) -> TwoBodyWithDualStm {
         TwoBodyWithDualStm {
             mu: state.frame.gm,
             stm: Matrix6::identity(),

@@ -15,10 +15,12 @@ fn backprop_rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) 
 fn two_body_parametrized() {
     extern crate nalgebra as na;
     use self::na::Vector6;
-    use nyx::celestia::EARTH;
+    use nyx::celestia::Cosm;
     use nyx::dynamics::celestial::TwoBody;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -36,7 +38,7 @@ fn two_body_parametrized() {
         5.848940867758592,
     ]);
 
-    let mut dynamics = TwoBody::from_state_vec::<EARTH>(init);
+    let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
     let mut prop = Propagator::new::<RK89>(
         &mut dynamics,
         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
@@ -99,13 +101,25 @@ fn two_body_state_parametrized() {
     extern crate nalgebra as na;
     use hifitime::julian::ModifiedJulian;
     use hifitime::SECONDS_PER_DAY;
-    use nyx::celestia::{State, EARTH, ECI};
+    use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::TwoBody;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+
     let dt = ModifiedJulian { days: 21545.0 };
-    let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
+    let initial_state = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088611,
+        -5.088611,
+        0.0,
+        dt,
+        earth_geoid.clone(),
+    );
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
@@ -114,7 +128,7 @@ fn two_body_state_parametrized() {
     let min_step = 0.1;
     let max_step = 60.0;
 
-    let rslt = State::from_cartesian_eci(
+    let rslt = State::<Geoid>::from_cartesian(
         -5971.1941916712285,
         3945.5066532419537,
         2864.636618390466,
@@ -122,9 +136,10 @@ fn two_body_state_parametrized() {
         -4.1850933184621315,
         5.848940867758592,
         ModifiedJulian { days: 21546.0 },
+        earth_geoid.clone(),
     );
 
-    let mut dynamics = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
+    let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid.clone());
     let mut prop = Propagator::new::<RK89>(
         &mut dynamics,
         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
@@ -134,7 +149,7 @@ fn two_body_state_parametrized() {
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
     };
-    let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&prop.state(), final_dt, ECI {});
+    let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid.clone());
     assert_eq!(final_state, rslt, "two body prop failed");
     assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
 
@@ -159,11 +174,14 @@ fn two_body_dual() {
     extern crate nalgebra as na;
     use self::na::{Matrix6, Vector6};
     use hifitime::julian::ModifiedJulian;
-    use nyx::celestia::{State, EARTH, ECI};
+    use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::TwoBodyWithDualStm;
     use nyx::od::AutoDiffDynamics;
 
-    let init = State::from_cartesian_eci(
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+
+    let init = State::<Geoid>::from_cartesian(
         -9042.862233600335,
         18536.333069123244,
         6999.9570694864115,
@@ -171,6 +189,7 @@ fn two_body_dual() {
         -2.226285193102822,
         1.6467383807226765,
         ModifiedJulian { days: 21546.0 },
+        earth_geoid,
     );
 
     let expected_fx = Vector6::new(
@@ -182,7 +201,7 @@ fn two_body_dual() {
         -0.00027005954128877916,
     );
 
-    let dynamics = TwoBodyWithDualStm::from_state::<EARTH, ECI>(init);
+    let dynamics = TwoBodyWithDualStm::from_state(&init);
     let (fx, grad) = dynamics.compute(0.0, &init.to_cartesian_vec());
 
     assert!(
