@@ -89,33 +89,21 @@ impl GroundStation {
     pub fn measure(self, rx: State<Geoid>, dt: Instant) -> StdMeasurement {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
-        let frame = rx.frame.clone();
+        if *rx.frame.frame_id() != 3 {
+            unimplemented!("frame transformation in measurements is not implemented");
+        }
         let mjd_dt = ModifiedJulian::from_instant(dt);
-        let tx_ecef = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, frame.clone());
-        let dcm_to_ecef = r3(-gast(dt));
-        let rx_ecef_r = dcm_to_ecef * rx.radius();
-        // Use the transport theorem and finite differencing for the velocity DCM
-        let h = Duration::from_millis(100);
-        let dcm_to_ecef_dt = (r3(-gast(dt + h)) - dcm_to_ecef) / 0.1;
-        let rx_ecef_v = dcm_to_ecef * rx.velocity() + dcm_to_ecef_dt * rx.radius();
-        let rx_ecef = State::from_cartesian_vec(
-            &Vector6::from_iterator(rx_ecef_r.iter().chain(rx_ecef_v.iter()).cloned()),
-            mjd_dt,
-            frame,
-        );
-
-        println!("{}", dcm_to_ecef);
-        println!("{}", rx);
-        println!("{}", rx_ecef);
+        let frame = rx.frame.clone();
+        let tx = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, frame.clone());
 
         // Let's start by computing the range and range rate
-        let rho_ecef = rx_ecef.radius() - tx_ecef.radius();
+        let rho_ecef = rx.radius() - tx.radius();
 
         // Convert to SEZ to compute elevation
         let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::new(dt, tx_ecef, rx_ecef, elevation >= self.elevation_mask)
+        StdMeasurement::new(dt, tx, rx, elevation >= self.elevation_mask)
     }
 }
 

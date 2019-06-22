@@ -13,7 +13,7 @@ fn nil_measurement() {
 
     let lat = -7.906_635_7;
     let long = 345.5975;
-    let height = 56.0e-3;
+    let height = 0.0;
     let dt = ModifiedJulian::j2000();
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
