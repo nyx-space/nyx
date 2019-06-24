@@ -7,7 +7,7 @@ use self::hifitime::{datetime, julian};
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Vector3, Vector6};
-use super::Body;
+use super::Frame;
 use celestia::frames::Geoid;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
@@ -31,7 +31,7 @@ const ZERO_DIV_TOL: f64 = 1e-15;
 #[derive(Copy, Clone, Debug)]
 pub struct State<F>
 where
-    F: Body,
+    F: Frame,
 {
     pub x: f64,
     pub y: f64,
@@ -47,14 +47,14 @@ where
 
 impl<F> State<F>
 where
-    F: Body,
+    F: Frame,
 {
     /// Creates a new State in the provided frame at the provided instant in time.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
     pub fn from_cartesian<G, T: TimeSystem>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T, frame: G) -> State<G>
     where
-        G: Body,
+        G: Frame,
     {
         State {
             x,
@@ -73,7 +73,7 @@ where
     /// **Units:** km, km, km
     pub fn from_position<G, T: TimeSystem>(x: f64, y: f64, z: f64, dt: T, frame: G) -> State<G>
     where
-        G: Body,
+        G: Frame,
     {
         State {
             x,
@@ -93,7 +93,7 @@ where
     /// and as such it has the same unit requirements.
     pub fn from_cartesian_vec<T: TimeSystem>(state: &Vector6<f64>, dt: T, frame: F) -> State<F>
     where
-        F: Body,
+        F: Frame,
     {
         State {
             x: state[(0, 0)],
@@ -145,12 +145,12 @@ where
     }
 }
 
-impl<F: Body> PartialEq for State<F> {
+impl<F: Frame> PartialEq for State<F> {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
     /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
     fn eq(&self, other: &State<F>) -> bool
     where
-        F: Body,
+        F: Frame,
     {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
@@ -164,14 +164,14 @@ impl<F: Body> PartialEq for State<F> {
     }
 }
 
-impl<F: Body> Sub for State<F> {
+impl<F: Frame> Sub for State<F> {
     type Output = State<F>;
 
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
     /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
     fn sub(self, other: State<F>) -> State<F>
     where
-        F: Body,
+        F: Frame,
     {
         State {
             x: self.x - other.x,
@@ -188,7 +188,7 @@ impl<F: Body> Sub for State<F> {
 
 impl<F> Serialize for State<F>
 where
-    F: Body,
+    F: Frame,
 {
     /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -633,7 +633,7 @@ impl State<Geoid> {
 
 impl<F> fmt::Display for State<F>
 where
-    F: Body,
+    F: Frame,
 {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

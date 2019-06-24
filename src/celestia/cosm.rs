@@ -5,8 +5,9 @@ use self::prost::Message;
 use crate::hifitime::julian::ModifiedJulian;
 use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
 use celestia::exb::{Ephemeris, EphemerisContainer};
+use celestia::frames::Frame;
 use celestia::frames::*;
-use celestia::fxb::{Frame, FrameContainer};
+use celestia::fxb::{Frame as FXBFrame, FrameContainer};
 use celestia::state::State;
 use std::collections::HashMap;
 use std::fs::File;
@@ -16,7 +17,7 @@ use std::time::Instant;
 // Defines Cosm, from the Greek word for "world" or "universe".
 pub struct Cosm {
     ephemerides: HashMap<(i32, String), Ephemeris>,
-    frames: HashMap<(i32, String), Frame>,
+    frames: HashMap<(i32, String), FXBFrame>,
     geoids: HashMap<(i32, String), Geoid>, // TODO: Change to Graph (must confirm traverse)
 }
 
@@ -97,7 +98,7 @@ impl Cosm {
         Err(CosmError::ObjectNameNotFound(name))
     }
 
-    pub fn state<B: Body>(&self, exb: EXBID, jde: f64, frame: B) -> Result<State<B>, CosmError> {
+    pub fn state<B: Frame>(&self, exb: EXBID, jde: f64, frame: B) -> Result<State<B>, CosmError> {
         let ephem = self
             .ephemerides
             .get(&(exb.number, exb.name))
@@ -227,7 +228,7 @@ pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
 /// Loads the provided input_filename as an FXB
 ///
 /// This function may panic!
-pub fn load_frames(input_filename: &str) -> Vec<Frame> {
+pub fn load_frames(input_filename: &str) -> Vec<FXBFrame> {
     let mut input_fxb_buf = Vec::new();
 
     File::open(input_filename)

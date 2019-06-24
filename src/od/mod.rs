@@ -6,7 +6,7 @@ use self::dual_num::{hyperspace_from_vector, Dual, Hyperdual, Owned};
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::instant::Instant;
-use celestia::{Body, State};
+use celestia::{Frame, State};
 use dynamics::Dynamics;
 
 /// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.
@@ -42,7 +42,7 @@ where
     type MeasurementSize: DimName;
 
     /// Computes a new measurement from the provided information.
-    fn new<F: Body>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> Self;
+    fn new<F: Frame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> Self;
 
     /// Returns the measurement/observation as a vector.
     fn observation(&self) -> &VectorN<f64, Self::MeasurementSize>
