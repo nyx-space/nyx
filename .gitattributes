@@ -1,0 +1,3 @@
+de438.exb filter=lfs diff=lfs merge=lfs -text
+de438.fxb filter=lfs diff=lfs merge=lfs -text
+de438.bsp filter=lfs diff=lfs merge=lfs -text

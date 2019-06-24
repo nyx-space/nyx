@@ -234,7 +234,7 @@ fn gmat_val_leo_day_fixed() {
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::from_xb("./de438");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
     let prop_time = 3_600.0 * 24.0;
@@ -285,6 +285,7 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        dbg!(dynamics.mu);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
