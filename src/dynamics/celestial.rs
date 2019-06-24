@@ -3,12 +3,11 @@ extern crate nalgebra as na;
 
 use self::dual_num::linalg::norm;
 use self::dual_num::{Float, Hyperdual};
-use self::na::{DimName, Matrix3x6, Matrix6, MatrixMN, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
+use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
-use celestia::{Body, Geoid, State};
+use celestia::{Geoid, State};
 use od::{AutoDiffDynamics, Linearization};
 use std::f64;
-use std::sync::mpsc::Sender;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]

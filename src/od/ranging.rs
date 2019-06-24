@@ -5,9 +5,9 @@ extern crate rand;
 
 use self::dual_num::linalg::norm;
 use self::dual_num::{hyperspace_from_vector, Hyperdual};
-use self::hifitime::instant::{Duration, Instant};
+use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
-use self::na::{DimName, Matrix2x6, Vector2, Vector6, VectorN, U2, U3, U6, U7};
+use self::na::{DimName, Matrix2x6, Vector2, VectorN, U2, U3, U6, U7};
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};

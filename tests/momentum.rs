@@ -5,7 +5,6 @@ extern crate nyx_space as nyx;
 fn const_mom() {
     use self::na::{Matrix3, Vector3};
     use nyx::dynamics::momentum::AngularMom;
-    use nyx::dynamics::Dynamics;
     use nyx::propagators::error_ctrl::LargestStep;
     use nyx::propagators::{CashKarp45, PropOpts, Propagator};
 

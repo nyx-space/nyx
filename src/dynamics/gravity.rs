@@ -1,9 +1,3 @@
-use super::na::{Vector6, VectorN, U3, U6};
-use super::Dynamics;
-use celestia::{CelestialBody, EARTH};
-use io::gravity::GravityPotentialStor;
-use std::cmp::min;
-
 #[cfg(feature = "unvalidated")]
 #[derive(Clone, Copy)]
 pub struct Harmonics<S>

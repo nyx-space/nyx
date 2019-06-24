@@ -16,7 +16,6 @@ use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
 use self::nyx::propagators::error_ctrl::{LargestError, RSSStepPV};
 use self::nyx::propagators::{PropOpts, Propagator, RK89};
-use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;

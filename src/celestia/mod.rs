@@ -13,38 +13,6 @@ pub trait CelestialBody {
     fn flattening() -> f64;
 }
 
-/// `NAIF` represents an object which has a NAIF ID and can be loaded from an SPK file.
-pub trait NAIF {
-    /// Returns the NAIF ID of this object.
-    fn id() -> i32;
-
-    /// Returns the NAIF ID of the barycenter
-    fn barycenter() -> i32 {
-        Self::id() / 100
-    }
-
-    /// Returns the NAIF ID of the satellite of this planet given its position (the first satellite is number **one** (not zero)).
-    ///
-    /// **Warning:** the logic here is based entirely on the NAIF ID of the main planet. No guarantee is made that the requested satellite number exists,
-    /// or is present in the loaded SPK files.
-    fn satellite(pos: i32) -> i32 {
-        Self::id() - 99 + pos
-    }
-}
-
-/// Solar system barycenter
-pub struct SSB;
-
-impl NAIF for SSB {
-    fn id() -> i32 {
-        0
-    }
-}
-
-// Re-Export the planets
-mod planets;
-pub use self::planets::*;
-
 // Re-Export state
 mod state;
 pub use self::state::*;

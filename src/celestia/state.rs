@@ -1,7 +1,7 @@
 extern crate hifitime;
 extern crate serde;
 
-use self::hifitime::instant::{Duration, Instant};
+use self::hifitime::instant::Instant;
 use self::hifitime::TimeSystem;
 use self::hifitime::{datetime, julian};
 use self::serde::ser::SerializeStruct;
