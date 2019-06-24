@@ -36,7 +36,7 @@ fn main() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 10.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
     let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 
@@ -49,6 +49,7 @@ fn main() {
     let cosm = Cosm::from_xb("../../de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid.clone());
+    println!("{}", initial_state);
 
     // Initialize the XYZV exporter
     let mut outfile = Cosmographia::from_path("truth.xyzv".to_owned());
@@ -66,6 +67,7 @@ fn main() {
     loop {
         match truth_rx.recv() {
             Ok((t, state_vec)) => {
+                println!("{}", state_vec);
                 let this_dt =
                     ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
                 let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid.clone());
