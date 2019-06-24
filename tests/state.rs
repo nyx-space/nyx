@@ -23,7 +23,9 @@ fn state_def_circ_inc() {
     use hifitime::TimeSystem;
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+    let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
+    // Let's use the GMAT GM value for which these tests we written.
+    earth_geoid.gm = 398600.4415;
     let dt = ModifiedJulian { days: 21545.0 };
     let cart = State::<Geoid>::from_cartesian(
         -2436.45,
@@ -103,7 +105,9 @@ fn state_def_circ_inc() {
 fn state_def_elliptical() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+    let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
+    // Let's use the GMAT GM value for which these tests we written.
+    earth_geoid.gm = 398600.4415;
     let dt = ModifiedJulian { days: 21545.0 };
     let cart = State::<Geoid>::from_cartesian(
         5946.673548288958,
@@ -163,7 +167,9 @@ fn state_def_elliptical() {
 fn state_def_circ_eq() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+    let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
+    // Let's use the GMAT GM value for which these tests we written.
+    earth_geoid.gm = 398600.4415;
     let dt = ModifiedJulian { days: 21545.0 };
     let cart = State::<Geoid>::from_cartesian(
         -38892.72444914902,
@@ -223,7 +229,9 @@ fn state_def_circ_eq() {
 fn state_def_reciprocity() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+    let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
+    // Let's use the GMAT GM value for which these tests we written.
+    earth_geoid.gm = 398600.4415;
     let dt = ModifiedJulian { days: 21545.0 };
 
     assert_eq!(
@@ -303,7 +311,9 @@ fn state_def_reciprocity() {
 fn geodetic_vallado() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+    let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
+    // Let's use the GMAT GM value for which these tests we written.
+    earth_geoid.gm = 398600.4415;
     let dt = ModifiedJulian { days: 51545.0 };
     // Test case from Vallado, 4th Ed., page 173, Example 3-3
     let ri = 6524.834;
@@ -311,10 +321,9 @@ fn geodetic_vallado() {
     let rj = 6862.875;
     let rj_val = 6862.874999999999;
     let rk = 6448.296;
-    let rk_val = 6448.295999999998;
-    let lat = 34.352495150861564;
+    let lat = 34.35249513991726;
     let long = 46.44641685678996;
-    let height = 5085.218731091624;
+    let height = 5085.21943034517;
     let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid.clone());
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
@@ -322,7 +331,7 @@ fn geodetic_vallado() {
     let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid.clone());
     f64_eq!(r.x, ri_val, "r_i");
     f64_eq!(r.y, rj_val, "r_j");
-    f64_eq!(r.z, rk_val, "r_k");
+    f64_eq!(r.z, rk, "r_k");
 
     // Test case from Vallado, 4th Ed., page 173, Example 3-4
     let lat = -7.906_635_7;
@@ -330,9 +339,9 @@ fn geodetic_vallado() {
     let long = 345.5975;
     let height = 56.0e-3;
     let height_val = 0.056000000000494765;
-    let ri = 6119.400259009384;
-    let rj = -1571.4795528014297;
-    let rk = -871.5612575789334;
+    let ri = 6119.399587411616;
+    let rj = -1571.479380333195;
+    let rk = -871.5611619260039;
     let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid.clone());
     f64_eq!(r.x, ri, "r_i");
     f64_eq!(r.y, rj, "r_j");
