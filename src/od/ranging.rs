@@ -146,10 +146,6 @@ impl StdMeasurement {
         let range = norm(&range_vec);
         let range_rate = range_vec.dot(&delta_v_vec);
 
-        // Added for inspection only
-        println!("range = {}", range);
-        println!("range_rate = {}", range_rate);
-
         // Extract result into Vector2 and Matrix2x6
         let mut fx = Vector2::zeros();
         let mut pmat = Matrix2x6::zeros();
