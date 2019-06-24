@@ -27,9 +27,9 @@ fn main() {
 
     // Define the ground stations.
     let num_meas_for_ekf = 15;
-    let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
+    let elevation_mask = 10.0;
+    let range_noise = 10.0;
+    let range_rate_noise = 0.5;
     let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
     let dss34_canberra = GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
     let dss13_goldstone = GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
@@ -67,7 +67,6 @@ fn main() {
     loop {
         match truth_rx.recv() {
             Ok((t, state_vec)) => {
-                println!("{}", state_vec);
                 let this_dt =
                     ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
                 let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid.clone());
@@ -102,8 +101,8 @@ fn main() {
     // And propagate
     prop_est.until_time_elapsed(prop_time);
 
-    let covar_radius = 1.0e-6;
-    let covar_velocity = 1.0e-6;
+    let covar_radius = 1.0e1;
+    let covar_velocity = 1.0e-1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
         covar_radius,
@@ -114,13 +113,13 @@ fn main() {
     ));
 
     let initial_estimate = Estimate {
-        state: Vector6::zeros(),
+        state: Vector6::new(1.0, -2.0, 1.9, 0.1, -0.3, 0.9),
         covar: init_covar,
         stm: prop_est.dynamics.stm.clone(),
         predicted: false,
     };
 
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-5, 1e-2));
     let mut kf = KF::initialize(initial_estimate, measurement_noise);
 
     println!("Will process {} measurements", measurements.len());
@@ -163,10 +162,6 @@ fn main() {
                                 .expect("wut?");
                             still_empty = false;
                             assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
-                            assert!(
-                                latest_est.state.norm() < EPSILON,
-                                "estimate error should be zero (perfect dynamics)"
-                            );
                             if kf.ekf {
                                 // It's an EKF, so let's update the state in the dynamics.
                                 // let now = tb_estimator.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
