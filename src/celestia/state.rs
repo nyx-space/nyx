@@ -1,11 +1,15 @@
 extern crate hifitime;
 extern crate serde;
+extern crate uom;
 
 use self::hifitime::instant::Instant;
 use self::hifitime::TimeSystem;
 use self::hifitime::{datetime, julian};
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
+use self::uom::si::f64::*;
+use self::uom::si::length::kilometer;
+use self::uom::si::velocity::kilometer_per_second;
 use super::na::{Vector3, Vector6};
 use super::Frame;
 use celestia::frames::Geoid;

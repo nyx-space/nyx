@@ -95,6 +95,7 @@ impl GroundStation {
         }
         let mjd_dt = ModifiedJulian::from_instant(dt);
         let tx = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, rx.frame);
+        /*
         // Convert the station to "ECEF"
         let theta = gast(dt);
         let tx_ecef_r = r3(-theta) * tx.radius();
@@ -105,15 +106,15 @@ impl GroundStation {
             mjd_dt,
             rx.frame,
         );
-
+        */
         // Let's start by computing the range and range rate
-        let rho_ecef = rx.radius() - tx_ecef_r;
+        let rho_ecef = rx.radius() - tx.radius();
 
         // Convert to SEZ to compute elevation
         let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::new(dt, tx_ecef, rx, elevation >= self.elevation_mask)
+        StdMeasurement::new(dt, tx, rx, elevation >= self.elevation_mask)
     }
 }
 
