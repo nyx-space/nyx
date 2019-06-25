@@ -18,7 +18,7 @@ use std::time::Instant;
 pub struct Cosm {
     ephemerides: HashMap<(i32, String), Ephemeris>,
     frames: HashMap<(i32, String), FXBFrame>,
-    geoids: HashMap<(i32, String), Geoid>, // TODO: Change to Graph (must confirm traverse)
+    geoids: HashMap<(i32, String), Geoid>,
 }
 
 #[derive(Debug)]
@@ -39,42 +39,74 @@ impl Cosm {
         };
 
         let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"));
-        for ephem in ephemerides {
+        for ephem in &ephemerides {
             let id = ephem.id.clone().unwrap();
-            cosm.ephemerides.insert((id.number, id.name), ephem);
+            let exb_tpl = (id.number, id.name.clone());
+
+            cosm.ephemerides.insert(exb_tpl.clone(), ephem.clone());
+
+            // Compute the exb_id and axb_id from the ref frame.
+            let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
+            let exb_id = ref_frame_id % 100000;
+            let axb_id = ref_frame_id / 100000;
+
+            // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
+
+            // Ephemeris exists
+            if let Some(gm) = ephem.ephem_parameters.get("GM") {
+                // It's a geoid, and we assume everything else is there
+                let flattening = match ephem.ephem_parameters.get("Flattening") {
+                    Some(param) => param.value,
+                    None => {
+                        if id.name != "Moon" {
+                            0.0
+                        } else {
+                            0.0012
+                        }
+                    }
+                };
+                let equatorial_radius = match ephem.ephem_parameters.get("Equatorial radius") {
+                    Some(param) => param.value,
+                    None => {
+                        if id.name != "Moon" {
+                            0.0
+                        } else {
+                            1738.1
+                        }
+                    }
+                };
+                let semi_major_radius = match ephem.ephem_parameters.get("Equatorial radius") {
+                    Some(param) => {
+                        if id.name != "Earth Barycenter" {
+                            param.value
+                        } else {
+                            6378.1370
+                        }
+                    }
+                    None => 0.0,
+                };
+                let geoid = Geoid {
+                    center_id: exb_id,
+                    orientation_id: axb_id,
+                    gm: gm.value,
+                    flattening,
+                    equatorial_radius,
+                    semi_major_radius,
+                };
+                cosm.geoids.insert(exb_tpl, geoid);
+            }
         }
 
         for frame in load_frames(&(filename.to_string() + ".fxb")) {
             let id = frame.id.clone().unwrap();
             cosm.frames.insert((id.number, id.name), frame.clone());
-
-            // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
-            let exb_id = frame.exb_id.clone().unwrap();
-            let exb_tpl = (exb_id.number, exb_id.name.clone());
-            if let Some(ephem) = cosm.ephemerides.get(&exb_tpl) {
-                // Ephemeris exists
-                if let Some(gm) = ephem.ephem_parameters.get("GM") {
-                    // It's a geoid, and we assume everything else is there
-                    let geoid = Geoid {
-                        frame_id: exb_id.number,
-                        gm: gm.value,
-                        flattening: ephem.ephem_parameters.get("Flattening").unwrap().value,
-                        equatorial_radius: ephem.ephem_parameters.get("Equatorial radius").unwrap().value,
-                        semi_major_radius: if exb_id.name == "EARTH BARYCENTER" {
-                            println!("FOUND");
-                            6378.1370
-                        } else {
-                            ephem.ephem_parameters.get("Equatorial radius").unwrap().value
-                        },
-                    };
-                    cosm.geoids.insert(exb_tpl, geoid);
-                }
-            } else if exb_id.number == 0 {
-                // Solar System Barycenter
-                cosm.geoids
-                    .insert(exb_tpl, Geoid::perfect_sphere(exb_id.number, 1.327_124_400_18e20));
-            }
         }
+
+        // Solar System Barycenter
+        cosm.geoids.insert(
+            (0, "Solar System Barycenter".to_string()),
+            Geoid::perfect_sphere(1, 1, 1.327_124_400_18e20),
+        );
 
         cosm
     }
@@ -95,6 +127,20 @@ impl Cosm {
             }
         }
         Err(CosmError::ObjectNameNotFound(name))
+    }
+
+    pub fn exbid_from_id(&self, id: i32) -> Result<EXBID, CosmError> {
+        for ((exb_id, _), ephem) in &self.ephemerides {
+            if *exb_id == id {
+                return Ok(ephem.id.clone().unwrap());
+            }
+        }
+        Err(CosmError::ObjectIDNotFound(id))
+    }
+
+    pub fn celestial_state<B: Frame>(&self, exb_id: i32, jde: f64, frame: B) -> Result<State<B>, CosmError> {
+        let exb = self.exbid_from_id(exb_id)?;
+        self.state(exb, jde, frame)
     }
 
     pub fn state<B: Frame>(&self, exb: EXBID, jde: f64, frame: B) -> Result<State<B>, CosmError> {
@@ -184,8 +230,11 @@ impl Cosm {
         // We now have the state of the body in its storage frame.
         let storage_state = State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid.clone());
         println!("{} {}", storage_state.rmag(), storage_state.vmag());
-        if storage_geoid != frame {
-            // Must go to the higher frame
+        if storage_geoid.orientation_id() != frame.orientation_id() {
+            unimplemented!("orientation changes are not yet implemented");
+        }
+        if storage_geoid.center_id() != frame.center_id() {
+            // Must convert the storage
             // TODO: Add a graph and find the path from storage frame to destination frame
         }
 
@@ -261,6 +310,7 @@ pub fn load_frames(input_filename: &str) -> Vec<FXBFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use celestia::bodies;
 
     #[test]
     fn test_cosm() {
@@ -280,7 +330,7 @@ mod tests {
             name: "Earth Barycenter".to_string(),
         };
 
-        let out_body = cosm.geoids[&(0, "Solar System Barycenter".to_string())].clone();
+        let out_body = cosm.geoid_from_id(bodies::SUN).unwrap();
 
         let out_state = cosm.state(exb_id, 2474160.13175, out_body).unwrap();
         println!("{:?}", out_state);
@@ -307,7 +357,7 @@ mod tests {
             name: "Earth Barycenter".to_string(),
         };
 
-        let out_body = cosm.geoids[&(1, "Venus Barycenter".to_string())].clone();
+        let out_body = cosm.geoid_from_id(bodies::VENUS).unwrap();
 
         let out_state = cosm.state(exb_id, 2474160.13175, out_body).unwrap();
         println!("{:?}", out_state);

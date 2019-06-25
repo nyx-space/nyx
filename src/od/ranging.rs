@@ -7,7 +7,7 @@ use self::dual_num::linalg::norm;
 use self::dual_num::{hyperspace_from_vector, Hyperdual};
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
-use self::na::{DimName, Matrix2x6, Vector2, Vector6, VectorN, U2, U3, U6, U7};
+use self::na::{DimName, Matrix2x6, Vector2, VectorN, U2, U3, U6, U7};
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
@@ -90,8 +90,8 @@ impl GroundStation {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
-        if *rx.frame.frame_id() != 3 {
-            unimplemented!("frame transformation in measurements is not implemented");
+        if *rx.frame.center_id() != 3 {
+            unimplemented!("the receiver is not around the Earth");
         }
         let mjd_dt = ModifiedJulian::from_instant(dt);
         let tx = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, rx.frame);

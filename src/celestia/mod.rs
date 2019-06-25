@@ -13,6 +13,34 @@ pub trait CelestialBody {
     fn flattening() -> f64;
 }
 
+/// Known orientation IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
+pub mod orientations {
+    /// J2000 orientation frame
+    pub const J2000: i32 = 1;
+}
+
+/// Known planets IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
+pub mod bodies {
+    /// Sun center ID
+    pub const SUN: i32 = 0;
+    /// Mercury center ID
+    pub const MERCURY: i32 = 1;
+    /// Venus center ID
+    pub const VENUS: i32 = 2;
+    /// Earth center ID
+    pub const EARTH: i32 = 3;
+    /// Mars center ID
+    pub const MARS: i32 = 4;
+    /// Jupiter center ID
+    pub const JUPITER: i32 = 5;
+    /// Saturn center ID
+    pub const SATURN: i32 = 6;
+    /// Uranus center ID
+    pub const URANUS: i32 = 7;
+    /// Neptune center ID
+    pub const NEPTUNE: i32 = 8;
+}
+
 // Re-Export state
 mod state;
 pub use self::state::*;
