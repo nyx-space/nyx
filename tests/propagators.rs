@@ -47,7 +47,7 @@ fn regress_leo_day_adaptive() {
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         let mut prop = Propagator::new::<RK2Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
@@ -62,7 +62,7 @@ fn regress_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         let mut prop = Propagator::new::<CashKarp45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -154,7 +154,7 @@ fn gmat_val_leo_day_adaptive() {
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         dynamics.mu = 398600.4415; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand45>(
             &mut dynamics,
@@ -173,7 +173,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         dynamics.mu = 398600.4415; // Using GMAT's value
         let mut prop = Propagator::new::<Verner56>(
             &mut dynamics,
@@ -192,7 +192,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         dynamics.mu = 398600.4415; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand78>(
             &mut dynamics,
@@ -288,7 +288,7 @@ fn gmat_val_leo_day_fixed() {
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         dynamics.mu = 398600.4415; // Using GMAT's value
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
@@ -296,7 +296,7 @@ fn gmat_val_leo_day_fixed() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         dynamics.mu = 398600.4415; // Using GMAT's value
         let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
@@ -304,7 +304,7 @@ fn gmat_val_leo_day_fixed() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         dynamics.mu = 398600.4415; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand45>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
@@ -312,7 +312,7 @@ fn gmat_val_leo_day_fixed() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid.clone());
+        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
         dynamics.mu = 398600.4415; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand78>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);

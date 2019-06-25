@@ -107,10 +107,10 @@ fn ckf_fixed_step_perfect_stations_std() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
-    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid.clone());
+    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
-    let geoid = earth_geoid.clone();
+    let geoid = earth_geoid;
     thread::spawn(move || {
         let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts.clone());
@@ -126,7 +126,7 @@ fn ckf_fixed_step_perfect_stations_std() {
                 // Convert the state to ECI.
                 let this_dt =
                     ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
-                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid.clone());
+                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
                 for station in all_stations.iter() {
                     let meas = station.measure(rx_state, this_dt.into_instant());
                     if meas.visible() {
@@ -192,8 +192,7 @@ fn ckf_fixed_step_perfect_stations_std() {
             panic!("already handled that time: {}", prev_dt);
         }
         prev_dt = this_dt;
-        let rx_state =
-            State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.two_body_dyn.state(), this_dt, earth_geoid.clone());
+        let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.two_body_dyn.state(), this_dt, earth_geoid);
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
@@ -249,10 +248,10 @@ fn ekf_fixed_step_perfect_stations() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let dt = ModifiedJulian { days: 21545.0 };
-    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid.clone());
+    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
-    let geoid = earth_geoid.clone();
+    let geoid = earth_geoid;
     thread::spawn(move || {
         let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts.clone());
@@ -268,7 +267,7 @@ fn ekf_fixed_step_perfect_stations() {
                 // Convert the state to ECI.
                 let this_dt =
                     ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
-                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid.clone());
+                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
                 for station in all_stations.iter() {
                     let meas = station.measure(rx_state, this_dt.into_instant());
                     if meas.visible() {
@@ -334,8 +333,7 @@ fn ekf_fixed_step_perfect_stations() {
             panic!("already handled that time: {}", prev_dt);
         }
         prev_dt = this_dt;
-        let rx_state =
-            State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.two_body_dyn.state(), this_dt, earth_geoid.clone());
+        let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.two_body_dyn.state(), this_dt, earth_geoid);
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
@@ -390,10 +388,10 @@ fn ckf_fixed_step_perfect_stations_dual() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
     let dt = ModifiedJulian { days: 21545.0 };
-    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid.clone());
+    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
-    let geoid = earth_geoid.clone();
+    let geoid = earth_geoid;
     thread::spawn(move || {
         let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts.clone());
@@ -409,7 +407,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
                 // Convert the state to ECI.
                 let this_dt =
                     ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
-                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid.clone());
+                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
                 for station in all_stations.iter() {
                     let meas = station.measure(rx_state, this_dt.into_instant());
                     if meas.visible() {
@@ -475,7 +473,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
             panic!("already handled that time: {}", prev_dt);
         }
         prev_dt = this_dt;
-        let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.pos_vel, this_dt, earth_geoid.clone());
+        let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.pos_vel, this_dt, earth_geoid);
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());

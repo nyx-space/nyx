@@ -111,16 +111,7 @@ fn two_body_state_parametrized() {
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
     let dt = ModifiedJulian { days: 21545.0 };
-    let initial_state = State::<Geoid>::from_cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088611,
-        -5.088611,
-        0.0,
-        dt,
-        earth_geoid.clone(),
-    );
+    let initial_state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
 
     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 
@@ -137,10 +128,10 @@ fn two_body_state_parametrized() {
         -4.1850841261300875,
         5.8489474622522595,
         ModifiedJulian { days: 21546.0 },
-        earth_geoid.clone(),
+        earth_geoid,
     );
 
-    let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid.clone());
+    let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid);
     let mut prop = Propagator::new::<RK89>(
         &mut dynamics,
         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
@@ -150,7 +141,7 @@ fn two_body_state_parametrized() {
     let final_dt = ModifiedJulian {
         days: dt.days + final_t / SECONDS_PER_DAY,
     };
-    let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid.clone());
+    let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid);
     assert_eq!(final_state, rslt, "two body prop failed");
     assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
 

@@ -27,16 +27,7 @@ fn state_def_circ_inc() {
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398600.4415;
     let dt = ModifiedJulian { days: 21545.0 };
-    let cart = State::<Geoid>::from_cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088611,
-        -5.088611,
-        0.0,
-        dt,
-        earth_geoid.clone(),
-    );
+    let cart = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
     let cart2 = State::<Geoid>::from_cartesian(
         -2436.45,
         -2436.45,
@@ -45,7 +36,7 @@ fn state_def_circ_inc() {
         -5.088611,
         0.0,
         Datetime::from_instant(dt.into_instant()),
-        earth_geoid.clone(),
+        earth_geoid,
     );
     assert_eq!(
         cart, cart2,
@@ -75,7 +66,7 @@ fn state_def_circ_inc() {
     f64_eq!(cart.periapsis(), 7704.477149058786, "peri");
     f64_eq!(cart.semi_parameter(), 7712.178412142147, "semi parameter");
 
-    let kep = State::<Geoid>::from_keplerian(8191.93, 1e-6, 12.85, 306.614, 314.19, 99.8877, dt, earth_geoid.clone());
+    let kep = State::<Geoid>::from_keplerian(8191.93, 1e-6, 12.85, 306.614, 314.19, 99.8877, dt, earth_geoid);
     f64_eq!(kep.x, 8057.976452202976, "x");
     f64_eq!(kep.y, -0.1967403702908889, "y");
     f64_eq!(kep.z, 1475.383214274138, "z");
@@ -117,7 +108,7 @@ fn state_def_elliptical() {
         4.579534132135011,
         6.246541551539432,
         dt,
-        earth_geoid.clone(),
+        earth_geoid,
     );
     f64_eq!(cart.energy(), -25.842247282849144, "energy");
     f64_eq!(cart.period(), 6740.2690636430425, "period");
@@ -137,7 +128,7 @@ fn state_def_elliptical() {
     f64_eq!(cart.periapsis(), 6485.94852514973, "peri");
     f64_eq!(cart.semi_parameter(), 7517.214340648537, "semi parameter");
 
-    let kep = State::<Geoid>::from_keplerian(8191.93, 0.0245, 12.85, 306.614, 314.19, 99.8877, dt, earth_geoid.clone());
+    let kep = State::<Geoid>::from_keplerian(8191.93, 0.0245, 12.85, 306.614, 314.19, 99.8877, dt, earth_geoid);
     f64_eq!(kep.x, 8087.1616180485225, "x");
     f64_eq!(kep.y, -0.19745294377252073, "y");
     f64_eq!(kep.z, 1480.726901246883, "z");
@@ -179,7 +170,7 @@ fn state_def_circ_eq() {
         -2.81465117260598,
         1.140294223185661e-05,
         dt,
-        earth_geoid.clone(),
+        earth_geoid,
     );
     f64_eq!(cart.energy(), -4.702902670552006, "energy");
     f64_eq!(cart.period(), 86820.7761529861, "period");
@@ -199,7 +190,7 @@ fn state_def_circ_eq() {
     f64_eq!(cart.periapsis(), 42378.12957621869, "peri");
     f64_eq!(cart.semi_parameter(), 42378.129999999976, "semi parameter");
 
-    let kep = State::<Geoid>::from_keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, earth_geoid.clone());
+    let kep = State::<Geoid>::from_keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, earth_geoid);
     f64_eq!(kep.x, 18190.717357886369, "x");
     f64_eq!(kep.y, -118.10716253921869, "y");
     f64_eq!(kep.z, 0.00025384564763305335, "z");
@@ -243,7 +234,7 @@ fn state_def_reciprocity() {
             -2.81465117260598,
             1.140294223185661e-05,
             dt,
-            earth_geoid.clone()
+            earth_geoid
         ),
         State::<Geoid>::from_keplerian(
             42378.12999999998,
@@ -253,7 +244,7 @@ fn state_def_reciprocity() {
             65.39999984718678,
             12.300000152813197,
             dt,
-            earth_geoid.clone()
+            earth_geoid
         ),
         "circ_eq"
     );
@@ -267,7 +258,7 @@ fn state_def_reciprocity() {
             4.579534132135011,
             6.246541551539432,
             dt,
-            earth_geoid.clone()
+            earth_geoid
         ),
         State::<Geoid>::from_keplerian(
             7712.186117895041,
@@ -277,22 +268,13 @@ fn state_def_reciprocity() {
             359.787880000004,
             25.434003407751188,
             dt,
-            earth_geoid.clone()
+            earth_geoid
         ),
         "elliptical"
     );
 
     assert_eq!(
-        State::<Geoid>::from_cartesian(
-            -2436.45,
-            -2436.45,
-            6891.037,
-            5.088611,
-            -5.088611,
-            0.0,
-            dt,
-            earth_geoid.clone()
-        ),
+        State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid),
         State::<Geoid>::from_keplerian(
             7712.186117895043,
             0.0009995828314320525,
@@ -301,7 +283,7 @@ fn state_def_reciprocity() {
             90.0,
             0.0,
             dt,
-            earth_geoid.clone()
+            earth_geoid
         ),
         "circ_inc"
     );
@@ -324,11 +306,11 @@ fn geodetic_vallado() {
     let lat = 34.35249513991726;
     let long = 46.44641685678996;
     let height = 5085.21943034517;
-    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid.clone());
+    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid);
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height, "height");
-    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid.clone());
+    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid);
     f64_eq!(r.x, ri_val, "r_i");
     f64_eq!(r.y, rj_val, "r_j");
     f64_eq!(r.z, rk, "r_k");
@@ -342,11 +324,11 @@ fn geodetic_vallado() {
     let ri = 6119.399587411616;
     let rj = -1571.479380333195;
     let rk = -871.5611619260039;
-    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid.clone());
+    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid);
     f64_eq!(r.x, ri, "r_i");
     f64_eq!(r.y, rj, "r_j");
     f64_eq!(r.z, rk, "r_k");
-    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid.clone());
+    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid);
     f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height_val, "height");
