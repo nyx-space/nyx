@@ -67,7 +67,6 @@ impl Cosm {
                             ephem.ephem_parameters.get("Equatorial radius").unwrap().value
                         },
                     };
-
                     cosm.geoids.insert(exb_tpl, geoid);
                 }
             } else if exb_id.number == 0 {
@@ -185,6 +184,10 @@ impl Cosm {
         // We now have the state of the body in its storage frame.
         let storage_state = State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid.clone());
         println!("{} {}", storage_state.rmag(), storage_state.vmag());
+        if storage_geoid != frame {
+            // Must go to the higher frame
+            // TODO: Add a graph and find the path from storage frame to destination frame
+        }
 
         // BUG: This does not perform any frame transformation
         Ok(State::<B>::from_cartesian(x, y, z, vx, vy, vz, dt, frame))
@@ -278,6 +281,33 @@ mod tests {
         };
 
         let out_body = cosm.geoids[&(0, "Solar System Barycenter".to_string())].clone();
+
+        let out_state = cosm.state(exb_id, 2474160.13175, out_body).unwrap();
+        println!("{:?}", out_state);
+
+        /*
+        Expected data from jplephem
+        (array([5.30527022e+07, 1.25344353e+08, 5.43293743e+07]), array([-2444703.8160139 ,   834536.49356688,   361669.07958066]))
+        */
+        // XXX: Why is the position that far off?!
+        assert!((out_state.x - 5.30527022e+07).abs() < 1e-1);
+        assert!((out_state.y - 1.25344353e+08).abs() < 1e-0);
+        assert!((out_state.z - 5.43293743e+07).abs() < 1e-1);
+        assert!((out_state.vx - -2444703.8160139).abs() < 1e-5);
+        assert!((out_state.vy - 834536.49356688).abs() < 1e-5);
+        assert!((out_state.vz - 361669.07958066).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_cosm_transform() {
+        let cosm = Cosm::from_xb("./de438s");
+
+        let exb_id = EXBID {
+            number: 3,
+            name: "Earth Barycenter".to_string(),
+        };
+
+        let out_body = cosm.geoids[&(1, "Venus Barycenter".to_string())].clone();
 
         let out_state = cosm.state(exb_id, 2474160.13175, out_body).unwrap();
         println!("{:?}", out_state);
