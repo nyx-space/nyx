@@ -12,7 +12,7 @@ use celestia::frames::Geoid;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
-use std::ops::Sub;
+use std::ops::{Add, Sub};
 use utils::{between_0_360, between_pm_180};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -164,11 +164,31 @@ impl<F: Frame> PartialEq for State<F> {
     }
 }
 
+impl<F: Frame> Add for State<F> {
+    type Output = State<F>;
+
+    /// Add one state from another. Frame must be manually changed if needed.
+    fn add(self, other: State<F>) -> State<F>
+    where
+        F: Frame,
+    {
+        State {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+            vx: self.vx + other.vx,
+            vy: self.vy + other.vy,
+            vz: self.vz + other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
 impl<F: Frame> Sub for State<F> {
     type Output = State<F>;
 
-    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
+    /// Subtract one state from another
     fn sub(self, other: State<F>) -> State<F>
     where
         F: Frame,

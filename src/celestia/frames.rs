@@ -9,6 +9,9 @@ pub trait Frame: Clone + fmt::Debug + fmt::Display {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Geoid {
+    // TODO: Currently planets all have the same center and orientation.
+    // Hence, there are no intermediate frames. This means that Venus to Earth has nothing to do,
+    // when in fact it needs to go through the Sun. I'm afraid I need to change this struct again.
     pub center_id: i32,
     pub orientation_id: i32,
     pub gm: f64,

@@ -171,10 +171,6 @@ impl Cosm {
 
     pub fn celestial_state(&self, exb_id: i32, jde: f64, frame: &Geoid) -> Result<State<Geoid>, CosmError> {
         let exb = self.exbid_from_id(exb_id)?;
-        self.state(exb, jde, frame)
-    }
-
-    pub fn state(&self, exb: EXBID, jde: f64, frame: &Geoid) -> Result<State<Geoid>, CosmError> {
         let ephem = self
             .ephemerides
             .get(&(exb.number, exb.name))
@@ -262,15 +258,21 @@ impl Cosm {
         let mut state = State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, *storage_geoid);
 
         // And now let's convert this storage state to the correct frame.
-        for iframe in &self.intermediate_geoid_frames(storage_geoid, frame)? {
-            // TODO: I'm not sure how to do this...
+        let path = self.intermediate_geoid(storage_geoid, frame)?;
+        println!("{} -> {}: {:?}", storage_geoid, frame, path);
+        for fno in 1..path.len() {
+            let int_st = self.celestial_state(*path[fno - 1].center_id(), jde, &path[fno])?;
+            println!("{}", int_st);
+            state = state + int_st;
         }
+        // And finally update the frame to the requested frame.
+        state.frame = *frame;
 
         // BUG: This does not perform any frame transformation
         Ok(state)
     }
 
-    pub fn intermediate_geoid_frames(&self, from: &Geoid, to: &Geoid) -> Result<Vec<Geoid>, CosmError> {
+    pub fn intermediate_geoid(&self, from: &Geoid, to: &Geoid) -> Result<Vec<Geoid>, CosmError> {
         if from.center_id() == to.center_id() && from.orientation_id() == to.orientation_id() {
             // Same frames, nothing to do
             return Ok(Vec::new());
@@ -287,7 +289,7 @@ impl Cosm {
                     start_idx, end_idx, path, weight
                 );
                 // Build the path with the frames
-                let mut f_path = Vec::new();
+                let mut f_path = vec![self.geoid_from_id(*from.center_id()).unwrap()];
                 for idx in path {
                     f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
                 }
@@ -402,18 +404,29 @@ mod tests {
         let cosm = Cosm::from_xb("./de438s");
 
         assert_eq!(
-            cosm.intermediate_geoid_frames(
-                &cosm.geoid_from_id(bodies::VENUS).unwrap(),
+            cosm.intermediate_geoid(
+                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
                 &cosm.geoid_from_id(bodies::EARTH).unwrap(),
             )
             .unwrap()
             .len(),
             0,
-            "Venus and Earth are in the same frame, no conversion should be needed"
+            "Conversions within Earth does not require any transformation"
+        );
+
+        assert_eq!(
+            cosm.intermediate_geoid(
+                &cosm.geoid_from_id(bodies::VENUS).unwrap(),
+                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
+            )
+            .unwrap()
+            .len(),
+            1,
+            "Venus and Earth are in the same frame via the Sun"
         );
 
         let path = cosm
-            .intermediate_geoid_frames(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &cosm.geoid_from_id(301).unwrap())
+            .intermediate_geoid(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &cosm.geoid_from_id(301).unwrap())
             .unwrap();
         assert_eq!(path.len(), 2, "Venus and Earth Moon should convert via Sun and Earth");
 
@@ -422,9 +435,10 @@ mod tests {
             name: "Earth Barycenter".to_string(),
         };
 
+        // let in_body = cosm.geoid_from_id(bodies::EARTH).unwrap();
         let out_body = cosm.geoid_from_id(bodies::VENUS).unwrap();
 
-        let out_state = cosm.state(exb_id, 2474160.13175, &out_body).unwrap();
+        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.13175, &out_body).unwrap();
         println!("{:?}", out_state);
 
         /*
