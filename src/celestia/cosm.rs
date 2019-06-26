@@ -1,6 +1,9 @@
 extern crate bytes;
+extern crate petgraph;
 extern crate prost;
 use self::bytes::IntoBuf;
+use self::petgraph::algo::astar;
+use self::petgraph::prelude::*;
 use self::prost::Message;
 use crate::hifitime::julian::ModifiedJulian;
 use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
@@ -19,6 +22,7 @@ pub struct Cosm {
     ephemerides: HashMap<(i32, String), Ephemeris>,
     frames: HashMap<(i32, String), FXBFrame>,
     geoids: HashMap<(i32, String), Geoid>,
+    exb_map: Graph<i32, u8, Undirected>,
 }
 
 #[derive(Debug)]
@@ -27,6 +31,10 @@ pub enum CosmError {
     ObjectNameNotFound(String),
     NoInterpolationData(i32, String),
     NoStateData(i32, String),
+    /// No path was found to convert from the first center to the second
+    DisjointFrameCenters(i32, i32),
+    /// No path was found to convert from the first orientation to the second
+    DisjointFrameOrientations(i32, i32),
 }
 
 impl Cosm {
@@ -36,7 +44,16 @@ impl Cosm {
             ephemerides: HashMap::new(),
             frames: HashMap::new(),
             geoids: HashMap::new(),
+            exb_map: Graph::new_undirected(),
         };
+
+        // Solar System Barycenter
+        cosm.geoids.insert(
+            (0, "Solar System Barycenter".to_string()),
+            Geoid::perfect_sphere(0, 1, 1.327_124_400_18e20),
+        );
+
+        cosm.exb_map.add_node(0); // Add the SSB
 
         let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"));
         for ephem in &ephemerides {
@@ -49,6 +66,17 @@ impl Cosm {
             let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
             let exb_id = ref_frame_id % 100000;
             let axb_id = ref_frame_id / 100000;
+
+            // Add this EXB to the map, and link it to its parent
+            let this_node = cosm.exb_map.add_node(id.number);
+            let parent_node = match cosm.exbid_to_map_idx(exb_id) {
+                Ok(p) => p,
+                Err(e) => panic!(e),
+            };
+            // All edges are of value 1
+            cosm.exb_map.add_edge(parent_node, this_node, 1);
+
+            // cosm.exb_map.add_edge(a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E)
 
             // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
 
@@ -102,13 +130,16 @@ impl Cosm {
             cosm.frames.insert((id.number, id.name), frame.clone());
         }
 
-        // Solar System Barycenter
-        cosm.geoids.insert(
-            (0, "Solar System Barycenter".to_string()),
-            Geoid::perfect_sphere(1, 1, 1.327_124_400_18e20),
-        );
-
         cosm
+    }
+
+    fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
+        for (idx, node) in self.exb_map.raw_nodes().iter().enumerate() {
+            if node.weight == id {
+                return Ok(NodeIndex::new(idx));
+            }
+        }
+        Err(CosmError::ObjectIDNotFound(id))
     }
 
     pub fn geoid_from_id(&self, id: i32) -> Result<Geoid, CosmError> {
@@ -138,12 +169,12 @@ impl Cosm {
         Err(CosmError::ObjectIDNotFound(id))
     }
 
-    pub fn celestial_state<B: Frame>(&self, exb_id: i32, jde: f64, frame: B) -> Result<State<B>, CosmError> {
+    pub fn celestial_state(&self, exb_id: i32, jde: f64, frame: &Geoid) -> Result<State<Geoid>, CosmError> {
         let exb = self.exbid_from_id(exb_id)?;
         self.state(exb, jde, frame)
     }
 
-    pub fn state<B: Frame>(&self, exb: EXBID, jde: f64, frame: B) -> Result<State<B>, CosmError> {
+    pub fn state(&self, exb: EXBID, jde: f64, frame: &Geoid) -> Result<State<Geoid>, CosmError> {
         let ephem = self
             .ephemerides
             .get(&(exb.number, exb.name))
@@ -228,18 +259,42 @@ impl Cosm {
         let dt = ModifiedJulian { days: jde - 2_400_000.5 };
 
         // We now have the state of the body in its storage frame.
-        let storage_state = State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid.clone());
-        println!("{} {}", storage_state.rmag(), storage_state.vmag());
-        if storage_geoid.orientation_id() != frame.orientation_id() {
-            unimplemented!("orientation changes are not yet implemented");
-        }
-        if storage_geoid.center_id() != frame.center_id() {
-            // Must convert the storage
-            // TODO: Add a graph and find the path from storage frame to destination frame
+        let mut state = State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, *storage_geoid);
+
+        // And now let's convert this storage state to the correct frame.
+        for iframe in &self.intermediate_geoid_frames(storage_geoid, frame)? {
+            // TODO: I'm not sure how to do this...
         }
 
         // BUG: This does not perform any frame transformation
-        Ok(State::<B>::from_cartesian(x, y, z, vx, vy, vz, dt, frame))
+        Ok(state)
+    }
+
+    pub fn intermediate_geoid_frames(&self, from: &Geoid, to: &Geoid) -> Result<Vec<Geoid>, CosmError> {
+        if from.center_id() == to.center_id() && from.orientation_id() == to.orientation_id() {
+            // Same frames, nothing to do
+            return Ok(Vec::new());
+        }
+        if from.orientation_id() != to.orientation_id() {
+            unimplemented!("orientation changes are not yet implemented");
+        }
+        let start_idx = self.exbid_to_map_idx(*from.center_id()).unwrap();
+        let end_idx = self.exbid_to_map_idx(*to.center_id()).unwrap();
+        match astar(&self.exb_map, start_idx, |finish| finish == end_idx, |e| *e.weight(), |_| 0) {
+            Some((weight, path)) => {
+                println!(
+                    "path from {:?} tp {:?} is {:?} with cost {}",
+                    start_idx, end_idx, path, weight
+                );
+                // Build the path with the frames
+                let mut f_path = Vec::new();
+                for idx in path {
+                    f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
+                }
+                Ok(f_path)
+            }
+            None => Err(CosmError::DisjointFrameCenters(*from.center_id(), *to.center_id())),
+        }
     }
 }
 
@@ -325,15 +380,9 @@ mod tests {
             println!("geoid -- {:?} {:?}", ek, cosm.geoids[&ek]);
         }
 
-        let exb_id = EXBID {
-            number: 3,
-            name: "Earth Barycenter".to_string(),
-        };
-
         let out_body = cosm.geoid_from_id(bodies::SUN).unwrap();
 
-        let out_state = cosm.state(exb_id, 2474160.13175, out_body).unwrap();
-        println!("{:?}", out_state);
+        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.13175, &out_body).unwrap();
 
         /*
         Expected data from jplephem
@@ -352,6 +401,22 @@ mod tests {
     fn test_cosm_transform() {
         let cosm = Cosm::from_xb("./de438s");
 
+        assert_eq!(
+            cosm.intermediate_geoid_frames(
+                &cosm.geoid_from_id(bodies::VENUS).unwrap(),
+                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
+            )
+            .unwrap()
+            .len(),
+            0,
+            "Venus and Earth are in the same frame, no conversion should be needed"
+        );
+
+        let path = cosm
+            .intermediate_geoid_frames(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &cosm.geoid_from_id(301).unwrap())
+            .unwrap();
+        assert_eq!(path.len(), 2, "Venus and Earth Moon should convert via Sun and Earth");
+
         let exb_id = EXBID {
             number: 3,
             name: "Earth Barycenter".to_string(),
@@ -359,7 +424,7 @@ mod tests {
 
         let out_body = cosm.geoid_from_id(bodies::VENUS).unwrap();
 
-        let out_state = cosm.state(exb_id, 2474160.13175, out_body).unwrap();
+        let out_state = cosm.state(exb_id, 2474160.13175, &out_body).unwrap();
         println!("{:?}", out_state);
 
         /*

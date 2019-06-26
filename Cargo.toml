@@ -28,6 +28,7 @@ dual_num = { git = "https://github.com/novacrazy/dual_num", branch = "master" }
 bytes = "0.4.12"
 prost = "0.5"
 prost-derive = "0.5"
+petgraph = "0.4"
 
 [dev-dependencies]
 pretty_env_logger = "0.3"
