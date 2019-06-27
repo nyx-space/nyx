@@ -50,7 +50,7 @@ impl Cosm {
         // Solar System Barycenter
         cosm.geoids.insert(
             (0, "Solar System Barycenter".to_string()),
-            Geoid::perfect_sphere(0, 1, 1.327_124_400_18e20),
+            Geoid::perfect_sphere(0, 0, 1, 1.327_124_400_18e20),
         );
 
         cosm.exb_map.add_node(0); // Add the SSB
@@ -58,13 +58,16 @@ impl Cosm {
         let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"));
         for ephem in &ephemerides {
             let id = ephem.id.clone().unwrap();
-            let exb_tpl = (id.number, id.name.clone());
+            let exb_tpl = (if id.number == 10 { 0 } else { id.number }, id.name.clone());
 
             cosm.ephemerides.insert(exb_tpl.clone(), ephem.clone());
 
             // Compute the exb_id and axb_id from the ref frame.
             let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
-            let exb_id = ref_frame_id % 100000;
+            let mut exb_id = ref_frame_id % 100000;
+            if exb_id == 10 {
+                exb_id = 0;
+            }
             let axb_id = ref_frame_id / 100000;
 
             // Add this EXB to the map, and link it to its parent
@@ -114,6 +117,7 @@ impl Cosm {
                     None => 0.0,
                 };
                 let geoid = Geoid {
+                    id: id.number,
                     center_id: exb_id,
                     orientation_id: axb_id,
                     gm: gm.value,
@@ -170,18 +174,25 @@ impl Cosm {
     }
 
     pub fn celestial_state(&self, exb_id: i32, jde: f64, frame: &Geoid) -> Result<State<Geoid>, CosmError> {
-        let exb = self.exbid_from_id(exb_id)?;
+        let sun_requested = exb_id == 0;
+        let exb = if sun_requested {
+            self.exbid_from_id(*frame.id())?
+        } else {
+            self.exbid_from_id(exb_id)?
+        };
+        println!("exbid worked: {}", exb_id);
         let ephem = self
             .ephemerides
             .get(&(exb.number, exb.name))
             .ok_or(CosmError::ObjectIDNotFound(exb.number))?;
+        println!("ephem worked: {}", exb_id);
 
-        // Compute the position
-        // TODO: Maybe should this cache the previous ephemeris retrieved?
+        // Compute the position as per the algorithm from jplephem
         let interp = ephem
             .clone()
             .interpolator
             .ok_or(CosmError::NoInterpolationData(exb.number, "exb.name".to_string()))?;
+        println!("interp worked: {}", exb_id);
 
         let start_mod_julian: f64 = interp.start_mod_julian;
         let coefficient_count: usize = interp.position_degree as usize;
@@ -240,59 +251,76 @@ impl Cosm {
             vz += vel_factor * pos_coeffs.z[idx];
         }
 
-        let ref_frame = ephem.ref_frame.clone().unwrap();
+        // let ref_frame = ephem.ref_frame.clone().unwrap();
         // Get the EXB of that frame
-        let frame_center = self
-            .frames
-            .get(&(ref_frame.number, ref_frame.name))
-            .unwrap()
-            .exb_id
-            .clone()
-            .unwrap();
+        // let frame_center = self
+        //     .frames
+        //     .get(&(ref_frame.number, ref_frame.name))
+        //     .unwrap()
+        //     .exb_id
+        //     .clone()
+        //     .unwrap();
         // Get the Geoid associated with the ephemeris frame
-        let storage_geoid = self.geoids.get(&(frame_center.number, frame_center.name)).unwrap();
+        let storage_is_origin = ephem.id.clone().unwrap().number == exb_id;
+        let storage_geoid = self.geoid_from_id(ephem.id.clone().unwrap().number).unwrap();
+        println!("fetched the geoid of ID {:?}", ephem.id.clone().unwrap().number);
+        // let storage_geoid = self.geoids.get(&(frame_center.number, frame_center.name)).unwrap();
 
         let dt = ModifiedJulian { days: jde - 2_400_000.5 };
 
         // We now have the state of the body in its storage frame.
-        let mut state = State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, *storage_geoid);
+        let mut state = if sun_requested || storage_is_origin {
+            State::<Geoid>::from_cartesian(-x, -y, -z, -vx, -vy, -vz, dt, storage_geoid)
+        } else {
+            State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid)
+        };
 
-        // And now let's convert this storage state to the correct frame.
-        let path = self.intermediate_geoid(storage_geoid, frame)?;
-        println!("{} -> {}: {:?}", storage_geoid, frame, path);
-        for fno in 1..path.len() {
-            let int_st = self.celestial_state(*path[fno - 1].center_id(), jde, &path[fno])?;
-            println!("{}", int_st);
-            state = state + int_st;
+        if !storage_is_origin {
+            // And now let's convert this storage state to the correct frame.
+            let path = self.intermediate_geoid(&storage_geoid, frame)?;
+            for fno in 1..path.len() {
+                // HERE
+                println!("BBB {} -> {}\t\t", *path[fno - 1].id(), &path[fno]);
+                let int_st = self.celestial_state(*path[fno - 1].id(), jde, &path[fno])?;
+                state = state + int_st;
+                println!("OK");
+            }
         }
         // And finally update the frame to the requested frame.
         state.frame = *frame;
 
-        // BUG: This does not perform any frame transformation
         Ok(state)
     }
 
     pub fn intermediate_geoid(&self, from: &Geoid, to: &Geoid) -> Result<Vec<Geoid>, CosmError> {
         if from.center_id() == to.center_id() && from.orientation_id() == to.orientation_id() {
-            // Same frames, nothing to do
-            return Ok(Vec::new());
+            if from.id() == to.id() {
+                // Same frames, nothing to do
+                return Ok(Vec::new());
+            }
+            // Same orientation, but different frames. Simply convert via the from frame.
+            return Ok(vec![*from]);
         }
         if from.orientation_id() != to.orientation_id() {
             unimplemented!("orientation changes are not yet implemented");
         }
-        let start_idx = self.exbid_to_map_idx(*from.center_id()).unwrap();
-        let end_idx = self.exbid_to_map_idx(*to.center_id()).unwrap();
+        println!("s = {}\te = {}", from.id(), to.id());
+        let start_idx = self.exbid_to_map_idx(*from.id()).unwrap();
+        let end_idx = self.exbid_to_map_idx(*to.id()).unwrap();
         match astar(&self.exb_map, start_idx, |finish| finish == end_idx, |e| *e.weight(), |_| 0) {
             Some((weight, path)) => {
-                println!(
-                    "path from {:?} tp {:?} is {:?} with cost {}",
-                    start_idx, end_idx, path, weight
-                );
                 // Build the path with the frames
-                let mut f_path = vec![self.geoid_from_id(*from.center_id()).unwrap()];
+                let mut f_path = Vec::new();
                 for idx in path {
                     f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
                 }
+                println!(
+                    "path from {:?} to {:?} is {:?} with cost {}",
+                    from.id(),
+                    to.id(),
+                    f_path,
+                    weight
+                );
                 Ok(f_path)
             }
             None => Err(CosmError::DisjointFrameCenters(*from.center_id(), *to.center_id())),
@@ -428,29 +456,34 @@ mod tests {
         let path = cosm
             .intermediate_geoid(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &cosm.geoid_from_id(301).unwrap())
             .unwrap();
-        assert_eq!(path.len(), 2, "Venus and Earth Moon should convert via Sun and Earth");
+        assert_eq!(path.len(), 4, "Venus and Earth Moon should convert via Sun and Earth");
 
-        let exb_id = EXBID {
-            number: 3,
-            name: "Earth Barycenter".to_string(),
-        };
-
-        // let in_body = cosm.geoid_from_id(bodies::EARTH).unwrap();
-        let out_body = cosm.geoid_from_id(bodies::VENUS).unwrap();
-
-        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.13175, &out_body).unwrap();
-        println!("{:?}", out_state);
+        let out_state = cosm
+            .celestial_state(bodies::VENUS, 2474160.0, &cosm.geoid_from_id(301).unwrap())
+            .unwrap();
+        println!("{}", out_state);
+        println!("{}", out_state.rmag());
 
         /*
-        Expected data from jplephem
-        (array([5.30527022e+07, 1.25344353e+08, 5.43293743e+07]), array([-2444703.8160139 ,   834536.49356688,   361669.07958066]))
+        Expected data from JPL Horizon
+        X = 1.158234274236687E+07 Y =-5.119007862873630E+07 Z =-2.518292393506091E+06
+        VX= 9.104062558220569E-01 VY= 1.071602860104991E+01 VZ= 1.958072164387888E+00
         */
-        // XXX: Why is the position that far off?!
-        assert!((out_state.x - 5.30527022e+07).abs() < 1e-1);
-        assert!((out_state.y - 1.25344353e+08).abs() < 1e-0);
-        assert!((out_state.z - 5.43293743e+07).abs() < 1e-1);
-        assert!((out_state.vx - -2444703.8160139).abs() < 1e-5);
-        assert!((out_state.vy - 834536.49356688).abs() < 1e-5);
-        assert!((out_state.vz - 361669.07958066).abs() < 1e-5);
+
+        dbg!((out_state.x - 1.158234274236687E+07).abs());
+        dbg!((out_state.y - -5.119007862873630E+07).abs());
+        dbg!((out_state.z - -2.518292393506091E+06).abs());
+        dbg!((out_state.vx - 9.104062558220569E-01).abs());
+        dbg!((out_state.vy - 1.071602860104991E+01).abs());
+        dbg!((out_state.vz - 1.958072164387888E+00).abs());
+
+        assert!((out_state.x - 1.158234274236687E+07).abs() < 1e-1);
+        assert!((out_state.y - -5.119007862873630E+07).abs() < 1e-0);
+        assert!((out_state.z - -2.518292393506091E+06).abs() < 1e-1);
+        assert!((out_state.vx - 9.104062558220569E-01).abs() < 1e-5);
+        assert!((out_state.vy - 1.071602860104991E+01).abs() < 1e-5);
+        assert!((out_state.vz - 1.958072164387888E+00).abs() < 1e-5);
+
+        // Let's simply check that the Venus state also works. No easy way to get that data, so no verification.
     }
 }
