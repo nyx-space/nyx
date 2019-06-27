@@ -173,26 +173,20 @@ impl Cosm {
         Err(CosmError::ObjectIDNotFound(id))
     }
 
-    pub fn celestial_state(&self, exb_id: i32, jde: f64, frame: &Geoid) -> Result<State<Geoid>, CosmError> {
-        let sun_requested = exb_id == 0;
-        let exb = if sun_requested {
-            self.exbid_from_id(*frame.id())?
-        } else {
-            self.exbid_from_id(exb_id)?
-        };
-        println!("exbid worked: {}", exb_id);
+    /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
+    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<State<Geoid>, CosmError> {
+        let exb = self.exbid_from_id(exb_id)?;
+
         let ephem = self
             .ephemerides
             .get(&(exb.number, exb.name))
             .ok_or(CosmError::ObjectIDNotFound(exb.number))?;
-        println!("ephem worked: {}", exb_id);
 
         // Compute the position as per the algorithm from jplephem
         let interp = ephem
             .clone()
             .interpolator
             .ok_or(CosmError::NoInterpolationData(exb.number, "exb.name".to_string()))?;
-        println!("interp worked: {}", exb_id);
 
         let start_mod_julian: f64 = interp.start_mod_julian;
         let coefficient_count: usize = interp.position_degree as usize;
@@ -222,7 +216,6 @@ impl Cosm {
             interp_t[i] = (2.0 * t1) * interp_t[i - 1] - interp_t[i - 2];
         }
 
-        // XXX: This uses the positions to compute the velocity.
         let mut interp_dt = vec![0.0; coefficient_count];
         interp_dt[0] = 0.0;
         interp_dt[1] = 1.0;
@@ -251,45 +244,38 @@ impl Cosm {
             vz += vel_factor * pos_coeffs.z[idx];
         }
 
-        // let ref_frame = ephem.ref_frame.clone().unwrap();
-        // Get the EXB of that frame
-        // let frame_center = self
-        //     .frames
-        //     .get(&(ref_frame.number, ref_frame.name))
-        //     .unwrap()
-        //     .exb_id
-        //     .clone()
-        //     .unwrap();
         // Get the Geoid associated with the ephemeris frame
-        let storage_is_origin = ephem.id.clone().unwrap().number == exb_id;
         let storage_geoid = self.geoid_from_id(ephem.id.clone().unwrap().number).unwrap();
-        println!("fetched the geoid of ID {:?}", ephem.id.clone().unwrap().number);
-        // let storage_geoid = self.geoids.get(&(frame_center.number, frame_center.name)).unwrap();
-
         let dt = ModifiedJulian { days: jde - 2_400_000.5 };
+        Ok(State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid))
+    }
 
-        // We now have the state of the body in its storage frame.
-        let mut state = if sun_requested || storage_is_origin {
-            State::<Geoid>::from_cartesian(-x, -y, -z, -vx, -vy, -vz, dt, storage_geoid)
-        } else {
-            State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid)
-        };
-
-        if !storage_is_origin {
-            // And now let's convert this storage state to the correct frame.
-            let path = self.intermediate_geoid(&storage_geoid, frame)?;
-            for fno in 1..path.len() {
-                // HERE
-                println!("BBB {} -> {}\t\t", *path[fno - 1].id(), &path[fno]);
-                let int_st = self.celestial_state(*path[fno - 1].id(), jde, &path[fno])?;
-                state = state + int_st;
-                println!("OK");
+    /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` in frame `frame` (coord origin)
+    pub fn celestial_state(&self, target_exb_id: i32, jde: f64, origin: &Geoid) -> Result<State<Geoid>, CosmError> {
+        let target_geoid = self.geoid_from_id(target_exb_id)?;
+        // And now let's convert this storage state to the correct frame.
+        let path = self.intermediate_geoid(&target_geoid, origin)?;
+        if path.len() == 2 {
+            // This means the target or the origin is exactly this path.
+            if *path[0].id() == target_exb_id {
+                Ok(self.raw_celestial_state(*origin.id(), jde)?)
+            } else {
+                Ok(self.raw_celestial_state(target_exb_id, jde)?)
             }
+        } else {
+            unimplemented!("for now");
         }
-        // And finally update the frame to the requested frame.
-        state.frame = *frame;
+        /*
+        for fno in 1..path.len() {
+            let int_st = self.celestial_state(*path[fno - 1].id(), jde, &path[fno])?;
+            state = state + int_st;
+            println!("OK");
+        }
 
-        Ok(state)
+        // And finally update the frame to the requested frame.
+        state.frame = *origin;
+
+        Ok(state)*/
     }
 
     pub fn intermediate_geoid(&self, from: &Geoid, to: &Geoid) -> Result<Vec<Geoid>, CosmError> {
@@ -304,7 +290,7 @@ impl Cosm {
         if from.orientation_id() != to.orientation_id() {
             unimplemented!("orientation changes are not yet implemented");
         }
-        println!("s = {}\te = {}", from.id(), to.id());
+
         let start_idx = self.exbid_to_map_idx(*from.id()).unwrap();
         let end_idx = self.exbid_to_map_idx(*to.id()).unwrap();
         match astar(&self.exb_map, start_idx, |finish| finish == end_idx, |e| *e.weight(), |_| 0) {
@@ -430,7 +416,7 @@ mod tests {
     #[test]
     fn test_cosm_transform() {
         let cosm = Cosm::from_xb("./de438s");
-
+        /*
         assert_eq!(
             cosm.intermediate_geoid(
                 &cosm.geoid_from_id(bodies::EARTH).unwrap(),
@@ -451,18 +437,34 @@ mod tests {
             .len(),
             1,
             "Venus and Earth are in the same frame via the Sun"
-        );
+        );*/
 
-        let path = cosm
-            .intermediate_geoid(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &cosm.geoid_from_id(301).unwrap())
-            .unwrap();
-        assert_eq!(path.len(), 4, "Venus and Earth Moon should convert via Sun and Earth");
+        let moon = cosm.geoid_from_id(301).unwrap();
 
-        let out_state = cosm
-            .celestial_state(bodies::VENUS, 2474160.0, &cosm.geoid_from_id(301).unwrap())
-            .unwrap();
-        println!("{}", out_state);
+        // let path = cosm
+        //     .intermediate_geoid(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &moon)
+        //     .unwrap();
+        // assert_eq!(path.len(), 4, "Venus and Moon should convert via Sun and Earth");
+
+        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.0, &moon).unwrap();
         println!("{}", out_state.rmag());
+        /*
+        Expected data from JPL Horizon
+        X = 2.266669901837353E+05 Y =-2.892263258349691E+05 Z =-2.817915057297521E+04
+        VX= 8.759790518306783E-01 VY= 6.029677812238290E-01 VZ= 4.225558861172871E-02
+        */
+
+        dbg!((out_state.x - 2.266669901837353E+05).abs());
+        dbg!((out_state.y - -2.892263258349691E+05).abs());
+        dbg!((out_state.z - -2.817915057297521E+04).abs());
+        dbg!((out_state.vx - 8.759790518306783E-01).abs());
+        dbg!((out_state.vy - 6.029677812238290E-01).abs());
+        dbg!((out_state.vz - 4.225558861172871E-02).abs());
+
+        /*
+
+        let out_state = cosm.celestial_state(bodies::VENUS, 2474160.0, &moon).unwrap();
+        println!("{}", out_state);
 
         /*
         Expected data from JPL Horizon
@@ -482,7 +484,7 @@ mod tests {
         assert!((out_state.z - -2.518292393506091E+06).abs() < 1e-1);
         assert!((out_state.vx - 9.104062558220569E-01).abs() < 1e-5);
         assert!((out_state.vy - 1.071602860104991E+01).abs() < 1e-5);
-        assert!((out_state.vz - 1.958072164387888E+00).abs() < 1e-5);
+        assert!((out_state.vz - 1.958072164387888E+00).abs() < 1e-5);*/
 
         // Let's simply check that the Venus state also works. No easy way to get that data, so no verification.
     }

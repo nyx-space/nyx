@@ -12,7 +12,7 @@ use celestia::frames::Geoid;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Neg, Sub};
 use utils::{between_0_360, between_pm_180};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -200,6 +200,24 @@ impl<F: Frame> Sub for State<F> {
             vx: self.vx - other.vx,
             vy: self.vy - other.vy,
             vz: self.vz - other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl<F: Frame> Neg for State<F> {
+    type Output = State<F>;
+
+    /// Subtract one state from another
+    fn neg(self) -> Self::Output {
+        State {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            vx: -self.vx,
+            vy: -self.vy,
+            vz: -self.vz,
             dt: self.dt,
             frame: self.frame,
         }
