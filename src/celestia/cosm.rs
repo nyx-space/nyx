@@ -48,6 +48,9 @@ impl Cosm {
         };
 
         // Solar System Barycenter
+        // BUG: This adds the Sun, but the Sun should be added by the loop below (the de file DOES contain the Sun).
+        // Further, when adding the SSB, I should probably _not_ add it to the Geoid, since it isn't one. That said, this will break things.
+        // Hence, I should probably add as a "virtual geoid", and computing the approximate GM from some estimated mass of the solar system (which includes asteroids, etc.).
         cosm.geoids
             .insert((10, "Sun".to_string()), Geoid::perfect_sphere(10, 0, 1, 1.327_124_400_18e20));
 
@@ -57,6 +60,7 @@ impl Cosm {
         for ephem in &ephemerides {
             let id = ephem.id.clone().unwrap();
             let exb_tpl = (id.number, id.name.clone());
+            println!("{:?}", exb_tpl);
 
             cosm.ephemerides.insert(exb_tpl.clone(), ephem.clone());
 
