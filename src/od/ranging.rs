@@ -127,7 +127,7 @@ impl GroundStation {
 fn gast(at: Instant) -> f64 {
     use std::f64::consts::PI;
     let tu = ModifiedJulian::from_instant(at).days - 51_544.5;
-    2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_5 * tu)
+    2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_6 * tu)
 }
 
 /// Stores a standard measurement of range (km) and range rate (km/s)

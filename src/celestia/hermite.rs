@@ -11,7 +11,7 @@ pub fn interpolate(time: f64, coeffs: &Coefficients) -> (f64, f64, f64) {
 /// hermval is a clone of numpy's Hermite values.
 ///
 /// Given an x value, and a list of coefficients, this will return the function's interpolation.
-pub fn hermval(x: f64, c: &Vec<f64>) -> f64 {
+pub fn hermval(x: f64, c: &[f64]) -> f64 {
     if c.len() == 1 {
         c[0]
     } else if c.len() == 2 {
@@ -20,7 +20,7 @@ pub fn hermval(x: f64, c: &Vec<f64>) -> f64 {
         let mut nd = c.len();
         let mut c0 = c[nd - 2];
         let mut c1 = c[nd - 1];
-        for i in 3..=c.len(){
+        for i in 3..=c.len() {
             let tmp = c0;
             nd -= 1;
             c0 = c[c.len() - i] - c1 * (2.0 * f64::from((nd - 1) as i32));
