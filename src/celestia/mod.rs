@@ -21,6 +21,8 @@ pub mod orientations {
 
 /// Known planets IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
 pub mod bodies {
+    /// Solar System Barycenter
+    pub const SSB: i32 = 0;
     /// Sun center ID
     pub const SUN: i32 = 10;
     /// Mercury barycenter ID
