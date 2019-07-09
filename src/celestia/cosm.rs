@@ -145,6 +145,10 @@ impl Cosm {
     }
 
     pub fn geoid_from_id(&self, id: i32) -> Result<Geoid, CosmError> {
+        if id == 0 {
+            // SSB and Sun are identical in the current implementation
+            return self.geoid_from_id(10);
+        }
         for ((geoid_id, _), geoid) in &self.geoids {
             if *geoid_id == id {
                 return Ok(geoid.clone());
@@ -307,7 +311,7 @@ impl Cosm {
                 for idx in path {
                     f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
                 }
-                println!(
+                debug!(
                     "path from {:?} to {:?} is {:?} with cost {}",
                     from.id(),
                     to.id(),
@@ -391,8 +395,20 @@ mod tests {
     use celestia::bodies;
 
     #[test]
-    fn test_cosm() {
+    fn test_cosm_direct() {
         let cosm = Cosm::from_xb("./de438s");
+
+        assert_eq!(
+            cosm.intermediate_geoid(
+                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
+                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
+            )
+            .unwrap()
+            .len(),
+            0,
+            "Conversions within Earth does not require any transformation"
+        );
+
         let out_state = cosm.celestial_state(bodies::EARTH, 2474160.13175, bodies::SUN).unwrap();
 
         /*
@@ -406,38 +422,6 @@ mod tests {
         assert!((out_state.vx - -2444703.8160139).abs() < 1e-5);
         assert!((out_state.vy - 834536.49356688).abs() < 1e-5);
         assert!((out_state.vz - 361669.07958066).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_cosm_transform() {
-        let cosm = Cosm::from_xb("./de438s");
-        /*
-        assert_eq!(
-            cosm.intermediate_geoid(
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
-            )
-            .unwrap()
-            .len(),
-            0,
-            "Conversions within Earth does not require any transformation"
-        );
-
-        assert_eq!(
-            cosm.intermediate_geoid(
-                &cosm.geoid_from_id(bodies::VENUS).unwrap(),
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
-            )
-            .unwrap()
-            .len(),
-            1,
-            "Venus and Earth are in the same frame via the Sun"
-        );*/
-
-        // let path = cosm
-        //     .intermediate_geoid(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &moon)
-        //     .unwrap();
-        // assert_eq!(path.len(), 4, "Venus and Moon should convert via Sun and Earth");
 
         /*
         Expected data from jplephem on de438s.bsp
@@ -465,6 +449,24 @@ mod tests {
         assert!((out_state.vx - 74764.97976908).abs() < 1e-3);
         assert!((out_state.vy - 45782.16541702).abs() < 1e-3);
         assert!((out_state.vz - 23779.8893784).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_cosm_indirect() {
+        let cosm = Cosm::from_xb("./de438s");
+
+        let ven2ear = cosm
+            .intermediate_geoid(
+                &cosm.geoid_from_id(bodies::VENUS).unwrap(),
+                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(ven2ear.len(), 2, "Venus and Earth are in the same frame via the Sun");
+
+        let path = cosm
+            .intermediate_geoid(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &cosm.geoid_from_id(301).unwrap())
+            .unwrap();
+        assert_eq!(path.len(), 3, "Venus and Moon should convert via Sun and Earth");
 
         /*
 
@@ -472,17 +474,19 @@ mod tests {
         println!("{}", out_state);
 
         /*
-        Expected data from JPL Horizon
-        X = 1.158234274236687E+07 Y =-5.119007862873630E+07 Z =-2.518292393506091E+06
-        VX= 9.104062558220569E-01 VY= 1.071602860104991E+01 VZ= 1.958072164387888E+00
+        Expected data from jplephem (continued from above)
+        >>> moon_state[0] + earth_state[0] - venus_state[0]
+        array([-11582342.64316903,  45964259.67546433,  22672732.01650738])
+        >>> moon_state[1] + earth_state[1] - venus_state[1]
+        array([ -78659.10187959, -782169.48874783, -523505.15611691])
         */
 
-        dbg!((out_state.x - 1.158234274236687E+07).abs());
-        dbg!((out_state.y - -5.119007862873630E+07).abs());
-        dbg!((out_state.z - -2.518292393506091E+06).abs());
-        dbg!((out_state.vx - 9.104062558220569E-01).abs());
-        dbg!((out_state.vy - 1.071602860104991E+01).abs());
-        dbg!((out_state.vz - 1.958072164387888E+00).abs());
+        dbg!((out_state.x - -11582342.64316903).abs());
+        dbg!((out_state.y - 45964259.67546433).abs());
+        dbg!((out_state.z - 22672732.01650738).abs());
+        dbg!((out_state.vx - -78659.10187959).abs());
+        dbg!((out_state.vy - -782169.48874783).abs());
+        dbg!((out_state.vz - -523505.15611691).abs());
 
         assert!((out_state.x - 1.158234274236687E+07).abs() < 1e-1);
         assert!((out_state.y - -5.119007862873630E+07).abs() < 1e-0);
