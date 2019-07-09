@@ -22,7 +22,7 @@ pub mod orientations {
 /// Known planets IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
 pub mod bodies {
     /// Sun center ID
-    pub const SUN: i32 = 0;
+    pub const SUN: i32 = 10;
     /// Mercury center ID
     pub const MERCURY: i32 = 1;
     /// Venus center ID

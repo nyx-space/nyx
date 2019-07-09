@@ -48,26 +48,24 @@ impl Cosm {
         };
 
         // Solar System Barycenter
-        cosm.geoids.insert(
-            (0, "Solar System Barycenter".to_string()),
-            Geoid::perfect_sphere(0, 0, 1, 1.327_124_400_18e20),
-        );
+        cosm.geoids
+            .insert((10, "Sun".to_string()), Geoid::perfect_sphere(10, 0, 1, 1.327_124_400_18e20));
 
         cosm.exb_map.add_node(0); // Add the SSB
 
         let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"));
         for ephem in &ephemerides {
             let id = ephem.id.clone().unwrap();
-            let exb_tpl = (if id.number == 10 { 0 } else { id.number }, id.name.clone());
+            let exb_tpl = (id.number, id.name.clone());
 
             cosm.ephemerides.insert(exb_tpl.clone(), ephem.clone());
 
             // Compute the exb_id and axb_id from the ref frame.
             let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
-            let mut exb_id = ref_frame_id % 100000;
-            if exb_id == 10 {
-                exb_id = 0;
-            }
+            let exb_id = ref_frame_id % 100000;
+            // if exb_id == 10 {
+            //     exb_id = 0;
+            // }
             let axb_id = ref_frame_id / 100000;
 
             // Add this EXB to the map, and link it to its parent
@@ -250,20 +248,25 @@ impl Cosm {
         Ok(State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid))
     }
 
-    /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` in frame `frame` (coord origin)
-    pub fn celestial_state(&self, target_exb_id: i32, jde: f64, origin: &Geoid) -> Result<State<Geoid>, CosmError> {
+    /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
+    pub fn celestial_state(&self, target_exb_id: i32, jde: f64, as_seen_from_exb_id: i32) -> Result<State<Geoid>, CosmError> {
         let target_geoid = self.geoid_from_id(target_exb_id)?;
+        let as_seen_from = self.geoid_from_id(as_seen_from_exb_id)?;
         // And now let's convert this storage state to the correct frame.
-        let path = self.intermediate_geoid(&target_geoid, origin)?;
-        if path.len() == 2 {
+        let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
+        // Maybe make the path mutable and pop each item as they come?
+        if path.len() == 1 {
             // This means the target or the origin is exactly this path.
             if *path[0].id() == target_exb_id {
-                Ok(self.raw_celestial_state(*origin.id(), jde)?)
+                // Let's invert the state (sicne it's in the wrong frame), and fix the frame.
+                let mut state = -self.raw_celestial_state(target_exb_id, jde)?;
+                state.frame = as_seen_from;
+                Ok(state)
             } else {
-                Ok(self.raw_celestial_state(target_exb_id, jde)?)
+                Ok(self.raw_celestial_state(as_seen_from_exb_id, jde)?)
             }
         } else {
-            unimplemented!("for now");
+            unimplemented!("convert celestial state to a different geoid");
         }
         /*
         for fno in 1..path.len() {
@@ -278,21 +281,25 @@ impl Cosm {
         Ok(state)*/
     }
 
+    /// Returns the conversion path from the target `from` as seen from `to`.
     pub fn intermediate_geoid(&self, from: &Geoid, to: &Geoid) -> Result<Vec<Geoid>, CosmError> {
-        if from.center_id() == to.center_id() && from.orientation_id() == to.orientation_id() {
-            if from.id() == to.id() {
-                // Same frames, nothing to do
-                return Ok(Vec::new());
-            }
-            // Same orientation, but different frames. Simply convert via the from frame.
-            return Ok(vec![*from]);
-        }
         if from.orientation_id() != to.orientation_id() {
             unimplemented!("orientation changes are not yet implemented");
         }
+        if from.id() == to.id() {
+            // Same geoids, nothing to do
+            return Ok(Vec::new());
+        }
+
+        // Check if the center of the target frame is the destination frame, or vice versa, so the path is simply one frame.
+        if from.center_id() == to.id() {
+            return Ok(vec![*from]);
+        } else if to.center_id() == from.id() {
+            return Ok(vec![*to]);
+        }
 
         let start_idx = self.exbid_to_map_idx(*from.id()).unwrap();
-        let end_idx = self.exbid_to_map_idx(*to.id()).unwrap();
+        let end_idx = self.exbid_to_map_idx(*to.center_id()).unwrap();
         match astar(&self.exb_map, start_idx, |finish| finish == end_idx, |e| *e.weight(), |_| 0) {
             Some((weight, path)) => {
                 // Build the path with the frames
@@ -386,19 +393,7 @@ mod tests {
     #[test]
     fn test_cosm() {
         let cosm = Cosm::from_xb("./de438s");
-        for key in cosm.frames.keys() {
-            println!("frame -- {:?} => {:?}", key, cosm.frames[&key]);
-        }
-        for ek in cosm.ephemerides.keys() {
-            println!("ephem -- {:?} {:?}", ek, cosm.ephemerides[&ek].ephem_parameters);
-        }
-        for ek in cosm.geoids.keys() {
-            println!("geoid -- {:?} {:?}", ek, cosm.geoids[&ek]);
-        }
-
-        let out_body = cosm.geoid_from_id(bodies::SUN).unwrap();
-
-        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.13175, &out_body).unwrap();
+        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.13175, bodies::SUN).unwrap();
 
         /*
         Expected data from jplephem
@@ -439,27 +434,37 @@ mod tests {
             "Venus and Earth are in the same frame via the Sun"
         );*/
 
-        let moon = cosm.geoid_from_id(301).unwrap();
-
         // let path = cosm
         //     .intermediate_geoid(&cosm.geoid_from_id(bodies::VENUS).unwrap(), &moon)
         //     .unwrap();
         // assert_eq!(path.len(), 4, "Venus and Moon should convert via Sun and Earth");
 
-        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.0, &moon).unwrap();
-        println!("{}", out_state.rmag());
         /*
-        Expected data from JPL Horizon
-        X = 2.266669901837353E+05 Y =-2.892263258349691E+05 Z =-2.817915057297521E+04
-        VX= 8.759790518306783E-01 VY= 6.029677812238290E-01 VZ= 4.225558861172871E-02
+        Expected data from jplephem on de438s.bsp
+        >>> s = SPK.open('bsp/de438s.bsp')
+        >>> moon_sg = s.pairs[(3, 301)]
+        >>> moon_sg.compute_and_differentiate(2474160.0)
+        (array([-223912.84465084,  251062.86640476,  139189.45802101]), array([-74764.97976908, -45782.16541702, -23779.8893784 ]))
         */
 
-        dbg!((out_state.x - 2.266669901837353E+05).abs());
-        dbg!((out_state.y - -2.892263258349691E+05).abs());
-        dbg!((out_state.z - -2.817915057297521E+04).abs());
-        dbg!((out_state.vx - 8.759790518306783E-01).abs());
-        dbg!((out_state.vy - 6.029677812238290E-01).abs());
-        dbg!((out_state.vz - 4.225558861172871E-02).abs());
+        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.0, 301).unwrap();
+        assert_eq!(out_state.frame.id(), &301);
+        assert!((out_state.x - -223912.84465084).abs() < 1e-3);
+        assert!((out_state.y - 251062.86640476).abs() < 1e-3);
+        assert!((out_state.z - 139189.45802101).abs() < 1e-3);
+        assert!((out_state.vx - -74764.97976908).abs() < 1e-3);
+        assert!((out_state.vy - -45782.16541702).abs() < 1e-3);
+        assert!((out_state.vz - -23779.8893784).abs() < 1e-3);
+
+        // Add the reverse test too
+        let out_state = cosm.celestial_state(301, 2474160.0, bodies::EARTH).unwrap();
+        assert_eq!(out_state.frame.id(), &3);
+        assert!((out_state.x - 223912.84465084).abs() < 1e-3);
+        assert!((out_state.y - -251062.86640476).abs() < 1e-3);
+        assert!((out_state.z - -139189.45802101).abs() < 1e-3);
+        assert!((out_state.vx - 74764.97976908).abs() < 1e-3);
+        assert!((out_state.vy - 45782.16541702).abs() < 1e-3);
+        assert!((out_state.vz - 23779.8893784).abs() < 1e-3);
 
         /*
 
