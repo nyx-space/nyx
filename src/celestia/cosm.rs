@@ -6,6 +6,7 @@ use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
 use self::prost::Message;
 use crate::hifitime::julian::ModifiedJulian;
+use crate::hifitime::SECONDS_PER_DAY;
 use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
 use celestia::exb::{Ephemeris, EphemerisContainer};
 use celestia::frames::Frame;
@@ -274,9 +275,20 @@ impl Cosm {
         }
 
         // Get the Geoid associated with the ephemeris frame
-        let storage_geoid = self.geoid_from_id(ephem.id.clone().unwrap().number).unwrap();
+        let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
+        let ref_frame_exb_id = ref_frame_id % 100_000;
+        let storage_geoid = self.geoid_from_id(ref_frame_exb_id).unwrap();
         let dt = ModifiedJulian { days: jde - 2_400_000.5 };
-        Ok(State::<Geoid>::from_cartesian(x, y, z, vx, vy, vz, dt, storage_geoid))
+        Ok(State::<Geoid>::from_cartesian(
+            x,
+            y,
+            z,
+            vx / SECONDS_PER_DAY,
+            vy / SECONDS_PER_DAY,
+            vz / SECONDS_PER_DAY,
+            dt,
+            storage_geoid,
+        ))
     }
 
     /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
@@ -288,14 +300,13 @@ impl Cosm {
         // Maybe make the path mutable and pop each item as they come?
         if path.len() == 1 {
             // This means the target or the origin is exactly this path.
-            if path[0].center_id() == as_seen_from_exb_id {
-                Ok(self.raw_celestial_state(target_exb_id, jde)?)
-            } else {
-                // Let's invert the state (sicne it's in the wrong frame), and fix the frame.
-                let mut state = -self.raw_celestial_state(target_exb_id, jde)?;
+            let mut state = self.raw_celestial_state(path[0].id(), jde)?;
+            if state.frame.id() == target_exb_id {
+                // Let's negate the state and change the frame.
+                state = -state;
                 state.frame = as_seen_from;
-                Ok(state)
             }
+            Ok(state)
         } else {
             unimplemented!("convert celestial state to a different geoid");
         }
@@ -367,8 +378,6 @@ pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
         panic!("EXB file {} is empty (zero bytes read)", input_filename);
     }
 
-    println!("Decoding EXB (this may take a while for large files).");
-
     let decode_start = Instant::now();
 
     let ephcnt = EphemerisContainer::decode(input_exb_buf.into_buf()).expect("could not decode EXB");
@@ -378,7 +387,7 @@ pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
     if num_eph == 0 {
         panic!("no ephemerides found in EXB");
     }
-    println!(
+    info!(
         "Loaded {} ephemerides in {} seconds.",
         num_eph,
         decode_start.elapsed().as_secs()
@@ -401,8 +410,6 @@ pub fn load_frames(input_filename: &str) -> Vec<FXBFrame> {
         panic!("FXB file {} is empty (zero bytes read)", input_filename);
     }
 
-    println!("Decoding FXB (this may take a while for large files).");
-
     let decode_start = Instant::now();
 
     let cnt = FrameContainer::decode(input_fxb_buf.into_buf()).expect("could not decode FXB");
@@ -412,7 +419,7 @@ pub fn load_frames(input_filename: &str) -> Vec<FXBFrame> {
     if num_eph == 0 {
         panic!("no frames found in FXB");
     }
-    println!("Loaded {} frames in {} seconds.", num_eph, decode_start.elapsed().as_secs());
+    info!("Loaded {} frames in {} seconds.", num_eph, decode_start.elapsed().as_secs());
     frames
 }
 
@@ -421,6 +428,75 @@ mod tests {
     use super::*;
     use celestia::bodies;
 
+    /// Tests direct transformations.
+    ///
+    /// Note that jplephem was manually verified against JPL HORIZONS, and confirmed to be correct AFTER selecting the correct frame
+    /// in JPL HORIZONS: Earth mean equator for the Moon/Earth barycenter state.
+    /// Here is the jplephem Python data and code, using DE431t.bsp which is the one used by JPL Horizons.
+    /// >>> jde = 2_452_312.5
+    /// >>> s = SPK.open('bsp/de438s.bsp')
+    /// >>> moon_sg = s.pairs[(3, 301)]
+    /// >>> moon_state = moon_sg.compute_and_differentiate(jde)
+    /// >>> moon_state[0]
+    /// array([ -81638.25306984, -345462.61724963, -144380.05941359])
+    /// >>> moon_state[1] / 86400.0
+    /// array([ 0.9606743 , -0.20373648, -0.18386955])
+    /// >>>
+    ///
+    /// *******************************************************************************
+    /// Target body name: Earth-Moon Barycenter (3)       {source: DE431mx}
+    /// Center body name: Moon (301)                      {source: DE431mx}
+    /// Center-site name: BODY CENTER
+    /// *******************************************************************************
+    /// Start time      : A.D. 2002-Feb-07 00:00:00.0000 TDB
+    /// Stop  time      : A.D. 2002-Feb-07 00:01:00.0000 TDB
+    /// Step-size       : 1 minutes
+    /// *******************************************************************************
+    /// Center geodetic : 0.00000000,0.00000000,0.0000000 {E-lon(deg),Lat(deg),Alt(km)}
+    /// Center cylindric: 0.00000000,0.00000000,0.0000000 {E-lon(deg),Dxy(km),Dz(km)}
+    /// Center radii    : 1737.4 x 1737.4 x 1737.4 km     {Equator, meridian, pole}    
+    /// Output units    : KM-S                                                         
+    /// Output type     : GEOMETRIC cartesian states
+    /// Output format   : 3 (position, velocity, LT, range, range-rate)
+    /// Reference frame : ICRF/J2000.0                                                 
+    /// Coordinate systm: Earth Mean Equator and Equinox of Reference Epoch            
+    /// *******************************************************************************
+    /// JDTDB
+    ///    X     Y     Z
+    ///    VX    VY    VZ
+    ///    LT    RG    RR
+    /// *******************************************************************************
+    /// $$SOE
+    /// 2452312.500000000 = A.D. 2002-Feb-07 00:00:00.0000 TDB
+    ///  X = 8.163825318809994E+04 Y = 3.454626174574621E+05 Z = 1.443800589307835E+05
+    ///  VX=-9.606743009525915E-01 VY= 2.037364763900419E-01 VZ= 1.838695524657854E-01
+    ///  LT= 1.278272389696382E+00 RG= 3.832164217006124E+05 RR= 4.828253792275582E-02
+    /// 2452312.500694444 = A.D. 2002-Feb-07 00:01:00.0000 TDB
+    ///  X = 8.158061167702588E+04 Y = 3.454748373483086E+05 Z = 1.443910893081474E+05
+    ///  VX=-9.607093974270383E-01 VY= 2.035932182209123E-01 VZ= 1.838096924721191E-01
+    ///  LT= 1.278282052563697E+00 RG= 3.832193185553559E+05 RR= 4.827928679408667E-02
+    /// $$EOE
+    /// *******************************************************************************
+    ///
+    /// >>> earth_state = earth_sg.compute_and_differentiate(jde)
+    /// >>> earth_state
+    /// (array([-1.09837695e+08,  8.97986222e+07,  3.89438783e+07]), array([-1762588.33759742, -1763694.78806168,  -764678.74349699]))
+    /// >>> earth_state[1] / 86400.0
+    /// array([-20.40032798, -20.41313412,  -8.85044842])
+    ///
+    /// Example from JPL Horizon for Earth state:
+    /// Target body name: Earth-Moon Barycenter (3)       {source: DE431mx}
+    /// Center body name: Solar System Barycenter (0)     {source: DE431mx}
+    /// Center-site name: BODY CENTER
+    /// *******************************************************************************
+    /// Start time      : A.D. 2002-Feb-07 00:00:00.0000 TDB
+    /// Stop  time      : A.D. 2002-Feb-07 00:01:00.0000 TDB
+    /// Step-size       : 1 minutes
+    /// *******************************************************************************
+    /// 2452312.500000000 = A.D. 2002-Feb-07 00:00:00.0000 TDB
+    /// X =-1.098376948721600E+08 Y = 9.787961009842677E+07 Z = 1.046913447994739E+04
+    /// VX=-2.040032797048864E+01 VY=-2.224919059680185E+01 VZ=-2.492197913035454E-04
+    /// LT= 4.907445188541736E+02 RG= 1.471215055573200E+08 RR= 4.281012177401806E-01
     #[test]
     fn test_cosm_direct() {
         let cosm = Cosm::from_xb("./de438s");
@@ -436,68 +512,40 @@ mod tests {
             "Conversions within Earth does not require any transformation"
         );
 
-        // Using an odd time to check that the computation is correct for small differences.
-        let out_state = cosm
-            .celestial_state(bodies::EARTH_BARYCENTER, 2_474_160.159_786, bodies::SSB)
-            .unwrap();
-
-        /*
-        Expected data from jplephem
-        (array([5.29841561e+07, 1.25367735e+08, 5.43395074e+07]), array([-2445159.18641162,   833442.50611388,   361194.96441988]))
-        */
-        assert!((out_state.x - 5.298_415_61e+7).abs() < 1e-1);
-        assert!((out_state.y - 1.253_677_35e+8).abs() < 1e0);
-        assert!((out_state.z - 5.433_950_74e+7).abs() < 1e-1);
-        assert!((out_state.vx - -2_445_159.186_411_62).abs() < 1e-3);
-        assert!((out_state.vy - 833_442.506_113_88).abs() < 1e-3);
-        assert!((out_state.vz - 361_194.964_419_88).abs() < 1e-3);
-
-        let jde = 2_474_160.0;
+        let jde = 2_452_312.5;
 
         let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB).unwrap();
+        assert_eq!(out_state.frame.id(), bodies::SSB);
+        assert!((out_state.x - -1.09837695e+08).abs() < 1e0);
+        assert!((out_state.y - 8.97986222e+07).abs() < 1e0);
+        assert!((out_state.z - 3.89438783e+07).abs() < 1e0);
+        assert!((out_state.vx - -20.400_327_98).abs() < 1e-3);
+        assert!((out_state.vy - -20.413_134_12).abs() < 1e-3);
+        assert!((out_state.vz - -8.850_448_42).abs() < 1e-3);
 
-        /*
-        Expected data from jplephem
-        (array([5.33746506e+07, 1.25234065e+08, 5.42815776e+07]), array([-2442556.02759262,   839674.57090544,   363895.83296089]))
-        */
-        assert!((out_state.x - 5.337_465_06e+7).abs() < 1e-1);
-        assert!((out_state.y - 1.252_340_65e+8).abs() < 1e0);
-        assert!((out_state.z - 5.428_157_76e+7).abs() < 1e-1);
-        assert!((out_state.vx - -2_442_556.027_592_62).abs() < 1e-3);
-        assert!((out_state.vy - 839_674.570_905_44).abs() < 1e-3);
-        assert!((out_state.vz - 363_895.832_960_89).abs() < 1e-3);
-
-        /*
-        Expected data from jplephem on de438s.bsp
-        >>> s = SPK.open('bsp/de438s.bsp')
-        >>> moon_sg = s.pairs[(3, 301)]
-        >>> moon_sg.compute_and_differentiate(2474160.0)
-        (array([-223912.84465084,  251062.86640476,  139189.45802101]), array([-74764.97976908, -45782.16541702, -23779.8893784 ]))
-        */
-
-        // BUG: Why is this frame seemingly inverted?!
         let out_state = cosm
             .celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_MOON)
             .unwrap();
         assert_eq!(out_state.frame.id(), bodies::EARTH_MOON);
-        assert!((out_state.x - -223_912.844_650_84).abs() < 1e-3);
-        assert!((out_state.y - 251_062.866_404_76).abs() < 1e-3);
-        assert!((out_state.z - 139_189.458_021_01).abs() < 1e-3);
-        assert!((out_state.vx - -74_764.979_769_08).abs() < 1e-3);
-        assert!((out_state.vy - -45_782.165_417_02).abs() < 1e-3);
-        assert!((out_state.vz - -23_779.889_378_4).abs() < 1e-3);
+        println!("{:.10}", out_state.x);
+        assert!((out_state.x - 816_38.253_069_84).abs() < 1e-3);
+        assert!((out_state.y - 345_462.617_249_63).abs() < 1e-3);
+        assert!((out_state.z - 144_380.059_413_59).abs() < 1e-3);
+        assert!((out_state.vx - -0.960_674_3).abs() < 1e-3);
+        assert!((out_state.vy - 0.203_736_48).abs() < 1e-3);
+        assert!((out_state.vz - 0.183_869_55).abs() < 1e-3);
 
         // Add the reverse test too
         let out_state = cosm
             .celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER)
             .unwrap();
-        assert_eq!(out_state.frame.id(), 3);
-        assert!((out_state.x - 223_912.844_650_84).abs() < 1e-3);
-        assert!((out_state.y - -251_062.866_404_76).abs() < 1e-3);
-        assert!((out_state.z - -139_189.458_021_01).abs() < 1e-3);
-        assert!((out_state.vx - 74_764.979_769_08).abs() < 1e-3);
-        assert!((out_state.vy - 45_782.165_417_02).abs() < 1e-3);
-        assert!((out_state.vz - 23_779.889_378_4).abs() < 1e-3);
+        assert_eq!(out_state.frame.id(), bodies::EARTH_BARYCENTER);
+        assert!((out_state.x - -816_38.253_069_84).abs() < 1e-3);
+        assert!((out_state.y - -345_462.617_249_63).abs() < 1e-3);
+        assert!((out_state.z - -144_380.059_413_59).abs() < 1e-3);
+        assert!((out_state.vx - 0.960_674_3).abs() < 1e-3);
+        assert!((out_state.vy - -0.203_736_48).abs() < 1e-3);
+        assert!((out_state.vz - -0.183_869_55).abs() < 1e-3);
     }
 
     #[test]
