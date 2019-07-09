@@ -47,12 +47,16 @@ impl Cosm {
             exb_map: Graph::new_undirected(),
         };
 
-        // Solar System Barycenter
         // BUG: This adds the Sun, but the Sun should be added by the loop below (the de file DOES contain the Sun).
         // Further, when adding the SSB, I should probably _not_ add it to the Geoid, since it isn't one. That said, this will break things.
         // Hence, I should probably add as a "virtual geoid", and computing the approximate GM from some estimated mass of the solar system (which includes asteroids, etc.).
-        cosm.geoids
-            .insert((10, "Sun".to_string()), Geoid::perfect_sphere(10, 0, 1, 1.327_124_400_18e20));
+        // Solar System Barycenter
+        let ss_mass = 1.0014; // https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
+        let sun_gm = 1.327_124_400_18e20;
+        cosm.geoids.insert(
+            (0, "Solar System Barycenter".to_string()),
+            Geoid::perfect_sphere(10, 0, 1, ss_mass * sun_gm),
+        );
 
         cosm.exb_map.add_node(0); // Add the SSB
 
@@ -67,9 +71,6 @@ impl Cosm {
             // Compute the exb_id and axb_id from the ref frame.
             let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
             let exb_id = ref_frame_id % 100_000;
-            // if exb_id == 10 {
-            //     exb_id = 0;
-            // }
             let axb_id = ref_frame_id / 100_000;
 
             // Add this EXB to the map, and link it to its parent
@@ -81,53 +82,85 @@ impl Cosm {
             // All edges are of value 1
             cosm.exb_map.add_edge(parent_node, this_node, 1);
 
-            // cosm.exb_map.add_edge(a: NodeIndex<Ix>, b: NodeIndex<Ix>, weight: E)
-
             // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
 
             // Ephemeris exists
-            if let Some(gm) = ephem.ephem_parameters.get("GM") {
-                // It's a geoid, and we assume everything else is there
-                let flattening = match ephem.ephem_parameters.get("Flattening") {
-                    Some(param) => param.value,
-                    None => {
-                        if id.name != "Moon" {
-                            0.0
-                        } else {
-                            0.0012
+            match ephem.ephem_parameters.get("GM") {
+                Some(gm) => {
+                    // It's a geoid, and we assume everything else is there
+                    let flattening = match ephem.ephem_parameters.get("Flattening") {
+                        Some(param) => param.value,
+                        None => {
+                            if id.name != "Moon" {
+                                0.0
+                            } else {
+                                0.0012
+                            }
+                        }
+                    };
+                    let equatorial_radius = match ephem.ephem_parameters.get("Equatorial radius") {
+                        Some(param) => param.value,
+                        None => {
+                            if id.name != "Moon" {
+                                0.0
+                            } else {
+                                1738.1
+                            }
+                        }
+                    };
+                    let semi_major_radius = match ephem.ephem_parameters.get("Equatorial radius") {
+                        Some(param) => {
+                            if id.name != "Earth Barycenter" {
+                                param.value
+                            } else {
+                                6378.1370
+                            }
+                        }
+                        None => 0.0,
+                    };
+                    let geoid = Geoid {
+                        id: id.number,
+                        center_id: exb_id,
+                        orientation_id: axb_id,
+                        gm: gm.value,
+                        flattening,
+                        equatorial_radius,
+                        semi_major_radius,
+                    };
+                    cosm.geoids.insert(exb_tpl, geoid);
+                }
+                None => {
+                    match id.number {
+                        10 => {
+                            // Sun
+                            let geoid = Geoid::perfect_sphere(id.number, exb_id, axb_id, sun_gm);
+                            cosm.geoids.insert(exb_tpl, geoid);
+                        }
+                        399 => {
+                            // Compute the Earth GM by subtracting the Moon GM from the Earth System GM
+                            let earth_sys = cosm
+                                .geoid_from_id(3)
+                                .expect("Earth Barycenter must be in EXB prior to Earth itself");
+                            let moon_gm = cosm
+                                .geoid_from_id(301)
+                                .expect("Earth Moon must be in EXB prior to Earth itself")
+                                .gm;
+                            let earth = Geoid {
+                                id: id.number,
+                                center_id: exb_id,
+                                orientation_id: axb_id,
+                                gm: earth_sys.gm - moon_gm,
+                                flattening: earth_sys.flattening,
+                                equatorial_radius: earth_sys.equatorial_radius,
+                                semi_major_radius: earth_sys.semi_major_radius,
+                            };
+                            cosm.geoids.insert(exb_tpl, earth);
+                        }
+                        _ => {
+                            println!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
                         }
                     }
-                };
-                let equatorial_radius = match ephem.ephem_parameters.get("Equatorial radius") {
-                    Some(param) => param.value,
-                    None => {
-                        if id.name != "Moon" {
-                            0.0
-                        } else {
-                            1738.1
-                        }
-                    }
-                };
-                let semi_major_radius = match ephem.ephem_parameters.get("Equatorial radius") {
-                    Some(param) => {
-                        if id.name != "Earth Barycenter" {
-                            param.value
-                        } else {
-                            6378.1370
-                        }
-                    }
-                    None => 0.0,
-                };
-                let geoid = Geoid {
-                    id: id.number,
-                    center_id: exb_id,
-                    orientation_id: axb_id,
-                    gm: gm.value,
-                    flattening,
-                    equatorial_radius,
-                    semi_major_radius,
-                };
-                cosm.geoids.insert(exb_tpl, geoid);
+                }
             }
         }
 
@@ -398,8 +431,8 @@ mod tests {
 
         assert_eq!(
             cosm.intermediate_geoid(
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
+                &cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap(),
+                &cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap(),
             )
             .unwrap()
             .len(),
@@ -407,7 +440,9 @@ mod tests {
             "Conversions within Earth does not require any transformation"
         );
 
-        let out_state = cosm.celestial_state(bodies::EARTH, 2_474_160.0, bodies::SUN).unwrap();
+        let out_state = cosm
+            .celestial_state(bodies::EARTH_BARYCENTER, 2_474_160.0, bodies::SUN)
+            .unwrap();
 
         /*
         Expected data from jplephem
@@ -428,8 +463,8 @@ mod tests {
         (array([-223912.84465084,  251062.86640476,  139189.45802101]), array([-74764.97976908, -45782.16541702, -23779.8893784 ]))
         */
 
-        let out_state = cosm.celestial_state(bodies::EARTH, 2_474_160.0, 301).unwrap();
-        assert_eq!(out_state.frame.id(), 301);
+        let out_state = cosm.celestial_state(bodies::EARTH, 2_474_160.0, bodies::EARTH_MOON).unwrap();
+        assert_eq!(out_state.frame.id(), bodies::EARTH_MOON);
         assert!((out_state.x - -223_912.844_650_84).abs() < 1e-3);
         assert!((out_state.y - 251_062.866_404_76).abs() < 1e-3);
         assert!((out_state.z - 139_189.458_021_01).abs() < 1e-3);
@@ -438,7 +473,9 @@ mod tests {
         assert!((out_state.vz - -23_779.889_378_4).abs() < 1e-3);
 
         // Add the reverse test too
-        let out_state = cosm.celestial_state(301, 2_474_160.0, bodies::EARTH).unwrap();
+        let out_state = cosm
+            .celestial_state(bodies::EARTH_MOON, 2_474_160.0, bodies::EARTH_BARYCENTER)
+            .unwrap();
         assert_eq!(out_state.frame.id(), 3);
         assert!((out_state.x - 223_912.844_650_84).abs() < 1e-3);
         assert!((out_state.y - -251_062.866_404_76).abs() < 1e-3);
@@ -454,8 +491,8 @@ mod tests {
 
         let ven2ear = cosm
             .intermediate_geoid(
-                &cosm.geoid_from_id(bodies::VENUS).unwrap(),
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
+                &cosm.geoid_from_id(bodies::VENUS_BARYCENTER).unwrap(),
+                &cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap(),
             )
             .unwrap();
         assert_eq!(ven2ear.len(), 2, "Venus and Earth are in the same frame via the Sun");

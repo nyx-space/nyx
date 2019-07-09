@@ -23,22 +23,30 @@ pub mod orientations {
 pub mod bodies {
     /// Sun center ID
     pub const SUN: i32 = 10;
+    /// Mercury barycenter ID
+    pub const MERCURY_BARYCENTER: i32 = 1;
     /// Mercury center ID
     pub const MERCURY: i32 = 1;
+    /// Venus barycenter ID
+    pub const VENUS_BARYCENTER: i32 = 2;
     /// Venus center ID
     pub const VENUS: i32 = 2;
-    /// Earth center ID
-    pub const EARTH: i32 = 3;
-    /// Mars center ID
-    pub const MARS: i32 = 4;
-    /// Jupiter center ID
-    pub const JUPITER: i32 = 5;
-    /// Saturn center ID
-    pub const SATURN: i32 = 6;
-    /// Uranus center ID
-    pub const URANUS: i32 = 7;
-    /// Neptune center ID
-    pub const NEPTUNE: i32 = 8;
+    /// Earth barycenter ID
+    pub const EARTH_BARYCENTER: i32 = 3;
+    /// Earth planet ID
+    pub const EARTH: i32 = 399;
+    /// Earth's MOon planet ID
+    pub const EARTH_MOON: i32 = 301;
+    /// Mars barycenter ID
+    pub const MARS_BARYCENTER: i32 = 4;
+    /// Jupiter barycenter ID
+    pub const JUPITER_BARYCENTER: i32 = 5;
+    /// Saturn barycenter ID
+    pub const SATURN_BARYCENTER: i32 = 6;
+    /// Uranus barycenter ID
+    pub const URANUS_BARYCENTER: i32 = 7;
+    /// Neptune barycenter ID
+    pub const NEPTUNE_BARYCENTER: i32 = 8;
 }
 
 // Re-Export state
