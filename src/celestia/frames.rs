@@ -3,9 +3,9 @@ pub use celestia::fxb::frame::Identifier as FrameID;
 use std::fmt;
 
 pub trait Frame: Clone + fmt::Debug + fmt::Display {
-    fn id(&self) -> &i32; // Returns the ID of this frame
-    fn center_id(&self) -> &i32; // Returns the integer of the center of this frame
-    fn orientation_id(&self) -> &i32; // Returns the orientation (1: J2000)
+    fn id(&self) -> i32; // Returns the ID of this frame
+    fn center_id(&self) -> i32; // Returns the integer of the center of this frame
+    fn orientation_id(&self) -> i32; // Returns the orientation (1: J2000)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -41,16 +41,16 @@ impl fmt::Display for Geoid {
 }
 
 impl Frame for Geoid {
-    fn id(&self) -> &i32 {
-        &self.id
+    fn id(&self) -> i32 {
+        self.id
     }
 
-    fn center_id(&self) -> &i32 {
-        &self.center_id
+    fn center_id(&self) -> i32 {
+        self.center_id
     }
 
-    fn orientation_id(&self) -> &i32 {
-        &self.orientation_id
+    fn orientation_id(&self) -> i32 {
+        self.orientation_id
     }
 }
 
@@ -62,16 +62,16 @@ pub struct Spacecraft {
 }
 
 impl Frame for Spacecraft {
-    fn id(&self) -> &i32 {
-        &self.id
+    fn id(&self) -> i32 {
+        self.id
     }
 
-    fn center_id(&self) -> &i32 {
-        &self.center_id
+    fn center_id(&self) -> i32 {
+        self.center_id
     }
 
-    fn orientation_id(&self) -> &i32 {
-        &self.orientation_id
+    fn orientation_id(&self) -> i32 {
+        self.orientation_id
     }
 }
 

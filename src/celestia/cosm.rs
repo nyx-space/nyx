@@ -257,7 +257,7 @@ impl Cosm {
         // Maybe make the path mutable and pop each item as they come?
         if path.len() == 1 {
             // This means the target or the origin is exactly this path.
-            if *path[0].id() == target_exb_id {
+            if path[0].id() == target_exb_id {
                 // Let's invert the state (sicne it's in the wrong frame), and fix the frame.
                 let mut state = -self.raw_celestial_state(target_exb_id, jde)?;
                 state.frame = as_seen_from;
@@ -298,8 +298,8 @@ impl Cosm {
             return Ok(vec![*to]);
         }
 
-        let start_idx = self.exbid_to_map_idx(*from.id()).unwrap();
-        let end_idx = self.exbid_to_map_idx(*to.center_id()).unwrap();
+        let start_idx = self.exbid_to_map_idx(from.id()).unwrap();
+        let end_idx = self.exbid_to_map_idx(to.center_id()).unwrap();
         match astar(&self.exb_map, start_idx, |finish| finish == end_idx, |e| *e.weight(), |_| 0) {
             Some((weight, path)) => {
                 // Build the path with the frames
@@ -316,7 +316,7 @@ impl Cosm {
                 );
                 Ok(f_path)
             }
-            None => Err(CosmError::DisjointFrameCenters(*from.center_id(), *to.center_id())),
+            None => Err(CosmError::DisjointFrameCenters(from.center_id(), to.center_id())),
         }
     }
 }
@@ -448,7 +448,7 @@ mod tests {
         */
 
         let out_state = cosm.celestial_state(bodies::EARTH, 2474160.0, 301).unwrap();
-        assert_eq!(out_state.frame.id(), &301);
+        assert_eq!(out_state.frame.id(), 301);
         assert!((out_state.x - -223912.84465084).abs() < 1e-3);
         assert!((out_state.y - 251062.86640476).abs() < 1e-3);
         assert!((out_state.z - 139189.45802101).abs() < 1e-3);
@@ -458,7 +458,7 @@ mod tests {
 
         // Add the reverse test too
         let out_state = cosm.celestial_state(301, 2474160.0, bodies::EARTH).unwrap();
-        assert_eq!(out_state.frame.id(), &3);
+        assert_eq!(out_state.frame.id(), 3);
         assert!((out_state.x - 223912.84465084).abs() < 1e-3);
         assert!((out_state.y - -251062.86640476).abs() < 1e-3);
         assert!((out_state.z - -139189.45802101).abs() < 1e-3);

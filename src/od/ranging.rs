@@ -90,7 +90,7 @@ impl GroundStation {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
-        if *rx.frame.center_id() != 3 {
+        if rx.frame.center_id() != 3 {
             unimplemented!("the receiver is not around the Earth");
         }
         let mjd_dt = ModifiedJulian::from_instant(dt);
