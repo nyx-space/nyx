@@ -113,33 +113,26 @@ fn ckf_fixed_step_perfect_stations_std() {
     let geoid = earth_geoid;
     thread::spawn(move || {
         let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts.clone());
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
     let mut prev_dt = dt.into_instant();
-    loop {
-        match truth_rx.recv() {
-            Ok((t, state_vec)) => {
-                // Convert the state to ECI.
-                let this_dt =
-                    ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
-                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
-                for station in all_stations.iter() {
-                    let meas = station.measure(rx_state, this_dt.into_instant());
-                    if meas.visible() {
-                        // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                        let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
-                        measurements.push((delta, meas));
-                        prev_dt = this_dt.into_instant();
-                        break; // We know that only one station is in visibility at each time.
-                    }
-                }
-            }
-            Err(_) => {
-                break;
+    while let Ok((t, state_vec)) = truth_rx.recv() {
+        // Convert the state to ECI.
+        let this_dt =
+            ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
+        let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
+        for station in all_stations.iter() {
+            let meas = station.measure(rx_state, this_dt.into_instant());
+            if meas.visible() {
+                // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
+                let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
+                measurements.push((delta, meas));
+                prev_dt = this_dt.into_instant();
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }
@@ -164,7 +157,7 @@ fn ckf_fixed_step_perfect_stations_std() {
     let initial_estimate = Estimate {
         state: Vector6::zeros(),
         covar: init_covar,
-        stm: prop_est.dynamics.stm.clone(),
+        stm: prop_est.dynamics.stm,
         predicted: false,
     };
 
@@ -183,7 +176,7 @@ fn ckf_fixed_step_perfect_stations_std() {
         let delta_time = (*duration) as f64;
         prop_est.until_time_elapsed(delta_time);
         // Update the STM of the KF
-        ckf.update_stm(prop_est.dynamics.stm.clone());
+        ckf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
         let this_dt = ModifiedJulian::from_instant(
             prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
@@ -254,33 +247,26 @@ fn ekf_fixed_step_perfect_stations() {
     let geoid = earth_geoid;
     thread::spawn(move || {
         let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts.clone());
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
     let mut prev_dt = dt.into_instant();
-    loop {
-        match truth_rx.recv() {
-            Ok((t, state_vec)) => {
-                // Convert the state to ECI.
-                let this_dt =
-                    ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
-                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
-                for station in all_stations.iter() {
-                    let meas = station.measure(rx_state, this_dt.into_instant());
-                    if meas.visible() {
-                        // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                        let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
-                        measurements.push((delta, meas));
-                        prev_dt = this_dt.into_instant();
-                        break; // We know that only one station is in visibility at each time.
-                    }
-                }
-            }
-            Err(_) => {
-                break;
+    while let Ok((t, state_vec)) = truth_rx.recv() {
+        // Convert the state to ECI.
+        let this_dt =
+            ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
+        let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
+        for station in all_stations.iter() {
+            let meas = station.measure(rx_state, this_dt.into_instant());
+            if meas.visible() {
+                // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
+                let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
+                measurements.push((delta, meas));
+                prev_dt = this_dt.into_instant();
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }
@@ -305,7 +291,7 @@ fn ekf_fixed_step_perfect_stations() {
     let initial_estimate = Estimate {
         state: Vector6::zeros(),
         covar: init_covar,
-        stm: prop_est.dynamics.stm.clone(),
+        stm: prop_est.dynamics.stm,
         predicted: false,
     };
 
@@ -324,7 +310,7 @@ fn ekf_fixed_step_perfect_stations() {
             kf.ekf = true;
         }
         // Update the STM of the KF
-        kf.update_stm(prop_est.dynamics.stm.clone());
+        kf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
         let this_dt = ModifiedJulian::from_instant(
             prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
@@ -394,33 +380,26 @@ fn ckf_fixed_step_perfect_stations_dual() {
     let geoid = earth_geoid;
     thread::spawn(move || {
         let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts.clone());
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
     let mut prev_dt = dt.into_instant();
-    loop {
-        match truth_rx.recv() {
-            Ok((t, state_vec)) => {
-                // Convert the state to ECI.
-                let this_dt =
-                    ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
-                let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
-                for station in all_stations.iter() {
-                    let meas = station.measure(rx_state, this_dt.into_instant());
-                    if meas.visible() {
-                        // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                        let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
-                        measurements.push((delta, meas));
-                        prev_dt = this_dt.into_instant();
-                        break; // We know that only one station is in visibility at each time.
-                    }
-                }
-            }
-            Err(_) => {
-                break;
+    while let Ok((t, state_vec)) = truth_rx.recv() {
+        // Convert the state to ECI.
+        let this_dt =
+            ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
+        let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
+        for station in all_stations.iter() {
+            let meas = station.measure(rx_state, this_dt.into_instant());
+            if meas.visible() {
+                // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
+                let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
+                measurements.push((delta, meas));
+                prev_dt = this_dt.into_instant();
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }
@@ -445,7 +424,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     let initial_estimate = Estimate {
         state: Vector6::zeros(),
         covar: init_covar,
-        stm: prop_est.dynamics.stm.clone(),
+        stm: prop_est.dynamics.stm,
         predicted: false,
     };
 
@@ -464,7 +443,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
         let delta_time = (*duration) as f64;
         prop_est.until_time_elapsed(delta_time);
         // Update the STM of the KF
-        ckf.update_stm(prop_est.dynamics.stm.clone());
+        ckf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
         let this_dt = ModifiedJulian::from_instant(
             prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),

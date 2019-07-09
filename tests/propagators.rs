@@ -17,37 +17,37 @@ fn regress_leo_day_adaptive() {
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
+    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0]);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
-            -5971.1987091336005,
-            3945.7867676598066,
-            2864.246881515823,
-            0.04875235739014966,
-            -4.184864764063978,
-            5.8491049745631765,
+            -5_971.198_709_133_600_5,
+            3_945.786_767_659_806_6,
+            2_864.246_881_515_823,
+            0.048_752_357_390_149_66,
+            -4.184_864_764_063_978,
+            5.849_104_974_563_176_5,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194375364978,
-            3945.517869775942,
-            2864.621016241891,
-            0.049083153975533804,
-            -4.185084160750795,
-            5.848947437814404,
+            -5_971.194_375_364_978,
+            3_945.517_869_775_942,
+            2_864.621_016_241_891,
+            0.049_083_153_975_533_804,
+            -4.185_084_160_750_795,
+            5.848_947_437_814_404,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194375418999,
-            3945.51787129825,
-            2864.621014165619,
-            0.04908315211452485,
-            -4.185084159507549,
-            5.8489474386880405,
+            -5_971.194_375_418_999,
+            3_945.517_871_298_25,
+            2_864.621_014_165_619,
+            0.049_083_152_114_524_85,
+            -4.185_084_159_507_549,
+            5.848_947_438_688_040_5,
         ]),
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
         let mut prop = Propagator::new::<RK2Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
@@ -62,7 +62,7 @@ fn regress_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
         let mut prop = Propagator::new::<CashKarp45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -80,7 +80,7 @@ fn regress_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
         let mut prop = Propagator::new::<Fehlberg45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -116,46 +116,46 @@ fn gmat_val_leo_day_adaptive() {
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
+    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0]);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
-            -5971.194191972316,
-            3945.5066620394823,
-            2864.636606375189,
-            0.049096946846225495,
-            -4.185093311278742,
-            5.848940872821119,
+            -5_971.194_191_972_316,
+            3_945.506_662_039_482_3,
+            2_864.636_606_375_189,
+            0.049_096_946_846_225_495,
+            -4.185_093_311_278_742,
+            5.848_940_872_821_119,
         ]),
         Vector6::from_row_slice(&[
-            -5971.19419167894,
-            3945.5066538720525,
-            2864.6366175103476,
-            0.049096956828390714,
-            -4.1850933179466505,
-            5.848940868134205,
+            -5_971.194_191_678_94,
+            3_945.506_653_872_052_5,
+            2_864.636_617_510_347_6,
+            0.049_096_956_828_390_714,
+            -4.185_093_317_946_650_5,
+            5.848_940_868_134_205,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191670392,
-            3945.506653218658,
-            2864.63661842225,
-            0.049096957637897856,
-            -4.185093318481106,
-            5.8489408677453,
+            -5_971.194_191_670_392,
+            3_945.506_653_218_658,
+            2_864.636_618_422_25,
+            0.049_096_957_637_897_856,
+            -4.185_093_318_481_106,
+            5.848_940_867_745_3,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191670676,
-            3945.506653225158,
-            2864.6366184134445,
-            0.04909695762999346,
-            -4.185093318475795,
-            5.848940867748944,
+            -5_971.194_191_670_676,
+            3_945.506_653_225_158,
+            2_864.636_618_413_444_5,
+            0.049_096_957_629_993_46,
+            -4.185_093_318_475_795,
+            5.848_940_867_748_944,
         ]),
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -173,8 +173,8 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<Verner56>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -192,8 +192,8 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand78>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -211,8 +211,8 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<RK89>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -242,86 +242,86 @@ fn gmat_val_leo_day_fixed() {
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
     let prop_time = 3_600.0 * 24.0;
-    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0]);
+    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0]);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
-            -5971.194191670768,
-            3945.506653227154,
-            2864.6366184109706,
-            0.04909695762764177,
-            -4.18509331847428,
-            5.8489408677500965,
+            -5_971.194_191_670_768,
+            3_945.506_653_227_154,
+            2_864.636_618_410_970_6,
+            0.049_096_957_627_641_77,
+            -4.185_093_318_474_28,
+            5.848_940_867_750_096_5,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191670203,
-            3945.5066532190967,
-            2864.636618421618,
-            0.04909695763733907,
-            -4.185093318480867,
-            5.848940867745654,
+            -5_971.194_191_670_203,
+            3_945.506_653_219_096_7,
+            2_864.636_618_421_618,
+            0.049_096_957_637_339_07,
+            -4.185_093_318_480_867,
+            5.848_940_867_745_654,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191699656,
-            3945.50665408017,
-            2864.63661724545,
-            0.04909695658406228,
-            -4.185093317777894,
-            5.848940868241106,
+            -5_971.194_191_699_656,
+            3_945.506_654_080_17,
+            2_864.636_617_245_45,
+            0.049_096_956_584_062_28,
+            -4.185_093_317_777_894,
+            5.848_940_868_241_106,
         ]),
         Vector6::from_row_slice(&[
-            -5971.194191670044,
-            3945.5066532117953,
-            2864.636618431374,
-            0.049096957645996114,
-            -4.185093318486724,
-            5.848940867741533,
+            -5_971.194_191_670_044,
+            3_945.506_653_211_795_3,
+            2_864.636_618_431_374,
+            0.049_096_957_645_996_114,
+            -4.185_093_318_486_724,
+            5.848_940_867_741_533,
         ]),
         Vector6::from_row_slice(&[
-            -5971.19419167081,
-            3945.5066532332503,
-            2864.6366184022418,
-            0.049096957620019005,
-            -4.185093318469214,
-            5.848940867753748,
+            -5_971.194_191_670_81,
+            3_945.506_653_233_250_3,
+            2_864.636_618_402_241_8,
+            0.049_096_957_620_019_005,
+            -4.185_093_318_469_214,
+            5.848_940_867_753_748,
         ]),
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand45>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<Dormand78>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[3], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init.clone(), earth_geoid);
-        dynamics.mu = 398600.4415; // Using GMAT's value
+        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        dynamics.mu = 398_600.441_5; // Using GMAT's value
         let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[4], "two body prop failed");

@@ -336,25 +336,32 @@ impl Default for PropOpts<RSSStepPV> {
 
 #[test]
 fn test_options() {
+    use std::f64::EPSILON;
+    macro_rules! f64_eq {
+        ($x:expr, $val:expr) => {
+            assert!(($x - $val).abs() < EPSILON)
+        };
+    }
+
     use self::error_ctrl::RSSStep;
 
     let opts = PropOpts::with_fixed_step(1e-1, RSSStep {});
-    assert_eq!(opts.min_step, 1e-1);
-    assert_eq!(opts.max_step, 1e-1);
-    assert_eq!(opts.tolerance, 0.0);
+    f64_eq!(opts.min_step, 1e-1);
+    f64_eq!(opts.max_step, 1e-1);
+    f64_eq!(opts.tolerance, 0.0);
     assert_eq!(opts.fixed_step, true);
 
     let opts = PropOpts::with_adaptive_step(1e-2, 10.0, 1e-12, RSSStep {});
-    assert_eq!(opts.min_step, 1e-2);
-    assert_eq!(opts.max_step, 10.0);
-    assert_eq!(opts.tolerance, 1e-12);
+    f64_eq!(opts.min_step, 1e-2);
+    f64_eq!(opts.max_step, 10.0);
+    f64_eq!(opts.tolerance, 1e-12);
     assert_eq!(opts.fixed_step, false);
 
     let opts: PropOpts<RSSStepPV> = Default::default();
-    assert_eq!(opts.init_step, 60.0);
-    assert_eq!(opts.min_step, 0.001);
-    assert_eq!(opts.max_step, 2700.0);
-    assert_eq!(opts.tolerance, 1e-12);
+    f64_eq!(opts.init_step, 60.0);
+    f64_eq!(opts.min_step, 0.001);
+    f64_eq!(opts.max_step, 2700.0);
+    f64_eq!(opts.tolerance, 1e-12);
     assert_eq!(opts.attempts, 50);
     assert_eq!(opts.fixed_step, false);
 }

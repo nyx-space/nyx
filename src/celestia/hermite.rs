@@ -20,7 +20,7 @@ pub fn hermval(x: f64, c: &Vec<f64>) -> f64 {
         let mut nd = c.len();
         let mut c0 = c[nd - 2];
         let mut c1 = c[nd - 1];
-        for i in 3..(c.len() + 1) {
+        for i in 3..=c.len(){
             let tmp = c0;
             nd -= 1;
             c0 = c[c.len() - i] - c1 * (2.0 * f64::from((nd - 1) as i32));
@@ -36,11 +36,12 @@ mod tests {
 
     #[test]
     fn test_hermval() {
+        use std::f64::EPSILON;
         let coeffs = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let xes = vec![1.0, 2.0, 3.0, 4.0];
         let sols = vec![-105.0, 591.0, 5215.0, 18759.0];
         for (i, x) in xes.iter().enumerate() {
-            assert!(hermval(*x, &coeffs) == sols[i]);
+            assert!((hermval(*x, &coeffs) - sols[i]).abs() < EPSILON);
         }
     }
 }

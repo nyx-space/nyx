@@ -29,8 +29,8 @@ pub struct Cosm {
 pub enum CosmError {
     ObjectIDNotFound(i32),
     ObjectNameNotFound(String),
-    NoInterpolationData(i32, String),
-    NoStateData(i32, String),
+    NoInterpolationData(i32),
+    NoStateData(i32),
     /// No path was found to convert from the first center to the second
     DisjointFrameCenters(i32, i32),
     /// No path was found to convert from the first orientation to the second
@@ -66,11 +66,11 @@ impl Cosm {
 
             // Compute the exb_id and axb_id from the ref frame.
             let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
-            let exb_id = ref_frame_id % 100000;
+            let exb_id = ref_frame_id % 100_000;
             // if exb_id == 10 {
             //     exb_id = 0;
             // }
-            let axb_id = ref_frame_id / 100000;
+            let axb_id = ref_frame_id / 100_000;
 
             // Add this EXB to the map, and link it to its parent
             let this_node = cosm.exb_map.add_node(id.number);
@@ -155,7 +155,7 @@ impl Cosm {
         }
         for ((geoid_id, _), geoid) in &self.geoids {
             if *geoid_id == id {
-                return Ok(geoid.clone());
+                return Ok(*geoid);
             }
         }
         Err(CosmError::ObjectIDNotFound(id))
@@ -164,7 +164,7 @@ impl Cosm {
     pub fn geoid_from_name(&self, name: String) -> Result<Geoid, CosmError> {
         for ((_, geoid_name), geoid) in &self.geoids {
             if *geoid_name == name {
-                return Ok(geoid.clone());
+                return Ok(*geoid);
             }
         }
         Err(CosmError::ObjectNameNotFound(name))
@@ -189,18 +189,12 @@ impl Cosm {
             .ok_or(CosmError::ObjectIDNotFound(exb.number))?;
 
         // Compute the position as per the algorithm from jplephem
-        let interp = ephem
-            .clone()
-            .interpolator
-            .ok_or(CosmError::NoInterpolationData(exb.number, "exb.name".to_string()))?;
+        let interp = ephem.clone().interpolator.ok_or(CosmError::NoInterpolationData(exb.number))?;
 
         let start_mod_julian: f64 = interp.start_mod_julian;
         let coefficient_count: usize = interp.position_degree as usize;
 
-        let exb_states = match interp
-            .state_data
-            .ok_or(CosmError::NoStateData(exb.number, "exb.name".to_string()))?
-        {
+        let exb_states = match interp.state_data.ok_or(CosmError::NoStateData(exb.number))? {
             EqualStates(states) => states.clone(),
             VarwindowStates(_) => panic!("var window not yet supported by Cosm"),
         };
@@ -229,8 +223,8 @@ impl Cosm {
         for i in 3..coefficient_count {
             interp_dt[i] = (2.0 * t1) * interp_dt[i - 1] - interp_dt[i - 2] + interp_t[i - 1] + interp_t[i - 1];
         }
-        for i in 0..interp_dt.len() {
-            interp_dt[i] *= 2.0 / interval_length;
+        for interp_i in &mut interp_dt {
+            *interp_i *= 2.0 / interval_length;
         }
 
         let mut x = 0.0;
@@ -336,11 +330,11 @@ pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
     let mut input_exb_buf = Vec::new();
 
     File::open(input_filename)
-        .expect(&format!("could not open EXB file {}", input_filename))
+        .unwrap_or_else(|_| panic!("could not open EXB file {}", input_filename))
         .read_to_end(&mut input_exb_buf)
         .expect("something went wrong reading the file");
 
-    if input_exb_buf.len() == 0 {
+    if input_exb_buf.is_empty() {
         panic!("EXB file {} is empty (zero bytes read)", input_filename);
     }
 
@@ -370,11 +364,11 @@ pub fn load_frames(input_filename: &str) -> Vec<FXBFrame> {
     let mut input_fxb_buf = Vec::new();
 
     File::open(input_filename)
-        .expect(&format!("could not open FXB file {}", input_filename))
+        .unwrap_or_else(|_| panic!("could not open FXB file {}", input_filename))
         .read_to_end(&mut input_fxb_buf)
         .expect("something went wrong reading the file");
 
-    if input_fxb_buf.len() == 0 {
+    if input_fxb_buf.is_empty() {
         panic!("FXB file {} is empty (zero bytes read)", input_filename);
     }
 
@@ -413,19 +407,18 @@ mod tests {
             "Conversions within Earth does not require any transformation"
         );
 
-        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.13175, bodies::SUN).unwrap();
+        let out_state = cosm.celestial_state(bodies::EARTH, 2_474_160.0, bodies::SUN).unwrap();
 
         /*
         Expected data from jplephem
         (array([5.30527022e+07, 1.25344353e+08, 5.43293743e+07]), array([-2444703.8160139 ,   834536.49356688,   361669.07958066]))
         */
-        // XXX: Why is the position that far off?!
-        assert!((out_state.x - 5.30527022e+07).abs() < 1e-1);
-        assert!((out_state.y - 1.25344353e+08).abs() < 1e-0);
-        assert!((out_state.z - 5.43293743e+07).abs() < 1e-1);
-        assert!((out_state.vx - -2444703.8160139).abs() < 1e-5);
-        assert!((out_state.vy - 834536.49356688).abs() < 1e-5);
-        assert!((out_state.vz - 361669.07958066).abs() < 1e-5);
+        assert!((out_state.x - 5.305_270_22e+07).abs() < 1e-3);
+        assert!((out_state.y - 1.253_443_53e+08).abs() < 1e-3);
+        assert!((out_state.z - 5.432_937_43e+07).abs() < 1e-3);
+        assert!((out_state.vx - -2_444_703.816_013_9).abs() < 1e-5);
+        assert!((out_state.vy - 834_536.493_566_88).abs() < 1e-5);
+        assert!((out_state.vz - 361_669.079_580_66).abs() < 1e-5);
 
         /*
         Expected data from jplephem on de438s.bsp
@@ -435,24 +428,24 @@ mod tests {
         (array([-223912.84465084,  251062.86640476,  139189.45802101]), array([-74764.97976908, -45782.16541702, -23779.8893784 ]))
         */
 
-        let out_state = cosm.celestial_state(bodies::EARTH, 2474160.0, 301).unwrap();
+        let out_state = cosm.celestial_state(bodies::EARTH, 2_474_160.0, 301).unwrap();
         assert_eq!(out_state.frame.id(), 301);
-        assert!((out_state.x - -223912.84465084).abs() < 1e-3);
-        assert!((out_state.y - 251062.86640476).abs() < 1e-3);
-        assert!((out_state.z - 139189.45802101).abs() < 1e-3);
-        assert!((out_state.vx - -74764.97976908).abs() < 1e-3);
-        assert!((out_state.vy - -45782.16541702).abs() < 1e-3);
-        assert!((out_state.vz - -23779.8893784).abs() < 1e-3);
+        assert!((out_state.x - -223_912.844_650_84).abs() < 1e-3);
+        assert!((out_state.y - 251_062.866_404_76).abs() < 1e-3);
+        assert!((out_state.z - 139_189.458_021_01).abs() < 1e-3);
+        assert!((out_state.vx - -74_764.979_769_08).abs() < 1e-3);
+        assert!((out_state.vy - -45_782.165_417_02).abs() < 1e-3);
+        assert!((out_state.vz - -23_779.889_378_4).abs() < 1e-3);
 
         // Add the reverse test too
-        let out_state = cosm.celestial_state(301, 2474160.0, bodies::EARTH).unwrap();
+        let out_state = cosm.celestial_state(301, 2_474_160.0, bodies::EARTH).unwrap();
         assert_eq!(out_state.frame.id(), 3);
-        assert!((out_state.x - 223912.84465084).abs() < 1e-3);
-        assert!((out_state.y - -251062.86640476).abs() < 1e-3);
-        assert!((out_state.z - -139189.45802101).abs() < 1e-3);
-        assert!((out_state.vx - 74764.97976908).abs() < 1e-3);
-        assert!((out_state.vy - 45782.16541702).abs() < 1e-3);
-        assert!((out_state.vz - 23779.8893784).abs() < 1e-3);
+        assert!((out_state.x - 223_912.844_650_84).abs() < 1e-3);
+        assert!((out_state.y - -251_062.866_404_76).abs() < 1e-3);
+        assert!((out_state.z - -139_189.458_021_01).abs() < 1e-3);
+        assert!((out_state.vx - 74_764.979_769_08).abs() < 1e-3);
+        assert!((out_state.vy - 45_782.165_417_02).abs() < 1e-3);
+        assert!((out_state.vz - 23_779.889_378_4).abs() < 1e-3);
     }
 
     #[test]
