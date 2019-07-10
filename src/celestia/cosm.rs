@@ -297,43 +297,28 @@ impl Cosm {
         let as_seen_from = self.geoid_from_id(as_seen_from_exb_id)?;
         // And now let's convert this storage state to the correct frame.
         let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
-        if path.is_empty() {
-            Ok(State::<Geoid>::from_cartesian(
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                ModifiedJulian { days: jde - 2_400_000.5 },
-                target_geoid,
-            ))
-        } else {
-            // Maybe make the path mutable and pop each item as they come?
-            if path.len() == 1 {
-                // This means the target or the origin is exactly this path.
-                let mut state = self.raw_celestial_state(path[0].id(), jde)?;
-                if state.frame.id() == target_exb_id {
-                    // Let's negate the state and change the frame.
-                    state = -state;
-                    state.frame = as_seen_from;
-                }
-                Ok(state)
-            } else {
-                unimplemented!("convert celestial state to a different geoid");
+        let mut state = State::<Geoid>::from_cartesian(
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            ModifiedJulian { days: jde - 2_400_000.5 },
+            as_seen_from,
+        );
+        let mut prev_frame_id = state.frame.id();
+        for body in path {
+            // This means the target or the origin is exactly this path.
+            let mut next_state = self.raw_celestial_state(body.id(), jde)?;
+            if prev_frame_id != next_state.frame.id() {
+                // Let's negate the next state prior to adding it.
+                next_state = -next_state;
             }
+            state = state + next_state;
+            prev_frame_id = next_state.frame.id();
         }
-        /*
-        for fno in 1..path.len() {
-            let int_st = self.celestial_state(*path[fno - 1].id(), jde, &path[fno])?;
-            state = state + int_st;
-            println!("OK");
-        }
-
-        // And finally update the frame to the requested frame.
-        state.frame = *origin;
-
-        Ok(state)*/
+        Ok(state)
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
@@ -353,14 +338,25 @@ impl Cosm {
             return Ok(vec![*to]);
         }
 
-        let start_idx = self.exbid_to_map_idx(from.id()).unwrap();
-        let end_idx = self.exbid_to_map_idx(to.center_id()).unwrap();
+        let start_idx = self.exbid_to_map_idx(to.id()).unwrap();
+        let end_idx = self.exbid_to_map_idx(from.center_id()).unwrap();
         match astar(&self.exb_map, start_idx, |finish| finish == end_idx, |e| *e.weight(), |_| 0) {
             Some((weight, path)) => {
                 // Build the path with the frames
                 let mut f_path = Vec::new();
+                let mut final_skipped_ssb = false;
                 for idx in path {
-                    f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
+                    if self.exb_map[idx] != 0 {
+                        // Ignore going through SSB since it isn't a geoid
+                        f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
+                        final_skipped_ssb = false;
+                    } else {
+                        final_skipped_ssb = true;
+                    }
+                }
+                if final_skipped_ssb {
+                    // If the last point skipped adding anything because it was the SSB, let's add the final geoid.
+                    f_path.push(*from);
                 }
                 debug!(
                     "path from {:?} to {:?} is {:?} with cost {}",
@@ -543,9 +539,9 @@ mod tests {
         // [src/celestia/cosm.rs:520] (out_state.x - -109837695.021661416).abs() = 1.0091163963079453
         // [src/celestia/cosm.rs:521] (out_state.y - 89798622.194651559).abs() = 0.3621309697628021
         // [src/celestia/cosm.rs:522] (out_state.z - 38943878.275922611).abs() = 0.0706547349691391
-        assert!((out_state.x - -1_098_37_694.012_545_019).abs() < 1e-9);
-        assert!((out_state.y - 897_98_621.832_520_589).abs() < 1e-9);
-        assert!((out_state.z - 389_43_878.205_267_876).abs() < 1e-9);
+        assert!((out_state.x - -109_837_694.012_545_02).abs() < 1e-9);
+        assert!((out_state.y - 89_798_621.832_520_59).abs() < 1e-9);
+        assert!((out_state.z - 38_943_878.205_267_88).abs() < 1e-9);
         assert!((out_state.vx - -20.400_327_981).abs() < 1e-4);
         assert!((out_state.vy - -20.413_134_121).abs() < 1e-4);
         assert!((out_state.vz - -8.850_448_420).abs() < 1e-4);
@@ -554,7 +550,7 @@ mod tests {
             .celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_MOON)
             .unwrap();
         assert_eq!(out_state.frame.id(), bodies::EARTH_MOON);
-        assert!((out_state.x - 816_38.253_069_84).abs() < 1e-8);
+        assert!((out_state.x - 81_638.253_069_84).abs() < 1e-8);
         assert!((out_state.y - 345_462.617_249_63).abs() < 1e-8);
         assert!((out_state.z - 144_380.059_413_59).abs() < 1e-8);
         assert!((out_state.vx - -0.960_674_3).abs() < 1e-7);
@@ -566,7 +562,7 @@ mod tests {
             .celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER)
             .unwrap();
         assert_eq!(out_state.frame.id(), bodies::EARTH_BARYCENTER);
-        assert!((out_state.x - -816_38.253_069_84).abs() < 1e-8);
+        assert!((out_state.x - -81_638.253_069_84).abs() < 1e-8);
         assert!((out_state.y - -345_462.617_249_63).abs() < 1e-8);
         assert!((out_state.z - -144_380.059_413_59).abs() < 1e-8);
         assert!((out_state.vx - 0.960_674_3).abs() < 1e-7);
@@ -576,53 +572,27 @@ mod tests {
 
     #[test]
     fn test_cosm_indirect() {
+        let jde = 2_452_312.5;
+
         let cosm = Cosm::from_xb("./de438s");
 
         let ven2ear = cosm
             .intermediate_geoid(
                 &cosm.geoid_from_id(bodies::VENUS_BARYCENTER).unwrap(),
-                &cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap(),
-            )
-            .unwrap();
-        assert_eq!(ven2ear.len(), 2, "Venus and Earth are in the same frame via the Sun");
-
-        let path = cosm
-            .intermediate_geoid(
-                &cosm.geoid_from_id(bodies::VENUS).unwrap(),
                 &cosm.geoid_from_id(bodies::EARTH_MOON).unwrap(),
             )
             .unwrap();
-        assert_eq!(path.len(), 3, "Venus and Moon should convert via Sun and Earth");
+        assert_eq!(ven2ear.len(), 3, "Venus -> (SSB) -> Earth Barycenter -> Earth Moon");
 
-        /*
-
-        let out_state = cosm.celestial_state(bodies::VENUS, 2474160.0, &moon).unwrap();
-        println!("{}", out_state);
-
-        /*
-        Expected data from jplephem (continued from above)
-        >>> moon_state[0] + earth_state[0] - venus_state[0]
-        array([-11582342.64316903,  45964259.67546433,  22672732.01650738])
-        >>> moon_state[1] + earth_state[1] - venus_state[1]
-        array([ -78659.10187959, -782169.48874783, -523505.15611691])
-        In km/s it should be
-        array([ -0.9104062717545139, -9.052887601248033, -6.0590874550568286])
-        */
-
-        dbg!((out_state.x - -11582342.64316903).abs());
-        dbg!((out_state.y - 45964259.67546433).abs());
-        dbg!((out_state.z - 22672732.01650738).abs());
-        dbg!((out_state.vx - -78659.10187959).abs());
-        dbg!((out_state.vy - -782169.48874783).abs());
-        dbg!((out_state.vz - -523505.15611691).abs());
-
-        assert!((out_state.x - 1.158234274236687E+07).abs() < 1e-1);
-        assert!((out_state.y - -5.119007862873630E+07).abs() < 1e-0);
-        assert!((out_state.z - -2.518292393506091E+06).abs() < 1e-1);
-        assert!((out_state.vx - 9.104062558220569E-01).abs() < 1e-5);
-        assert!((out_state.vy - 1.071602860104991E+01).abs() < 1e-5);
-        assert!((out_state.vz - 1.958072164387888E+00).abs() < 1e-5);*/
-
-        // Let's simply check that the Venus state also works. No easy way to get that data, so no verification.
+        let ven2ear_state = cosm
+            .celestial_state(bodies::VENUS_BARYCENTER, jde, bodies::EARTH_MOON)
+            .unwrap();
+        assert_eq!(ven2ear_state.frame.id(), bodies::EARTH_MOON);
+        dbg!((ven2ear_state.x - 205123905.5860059559345245).abs());
+        dbg!((ven2ear_state.y - -135615685.8497693836688995).abs());
+        dbg!((ven2ear_state.z - -65579728.4858155474066734).abs());
+        dbg!((ven2ear_state.vx - 36.0523317870596145).abs());
+        dbg!((ven2ear_state.vy - 48.8886382916473323).abs());
+        dbg!((ven2ear_state.vz - 20.7027191934647661).abs());
     }
 }
