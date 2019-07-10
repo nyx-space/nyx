@@ -297,18 +297,31 @@ impl Cosm {
         let as_seen_from = self.geoid_from_id(as_seen_from_exb_id)?;
         // And now let's convert this storage state to the correct frame.
         let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
-        // Maybe make the path mutable and pop each item as they come?
-        if path.len() == 1 {
-            // This means the target or the origin is exactly this path.
-            let mut state = self.raw_celestial_state(path[0].id(), jde)?;
-            if state.frame.id() == target_exb_id {
-                // Let's negate the state and change the frame.
-                state = -state;
-                state.frame = as_seen_from;
-            }
-            Ok(state)
+        if path.is_empty() {
+            Ok(State::<Geoid>::from_cartesian(
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                ModifiedJulian { days: jde - 2_400_000.5 },
+                target_geoid,
+            ))
         } else {
-            unimplemented!("convert celestial state to a different geoid");
+            // Maybe make the path mutable and pop each item as they come?
+            if path.len() == 1 {
+                // This means the target or the origin is exactly this path.
+                let mut state = self.raw_celestial_state(path[0].id(), jde)?;
+                if state.frame.id() == target_exb_id {
+                    // Let's negate the state and change the frame.
+                    state = -state;
+                    state.frame = as_seen_from;
+                }
+                Ok(state)
+            } else {
+                unimplemented!("convert celestial state to a different geoid");
+            }
         }
         /*
         for fno in 1..path.len() {
@@ -499,6 +512,7 @@ mod tests {
     /// LT= 4.907445188541736E+02 RG= 1.471215055573200E+08 RR= 4.281012177401806E-01
     #[test]
     fn test_cosm_direct() {
+        use std::f64::EPSILON;
         let cosm = Cosm::from_xb("./de438s");
 
         assert_eq!(
@@ -513,6 +527,13 @@ mod tests {
         );
 
         let jde = 2_452_312.5;
+
+        assert!(
+            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_BARYCENTER)
+                .unwrap()
+                .rmag()
+                < EPSILON
+        );
 
         let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB).unwrap();
         assert_eq!(out_state.frame.id(), bodies::SSB);
@@ -584,6 +605,8 @@ mod tests {
         array([-11582342.64316903,  45964259.67546433,  22672732.01650738])
         >>> moon_state[1] + earth_state[1] - venus_state[1]
         array([ -78659.10187959, -782169.48874783, -523505.15611691])
+        In km/s it should be
+        array([ -0.9104062717545139, -9.052887601248033, -6.0590874550568286])
         */
 
         dbg!((out_state.x - -11582342.64316903).abs());

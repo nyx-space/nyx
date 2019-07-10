@@ -21,7 +21,7 @@
                 }
             },
             "args": [
-                "cosm_direct"
+                "cosm_indirect"
             ],
             "cwd": "${workspaceFolder}"
         },
