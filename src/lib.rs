@@ -24,7 +24,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.7"
+//! nyx-space = "0.0.8"
 //! ```
 //!
 //! And add the following to your crate root:
@@ -40,13 +40,16 @@
 /// extern crate nalgebra as na;
 /// extern crate nyx_space as nyx;
 /// use self::na::Vector6;
-/// use nyx::celestia::EARTH;
+/// use nyx::celestia::Cosm;
 /// use nyx::dynamics::celestial::TwoBody;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
 /// use nyx::propagators::*;
 ///
 /// fn main() {
+///     let cosm = Cosm::from_xb("./de438s");
+///     let earth_geoid = cosm.geoid_from_id(3).unwrap();
+///
 ///     let prop_time = 24.0 * 3_600.0;
 ///     let accuracy = 1e-12;
 ///     let min_step = 0.1;
@@ -55,15 +58,15 @@
 ///     let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
 ///
 ///     let rslt = Vector6::from_row_slice(&[
-///         -5971.1941916712285,
-///         3945.5066532419537,
-///         2864.636618390466,
-///         0.04909695760948815,
-///         -4.1850933184621315,
-///         5.848940867758592,
+///         -5_971.194_376_784_884,
+///         3_945.517_912_191_541,
+///         2_864.620_958_267_658_4,
+///         0.049_083_102_073_914_83,
+///         -4.185_084_126_130_087_5,
+///         5.848_947_462_252_259_5,
 ///     ]);
 ///
-///     let mut dyn = TwoBody::from_state_vec::<EARTH>(init);
+///     let mut dyn = TwoBody::from_state_vec(init, earth_geoid);
 ///     let mut prop = Propagator::new::<RK89>(
 ///         &mut dyn,
 ///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
@@ -83,15 +86,18 @@ pub mod propagators;
 /// extern crate nyx_space as nyx;
 /// use hifitime::julian::ModifiedJulian;
 /// use hifitime::SECONDS_PER_DAY;
-/// use nyx::celestia::{State, EARTH, ECI};
+/// use nyx::celestia::{Cosm, Geoid, State};
 /// use nyx::dynamics::celestial::TwoBody;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
 /// use nyx::propagators::{PropOpts, Propagator, RK89};
 ///
 /// fn main() {
+///     let cosm = Cosm::from_xb("./de438s");
+///     let earth_geoid = cosm.geoid_from_id(3).unwrap();
+///
 ///     let dt = ModifiedJulian { days: 21545.0 };
-///     let initial_state = State::from_cartesian_eci(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt);
+///     let initial_state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
 ///
 ///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
@@ -100,17 +106,18 @@ pub mod propagators;
 ///     let min_step = 0.1;
 ///     let max_step = 60.0;
 ///
-///     let rslt = State::from_cartesian_eci(
-///         -5971.1941916712285,
-///         3945.5066532419537,
-///         2864.636618390466,
-///         0.04909695760948815,
-///         -4.1850933184621315,
-///         5.848940867758592,
-///         ModifiedJulian { days: 21546.0 },
+///     let rslt = State::<Geoid>::from_cartesian(
+///             -5_971.194_376_784_884,
+///             3_945.517_912_191_541,
+///             2_864.620_958_267_658_4,
+///             0.049_083_102_073_914_83,
+///             -4.185_084_126_130_087_5,
+///             5.848_947_462_252_259_5,
+///             ModifiedJulian { days: 21546.0 },
+///             earth_geoid,
 ///     );
 ///
-///     let mut dyn = TwoBody::from_state_vec::<EARTH>(initial_state.to_cartesian_vec());
+///     let mut dyn = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid);
 ///     let mut prop = Propagator::new::<RK89>(
 ///         &mut dyn,
 ///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
@@ -120,7 +127,7 @@ pub mod propagators;
 ///     let final_dt = ModifiedJulian {
 ///         days: dt.days + final_t / SECONDS_PER_DAY,
 ///     };
-///     let final_state = State::from_cartesian_vec::<EARTH, ModifiedJulian>(&prop.state(), final_dt, ECI {});
+///     let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid);
 ///     assert_eq!(final_state, rslt, "two body prop failed");
 ///     assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
 ///
@@ -138,45 +145,38 @@ pub mod dynamics;
 ///
 /// fn main(){
 ///     use hifitime::julian::ModifiedJulian;
-///     use nyx::celestia::{State, EARTH, ECI};
+///     use nyx::celestia::{Cosm, Geoid, State};
+///     let cosm = Cosm::from_xb("./de438s");
+///     // In this case, we're creating these states around a Geoid which is Earth.
+///     // But for simplicity, we're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
+///     let mut earth_geoid = cosm.geoid_from_id(399).unwrap();
+///     earth_geoid.gm = 398_600.441_5;
 ///     let dt = ModifiedJulian { days: 21545.0 };
-///     // The parameter is anything which implements `CelestialBody`.
-///     // In this case, we're creating these states around Earth.
-///     let cart = State::from_cartesian::<EARTH, ModifiedJulian>(
-///         5946.673548288958,
-///         1656.154606023661,
-///         2259.012129598249,
-///         -3.098683050943824,
-///         4.579534132135011,
-///         6.246541551539432,
-///         dt,
-///         ECI {},
+///     let cart = State::<Geoid>::from_cartesian(
+///             5_946.673_548_288_958,
+///             1_656.154_606_023_661,
+///             2_259.012_129_598_249,
+///             -3.098_683_050_943_824,
+///             4.579_534_132_135_011,
+///             6.246_541_551_539_432,
+///             dt,
+///             earth_geoid,
 ///     );
-///     let cart_simple = State::from_cartesian_eci(
-///         5946.673548288958,
-///         1656.154606023661,
-///         2259.012129598249,
-///         -3.098683050943824,
-///         4.579534132135011,
-///         6.246541551539432,
-///         dt,
-///     );
-///     let kep = State::from_keplerian::<EARTH, ModifiedJulian>(
-///         7712.186117895041,
-///         0.15899999999999995,
-///         53.75369,
-///         1.99863286421117e-05,
-///         359.787880000004,
-///         25.434003407751188,
-///         dt,
-///         ECI {},
+///
+///     let kep = State::<Geoid>::from_keplerian(
+///            7_712.186_117_895_041,
+///            0.158_999_999_999_999_95,
+///            53.75369,
+///            1.998_632_864_211_17e-5,
+///            359.787_880_000_004,
+///            25.434_003_407_751_188,
+///            dt,
+///            earth_geoid
 ///     );
 ///     // We can check whether two states are equal.
 ///     if cart != kep {
+///         dbg!("{:?}", cart-kep);
 ///         panic!("This won't happen");
-///     }
-///     if cart != cart_simple {
-///         panic!("This won't happen either");
 ///     }
 ///     // Of more interest, we can fetch specific orbital elements.
 ///     println!("sma = {} km   inc = {} degrees", cart.sma(), cart.inc());
