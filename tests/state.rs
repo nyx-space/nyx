@@ -4,11 +4,10 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use hifitime::julian::ModifiedJulian;
-use std::f64::EPSILON;
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
-        assert!(($x - $val).abs() < EPSILON, $msg)
+        assert!(($x - $val).abs() < 1e-10, $msg)
     };
 }
 
@@ -303,9 +302,9 @@ fn geodetic_vallado() {
     let rj = 6862.875;
     let rj_val = 6_862.874_999_999_999;
     let rk = 6448.296;
-    let lat = 34.352_495_139_917_26;
+    let lat = 34.352_495_150_861_564;
     let long = 46.446_416_856_789_96;
-    let height = 5_085.219_430_345_17;
+    let height = 5_085.218_731_091_624;
     let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth_geoid);
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
@@ -321,9 +320,9 @@ fn geodetic_vallado() {
     let long = 345.5975;
     let height = 56.0e-3;
     let height_val = 0.056_000_000_000_494_765;
-    let ri = 6_119.399_587_411_616;
-    let rj = -1_571.479_380_333_195;
-    let rk = -871.561_161_926_003_9;
+    let ri = 6_119.400_259_009_384;
+    let rj = -1_571.479_552_801_429;
+    let rk = -871.561_257_578_933_4;
     let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid);
     f64_eq!(r.x, ri, "r_i");
     f64_eq!(r.y, rj, "r_j");
