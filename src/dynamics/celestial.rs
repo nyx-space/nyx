@@ -3,12 +3,11 @@ extern crate nalgebra as na;
 
 use self::dual_num::linalg::norm;
 use self::dual_num::{Float, Hyperdual};
-use self::na::{DimName, Matrix3x6, Matrix6, MatrixMN, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
+use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
-use celestia::{CelestialBody, CoordinateFrame, State};
+use celestia::{Geoid, State};
 use od::{AutoDiffDynamics, Linearization};
 use std::f64;
-use std::sync::mpsc::Sender;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]
@@ -29,9 +28,9 @@ impl TwoBody {
     }
 
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided state vector (cf. nyx::celestia).
-    pub fn from_state_vec<B: CelestialBody>(state: Vector6<f64>) -> TwoBody {
+    pub fn from_state_vec(state: Vector6<f64>, frame: Geoid) -> TwoBody {
         TwoBody {
-            mu: B::gm(),
+            mu: frame.gm,
             time: 0.0,
             pos_vel: state,
         }
@@ -71,10 +70,10 @@ pub struct TwoBodyWithStm {
 
 impl TwoBodyWithStm {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
-    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithStm {
+    pub fn from_state(state: State<Geoid>) -> TwoBodyWithStm {
         TwoBodyWithStm {
             stm: Matrix6::identity(),
-            two_body_dyn: TwoBody::from_state_vec::<B>(state.to_cartesian_vec()),
+            two_body_dyn: TwoBody::from_state_vec(state.to_cartesian_vec(), state.frame),
         }
     }
 }
@@ -188,9 +187,9 @@ pub struct TwoBodyWithDualStm {
 
 impl TwoBodyWithDualStm {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
-    pub fn from_state<B: CelestialBody, F: CoordinateFrame>(state: State<F>) -> TwoBodyWithDualStm {
+    pub fn from_state(state: &State<Geoid>) -> TwoBodyWithDualStm {
         TwoBodyWithDualStm {
-            mu: B::gm(),
+            mu: state.frame.gm,
             stm: Matrix6::identity(),
             pos_vel: state.to_cartesian_vec(),
             time: 0.0,

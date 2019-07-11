@@ -13,37 +13,43 @@ pub trait CelestialBody {
     fn flattening() -> f64;
 }
 
-/// `NAIF` represents an object which has a NAIF ID and can be loaded from an SPK file.
-pub trait NAIF {
-    /// Returns the NAIF ID of this object.
-    fn id() -> i32;
-
-    /// Returns the NAIF ID of the barycenter
-    fn barycenter() -> i32 {
-        Self::id() / 100
-    }
-
-    /// Returns the NAIF ID of the satellite of this planet given its position (the first satellite is number **one** (not zero)).
-    ///
-    /// **Warning:** the logic here is based entirely on the NAIF ID of the main planet. No guarantee is made that the requested satellite number exists,
-    /// or is present in the loaded SPK files.
-    fn satellite(pos: i32) -> i32 {
-        Self::id() - 99 + pos
-    }
+/// Known orientation IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
+pub mod orientations {
+    /// J2000 orientation frame
+    pub const J2000: i32 = 1;
 }
 
-/// Solar system barycenter
-pub struct SSB;
-
-impl NAIF for SSB {
-    fn id() -> i32 {
-        0
-    }
+/// Known planets IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
+pub mod bodies {
+    /// Solar System Barycenter
+    pub const SSB: i32 = 0;
+    /// Sun center ID
+    pub const SUN: i32 = 10;
+    /// Mercury barycenter ID
+    pub const MERCURY_BARYCENTER: i32 = 1;
+    /// Mercury center ID
+    pub const MERCURY: i32 = 1;
+    /// Venus barycenter ID
+    pub const VENUS_BARYCENTER: i32 = 2;
+    /// Venus center ID
+    pub const VENUS: i32 = 2;
+    /// Earth barycenter ID
+    pub const EARTH_BARYCENTER: i32 = 3;
+    /// Earth planet ID
+    pub const EARTH: i32 = 399;
+    /// Earth's MOon planet ID
+    pub const EARTH_MOON: i32 = 301;
+    /// Mars barycenter ID
+    pub const MARS_BARYCENTER: i32 = 4;
+    /// Jupiter barycenter ID
+    pub const JUPITER_BARYCENTER: i32 = 5;
+    /// Saturn barycenter ID
+    pub const SATURN_BARYCENTER: i32 = 6;
+    /// Uranus barycenter ID
+    pub const URANUS_BARYCENTER: i32 = 7;
+    /// Neptune barycenter ID
+    pub const NEPTUNE_BARYCENTER: i32 = 8;
 }
-
-// Re-Export the planets
-mod planets;
-pub use self::planets::*;
 
 // Re-Export state
 mod state;
@@ -52,3 +58,10 @@ pub use self::state::*;
 // Re-Export frames
 mod frames;
 pub use self::frames::*;
+
+mod axb;
+mod cosm;
+pub use self::cosm::*;
+mod exb;
+mod fxb;
+mod hermite;

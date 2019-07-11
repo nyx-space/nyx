@@ -1,7 +1,7 @@
 extern crate csv;
 
 use self::csv::{QuoteStyle, Writer, WriterBuilder};
-use celestia::{CoordinateFrame, State};
+use celestia::{Frame, State};
 use std::fs::File;
 
 /// Exports to the XYZV data type used in Cosmographia
@@ -21,7 +21,7 @@ impl Cosmographia {
         }
     }
 
-    pub fn append<F: CoordinateFrame>(&mut self, s: State<F>) {
+    pub fn append<F: Frame>(&mut self, s: State<F>) {
         self.wtr.serialize(s).expect("could not write to XYZV file");
     }
 }

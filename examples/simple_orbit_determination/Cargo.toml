@@ -5,6 +5,6 @@ authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 
 [dependencies]
 nyx-space = {path = "../../"}
-nalgebra = "0.15"
-hifitime = "0.1.4"
+nalgebra = "0.17"
+hifitime = "0.1"
 csv ="1.0"

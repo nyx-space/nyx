@@ -12,7 +12,7 @@ use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::Measurement;
-use celestia::{CoordinateFrame, State, ECEF};
+use celestia::{Frame, Geoid, State};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
@@ -86,20 +86,48 @@ impl GroundStation {
     }
 
     /// Perform a measurement from the ground station to the receiver (rx).
-    pub fn measure<F: CoordinateFrame>(self, rx: State<F>, dt: Instant) -> StdMeasurement {
+    pub fn measure(self, rx: State<Geoid>, dt: Instant) -> StdMeasurement {
         use std::f64::consts::PI;
-        let tx_ecef =
-            State::<ECEF>::from_geodesic(self.latitude, self.longitude, self.height, ModifiedJulian::from_instant(dt));
-        let rx_ecef = rx.in_frame(ECEF {});
+        // TODO: Get the frame from cosm instead of using the one from Rx!
+        // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
+        if rx.frame.id() != 3 {
+            unimplemented!("the receiver is not around the Earth");
+        }
+        let mjd_dt = ModifiedJulian::from_instant(dt);
+        let tx = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, rx.frame);
+        /*
+        // Convert the station to "ECEF"
+        let theta = gast(dt);
+        let tx_ecef_r = r3(-theta) * tx.radius();
+        let tx_ecef_v = r3(-theta) * tx.velocity(); // XXX: Shouldn't we be using the transport theorem?
+                                                    // HACK: change after Cosm supports rotations
+        let tx_ecef = State::from_cartesian_vec(
+            &Vector6::from_iterator(tx_ecef_r.iter().chain(tx_ecef_v.iter()).cloned()),
+            mjd_dt,
+            rx.frame,
+        );
+        */
         // Let's start by computing the range and range rate
-        let rho_ecef = rx_ecef.radius() - tx_ecef.radius();
+        let rho_ecef = rx.radius() - tx.radius();
 
         // Convert to SEZ to compute elevation
         let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::new(dt, tx_ecef, rx_ecef, elevation >= self.elevation_mask)
+        StdMeasurement::new(dt, tx, rx, elevation >= self.elevation_mask)
     }
+}
+
+/// Computes the (approximate) Greenwich Apparent Sideral Time as per IAU2000.
+///
+/// NOTE: This is an approximation valid to within 0.9 seconds in absolute value.
+/// In fact, hifitime does not support UT1, but according to the [IERS](https://www.iers.org/IERS/EN/Science/EarthRotation/UTC.html;jsessionid=A6E88EB4CF0FC2E1A3C10D807F51B829.live2?nn=12932)
+/// UTC with leap seconds is always within 0.9 seconds to UT1, and hifitime inherently supports leap seconds.
+/// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
+fn gast(at: Instant) -> f64 {
+    use std::f64::consts::PI;
+    let tu = ModifiedJulian::from_instant(at).days - 51_544.5;
+    2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_6 * tu)
 }
 
 /// Stores a standard measurement of range (km) and range rate (km/s)
@@ -129,10 +157,6 @@ impl StdMeasurement {
         let range = norm(&range_vec);
         let range_rate = range_vec.dot(&delta_v_vec);
 
-        // Added for inspection only
-        println!("range = {}", range);
-        println!("range_rate = {}", range_rate);
-
         // Extract result into Vector2 and Matrix2x6
         let mut fx = Vector2::zeros();
         let mut pmat = Matrix2x6::zeros();
@@ -150,7 +174,7 @@ impl Measurement for StdMeasurement {
     type StateSize = U6;
     type MeasurementSize = U2;
 
-    fn new<F: CoordinateFrame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
+    fn new<F: Frame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 

@@ -1,6 +1,3 @@
-use super::na::{Vector3, Vector6, VectorN, U3, U6};
-use super::Dynamics;
-
 /// `BasicDrag` implements the basic drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
 ///
 /// **WARNING:** This basic model assumes that the velocity of the spacecraft is identical to the velocity of the upper atmosphere,

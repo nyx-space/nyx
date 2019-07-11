@@ -1,0 +1,6 @@
+stable:
+  image: rust:1-slim
+  script:
+    - rustup component add rustfmt
+    - cargo test --release
+    - cargo fmt -- --check

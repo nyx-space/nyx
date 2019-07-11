@@ -1,0 +1,143 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'nyx-space'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "nyx-space",
+                    "kind": "lib"
+                }
+            },
+            "args": [
+                "cosm_indirect"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'lib'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=lib",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "lib",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'state'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=state",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "state",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'utils'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=utils",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "utils",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'orbitaldyn'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=orbitaldyn",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "orbitaldyn",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'momentum'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=momentum",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "momentum",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'propagators'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=propagators",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "propagators",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
