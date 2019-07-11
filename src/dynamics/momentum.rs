@@ -1,4 +1,4 @@
-use super::na::{Matrix3, U3, Vector3, VectorN};
+use super::na::{Matrix3, Vector3, VectorN, U3};
 use super::Dynamics;
 use std::f64;
 use utils::is_diagonal;
