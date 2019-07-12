@@ -223,4 +223,6 @@ fn two_body_dual() {
         "gradient computation is incorrect {:e}",
         (grad - expected).norm()
     );
+
+    assert_eq!(dynamics.to_state(), init);
 }
