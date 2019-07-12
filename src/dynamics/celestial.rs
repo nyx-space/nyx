@@ -1,8 +1,12 @@
 extern crate dual_num;
+extern crate hifitime;
 extern crate nalgebra as na;
 
 use self::dual_num::linalg::norm;
 use self::dual_num::{Float, Hyperdual};
+use self::hifitime::instant::{Era, Instant};
+use self::hifitime::julian::ModifiedJulian;
+use self::hifitime::TimeSystem;
 use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
 use celestia::{Geoid, State};
@@ -66,6 +70,8 @@ impl Dynamics for TwoBody {
 pub struct TwoBodyWithStm {
     pub stm: Matrix6<f64>,
     pub two_body_dyn: TwoBody,
+    pub geoid: Geoid,
+    pub initial_instant: Instant,
 }
 
 impl TwoBodyWithStm {
@@ -74,7 +80,19 @@ impl TwoBodyWithStm {
         TwoBodyWithStm {
             stm: Matrix6::identity(),
             two_body_dyn: TwoBody::from_state_vec(state.to_cartesian_vec(), state.frame),
+            geoid: state.frame,
+            initial_instant: state.dt,
         }
+    }
+
+    pub fn to_state(&self) -> State<Geoid> {
+        // Compute the new time
+        let instant_in_secs = self.initial_instant.secs() as f64 + (self.initial_instant.nanos() as f64) * 1e-9;
+        State::<Geoid>::from_cartesian_vec(
+            &self.two_body_dyn.state(),
+            ModifiedJulian::from_instant(Instant::from_precise_seconds(instant_in_secs, Era::Present)),
+            self.geoid,
+        )
     }
 }
 
@@ -183,6 +201,8 @@ pub struct TwoBodyWithDualStm {
     pub stm: Matrix6<f64>,
     pub pos_vel: Vector6<f64>,
     time: f64,
+    geoid: Geoid,
+    initial_instant: Instant,
 }
 
 impl TwoBodyWithDualStm {
@@ -193,7 +213,19 @@ impl TwoBodyWithDualStm {
             stm: Matrix6::identity(),
             pos_vel: state.to_cartesian_vec(),
             time: 0.0,
+            geoid: state.frame,
+            initial_instant: state.dt,
         }
+    }
+
+    pub fn to_state(&self) -> State<Geoid> {
+        // Compute the new time
+        let instant_in_secs = self.initial_instant.secs() as f64 + (self.initial_instant.nanos() as f64) * 1e-9;
+        State::<Geoid>::from_cartesian_vec(
+            &self.pos_vel,
+            ModifiedJulian::from_instant(Instant::from_precise_seconds(instant_in_secs, Era::Present)),
+            self.geoid,
+        )
     }
 }
 
