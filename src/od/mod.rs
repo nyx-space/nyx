@@ -1,8 +1,8 @@
-extern crate dual_num;
+extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate serde;
 
-use self::dual_num::{hyperspace_from_vector, Dual, Hyperdual, Owned};
+use self::hyperdual::{hyperspace_from_vector, Dual, Hyperdual, Owned};
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::instant::Instant;

@@ -163,7 +163,7 @@ fn two_body_state_parametrized() {
 
 #[test]
 fn two_body_dual() {
-    // This is a duplicate of the differentials test in dual_num.
+    // This is a duplicate of the differentials test in hyperdual.
     extern crate nalgebra as na;
     use self::na::{Matrix6, Vector6};
     use hifitime::julian::ModifiedJulian;

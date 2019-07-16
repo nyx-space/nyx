@@ -10,7 +10,7 @@ keywords = ["space", "mission", "design", "orbit", "propagator"]
 categories = ["science", "simulation"]
 readme = "README.md"
 license = "Apache-2.0"
-exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data/*.gz", "rustfmt.toml"]
+exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data/*.gz", "rustfmt.toml", "de438*"]
 
 [badges]
 maintenance = { status = "actively-developed" }
@@ -24,7 +24,7 @@ flate2 = { version = "1.0", features = ["rust_backend"], default-features = fals
 rand = "0.6"
 serde = "1.0"
 csv = "1"
-dual_num = { git = "https://github.com/novacrazy/dual_num", branch = "master" }
+hyperdual = "=0.3.0"
 bytes = "0.4.12"
 prost = "0.5"
 prost-derive = "0.5"
