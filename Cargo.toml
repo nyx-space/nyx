@@ -10,7 +10,7 @@ keywords = ["space", "mission", "design", "orbit", "propagator"]
 categories = ["science", "simulation"]
 readme = "README.md"
 license = "Apache-2.0"
-exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data/*.gz", "rustfmt.toml"]
+exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data/*.gz", "rustfmt.toml", "de438.bsp", "de438.exb", "de438.fxb"]
 
 [badges]
 maintenance = { status = "actively-developed" }
