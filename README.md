@@ -5,14 +5,13 @@ It will _eventually_ provide most functionality in Python for rapid prototyping.
 The target audience is researchers and astrodynamics engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
 and portability to all platforms supported by [Rust](https://forge.rust-lang.org/platform-support.html).
 
-[![Build Status](https://travis-ci.org/ChristopherRabotin/nyx.svg?branch=master)](https://travis-ci.org/ChristopherRabotin/nyx)
 [![nyx-space on crates.io][cratesio-image]][cratesio]
 [![nyx-space on docs.rs][docsrs-image]][docsrs]
 
 [cratesio-image]: https://img.shields.io/crates/v/nyx-space.svg
 [cratesio]: https://crates.io/crates/nyx-space
-[docsrs-image]: https://docs.rs/nyx-space/badge.svg?version=0.0.4
-[docsrs]: https://docs.rs/nyx-space/0.0.4/
+[docsrs-image]: https://docs.rs/nyx-space/badge.svg
+[docsrs]: https://docs.rs/nyx-space/
 
 # License
 The [LICENSE](https://github.com/ChristopherRabotin/nyx/blob/master/LICENSE) will be strictly enforced once/if this toolkit
