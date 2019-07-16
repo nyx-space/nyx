@@ -1,9 +1,9 @@
-extern crate dual_num;
+extern crate hyperdual;
 extern crate hifitime;
 extern crate nalgebra as na;
 
-use self::dual_num::linalg::norm;
-use self::dual_num::{Float, Hyperdual};
+use self::hyperdual::linalg::norm;
+use self::hyperdual::{Float, Hyperdual};
 use self::hifitime::instant::{Era, Instant};
 use self::hifitime::julian::ModifiedJulian;
 use self::hifitime::TimeSystem;

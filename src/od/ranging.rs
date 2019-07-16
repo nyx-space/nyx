@@ -1,10 +1,10 @@
-extern crate dual_num;
+extern crate hyperdual;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate rand;
 
-use self::dual_num::linalg::norm;
-use self::dual_num::{hyperspace_from_vector, Hyperdual};
+use self::hyperdual::linalg::norm;
+use self::hyperdual::{hyperspace_from_vector, Hyperdual};
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
 use self::na::{DimName, Matrix2x6, Vector2, VectorN, U2, U3, U6, U7};
