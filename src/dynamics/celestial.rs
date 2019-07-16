@@ -1,12 +1,12 @@
-extern crate hyperdual;
 extern crate hifitime;
+extern crate hyperdual;
 extern crate nalgebra as na;
 
-use self::hyperdual::linalg::norm;
-use self::hyperdual::{Float, Hyperdual};
 use self::hifitime::instant::{Era, Instant};
 use self::hifitime::julian::ModifiedJulian;
 use self::hifitime::TimeSystem;
+use self::hyperdual::linalg::norm;
+use self::hyperdual::{Float, Hyperdual};
 use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
 use celestia::{Geoid, State};

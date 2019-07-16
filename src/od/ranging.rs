@@ -1,12 +1,12 @@
-extern crate hyperdual;
 extern crate hifitime;
+extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate rand;
 
-use self::hyperdual::linalg::norm;
-use self::hyperdual::{hyperspace_from_vector, Hyperdual};
 use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
+use self::hyperdual::linalg::norm;
+use self::hyperdual::{hyperspace_from_vector, Hyperdual};
 use self::na::{DimName, Matrix2x6, Vector2, VectorN, U2, U3, U6, U7};
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
