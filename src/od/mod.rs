@@ -45,12 +45,12 @@ where
     fn new<F: Frame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> Self;
 
     /// Returns the measurement/observation as a vector.
-    fn observation(&self) -> &VectorN<f64, Self::MeasurementSize>
+    fn observation(&self) -> VectorN<f64, Self::MeasurementSize>
     where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> &MatrixMN<f64, Self::MeasurementSize, Self::StateSize>
+    fn sensitivity(&self) -> MatrixMN<f64, Self::MeasurementSize, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
 

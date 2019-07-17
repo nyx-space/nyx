@@ -65,7 +65,6 @@ impl Cosm {
         for ephem in &ephemerides {
             let id = ephem.id.clone().unwrap();
             let exb_tpl = (id.number, id.name.clone());
-            println!("{:?}", exb_tpl);
 
             cosm.ephemerides.insert(exb_tpl.clone(), ephem.clone());
 

@@ -7,7 +7,7 @@ use self::hifitime::instant::Instant;
 use self::hifitime::julian::*;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual};
-use self::na::{DimName, Matrix2x6, Vector2, VectorN, U2, U3, U6, U7};
+use self::na::{DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7};
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
@@ -189,12 +189,12 @@ impl Measurement for StdMeasurement {
     /// Returns this measurement as a vector of Range and Range Rate
     ///
     /// **Units:** km, km/s
-    fn observation(&self) -> &Vector2<f64> {
-        &self.obs
+    fn observation(&self) -> Vector2<f64> {
+        self.obs
     }
 
-    fn sensitivity(&self) -> &Matrix2x6<f64> {
-        &self.h_tilde
+    fn sensitivity(&self) -> Matrix2x6<f64> {
+        self.h_tilde
     }
 
     fn visible(&self) -> bool {
@@ -217,6 +217,181 @@ impl Serialize for StdMeasurement {
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.serialize_element(&obs[(1, 0)])?;
+        seq.end()
+    }
+}
+
+/// Stores a standard measurement of range (km)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RangeMsr {
+    dt: Instant,
+    obs: Vector1<f64>,
+    visible: bool,
+    h_tilde: Matrix1x6<f64>,
+}
+
+impl RangeMsr {
+    pub fn range(&self) -> f64 {
+        self.obs[(0, 0)]
+    }
+
+    fn compute_sensitivity(state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector1<f64>, Matrix1x6<f64>) {
+        // Extract data from hyperspace
+        let range_vec = state.fixed_rows::<U3>(0).into_owned();
+
+        // Code up math as usual
+        let range = norm(&range_vec);
+
+        // Extract result into Vector2 and Matrix2x6
+        let fx = Vector1::new(range.real());
+        let mut pmat = Matrix1x6::zeros();
+
+        for j in 1..U7::dim() {
+            pmat[(j - 1)] = range[j];
+        }
+
+        (fx, pmat)
+    }
+}
+
+impl Measurement for RangeMsr {
+    type StateSize = U6;
+    type MeasurementSize = U1;
+
+    fn new<F: Frame>(_: Instant, tx: State<F>, rx: State<F>, visible: bool) -> RangeMsr {
+        assert_eq!(tx.frame.id(), rx.frame.id(), "tx and rx in different frames");
+        assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
+
+        let dt = tx.dt;
+        let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
+        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
+
+        RangeMsr {
+            dt,
+            obs: Vector1::new(obs[0]),
+            visible,
+            h_tilde: h_tilde.fixed_columns::<U6>(0).into_owned(),
+        }
+    }
+
+    /// Returns this measurement as a vector of Range and Range Rate
+    ///
+    /// **Units:** km
+    fn observation(&self) -> Vector1<f64> {
+        self.obs
+    }
+
+    fn sensitivity(&self) -> Matrix1x6<f64> {
+        self.h_tilde
+    }
+
+    fn visible(&self) -> bool {
+        self.visible
+    }
+
+    fn at(&self) -> Instant {
+        self.dt
+    }
+}
+
+impl Serialize for RangeMsr {
+    /// Serializes the observation vector at the given time.
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(3))?;
+        seq.serialize_element(&ModifiedJulian::from_instant(self.dt).days)?;
+        let obs = self.observation();
+        seq.serialize_element(&obs[(0, 0)])?;
+        seq.end()
+    }
+}
+
+/// Stores a standard measurement of range (km)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DopplerMsr {
+    dt: Instant,
+    obs: Vector1<f64>,
+    visible: bool,
+    h_tilde: Matrix1x6<f64>,
+}
+
+impl DopplerMsr {
+    pub fn range_rate(&self) -> f64 {
+        self.obs[(0, 0)]
+    }
+
+    fn compute_sensitivity(state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector1<f64>, Matrix1x6<f64>) {
+        // Extract data from hyperspace
+        let range_vec = state.fixed_rows::<U3>(0).into_owned();
+        let velocity_vec = state.fixed_rows::<U3>(3).into_owned();
+
+        // Code up math as usual
+        let delta_v_vec = velocity_vec / norm(&range_vec);
+        let range_rate = range_vec.dot(&delta_v_vec);
+
+        // Extract result into Vector2 and Matrix2x6
+        let fx = Vector1::new(range_rate.real());
+        let mut pmat = Matrix1x6::zeros();
+
+        for j in 1..U7::dim() {
+            pmat[(0, j - 1)] = range_rate[j];
+        }
+        (fx, pmat)
+    }
+}
+
+impl Measurement for DopplerMsr {
+    type StateSize = U6;
+    type MeasurementSize = U1;
+
+    fn new<F: Frame>(_: Instant, tx: State<F>, rx: State<F>, visible: bool) -> DopplerMsr {
+        assert_eq!(tx.frame.id(), rx.frame.id(), "tx and rx in different frames");
+        assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
+
+        let dt = tx.dt;
+        let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
+        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
+
+        DopplerMsr {
+            dt,
+            obs: Vector1::new(obs[1]),
+            visible,
+            h_tilde: h_tilde.fixed_columns::<U6>(1).into_owned(),
+        }
+    }
+
+    /// Returns this measurement as a vector of Range and Range Rate
+    ///
+    /// **Units:** km/s
+    fn observation(&self) -> Vector1<f64> {
+        self.obs
+    }
+
+    fn sensitivity(&self) -> Matrix1x6<f64> {
+        self.h_tilde
+    }
+
+    fn visible(&self) -> bool {
+        self.visible
+    }
+
+    fn at(&self) -> Instant {
+        self.dt
+    }
+}
+
+impl Serialize for DopplerMsr {
+    /// Serializes the observation vector at the given time.
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(3))?;
+        seq.serialize_element(&ModifiedJulian::from_instant(self.dt).days)?;
+        let obs = self.observation();
+        seq.serialize_element(&obs[(0, 0)])?;
         seq.end()
     }
 }

@@ -87,7 +87,7 @@ impl TwoBodyWithStm {
 
     pub fn to_state(&self) -> State<Geoid> {
         // Compute the new time
-        let instant_in_secs = self.initial_instant.secs() as f64 + (self.initial_instant.nanos() as f64) * 1e-9;
+        let instant_in_secs = self.initial_instant.secs() as f64 + (f64::from(self.initial_instant.nanos())) * 1e-9;
         State::<Geoid>::from_cartesian_vec(
             &self.two_body_dyn.state(),
             ModifiedJulian::from_instant(Instant::from_precise_seconds(instant_in_secs, Era::Present)),
@@ -220,7 +220,7 @@ impl TwoBodyWithDualStm {
 
     pub fn to_state(&self) -> State<Geoid> {
         // Compute the new time
-        let instant_in_secs = self.initial_instant.secs() as f64 + (self.initial_instant.nanos() as f64) * 1e-9;
+        let instant_in_secs = self.initial_instant.secs() as f64 + (f64::from(self.initial_instant.nanos())) * 1e-9;
         State::<Geoid>::from_cartesian_vec(
             &self.pos_vel,
             ModifiedJulian::from_instant(Instant::from_precise_seconds(instant_in_secs, Era::Present)),
