@@ -190,9 +190,9 @@ fn ckf_fixed_step_perfect_stations_std() {
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
-                ckf.update_h_tilde(*computed_meas.sensitivity());
+                ckf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = ckf
-                    .measurement_update(*real_meas.observation(), *computed_meas.observation())
+                    .measurement_update(real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
@@ -324,9 +324,9 @@ fn ekf_fixed_step_perfect_stations() {
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
-                kf.update_h_tilde(*computed_meas.sensitivity());
+                kf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = kf
-                    .measurement_update(*real_meas.observation(), *computed_meas.observation())
+                    .measurement_update(real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
@@ -457,9 +457,9 @@ fn ckf_fixed_step_perfect_stations_dual() {
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt.into_instant());
             if computed_meas.visible() {
-                ckf.update_h_tilde(*computed_meas.sensitivity());
+                ckf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = ckf
-                    .measurement_update(*real_meas.observation(), *computed_meas.observation())
+                    .measurement_update(real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");

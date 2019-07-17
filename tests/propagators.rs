@@ -238,7 +238,7 @@ fn gmat_val_leo_day_fixed() {
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
-    let cosm = Cosm::from_xb("./de438");
+    let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
     let prop_time = 3_600.0 * 24.0;
