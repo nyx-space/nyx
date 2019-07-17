@@ -189,12 +189,12 @@ impl Measurement for StdMeasurement {
     /// Returns this measurement as a vector of Range and Range Rate
     ///
     /// **Units:** km, km/s
-    fn observation(&self) -> &Vector2<f64> {
-        &self.obs
+    fn observation(&self) -> Vector2<f64> {
+        self.obs
     }
 
-    fn sensitivity(&self) -> &Matrix2x6<f64> {
-        &self.h_tilde
+    fn sensitivity(&self) -> Matrix2x6<f64> {
+        self.h_tilde
     }
 
     fn visible(&self) -> bool {
@@ -276,13 +276,13 @@ impl Measurement for RangeMsr {
 
     /// Returns this measurement as a vector of Range and Range Rate
     ///
-    /// **Units:** km, km/s
-    fn observation(&self) -> &Vector1<f64> {
-        &self.obs
+    /// **Units:** km
+    fn observation(&self) -> Vector1<f64> {
+        self.obs
     }
 
-    fn sensitivity(&self) -> &Matrix1x6<f64> {
-        &self.h_tilde
+    fn sensitivity(&self) -> Matrix1x6<f64> {
+        self.h_tilde
     }
 
     fn visible(&self) -> bool {
@@ -364,13 +364,13 @@ impl Measurement for DopplerMsr {
 
     /// Returns this measurement as a vector of Range and Range Rate
     ///
-    /// **Units:** km, km/s
-    fn observation(&self) -> &Vector1<f64> {
-        &self.obs
+    /// **Units:** km/s
+    fn observation(&self) -> Vector1<f64> {
+        self.obs
     }
 
-    fn sensitivity(&self) -> &Matrix1x6<f64> {
-        &self.h_tilde
+    fn sensitivity(&self) -> Matrix1x6<f64> {
+        self.h_tilde
     }
 
     fn visible(&self) -> bool {
