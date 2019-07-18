@@ -268,9 +268,9 @@ impl Measurement for RangeMsr {
 
         RangeMsr {
             dt,
-            obs: Vector1::new(obs[0]),
+            obs,
             visible,
-            h_tilde: h_tilde.fixed_columns::<U6>(0).into_owned(),
+            h_tilde,
         }
     }
 
@@ -356,9 +356,9 @@ impl Measurement for DopplerMsr {
 
         DopplerMsr {
             dt,
-            obs: Vector1::new(obs[1]),
+            obs,
             visible,
-            h_tilde: h_tilde.fixed_columns::<U6>(1).into_owned(),
+            h_tilde,
         }
     }
 
