@@ -1,6 +1,6 @@
 [package]
 name = "nyx-space"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://github.com/ChristopherRabotin/nyx"
@@ -17,14 +17,14 @@ maintenance = { status = "actively-developed" }
 travis-ci = { repository = "ChristopherRabotin/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "0.17"
+nalgebra = "0.18"
 log = "0.4"
 hifitime = "0.1"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 rand = "0.6"
 serde = "1.0"
 csv = "1"
-hyperdual = "=0.3.0"
+hyperdual = "0.3.1"
 bytes = "0.4.12"
 prost = "0.5"
 prost-derive = "0.5"
