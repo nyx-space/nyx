@@ -226,3 +226,52 @@ fn two_body_dual() {
 
     assert_eq!(dynamics.to_state(), init);
 }
+
+#[test]
+fn third_bodies() {
+    extern crate nalgebra as na;
+    use self::na::Vector6;
+    use nyx::celestia::{bodies, Cosm};
+    use nyx::dynamics::celestial::{ThirdBodies, TwoBody};
+    use nyx::propagators::error_ctrl::RSSStepPV;
+    use nyx::propagators::*;
+
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+
+    let prop_time = 24.0 * 3_600.0;
+    let accuracy = 1e-12;
+    let min_step = 0.1;
+    let max_step = 60.0;
+
+    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0);
+
+    let rslt = Vector6::from_row_slice(&[
+        -5_971.194_376_784_884,
+        3_945.517_912_191_541,
+        2_864.620_958_267_658_4,
+        0.049_083_102_073_914_83,
+        -4.185_084_126_130_087_5,
+        5.848_947_462_252_259_5,
+    ]);
+
+    let two_body = TwoBody::from_state_vec(init, earth_geoid);
+    let mut dynamics = ThirdBodies::with_bodies(two_body, vec![bodies::EARTH_MOON], &cosm);
+    let mut prop = Propagator::new::<RK89>(
+        &mut dynamics,
+        &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
+    );
+    prop.until_time_elapsed(prop_time);
+    assert_eq!(prop.state(), rslt, "two body prop failed");
+    // And now do the backprop
+    prop.until_time_elapsed(-prop_time);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &init);
+    assert!(
+        err_r < 1e-5,
+        "two body back prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back prop failed to return to the initial state in velocity"
+    );
+}

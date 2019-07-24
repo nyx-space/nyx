@@ -9,16 +9,19 @@ use self::hyperdual::linalg::norm;
 use self::hyperdual::{Float, Hyperdual};
 use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
-use celestia::{Geoid, State};
+use celestia::{Cosm, Geoid, State};
 use od::{AutoDiffDynamics, Linearization};
 use std::f64;
 
 /// `TwoBody` exposes the equations of motion for a simple two body propagation.
 #[derive(Copy, Clone)]
 pub struct TwoBody {
+    /// Gravitational parameter of the center body
     pub mu: f64,
     time: f64,
     pos_vel: Vector6<f64>,
+    // EXB ID of the center body (defaults to -1 if no frame provided)
+    pub center_id: i32,
 }
 
 impl TwoBody {
@@ -28,6 +31,7 @@ impl TwoBody {
             mu,
             time: 0.0,
             pos_vel: state,
+            center_id: -1,
         }
     }
 
@@ -37,6 +41,7 @@ impl TwoBody {
             mu: frame.gm,
             time: 0.0,
             pos_vel: state,
+            center_id: frame.center_id,
         }
     }
 }
@@ -313,4 +318,54 @@ impl Dynamics for TwoBodyWithDualStm {
         }
         VectorN::<f64, Self::StateSize>::from_iterator(state.iter().chain(stm_as_vec.iter()).cloned())
     }
+}
+
+/// `ThirdBodies` provides third body dynamics.
+pub struct ThirdBodies<'a> {
+    pub bodies: Vec<i32>,
+    two_body: TwoBody,
+    cosm: &'a Cosm, // TODO: Add the absolute time, needed to compute the position of the planets
+}
+
+impl<'a> ThirdBodies<'a> {
+    /// Initialize third body dynamics given the EXB IDs and a Cosm
+    pub fn with_bodies(two_body: TwoBody, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+        assert!(two_body.center_id != -1, "cannot used third body dynamics if no center defined");
+        Self { two_body, bodies, cosm }
+    }
+}
+
+impl<'a> Dynamics for ThirdBodies<'a> {
+    type StateSize = U6;
+    fn time(&self) -> f64 {
+        self.two_body.time()
+    }
+
+    fn state(&self) -> VectorN<f64, Self::StateSize> {
+        self.two_body.state()
+    }
+
+    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+        self.two_body.set_state(new_t, new_state);
+    }
+
+    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
+        // TODO: Add third bodies
+        // Get all of the position vectors between the center body and the third bodies
+        let mut r_i = Vec::new();
+        // let jde = 
+        for exb_id in self.bodies {
+            celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB).unwrap()
+        }
+        self.two_body.eom(t, state)
+    }
+}
+
+#[test]
+#[should_panic]
+fn third_body_unknown_center() {
+    let cosm = Cosm::from_xb("./de438s");
+    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0);
+    let two_body = TwoBody::from_state_vec_with_gm(init, 398_600.441_5);
+    ThirdBodies::with_bodies(two_body, vec![301], &cosm);
 }
