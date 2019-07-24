@@ -5,6 +5,7 @@ extern crate nalgebra as na;
 use self::hifitime::instant::{Era, Instant};
 use self::hifitime::julian::ModifiedJulian;
 use self::hifitime::TimeSystem;
+use self::hifitime::SECONDS_PER_DAY;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{Float, Hyperdual};
 use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
@@ -320,52 +321,61 @@ impl Dynamics for TwoBodyWithDualStm {
     }
 }
 
-/// `ThirdBodies` provides third body dynamics.
-pub struct ThirdBodies<'a> {
+pub struct CelestialDynamics<'a> {
+    pub state: State<Geoid>,
     pub bodies: Vec<i32>,
-    two_body: TwoBody,
-    cosm: &'a Cosm, // TODO: Add the absolute time, needed to compute the position of the planets
+    cosm: &'a Cosm,
 }
 
-impl<'a> ThirdBodies<'a> {
+impl<'a> CelestialDynamics<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
-    pub fn with_bodies(two_body: TwoBody, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
-        assert!(two_body.center_id != -1, "cannot used third body dynamics if no center defined");
-        Self { two_body, bodies, cosm }
+    pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+        Self { state, bodies, cosm }
+    }
+
+    pub fn as_state(&self) -> State<Geoid> {
+        self.state
     }
 }
 
-impl<'a> Dynamics for ThirdBodies<'a> {
+impl<'a> Dynamics for CelestialDynamics<'a> {
     type StateSize = U6;
+    /// Returns modified Julian seconds
     fn time(&self) -> f64 {
-        self.two_body.time()
+        self.state.dt_as_modified_julian().days * SECONDS_PER_DAY
     }
 
     fn state(&self) -> VectorN<f64, Self::StateSize> {
-        self.two_body.state()
+        self.state.to_cartesian_vec()
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        self.two_body.set_state(new_t, new_state);
+        self.state.x = new_state[0];
+        self.state.y = new_state[1];
+        self.state.z = new_state[2];
+        self.state.vx = new_state[3];
+        self.state.vy = new_state[4];
+        self.state.vz = new_state[5];
+        println!("dt = {}", new_t - self.time());
+        let mjd = ModifiedJulian {
+            days: new_t / SECONDS_PER_DAY,
+        };
+        self.state.dt = mjd.into_instant();
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
+        let radius = state.fixed_rows::<U3>(0).into_owned();
+        let velocity = state.fixed_rows::<U3>(3).into_owned();
+        let body_acceleration = (-self.state.frame.gm / radius.norm().powi(3)) * radius;
+        Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
+
         // TODO: Add third bodies
         // Get all of the position vectors between the center body and the third bodies
-        let mut r_i = Vec::new();
-        // let jde = 
-        for exb_id in self.bodies {
-            celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB).unwrap()
-        }
-        self.two_body.eom(t, state)
+        // let mut r_i = Vec::new();
+        // let jde =
+        // for exb_id in self.bodies {
+        //     celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB).unwrap()
+        // }
+        // self.two_body.eom(t, state)
     }
-}
-
-#[test]
-#[should_panic]
-fn third_body_unknown_center() {
-    let cosm = Cosm::from_xb("./de438s");
-    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0);
-    let two_body = TwoBody::from_state_vec_with_gm(init, 398_600.441_5);
-    ThirdBodies::with_bodies(two_body, vec![301], &cosm);
 }
