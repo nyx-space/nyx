@@ -4,8 +4,8 @@ extern crate nalgebra as na;
 
 use self::hifitime::instant::{Era, Instant};
 use self::hifitime::julian::ModifiedJulian;
-use self::hifitime::TimeSystem;
 use self::hifitime::SECONDS_PER_DAY;
+use self::hifitime::TimeSystem;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{Float, Hyperdual};
 use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
@@ -324,13 +324,21 @@ impl Dynamics for TwoBodyWithDualStm {
 pub struct CelestialDynamics<'a> {
     pub state: State<Geoid>,
     pub bodies: Vec<i32>,
+    init_mjd: ModifiedJulian,
+    time: f64,
     cosm: &'a Cosm,
 }
 
 impl<'a> CelestialDynamics<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
     pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
-        Self { state, bodies, cosm }
+        Self {
+            state,
+            bodies,
+            init_mjd: state.dt_as_modified_julian(),
+            time: 0.0,
+            cosm,
+        }
     }
 
     pub fn as_state(&self) -> State<Geoid> {
@@ -340,9 +348,9 @@ impl<'a> CelestialDynamics<'a> {
 
 impl<'a> Dynamics for CelestialDynamics<'a> {
     type StateSize = U6;
-    /// Returns modified Julian seconds
+    /// Returns modified Julian seconds since 01 Jan 2000 00:00
     fn time(&self) -> f64 {
-        self.state.dt_as_modified_julian().days * SECONDS_PER_DAY
+        self.time
     }
 
     fn state(&self) -> VectorN<f64, Self::StateSize> {
@@ -350,15 +358,15 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+        self.time = new_t;
         self.state.x = new_state[0];
         self.state.y = new_state[1];
         self.state.z = new_state[2];
         self.state.vx = new_state[3];
         self.state.vy = new_state[4];
         self.state.vz = new_state[5];
-        println!("dt = {}", new_t - self.time());
         let mjd = ModifiedJulian {
-            days: new_t / SECONDS_PER_DAY,
+            days: self.init_mjd.days + self.time / SECONDS_PER_DAY,
         };
         self.state.dt = mjd.into_instant();
     }

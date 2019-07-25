@@ -106,6 +106,7 @@ fn two_body_dynamics() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
+    use std::f64::EPSILON;
 
     let prop_time = 24.0 * 3_600.0;
 
@@ -116,22 +117,21 @@ fn two_body_dynamics() {
     let state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let rslt = Vector6::new(
-        -5_971.194_191_684_024,
-        3_945.506_653_624_737_3,
-        2_864.636_617_867_270_6,
-        0.049_096_957_141_044_464,
-        -4.185_093_318_149_689,
-        5.848_940_867_979_176,
+        -5_971.194_376_797_642,
+        3_945.517_912_574_167_4,
+        2_864.620_957_744_445,
+        0.049_083_101_605_521_72,
+        -4.185_084_125_817_668,
+        5.848_947_462_472_871,
     );
 
     let mut dynamics = CelestialDynamics::new(state, Vec::new(), &cosm);
-    dbg!(state.energy());
 
     // let mut dynamics = TwoBody::from_state_vec_with_gm(init, 398_600.441_5);
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
-    dbg!(prop.dynamics.as_state().energy());
     assert_eq!(prop.state(), rslt, "two body prop failed");
+    assert!((prop.dynamics.state.dt_as_modified_julian().days - dt.days - 1.0).abs() <= EPSILON);
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
     let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &state.to_cartesian_vec());

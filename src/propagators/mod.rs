@@ -133,7 +133,7 @@ where
         loop {
             let dx = self.dynamics.state().clone();
             let dt = self.dynamics.time();
-            let (t, state) = self.derive(dbg!(dt), dx);
+            let (t, state) = self.derive(dt, dx);
             if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state.clone());
@@ -146,7 +146,7 @@ where
                 let prev_details = self.latest_details().clone();
                 let overshot = t - stop_time;
                 if (!backprop && overshot > 0.0) || (backprop && overshot < 0.0) {
-                    println!("overshot by {} seconds\t{}\t{}\t{}", overshot, t, stop_time, init_seconds);
+                    warn!("overshot by {} seconds", overshot);
                     self.set_fixed_step(prev_details.step - overshot);
                     // Take one final step
                     let dx = self.dynamics.state().clone();
@@ -245,7 +245,7 @@ where
                         self.step_size = if proposed_step > self.opts.max_step {
                             self.opts.max_step
                         } else {
-                            dbg!(proposed_step)
+                            proposed_step
                         };
                     }
                     return ((t + self.details.step), next_state);

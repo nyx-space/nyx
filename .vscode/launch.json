@@ -7,6 +7,25 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug integration test 'two_body_dynamics'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=state",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "state",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in library 'nyx-space'",
             "cargo": {
                 "args": [
