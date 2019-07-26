@@ -4,8 +4,8 @@ extern crate nalgebra as na;
 
 use self::hifitime::instant::{Era, Instant};
 use self::hifitime::julian::ModifiedJulian;
-use self::hifitime::SECONDS_PER_DAY;
 use self::hifitime::TimeSystem;
+use self::hifitime::SECONDS_PER_DAY;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{Float, Hyperdual};
 use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
@@ -14,78 +14,101 @@ use celestia::{Cosm, Geoid, State};
 use od::{AutoDiffDynamics, Linearization};
 use std::f64;
 
-/// `TwoBody` exposes the equations of motion for a simple two body propagation.
-#[derive(Copy, Clone)]
-pub struct TwoBody {
-    /// Gravitational parameter of the center body
-    pub mu: f64,
+/// `CelestialDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
+pub struct CelestialDynamics<'a> {
+    pub state: State<Geoid>,
+    pub bodies: Vec<i32>,
+    init_mjd: ModifiedJulian,
     time: f64,
-    pos_vel: Vector6<f64>,
-    // EXB ID of the center body (defaults to -1 if no frame provided)
-    pub center_id: i32,
+    cosm: Option<&'a Cosm>,
 }
 
-impl TwoBody {
-    /// Initialize TwoBody dynamics given a provided gravitional parameter (as `mu`)
-    pub fn from_state_vec_with_gm(state: Vector6<f64>, mu: f64) -> TwoBody {
-        TwoBody {
-            mu,
+impl<'a> CelestialDynamics<'a> {
+    /// Initialize third body dynamics given the EXB IDs and a Cosm
+    pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+        Self {
+            state,
+            bodies,
+            init_mjd: state.dt_as_modified_julian(),
             time: 0.0,
-            pos_vel: state,
-            center_id: -1,
+            cosm: Some(cosm),
         }
     }
 
-    /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided state vector (cf. nyx::celestia).
-    pub fn from_state_vec(state: Vector6<f64>, frame: Geoid) -> TwoBody {
-        TwoBody {
-            mu: frame.gm,
+    /// Initializes a CelestialDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
+    pub fn two_body(state: State<Geoid>) -> Self {
+        Self {
+            state,
+            bodies: Vec::new(),
+            init_mjd: state.dt_as_modified_julian(),
             time: 0.0,
-            pos_vel: state,
-            center_id: frame.center_id,
+            cosm: None,
         }
+    }
+
+    /// Provides a copy to the state.
+    pub fn as_state(&self) -> State<Geoid> {
+        self.state
     }
 }
 
-impl Dynamics for TwoBody {
+impl<'a> Dynamics for CelestialDynamics<'a> {
     type StateSize = U6;
+    /// Returns modified Julian seconds since 01 Jan 2000 00:00
     fn time(&self) -> f64 {
         self.time
     }
 
     fn state(&self) -> VectorN<f64, Self::StateSize> {
-        self.pos_vel
+        self.state.to_cartesian_vec()
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
         self.time = new_t;
-        self.pos_vel = *new_state;
+        self.state.x = new_state[0];
+        self.state.y = new_state[1];
+        self.state.z = new_state[2];
+        self.state.vx = new_state[3];
+        self.state.vy = new_state[4];
+        self.state.vz = new_state[5];
+        let mjd = ModifiedJulian {
+            days: self.init_mjd.days + self.time / SECONDS_PER_DAY,
+        };
+        self.state.dt = mjd.into_instant();
     }
 
-    fn eom(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
+    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let radius = state.fixed_rows::<U3>(0).into_owned();
         let velocity = state.fixed_rows::<U3>(3).into_owned();
-        let body_acceleration = (-self.mu / radius.norm().powi(3)) * radius;
+        let body_acceleration = (-self.state.frame.gm / radius.norm().powi(3)) * radius;
         Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
+
+        // TODO: Add third bodies
+        // Get all of the position vectors between the center body and the third bodies
+        // let mut r_i = Vec::new();
+        // let jde =
+        // for exb_id in self.bodies {
+        //     celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB).unwrap()
+        // }
+        // self.two_body.eom(t, state)
     }
 }
 
 /// `TwoBodyWithStm` exposes the equations of motion for a simple two body propagation. It inherently supports
 /// the State Transition Matrix for orbital determination.
-#[derive(Copy, Clone)]
-pub struct TwoBodyWithStm {
+pub struct TwoBodyWithStm<'a> {
     pub stm: Matrix6<f64>,
-    pub two_body_dyn: TwoBody,
+    pub two_body_dyn: CelestialDynamics<'a>,
     pub geoid: Geoid,
     pub initial_instant: Instant,
 }
 
-impl TwoBodyWithStm {
+impl<'a> TwoBodyWithStm<'a> {
     /// Initialize TwoBody dynamics around a provided `CelestialBody` from the provided position and velocity state (cf. nyx::celestia).
-    pub fn from_state(state: State<Geoid>) -> TwoBodyWithStm {
+    pub fn from_state(state: State<Geoid>) -> TwoBodyWithStm<'a> {
         TwoBodyWithStm {
             stm: Matrix6::identity(),
-            two_body_dyn: TwoBody::from_state_vec(state.to_cartesian_vec(), state.frame),
+            two_body_dyn: CelestialDynamics::two_body(state),
             geoid: state.frame,
             initial_instant: state.dt,
         }
@@ -102,7 +125,7 @@ impl TwoBodyWithStm {
     }
 }
 
-impl Dynamics for TwoBodyWithStm {
+impl<'a> Dynamics for TwoBodyWithStm<'a> {
     type StateSize = U42;
     fn time(&self) -> f64 {
         self.two_body_dyn.time()
@@ -156,7 +179,7 @@ impl Dynamics for TwoBodyWithStm {
     }
 }
 
-impl Linearization for TwoBodyWithStm {
+impl<'a> Linearization for TwoBodyWithStm<'a> {
     type StateSize = U6;
 
     fn gradient(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize> {
@@ -176,15 +199,15 @@ impl Linearization for TwoBodyWithStm {
         let r252 = (x2 + y2 + z2).powf(5.0 / 2.0);
 
         // Add the body perturbations
-        let dax_dx = 3.0 * self.two_body_dyn.mu * x2 / r252 - self.two_body_dyn.mu / r232;
-        let dax_dy = 3.0 * self.two_body_dyn.mu * x * y / r252;
-        let dax_dz = 3.0 * self.two_body_dyn.mu * x * z / r252;
-        let day_dx = 3.0 * self.two_body_dyn.mu * x * y / r252;
-        let day_dy = 3.0 * self.two_body_dyn.mu * y2 / r252 - self.two_body_dyn.mu / r232;
-        let day_dz = 3.0 * self.two_body_dyn.mu * y * z / r252;
-        let daz_dx = 3.0 * self.two_body_dyn.mu * x * z / r252;
-        let daz_dy = 3.0 * self.two_body_dyn.mu * y * z / r252;
-        let daz_dz = 3.0 * self.two_body_dyn.mu * z2 / r252 - self.two_body_dyn.mu / r232;
+        let dax_dx = 3.0 * self.geoid.gm * x2 / r252 - self.geoid.gm / r232;
+        let dax_dy = 3.0 * self.geoid.gm * x * y / r252;
+        let dax_dz = 3.0 * self.geoid.gm * x * z / r252;
+        let day_dx = 3.0 * self.geoid.gm * x * y / r252;
+        let day_dy = 3.0 * self.geoid.gm * y2 / r252 - self.geoid.gm / r232;
+        let day_dz = 3.0 * self.geoid.gm * y * z / r252;
+        let daz_dx = 3.0 * self.geoid.gm * x * z / r252;
+        let daz_dy = 3.0 * self.geoid.gm * y * z / r252;
+        let daz_dz = 3.0 * self.geoid.gm * z2 / r252 - self.geoid.gm / r232;
 
         // Let the gradient
         grad[(3, 0)] = dax_dx;
@@ -318,72 +341,5 @@ impl Dynamics for TwoBodyWithDualStm {
             }
         }
         VectorN::<f64, Self::StateSize>::from_iterator(state.iter().chain(stm_as_vec.iter()).cloned())
-    }
-}
-
-pub struct CelestialDynamics<'a> {
-    pub state: State<Geoid>,
-    pub bodies: Vec<i32>,
-    init_mjd: ModifiedJulian,
-    time: f64,
-    cosm: &'a Cosm,
-}
-
-impl<'a> CelestialDynamics<'a> {
-    /// Initialize third body dynamics given the EXB IDs and a Cosm
-    pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
-        Self {
-            state,
-            bodies,
-            init_mjd: state.dt_as_modified_julian(),
-            time: 0.0,
-            cosm,
-        }
-    }
-
-    pub fn as_state(&self) -> State<Geoid> {
-        self.state
-    }
-}
-
-impl<'a> Dynamics for CelestialDynamics<'a> {
-    type StateSize = U6;
-    /// Returns modified Julian seconds since 01 Jan 2000 00:00
-    fn time(&self) -> f64 {
-        self.time
-    }
-
-    fn state(&self) -> VectorN<f64, Self::StateSize> {
-        self.state.to_cartesian_vec()
-    }
-
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        self.time = new_t;
-        self.state.x = new_state[0];
-        self.state.y = new_state[1];
-        self.state.z = new_state[2];
-        self.state.vx = new_state[3];
-        self.state.vy = new_state[4];
-        self.state.vz = new_state[5];
-        let mjd = ModifiedJulian {
-            days: self.init_mjd.days + self.time / SECONDS_PER_DAY,
-        };
-        self.state.dt = mjd.into_instant();
-    }
-
-    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
-        let radius = state.fixed_rows::<U3>(0).into_owned();
-        let velocity = state.fixed_rows::<U3>(3).into_owned();
-        let body_acceleration = (-self.state.frame.gm / radius.norm().powi(3)) * radius;
-        Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned())
-
-        // TODO: Add third bodies
-        // Get all of the position vectors between the center body and the third bodies
-        // let mut r_i = Vec::new();
-        // let jde =
-        // for exb_id in self.bodies {
-        //     celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB).unwrap()
-        // }
-        // self.two_body.eom(t, state)
     }
 }

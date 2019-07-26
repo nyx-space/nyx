@@ -8,7 +8,7 @@ use self::hifitime::julian::*;
 use self::hifitime::SECONDS_PER_DAY;
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{Cosm, Geoid, State};
-use self::nyx::dynamics::celestial::{TwoBody, TwoBodyWithDualStm, TwoBodyWithStm};
+use self::nyx::dynamics::celestial::{CelestialDynamics, TwoBodyWithDualStm, TwoBodyWithStm};
 use self::nyx::dynamics::Dynamics;
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
@@ -110,9 +110,8 @@ fn ckf_fixed_step_perfect_stations_std() {
     let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
-    let geoid = earth_geoid;
     thread::spawn(move || {
-        let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
+        let mut dynamics = CelestialDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
@@ -244,9 +243,8 @@ fn ekf_fixed_step_perfect_stations() {
     let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
-    let geoid = earth_geoid;
     thread::spawn(move || {
-        let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
+        let mut dynamics = CelestialDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
@@ -377,9 +375,8 @@ fn ckf_fixed_step_perfect_stations_dual() {
     let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
-    let geoid = earth_geoid;
     thread::spawn(move || {
-        let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), geoid);
+        let mut dynamics = CelestialDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);

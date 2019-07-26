@@ -9,7 +9,7 @@ use self::na::{DefaultAllocator, DimName, VectorN};
 /// from this module match, or perform the appropriate coordinate transformations.
 pub mod celestial;
 
-/// The gravity module handles spherical harmonics only. It _must_ be combined with a TwoBody dynamics
+/// The gravity module handles spherical harmonics only. It _must_ be combined with a CelestialDynamics dynamics
 ///
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
 pub mod gravity;

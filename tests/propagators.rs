@@ -1,3 +1,4 @@
+extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
@@ -6,8 +7,9 @@ use std::f64;
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
     use self::na::Vector6;
-    use nyx::celestia::Cosm;
-    use nyx::dynamics::celestial::TwoBody;
+    use hifitime::julian::ModifiedJulian;
+    use nyx::celestia::{Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
     let cosm = Cosm::from_xb("./de438s");
@@ -17,7 +19,8 @@ fn regress_leo_day_adaptive() {
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0]);
+    let dt = ModifiedJulian::j2000();
+    let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -47,7 +50,7 @@ fn regress_leo_day_adaptive() {
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<RK2Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
@@ -62,7 +65,7 @@ fn regress_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<CashKarp45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -80,7 +83,7 @@ fn regress_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Fehlberg45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -104,19 +107,22 @@ fn gmat_val_leo_day_adaptive() {
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
     use self::na::Vector6;
-    use nyx::celestia::Cosm;
-    use nyx::dynamics::celestial::TwoBody;
+    use hifitime::julian::ModifiedJulian;
+    use nyx::celestia::{Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+    let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
+    earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0]);
+    let dt = ModifiedJulian::j2000();
+    let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -154,8 +160,7 @@ fn gmat_val_leo_day_adaptive() {
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -173,8 +178,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Verner56>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -192,8 +196,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand78>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -211,8 +214,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<RK89>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -233,16 +235,19 @@ fn gmat_val_leo_day_adaptive() {
 #[test]
 fn gmat_val_leo_day_fixed() {
     use crate::na::Vector6;
-    use nyx::celestia::Cosm;
-    use nyx::dynamics::celestial::TwoBody;
+    use hifitime::julian::ModifiedJulian;
+    use nyx::celestia::{Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
+    let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
+    earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 3_600.0 * 24.0;
-    let init = Vector6::from_row_slice(&[-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0]);
+    let dt = ModifiedJulian::j2000();
+    let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -288,40 +293,35 @@ fn gmat_val_leo_day_fixed() {
     ];
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand45>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand78>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[3], "two body prop failed");
     }
 
     {
-        let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-        dynamics.mu = 398_600.441_5; // Using GMAT's value
+        let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[4], "two body prop failed");

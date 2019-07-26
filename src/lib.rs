@@ -17,6 +17,7 @@
 //!  * Angular momentum dynamics for a rigid body
 //!  * Convenient and explicit definition of the dynamics for a simulation (cf. the [dynamics documentation](./dynamics/index.html))
 //!  * Orbital state definition with transformations to other frames
+//!  * Multi body dynamics
 //!
 //! ## Usage
 //!
@@ -24,7 +25,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.9"
+//! nyx-space = "0.0.10"
 //! ```
 //!
 //! And add the following to your crate root:
@@ -34,47 +35,6 @@
 //! ```
 
 /// Provides all the propagators / integrators available in `nyx`.
-///
-/// # Custom derivative function example
-/// ```
-/// extern crate nalgebra as na;
-/// extern crate nyx_space as nyx;
-/// use self::na::Vector6;
-/// use nyx::celestia::Cosm;
-/// use nyx::dynamics::celestial::TwoBody;
-/// use nyx::dynamics::Dynamics;
-/// use nyx::propagators::error_ctrl::RSSStepPV;
-/// use nyx::propagators::*;
-///
-/// fn main() {
-///     let cosm = Cosm::from_xb("./de438s");
-///     let earth_geoid = cosm.geoid_from_id(3).unwrap();
-///
-///     let prop_time = 24.0 * 3_600.0;
-///     let accuracy = 1e-12;
-///     let min_step = 0.1;
-///     let max_step = 60.0;
-///
-///     let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
-///
-///     let rslt = Vector6::from_row_slice(&[
-///         -5_971.194_376_784_884,
-///         3_945.517_912_191_541,
-///         2_864.620_958_267_658_4,
-///         0.049_083_102_073_914_83,
-///         -4.185_084_126_130_087_5,
-///         5.848_947_462_252_259_5,
-///     ]);
-///
-///     let mut dyn = TwoBody::from_state_vec(init, earth_geoid);
-///     let mut prop = Propagator::new::<RK89>(
-///         &mut dyn,
-///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
-///     );
-///     prop.until_time_elapsed(prop_time);
-///     assert_eq!(prop.state(), rslt, "two body prop failed");
-/// }
-/// ```
 pub mod propagators;
 
 /// Provides several dynamics used for orbital mechanics and attitude dynamics, which can be elegantly combined.
@@ -87,7 +47,7 @@ pub mod propagators;
 /// use hifitime::julian::ModifiedJulian;
 /// use hifitime::SECONDS_PER_DAY;
 /// use nyx::celestia::{Cosm, Geoid, State};
-/// use nyx::dynamics::celestial::TwoBody;
+/// use nyx::dynamics::celestial::CelestialDynamics;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
 /// use nyx::propagators::{PropOpts, Propagator, RK89};
@@ -117,7 +77,7 @@ pub mod propagators;
 ///             earth_geoid,
 ///     );
 ///
-///     let mut dyn = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid);
+///     let mut dyn = CelestialDynamics::two_body(initial_state);
 ///     let mut prop = Propagator::new::<RK89>(
 ///         &mut dyn,
 ///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),

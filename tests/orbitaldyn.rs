@@ -12,64 +12,23 @@ fn backprop_rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) 
 }
 
 #[test]
-fn two_body_parametrized() {
-    extern crate nalgebra as na;
-    use self::na::Vector6;
-    use nyx::celestia::Cosm;
-    use nyx::dynamics::celestial::TwoBody;
-    use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::*;
-
-    let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
-
-    let prop_time = 24.0 * 3_600.0;
-    let accuracy = 1e-12;
-    let min_step = 0.1;
-    let max_step = 60.0;
-
-    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0);
-
-    let rslt = Vector6::from_row_slice(&[
-        -5_971.194_376_784_884,
-        3_945.517_912_191_541,
-        2_864.620_958_267_658_4,
-        0.049_083_102_073_914_83,
-        -4.185_084_126_130_087_5,
-        5.848_947_462_252_259_5,
-    ]);
-
-    let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
-    );
-    prop.until_time_elapsed(prop_time);
-    assert_eq!(prop.state(), rslt, "two body prop failed");
-    // And now do the backprop
-    prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &init);
-    assert!(
-        err_r < 1e-5,
-        "two body back prop failed to return to the initial state in position"
-    );
-    assert!(
-        err_v < 1e-8,
-        "two body back prop failed to return to the initial state in velocity"
-    );
-}
-
-#[test]
 fn two_body_custom() {
     extern crate nalgebra as na;
     use self::na::Vector6;
-    use nyx::dynamics::celestial::TwoBody;
+    use hifitime::julian::ModifiedJulian;
+    use nyx::celestia::{bodies, Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
 
-    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0);
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap();
+
+    let dt = ModifiedJulian::j2000();
+    let mut state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    state.frame.gm = 398_600.441_5;
 
     let rslt = Vector6::new(
         -5_971.194_191_684_024,
@@ -80,13 +39,14 @@ fn two_body_custom() {
         5.848_940_867_979_176,
     );
 
-    let mut dynamics = TwoBody::from_state_vec_with_gm(init, 398_600.441_5);
+    let mut dynamics = CelestialDynamics::two_body(state);
+
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
     assert_eq!(prop.state(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &init);
+    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -125,9 +85,8 @@ fn two_body_dynamics() {
         5.848_947_462_472_871,
     );
 
-    let mut dynamics = CelestialDynamics::new(state, Vec::new(), &cosm);
+    let mut dynamics = CelestialDynamics::two_body(state);
 
-    // let mut dynamics = TwoBody::from_state_vec_with_gm(init, 398_600.441_5);
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
     assert_eq!(prop.state(), rslt, "two body prop failed");
@@ -136,75 +95,11 @@ fn two_body_dynamics() {
     prop.until_time_elapsed(-prop_time);
     let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &state.to_cartesian_vec());
     assert!(
-        err_r < 1e-5,
+        err_r < 1e-6,
         "two body back prop failed to return to the initial state in position"
     );
     assert!(
-        err_v < 1e-8,
-        "two body back prop failed to return to the initial state in velocity"
-    );
-}
-
-#[test]
-fn two_body_state_parametrized() {
-    extern crate nalgebra as na;
-    use hifitime::julian::ModifiedJulian;
-    use hifitime::SECONDS_PER_DAY;
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::TwoBody;
-    use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
-
-    let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
-
-    let dt = ModifiedJulian { days: 21545.0 };
-    let initial_state =
-        State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
-
-    println!("Initial state:\n{0}\n{0:o}\n", initial_state);
-
-    let prop_time = 24.0 * 3_600.0;
-    let accuracy = 1e-12;
-    let min_step = 0.1;
-    let max_step = 60.0;
-
-    let rslt = State::<Geoid>::from_cartesian(
-        -5_971.194_376_784_884,
-        3_945.517_912_191_541,
-        2_864.620_958_267_658_4,
-        0.049_083_102_073_914_83,
-        -4.185_084_126_130_087_5,
-        5.848_947_462_252_259_5,
-        ModifiedJulian { days: 21546.0 },
-        earth_geoid,
-    );
-
-    let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid);
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
-    );
-    let (final_t, final_state0) = prop.until_time_elapsed(prop_time);
-
-    let final_dt = ModifiedJulian {
-        days: dt.days + final_t / SECONDS_PER_DAY,
-    };
-    let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid);
-    assert_eq!(final_state, rslt, "two body prop failed");
-    assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
-
-    println!("Final state:\n{0}\n{0:o}", final_state);
-
-    // And now do the backprop
-    prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &initial_state.to_cartesian_vec());
-    assert!(
-        err_r < 1e-5,
-        "two body back prop failed to return to the initial state in position"
-    );
-    assert!(
-        err_v < 1e-8,
+        err_v < 1e-9,
         "two body back prop failed to return to the initial state in velocity"
     );
 }
