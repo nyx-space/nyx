@@ -105,6 +105,71 @@ fn two_body_dynamics() {
 }
 
 #[test]
+fn three_body_dynamics() {
+    extern crate nalgebra as na;
+    use self::na::Vector6;
+    use hifitime::datetime::Datetime;
+    use hifitime::julian::ModifiedJulian;
+    use hifitime::TimeSystem;
+    use nyx::celestia::{bodies, Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
+    use nyx::propagators::error_ctrl::RSSStepPV;
+    use nyx::propagators::*;
+
+    let prop_time = 24.0 * 3_600.0;
+
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
+
+    let start_time = ModifiedJulian::from_instant(Datetime::at_midnight(2020, 1, 1).unwrap().into_instant());
+
+    let halo_rcvr = State::<Geoid>::from_cartesian(
+        333_321.004_516,
+        -76_134.198_887,
+        -20_873.831_939,
+        0.257_153_712,
+        0.930_284_066,
+        0.346_177,
+        start_time,
+        earth_geoid,
+    );
+
+    let rslt = Vector6::new(
+        345_350.661_525_660,
+        5_930.672_633_0197,
+        7_333.285_591_307,
+        2.129_812_933e-2,
+        9.566_789_680e-1,
+        3.028_176_198e-1,
+    );
+
+    // HAD:   left: `Matrix { data: [343206.9934741252, 6027.320454567925,  9430.188737830082, -0.02934707799392118,  0.9600169353090493, 0.35103917505038895] }`,
+    // GOT:   left: `Matrix { data: [343162.7343812757, 5989.6805335097215, 9412.246006634898, -0.030412263432568358, 0.959229681167265,  0.3506632777757227] }`,
+    // NOW:   left: `Matrix { data: [343007.25430964294, 6011.974861696354, 9417.141146684777, -0.034068311795565645, 0.9595987074407781, 0.35072154117333154] }`,
+    // WANT: right: `Matrix { data: [345350.66152566,   5930.6726330197,    7333.285591307,     0.02129812933,        0.956678968,        0.3028176198] }`: two body prop failed', tests/orbitaldyn.rs:158:5
+
+    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    // let mut dynamics = CelestialDynamics::new(halo_rcvr, vec![bodies::EARTH_MOON, bodies::JUPITER_BARYCENTER], &cosm);
+
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_adaptive_step(1.0, 600.0, 1e-6, RSSStepPV {}));
+    prop.until_time_elapsed(prop_time);
+    println!("{}", prop.state());
+    assert_eq!(prop.state(), rslt, "two body prop failed");
+    // And now do the backprop
+    //prop.until_time_elapsed(-prop_time);
+    //let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &state.to_cartesian_vec());
+    //assert!(
+    //    err_r < 1e-6,
+    //    "two body back prop failed to return to the initial state in position"
+    //);
+    //assert!(
+    //    err_v < 1e-9,
+    //    "two body back prop failed to return to the initial state in velocity"
+    //);
+}
+
+#[test]
 fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
     extern crate nalgebra as na;

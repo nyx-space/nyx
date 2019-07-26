@@ -53,7 +53,7 @@ impl Cosm {
         // Hence, I should probably add as a "virtual geoid", and computing the approximate GM from some estimated mass of the solar system (which includes asteroids, etc.).
         // Solar System Barycenter
         let ss_mass = 1.0014; // https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
-        let sun_gm = 1.327_124_400_18e20;
+        let sun_gm = 132_712_440_041.939_38;
         cosm.geoids.insert(
             (0, "Solar System Barycenter".to_string()),
             Geoid::perfect_sphere(0, 0, 1, ss_mass * sun_gm),
