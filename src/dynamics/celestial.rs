@@ -82,7 +82,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         let radius = state.fixed_rows::<U3>(0).into_owned();
         let velocity = state.fixed_rows::<U3>(3).into_owned();
         let body_acceleration = (-self.state.frame.gm / radius.norm().powi(3)) * radius;
-        let mut dX = Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
+        let mut d_x = Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
 
         // Get all of the position vectors between the center body and the third bodies
         let jde = ModifiedJulian {
@@ -98,15 +98,15 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
             let st_ij = self.cosm.unwrap().celestial_state(self.state.frame.id, jde, *exb_id).unwrap(); // frame center to 3rd body
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
-            let r_j = radius - r_ij; // sc to 3rd body
+            let r_j = radius - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
             let third_body_acc = -third_body.gm * (r_j / r_j3 + r_ij / r_ij3);
-            dX[3] += third_body_acc[0];
-            dX[4] += third_body_acc[1];
-            dX[5] += third_body_acc[2];
+            d_x[3] += third_body_acc[0];
+            d_x[4] += third_body_acc[1];
+            d_x[5] += third_body_acc[2];
         }
 
-        dX
+        d_x
     }
 }
 
