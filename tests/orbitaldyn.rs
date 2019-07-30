@@ -91,8 +91,8 @@ fn two_body_dynamics() {
     prop.until_time_elapsed(prop_time);
     dbg!(prop.dynamics.state.dt.as_mjd_tai_days());
     dbg!(dt.as_mjd_tai_days());
-    assert_eq!(prop.state(), rslt, "two body prop failed");
     assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
+    assert_eq!(prop.state(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state(), &state.to_cartesian_vec());
@@ -104,6 +104,10 @@ fn two_body_dynamics() {
         err_v < 1e-9,
         "two body back prop failed to return to the initial state in velocity"
     );
+    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days()).abs() <= EPSILON);
+    // Forward propagation again to confirm that we can do repeated calls
+    assert_eq!(prop.state(), rslt, "two body prop failed");
+    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
 }
 
 #[test]

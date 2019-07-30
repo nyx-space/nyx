@@ -297,6 +297,15 @@ fn gmat_val_leo_day_fixed() {
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
+        println!("backprop (1) by {}", prop_time);
+        prop.until_time_elapsed(-prop_time);
+        println!("fwdprop (1) by {}", prop_time);
+        prop.until_time_elapsed(prop_time);
+        println!("fwdprop (2) by {}", prop_time);
+        prop.until_time_elapsed(prop_time);
+        println!("backprop (2) by {}", prop_time);
+        prop.until_time_elapsed(-prop_time);
+        assert_eq!(prop.state(), all_rslts[0], "two body prop failed after back and forth");
     }
 
     {

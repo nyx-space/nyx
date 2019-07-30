@@ -96,13 +96,13 @@ where
             order: T::order(),
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
-            fixed_step: T::stages() == usize::from(T::order()),
+            fixed_step: opts.fixed_step,
         }
     }
 
-    pub fn set_fixed_step(&mut self, step_size: f64) {
+    pub fn set_step(&mut self, step_size: f64, fixed: bool) {
         self.step_size = step_size;
-        self.fixed_step = true;
+        self.fixed_step = fixed;
     }
 
     /// Returns the time of the propagation
@@ -131,9 +131,9 @@ where
         let init_seconds = self.dynamics.time();
         let stop_time = init_seconds + elapsed_time;
         loop {
-            let dx = self.dynamics.state().clone();
+            // let dx = self.dynamics.state().clone();
             let dt = self.dynamics.time();
-            let (t, state) = self.derive(dt, dx);
+            let (t, state) = self.derive(dt, &self.dynamics.state());
             if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state.clone());
@@ -143,16 +143,18 @@ where
                     }
                 }
             } else {
-                let prev_details = self.latest_details().clone();
                 let overshot = t - stop_time;
                 if (!backprop && overshot > 0.0) || (backprop && overshot < 0.0) {
                     warn!("overshot by {} seconds", overshot);
-                    self.set_fixed_step(prev_details.step - overshot);
+                    let prev_step_size = self.step_size;
+                    let prev_step_kind = self.fixed_step;
+                    let prev_details = self.latest_details().clone();
+                    self.set_step(prev_details.step - overshot, true);
                     // Take one final step
-                    let dx = self.dynamics.state().clone();
-                    let dt = self.dynamics.time();
-                    let (t, state) = self.derive(dt, dx);
+                    let (t, state) = self.derive(dt, &self.dynamics.state());
                     self.dynamics.set_state(t, &state.clone());
+                    // Restore the step size for subsequent calls
+                    self.set_step(prev_step_size, prev_step_kind);
                     if let Some(ref chan) = self.tx_chan {
                         if let Err(e) = chan.send((t, state.clone())) {
                             warn!("could not publish to channel: {}", e)
@@ -165,6 +167,9 @@ where
                             warn!("could not publish to channel: {}", e)
                         }
                     }
+                }
+                if backprop {
+                    self.step_size *= -1.0; // Restore to a positive step size
                 }
                 return (t, state);
             }
@@ -181,12 +186,12 @@ where
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive(&mut self, t: f64, state: VectorN<f64, M::StateSize>) -> (f64, VectorN<f64, M::StateSize>) {
+    pub fn derive(&mut self, t: f64, state: &VectorN<f64, M::StateSize>) -> (f64, VectorN<f64, M::StateSize>) {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         loop {
             let mut k = Vec::with_capacity(self.stages + 1); // Will store all the k_i.
-            let ki = self.dynamics.eom(t, &state.clone());
+            let ki = self.dynamics.eom(t, &state);
             k.push(ki);
             let mut a_idx: usize = 0;
             for _ in 0..(self.stages - 1) {
@@ -202,9 +207,7 @@ where
                     a_idx += 1;
                 }
 
-                let ki = self
-                    .dynamics
-                    .eom(t + ci * self.step_size, &(state.clone() + self.step_size * wi));
+                let ki = self.dynamics.eom(t + ci * self.step_size, &(state + self.step_size * wi));
                 k.push(ki);
             }
             // Compute the next state and the error
