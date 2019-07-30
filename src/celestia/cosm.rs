@@ -5,8 +5,7 @@ use self::bytes::IntoBuf;
 use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
 use self::prost::Message;
-use crate::hifitime::julian::ModifiedJulian;
-use crate::hifitime::SECONDS_PER_DAY;
+use crate::hifitime::{Epoch, SECONDS_PER_DAY};
 use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
 use celestia::exb::{Ephemeris, EphemerisContainer};
 use celestia::frames::Frame;
@@ -280,7 +279,7 @@ impl Cosm {
         let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
         let ref_frame_exb_id = ref_frame_id % 100_000;
         let storage_geoid = self.geoid_from_id(ref_frame_exb_id).unwrap();
-        let dt = ModifiedJulian { days: jde - 2_400_000.5 };
+        let dt = Epoch::from_jde_tai(jde);
         Ok(State::<Geoid>::from_cartesian(
             x,
             y,
@@ -299,16 +298,7 @@ impl Cosm {
         let as_seen_from = self.geoid_from_id(as_seen_from_exb_id)?;
         // And now let's convert this storage state to the correct frame.
         let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
-        let mut state = State::<Geoid>::from_cartesian(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            ModifiedJulian { days: jde - 2_400_000.5 },
-            as_seen_from,
-        );
+        let mut state = State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Epoch::from_jde_tai(jde), as_seen_from);
         let mut prev_frame_id = state.frame.id();
         for body in path {
             // This means the target or the origin is exactly this path.

@@ -5,7 +5,7 @@ extern crate serde;
 use self::hyperdual::{hyperspace_from_vector, Dual, Hyperdual, Owned};
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
-use crate::hifitime::instant::Instant;
+use crate::hifitime::Epoch;
 use celestia::{Frame, State};
 use dynamics::Dynamics;
 
@@ -42,7 +42,7 @@ where
     type MeasurementSize: DimName;
 
     /// Computes a new measurement from the provided information.
-    fn new<F: Frame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> Self;
+    fn new<F: Frame>(dt: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> Self;
 
     /// Returns the measurement/observation as a vector.
     fn observation(&self) -> VectorN<f64, Self::MeasurementSize>
@@ -58,7 +58,7 @@ where
     fn visible(&self) -> bool;
 
     /// Returns the time at which the measurement was performed.
-    fn at(&self) -> Instant;
+    fn at(&self) -> Epoch;
 }
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.

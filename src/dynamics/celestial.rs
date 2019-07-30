@@ -2,10 +2,7 @@ extern crate hifitime;
 extern crate hyperdual;
 extern crate nalgebra as na;
 
-use self::hifitime::instant::{Era, Instant};
-use self::hifitime::julian::ModifiedJulian;
-use self::hifitime::TimeSystem;
-use self::hifitime::SECONDS_PER_DAY;
+use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{Float, Hyperdual};
 use self::na::{DimName, Matrix6, MatrixMN, Vector6, VectorN, U3, U36, U42, U6, U7};
@@ -18,7 +15,7 @@ use std::f64;
 pub struct CelestialDynamics<'a> {
     pub state: State<Geoid>,
     pub bodies: Vec<i32>,
-    init_mjd: ModifiedJulian,
+    init_mjd_tai_days: f64,
     time: f64,
     cosm: Option<&'a Cosm>,
 }
@@ -29,7 +26,7 @@ impl<'a> CelestialDynamics<'a> {
         Self {
             state,
             bodies,
-            init_mjd: state.dt_as_modified_julian(),
+            init_mjd_tai_days: state.dt.as_mjd_tai_days(),
             time: 0.0,
             cosm: Some(cosm),
         }
@@ -40,7 +37,7 @@ impl<'a> CelestialDynamics<'a> {
         Self {
             state,
             bodies: Vec::new(),
-            init_mjd: state.dt_as_modified_julian(),
+            init_mjd_tai_days: state.dt.as_mjd_tai_days(),
             time: 0.0,
             cosm: None,
         }
@@ -71,11 +68,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         self.state.vx = new_state[3];
         self.state.vy = new_state[4];
         self.state.vz = new_state[5];
-        let mjd = ModifiedJulian {
-            days: self.init_mjd.days + self.time / SECONDS_PER_DAY,
-        };
-        debug!("set state at MJD: {}", mjd);
-        self.state.dt = mjd.into_instant();
+        self.state.dt.mut_add_secs(self.time);
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
@@ -85,10 +78,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         let mut d_x = Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
 
         // Get all of the position vectors between the center body and the third bodies
-        let jde = ModifiedJulian {
-            days: self.init_mjd.days + t / SECONDS_PER_DAY,
-        }
-        .julian_days();
+        let jde = Epoch::from_mjd_tai(self.init_mjd_tai_days + t / SECONDS_PER_DAY).as_jde_tai_days();
         for exb_id in &self.bodies {
             let third_body = self
                 .cosm
@@ -116,7 +106,6 @@ pub struct TwoBodyWithStm<'a> {
     pub stm: Matrix6<f64>,
     pub two_body_dyn: CelestialDynamics<'a>,
     pub geoid: Geoid,
-    pub initial_instant: Instant,
 }
 
 impl<'a> TwoBodyWithStm<'a> {
@@ -126,18 +115,11 @@ impl<'a> TwoBodyWithStm<'a> {
             stm: Matrix6::identity(),
             two_body_dyn: CelestialDynamics::two_body(state),
             geoid: state.frame,
-            initial_instant: state.dt,
         }
     }
 
     pub fn to_state(&self) -> State<Geoid> {
-        // Compute the new time
-        let instant_in_secs = self.initial_instant.secs() as f64 + (f64::from(self.initial_instant.nanos())) * 1e-9;
-        State::<Geoid>::from_cartesian_vec(
-            &self.two_body_dyn.state(),
-            ModifiedJulian::from_instant(Instant::from_precise_seconds(instant_in_secs, Era::Present)),
-            self.geoid,
-        )
+        self.two_body_dyn.as_state()
     }
 }
 
@@ -247,7 +229,7 @@ pub struct TwoBodyWithDualStm {
     pub pos_vel: Vector6<f64>,
     time: f64,
     geoid: Geoid,
-    initial_instant: Instant,
+    init_epoch: Epoch,
 }
 
 impl TwoBodyWithDualStm {
@@ -259,16 +241,15 @@ impl TwoBodyWithDualStm {
             pos_vel: state.to_cartesian_vec(),
             time: 0.0,
             geoid: state.frame,
-            initial_instant: state.dt,
+            init_epoch: state.dt,
         }
     }
 
     pub fn to_state(&self) -> State<Geoid> {
         // Compute the new time
-        let instant_in_secs = self.initial_instant.secs() as f64 + (f64::from(self.initial_instant.nanos())) * 1e-9;
         State::<Geoid>::from_cartesian_vec(
             &self.pos_vel,
-            ModifiedJulian::from_instant(Instant::from_precise_seconds(instant_in_secs, Era::Present)),
+            Epoch::from_mjd_tai(self.init_epoch.as_mjd_tai_days() + self.time / SECONDS_PER_DAY),
             self.geoid,
         )
     }
