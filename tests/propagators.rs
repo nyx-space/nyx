@@ -3,11 +3,13 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
 
+use nyx::utils::rss_state_errors;
+
 #[test]
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
-    use self::na::Vector6;
     use hifitime::{Epoch, J2000_OFFSET};
+    use na::Vector6;
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
@@ -175,6 +177,20 @@ fn gmat_val_leo_day_adaptive() {
                 prev_details
             );
         }
+        assert_eq!(prop.state(), all_rslts[0], "first forward two body prop failed");
+        prop.until_time_elapsed(-prop_time);
+        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(-prop_time);
+        let (err_r, err_v) = rss_state_errors(&prop.state(), &all_rslts[0]);
+        assert!(
+            err_r < 1e-5,
+            "two body 2*(fwd+back) prop failed to return to the initial state in position"
+        );
+        assert!(
+            err_v < 1e-8,
+            "two body 2*(fwd+back) prop failed to return to the initial state in velocity"
+        );
     }
 
     {
@@ -296,16 +312,20 @@ fn gmat_val_leo_day_fixed() {
         let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
-        println!("backprop (1) by {}", prop_time);
+        assert_eq!(prop.state(), all_rslts[0], "first forward two body prop failed");
         prop.until_time_elapsed(-prop_time);
-        println!("fwdprop (1) by {}", prop_time);
         prop.until_time_elapsed(prop_time);
-        println!("fwdprop (2) by {}", prop_time);
         prop.until_time_elapsed(prop_time);
-        println!("backprop (2) by {}", prop_time);
         prop.until_time_elapsed(-prop_time);
-        assert_eq!(prop.state(), all_rslts[0], "two body prop failed after back and forth");
+        let (err_r, err_v) = rss_state_errors(&prop.state(), &all_rslts[0]);
+        assert!(
+            err_r < 1e-5,
+            "two body 2*(fwd+back) prop failed to return to the initial state in position"
+        );
+        assert!(
+            err_v < 1e-8,
+            "two body 2*(fwd+back) prop failed to return to the initial state in velocity"
+        );
     }
 
     {

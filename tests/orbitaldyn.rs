@@ -2,20 +2,12 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::na::{Vector6, U3};
-fn rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
-    let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
-
-    let err_velocity = (prop_err.fixed_rows::<U3>(3) - cur_state.fixed_rows::<U3>(3)).norm();
-
-    (err_radius, err_velocity)
-}
+use nyx::utils::rss_state_errors;
 
 #[test]
 fn two_body_custom() {
-    extern crate nalgebra as na;
-    use self::na::Vector6;
     use hifitime::{Epoch, J2000_OFFSET};
+    use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
@@ -59,9 +51,8 @@ fn two_body_custom() {
 
 #[test]
 fn two_body_dynamics() {
-    extern crate nalgebra as na;
-    use self::na::Vector6;
     use hifitime::{Epoch, J2000_OFFSET};
+    use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
@@ -113,9 +104,8 @@ fn two_body_dynamics() {
 #[test]
 #[ignore]
 fn three_body_dynamics() {
-    extern crate nalgebra as na;
-    use self::na::Vector6;
     use hifitime::Epoch;
+    use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
