@@ -128,20 +128,20 @@ fn gmat_val_leo_day_adaptive() {
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
-            -5_971.194_191_972_316,
-            3_945.506_662_039_482_3,
-            2_864.636_606_375_189,
-            0.049_096_946_846_225_495,
-            -4.185_093_311_278_742,
-            5.848_940_872_821_119,
+            -5_971.194_191_972_314,
+            3_945.506_662_039_457,
+            2_864.636_606_375_225_7,
+            0.049_096_946_846_257_56,
+            -4.185_093_311_278_763,
+            5.848_940_872_821_106,
         ]),
         Vector6::from_row_slice(&[
             -5_971.194_191_678_94,
-            3_945.506_653_872_052_5,
-            2_864.636_617_510_347_6,
-            0.049_096_956_828_390_714,
-            -4.185_093_317_946_650_5,
-            5.848_940_868_134_205,
+            3_945.506_653_872_037_5,
+            2_864.636_617_510_367,
+            0.049_096_956_828_408_46,
+            -4.185_093_317_946_663,
+            5.848_940_868_134_195_4,
         ]),
         Vector6::from_row_slice(&[
             -5_971.194_191_670_392,
@@ -169,6 +169,8 @@ fn gmat_val_leo_day_adaptive() {
         );
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
+        assert!((prop.dynamics.state.dt.as_tai_seconds() - init.dt.as_tai_seconds() - prop_time).abs() < f64::EPSILON);
+        assert!((prop.time() - prop_time).abs() < f64::EPSILON);
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(

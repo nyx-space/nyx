@@ -23,12 +23,12 @@ fn two_body_custom() {
     state.frame.gm = 398_600.441_5;
 
     let rslt = Vector6::new(
-        -5_971.194_191_684_024,
-        3_945.506_653_624_737_3,
-        2_864.636_617_867_270_6,
-        0.049_096_957_141_044_464,
-        -4.185_093_318_149_689,
-        5.848_940_867_979_176,
+        -5_971.194_191_684_025,
+        3_945.506_653_624_713,
+        2_864.636_617_867_305,
+        0.049_096_957_141_074_773,
+        -4.185_093_318_149_709,
+        5.848_940_867_979_16,
     );
 
     let mut dynamics = CelestialDynamics::two_body(state);
@@ -68,37 +68,44 @@ fn two_body_dynamics() {
     let state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let rslt = Vector6::new(
-        -5_971.194_376_797_642,
-        3_945.517_912_574_167_4,
-        2_864.620_957_744_445,
-        0.049_083_101_605_521_72,
-        -4.185_084_125_817_668,
-        5.848_947_462_472_871,
+        -5_971.194_376_797_643,
+        3_945.517_912_574_178_4,
+        2_864.620_957_744_429_2,
+        0.049_083_101_605_507_95,
+        -4.185_084_125_817_658,
+        5.848_947_462_472_877,
     );
 
     let mut dynamics = CelestialDynamics::two_body(state);
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
-    dbg!(prop.dynamics.state.dt.as_mjd_tai_days());
-    dbg!(dt.as_mjd_tai_days());
     assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
     assert_eq!(prop.state(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state(), &state.to_cartesian_vec());
     assert!(
-        err_r < 1e-6,
+        err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
     );
     assert!(
-        err_v < 1e-9,
+        err_v < 1e-8,
         "two body back prop failed to return to the initial state in velocity"
     );
     assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days()).abs() <= EPSILON);
     // Forward propagation again to confirm that we can do repeated calls
-    assert_eq!(prop.state(), rslt, "two body prop failed");
+    prop.until_time_elapsed(prop_time);
     assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
+    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    assert!(
+        err_r < 1e-5,
+        "two body back+fwd prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back+fwd prop failed to return to the initial state in velocity"
+    );
 }
 
 #[test]

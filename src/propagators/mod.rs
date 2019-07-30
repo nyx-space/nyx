@@ -131,7 +131,6 @@ where
         let init_seconds = self.dynamics.time();
         let stop_time = init_seconds + elapsed_time;
         loop {
-            // let dx = self.dynamics.state().clone();
             let dt = self.dynamics.time();
             let (t, state) = self.derive(dt, &self.dynamics.state());
             if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
@@ -148,8 +147,7 @@ where
                     warn!("overshot by {} seconds", overshot);
                     let prev_step_size = self.step_size;
                     let prev_step_kind = self.fixed_step;
-                    let prev_details = self.latest_details().clone();
-                    self.set_step(prev_details.step - overshot, true);
+                    self.set_step(stop_time - dt, true);
                     // Take one final step
                     let (t, state) = self.derive(dt, &self.dynamics.state());
                     self.dynamics.set_state(t, &state);

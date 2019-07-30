@@ -116,7 +116,7 @@ fn ckf_fixed_step_perfect_stations_std() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = dt.as_tai_seconds();
+    let mut prev_t = 0.0;
     while let Ok((t, state_vec)) = truth_rx.recv() {
         // Convert the state to ECI.
         let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
@@ -242,7 +242,7 @@ fn ekf_fixed_step_perfect_stations() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = dt.as_tai_seconds();
+    let mut prev_t = 0.0;
     while let Ok((t, state_vec)) = truth_rx.recv() {
         // Convert the state to ECI.
         let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
@@ -368,7 +368,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = dt.as_tai_seconds();
+    let mut prev_t = 0.0;
     while let Ok((t, state_vec)) = truth_rx.recv() {
         // Convert the state to ECI.
         let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);

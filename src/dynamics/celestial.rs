@@ -15,6 +15,10 @@ use std::f64;
 pub struct CelestialDynamics<'a> {
     pub state: State<Geoid>,
     pub bodies: Vec<i32>,
+    // Loss in precision is avoided by using a relative time parameter initialized to zero
+    relative_time: f64,
+    // Allows us to rebuilt the true epoch
+    init_tai_secs: f64,
     cosm: Option<&'a Cosm>,
 }
 
@@ -24,6 +28,8 @@ impl<'a> CelestialDynamics<'a> {
         Self {
             state,
             bodies,
+            relative_time: 0.0,
+            init_tai_secs: state.dt.as_tai_seconds(),
             cosm: Some(cosm),
         }
     }
@@ -33,6 +39,8 @@ impl<'a> CelestialDynamics<'a> {
         Self {
             state,
             bodies: Vec::new(),
+            relative_time: 0.0,
+            init_tai_secs: state.dt.as_tai_seconds(),
             cosm: None,
         }
     }
@@ -45,9 +53,9 @@ impl<'a> CelestialDynamics<'a> {
 
 impl<'a> Dynamics for CelestialDynamics<'a> {
     type StateSize = U6;
-    /// Returns seconds since 01 Jan 1900 00:00 (TAI/NTP)
+    /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
     fn time(&self) -> f64 {
-        self.state.dt.as_tai_seconds()
+        self.relative_time
     }
 
     fn state(&self) -> VectorN<f64, Self::StateSize> {
@@ -55,7 +63,8 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        self.state.dt = Epoch::from_tai_seconds(new_t);
+        self.relative_time = new_t;
+        self.state.dt = Epoch::from_tai_seconds(self.init_tai_secs + new_t);
         self.state.x = new_state[0];
         self.state.y = new_state[1];
         self.state.z = new_state[2];
