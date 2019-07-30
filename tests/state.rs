@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
-use hifitime::julian::ModifiedJulian;
+use hifitime::Epoch;
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
@@ -18,14 +18,12 @@ fn state_def_() {
 
 #[test]
 fn state_def_circ_inc() {
-    use hifitime::datetime::Datetime;
-    use hifitime::TimeSystem;
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
     let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
     let cart2 = State::<Geoid>::from_cartesian(
         -2436.45,
@@ -34,7 +32,7 @@ fn state_def_circ_inc() {
         5.088_611,
         -5.088_611,
         0.0,
-        Datetime::from_instant(dt.into_instant()),
+        Epoch::from_jde_tai(dt.as_jde_tai_days()),
         earth_geoid,
     );
     assert_eq!(
@@ -98,7 +96,7 @@ fn state_def_elliptical() {
     let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = State::<Geoid>::from_cartesian(
         5_946.673_548_288_958,
         1_656.154_606_023_661,
@@ -160,7 +158,7 @@ fn state_def_circ_eq() {
     let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = State::<Geoid>::from_cartesian(
         -38_892.724_449_149_02,
         16_830.384_772_891_86,
@@ -222,7 +220,7 @@ fn state_def_reciprocity() {
     let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = Epoch::from_mjd_tai(21_545.0);
 
     assert_eq!(
         State::<Geoid>::from_cartesian(
@@ -295,7 +293,7 @@ fn geodetic_vallado() {
     let mut earth_geoid = cosm.geoid_from_id(3).unwrap();
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
-    let dt = ModifiedJulian { days: 51545.0 };
+    let dt = Epoch::from_mjd_tai(51_545.0);
     // Test case from Vallado, 4th Ed., page 173, Example 3-3
     let ri = 6524.834;
     let ri_val = 6_524.833_999_999_999;

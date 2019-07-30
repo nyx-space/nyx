@@ -15,8 +15,6 @@ use std::f64;
 pub struct CelestialDynamics<'a> {
     pub state: State<Geoid>,
     pub bodies: Vec<i32>,
-    init_mjd_tai_days: f64,
-    time: f64,
     cosm: Option<&'a Cosm>,
 }
 
@@ -26,8 +24,6 @@ impl<'a> CelestialDynamics<'a> {
         Self {
             state,
             bodies,
-            init_mjd_tai_days: state.dt.as_mjd_tai_days(),
-            time: 0.0,
             cosm: Some(cosm),
         }
     }
@@ -37,8 +33,6 @@ impl<'a> CelestialDynamics<'a> {
         Self {
             state,
             bodies: Vec::new(),
-            init_mjd_tai_days: state.dt.as_mjd_tai_days(),
-            time: 0.0,
             cosm: None,
         }
     }
@@ -51,9 +45,9 @@ impl<'a> CelestialDynamics<'a> {
 
 impl<'a> Dynamics for CelestialDynamics<'a> {
     type StateSize = U6;
-    /// Returns modified Julian seconds since 01 Jan 2000 00:00
+    /// Returns seconds since 01 Jan 1900 00:00 (TAI/NTP)
     fn time(&self) -> f64 {
-        self.time
+        self.state.dt.as_tai_seconds()
     }
 
     fn state(&self) -> VectorN<f64, Self::StateSize> {
@@ -61,14 +55,13 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        self.time = new_t;
+        self.state.dt = Epoch::from_tai_seconds(new_t);
         self.state.x = new_state[0];
         self.state.y = new_state[1];
         self.state.z = new_state[2];
         self.state.vx = new_state[3];
         self.state.vy = new_state[4];
         self.state.vz = new_state[5];
-        self.state.dt.mut_add_secs(self.time);
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
@@ -78,7 +71,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         let mut d_x = Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
 
         // Get all of the position vectors between the center body and the third bodies
-        let jde = Epoch::from_mjd_tai(self.init_mjd_tai_days + t / SECONDS_PER_DAY).as_jde_tai_days();
+        let jde = Epoch::from_tai_seconds(t).as_jde_tai_days();
         for exb_id in &self.bodies {
             let third_body = self
                 .cosm

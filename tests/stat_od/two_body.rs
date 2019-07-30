@@ -3,9 +3,7 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::hifitime::instant::*;
-use self::hifitime::julian::*;
-use self::hifitime::SECONDS_PER_DAY;
+use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, TwoBodyWithDualStm, TwoBodyWithStm};
@@ -103,7 +101,7 @@ fn ckf_fixed_step_perfect_stations_std() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = Epoch::from_mjd_tai(21545.0);
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 
@@ -118,19 +116,17 @@ fn ckf_fixed_step_perfect_stations_std() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_dt = dt.into_instant();
+    let mut prev_t = dt.as_tai_seconds();
     while let Ok((t, state_vec)) = truth_rx.recv() {
         // Convert the state to ECI.
-        let this_dt =
-            ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
+        let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
         let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state, this_dt.into_instant());
+            let meas = station.measure(rx_state, this_dt);
             if meas.visible() {
-                // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
+                let delta = t - prev_t;
                 measurements.push((delta, meas));
-                prev_dt = this_dt.into_instant();
+                prev_t = t;
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -165,7 +161,7 @@ fn ckf_fixed_step_perfect_stations_std() {
 
     println!("Will process {} measurements", measurements.len());
 
-    let mut prev_dt = dt;
+    let mut this_dt = dt;
     let mut printed = false;
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
@@ -177,17 +173,12 @@ fn ckf_fixed_step_perfect_stations_std() {
         // Update the STM of the KF
         ckf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
-        let this_dt = ModifiedJulian::from_instant(
-            prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
-        );
-        if prev_dt == this_dt {
-            panic!("already handled that time: {}", prev_dt);
-        }
-        prev_dt = this_dt;
+        assert!(delta_time > 0.0, "repeated time");
+        this_dt.mut_add_secs(delta_time);
         let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.two_body_dyn.state(), this_dt, earth_geoid);
         let mut still_empty = true;
         for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state, this_dt.into_instant());
+            let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = ckf
@@ -208,7 +199,7 @@ fn ckf_fixed_step_perfect_stations_std() {
         }
         if still_empty {
             // We're doing perfect everything, so we should always be in visibility
-            panic!("T+{} : not in visibility", this_dt);
+            panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
         }
     }
 }
@@ -239,7 +230,7 @@ fn ekf_fixed_step_perfect_stations() {
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
@@ -251,19 +242,17 @@ fn ekf_fixed_step_perfect_stations() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_dt = dt.into_instant();
+    let mut prev_t = dt.as_tai_seconds();
     while let Ok((t, state_vec)) = truth_rx.recv() {
         // Convert the state to ECI.
-        let this_dt =
-            ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
+        let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
         let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state, this_dt.into_instant());
+            let meas = station.measure(rx_state, this_dt);
             if meas.visible() {
-                // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
+                let delta = t - prev_t;
                 measurements.push((delta, meas));
-                prev_dt = this_dt.into_instant();
+                prev_t = t;
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -298,7 +287,7 @@ fn ekf_fixed_step_perfect_stations() {
 
     println!("Will process {} measurements", measurements.len());
 
-    let mut prev_dt = dt;
+    let mut this_dt = dt;
     for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
@@ -310,17 +299,12 @@ fn ekf_fixed_step_perfect_stations() {
         // Update the STM of the KF
         kf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
-        let this_dt = ModifiedJulian::from_instant(
-            prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
-        );
-        if prev_dt == this_dt {
-            panic!("already handled that time: {}", prev_dt);
-        }
-        prev_dt = this_dt;
+        assert!(delta_time > 0.0, "repeated time");
+        this_dt.mut_add_secs(delta_time);
         let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.two_body_dyn.state(), this_dt, earth_geoid);
         let mut still_empty = true;
         for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state, this_dt.into_instant());
+            let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 kf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = kf
@@ -328,6 +312,7 @@ fn ekf_fixed_step_perfect_stations() {
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
+                // BUG: The following fails. Must be a time computation issue.
                 assert!(
                     latest_est.state.norm() < EPSILON,
                     "estimate error should be zero (perfect dynamics)"
@@ -341,7 +326,7 @@ fn ekf_fixed_step_perfect_stations() {
         }
         if still_empty {
             // We're doing perfect everything, so we should always be in visibility
-            panic!("T+{} : not in visibility", this_dt);
+            panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
         }
     }
 }
@@ -371,7 +356,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
-    let dt = ModifiedJulian { days: 21545.0 };
+    let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
@@ -383,19 +368,17 @@ fn ckf_fixed_step_perfect_stations_dual() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_dt = dt.into_instant();
+    let mut prev_t = dt.as_tai_seconds();
     while let Ok((t, state_vec)) = truth_rx.recv() {
         // Convert the state to ECI.
-        let this_dt =
-            ModifiedJulian::from_instant(dt.into_instant() + Instant::from_precise_seconds(t, Era::Present).duration());
+        let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
         let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state, this_dt.into_instant());
+            let meas = station.measure(rx_state, this_dt);
             if meas.visible() {
-                // XXX: Instant does not implement Eq, only PartialEq, so can't use it as an index =(
-                let delta = (prev_dt - this_dt.into_instant().duration()).duration().as_secs();
+                let delta = t - prev_t;
                 measurements.push((delta, meas));
-                prev_dt = this_dt.into_instant();
+                prev_t = t;
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -430,7 +413,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
 
     println!("Will process {} measurements", measurements.len());
 
-    let mut prev_dt = dt;
+    let mut this_dt = dt;
     let mut printed = false;
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
@@ -442,17 +425,12 @@ fn ckf_fixed_step_perfect_stations_dual() {
         // Update the STM of the KF
         ckf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
-        let this_dt = ModifiedJulian::from_instant(
-            prev_dt.into_instant() + Instant::from_precise_seconds(delta_time, Era::Present).duration(),
-        );
-        if prev_dt == this_dt {
-            panic!("already handled that time: {}", prev_dt);
-        }
-        prev_dt = this_dt;
+        assert!(delta_time > 0.0, "repeated time");
+        this_dt.mut_add_secs(delta_time);
         let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.pos_vel, this_dt, earth_geoid);
         let mut still_empty = true;
         for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state, this_dt.into_instant());
+            let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = ckf
@@ -474,7 +452,7 @@ fn ckf_fixed_step_perfect_stations_dual() {
         }
         if still_empty {
             // We're doing perfect everything, so we should always be in visibility
-            panic!("T+{} : not in visibility", this_dt);
+            panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
         }
     }
 }

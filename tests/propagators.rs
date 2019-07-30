@@ -7,7 +7,7 @@ use std::f64;
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
     use self::na::Vector6;
-    use hifitime::julian::ModifiedJulian;
+    use hifitime::{Epoch, J2000_OFFSET};
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
@@ -19,7 +19,7 @@ fn regress_leo_day_adaptive() {
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-    let dt = ModifiedJulian::j2000();
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let all_rslts = vec![
@@ -107,7 +107,7 @@ fn gmat_val_leo_day_adaptive() {
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
     use self::na::Vector6;
-    use hifitime::julian::ModifiedJulian;
+    use hifitime::{Epoch, J2000_OFFSET};
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
@@ -121,7 +121,7 @@ fn gmat_val_leo_day_adaptive() {
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
-    let dt = ModifiedJulian::j2000();
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let all_rslts = vec![
@@ -235,7 +235,7 @@ fn gmat_val_leo_day_adaptive() {
 #[test]
 fn gmat_val_leo_day_fixed() {
     use crate::na::Vector6;
-    use hifitime::julian::ModifiedJulian;
+    use hifitime::{Epoch, J2000_OFFSET};
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
@@ -246,7 +246,7 @@ fn gmat_val_leo_day_fixed() {
     earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 3_600.0 * 24.0;
-    let dt = ModifiedJulian::j2000();
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
 
     let all_rslts = vec![
