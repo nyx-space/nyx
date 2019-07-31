@@ -132,8 +132,26 @@ where
         let stop_time = init_seconds + elapsed_time;
         loop {
             let dt = self.dynamics.time();
-            let (t, state) = self.derive(dt, &self.dynamics.state());
-            if (t < stop_time && !backprop) || (t >= stop_time && backprop) {
+            if (!backprop && dt + self.step_size >= stop_time) || (backprop && dt + self.step_size < stop_time) {
+                // Take one final step of exactly the needed duration until the stop time
+                let prev_step_size = self.step_size;
+                let prev_step_kind = self.fixed_step;
+                self.set_step(stop_time - dt, true);
+                let (t, state) = self.derive(dt, &self.dynamics.state());
+                self.dynamics.set_state(t, &state);
+                // Restore the step size for subsequent calls
+                self.set_step(prev_step_size, prev_step_kind);
+                if let Some(ref chan) = self.tx_chan {
+                    if let Err(e) = chan.send((t, state.clone())) {
+                        warn!("could not publish to channel: {}", e)
+                    }
+                }
+                if backprop {
+                    self.step_size *= -1.0; // Restore to a positive step size
+                }
+                return (t, state);
+            } else {
+                let (t, state) = self.derive(dt, &self.dynamics.state());
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state);
                 if let Some(ref chan) = self.tx_chan {
@@ -141,35 +159,6 @@ where
                         warn!("could not publish to channel: {}", e)
                     }
                 }
-            } else {
-                let overshot = t - stop_time;
-                if (!backprop && overshot > 0.0) || (backprop && overshot < 0.0) {
-                    warn!("overshot by {} seconds", overshot);
-                    let prev_step_size = self.step_size;
-                    let prev_step_kind = self.fixed_step;
-                    self.set_step(stop_time - dt, true);
-                    // Take one final step
-                    let (t, state) = self.derive(dt, &self.dynamics.state());
-                    self.dynamics.set_state(t, &state);
-                    // Restore the step size for subsequent calls
-                    self.set_step(prev_step_size, prev_step_kind);
-                    if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send((t, state.clone())) {
-                            warn!("could not publish to channel: {}", e)
-                        }
-                    }
-                } else {
-                    self.dynamics.set_state(t, &state);
-                    if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send((t, state.clone())) {
-                            warn!("could not publish to channel: {}", e)
-                        }
-                    }
-                }
-                if backprop {
-                    self.step_size *= -1.0; // Restore to a positive step size
-                }
-                return (t, state);
             }
         }
     }
