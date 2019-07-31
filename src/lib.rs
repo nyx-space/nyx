@@ -44,8 +44,7 @@ pub mod propagators;
 /// extern crate nalgebra as na;
 /// extern crate hifitime;
 /// extern crate nyx_space as nyx;
-/// use hifitime::julian::ModifiedJulian;
-/// use hifitime::SECONDS_PER_DAY;
+/// use hifitime::{Epoch, SECONDS_PER_DAY};
 /// use nyx::celestia::{Cosm, Geoid, State};
 /// use nyx::dynamics::celestial::CelestialDynamics;
 /// use nyx::dynamics::Dynamics;
@@ -56,7 +55,7 @@ pub mod propagators;
 ///     let cosm = Cosm::from_xb("./de438s");
 ///     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 ///
-///     let dt = ModifiedJulian { days: 21545.0 };
+///     let dt = Epoch::from_mjd_tai(21_545.0);
 ///     let initial_state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
 ///
 ///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
@@ -67,31 +66,26 @@ pub mod propagators;
 ///     let max_step = 60.0;
 ///
 ///     let rslt = State::<Geoid>::from_cartesian(
-///             -5_971.194_376_784_884,
-///             3_945.517_912_191_541,
-///             2_864.620_958_267_658_4,
-///             0.049_083_102_073_914_83,
-///             -4.185_084_126_130_087_5,
-///             5.848_947_462_252_259_5,
-///             ModifiedJulian { days: 21546.0 },
+///             -5_971.194_376_797_643,
+///             3_945.517_912_574_178_4,
+///             2_864.620_957_744_429_2,
+///             0.049_083_101_605_507_95,
+///             -4.185_084_125_817_658,
+///             5.848_947_462_472_877,
+///             Epoch::from_mjd_tai(21_546.0),
 ///             earth_geoid,
 ///     );
 ///
-///     let mut dyn = CelestialDynamics::two_body(initial_state);
+///     let mut dynamics = CelestialDynamics::two_body(initial_state);
 ///     let mut prop = Propagator::new::<RK89>(
-///         &mut dyn,
+///         &mut dynamics,
 ///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
 ///     );
-///     let (final_t, final_state0) = prop.until_time_elapsed(prop_time);
+///     prop.until_time_elapsed(prop_time);
 ///
-///     let final_dt = ModifiedJulian {
-///         days: dt.days + final_t / SECONDS_PER_DAY,
-///     };
-///     let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid);
-///     assert_eq!(final_state, rslt, "two body prop failed");
-///     assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
+///     assert_eq!(prop.dynamics.state, rslt, "two body prop failed");
 ///
-///     println!("Final state:\n{0}\n{0:o}", final_state);
+///     println!("Final state:\n{0}\n{0:o}", prop.dynamics.state);
 /// }
 /// ```
 pub mod dynamics;
@@ -104,14 +98,14 @@ pub mod dynamics;
 /// extern crate nyx_space as nyx;
 ///
 /// fn main(){
-///     use hifitime::julian::ModifiedJulian;
+///     use hifitime::Epoch;
 ///     use nyx::celestia::{Cosm, Geoid, State};
 ///     let cosm = Cosm::from_xb("./de438s");
 ///     // In this case, we're creating these states around a Geoid which is Earth.
 ///     // But for simplicity, we're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
 ///     let mut earth_geoid = cosm.geoid_from_id(399).unwrap();
 ///     earth_geoid.gm = 398_600.441_5;
-///     let dt = ModifiedJulian { days: 21545.0 };
+///     let dt = Epoch::from_mjd_tai(21545.0);
 ///     let cart = State::<Geoid>::from_cartesian(
 ///             5_946.673_548_288_958,
 ///             1_656.154_606_023_661,
