@@ -336,20 +336,19 @@ impl Cosm {
             Some((weight, path)) => {
                 // Build the path with the frames
                 let mut f_path = Vec::new();
-                let mut final_skipped_ssb = false;
+                // let mut final_skipped_ssb = false;
                 for idx in path {
-                    if self.exb_map[idx] != 0 {
-                        // Ignore going through SSB since it isn't a geoid
-                        f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
-                        final_skipped_ssb = false;
-                    } else {
-                        final_skipped_ssb = true;
-                    }
+                    // Ignore going through SSB since it isn't a geoid
+                    f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
                 }
-                if final_skipped_ssb {
-                    // If the last point skipped adding anything because it was the SSB, let's add the final geoid.
-                    f_path.push(*from);
+
+                if f_path.last().unwrap().id == from.center_id {
+                    // The destination and the previous item share their center, so let's not go through the center
+                    f_path.pop();
                 }
+
+                // Let's add the final geoid.
+                f_path.push(*from);
                 debug!(
                     "path from {:?} to {:?} is {:?} with cost {}",
                     from.id(),
@@ -579,5 +578,16 @@ mod tests {
         assert!((ven2ear_state.vx - 36.052_331_787_059_61).abs() < 1e-12);
         assert!((ven2ear_state.vy - 48.888_638_291_647_33).abs() < 1e-12);
         assert!((ven2ear_state.vz - 20.702_719_193_464_77).abs() < 1e-12);
+
+        // Check that conversion via a center frame works
+        let moon_from_emb = cosm
+            .celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER)
+            .unwrap();
+
+        let earth_from_emb = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_BARYCENTER).unwrap();
+
+        let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH).unwrap();
+
+        assert_eq!(moon_from_emb - earth_from_emb, moon_from_earth);
     }
 }
