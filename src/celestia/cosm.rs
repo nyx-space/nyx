@@ -217,13 +217,13 @@ impl Cosm {
             .ok_or(CosmError::ObjectIDNotFound(exb.number))?;
 
         // Compute the position as per the algorithm from jplephem
-        let interp = ephem.clone().interpolator.ok_or(CosmError::NoInterpolationData(exb.number))?;
+        let interp = ephem.interpolator.as_ref().ok_or(CosmError::NoInterpolationData(exb.number))?;
 
         let start_mod_julian: f64 = interp.start_mod_julian;
         let coefficient_count: usize = interp.position_degree as usize;
 
-        let exb_states = match interp.state_data.ok_or(CosmError::NoStateData(exb.number))? {
-            EqualStates(states) => states.clone(),
+        let exb_states = match interp.state_data.as_ref().ok_or(CosmError::NoStateData(exb.number))? {
+            EqualStates(states) => states,
             VarwindowStates(_) => panic!("var window not yet supported by Cosm"),
         };
 
