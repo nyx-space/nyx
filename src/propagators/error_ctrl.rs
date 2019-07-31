@@ -182,8 +182,6 @@ impl ErrorCtrl for RSSStatePV {
     }
 }
 
-/// A largest step error control which effectively computes the L1 norm of the provided vector
-/// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 /// An RSS state error control which effectively for the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 #[derive(Clone, Copy)]

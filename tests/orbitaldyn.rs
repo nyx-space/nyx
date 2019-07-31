@@ -109,7 +109,6 @@ fn two_body_dynamics() {
 }
 
 #[test]
-#[ignore]
 fn three_body_dynamics() {
     use hifitime::Epoch;
     use na::Vector6;
@@ -148,10 +147,8 @@ fn three_body_dynamics() {
     // GMAT data (uses different GMs)
     // 28850.5                   345350.6640304797           5930.672047088849           7333.28377928682            0.02129818943860685          0.9566789568516441           0.302817581134027
 
-    // HAD:   left: `Matrix { data: [343206.9934741252, 6027.320454567925,  9430.188737830082, -0.02934707799392118,  0.9600169353090493, 0.35103917505038895] }`,
-    // GOT:   left: `Matrix { data: [343162.7343812757, 5989.6805335097215, 9412.246006634898, -0.030412263432568358, 0.959229681167265,  0.3506632777757227] }`,
-    // NOW:   left: `Matrix { data: [343007.25430964294, 6011.974861696354, 9417.141146684777, -0.034068311795565645, 0.9595987074407781, 0.35072154117333154] }`,\
-    // WANT: right: `Matrix { data: [345350.66152566,   5930.6726330197,    7333.285591307,     0.02129812933,        0.956678968,        0.3028176198] }`: two body prop failed', tests/orbitaldyn.rs:158:5
+    // NOW:   left: `Matrix { data: [343_007.25430964294, 6_011.974861696354,  9_417.141146684777, -0.034068311795565645, 0.9595987074407781, 0.35072154117333154] }`,
+    // WANT: right: `Matrix { data: [345_350.66152566,    5_930.6726330197,    7_333.285591307,     0.02129812933,        0.956678968,        0.3028176198] }`: two body prop failed', tests/orbitaldyn.rs:158:5
 
     // Without third bodies:
     //  ┌                      ┐
@@ -163,12 +160,38 @@ fn three_body_dynamics() {
     //  │  0.35109730571850106 │
     //  └                      ┘
 
+    /*
+      With the correct math (I think)
+      ┌                     ┐
+      │  343006.99085604877 │
+      │    6012.17323989264 │
+      │   9417.219682155877 │
+      │ -0.0340740381357025 │
+      │  0.9596038303317591 │
+      │ 0.35072361872309055 │
+      └                     ┘
+
+      With the incorrect math (I think)
+
+    ┌                      ┐
+    │    343007.2582415777 │
+    │    6011.972262723755 │
+    │    9417.139919735928 │
+    │ -0.03406822509573608 │
+    │   0.9595986397397376 │
+    │   0.3507215097717167 │
+    └                      ┘
+
+      */
+
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    // let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
     // let mut dynamics = CelestialDynamics::new(halo_rcvr, vec![bodies::EARTH_MOON, bodies::JUPITER_BARYCENTER], &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_adaptive_step(1.0, 2700.0, 1e-13, RSSStepPV {}));
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_adaptive_step(10.0, 2700.0, 1e-3, RSSStepPV {}));
     prop.until_time_elapsed(prop_time);
+    println!("{:?}", prop.latest_details());
     println!("{}", prop.state());
     let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
     assert!(err_r < 1e-3, format!("multi body failed in position: {:.5e}", err_r));

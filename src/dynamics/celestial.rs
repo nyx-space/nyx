@@ -80,19 +80,23 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         let mut d_x = Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
 
         // Get all of the position vectors between the center body and the third bodies
-        let jde = Epoch::from_tai_seconds(t).as_jde_tai_days();
+        let jde = Epoch::from_tai_seconds(self.init_tai_secs + t).as_jde_tai_days();
         for exb_id in &self.bodies {
             let third_body = self
                 .cosm
                 .unwrap()
                 .geoid_from_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
-            let st_ij = self.cosm.unwrap().celestial_state(self.state.frame.id, jde, *exb_id).unwrap(); // frame center to 3rd body
+            // State of j-th body as seen from primary body
+            // let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id).unwrap();
+            let st_ij = self.cosm.unwrap().celestial_state(self.state.frame.id, jde, *exb_id).unwrap();
+
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
             let r_j = radius - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
             let third_body_acc = -third_body.gm * (r_j / r_j3 + r_ij / r_ij3);
+
             d_x[3] += third_body_acc[0];
             d_x[4] += third_body_acc[1];
             d_x[5] += third_body_acc[2];

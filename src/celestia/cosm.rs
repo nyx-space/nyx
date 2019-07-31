@@ -338,8 +338,10 @@ impl Cosm {
                 let mut f_path = Vec::new();
                 // let mut final_skipped_ssb = false;
                 for idx in path {
-                    // Ignore going through SSB since it isn't a geoid
-                    f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
+                    if self.exb_map[idx] != 0 {
+                        // Ignore going through SSB since it isn't a geoid
+                        f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
+                    }
                 }
 
                 if f_path.last().unwrap().id == from.center_id {
