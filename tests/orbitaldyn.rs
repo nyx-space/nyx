@@ -121,7 +121,15 @@ fn three_body_dynamics() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
 
-    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let mut start_time = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
+    // NOTE: hifitime includes ALL leap seconds,  This is needed in order to
+    // start_time.mut_add_secs(32.0);
+    start_time.mut_sub_secs(10.0);
+    println!(
+        "{}",
+        Epoch::from_gregorian_utc_at_midnight(2020, 1, 1).as_tai_seconds()
+            - Epoch::from_gregorian_tai_at_midnight(2020, 1, 1).as_tai_seconds()
+    );
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -154,7 +162,7 @@ fn three_body_dynamics() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    println!("{}", prop.state() - rslt);
+    println!("{:.4e}", (prop.state() - rslt).norm());
     let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
     // IMPORTANT NOTE: The position is 1.3km off. Not sure why at all, and I can't seem to find the exact reason.
     println!("{}", prop.dynamics.state);
