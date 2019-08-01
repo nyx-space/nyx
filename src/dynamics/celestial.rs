@@ -88,10 +88,9 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
                 .geoid_from_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
             // State of j-th body as seen from primary body
-            // let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id).unwrap();
-            let st_ij = self.cosm.unwrap().celestial_state(self.state.frame.id, jde, *exb_id).unwrap();
+            let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id).unwrap();
 
-            let r_ij = -st_ij.radius();
+            let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
             let r_j = radius - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);

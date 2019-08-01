@@ -132,7 +132,6 @@ where
         let stop_time = init_seconds + elapsed_time;
         loop {
             let dt = self.dynamics.time();
-            dbg!(self.step_size);
             if (!backprop && dt + self.step_size >= stop_time) || (backprop && dt + self.step_size < stop_time) {
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;

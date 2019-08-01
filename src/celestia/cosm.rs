@@ -217,7 +217,10 @@ impl Cosm {
             .ok_or(CosmError::ObjectIDNotFound(exb.number))?;
 
         // Compute the position as per the algorithm from jplephem
-        let interp = ephem.interpolator.as_ref().ok_or(CosmError::NoInterpolationData(exb.number))?;
+        let interp = ephem
+            .interpolator
+            .as_ref()
+            .ok_or(CosmError::NoInterpolationData(exb.number))?;
 
         let start_mod_julian: f64 = interp.start_mod_julian;
         let coefficient_count: usize = interp.position_degree as usize;
@@ -591,5 +594,16 @@ mod tests {
         let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH).unwrap();
 
         assert_eq!(moon_from_emb - earth_from_emb, moon_from_earth);
+
+        // Check that Sun works
+        let sun2ear_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SSB).unwrap();
+        assert_eq!(ven2ear_state.frame.id(), bodies::EARTH_MOON);
+        println!("{}", sun2ear_state);
+        assert!(dbg!(sun2ear_state.x - 1.096537548791171E+08).abs() < 1e-1);
+        assert!(dbg!(sun2ear_state.y - -9.057220115376981E+07).abs() < 1e-1);
+        assert!(dbg!(sun2ear_state.z - -3.926714485809306E+07).abs() < 1e-1);
+        assert!(dbg!(sun2ear_state.vx - 2.042686047796898E+01).abs() < 1e-7);
+        assert!(dbg!(sun2ear_state.vy - 2.041187043287114E+01).abs() < 1e-7);
+        assert!(dbg!(sun2ear_state.vz - 8.848320853924715E+00).abs() < 1e-7);
     }
 }
