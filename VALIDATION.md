@@ -10,8 +10,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
 - [Orbital state](#orbital-state)
   * [From a Cartesian state](#from-a-cartesian-state)
   * [From a Keplerian state](#from-a-keplerian-state)
-- [Harmonics](#harmonics)
-- [Drag](#drag)
+- [Multibody dynamics](#multibody-dynamics)
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
@@ -115,29 +114,9 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 
 (3) Similarly to (1), we get a very significant error in the orbital momentum computation of both HX and HY. These components are small for the orbital momentum (both on the order of 1e-3 in GMAT and in `nyx`). I am not too concerned about these differences given that the orbital momentum component of the Z axis is exactly that returned by GMAT (all 16 digits are equal).
 
-# Harmonics
-Spherical harmonics allow for high fidelity gravity fields. `nyx` supports the PDS, EGM2008 and COF file formats. For now, `nyx` stores all the coefficients in memory (which is a HashMap). As such, it may use up quite some RAM if enabling all the orders and degrees of the provided files. The validation is done using the JGM3 model around Earth whose coefficients are delivered in GMAT and in `nyx` (cf. the [data](./data/) folder).
-
-## Status: not validated
-After quite some debugging, the algorithm is correct **but** it is applied in the **wrong** frame. In fact, it needs to be applied in a Body Fixed frame instead of an ICRF frame. Frame transformations are not yet supported. In the case of the J<sub>2</sub> effects, the frame conversion _should not_ matter. However, when validating against GMAT, which does perform that transformation all the time, some rounding happens when converting between frames, and as such, there is an RSS error between `nyx` and GMAT of 0.097177 km after one day propagation in LEO. The higher harmonics are very dependent on the frame transformation.
-
-If you _only_ need J2 and do not mind a growing rounding error between GMAT and `nyx`, you may enable the spherical harmonics by enabling the `unvalidated` feature of the library.
-
-
-## Propagator configuration
-
-+ Method: RK89
-+ Step configuration:
-  - Minimum step: 0.1 seconds
-  - Maximum step: 30.0 seconds
-  - Accuracy: 1e-12
-  - Max attempts: 50
-
-Fidelity  | x | y | z | vx | vy | vz | RSS (km)
---|---|---|---|---|---|---|--
-J(2,0)    |  |  |  |  |  |  |
-J(21,21)  |  |  |  |  |  |  |
-J(70,70)  |  |  |  |  |  |  |
-
-# Drag
-There currently is a basic drag model which is implemented as in Vallado. Its fidelity isn't good enough to be considered validated. Hence, it can be used only with the `unvalidated` feature enabled.
+# Multibody dynamics
+The `multi_body_dynamics` test in tests/orbitaldyn.rs is the validation against GMAT. GMAT uses different gravitational parameters than de438s for all planets. Hence, the error achieved. There also seems to be a time difference between GMAT and TAI (which corresponds to TT ... suspicious).
+In this test, nyx is 11 to 13 times faster than GMAT, while still running on a single core (like GMAT). The root mean squared errors in position and velocity are as follows:
+```
+RSS errors:     pos = 5.06214e-4 km     vel = 1.07357e-8 km/s
+```

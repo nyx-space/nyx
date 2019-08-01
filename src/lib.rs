@@ -90,6 +90,8 @@ pub mod propagators;
 /// ```
 ///
 /// # Multibody propagation of a Halo orbit
+/// Multibody propagation is **an order of magnitude faster** in nyx than in GMAT.
+/// In nyx, the following function is executed in 0.14 seconds in release mode.
 /// ```
 /// extern crate nalgebra as na;
 /// extern crate hifitime;

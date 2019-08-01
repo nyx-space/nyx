@@ -109,7 +109,7 @@ fn two_body_dynamics() {
 }
 
 #[test]
-fn three_body_dynamics() {
+fn multi_body_dynamics() {
     /*
     In this test, we validate against GMAT. However, we're using the GM values from the de438s file, whereas GMAT has different values.
     This causes a slight difference in the values between nyx and GMAT. However, that difference is one order of magnitude better than
