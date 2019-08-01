@@ -110,6 +110,17 @@ fn two_body_dynamics() {
 
 #[test]
 fn three_body_dynamics() {
+    /*
+    In this test, we validate against GMAT. However, we're using the GM values from the de438s file, whereas GMAT has different values.
+    This causes a slight difference in the values between nyx and GMAT. However, that difference is one order of magnitude better than
+    the difference between nyx and Monte, which I attribute to a propagator difference. Monte and nyx are at 3e-3 km positional error.
+
+    GMAT data (uses different GMs)
+    // 345350.66403047      5930.6720470888     7333.283779286      0.02129818943   0.956678956     0.3028175811
+
+    Monte data (same GMs maybe different DE file though!)
+    // 345350.66152566      5930.6726330197     7333.285591307      0.02129812933   0.956678968     0.3028176198
+    */
     use hifitime::Epoch;
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
@@ -121,15 +132,9 @@ fn three_body_dynamics() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
 
-    let mut start_time = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
-    // NOTE: hifitime includes ALL leap seconds,  This is needed in order to
-    // start_time.mut_add_secs(32.0);
-    start_time.mut_sub_secs(10.0);
-    println!(
-        "{}",
-        Epoch::from_gregorian_utc_at_midnight(2020, 1, 1).as_tai_seconds()
-            - Epoch::from_gregorian_tai_at_midnight(2020, 1, 1).as_tai_seconds()
-    );
+    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    // NOTE: It seems that GMAT is using a TT date instead of TAI!
+    start_time.mut_add_secs(32.184);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -142,32 +147,29 @@ fn three_body_dynamics() {
         earth_geoid,
     );
 
-    // Monte data:
+    // GMAT data
     let rslt = Vector6::new(
-        345_350.661_525_660,
-        5_930.672_633_019_7,
-        7_333.285_591_307,
-        2.129_812_933e-2,
-        9.566_789_680e-1,
-        3.028_176_198e-1,
+        345_350.664_030_479,
+        5_930.672_047_088,
+        7_333.283_779_286,
+        2.129_819_943e-2,
+        9.566_789_568e-1,
+        3.028_175_811e-1,
     );
-    /* GMAT data (uses different GMs)
-    // 28850.5                   345350.6640304797           5930.672047088849           7333.28377928682            0.02129818943860685          0.9566789568516441           0.302817581134027
-    Monte data (same GMs maybe different DE file though!)
-    // WANT: right: `Matrix { data: [345_350.66152566,    5_930.6726330197,    7_333.285591307,     0.02129812933,        0.956678968,        0.3028176198] }`: two body prop failed', tests/orbitaldyn.rs:158:5
-    */
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    println!("{:.4e}", (prop.state() - rslt).norm());
     let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
-    // IMPORTANT NOTE: The position is 1.3km off. Not sure why at all, and I can't seem to find the exact reason.
-    println!("{}", prop.dynamics.state);
-    assert!(err_r < 1.333, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-4, format!("multi body failed in velocity: {:.5e}", err_v));
+
+    println!(
+        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
+        err_r, err_v, halo_rcvr, prop.dynamics.state
+    );
+    assert!(err_r < 1e-3, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-6, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
