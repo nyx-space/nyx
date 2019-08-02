@@ -305,12 +305,10 @@ impl Cosm {
         let mut prev_frame_id = state.frame.id();
         for body in path {
             // This means the target or the origin is exactly this path.
-            dbg!(body.id());
             let mut next_state = self.raw_celestial_state(body.id(), jde)?;
             if prev_frame_id != next_state.frame.id() {
                 // Let's negate the next state prior to adding it.
                 next_state = -next_state;
-                dbg!();
             }
             state = state + next_state;
             prev_frame_id = next_state.frame.id();
@@ -596,32 +594,18 @@ mod tests {
         assert_eq!(earth_from_moon, -moon_from_earth);*/
 
         // Check that Sun works
-        let sun2ear = cosm
-            .intermediate_geoid(
-                &cosm.geoid_from_id(bodies::SUN).unwrap(),
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
-            )
-            .unwrap();
-        println!("\nPOW\n");
-        let ear2sun = cosm
-            .intermediate_geoid(
-                &cosm.geoid_from_id(bodies::EARTH).unwrap(),
-                &cosm.geoid_from_id(bodies::SUN).unwrap(),
-            )
-            .unwrap();
-        println!("{:?}\n{:?}", sun2ear, ear2sun);
-
         let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, bodies::EARTH).unwrap();
         println!("{}", sun2ear_state);
-        assert!(dbg!(sun2ear_state.x - 1.096537548791171E+08).abs() < 1e-1);
-        assert!(dbg!(sun2ear_state.y - -9.057220115376981E+07).abs() < 1e-1);
-        assert!(dbg!(sun2ear_state.z - -3.926714485809306E+07).abs() < 1e-1);
-        assert!(dbg!(sun2ear_state.vx - 2.042686047796898E+01).abs() < 1e-7);
-        assert!(dbg!(sun2ear_state.vy - 2.041187043287114E+01).abs() < 1e-7);
-        assert!(dbg!(sun2ear_state.vz - 8.848320853924715E+00).abs() < 1e-7);
+        assert!((sun2ear_state.x - 1.096537548791171E+08).abs() < 1e-1);
+        assert!((sun2ear_state.y - -9.057220115376981E+07).abs() < 1e-1);
+        assert!((sun2ear_state.z - -3.926714485809306E+07).abs() < 1e-1);
+        assert!((sun2ear_state.vx - 2.042686047796898E+01).abs() < 1e-7);
+        assert!((sun2ear_state.vy - 2.041187043287114E+01).abs() < 1e-7);
+        assert!((sun2ear_state.vz - 8.848320853924715E+00).abs() < 1e-7);
         // And check the converse
         let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SUN).unwrap();
         dbg!(ear2sun_state.radius() -sun2ear_state.radius());
         dbg!(ear2sun_state.velocity() -sun2ear_state.velocity());
+        // XXX: Reenable this test when bug is fixed: https://gitlab.com/chrisrabotin/nyx/issues/61 .
     }
 }
