@@ -103,16 +103,16 @@ pub mod propagators;
 ///     use nyx::dynamics::celestial::CelestialDynamics;
 ///     use nyx::propagators::*;
 ///     use nyx::utils::rss_state_errors;
-/// 
+///
 ///     let prop_time = 24.0 * 3_600.0;
-/// 
+///
 ///     let cosm = Cosm::from_xb("./de438s");
 ///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
-/// 
+///
 ///     let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///     // NOTE: It seems that GMAT is using a TT date instead of TAI!
 ///     start_time.mut_add_secs(32.184);
-/// 
+///
 ///     let halo_rcvr = State::<Geoid>::from_cartesian(
 ///         333_321.004_516,
 ///         -76_134.198_887,
@@ -123,7 +123,7 @@ pub mod propagators;
 ///         start_time,
 ///         earth_geoid,
 ///     );
-/// 
+///
 ///     // GMAT data
 ///     let rslt = Vector6::new(
 ///         345_350.664_030_479,
@@ -133,14 +133,14 @@ pub mod propagators;
 ///         9.566_789_568e-1,
 ///         3.028_175_811e-1,
 ///     );
-/// 
+///
 ///     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
 ///     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
-/// 
+///
 ///     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
 ///     prop.until_time_elapsed(prop_time);
 ///     let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
-/// 
+///
 ///     println!(
 ///         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
 ///         err_r, err_v, halo_rcvr, prop.dynamics.state
