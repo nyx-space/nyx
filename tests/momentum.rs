@@ -27,6 +27,16 @@ fn const_mom() {
             delta_mom, tolerance
         );
     }
+
+    prop.until_time_elapsed(-5.0);
+    println!("{:?}", prop.latest_details());
+    let delta_mom = ((prop.dynamics.momentum().norm() - init_momentum) / init_momentum).abs();
+    if delta_mom > tolerance {
+        panic!(
+            "angular momentum prop failed: momentum changed by {:e} (> {:e})",
+            delta_mom, tolerance
+        );
+    }
 }
 
 #[test]
