@@ -1,9 +1,7 @@
 extern crate hifitime;
 extern crate serde;
 
-use self::hifitime::instant::Instant;
-use self::hifitime::TimeSystem;
-use self::hifitime::{datetime, julian};
+use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Vector3, Vector6};
@@ -39,8 +37,7 @@ where
     pub vx: f64,
     pub vy: f64,
     pub vz: f64,
-    /// The date time is stored as a a hifitime::instant::Instant, which is the NTP representation of time.
-    pub dt: Instant,
+    pub dt: Epoch,
     /// The frame will later allow for coordinate frame transformations.
     pub frame: F,
 }
@@ -49,10 +46,10 @@ impl<F> State<F>
 where
     F: Frame,
 {
-    /// Creates a new State in the provided frame at the provided instant in time.
+    /// Creates a new State in the provided frame at the provided Epoch.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    pub fn from_cartesian<G, T: TimeSystem>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: T, frame: G) -> State<G>
+    pub fn from_cartesian<G>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: Epoch, frame: G) -> State<G>
     where
         G: Frame,
     {
@@ -63,15 +60,15 @@ where
             vx,
             vy,
             vz,
-            dt: dt.into_instant(),
+            dt,
             frame,
         }
     }
 
-    /// Creates a new State in the provided frame at the provided instant in time with 0.0 velocity.
+    /// Creates a new State in the provided frame at the provided Epoch in time with 0.0 velocity.
     ///
     /// **Units:** km, km, km
-    pub fn from_position<G, T: TimeSystem>(x: f64, y: f64, z: f64, dt: T, frame: G) -> State<G>
+    pub fn from_position<G>(x: f64, y: f64, z: f64, dt: Epoch, frame: G) -> State<G>
     where
         G: Frame,
     {
@@ -82,7 +79,7 @@ where
             vx: 0.0,
             vy: 0.0,
             vz: 0.0,
-            dt: dt.into_instant(),
+            dt,
             frame,
         }
     }
@@ -91,7 +88,7 @@ where
     ///
     /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `from_cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_cartesian_vec<T: TimeSystem>(state: &Vector6<f64>, dt: T, frame: F) -> State<F>
+    pub fn from_cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: F) -> State<F>
     where
         F: Frame,
     {
@@ -102,7 +99,7 @@ where
             vx: state[(3, 0)],
             vy: state[(4, 0)],
             vz: state[(5, 0)],
-            dt: dt.into_instant(),
+            dt,
             frame,
         }
     }
@@ -127,16 +124,6 @@ where
         Vector3::new(self.vx, self.vy, self.vz)
     }
 
-    /// Returns the date time as its Modified Julian time representation
-    pub fn dt_as_modified_julian(&self) -> julian::ModifiedJulian {
-        julian::ModifiedJulian::from_instant(self.dt)
-    }
-
-    /// Returns the date time as its UTC representation
-    pub fn dt_as_utc(&self) -> datetime::Datetime {
-        datetime::Datetime::from_instant(self.dt)
-    }
-
     /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
     ///
     /// Note that the time is **not** returned in the vector.
@@ -147,7 +134,6 @@ where
 
 impl<F: Frame> PartialEq for State<F> {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    /// For time equality, we're relying on the high fidelity time computation of `hifitime` provided through the `Instant` representation.
     fn eq(&self, other: &State<F>) -> bool
     where
         F: Frame,
@@ -234,7 +220,7 @@ where
         S: Serializer,
     {
         let mut state = serializer.serialize_struct("State", 7)?;
-        state.serialize_field("dt", &julian::ModifiedJulian::from_instant(self.dt).julian_days())?;
+        state.serialize_field("dt", &self.dt.as_jde_tai_days())?;
         state.serialize_field("x", &self.x)?;
         state.serialize_field("y", &self.y)?;
         state.serialize_field("z", &self.z)?;
@@ -254,16 +240,7 @@ impl State<Geoid> {
     /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
-    pub fn from_keplerian<T: TimeSystem>(
-        sma: f64,
-        ecc: f64,
-        inc: f64,
-        raan: f64,
-        aop: f64,
-        ta: f64,
-        dt: T,
-        frame: Geoid,
-    ) -> Self {
+    pub fn from_keplerian(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64, dt: Epoch, frame: Geoid) -> Self {
         if frame.gm.abs() < ZERO_DIV_TOL {
             warn!(
                 "GM very low ({}): expect math errors in Keplerian to Cartesian conversion",
@@ -356,7 +333,7 @@ impl State<Geoid> {
             vx,
             vy,
             vz,
-            dt: dt.into_instant(),
+            dt,
             frame,
         }
     }
@@ -365,8 +342,8 @@ impl State<Geoid> {
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `from_cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_keplerian_vec<T: TimeSystem>(state: &Vector6<f64>, dt: T, frame: Geoid) -> Self {
-        Self::from_keplerian::<T>(
+    pub fn from_keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Geoid) -> Self {
+        Self::from_keplerian(
             state[(0, 0)],
             state[(1, 0)],
             state[(2, 0)],
@@ -383,7 +360,7 @@ impl State<Geoid> {
     /// **Units:** degrees, degrees, km
     /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of Earth.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-    pub fn from_geodesic<T: TimeSystem>(latitude: f64, longitude: f64, height: f64, dt: T, frame: Geoid) -> State<Geoid> {
+    pub fn from_geodesic(latitude: f64, longitude: f64, height: f64, dt: Epoch, frame: Geoid) -> State<Geoid> {
         let e2 = 2.0 * frame.flattening - frame.flattening.powi(2);
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
@@ -679,7 +656,7 @@ where
             f,
             "[{}] {}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
             self.frame,
-            self.dt_as_utc(),
+            self.dt.as_mjd_tai_days(),
             self.x,
             self.y,
             self.z,
@@ -697,7 +674,7 @@ impl fmt::Octal for State<Geoid> {
             f,
             "[{}] {}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
             self.frame,
-            self.dt_as_utc(),
+            self.dt.as_mjd_tai_days(),
             self.sma(),
             self.ecc(),
             self.inc(),

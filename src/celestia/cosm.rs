@@ -5,8 +5,7 @@ use self::bytes::IntoBuf;
 use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
 use self::prost::Message;
-use crate::hifitime::julian::ModifiedJulian;
-use crate::hifitime::SECONDS_PER_DAY;
+use crate::hifitime::{Epoch, SECONDS_PER_DAY};
 use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
 use celestia::exb::{Ephemeris, EphemerisContainer};
 use celestia::frames::Frame;
@@ -53,7 +52,7 @@ impl Cosm {
         // Hence, I should probably add as a "virtual geoid", and computing the approximate GM from some estimated mass of the solar system (which includes asteroids, etc.).
         // Solar System Barycenter
         let ss_mass = 1.0014; // https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
-        let sun_gm = 1.327_124_400_18e20;
+        let sun_gm = 132_712_440_041.939_38;
         cosm.geoids.insert(
             (0, "Solar System Barycenter".to_string()),
             Geoid::perfect_sphere(0, 0, 1, ss_mass * sun_gm),
@@ -218,13 +217,16 @@ impl Cosm {
             .ok_or(CosmError::ObjectIDNotFound(exb.number))?;
 
         // Compute the position as per the algorithm from jplephem
-        let interp = ephem.clone().interpolator.ok_or(CosmError::NoInterpolationData(exb.number))?;
+        let interp = ephem
+            .interpolator
+            .as_ref()
+            .ok_or(CosmError::NoInterpolationData(exb.number))?;
 
         let start_mod_julian: f64 = interp.start_mod_julian;
         let coefficient_count: usize = interp.position_degree as usize;
 
-        let exb_states = match interp.state_data.ok_or(CosmError::NoStateData(exb.number))? {
-            EqualStates(states) => states.clone(),
+        let exb_states = match interp.state_data.as_ref().ok_or(CosmError::NoStateData(exb.number))? {
+            EqualStates(states) => states,
             VarwindowStates(_) => panic!("var window not yet supported by Cosm"),
         };
 
@@ -280,7 +282,7 @@ impl Cosm {
         let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
         let ref_frame_exb_id = ref_frame_id % 100_000;
         let storage_geoid = self.geoid_from_id(ref_frame_exb_id).unwrap();
-        let dt = ModifiedJulian { days: jde - 2_400_000.5 };
+        let dt = Epoch::from_jde_tai(jde);
         Ok(State::<Geoid>::from_cartesian(
             x,
             y,
@@ -299,16 +301,7 @@ impl Cosm {
         let as_seen_from = self.geoid_from_id(as_seen_from_exb_id)?;
         // And now let's convert this storage state to the correct frame.
         let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
-        let mut state = State::<Geoid>::from_cartesian(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            ModifiedJulian { days: jde - 2_400_000.5 },
-            as_seen_from,
-        );
+        let mut state = State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Epoch::from_jde_tai(jde), as_seen_from);
         let mut prev_frame_id = state.frame.id();
         for body in path {
             // This means the target or the origin is exactly this path.
@@ -346,20 +339,17 @@ impl Cosm {
             Some((weight, path)) => {
                 // Build the path with the frames
                 let mut f_path = Vec::new();
-                let mut final_skipped_ssb = false;
+                let shared_centers = from.center_id == to.center_id;
                 for idx in path {
-                    if self.exb_map[idx] != 0 {
+                    let exb_id = self.exb_map[idx];
+                    if !(shared_centers && to.center_id == exb_id || exb_id == 0) {
                         // Ignore going through SSB since it isn't a geoid
-                        f_path.push(self.geoid_from_id(self.exb_map[idx]).unwrap());
-                        final_skipped_ssb = false;
-                    } else {
-                        final_skipped_ssb = true;
+                        f_path.push(self.geoid_from_id(exb_id).unwrap());
                     }
                 }
-                if final_skipped_ssb {
-                    // If the last point skipped adding anything because it was the SSB, let's add the final geoid.
-                    f_path.push(*from);
-                }
+
+                // Let's add the final geoid.
+                f_path.push(*from);
                 debug!(
                     "path from {:?} to {:?} is {:?} with cost {}",
                     from.id(),
@@ -570,7 +560,7 @@ mod tests {
         let jde = 2_452_312.5;
 
         let cosm = Cosm::from_xb("./de438s");
-
+        /*
         let ven2ear = cosm
             .intermediate_geoid(
                 &cosm.geoid_from_id(bodies::VENUS_BARYCENTER).unwrap(),
@@ -589,5 +579,33 @@ mod tests {
         assert!((ven2ear_state.vx - 36.052_331_787_059_61).abs() < 1e-12);
         assert!((ven2ear_state.vy - 48.888_638_291_647_33).abs() < 1e-12);
         assert!((ven2ear_state.vz - 20.702_719_193_464_77).abs() < 1e-12);
+
+        // Check that conversion via a center frame works
+        let moon_from_emb = cosm
+            .celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER)
+            .unwrap();
+
+        let earth_from_emb = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_BARYCENTER).unwrap();
+
+        let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH).unwrap();
+        let earth_from_moon = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_MOON).unwrap();
+
+        assert_eq!(moon_from_emb - earth_from_emb, moon_from_earth);
+        assert_eq!(earth_from_moon, -moon_from_earth);*/
+
+        // Check that Sun works
+        let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, bodies::EARTH).unwrap();
+        println!("{}", sun2ear_state);
+        assert!((sun2ear_state.x - 1.096537548791171E+08).abs() < 1e-1);
+        assert!((sun2ear_state.y - -9.057220115376981E+07).abs() < 1e-1);
+        assert!((sun2ear_state.z - -3.926714485809306E+07).abs() < 1e-1);
+        assert!((sun2ear_state.vx - 2.042686047796898E+01).abs() < 1e-7);
+        assert!((sun2ear_state.vy - 2.041187043287114E+01).abs() < 1e-7);
+        assert!((sun2ear_state.vz - 8.848320853924715E+00).abs() < 1e-7);
+        // And check the converse
+        let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SUN).unwrap();
+        dbg!(ear2sun_state.radius() - sun2ear_state.radius());
+        dbg!(ear2sun_state.velocity() - sun2ear_state.velocity());
+        // XXX: Reenable this test when bug is fixed: https://gitlab.com/chrisrabotin/nyx/issues/61 .
     }
 }

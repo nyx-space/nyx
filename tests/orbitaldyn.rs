@@ -2,91 +2,43 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::na::{Vector6, U3};
-fn backprop_rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
-    let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
-
-    let err_velocity = (prop_err.fixed_rows::<U3>(3) - cur_state.fixed_rows::<U3>(3)).norm();
-
-    (err_radius, err_velocity)
-}
-
-#[test]
-fn two_body_parametrized() {
-    extern crate nalgebra as na;
-    use self::na::Vector6;
-    use nyx::celestia::Cosm;
-    use nyx::dynamics::celestial::TwoBody;
-    use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::*;
-
-    let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
-
-    let prop_time = 24.0 * 3_600.0;
-    let accuracy = 1e-12;
-    let min_step = 0.1;
-    let max_step = 60.0;
-
-    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0);
-
-    let rslt = Vector6::from_row_slice(&[
-        -5_971.194_376_784_884,
-        3_945.517_912_191_541,
-        2_864.620_958_267_658_4,
-        0.049_083_102_073_914_83,
-        -4.185_084_126_130_087_5,
-        5.848_947_462_252_259_5,
-    ]);
-
-    let mut dynamics = TwoBody::from_state_vec(init, earth_geoid);
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
-    );
-    prop.until_time_elapsed(prop_time);
-    assert_eq!(prop.state(), rslt, "two body prop failed");
-    // And now do the backprop
-    prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &init);
-    assert!(
-        err_r < 1e-5,
-        "two body back prop failed to return to the initial state in position"
-    );
-    assert!(
-        err_v < 1e-8,
-        "two body back prop failed to return to the initial state in velocity"
-    );
-}
+use nyx::utils::rss_state_errors;
 
 #[test]
 fn two_body_custom() {
-    extern crate nalgebra as na;
-    use self::na::Vector6;
-    use nyx::dynamics::celestial::TwoBody;
+    use hifitime::{Epoch, J2000_OFFSET};
+    use na::Vector6;
+    use nyx::celestia::{bodies, Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
 
-    let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0);
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap();
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let mut state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    state.frame.gm = 398_600.441_5;
 
     let rslt = Vector6::new(
-        -5_971.194_191_684_024,
-        3_945.506_653_624_737_3,
-        2_864.636_617_867_270_6,
-        0.049_096_957_141_044_464,
-        -4.185_093_318_149_689,
-        5.848_940_867_979_176,
+        -5_971.194_191_684_025,
+        3_945.506_653_624_713,
+        2_864.636_617_867_305,
+        0.049_096_957_141_074_773,
+        -4.185_093_318_149_709,
+        5.848_940_867_979_16,
     );
 
-    let mut dynamics = TwoBody::from_state_vec_with_gm(init, 398_600.441_5);
+    let mut dynamics = CelestialDynamics::two_body(state);
+
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
     assert_eq!(prop.state(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &init);
+    let (err_r, err_v) = rss_state_errors(&prop.state(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -98,59 +50,41 @@ fn two_body_custom() {
 }
 
 #[test]
-fn two_body_state_parametrized() {
-    extern crate nalgebra as na;
-    use hifitime::julian::ModifiedJulian;
-    use hifitime::SECONDS_PER_DAY;
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::TwoBody;
+fn two_body_dynamics() {
+    use hifitime::{Epoch, J2000_OFFSET};
+    use na::Vector6;
+    use nyx::celestia::{bodies, Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
-
-    let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3).unwrap();
-
-    let dt = ModifiedJulian { days: 21545.0 };
-    let initial_state =
-        State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
-
-    println!("Initial state:\n{0}\n{0:o}\n", initial_state);
+    use nyx::propagators::*;
+    use std::f64::EPSILON;
 
     let prop_time = 24.0 * 3_600.0;
-    let accuracy = 1e-12;
-    let min_step = 0.1;
-    let max_step = 60.0;
 
-    let rslt = State::<Geoid>::from_cartesian(
-        -5_971.194_376_784_884,
-        3_945.517_912_191_541,
-        2_864.620_958_267_658_4,
-        0.049_083_102_073_914_83,
-        -4.185_084_126_130_087_5,
-        5.848_947_462_252_259_5,
-        ModifiedJulian { days: 21546.0 },
-        earth_geoid,
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap();
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+
+    let rslt = Vector6::new(
+        -5_971.194_376_797_643,
+        3_945.517_912_574_178_4,
+        2_864.620_957_744_429_2,
+        0.049_083_101_605_507_95,
+        -4.185_084_125_817_658,
+        5.848_947_462_472_877,
     );
 
-    let mut dynamics = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid);
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
-    );
-    let (final_t, final_state0) = prop.until_time_elapsed(prop_time);
+    let mut dynamics = CelestialDynamics::two_body(state);
 
-    let final_dt = ModifiedJulian {
-        days: dt.days + final_t / SECONDS_PER_DAY,
-    };
-    let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid);
-    assert_eq!(final_state, rslt, "two body prop failed");
-    assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
-
-    println!("Final state:\n{0}\n{0:o}", final_state);
-
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
+    prop.until_time_elapsed(prop_time);
+    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
+    assert_eq!(prop.state(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = backprop_rss_state_errors(&prop.state(), &initial_state.to_cartesian_vec());
+    let (err_r, err_v) = rss_state_errors(&prop.state(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -159,6 +93,83 @@ fn two_body_state_parametrized() {
         err_v < 1e-8,
         "two body back prop failed to return to the initial state in velocity"
     );
+    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days()).abs() <= EPSILON);
+    // Forward propagation again to confirm that we can do repeated calls
+    prop.until_time_elapsed(prop_time);
+    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
+    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    assert!(
+        err_r < 1e-5,
+        "two body back+fwd prop failed to return to the initial state in position"
+    );
+    assert!(
+        err_v < 1e-8,
+        "two body back+fwd prop failed to return to the initial state in velocity"
+    );
+}
+
+#[test]
+fn multi_body_dynamics() {
+    /*
+    In this test, we validate against GMAT. However, we're using the GM values from the de438s file, whereas GMAT has different values.
+    This causes a slight difference in the values between nyx and GMAT. However, that difference is one order of magnitude better than
+    the difference between nyx and Monte, which I attribute to a propagator difference. Monte and nyx are at 3e-3 km positional error.
+
+    GMAT data (uses different GMs)
+    // 345350.66403047      5930.6720470888     7333.283779286      0.02129818943   0.956678956     0.3028175811
+
+    Monte data (same GMs maybe different DE file though!)
+    // 345350.66152566      5930.6726330197     7333.285591307      0.02129812933   0.956678968     0.3028176198
+    */
+    use hifitime::Epoch;
+    use na::Vector6;
+    use nyx::celestia::{bodies, Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
+    use nyx::propagators::*;
+
+    let prop_time = 24.0 * 3_600.0;
+
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
+
+    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    // NOTE: It seems that GMAT is using a TT date instead of TAI!
+    start_time.mut_add_secs(32.184);
+
+    let halo_rcvr = State::<Geoid>::from_cartesian(
+        333_321.004_516,
+        -76_134.198_887,
+        -20_873.831_939,
+        0.257_153_712,
+        0.930_284_066,
+        0.346_177,
+        start_time,
+        earth_geoid,
+    );
+
+    // GMAT data
+    let rslt = Vector6::new(
+        345_350.664_030_479,
+        5_930.672_047_088,
+        7_333.283_779_286,
+        2.129_819_943e-2,
+        9.566_789_568e-1,
+        3.028_175_811e-1,
+    );
+
+    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    prop.until_time_elapsed(prop_time);
+    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+
+    println!(
+        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
+        err_r, err_v, halo_rcvr, prop.dynamics.state
+    );
+    assert!(err_r < 1e-3, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-6, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
@@ -166,7 +177,7 @@ fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
     extern crate nalgebra as na;
     use self::na::{Matrix6, Vector6};
-    use hifitime::julian::ModifiedJulian;
+    use hifitime::Epoch;
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::TwoBodyWithDualStm;
     use nyx::od::AutoDiffDynamics;
@@ -181,7 +192,7 @@ fn two_body_dual() {
         -3.288_789_003_770_57,
         -2.226_285_193_102_822,
         1.646_738_380_722_676_5,
-        ModifiedJulian { days: 21546.0 },
+        Epoch::from_mjd_tai(21_546.0),
         earth_geoid,
     );
 

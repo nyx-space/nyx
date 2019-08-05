@@ -17,6 +17,7 @@
 //!  * Angular momentum dynamics for a rigid body
 //!  * Convenient and explicit definition of the dynamics for a simulation (cf. the [dynamics documentation](./dynamics/index.html))
 //!  * Orbital state definition with transformations to other frames
+//!  * Multi body dynamics (known bug for heliocentric propagation: https://gitlab.com/chrisrabotin/nyx/issues/61)
 //!
 //! ## Usage
 //!
@@ -24,7 +25,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.9"
+//! nyx-space = "0.0.10"
 //! ```
 //!
 //! And add the following to your crate root:
@@ -34,47 +35,6 @@
 //! ```
 
 /// Provides all the propagators / integrators available in `nyx`.
-///
-/// # Custom derivative function example
-/// ```
-/// extern crate nalgebra as na;
-/// extern crate nyx_space as nyx;
-/// use self::na::Vector6;
-/// use nyx::celestia::Cosm;
-/// use nyx::dynamics::celestial::TwoBody;
-/// use nyx::dynamics::Dynamics;
-/// use nyx::propagators::error_ctrl::RSSStepPV;
-/// use nyx::propagators::*;
-///
-/// fn main() {
-///     let cosm = Cosm::from_xb("./de438s");
-///     let earth_geoid = cosm.geoid_from_id(3).unwrap();
-///
-///     let prop_time = 24.0 * 3_600.0;
-///     let accuracy = 1e-12;
-///     let min_step = 0.1;
-///     let max_step = 60.0;
-///
-///     let init = Vector6::new(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0);
-///
-///     let rslt = Vector6::from_row_slice(&[
-///         -5_971.194_376_784_884,
-///         3_945.517_912_191_541,
-///         2_864.620_958_267_658_4,
-///         0.049_083_102_073_914_83,
-///         -4.185_084_126_130_087_5,
-///         5.848_947_462_252_259_5,
-///     ]);
-///
-///     let mut dyn = TwoBody::from_state_vec(init, earth_geoid);
-///     let mut prop = Propagator::new::<RK89>(
-///         &mut dyn,
-///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
-///     );
-///     prop.until_time_elapsed(prop_time);
-///     assert_eq!(prop.state(), rslt, "two body prop failed");
-/// }
-/// ```
 pub mod propagators;
 
 /// Provides several dynamics used for orbital mechanics and attitude dynamics, which can be elegantly combined.
@@ -84,10 +44,9 @@ pub mod propagators;
 /// extern crate nalgebra as na;
 /// extern crate hifitime;
 /// extern crate nyx_space as nyx;
-/// use hifitime::julian::ModifiedJulian;
-/// use hifitime::SECONDS_PER_DAY;
+/// use hifitime::{Epoch, SECONDS_PER_DAY};
 /// use nyx::celestia::{Cosm, Geoid, State};
-/// use nyx::dynamics::celestial::TwoBody;
+/// use nyx::dynamics::celestial::CelestialDynamics;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
 /// use nyx::propagators::{PropOpts, Propagator, RK89};
@@ -96,7 +55,7 @@ pub mod propagators;
 ///     let cosm = Cosm::from_xb("./de438s");
 ///     let earth_geoid = cosm.geoid_from_id(3).unwrap();
 ///
-///     let dt = ModifiedJulian { days: 21545.0 };
+///     let dt = Epoch::from_mjd_tai(21_545.0);
 ///     let initial_state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
 ///
 ///     println!("Initial state:\n{0}\n{0:o}\n", initial_state);
@@ -107,31 +66,87 @@ pub mod propagators;
 ///     let max_step = 60.0;
 ///
 ///     let rslt = State::<Geoid>::from_cartesian(
-///             -5_971.194_376_784_884,
-///             3_945.517_912_191_541,
-///             2_864.620_958_267_658_4,
-///             0.049_083_102_073_914_83,
-///             -4.185_084_126_130_087_5,
-///             5.848_947_462_252_259_5,
-///             ModifiedJulian { days: 21546.0 },
+///             -5_971.194_376_797_643,
+///             3_945.517_912_574_178_4,
+///             2_864.620_957_744_429_2,
+///             0.049_083_101_605_507_95,
+///             -4.185_084_125_817_658,
+///             5.848_947_462_472_877,
+///             Epoch::from_mjd_tai(21_546.0),
 ///             earth_geoid,
 ///     );
 ///
-///     let mut dyn = TwoBody::from_state_vec(initial_state.to_cartesian_vec(), earth_geoid);
+///     let mut dynamics = CelestialDynamics::two_body(initial_state);
 ///     let mut prop = Propagator::new::<RK89>(
-///         &mut dyn,
+///         &mut dynamics,
 ///         &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
 ///     );
-///     let (final_t, final_state0) = prop.until_time_elapsed(prop_time);
+///     prop.until_time_elapsed(prop_time);
 ///
-///     let final_dt = ModifiedJulian {
-///         days: dt.days + final_t / SECONDS_PER_DAY,
-///     };
-///     let final_state = State::from_cartesian_vec(&prop.state(), final_dt, earth_geoid);
-///     assert_eq!(final_state, rslt, "two body prop failed");
-///     assert_eq!(prop.state(), final_state0, "until_time_elapsed returns the wrong value");
+///     assert_eq!(prop.dynamics.state, rslt, "two body prop failed");
 ///
-///     println!("Final state:\n{0}\n{0:o}", final_state);
+///     println!("Final state:\n{0}\n{0:o}", prop.dynamics.state);
+/// }
+/// ```
+///
+/// # Multibody propagation of a Halo orbit
+/// Multibody propagation is **an order of magnitude faster** in nyx than in GMAT.
+/// In nyx, the following function is executed in 0.14 seconds in release mode.
+/// ```
+/// extern crate nalgebra as na;
+/// extern crate hifitime;
+/// extern crate nyx_space as nyx;
+/// fn main() {
+///     use hifitime::Epoch;
+///     use na::Vector6;
+///     use nyx::celestia::{bodies, Cosm, Geoid, State};
+///     use nyx::dynamics::celestial::CelestialDynamics;
+///     use nyx::propagators::*;
+///     use nyx::utils::rss_state_errors;
+///
+///     let prop_time = 24.0 * 3_600.0;
+///
+///     let cosm = Cosm::from_xb("./de438s");
+///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
+///
+///     let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+///     // NOTE: It seems that GMAT is using a TT date instead of TAI!
+///     start_time.mut_add_secs(32.184);
+///
+///     let halo_rcvr = State::<Geoid>::from_cartesian(
+///         333_321.004_516,
+///         -76_134.198_887,
+///         -20_873.831_939,
+///         0.257_153_712,
+///         0.930_284_066,
+///         0.346_177,
+///         start_time,
+///         earth_geoid,
+///     );
+///
+///     // GMAT data
+///     let rslt = Vector6::new(
+///         345_350.664_030_479,
+///         5_930.672_047_088,
+///         7_333.283_779_286,
+///         2.129_819_943e-2,
+///         9.566_789_568e-1,
+///         3.028_175_811e-1,
+///     );
+///
+///     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+///     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+///
+///     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+///     prop.until_time_elapsed(prop_time);
+///     let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+///
+///     println!(
+///         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
+///         err_r, err_v, halo_rcvr, prop.dynamics.state
+///     );
+///     assert!(err_r < 1e-3, format!("multi body failed in position: {:.5e}", err_r));
+///     assert!(err_v < 1e-6, format!("multi body failed in velocity: {:.5e}", err_v));
 /// }
 /// ```
 pub mod dynamics;
@@ -144,14 +159,14 @@ pub mod dynamics;
 /// extern crate nyx_space as nyx;
 ///
 /// fn main(){
-///     use hifitime::julian::ModifiedJulian;
+///     use hifitime::Epoch;
 ///     use nyx::celestia::{Cosm, Geoid, State};
 ///     let cosm = Cosm::from_xb("./de438s");
 ///     // In this case, we're creating these states around a Geoid which is Earth.
 ///     // But for simplicity, we're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
 ///     let mut earth_geoid = cosm.geoid_from_id(399).unwrap();
 ///     earth_geoid.gm = 398_600.441_5;
-///     let dt = ModifiedJulian { days: 21545.0 };
+///     let dt = Epoch::from_mjd_tai(21545.0);
 ///     let cart = State::<Geoid>::from_cartesian(
 ///             5_946.673_548_288_958,
 ///             1_656.154_606_023_661,

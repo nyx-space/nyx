@@ -3,8 +3,7 @@ extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate rand;
 
-use self::hifitime::instant::Instant;
-use self::hifitime::julian::*;
+use self::hifitime::Epoch;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual};
 use self::na::{DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7};
@@ -86,15 +85,14 @@ impl GroundStation {
     }
 
     /// Perform a measurement from the ground station to the receiver (rx).
-    pub fn measure(self, rx: State<Geoid>, dt: Instant) -> StdMeasurement {
+    pub fn measure(self, rx: State<Geoid>, dt: Epoch) -> StdMeasurement {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
         if rx.frame.id() != 3 {
             unimplemented!("the receiver is not around the Earth");
         }
-        let mjd_dt = ModifiedJulian::from_instant(dt);
-        let tx = State::from_geodesic(self.latitude, self.longitude, self.height, mjd_dt, rx.frame);
+        let tx = State::from_geodesic(self.latitude, self.longitude, self.height, dt, rx.frame);
         /*
         // Convert the station to "ECEF"
         let theta = gast(dt);
@@ -124,16 +122,16 @@ impl GroundStation {
 /// In fact, hifitime does not support UT1, but according to the [IERS](https://www.iers.org/IERS/EN/Science/EarthRotation/UTC.html;jsessionid=A6E88EB4CF0FC2E1A3C10D807F51B829.live2?nn=12932)
 /// UTC with leap seconds is always within 0.9 seconds to UT1, and hifitime inherently supports leap seconds.
 /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-fn gast(at: Instant) -> f64 {
+fn gast(at: Epoch) -> f64 {
     use std::f64::consts::PI;
-    let tu = ModifiedJulian::from_instant(at).days - 51_544.5;
+    let tu = at.as_mjd_tai_days() - 51_544.5;
     2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_6 * tu)
 }
 
 /// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {
-    dt: Instant,
+    dt: Epoch,
     obs: Vector2<f64>,
     visible: bool,
     h_tilde: Matrix2x6<f64>,
@@ -174,7 +172,7 @@ impl Measurement for StdMeasurement {
     type StateSize = U6;
     type MeasurementSize = U2;
 
-    fn new<F: Frame>(dt: Instant, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
+    fn new<F: Frame>(dt: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 
@@ -201,7 +199,7 @@ impl Measurement for StdMeasurement {
         self.visible
     }
 
-    fn at(&self) -> Instant {
+    fn at(&self) -> Epoch {
         self.dt
     }
 }
@@ -213,7 +211,7 @@ impl Serialize for StdMeasurement {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(3))?;
-        seq.serialize_element(&ModifiedJulian::from_instant(self.dt).days)?;
+        seq.serialize_element(&self.dt.as_mjd_tai_days())?;
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.serialize_element(&obs[(1, 0)])?;
@@ -224,7 +222,7 @@ impl Serialize for StdMeasurement {
 /// Stores a standard measurement of range (km)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RangeMsr {
-    dt: Instant,
+    dt: Epoch,
     obs: Vector1<f64>,
     visible: bool,
     h_tilde: Matrix1x6<f64>,
@@ -258,7 +256,7 @@ impl Measurement for RangeMsr {
     type StateSize = U6;
     type MeasurementSize = U1;
 
-    fn new<F: Frame>(_: Instant, tx: State<F>, rx: State<F>, visible: bool) -> RangeMsr {
+    fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> RangeMsr {
         assert_eq!(tx.frame.id(), rx.frame.id(), "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
@@ -268,9 +266,9 @@ impl Measurement for RangeMsr {
 
         RangeMsr {
             dt,
-            obs: Vector1::new(obs[0]),
+            obs,
             visible,
-            h_tilde: h_tilde.fixed_columns::<U6>(0).into_owned(),
+            h_tilde,
         }
     }
 
@@ -289,7 +287,7 @@ impl Measurement for RangeMsr {
         self.visible
     }
 
-    fn at(&self) -> Instant {
+    fn at(&self) -> Epoch {
         self.dt
     }
 }
@@ -301,7 +299,7 @@ impl Serialize for RangeMsr {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(3))?;
-        seq.serialize_element(&ModifiedJulian::from_instant(self.dt).days)?;
+        seq.serialize_element(&self.dt.as_mjd_tai_days())?;
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.end()
@@ -311,7 +309,7 @@ impl Serialize for RangeMsr {
 /// Stores a standard measurement of range (km)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DopplerMsr {
-    dt: Instant,
+    dt: Epoch,
     obs: Vector1<f64>,
     visible: bool,
     h_tilde: Matrix1x6<f64>,
@@ -346,7 +344,7 @@ impl Measurement for DopplerMsr {
     type StateSize = U6;
     type MeasurementSize = U1;
 
-    fn new<F: Frame>(_: Instant, tx: State<F>, rx: State<F>, visible: bool) -> DopplerMsr {
+    fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> DopplerMsr {
         assert_eq!(tx.frame.id(), rx.frame.id(), "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
@@ -356,9 +354,9 @@ impl Measurement for DopplerMsr {
 
         DopplerMsr {
             dt,
-            obs: Vector1::new(obs[1]),
+            obs,
             visible,
-            h_tilde: h_tilde.fixed_columns::<U6>(1).into_owned(),
+            h_tilde,
         }
     }
 
@@ -377,7 +375,7 @@ impl Measurement for DopplerMsr {
         self.visible
     }
 
-    fn at(&self) -> Instant {
+    fn at(&self) -> Epoch {
         self.dt
     }
 }
@@ -389,7 +387,7 @@ impl Serialize for DopplerMsr {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(3))?;
-        seq.serialize_element(&ModifiedJulian::from_instant(self.dt).days)?;
+        seq.serialize_element(&self.dt.as_mjd_tai_days())?;
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.end()

@@ -1,5 +1,5 @@
 extern crate nalgebra as na;
-use self::na::{Matrix3, Vector3};
+use self::na::{Matrix3, Vector3, Vector6, U3};
 use std::f64;
 
 /// Returns the tilde matrix from the provided Vector3.
@@ -87,4 +87,13 @@ pub fn r2(angle: f64) -> Matrix3<f64> {
 pub fn r3(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
     Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
+}
+
+/// Computes the RSS state errors in position and in velocity
+pub fn rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
+    let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
+
+    let err_velocity = (prop_err.fixed_rows::<U3>(3) - cur_state.fixed_rows::<U3>(3)).norm();
+
+    (err_radius, err_velocity)
 }
