@@ -133,6 +133,10 @@ where
         loop {
             let dt = self.dynamics.time();
             if (!backprop && dt + self.step_size > stop_time) || (backprop && dt + self.step_size <= stop_time) {
+                if (stop_time - dt).abs() < f64::EPSILON {
+                    // No propagation necessary
+                    return (dt, self.dynamics.state());
+                }
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
