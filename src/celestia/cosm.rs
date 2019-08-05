@@ -604,8 +604,8 @@ mod tests {
         assert!((sun2ear_state.vz - 8.848320853924715E+00).abs() < 1e-7);
         // And check the converse
         let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SUN).unwrap();
-        dbg!(ear2sun_state.radius() -sun2ear_state.radius());
-        dbg!(ear2sun_state.velocity() -sun2ear_state.velocity());
+        dbg!(ear2sun_state.radius() - sun2ear_state.radius());
+        dbg!(ear2sun_state.velocity() - sun2ear_state.velocity());
         // XXX: Reenable this test when bug is fixed: https://gitlab.com/chrisrabotin/nyx/issues/61 .
     }
 }
