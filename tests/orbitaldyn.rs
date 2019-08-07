@@ -176,7 +176,7 @@ fn multi_body_dynamics() {
 fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
     extern crate nalgebra as na;
-    use self::na::{Matrix6, Vector6, VectorN, U3, U42};
+    use self::na::{Matrix6, Vector6, U3};
     use hifitime::Epoch;
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::{CelestialDynamicsStm, TwoBodyWithDualStm};
@@ -239,10 +239,6 @@ fn two_body_dual() {
 
     assert_eq!(dynamics.to_state(), init);
 
-    // Test the iter() on a matrix, and try to rebuild it
-    let itered = VectorN::<f64, U42>::from_iterator(fx.iter().chain(grad.iter()).cloned());
-    println!("{}\n\n{}\n\n{}", fx, grad, itered);
-
     let prop_time = 24.0 * 3_600.0;
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
@@ -264,8 +260,6 @@ fn two_body_dual() {
 
     // Now let's compare with CelestialDynamicsStm
     let mut dynamics = CelestialDynamicsStm::new(init, vec![], &cosm);
-
-    // let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
     prop.until_time_elapsed(prop_time);
 
@@ -286,7 +280,7 @@ fn multi_body_dynamics_dual() {
     // 345350.66152566      5930.6726330197     7333.285591307      0.02129812933   0.956678968     0.3028176198
     */
     use hifitime::Epoch;
-    use na::Vector6;
+    use na::{Vector6, U3};
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamicsStm;
     use nyx::propagators::error_ctrl::RSSStatePV;
@@ -322,11 +316,9 @@ fn multi_body_dynamics_dual() {
         3.028_175_811e-1,
     );
 
-    // let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let bodies = Vec::new();
+    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamicsStm::new(halo_rcvr, bodies, &cosm);
 
-    // let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.dynamics.state.to_cartesian_vec(), &rslt);
@@ -338,9 +330,6 @@ fn multi_body_dynamics_dual() {
     assert!(err_r < 1e-3, format!("multi body failed in position: {:.5e}", err_r));
     assert!(err_v < 1e-6, format!("multi body failed in velocity: {:.5e}", err_v));
 
-    println!("{:?}", prop.latest_details());
-    println!("{}", prop.dynamics.stm);
-
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_state = prop.dynamics.state.to_cartesian_vec();
     let final_stm = prop.dynamics.stm;
@@ -348,5 +337,10 @@ fn multi_body_dynamics_dual() {
     prop.until_time_elapsed(-final_step);
 
     // And check the difference
-    // println!("{}", final_stm * final_state - prop.dynamics.state.to_cartesian_vec());
+    let stm_err = final_stm * prop.dynamics.state.to_cartesian_vec() - final_state;
+    let radius_err = stm_err.fixed_rows::<U3>(0).into_owned();
+    let velocity_err = stm_err.fixed_rows::<U3>(3).into_owned();
+
+    assert!(radius_err.norm() < 1e-3);
+    assert!(velocity_err.norm() < 1e-3);
 }
