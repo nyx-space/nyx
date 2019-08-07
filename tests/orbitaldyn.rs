@@ -176,7 +176,7 @@ fn multi_body_dynamics() {
 fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
     extern crate nalgebra as na;
-    use self::na::{Matrix6, Vector6, U3};
+    use self::na::{Matrix6, Vector6, VectorN, U3, U42};
     use hifitime::Epoch;
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::{CelestialDynamicsStm, TwoBodyWithDualStm};
@@ -238,6 +238,10 @@ fn two_body_dual() {
     );
 
     assert_eq!(dynamics.to_state(), init);
+
+    // Test the iter() on a matrix, and try to rebuild it
+    let itered = VectorN::<f64, U42>::from_iterator(fx.iter().chain(grad.iter()).cloned());
+    println!("{}\n\n{}\n\n{}", fx, grad, itered);
 
     let prop_time = 24.0 * 3_600.0;
 

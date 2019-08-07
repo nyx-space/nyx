@@ -389,61 +389,6 @@ impl<'a> CelestialDynamicsStm<'a> {
     }
 }
 
-impl<'a> Dynamics for CelestialDynamicsStm<'a> {
-    type StateSize = U42;
-    /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
-    fn time(&self) -> f64 {
-        self.relative_time
-    }
-
-    fn state(&self) -> VectorN<f64, Self::StateSize> {
-        VectorN::<f64, Self::StateSize>::from_iterator(self.state.to_cartesian_vec().iter().chain(self.stm.iter()).cloned())
-    }
-
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        self.relative_time = new_t;
-        self.state.dt = Epoch::from_tai_seconds(self.init_tai_secs + new_t);
-        self.state.x = new_state[0];
-        self.state.y = new_state[1];
-        self.state.z = new_state[2];
-        self.state.vx = new_state[3];
-        self.state.vy = new_state[4];
-        self.state.vz = new_state[5];
-        // And update the STM
-        let mut stm_k_to_0 = Matrix6::zeros();
-        let mut stm_idx = 6;
-        for i in 0..6 {
-            for j in 0..6 {
-                stm_k_to_0[(i, j)] = new_state[stm_idx];
-                stm_idx += 1;
-            }
-        }
-
-        let mut stm_prev = self.stm;
-        if !stm_prev.try_inverse_mut() {
-            println!("{}", self.stm);
-            panic!("STM not invertible");
-        }
-        self.stm = stm_k_to_0 * stm_prev;
-    }
-
-    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
-        let pos_vel = state.fixed_rows::<U6>(0).into_owned();
-        let (state, grad) = self.compute(t, &pos_vel);
-        let stm_dt = self.stm * grad;
-        // Rebuild the STM as a vector.
-        let mut stm_as_vec = VectorN::<f64, U36>::zeros();
-        let mut stm_idx = 0;
-        for i in 0..6 {
-            for j in 0..6 {
-                stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
-                stm_idx += 1;
-            }
-        }
-        VectorN::<f64, Self::StateSize>::from_iterator(state.iter().chain(stm_as_vec.iter()).cloned())
-    }
-}
-
 impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
     type HyperStateSize = U7;
     type STMSize = U6;
@@ -509,12 +454,70 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
                 }
             }
         }
-        // println!("{}", grad);
+
         (fx, grad)
     }
 }
 
-/*
-od::hyperdual::Hyperdual<f64, propagators::na::U7> *
-propagators::na::Matrix<od::hyperdual::Hyperdual<f64, propagators::na::U7>, propagators::na::U3, propagators::na::U1, propagators::na::ArrayStorage<od::hyperdual::Hyperdual<f64, propagators::na::U7>, propagators::na::U3, propagators::na::U1>>`
-*/
+impl<'a> Dynamics for CelestialDynamicsStm<'a> {
+    type StateSize = U42;
+    /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
+    fn time(&self) -> f64 {
+        self.relative_time
+    }
+
+    fn state(&self) -> VectorN<f64, Self::StateSize> {
+        let mut stm_as_vec = VectorN::<f64, U36>::zeros();
+        let mut stm_idx = 0;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_as_vec[(stm_idx, 0)] = self.stm[(i, j)];
+                stm_idx += 1;
+            }
+        }
+        VectorN::<f64, Self::StateSize>::from_iterator(self.state.to_cartesian_vec().iter().chain(stm_as_vec.iter()).cloned())
+    }
+
+    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+        self.relative_time = new_t;
+        self.state.dt = Epoch::from_tai_seconds(self.init_tai_secs + new_t);
+        self.state.x = new_state[0];
+        self.state.y = new_state[1];
+        self.state.z = new_state[2];
+        self.state.vx = new_state[3];
+        self.state.vy = new_state[4];
+        self.state.vz = new_state[5];
+        // And update the STM
+        let mut stm_k_to_0 = Matrix6::zeros();
+        let mut stm_idx = 6;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_k_to_0[(i, j)] = new_state[(stm_idx, 0)];
+                stm_idx += 1;
+            }
+        }
+
+        let mut stm_prev = self.stm;
+        if !stm_prev.try_inverse_mut() {
+            println!("{}", self.stm);
+            panic!("STM not invertible");
+        }
+        self.stm = stm_k_to_0 * stm_prev;
+    }
+
+    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
+        let pos_vel = state.fixed_rows::<U6>(0).into_owned();
+        let (state, grad) = self.compute(t, &pos_vel);
+        let stm_dt = self.stm * grad;
+        // Rebuild the STM as a vector.
+        let mut stm_as_vec = VectorN::<f64, U36>::zeros();
+        let mut stm_idx = 0;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
+                stm_idx += 1;
+            }
+        }
+        VectorN::<f64, Self::StateSize>::from_iterator(state.iter().chain(stm_as_vec.iter()).cloned())
+    }
+}
