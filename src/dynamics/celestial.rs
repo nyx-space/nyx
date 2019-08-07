@@ -421,6 +421,7 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
 
         let mut stm_prev = self.stm;
         if !stm_prev.try_inverse_mut() {
+            println!("{}", self.stm);
             panic!("STM not invertible");
         }
         self.stm = stm_k_to_0 * stm_prev;
@@ -451,7 +452,7 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
         // Extract data from hyperspace
         let radius = state.fixed_rows::<U3>(0).into_owned();
         let velocity = state.fixed_rows::<U3>(3).into_owned();
-        let radius_real = Vector3::new(radius[0].real(), radius[1].real(), radius[2].real());
+        // let radius_real = Vector3::new(radius[0].real(), radius[1].real(), radius[2].real());
 
         // Code up math as usual
         let rmag = norm(&radius);
@@ -479,19 +480,26 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
                 .unwrap()
                 .geoid_from_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
+            
+            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm);
+
             // State of j-th body as seen from primary body
             let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id).unwrap();
 
-            let r_ij = st_ij.radius();
-            let r_ij3 = st_ij.rmag().powi(3);
-            let r_j = radius_real - r_ij; // sc as seen from 3rd body
-            let r_j3 = r_j.norm().powi(3);
-            let third_body_acc = -third_body.gm * (r_j / r_j3 + r_ij / r_ij3);
-            let third_body_acc_d: Vector3<Hyperdual<f64, U4>> = hyperspace_from_vector(&third_body_acc);
+            let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
+            // dbg!(r_ij);
+            let r_ij3 = dbg!(norm(&r_ij)).powi(3) / gm_d;
+            // XXX: Should I be taking only part of the `radius` vector? ==> seems like I could. And same for r_ij.
+            // TODO: fix bug here. The difference leads to the dual parts nulling themselves out.
+            let r_j = dbg!(radius) - dbg!(r_ij); // sc as seen from 3rd body
+            let r_j3 = norm(&r_j).powi(3) / gm_d;
+            let third_body_acc_d = dbg!(r_j / r_j3 + r_ij / r_ij3);
+            // dbg!(third_body_acc_d);
+            // let third_body_acc_d: Vector3<Hyperdual<f64, U4>> = hyperspace_from_vector(&third_body_acc);
 
             for i in 0..U3::dim() {
                 fx[i + 3] += third_body_acc_d[i][0];
-                for j in 1..U4::dim() {
+                for j in 1..U7::dim() {
                     grad[(i + 3, j - 1)] += third_body_acc_d[i][j];
                 }
             }
@@ -502,7 +510,6 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
 }
 
 /*
-propagators::na::Matrix<od::hyperdual::Hyperdual<f64, propagators::na::U7>, propagators::na::U3, propagators::na::U1, propagators::na::ArrayStorage<od::hyperdual::Hyperdual<f64, propagators::na::U7>, propagators::na::U3, propagators::na::U1>>
-propagators::na::Matrix<f64, propagators::na::U3, propagators::na::U1, propagators::na::ArrayStorage<f64, propagators::na::U3, propagators::na::U1>>`
-
+od::hyperdual::Hyperdual<f64, propagators::na::U7> *
+propagators::na::Matrix<od::hyperdual::Hyperdual<f64, propagators::na::U7>, propagators::na::U3, propagators::na::U1, propagators::na::ArrayStorage<od::hyperdual::Hyperdual<f64, propagators::na::U7>, propagators::na::U3, propagators::na::U1>>`
 */
