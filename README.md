@@ -23,13 +23,13 @@ reaches production-level quality.
 - [x] Orbital state manipulation (from GMAT source code and validated in GMAT)
 - [x] Statistical Orbit Determination: Classical and Extended Kalman Filter
 - [x] Multibody dynamics using XB files (caveat:https://gitlab.com/chrisrabotin/nyx/issues/61)
-- [ ] Orbit Determination with multibody dynamics
-- [ ] Planetary and Solar eclipse and visibility computation
+- [x] Orbit Determination with multibody dynamics
 - [ ] Finite burns with fuel depletion (including low thrust / ion propulsion)
-- [ ] Monte Carlo simulations on different parameters
+- [ ] Planetary and Solar eclipse and visibility computation
 - [ ] Sub-Optimal Control of continuous thrust (Ruggerio, Naasz, Petropoulos)
-- [ ] Link budget computations
 - [ ] Spacecraft attitude control and some useful optimal control algorithms
+- [ ] Monte Carlo simulations on different parameters
+- [ ] Link budget computations
 
 _Note:_ Some of these features may only be made available only through a commercial license in the future.
 

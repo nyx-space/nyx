@@ -16,7 +16,7 @@ fn two_body_custom() {
     let prop_time = 24.0 * 3_600.0;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap();
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let mut state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
@@ -62,7 +62,7 @@ fn two_body_dynamics() {
     let prop_time = 24.0 * 3_600.0;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER).unwrap();
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
