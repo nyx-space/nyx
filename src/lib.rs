@@ -18,6 +18,7 @@
 //!  * Convenient and explicit definition of the dynamics for a simulation (cf. the [dynamics documentation](./dynamics/index.html))
 //!  * Orbital state definition with transformations to other frames
 //!  * Multi body dynamics (known bug for heliocentric propagation: https://gitlab.com/chrisrabotin/nyx/issues/61)
+//!  * Multi body dynamics estimation (i.e. state transition matrix computation, using hyperdual numbers, cf. conf. paper AAS 19-716)
 //!
 //! ## Usage
 //!
@@ -25,7 +26,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.10"
+//! nyx-space = "0.0.11"
 //! ```
 //!
 //! And add the following to your crate root:
@@ -53,7 +54,7 @@ pub mod propagators;
 ///
 /// fn main() {
 ///     let cosm = Cosm::from_xb("./de438s");
-///     let earth_geoid = cosm.geoid_from_id(3).unwrap();
+///     let earth_geoid = cosm.geoid_from_id(3);
 ///
 ///     let dt = Epoch::from_mjd_tai(21_545.0);
 ///     let initial_state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
@@ -107,7 +108,7 @@ pub mod propagators;
 ///     let prop_time = 24.0 * 3_600.0;
 ///
 ///     let cosm = Cosm::from_xb("./de438s");
-///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
+///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 ///
 ///     let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///     // NOTE: It seems that GMAT is using a TT date instead of TAI!
@@ -164,7 +165,7 @@ pub mod dynamics;
 ///     let cosm = Cosm::from_xb("./de438s");
 ///     // In this case, we're creating these states around a Geoid which is Earth.
 ///     // But for simplicity, we're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
-///     let mut earth_geoid = cosm.geoid_from_id(399).unwrap();
+///     let mut earth_geoid = cosm.geoid_from_id(399);
 ///     earth_geoid.gm = 398_600.441_5;
 ///     let dt = Epoch::from_mjd_tai(21545.0);
 ///     let cart = State::<Geoid>::from_cartesian(

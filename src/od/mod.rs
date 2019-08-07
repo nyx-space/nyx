@@ -66,7 +66,7 @@ where
 /// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
 pub trait AutoDiffDynamics: Dynamics
 where
-    Self: Copy + Sized,
+    Self: Sized,
 {
     /// Defines the state size of the estimated state
     type HyperStateSize: DimName;
