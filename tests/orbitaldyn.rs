@@ -179,7 +179,7 @@ fn two_body_dual() {
     use self::na::{Matrix6, Vector6, U3};
     use hifitime::Epoch;
     use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::{CelestialDynamicsStm, TwoBodyWithDualStm};
+    use nyx::dynamics::celestial::CelestialDynamicsStm;
     use nyx::od::AutoDiffDynamics;
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
@@ -207,7 +207,7 @@ fn two_body_dual() {
         -0.000_270_059_537_150_490_5,
     );
 
-    let mut dynamics = TwoBodyWithDualStm::from_state(&init);
+    let mut dynamics = CelestialDynamicsStm::two_body(init);
     let (fx, grad) = dynamics.compute(0.0, &init.to_cartesian_vec());
 
     assert!(
@@ -237,7 +237,7 @@ fn two_body_dual() {
         (grad - expected).norm()
     );
 
-    assert_eq!(dynamics.to_state(), init);
+    assert_eq!(dynamics.state, init);
 
     let prop_time = 24.0 * 3_600.0;
 
@@ -245,25 +245,18 @@ fn two_body_dual() {
     prop.until_time_elapsed(prop_time);
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
-    let final_state = prop.dynamics.pos_vel;
+    let final_state = prop.dynamics.state.to_cartesian_vec();
     let final_stm = prop.dynamics.stm;
     let final_step = prop.latest_details().step;
     prop.until_time_elapsed(-final_step);
 
     // And check the difference
-    let stm_err = final_stm * prop.dynamics.pos_vel - final_state;
+    let stm_err = final_stm * prop.dynamics.state.to_cartesian_vec() - final_state;
     let radius_err = stm_err.fixed_rows::<U3>(0).into_owned();
     let velocity_err = stm_err.fixed_rows::<U3>(3).into_owned();
 
     assert!(radius_err.norm() < 1e-1);
     assert!(velocity_err.norm() < 1e-1);
-
-    // Now let's compare with CelestialDynamicsStm
-    let mut dynamics = CelestialDynamicsStm::new(init, vec![], &cosm);
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
-    prop.until_time_elapsed(prop_time);
-
-    println!("{}", prop.dynamics.stm - final_stm);
 }
 
 #[test]
