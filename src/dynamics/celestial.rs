@@ -25,6 +25,10 @@ pub struct CelestialDynamics<'a> {
 impl<'a> CelestialDynamics<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
     pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+        for exb_id in &bodies {
+            cosm.try_geoid_from_id(*exb_id)
+                .expect("unknown EXB ID in list of third bodies");
+        }
         Self {
             state,
             bodies,
@@ -82,13 +86,9 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         // Get all of the position vectors between the center body and the third bodies
         let jde = Epoch::from_tai_seconds(self.init_tai_secs + t).as_jde_tai_days();
         for exb_id in &self.bodies {
-            let third_body = self
-                .cosm
-                .unwrap()
-                .geoid_from_id(*exb_id)
-                .expect("unknown EXB ID in list of third bodies");
+            let third_body = self.cosm.unwrap().geoid_from_id(*exb_id);
             // State of j-th body as seen from primary body
-            let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id).unwrap();
+            let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id);
 
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
@@ -361,6 +361,11 @@ pub struct CelestialDynamicsStm<'a> {
 impl<'a> CelestialDynamicsStm<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
     pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+        // Check that these bodies are present in the EXB.
+        for exb_id in &bodies {
+            cosm.try_geoid_from_id(*exb_id)
+                .expect("unknown EXB ID in list of third bodies");
+        }
         Self {
             state,
             bodies,
@@ -419,33 +424,22 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
         // Get all of the position vectors between the center body and the third bodies
         let jde = Epoch::from_tai_seconds(self.init_tai_secs + t).as_jde_tai_days();
         for exb_id in &self.bodies {
-            let third_body = self
-                .cosm
-                .unwrap()
-                .geoid_from_id(*exb_id)
-                .expect("unknown EXB ID in list of third bodies");
+            let third_body = self.cosm.unwrap().geoid_from_id(*exb_id);
             let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm);
 
             // State of j-th body as seen from primary body
-            let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id).unwrap();
+            let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id);
 
             let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
-            // dbg!(r_ij);
             let r_ij3 = norm(&r_ij).powi(3) / gm_d;
-            // XXX: Should I be taking only part of the `radius` vector? ==> seems like I could. And same for r_ij.
-            // TODO: fix bug here. The difference leads to the dual parts nulling themselves out.
+            // The difference leads to the dual parts nulling themselves out, so let's fix that.
             let mut r_j = radius - r_ij; // sc as seen from 3rd body
             r_j[0][1] = 1.0;
             r_j[1][2] = 1.0;
             r_j[2][3] = 1.0;
-            // dbg!(r_j);
-            // r_j[1] = Hyperdual::<f64, U7>::from_slice(&[r_j[1].real(), 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
-            // r_j[2] = Hyperdual::<f64, U7>::from_slice(&[r_j[2].real(), 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]);
-            // r_j[3] = Hyperdual::<f64, U7>::from_slice(&[r_j[3].real(), 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
 
             let r_j3 = norm(&r_j).powi(3) / gm_d;
             let third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
-            // dbg!(third_body_acc_d);
 
             for i in 0..U3::dim() {
                 fx[i + 3] += third_body_acc_d[i][0];

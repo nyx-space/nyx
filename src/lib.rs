@@ -107,7 +107,7 @@ pub mod propagators;
 ///     let prop_time = 24.0 * 3_600.0;
 ///
 ///     let cosm = Cosm::from_xb("./de438s");
-///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH).unwrap();
+///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 ///
 ///     let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///     // NOTE: It seems that GMAT is using a TT date instead of TAI!
