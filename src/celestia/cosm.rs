@@ -13,6 +13,8 @@ use celestia::frames::*;
 use celestia::fxb::{Frame as FXBFrame, FrameContainer};
 use celestia::state::State;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::time::Instant;
@@ -35,6 +37,18 @@ pub enum CosmError {
     DisjointFrameCenters(i32, i32),
     /// No path was found to convert from the first orientation to the second
     DisjointFrameOrientations(i32, i32),
+}
+
+impl fmt::Display for CosmError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CosmError: {:?}", self)
+    }
+}
+
+impl Error for CosmError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
 }
 
 impl Cosm {
@@ -560,7 +574,7 @@ mod tests {
         let jde = 2_452_312.5;
 
         let cosm = Cosm::from_xb("./de438s");
-        /*
+
         let ven2ear = cosm
             .intermediate_geoid(
                 &cosm.geoid_from_id(bodies::VENUS_BARYCENTER).unwrap(),
@@ -591,17 +605,17 @@ mod tests {
         let earth_from_moon = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_MOON).unwrap();
 
         assert_eq!(moon_from_emb - earth_from_emb, moon_from_earth);
-        assert_eq!(earth_from_moon, -moon_from_earth);*/
+        assert_eq!(earth_from_moon, -moon_from_earth);
 
         // Check that Sun works
         let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, bodies::EARTH).unwrap();
         println!("{}", sun2ear_state);
-        assert!((sun2ear_state.x - 1.096537548791171E+08).abs() < 1e-1);
-        assert!((sun2ear_state.y - -9.057220115376981E+07).abs() < 1e-1);
-        assert!((sun2ear_state.z - -3.926714485809306E+07).abs() < 1e-1);
-        assert!((sun2ear_state.vx - 2.042686047796898E+01).abs() < 1e-7);
-        assert!((sun2ear_state.vy - 2.041187043287114E+01).abs() < 1e-7);
-        assert!((sun2ear_state.vz - 8.848320853924715E+00).abs() < 1e-7);
+        assert!((sun2ear_state.x - 1.096_537_548_791_171E8).abs() < 1e-1);
+        assert!((sun2ear_state.y - -9.057_220_115_376_98E7).abs() < 1e-1);
+        assert!((sun2ear_state.z - -3.926_714_485_809_306E7).abs() < 1e-1);
+        assert!((sun2ear_state.vx - 2.042_686_047_796_898E1).abs() < 1e-7);
+        assert!((sun2ear_state.vy - 2.041_187_043_287_114E1).abs() < 1e-7);
+        assert!((sun2ear_state.vz - 8.848_320_853_924_715).abs() < 1e-7);
         // And check the converse
         let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SUN).unwrap();
         dbg!(ear2sun_state.radius() - sun2ear_state.radius());
