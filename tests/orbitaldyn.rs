@@ -176,11 +176,13 @@ fn multi_body_dynamics() {
 fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
     extern crate nalgebra as na;
-    use self::na::{Matrix6, Vector6};
+    use self::na::{Matrix6, Vector6, U3};
     use hifitime::Epoch;
     use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::TwoBodyWithDualStm;
+    use nyx::dynamics::celestial::{CelestialDynamicsStm, TwoBodyWithDualStm};
     use nyx::od::AutoDiffDynamics;
+    use nyx::propagators::error_ctrl::RSSStatePV;
+    use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3).unwrap();
@@ -205,7 +207,7 @@ fn two_body_dual() {
         -0.000_270_059_537_150_490_5,
     );
 
-    let dynamics = TwoBodyWithDualStm::from_state(&init);
+    let mut dynamics = TwoBodyWithDualStm::from_state(&init);
     let (fx, grad) = dynamics.compute(0.0, &init.to_cartesian_vec());
 
     assert!(
@@ -236,6 +238,34 @@ fn two_body_dual() {
     );
 
     assert_eq!(dynamics.to_state(), init);
+
+    let prop_time = 24.0 * 3_600.0;
+
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    prop.until_time_elapsed(prop_time);
+
+    // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
+    let final_state = prop.dynamics.pos_vel;
+    let final_stm = prop.dynamics.stm;
+    let final_step = prop.latest_details().step;
+    prop.until_time_elapsed(-final_step);
+
+    // And check the difference
+    let stm_err = final_stm * prop.dynamics.pos_vel - final_state;
+    let radius_err = stm_err.fixed_rows::<U3>(0).into_owned();
+    let velocity_err = stm_err.fixed_rows::<U3>(3).into_owned();
+
+    assert!(radius_err.norm() < 1e-1);
+    assert!(velocity_err.norm() < 1e-1);
+
+    // Now let's compare with CelestialDynamicsStm
+    let mut dynamics = CelestialDynamicsStm::new(init, vec![], &cosm);
+
+    // let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    prop.until_time_elapsed(prop_time);
+
+    println!("{}", prop.dynamics.stm - final_stm);
 }
 
 #[test]
@@ -255,8 +285,8 @@ fn multi_body_dynamics_dual() {
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamicsStm;
-    use nyx::propagators::*;
     use nyx::propagators::error_ctrl::RSSStatePV;
+    use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;
 
@@ -288,11 +318,12 @@ fn multi_body_dynamics_dual() {
         3.028_175_811e-1,
     );
 
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    // let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = Vec::new();
     let mut dynamics = CelestialDynamicsStm::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
-    // let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    // let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.dynamics.state.to_cartesian_vec(), &rslt);
 
