@@ -115,8 +115,15 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 (3) Similarly to (1), we get a very significant error in the orbital momentum computation of both HX and HY. These components are small for the orbital momentum (both on the order of 1e-3 in GMAT and in `nyx`). I am not too concerned about these differences given that the orbital momentum component of the Z axis is exactly that returned by GMAT (all 16 digits are equal).
 
 # Multibody dynamics
-The `multi_body_dynamics` test in tests/orbitaldyn.rs is the validation against GMAT. GMAT uses different gravitational parameters than de438s for all planets. Hence, the error achieved. There also seems to be a time difference between GMAT and TAI (which corresponds to TT ... suspicious).
+The `multi_body_dynamics` test in tests/orbitaldyn.rs is the validation against GMAT. There seems to be a time difference between GMAT and TAI (and the RSS errors are minimized when adding an offset corresponding exactly to TT ... suspicious). **GMAT uses DE405 (released in May 1997) whereas `nyx` uses DE438s (released in March 2018): I believe this explains the large RSS error in position.**
+
 In this test, nyx is 11 to 13 times faster than GMAT, while still running on a single core (like GMAT). The root mean squared errors in position and velocity are as follows:
 ```
-RSS errors:     pos = 5.06214e-4 km     vel = 1.07357e-8 km/s
+RSS errors:     pos = 4.62544e-4 km     vel = 8.84538e-9 km/s
 ```
+
+Final state  | x (km) | y (km) | z (km) | vx (km/s) | vy (km/s) | vz (km/s)
+--|---|---|---|---|---|---|--
+nyx  | 345350.664308004 | 5930.672405520 | 7333.283871226 | 0.02129819650 | 0.95667896503 | 0.30281758249 
+GMAT  | 345350.664030479 | 5930.672047088 | 7333.283779286 | 0.02129819943 | 0.9566789568 | 0.3028175811
+Abs. diff. | 2.775e-4 | 3.584e-4 | 9.194e-5 | 2.926e-9 | 8.231e-9 | 1.391e-9

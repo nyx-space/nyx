@@ -209,6 +209,18 @@ impl Cosm {
         self.try_geoid_from_id(id).unwrap()
     }
 
+    /// Mutates the GM value for the provided geoid id. Panics if ID not found.
+    pub fn mut_gm_for_geoid_id(&mut self, id: i32, gm: f64) {
+        let mut key = None;
+        for geoid_key in self.geoids.keys() {
+            if geoid_key.0 == id {
+                key = Some(geoid_key.clone());
+            }
+        }
+        let mut geoid = self.geoids.get_mut(&key.unwrap()).unwrap();
+        geoid.gm = gm;
+    }
+
     pub fn geoid_from_name(&self, name: String) -> Result<Geoid, CosmError> {
         for ((_, geoid_name), geoid) in &self.geoids {
             if *geoid_name == name {

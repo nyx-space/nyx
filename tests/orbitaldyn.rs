@@ -116,7 +116,7 @@ fn multi_body_dynamics() {
     the difference between nyx and Monte, which I attribute to a propagator difference. Monte and nyx are at 3e-3 km positional error.
 
     GMAT data (uses different GMs)
-    // 345350.66403047      5930.6720470888     7333.283779286      0.02129818943   0.956678956     0.3028175811
+    // 345350.664030479      5930.6720470888     7333.283779286      0.02129818943   0.9566789568     0.3028175811
 
     Monte data (same GMs maybe different DE file though!)
     // 345350.66152566      5930.6726330197     7333.285591307      0.02129812933   0.956678968     0.3028176198
@@ -129,8 +129,13 @@ fn multi_body_dynamics() {
 
     let prop_time = 24.0 * 3_600.0;
 
-    let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let mut cosm = Cosm::from_xb("./de438s");
+    // Modify GMs to match GMAT's
+    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
+    cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
+    cosm.mut_gm_for_geoid_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
+    cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
+    let earth = cosm.geoid_from_id(bodies::EARTH);
 
     let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     // NOTE: It seems that GMAT is using a TT date instead of TAI!
@@ -144,7 +149,7 @@ fn multi_body_dynamics() {
         0.930_284_066,
         0.346_177,
         start_time,
-        earth_geoid,
+        earth,
     );
 
     // GMAT data
@@ -168,8 +173,9 @@ fn multi_body_dynamics() {
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
-    assert!(err_r < 1e-3, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-6, format!("multi body failed in velocity: {:.5e}", err_v));
+
+    assert!(err_r < 5e-4, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 9e-8, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
