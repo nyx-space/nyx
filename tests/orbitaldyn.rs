@@ -472,6 +472,8 @@ fn llo_multi_body_dynamics_adaptive() {
     // Modify GMs to match GMAT's
     cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
     cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
+    cosm.mut_gm_for_geoid_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
+    cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
     let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -499,7 +501,7 @@ fn llo_multi_body_dynamics_adaptive() {
         0.152_124_091_174_275_7,
     );
 
-    let bodies = vec![bodies::EARTH_MOON];
+    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(llo_xmtr, bodies, &cosm);
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
@@ -520,6 +522,127 @@ fn llo_multi_body_dynamics_adaptive() {
 
     assert!(err_r < 4e-6, format!("multi body failed in position: {:.5e}", err_r));
     assert!(err_v < 8e-11, format!("multi body failed in velocity: {:.5e}", err_v));
+}
+
+#[test]
+fn leo_multi_body_dynamics_adaptive_wo_moon() {
+    /*
+    We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
+    The state in `rslt` is exactly the GMAT output.
+    */
+    use hifitime::Epoch;
+    use na::Vector6;
+    use nyx::celestia::{bodies, Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
+    use nyx::propagators::{PropOpts, Propagator, RK89};
+
+    let prop_time = 24.0 * 3_600.0;
+
+    let mut cosm = Cosm::from_xb("./de438s");
+    // Modify GMs to match GMAT's
+    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
+    cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
+    cosm.mut_gm_for_geoid_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
+    cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
+    let earth = cosm.geoid_from_id(bodies::EARTH);
+
+    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
+    start_time.mut_add_secs(32.184);
+
+    let leo = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth);
+
+    // GMAT data
+    let rslt = Vector6::new(
+        -5_971.190_141_842_914,
+        3_945.572_972_028_369,
+        2_864.554_642_502_679,
+        0.049_014_376_371_383_95,
+        -4.185_051_832_316_421,
+        5.848_971_837_743_221,
+    );
+
+    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    prop.until_time_elapsed(prop_time);
+    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+
+    println!("Absolute errors");
+    let delta = prop.state() - rslt;
+    for i in 0..6 {
+        print!("{:.0e}\t", delta[i].abs());
+    }
+    println!();
+
+    println!(
+        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
+        err_r, err_v, leo, prop.dynamics.state
+    );
+
+    assert!(err_r < 5e-7, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 5e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+}
+
+#[test]
+fn leo_multi_body_dynamics_adaptive() {
+    /*
+    We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
+    The state in `rslt` is exactly the GMAT output.
+    */
+    use hifitime::Epoch;
+    use na::Vector6;
+    use nyx::celestia::{bodies, Cosm, Geoid, State};
+    use nyx::dynamics::celestial::CelestialDynamics;
+    use nyx::propagators::{PropOpts, Propagator, RK89};
+
+    let prop_time = 24.0 * 3_600.0;
+
+    let mut cosm = Cosm::from_xb("./de438s");
+    // Modify GMs to match GMAT's
+    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
+    cosm.mut_gm_for_geoid_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
+    cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
+    let earth = cosm.geoid_from_id(bodies::EARTH);
+
+    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
+    start_time.mut_add_secs(32.184);
+
+    let leo = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth);
+
+    // GMAT data
+    let rslt = Vector6::new(
+        -5_971.190_491_039_24,
+        3_945.529_211_711_111,
+        2_864.613_171_213_388,
+        0.049_086_325_111_121_92,
+        -4.185_065_854_096_239,
+        5.848_960_991_136_447,
+    );
+
+    let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    prop.until_time_elapsed(prop_time);
+    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+
+    println!("Absolute errors");
+    let delta = prop.state() - rslt;
+    for i in 0..6 {
+        print!("{:.0e}\t", delta[i].abs());
+    }
+    println!();
+
+    println!(
+        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
+        err_r, err_v, leo, prop.dynamics.state
+    );
+
+    assert!(err_r < 3e-6, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 3e-9, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
