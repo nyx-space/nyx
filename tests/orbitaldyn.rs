@@ -129,9 +129,7 @@ fn halo_earth_moon_dynamics() {
     cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -197,9 +195,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -269,9 +265,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let llo_xmtr = State::<Geoid>::from_cartesian(
         3.919_869_89e5,
@@ -340,9 +334,7 @@ fn halo_multi_body_dynamics() {
     cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -410,9 +402,7 @@ fn halo_multi_body_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -480,9 +470,7 @@ fn llo_multi_body_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let llo_xmtr = State::<Geoid>::from_cartesian(
         3.919_869_89e5,
@@ -550,9 +538,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let leo = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth);
 
@@ -610,9 +596,7 @@ fn leo_multi_body_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let leo = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth);
 
@@ -750,9 +734,7 @@ fn multi_body_dynamics_dual() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 
-    let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    // NOTE: Until hifitime version 1.0.2, we need to manually change to ET/TDT
-    start_time.mut_add_secs(32.184);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
