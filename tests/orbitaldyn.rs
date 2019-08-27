@@ -445,7 +445,7 @@ fn halo_multi_body_dynamics_adaptive() {
     );
 
     assert!(err_r < 4e-6, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 8e-11, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_v < 1e-10, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
