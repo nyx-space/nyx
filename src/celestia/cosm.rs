@@ -625,6 +625,15 @@ mod tests {
         assert_eq!(moon_from_emb - earth_from_emb, moon_from_earth);
         assert_eq!(earth_from_moon, -moon_from_earth);
 
+        // Check that Moon <-> Earth state is correct from JPL Horizons
+        println!("{}", moon_from_earth);
+        assert!(dbg!(moon_from_earth.x - -8.264240671516322E4).abs() < 1e-1);
+        assert!(dbg!(moon_from_earth.y - -3.497118204014440E5).abs() < 1e-1);
+        assert!(dbg!(moon_from_earth.z - -1.461559389839604E5).abs() < 1e-1);
+        assert!(dbg!(moon_from_earth.vx - 9.724906303078747E-1).abs() < 1e-7);
+        assert!(dbg!(moon_from_earth.vy - -2.062424425685089E-1).abs() < 1e-7);
+        assert!(dbg!(moon_from_earth.vz - -1.861311547467976E-1).abs() < 1e-7);
+
         // Check that Sun works
         let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, bodies::EARTH);
         println!("{}", sun2ear_state);
