@@ -115,8 +115,22 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 (3) Similarly to (1), we get a very significant error in the orbital momentum computation of both HX and HY. These components are small for the orbital momentum (both on the order of 1e-3 in GMAT and in `nyx`). I am not too concerned about these differences given that the orbital momentum component of the Z axis is exactly that returned by GMAT (all 16 digits are equal).
 
 # Multibody dynamics
-The `multi_body_dynamics` test in tests/orbitaldyn.rs is the validation against GMAT. GMAT uses different gravitational parameters than de438s for all planets. Hence, the error achieved. There also seems to be a time difference between GMAT and TAI (which corresponds to TT ... suspicious).
-In this test, nyx is 11 to 13 times faster than GMAT, while still running on a single core (like GMAT). The root mean squared errors in position and velocity are as follows:
-```
-RSS errors:     pos = 5.06214e-4 km     vel = 1.07357e-8 km/s
-```
+The root mean squared errors in position and velocity are as follows:
+
+The following scenario permutations are tested:
++ Halo orbit, LLO or LEO
++ RK8 10s time step, or RK89 with adaptive step size
++ Earth & Moon point masses, or Earth, Moon, Sun and Jupiter
+
+Position errors are in **kilometers**, and velocity errors in **kilometers per second**.
+
+Orbit | Adaptive/Fixed | Point masses | x | y | z | vx | vy | vz | RSS position error | RSS velocity error
+--|---|---|---|---|---|---|---|---|---|--
+Halo | Fixed | Earth Moon  | 2e-6  |  3e-6  |  4e-7 |   4e-11 |  6e-11 |  3e-12 | **3.43547e-6** | **7.59319e-11**
+Halo | Adaptive | Earth Moon | 2e-6  |  3e-6  |  4e-7 |   4e-11 |  7e-11 |  3e-12 |  **3.59885e-6** | **7.65592e-11**
+Halo | Fixed | Earth Moon Sun Jupiter | 2e-6  |  3e-6  |  4e-7  |  4e-11 |  6e-11  | 3e-12 | **3.43284e-6** | **7.58771e-11**
+Halo | Adaptive | Earth Moon Sun Jupiter | 2e-6 |   3e-6 |   4e-7 |   4e-11 |  6e-11 |  4e-12 | **3.28520e-6** | **7.55620e-11**
+LLO **FAIL** | Adaptive | Earth Moon | 1e-3  |  1e-2  |  2e-3  |  6e-6  |  3e-7  |  7e-7 | **1.10137e-2** | **5.61146e-6**
+LLO **FAIL** | Adaptive | Earth Moon Sun Jupiter | 1e-3  |  1e-2  |  2e-3  |  6e-6  |  3e-7  |  7e-7 | **1.10190e-2** | **5.61904e-6**
+LEO | Adaptive | Earth Moon Sun Jupiter | 3e-9  |  3e-7  |  4e-7  |  3e-10 |  2e-10 |  2e-10 | **2.63084e-6** | **2.45336e-9**
+LEO | Adaptive | Earth Sun Jupiter | 2e-8  |  2e-6  |  2e-6  |  2e-9  |  1e-9  |  9e-10 | **4.76933e-7** | **4.44756e-10**
