@@ -110,9 +110,7 @@ pub mod propagators;
 ///     let cosm = Cosm::from_xb("./de438s");
 ///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 ///
-///     let mut start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-///     // NOTE: It seems that GMAT is using a TT date instead of TAI!
-///     start_time.mut_add_secs(32.184);
+///     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///
 ///     let halo_rcvr = State::<Geoid>::from_cartesian(
 ///         333_321.004_516,
