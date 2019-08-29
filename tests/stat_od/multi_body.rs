@@ -12,7 +12,6 @@ use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
 use self::nyx::propagators::error_ctrl::{LargestError, RSSStepPV};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -128,7 +127,7 @@ fn multi_body_ckf_perfect_stations() {
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
                 assert!(
-                    latest_est.state.norm() < EPSILON,
+                    latest_est.state.norm() < 1e-6, // Less than the noise
                     "estimate error should be zero (perfect dynamics) ({:e})",
                     latest_est.state.norm()
                 );
