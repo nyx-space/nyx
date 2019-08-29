@@ -195,7 +195,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -208,18 +208,13 @@ fn halo_earth_moon_dynamics_adaptive() {
         earth,
     );
 
-    // GMAT data
-    // Rel on:
-    // 345395.216 735 6765           5967.890268488404           7350.73461958122            0.02237075422400089          0.9574508184668492           0.3031720196450679
-    // Rel off:
-    //  345395.216_735_676_5           5967.890268488404           7350.73461958122            0.02237075422400089          0.9574508184668492           0.3031720196450679
     let rslt = Vector6::new(
-        345395.216_735_676_5,
-        5967.890268488404,
-        7350.73461958122,
-        0.02237075422400089,
-        0.9574508184668492,
-        0.3031720196450679,
+        343016.0281933062,
+        6118.870782679712,
+        9463.253311291081,
+        -0.03388550441829203,
+        0.9619425779605422,
+        0.3517381217093635,
     );
 
     let bodies = vec![bodies::EARTH_MOON];
@@ -241,8 +236,8 @@ fn halo_earth_moon_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 3e-5, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 6e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_r < 1e-6, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-11, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
@@ -265,7 +260,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
     let llo_xmtr = State::<Geoid>::from_cartesian(
         3.919_869_89e5,
@@ -280,12 +275,12 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     // GMAT data
     let rslt = Vector6::new(
-        399_891.852_253_438,
-        -182.241_638_719_317_7,
-        -40_304.879_384_388_75,
-        0.154_312_253_615_722_5,
-        -0.378_633_366_237_038_9,
-        0.152_743_615_566_834_3,
+        322883.8868354332,
+        97580.280858158,
+        -30871.08580743158,
+        -0.9340396297270035,
+        1.980106615205608,
+        0.4726308955048544,
     );
 
     let bodies = vec![bodies::EARTH_MOON];
@@ -307,8 +302,8 @@ fn llo_earth_moon_dynamics_adaptive() {
         err_r, err_v, llo_xmtr, prop.dynamics.state
     );
 
-    assert!(err_r < 2e-2, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-5, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_r < 1e-5, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-8, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
@@ -402,7 +397,8 @@ fn halo_multi_body_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    // let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
     let halo_rcvr = State::<Geoid>::from_cartesian(
         333_321.004_516,
@@ -417,12 +413,12 @@ fn halo_multi_body_dynamics_adaptive() {
 
     // GMAT data
     let rslt = Vector6::new(
-        345_350.664_306_402_3,
-        5_930.672_402_673_02,
-        7_333.283_870_875_436,
-        0.021_298_196_464_808_92,
-        0.956_678_964_966_713_7,
-        0.302_817_582_486_872_2,
+        343063.3150797269,
+        6045.912866799058,
+        9430.044002816507,
+        -0.03284104050047527,
+        0.9602726135306772,
+        0.3509814313220894,
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
@@ -444,8 +440,8 @@ fn halo_multi_body_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 4e-6, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_r < 1e-6, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-11, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
@@ -470,7 +466,7 @@ fn llo_multi_body_dynamics_adaptive() {
     cosm.mut_gm_for_geoid_id(bodies::SUN, 132_712_440_017.99);
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
-    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
     let llo_xmtr = State::<Geoid>::from_cartesian(
         3.919_869_89e5,
@@ -485,12 +481,12 @@ fn llo_multi_body_dynamics_adaptive() {
 
     // GMAT data
     let rslt = Vector6::new(
-        399_894.215_878_417,
-        -179.851_733_070_170_1,
-        -40_304.171_455_428_86,
-        0.151_370_122_296_062_1,
-        -0.380_202_640_292_017_9,
-        0.152_124_091_174_275_7,
+        322931.8517607412,
+        97497.69973881113,
+        -30899.3238203672,
+        -0.9330952021437368,
+        1.978291140770421,
+        0.4720361979683693,
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
@@ -512,8 +508,8 @@ fn llo_multi_body_dynamics_adaptive() {
         err_r, err_v, llo_xmtr, prop.dynamics.state
     );
 
-    assert!(err_r < 2e-2, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 7e-6, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_r < 2e-6, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-9, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]

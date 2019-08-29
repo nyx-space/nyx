@@ -4,26 +4,19 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
-use self::nyx::celestia::{Cosm, Geoid, State};
+use self::na::{Matrix2, Matrix6, Vector2, Vector6};
+use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
-use self::nyx::od::kalman::{Estimate, FilterError, KF};
+use self::nyx::od::kalman::{Estimate, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
 use self::nyx::propagators::error_ctrl::{LargestError, RSSStepPV};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
-macro_rules! f64_nil {
-    ($x:expr, $msg:expr) => {
-        assert!($x.abs() < EPSILON, $msg)
-    };
-}
-
 #[test]
-fn muli_body_ckf_perfect_stations() {
+fn multi_body_ckf_perfect_stations() {
     use std::{io, thread};
 
     // Define the ground stations.
@@ -52,6 +45,7 @@ fn muli_body_ckf_perfect_stations() {
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
+        let cosm = Cosm::from_xb("./de438s");
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = CelestialDynamics::new(initial_state, bodies, &cosm);
         // let mut dynamics = CelestialDynamics::two_body(initial_state);
@@ -133,7 +127,7 @@ fn muli_body_ckf_perfect_stations() {
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
                 assert!(
-                    latest_est.state.norm() < EPSILON,
+                    latest_est.state.norm() < 1e-6, // Less than the noise
                     "estimate error should be zero (perfect dynamics) ({:e})",
                     latest_est.state.norm()
                 );

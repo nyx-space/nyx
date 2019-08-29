@@ -115,6 +115,9 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 (3) Similarly to (1), we get a very significant error in the orbital momentum computation of both HX and HY. These components are small for the orbital momentum (both on the order of 1e-3 in GMAT and in `nyx`). I am not too concerned about these differences given that the orbital momentum component of the Z axis is exactly that returned by GMAT (all 16 digits are equal).
 
 # Multibody dynamics
+
+*Note:* In the LLO scenarios, if propagation start on 2020 Jan 01 midnight TAI, the GMAT results and nyx results vary significantly. Nyx relies on the `hifitime` library for date time conversions, which has its own set of thorough validation. Hence, I have yet to find a good explanation for why the validation fails in 2020. In the following table, to avoid any misunderstandings, the start time of the one-day propagation is added.
+
 The root mean squared errors in position and velocity are as follows:
 
 The following scenario permutations are tested:
@@ -124,13 +127,13 @@ The following scenario permutations are tested:
 
 Position errors are in **kilometers**, and velocity errors in **kilometers per second**.
 
-Orbit | Adaptive/Fixed | Point masses | x | y | z | vx | vy | vz | RSS position error | RSS velocity error
---|---|---|---|---|---|---|---|---|---|--
-Halo | Fixed | Earth Moon  | 2e-6  |  3e-6  |  4e-7 |   4e-11 |  6e-11 |  3e-12 | **3.43547e-6** | **7.59319e-11**
-Halo | Adaptive | Earth Moon | 2e-6  |  3e-6  |  4e-7 |   4e-11 |  7e-11 |  3e-12 |  **3.59885e-6** | **7.65592e-11**
-Halo | Fixed | Earth Moon Sun Jupiter | 2e-6  |  3e-6  |  4e-7  |  4e-11 |  6e-11  | 3e-12 | **3.43284e-6** | **7.58771e-11**
-Halo | Adaptive | Earth Moon Sun Jupiter | 2e-6 |   3e-6 |   4e-7 |   4e-11 |  6e-11 |  4e-12 | **3.28520e-6** | **7.55620e-11**
-LLO **FAIL** | Adaptive | Earth Moon | 1e-3  |  1e-2  |  2e-3  |  6e-6  |  3e-7  |  7e-7 | **1.10137e-2** | **5.61146e-6**
-LLO **FAIL** | Adaptive | Earth Moon Sun Jupiter | 1e-3  |  1e-2  |  2e-3  |  6e-6  |  3e-7  |  7e-7 | **1.10190e-2** | **5.61904e-6**
-LEO | Adaptive | Earth Moon Sun Jupiter | 3e-9  |  3e-7  |  4e-7  |  3e-10 |  2e-10 |  2e-10 | **2.63084e-6** | **2.45336e-9**
-LEO | Adaptive | Earth Sun Jupiter | 2e-8  |  2e-6  |  2e-6  |  2e-9  |  1e-9  |  9e-10 | **4.76933e-7** | **4.44756e-10**
+Orbit | Adaptive/Fixed | Point masses | Prop. start date | x | y | z | vx | vy | vz | RSS position error | RSS velocity error
+--|---|---|---|---|---|---|---|---|---|---|--
+Halo | Fixed | Earth Moon  | 2020-01-01 | 2e-6  |  4e-6  |  5e-7  |  5e-11  | 8e-11  | 4e-12 | **4.00887e-6** | **8.93137e-11**
+Halo | Adaptive | Earth Moon | 2002-02-07 | 4e-7  |  2e-7  |  6e-8  |  9e-12 |  4e-12 |  1e-12 | **3.93309e-7** | **9.79715e-12**
+Halo | Fixed | Earth Moon Sun Jupiter | 2020-01-01 | 2e-6  |  4e-6  |  5e-7  |  5e-11 |  8e-11 |  4e-12 | **3.99822e-6** | **8.92397e-11**
+Halo | Adaptive | Earth Moon Sun Jupiter | 2002-02-07 | 3e-7  |  3e-8 |   1e-8  |  8e-12 |  4e-12 |  1e-12 | **3.26714e-7** | **8.70780e-12**
+LLO | Adaptive | Earth Moon | 2002-02-07 | 2e-7  |  5e-7  |  1e-7  |  7e-12  |  3e-12 |  5e-13 | **5.02758e-7** | **7.76362e-12**
+LLO | Adaptive | Earth Moon Sun Jupiter | 2002-02-07 | 7e-7  |  7e-7  |  2e-7  |  9e-12 |  4e-12 |  3e-13 |  **1.06129e-6** | **9.22374e-12**
+LEO | Adaptive | Earth Moon Sun Jupiter | 2020-01-01 | 2e-8  |  2e-6  |  2e-6  |  2e-9  |  1e-9  |  9e-10 | **2.63493e-6** | **2.45722e-9**
+LEO | Adaptive | Earth Sun Jupiter | 2020-01-01 | 3e-9  |  3e-7  |  4e-7  |  3e-10 |  2e-10 |  2e-10 | **4.82755e-7** | **4.50211e-10**
