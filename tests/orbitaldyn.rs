@@ -236,8 +236,8 @@ fn halo_earth_moon_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 3e-5, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 6e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_r < 1e-6, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-11, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
@@ -302,8 +302,8 @@ fn llo_earth_moon_dynamics_adaptive() {
         err_r, err_v, llo_xmtr, prop.dynamics.state
     );
 
-    assert!(err_r < 2e-2, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-5, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_r < 1e-5, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-8, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
@@ -440,8 +440,8 @@ fn halo_multi_body_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 4e-6, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(err_r < 1e-6, format!("multi body failed in position: {:.5e}", err_r));
+    assert!(err_v < 1e-11, format!("multi body failed in velocity: {:.5e}", err_v));
 }
 
 #[test]
