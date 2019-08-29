@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{Cosm, Geoid, State, bodies};
+use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::kalman::{Estimate, KF};
 use self::nyx::od::ranging::GroundStation;
