@@ -631,32 +631,32 @@ mod tests {
 
         let ven2ear_state = cosm.celestial_state(bodies::VENUS_BARYCENTER, jde, bodies::EARTH_MOON);
         assert_eq!(ven2ear_state.frame.id(), bodies::EARTH_MOON);
-        assert!(dbg!(ven2ear_state.x - 2.0512621957200775e+08).abs() < EPSILON || true);
-        assert!(dbg!(ven2ear_state.y - -1.3561254792308527e+08).abs() < EPSILON || true);
-        assert!(dbg!(ven2ear_state.z - -6.5578399676151529e+07).abs() < EPSILON || true);
-        assert!(dbg!(ven2ear_state.vx - 3.6051374278177832e+01).abs() < EPSILON || true);
-        assert!(dbg!(ven2ear_state.vy - 4.8889024622170766e+01).abs() < EPSILON || true);
-        assert!(dbg!(ven2ear_state.vz - 2.0702933800843084e+01).abs() < EPSILON || true);
+        assert!(dbg!(ven2ear_state.x - 2.051_262_195_720_077_5e8).abs() < EPSILON || true);
+        assert!(dbg!(ven2ear_state.y - -1.356_125_479_230_852_7e8).abs() < EPSILON || true);
+        assert!(dbg!(ven2ear_state.z - -6.557_839_967_615_153e7).abs() < EPSILON || true);
+        assert!(dbg!(ven2ear_state.vx - 3.605_137_427_817_783e1).abs() < EPSILON || true);
+        assert!(dbg!(ven2ear_state.vy - 4.888_902_462_217_076_6e1).abs() < EPSILON || true);
+        assert!(dbg!(ven2ear_state.vz - 2.070_293_380_084_308_4e1).abs() < EPSILON || true);
 
         // Check that conversion via a center frame works
         let moon_from_emb = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER);
         // Check this state again, as in the direct test
         assert_eq!(moon_from_emb.frame.id(), bodies::EARTH_BARYCENTER);
-        assert!(dbg!(moon_from_emb.x - -8.1576591043050896e+04).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_emb.y - -3.4547568914480874e+05).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_emb.z - -1.4439185901465410e+05).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_emb.vx - 9.6071184439702662e-01).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_emb.vy - -2.0358322542180365e-01).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_emb.vz - -1.8380551745739407e-01).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_emb.x - -8.157_659_104_305_09e4).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_emb.z - -1.443_918_590_146_541e5).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_emb.vx - 9.607_118_443_970_266e-1).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < EPSILON || true);
 
         let earth_from_emb = cosm.celestial_state(bodies::EARTH, test_epoch.as_jde_et_days(), bodies::EARTH_BARYCENTER);
         // Idem
-        assert!(dbg!(earth_from_emb.x - 1.0033950894874154e+03).abs() < EPSILON || true);
-        assert!(dbg!(earth_from_emb.y - 4.2493637646888546e+03).abs() < EPSILON || true);
-        assert!(dbg!(earth_from_emb.z - 1.7760252107225667e+03).abs() < EPSILON || true);
-        assert!(dbg!(earth_from_emb.vx - -1.1816791248014408e-02).abs() < EPSILON || true);
-        assert!(dbg!(earth_from_emb.vy - 2.5040812085717632e-03).abs() < EPSILON || true);
-        assert!(dbg!(earth_from_emb.vz - 2.2608146685133296e-03).abs() < EPSILON || true);
+        assert!(dbg!(earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < EPSILON || true);
+        assert!(dbg!(earth_from_emb.y - 4.249_363_764_688_855e3).abs() < EPSILON || true);
+        assert!(dbg!(earth_from_emb.z - 1.776_025_210_722_566_7e3).abs() < EPSILON || true);
+        assert!(dbg!(earth_from_emb.vx - -1.181_679_124_801_440_8e-2).abs() < EPSILON || true);
+        assert!(dbg!(earth_from_emb.vy - 2.504_081_208_571_763e-3).abs() < EPSILON || true);
+        assert!(dbg!(earth_from_emb.vz - 2.260_814_668_513_329_6e-3).abs() < EPSILON || true);
 
         let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH);
         let earth_from_moon = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_MOON);
@@ -666,12 +666,12 @@ mod tests {
 
         println!("{}", moon_from_earth);
         // The error is high! 0.5 meters at the worst.
-        assert!(dbg!(moon_from_earth.x - -8.2579986132538310e+04).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_earth.y - -3.4972505290949758e+05).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_earth.z - -1.4616788422537665e+05).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_earth.vx - 9.7252863564504100e-01).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_earth.vy - -2.0608730663037542e-01).abs() < EPSILON || true);
-        assert!(dbg!(moon_from_earth.vz - -1.8606633212590740e-01).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_earth.x - -8.257_998_613_253_831e4).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_earth.y - -3.497_250_529_094_976e5).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_earth.z - -1.461_678_842_253_766_5e5).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_earth.vx - 9.725_286_356_450_41e-1).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_earth.vy - -2.060_873_066_303_754_2e-1).abs() < EPSILON || true);
+        assert!(dbg!(moon_from_earth.vz - -1.860_663_321_259_074e-1).abs() < EPSILON || true);
 
         // Check that Sun works -- it does not work well!
         let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, bodies::EARTH);
@@ -680,12 +680,12 @@ mod tests {
         let delta_state = sun2ear_state + dbg!(-sun_from_ssb + emb_from_ssb + earth_from_emb);
         assert!(delta_state.radius().norm() < EPSILON);
         assert!(delta_state.velocity().norm() < EPSILON);
-        assert!(dbg!(sun2ear_state.x - 1.0973764590146853e+08).abs() < EPSILON || true);
-        assert!(dbg!(sun2ear_state.y - -9.0221165978615537e+07).abs() < EPSILON || true);
-        assert!(dbg!(sun2ear_state.z - -3.9120409135249130e+07).abs() < EPSILON || true);
-        assert!(dbg!(sun2ear_state.vx - 1.9454041488910683e+01).abs() < EPSILON || true);
-        assert!(dbg!(sun2ear_state.vy - 2.0618199805434404e+01).abs() < EPSILON || true);
-        assert!(dbg!(sun2ear_state.vz - 9.0344921170719186e+00).abs() < EPSILON || true);
+        assert!(dbg!(sun2ear_state.x - 1.097_376_459_014_685_3e8).abs() < EPSILON || true);
+        assert!(dbg!(sun2ear_state.y - -9.022_116_597_861_554e7).abs() < EPSILON || true);
+        assert!(dbg!(sun2ear_state.z - -3.912_040_913_524_913e7).abs() < EPSILON || true);
+        assert!(dbg!(sun2ear_state.vx - 1.945_404_148_891_068_3e1).abs() < EPSILON || true);
+        assert!(dbg!(sun2ear_state.vy - 2.061_819_980_543_440_4e1).abs() < EPSILON || true);
+        assert!(dbg!(sun2ear_state.vz - 9.034_492_117_071_919).abs() < EPSILON || true);
         // And check the converse
         let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SUN);
         dbg!(ear2sun_state.radius() - sun2ear_state.radius());
