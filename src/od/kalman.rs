@@ -174,6 +174,20 @@ where
             stm: MatrixMN::<f64, S, S>::zeros(),
         }
     }
+
+    pub fn header() -> Vec<String> {
+        let mut hdr_v = Vec::with_capacity(3 * S::dim());
+        for i in 0..S::dim() {
+            hdr_v.push(format!("state_{}", i));
+        }
+        // Serialize the covariance
+        for i in 0..S::dim() {
+            for j in 0..S::dim() {
+                hdr_v.push(format!("covar_{}_{}", i, j));
+            }
+        }
+        hdr_v
+    }
 }
 
 impl<S> fmt::Display for Estimate<S>

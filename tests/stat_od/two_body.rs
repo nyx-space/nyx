@@ -161,6 +161,9 @@ fn ekf_fixed_step_perfect_stations() {
     println!("Will process {} measurements", measurements.len());
 
     let mut this_dt = dt;
+
+    let mut last_est = None;
+
     for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
@@ -194,12 +197,25 @@ fn ekf_fixed_step_perfect_stations() {
                 let now = prop_est.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
                 let new_state = prop_est.dynamics.state.to_cartesian_vec() + latest_est.state;
                 prop_est.dynamics.set_orbital_state(now, &new_state);
-                break; // We know that only one station is in visibility at each time.
+
+                last_est = Some(latest_est);
+                break;
             }
         }
         if still_empty {
             // We're doing perfect everything, so we should always be in visibility
             panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
+        }
+    }
+
+    // Check that the covariance deflated
+    if let Some(est) = last_est {
+        for i in 0..6 {
+            if i < 3 {
+                assert!(est.covar[(i, i)].abs() < covar_radius, "covar radius did not decrease");
+            } else {
+                assert!(est.covar[(i, i)].abs() < covar_velocity, "covar velocity did not decrease");
+            }
         }
     }
 }
@@ -252,7 +268,7 @@ fn ckf_fixed_step_perfect_stations() {
                 let delta = t - prev_t;
                 measurements.push((delta, meas));
                 prev_t = t;
-                break; // We know that only one station is in visibility at each time.
+                break;
             }
         }
     }
@@ -263,7 +279,7 @@ fn ckf_fixed_step_perfect_stations() {
     let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
     let mut tb_estimator = CelestialDynamicsStm::two_body(initial_state);
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
-    let covar_radius = 1.0e-6;
+    let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
@@ -291,6 +307,8 @@ fn ckf_fixed_step_perfect_stations() {
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
 
+    let mut last_est = None;
+
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = (*duration) as f64;
@@ -317,15 +335,27 @@ fn ckf_fixed_step_perfect_stations() {
                     latest_est.state.norm()
                 );
                 if !printed {
-                    wtr.serialize(latest_est).expect("could not write to stdout");
+                    wtr.serialize(latest_est.clone()).expect("could not write to stdout");
                     printed = true;
                 }
+                last_est = Some(latest_est);
                 break; // We know that only one station is in visibility at each time.
             }
         }
         if still_empty {
             // We're doing perfect everything, so we should always be in visibility
             panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
+        }
+    }
+
+    // Check that the covariance deflated
+    if let Some(est) = last_est {
+        for i in 0..6 {
+            if i < 3 {
+                assert!(est.covar[(i, i)].abs() < covar_radius, "covar radius did not decrease");
+            } else {
+                assert!(est.covar[(i, i)].abs() < covar_velocity, "covar velocity did not decrease");
+            }
         }
     }
 }

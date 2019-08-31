@@ -10,8 +10,9 @@ use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::kalman::{Estimate, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
-use self::nyx::propagators::error_ctrl::{LargestError, RSSStepPV};
+use self::nyx::propagators::error_ctrl::{RSSStep, RSSStepPV};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -40,7 +41,7 @@ fn multi_body_ckf_perfect_stations() {
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(3);
-    let dt = Epoch::from_mjd_tai(21545.0);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
@@ -48,25 +49,21 @@ fn multi_body_ckf_perfect_stations() {
         let cosm = Cosm::from_xb("./de438s");
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = CelestialDynamics::new(initial_state, bodies, &cosm);
-        // let mut dynamics = CelestialDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = 0.0;
     while let Ok((t, state_vec)) = truth_rx.recv() {
-        // Convert the state to ECI.
-        let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
+        let this_dt = Epoch::from_tai_seconds(dt.as_tai_seconds() + t);
         let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
+
         for station in all_stations.iter() {
             let meas = station.measure(rx_state, this_dt);
             if meas.visible() {
-                let delta = t - prev_t;
-                measurements.push((delta, meas));
-                prev_t = t;
-                break; // We know that only one station is in visibility at each time.
+                measurements.push((t, meas));
+                break;
             }
         }
     }
@@ -74,12 +71,12 @@ fn multi_body_ckf_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
+    let opts_est = PropOpts::with_fixed_step(step_size, RSSStep {});
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut tb_estimator = CelestialDynamicsStm::new(initial_state, bodies, &cosm);
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
-    let covar_radius = 1.0e-6;
-    let covar_velocity = 1.0e-6;
+    let mut estimator = CelestialDynamicsStm::new(initial_state, bodies, &cosm);
+    let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
+    let covar_radius = 1.0e-3_f64.powi(2);
+    let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
         covar_radius,
@@ -96,45 +93,56 @@ fn multi_body_ckf_perfect_stations() {
         predicted: false,
     };
 
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
     println!("Will process {} measurements", measurements.len());
 
-    let mut this_dt = dt;
     let mut printed = false;
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
 
-    for (duration, real_meas) in measurements.iter() {
+    let mut last_est = None;
+    let mut prev_dt = 0.0;
+    for (msr_delta_t, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time);
+        let delta_time = msr_delta_t - prev_dt;
+        let (new_t, _) = prop_est.until_time_elapsed(delta_time);
+        prev_dt = *msr_delta_t;
         // Update the STM of the KF
         ckf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
         assert!(delta_time > 0.0, "repeated time");
-        this_dt.mut_add_secs(delta_time);
+        let mut this_dt = dt;
+        this_dt.mut_add_secs(new_t);
         let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.state.to_cartesian_vec(), this_dt, earth_geoid);
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
+                let delta_obs = (real_meas.observation() - computed_meas.observation()).norm();
+                if delta_obs > EPSILON {
+                    println!("{} {:e}", this_dt.as_tai_seconds(), delta_obs);
+                }
                 let latest_est = ckf
                     .measurement_update(real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
                 assert!(
-                    latest_est.state.norm() < 1e-6, // Less than the noise
+                    latest_est.state.norm() < 1e-6,
                     "estimate error should be zero (perfect dynamics) ({:e})",
                     latest_est.state.norm()
                 );
+
                 if !printed {
-                    wtr.serialize(latest_est).expect("could not write to stdout");
+                    wtr.serialize(latest_est.clone()).expect("could not write to stdout");
                     printed = true;
                 }
+
+                last_est = Some(latest_est);
+
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -143,4 +151,7 @@ fn multi_body_ckf_perfect_stations() {
             panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
         }
     }
+
+    // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
+    // The filter in multibody dynamics has been validated against JPL tools using a proprietary scenario.
 }
