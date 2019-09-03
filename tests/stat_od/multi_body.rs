@@ -10,9 +10,8 @@ use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::kalman::{Estimate, KF};
 use self::nyx::od::ranging::GroundStation;
 use self::nyx::od::Measurement;
-use self::nyx::propagators::error_ctrl::{RSSStep, RSSStepPV};
+use self::nyx::propagators::error_ctrl::{RSSStepPV, RSSStepPVStm};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use std::f64::EPSILON;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -71,7 +70,7 @@ fn multi_body_ckf_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size, RSSStep {});
+    let opts_est = PropOpts::with_fixed_step(step_size, RSSStepPVStm {});
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut estimator = CelestialDynamicsStm::new(initial_state, bodies, &cosm);
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
@@ -121,10 +120,6 @@ fn multi_body_ckf_perfect_stations() {
             let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
-                let delta_obs = (real_meas.observation() - computed_meas.observation()).norm();
-                if delta_obs > EPSILON {
-                    println!("{} {:e}", this_dt.as_tai_seconds(), delta_obs);
-                }
                 let latest_est = ckf
                     .measurement_update(real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
@@ -154,4 +149,7 @@ fn multi_body_ckf_perfect_stations() {
 
     // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
     // The filter in multibody dynamics has been validated against JPL tools using a proprietary scenario.
+    let est = last_est.unwrap();
+    assert!(est.state.norm() < 1e-8);
+    assert!(est.covar.norm() < 1e-5);
 }
