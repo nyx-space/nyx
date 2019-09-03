@@ -4,6 +4,7 @@ use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
+use crate::hifitime::Epoch;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
@@ -13,7 +14,9 @@ where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
-    /// The estimated state
+    /// Date time of this Estimate
+    pub dt: Epoch,
+    /// The estimated state, or state deviation (check filter docs).
     pub state: VectorN<f64, S>,
     /// The Covariance of this estimate
     pub covar: MatrixMN<f64, S, S>,
@@ -31,6 +34,7 @@ where
     /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     pub fn empty() -> Estimate<S> {
         Estimate {
+            dt: Epoch::from_tai_seconds(0.0),
             state: VectorN::<f64, S>::zeros(),
             covar: MatrixMN::<f64, S, S>::zeros(),
             predicted: true,
@@ -50,6 +54,16 @@ where
             }
         }
         hdr_v
+    }
+
+    pub fn from_covar(dt: Epoch, covar: MatrixMN<f64, S, S>) -> Estimate<S> {
+        Estimate {
+            dt,
+            state: VectorN::<f64, S>::zeros(),
+            covar,
+            predicted: true,
+            stm: MatrixMN::<f64, S, S>::zeros(),
+        }
     }
 }
 

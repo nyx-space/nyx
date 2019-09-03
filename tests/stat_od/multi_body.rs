@@ -86,6 +86,7 @@ fn multi_body_ckf_perfect_stations() {
     ));
 
     let initial_estimate = Estimate {
+        dt,
         state: Vector6::zeros(),
         covar: init_covar,
         stm: prop_est.dynamics.stm,
@@ -121,7 +122,7 @@ fn multi_body_ckf_perfect_stations() {
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = ckf
-                    .measurement_update(real_meas.observation(), computed_meas.observation())
+                    .measurement_update(this_dt, real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");

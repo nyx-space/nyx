@@ -2,8 +2,10 @@ extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
-use super::estimate::Estimate;
+use crate::hifitime::Epoch;
 use std::fmt;
+
+pub use super::estimate::Estimate;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -64,10 +66,10 @@ where
         self.h_tilde_updated = true;
     }
 
-    /// Computes a time update (i.e. advances the filter estimate with the updated STM).
+    /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    pub fn time_update(&mut self) -> Result<Estimate<S>, FilterError> {
+    pub fn time_update(&mut self, dt: Epoch) -> Result<Estimate<S>, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
@@ -78,6 +80,7 @@ where
             self.stm.clone() * self.prev_estimate.state.clone()
         };
         let estimate = Estimate {
+            dt,
             state: state_bar,
             covar: covar_bar,
             stm: self.stm.clone(),
@@ -93,6 +96,7 @@ where
     /// May return a FilterError if the STM or sensitivity matrices were not updated.
     pub fn measurement_update(
         &mut self,
+        dt: Epoch,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
     ) -> Result<Estimate<S>, FilterError> {
@@ -130,6 +134,7 @@ where
 
         // And wrap up
         let estimate = Estimate {
+            dt,
             state: state_hat,
             covar,
             stm: self.stm.clone(),

@@ -47,29 +47,30 @@ fn filter_errors() {
     let computed_obs = Vector2::zeros();
     let sensitivity = Matrix2x6::zeros();
     let stm = Matrix6::zeros();
+    let dt = Epoch::from_tai_seconds(0.0);
 
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
-    match ckf.time_update() {
+    match ckf.time_update(dt) {
         Ok(_) => panic!("expected the time update to fail"),
         Err(e) => {
             assert_eq!(e, FilterError::StateTransitionMatrixNotUpdated);
         }
     }
-    match ckf.measurement_update(real_obs, computed_obs) {
+    match ckf.measurement_update(dt, real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
             assert_eq!(e, FilterError::StateTransitionMatrixNotUpdated);
         }
     }
     ckf.update_stm(stm);
-    match ckf.measurement_update(real_obs, computed_obs) {
+    match ckf.measurement_update(dt, real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
             assert_eq!(e, FilterError::SensitivityNotUpdated);
         }
     }
     ckf.update_h_tilde(sensitivity);
-    match ckf.measurement_update(real_obs, computed_obs) {
+    match ckf.measurement_update(dt, real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
             assert_eq!(e, FilterError::GainIsSingular);
@@ -149,6 +150,7 @@ fn ekf_fixed_step_perfect_stations() {
     ));
 
     let initial_estimate = Estimate {
+        dt,
         state: Vector6::zeros(),
         covar: init_covar,
         stm: prop_est.dynamics.stm,
@@ -184,7 +186,7 @@ fn ekf_fixed_step_perfect_stations() {
             if computed_meas.visible() {
                 kf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = kf
-                    .measurement_update(real_meas.observation(), computed_meas.observation())
+                    .measurement_update(this_dt, real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
@@ -291,6 +293,7 @@ fn ckf_fixed_step_perfect_stations() {
     ));
 
     let initial_estimate = Estimate {
+        dt,
         state: Vector6::zeros(),
         covar: init_covar,
         stm: prop_est.dynamics.stm,
@@ -325,7 +328,7 @@ fn ckf_fixed_step_perfect_stations() {
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = ckf
-                    .measurement_update(real_meas.observation(), computed_meas.observation())
+                    .measurement_update(this_dt, real_meas.observation(), computed_meas.observation())
                     .expect("wut?");
                 still_empty = false;
                 assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
