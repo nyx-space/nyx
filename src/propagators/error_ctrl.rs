@@ -209,3 +209,46 @@ impl ErrorCtrl for RSSStepPV {
         }
     }
 }
+
+/// An RSS state error control which effectively for the provided vector
+/// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
+#[derive(Clone, Copy)]
+pub struct RSSStepPVStm;
+impl ErrorCtrl for RSSStepPVStm {
+    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    where
+        DefaultAllocator: Allocator<f64, N>,
+    {
+        let err_radius = RSSStep::estimate::<U3>(
+            &error_est.fixed_rows::<U3>(0).into_owned(),
+            &candidate.fixed_rows::<U3>(0).into_owned(),
+            &cur_state.fixed_rows::<U3>(0).into_owned(),
+        );
+        let err_velocity = RSSStep::estimate::<U3>(
+            &error_est.fixed_rows::<U3>(3).into_owned(),
+            &candidate.fixed_rows::<U3>(3).into_owned(),
+            &cur_state.fixed_rows::<U3>(3).into_owned(),
+        );
+        let err_cov_radius = RSSStep::estimate::<U3>(
+            &VectorN::<f64, U3>::new(error_est[6], error_est[6 + 7], error_est[6 + 14]),
+            &VectorN::<f64, U3>::new(candidate[6], candidate[6 + 7], candidate[6 + 14]),
+            &VectorN::<f64, U3>::new(cur_state[6], cur_state[6 + 7], cur_state[6 + 14]),
+        );
+
+        let err_cov_velocity = RSSStep::estimate::<U3>(
+            &VectorN::<f64, U3>::new(error_est[6 + 21], error_est[6 + 28], error_est[6 + 35]),
+            &VectorN::<f64, U3>::new(candidate[6 + 21], candidate[6 + 28], candidate[6 + 35]),
+            &VectorN::<f64, U3>::new(cur_state[6 + 21], cur_state[6 + 28], cur_state[6 + 35]),
+        );
+
+        let errs = vec![err_radius, err_velocity, err_cov_radius, err_cov_velocity];
+        let mut max_err = 0.0;
+        for err in errs {
+            if err > max_err {
+                max_err = err;
+            }
+        }
+
+        max_err
+    }
+}
