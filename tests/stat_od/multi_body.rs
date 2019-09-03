@@ -85,13 +85,7 @@ fn multi_body_ckf_perfect_stations() {
         covar_velocity,
     ));
 
-    let initial_estimate = Estimate {
-        dt,
-        state: Vector6::zeros(),
-        covar: init_covar,
-        stm: prop_est.dynamics.stm,
-        predicted: false,
-    };
+    let initial_estimate = Estimate::from_covar(dt, init_covar);
 
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);

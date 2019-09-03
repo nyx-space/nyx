@@ -149,13 +149,7 @@ fn ekf_fixed_step_perfect_stations() {
         covar_velocity,
     ));
 
-    let initial_estimate = Estimate {
-        dt,
-        state: Vector6::zeros(),
-        covar: init_covar,
-        stm: prop_est.dynamics.stm,
-        predicted: false,
-    };
+    let initial_estimate = Estimate::from_covar(dt, init_covar);
 
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut kf = KF::initialize(initial_estimate, measurement_noise);
@@ -292,13 +286,7 @@ fn ckf_fixed_step_perfect_stations() {
         covar_velocity,
     ));
 
-    let initial_estimate = Estimate {
-        dt,
-        state: Vector6::zeros(),
-        covar: init_covar,
-        stm: prop_est.dynamics.stm,
-        predicted: false,
-    };
+    let initial_estimate = Estimate::from_covar(dt, init_covar);
 
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);

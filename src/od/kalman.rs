@@ -6,6 +6,7 @@ use crate::hifitime::Epoch;
 use std::fmt;
 
 pub use super::estimate::Estimate;
+use super::estimate::{CovarFormat, EpochFormat};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -27,6 +28,8 @@ where
     stm: MatrixMN<f64, S, S>,
     stm_updated: bool,
     h_tilde_updated: bool,
+    epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
+    covar_fmt: CovarFormat, // Idem
 }
 
 impl<S, M> KF<S, M>
@@ -50,6 +53,8 @@ where
             stm: MatrixMN::<f64, S, S>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
+            epoch_fmt: EpochFormat::MjdTai,
+            covar_fmt: CovarFormat::Sqrt,
         }
     }
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
@@ -85,6 +90,8 @@ where
             covar: covar_bar,
             stm: self.stm.clone(),
             predicted: true,
+            epoch_fmt: self.epoch_fmt,
+            covar_fmt: self.covar_fmt,
         };
         self.stm_updated = false;
         self.prev_estimate = estimate.clone();
@@ -139,6 +146,8 @@ where
             covar,
             stm: self.stm.clone(),
             predicted: false,
+            epoch_fmt: self.epoch_fmt,
+            covar_fmt: self.covar_fmt,
         };
         self.stm_updated = false;
         self.h_tilde_updated = false;
