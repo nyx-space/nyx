@@ -15,6 +15,9 @@ pub mod kalman;
 /// Provides a range and range rate measuring models.
 pub mod ranging;
 
+/// Provides Estimate handling functionalities.
+pub mod estimate;
+
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
 ///
 /// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
