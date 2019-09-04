@@ -120,6 +120,10 @@ where
         hdr_v
     }
 
+    pub fn default_header() -> Vec<String> {
+        Self::header(EpochFormat::MjdTai, CovarFormat::Sqrt)
+    }
+
     pub fn from_covar(dt: Epoch, covar: MatrixMN<f64, S, S>) -> Estimate<S> {
         Estimate {
             dt,
