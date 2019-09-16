@@ -84,7 +84,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         let mut d_x = Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
 
         // Get all of the position vectors between the center body and the third bodies
-        let jde = Epoch::from_tai_seconds(self.init_tai_secs + t).as_jde_tt_days();
+        let jde = Epoch::from_tai_seconds(self.init_tai_secs + t).as_jde_et_days();
         for exb_id in &self.bodies {
             let third_body = self.cosm.unwrap().geoid_from_id(*exb_id);
             // State of j-th body as seen from primary body
