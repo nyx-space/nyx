@@ -220,7 +220,7 @@ where
         S: Serializer,
     {
         let mut state = serializer.serialize_struct("State", 7)?;
-        state.serialize_field("dt", &self.dt.as_jde_tai_days())?;
+        state.serialize_field("dt", &self.dt.as_jde_et_days())?;
         state.serialize_field("x", &self.x)?;
         state.serialize_field("y", &self.y)?;
         state.serialize_field("z", &self.z)?;
