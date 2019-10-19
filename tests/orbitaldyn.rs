@@ -1,5 +1,8 @@
 extern crate hifitime;
 extern crate nalgebra as na;
+#[macro_use]
+extern crate approx; // For the macro relative_eq!
+
 extern crate nyx_space as nyx;
 
 use nyx::utils::rss_state_errors;
@@ -81,7 +84,7 @@ fn two_body_dynamics() {
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
     assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
-    assert_eq!(prop.state(), rslt, "two body prop failed");
+    assert!(abs_diff_eq!(prop.state(), rslt, epsilon = 2e-9f64), "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state(), &state.to_cartesian_vec());
