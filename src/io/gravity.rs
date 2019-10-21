@@ -95,7 +95,8 @@ impl MemoryBackend {
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer).expect("could not read the full file");
+            d.read_to_end(&mut buffer)
+                .expect("could not read the full file");
         } else {
             f.read_to_end(&mut buffer).expect("to end");
         }
@@ -113,7 +114,8 @@ impl MemoryBackend {
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer).expect("could not read the full file");
+            d.read_to_end(&mut buffer)
+                .expect("could not read the full file");
         } else {
             f.read_to_end(&mut buffer).expect("to end");
         }
@@ -131,7 +133,8 @@ impl MemoryBackend {
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer).expect("could not read the full file");
+            d.read_to_end(&mut buffer)
+                .expect("could not read the full file");
         } else {
             f.read_to_end(&mut buffer).expect("to end");
         }
@@ -184,14 +187,18 @@ impl MemoryBackend {
                             match f64::from_str(item) {
                                 Ok(val) => c_nm = val,
                                 Err(_) => {
-                                    println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
+                                    println!(
+                                        "could not parse C_nm `{}` on line {} -- ignoring line",
+                                        item, lno
+                                    );
                                     break;
                                 }
                             }
                         } else {
                             // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
                             // is a positive number, otherwise, they are continuous (what a great format).
-                            if (item.matches('-').count() == 3 && item.chars().nth(0).unwrap() != '-')
+                            if (item.matches('-').count() == 3
+                                && item.chars().nth(0).unwrap() != '-')
                                 || item.matches('-').count() == 4
                             {
                                 // Now we have two items concatenated into one... great
@@ -240,7 +247,10 @@ impl MemoryBackend {
                                 match f64::from_str(item) {
                                     Ok(val) => c_nm = val,
                                     Err(_) => {
-                                        println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
+                                        println!(
+                                            "could not parse C_nm `{}` on line {} -- ignoring line",
+                                            item, lno
+                                        );
                                         break;
                                     }
                                 }
@@ -279,8 +289,16 @@ impl MemoryBackend {
             }
 
             // This serves as a warning.
-            max_order = if cur_order > max_order { cur_order } else { max_order };
-            max_degree = if cur_degree > max_degree { cur_degree } else { max_degree };
+            max_order = if cur_order > max_order {
+                cur_order
+            } else {
+                max_order
+            };
+            max_degree = if cur_degree > max_degree {
+                cur_degree
+            } else {
+                max_degree
+            };
         }
         if max_degree < degree || max_order < order {
             warn!(
@@ -288,7 +306,10 @@ impl MemoryBackend {
                 filepath, max_degree, max_order, degree, order
             );
         } else {
-            info!("{} loaded with (degree, order) = ({}, {})", filepath, degree, order);
+            info!(
+                "{} loaded with (degree, order) = ({}, {})",
+                filepath, degree, order
+            );
         }
         MemoryBackend {
             degree: max_degree,
@@ -298,7 +319,13 @@ impl MemoryBackend {
     }
 
     /// `load` handles the actual loading in memory.
-    fn load(skip_first_line: bool, degree: u16, order: u16, data_as_str: String, filepath: &str) -> MemoryBackend {
+    fn load(
+        skip_first_line: bool,
+        degree: u16,
+        order: u16,
+        data_as_str: String,
+        filepath: &str,
+    ) -> MemoryBackend {
         let mut data: HashMap<(u16, u16), (f64, f64)>;
         data = HashMap::new();
         // Immediately add data which will be requested but may not exist (will be overwritten if it does)
@@ -335,7 +362,10 @@ impl MemoryBackend {
                     2 => match f64::from_str(&item.replace("D", "E")) {
                         Ok(val) => c_nm = val,
                         Err(_) => {
-                            println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
+                            println!(
+                                "could not parse C_nm `{}` on line {} -- ignoring line",
+                                item, lno
+                            );
                             break;
                         }
                     },
@@ -361,8 +391,16 @@ impl MemoryBackend {
                 data.insert((cur_degree, cur_order), (c_nm, s_nm));
             }
             // This serves as a warning.
-            max_order = if cur_order > max_order { cur_order } else { max_order };
-            max_degree = if cur_degree > max_degree { cur_degree } else { max_degree };
+            max_order = if cur_order > max_order {
+                cur_order
+            } else {
+                max_order
+            };
+            max_degree = if cur_degree > max_degree {
+                cur_degree
+            } else {
+                max_degree
+            };
         }
         if max_degree < degree || max_order < order {
             warn!(
@@ -370,7 +408,10 @@ impl MemoryBackend {
                 filepath, max_degree, max_order, degree, order
             );
         } else {
-            info!("{} loaded with (degree, order) = ({}, {})", filepath, degree, order);
+            info!(
+                "{} loaded with (degree, order) = ({}, {})",
+                filepath, degree, order
+            );
         }
         MemoryBackend {
             order: max_order,

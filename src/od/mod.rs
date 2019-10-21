@@ -28,16 +28,22 @@ where
     /// Defines the state size of the estimated state
     type StateSize: DimName;
     /// Defines the gradient of the equations of motion for these dynamics.
-    fn gradient(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
+    fn gradient(
+        &self,
+        t: f64,
+        state: &VectorN<f64, Self::StateSize>,
+    ) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
     where
-        DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>;
+        DefaultAllocator:
+            Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>;
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
 pub trait Measurement
 where
     Self: Sized,
-    DefaultAllocator: Allocator<f64, Self::MeasurementSize> + Allocator<f64, Self::MeasurementSize, Self::StateSize>,
+    DefaultAllocator: Allocator<f64, Self::MeasurementSize>
+        + Allocator<f64, Self::MeasurementSize, Self::StateSize>,
 {
     /// Defines the state size of the estimated state
     type StateSize: DimName;
@@ -80,7 +86,10 @@ where
         &self,
         t: f64,
         state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-    ) -> (VectorN<f64, Self::STMSize>, MatrixMN<f64, Self::STMSize, Self::STMSize>)
+    ) -> (
+        VectorN<f64, Self::STMSize>,
+        MatrixMN<f64, Self::STMSize, Self::STMSize>,
+    )
     where
         DefaultAllocator: Allocator<f64, Self::HyperStateSize>
             + Allocator<f64, Self::STMSize>
@@ -94,7 +103,10 @@ where
         &self,
         t: f64,
         state: &VectorN<f64, Self::STMSize>,
-    ) -> (VectorN<f64, Self::STMSize>, MatrixMN<f64, Self::STMSize, Self::STMSize>)
+    ) -> (
+        VectorN<f64, Self::STMSize>,
+        MatrixMN<f64, Self::STMSize, Self::STMSize>,
+    )
     where
         DefaultAllocator: Allocator<f64, Self::HyperStateSize>
             + Allocator<f64, Self::STMSize>
@@ -112,16 +124,22 @@ where
 
 impl<T: AutoDiffDynamics> Linearization for T
 where
-    DefaultAllocator: Allocator<Dual<f64>, T::StateSize> + Allocator<Dual<f64>, T::StateSize, T::StateSize>,
+    DefaultAllocator:
+        Allocator<Dual<f64>, T::StateSize> + Allocator<Dual<f64>, T::StateSize, T::StateSize>,
 {
     type StateSize = T::HyperStateSize;
 
     /// Returns the gradient of the dynamics at the given state.
     ///
     /// **WARNING:** Requires a prior call to self.compute() ! This is where the auto-differentiation happens.
-    fn gradient(&self, _t: f64, _state: &VectorN<f64, Self::StateSize>) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
+    fn gradient(
+        &self,
+        _t: f64,
+        _state: &VectorN<f64, Self::StateSize>,
+    ) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
     where
-        DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
+        DefaultAllocator:
+            Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
     {
         panic!("retrieve the gradient by calling self.compute(...)");
     }

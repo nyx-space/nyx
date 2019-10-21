@@ -14,8 +14,11 @@ pub struct KF<S, M>
 where
     S: DimName,
     M: DimName,
-    DefaultAllocator:
-        Allocator<f64, M> + Allocator<f64, S> + Allocator<f64, M, M> + Allocator<f64, M, S> + Allocator<f64, S, S>,
+    DefaultAllocator: Allocator<f64, M>
+        + Allocator<f64, S>
+        + Allocator<f64, M, M>
+        + Allocator<f64, M, S>
+        + Allocator<f64, S, S>,
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: Estimate<S>,
@@ -44,7 +47,10 @@ where
         + Allocator<f64, S, S>,
 {
     /// Initializes this KF with an initial estimate and measurement noise.
-    pub fn initialize(initial_estimate: Estimate<S>, measurement_noise: MatrixMN<f64, M, M>) -> KF<S, M> {
+    pub fn initialize(
+        initial_estimate: Estimate<S>,
+        measurement_noise: MatrixMN<f64, M, M>,
+    ) -> KF<S, M> {
         KF {
             prev_estimate: initial_estimate,
             measurement_noise,
@@ -117,7 +123,8 @@ where
         let covar_bar = self.stm.clone() * self.prev_estimate.covar.clone() * self.stm.transpose();
         let mut h_tilde_t = MatrixMN::<f64, S, M>::zeros();
         self.h_tilde.transpose_to(&mut h_tilde_t);
-        let mut invertible_part = self.h_tilde.clone() * covar_bar.clone() * h_tilde_t.clone() + self.measurement_noise.clone();
+        let mut invertible_part = self.h_tilde.clone() * covar_bar.clone() * h_tilde_t.clone()
+            + self.measurement_noise.clone();
         if !invertible_part.try_inverse_mut() {
             return Err(FilterError::GainIsSingular);
         }
@@ -174,7 +181,10 @@ impl fmt::Display for FilterError {
                 f,
                 "The measurement matrix H_tilde was not updated prior to measurement update"
             ),
-            FilterError::GainIsSingular => write!(f, "Gain could not be computed because H*P_bar*H + R is singular"),
+            FilterError::GainIsSingular => write!(
+                f,
+                "Gain could not be computed because H*P_bar*H + R is singular"
+            ),
         }
     }
 }

@@ -49,7 +49,16 @@ where
     /// Creates a new State in the provided frame at the provided Epoch.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    pub fn from_cartesian<G>(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, dt: Epoch, frame: G) -> State<G>
+    pub fn from_cartesian<G>(
+        x: f64,
+        y: f64,
+        z: f64,
+        vx: f64,
+        vy: f64,
+        vz: f64,
+        dt: Epoch,
+        frame: G,
+    ) -> State<G>
     where
         G: Frame,
     {
@@ -240,7 +249,16 @@ impl State<Geoid> {
     /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
-    pub fn from_keplerian(sma: f64, ecc: f64, inc: f64, raan: f64, aop: f64, ta: f64, dt: Epoch, frame: Geoid) -> Self {
+    pub fn from_keplerian(
+        sma: f64,
+        ecc: f64,
+        inc: f64,
+        raan: f64,
+        aop: f64,
+        ta: f64,
+        dt: Epoch,
+        frame: Geoid,
+    ) -> Self {
         if frame.gm.abs() < ZERO_DIV_TOL {
             warn!(
                 "GM very low ({}): expect math errors in Keplerian to Cartesian conversion",
@@ -277,7 +295,10 @@ impl State<Geoid> {
         if ecc > 1.0 {
             let ta = between_0_360(ta);
             if ta > (PI - (1.0 / ecc).acos()).to_degrees() {
-                panic!("true anomaly value ({}) physically impossible for a hyperbolic orbit", ta);
+                panic!(
+                    "true anomaly value ({}) physically impossible for a hyperbolic orbit",
+                    ta
+                );
             }
         }
 
@@ -360,13 +381,20 @@ impl State<Geoid> {
     /// **Units:** degrees, degrees, km
     /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of Earth.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-    pub fn from_geodesic(latitude: f64, longitude: f64, height: f64, dt: Epoch, frame: Geoid) -> State<Geoid> {
+    pub fn from_geodesic(
+        latitude: f64,
+        longitude: f64,
+        height: f64,
+        dt: Epoch,
+        frame: Geoid,
+    ) -> State<Geoid> {
         let e2 = 2.0 * frame.flattening - frame.flattening.powi(2);
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
         // page 144
         let c_earth = frame.semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
-        let s_earth = (frame.semi_major_radius * (1.0 - frame.flattening).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+        let s_earth = (frame.semi_major_radius * (1.0 - frame.flattening).powi(2))
+            / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
         let ri = (c_earth + height) * cos_lat * cos_long;
         let rj = (c_earth + height) * cos_lat * sin_long;
         let rk = (s_earth + height) * sin_lat;
@@ -388,7 +416,14 @@ impl State<Geoid> {
     ///
     /// Note that the time is **not** returned in the vector.
     pub fn to_keplerian_vec(&self) -> Vector6<f64> {
-        Vector6::new(self.sma(), self.ecc(), self.inc(), self.raan(), self.aop(), self.ta())
+        Vector6::new(
+            self.sma(),
+            self.ecc(),
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta(),
+        )
     }
 
     /// Returns the orbital momentum vector
@@ -481,7 +516,10 @@ impl State<Geoid> {
     /// NOTE: This function will emit a warning stating that the TA should be avoided if in a very near circular orbit
     pub fn ta(&self) -> f64 {
         if self.ecc() < ECC_EPSILON {
-            warn!("true anomaly ill-defined (eccentricity too low, e = {})", self.ecc());
+            warn!(
+                "true anomaly ill-defined (eccentricity too low, e = {})",
+                self.ecc()
+            );
         }
         let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag());
         if (cos_nu.abs() - 1.0).abs() < EPSILON {
@@ -549,7 +587,9 @@ impl State<Geoid> {
     /// This is a conversion from GMAT's StateConversionUtil::TrueToMeanAnomaly
     pub fn ma(&self) -> f64 {
         if self.ecc() < 1.0 {
-            between_0_360((self.ea().to_radians() - self.ecc() * self.ea().to_radians().sin()).to_degrees())
+            between_0_360(
+                (self.ea().to_radians() - self.ecc() * self.ea().to_radians().sin()).to_degrees(),
+            )
         } else if self.ecc() > 1.0 {
             info!("computing the hyperbolic anomaly");
             // From GMAT's TrueToHyperbolicAnomaly
@@ -611,7 +651,8 @@ impl State<Geoid> {
         let e2 = self.frame.flattening * (2.0 - self.frame.flattening);
         loop {
             attempt_no += 1;
-            let c_earth = self.frame.semi_major_radius / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
+            let c_earth =
+                self.frame.semi_major_radius / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
             let new_latitude = (self.z + c_earth * e2 * (latitude).sin()).atan2(r_delta);
             if (latitude - new_latitude).abs() < eps {
                 return between_pm_180(new_latitude.to_degrees());
@@ -635,8 +676,8 @@ impl State<Geoid> {
         let sin_lat = latitude.sin();
         if (latitude - 1.0).abs() < 0.1 {
             // We are near poles, let's use another formulation.
-            let s_earth =
-                (self.frame.semi_major_radius * (1.0 - self.frame.flattening).powi(2)) / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+            let s_earth = (self.frame.semi_major_radius * (1.0 - self.frame.flattening).powi(2))
+                / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
             self.z / latitude.sin() - s_earth
         } else {
             let c_earth = self.frame.semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());

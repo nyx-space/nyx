@@ -36,6 +36,12 @@ fn nil_measurement() {
     assert!(h_tilde[(1, 4)].is_nan(), "expected NaN");
     assert!(h_tilde[(1, 5)].is_nan(), "expected NaN");
 
-    assert!(meas.observation()[(0, 0)] - 0.0 < EPSILON, "observation is not range=0");
-    assert!(meas.observation()[(1, 0)].is_nan(), "observation is not range=0");
+    assert!(
+        meas.observation()[(0, 0)] - 0.0 < EPSILON,
+        "observation is not range=0"
+    );
+    assert!(
+        meas.observation()[(1, 0)].is_nan(),
+        "observation is not range=0"
+    );
 }

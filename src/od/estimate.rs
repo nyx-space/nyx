@@ -140,7 +140,8 @@ where
 impl<S> fmt::Display for Estimate<S>
 where
     S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -154,7 +155,8 @@ where
 impl<S> Serialize for Estimate<S>
 where
     S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     /// Serializes the estimate
     fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
