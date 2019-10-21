@@ -34,11 +34,13 @@ where
 {
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
     type StateSize: DimName;
+    /// Defines the type which will be published on the propagator channel
+    type StateType;
     /// Returns the time of the current state
     fn time(&self) -> f64;
 
-    /// Returns the current state of the dynamics so it can be integrated.
-    fn state(&self) -> VectorN<f64, Self::StateSize>
+    /// Returns the current state of the dynamics as a vector so it can be integrated.
+    fn state_vector(&self) -> VectorN<f64, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 
@@ -51,4 +53,7 @@ where
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
+
+    /// Returns the state of the dynamics
+    fn state(&self) -> Self::StateType;
 }

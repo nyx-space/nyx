@@ -57,12 +57,13 @@ impl<'a> CelestialDynamics<'a> {
 
 impl<'a> Dynamics for CelestialDynamics<'a> {
     type StateSize = U6;
+    type StateType = State<Geoid>;
     /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
     fn time(&self) -> f64 {
         self.relative_time
     }
 
-    fn state(&self) -> VectorN<f64, Self::StateSize> {
+    fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
         self.state.to_cartesian_vec()
     }
 
@@ -77,18 +78,26 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         self.state.vz = new_state[5];
     }
 
+    fn state(&self) -> State<Geoid> {
+        self.state
+    }
+
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let radius = state.fixed_rows::<U3>(0).into_owned();
         let velocity = state.fixed_rows::<U3>(3).into_owned();
         let body_acceleration = (-self.state.frame.gm / radius.norm().powi(3)) * radius;
-        let mut d_x = Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
+        let mut d_x =
+            Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
 
         // Get all of the position vectors between the center body and the third bodies
         let jde = Epoch::from_tai_seconds(self.init_tai_secs + t).as_jde_et_days();
         for exb_id in &self.bodies {
             let third_body = self.cosm.unwrap().geoid_from_id(*exb_id);
             // State of j-th body as seen from primary body
-            let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id);
+            let st_ij = self
+                .cosm
+                .unwrap()
+                .celestial_state(*exb_id, jde, self.state.frame.id);
 
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
@@ -169,14 +178,19 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
     type HyperStateSize = U7;
     type STMSize = U6;
 
-    fn dual_eom(&self, t: f64, state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector6<f64>, Matrix6<f64>) {
+    fn dual_eom(
+        &self,
+        t: f64,
+        state: &VectorN<Hyperdual<f64, U7>, U6>,
+    ) -> (Vector6<f64>, Matrix6<f64>) {
         // Extract data from hyperspace
         let radius = state.fixed_rows::<U3>(0).into_owned();
         let velocity = state.fixed_rows::<U3>(3).into_owned();
 
         // Code up math as usual
         let rmag = norm(&radius);
-        let body_acceleration = radius * (Hyperdual::<f64, U7>::from_real(-self.state.frame.gm) / rmag.powi(3));
+        let body_acceleration =
+            radius * (Hyperdual::<f64, U7>::from_real(-self.state.frame.gm) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector6::zeros();
@@ -188,7 +202,11 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
                 body_acceleration[i - 3].real()
             };
             for j in 1..U7::dim() {
-                grad[(i, j - 1)] = if i < 3 { velocity[i][j] } else { body_acceleration[i - 3][j] };
+                grad[(i, j - 1)] = if i < 3 {
+                    velocity[i][j]
+                } else {
+                    body_acceleration[i - 3][j]
+                };
             }
         }
 
@@ -199,7 +217,10 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
             let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm);
 
             // State of j-th body as seen from primary body
-            let st_ij = self.cosm.unwrap().celestial_state(*exb_id, jde, self.state.frame.id);
+            let st_ij = self
+                .cosm
+                .unwrap()
+                .celestial_state(*exb_id, jde, self.state.frame.id);
 
             let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
             let r_ij3 = norm(&r_ij).powi(3) / gm_d;
@@ -226,12 +247,13 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
 
 impl<'a> Dynamics for CelestialDynamicsStm<'a> {
     type StateSize = U42;
+    type StateType = (State<Geoid>, Matrix6<f64>);
     /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
     fn time(&self) -> f64 {
         self.relative_time
     }
 
-    fn state(&self) -> VectorN<f64, Self::StateSize> {
+    fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
         let mut stm_idx = 0;
         for i in 0..6 {
@@ -240,7 +262,18 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
                 stm_idx += 1;
             }
         }
-        VectorN::<f64, Self::StateSize>::from_iterator(self.state.to_cartesian_vec().iter().chain(stm_as_vec.iter()).cloned())
+        VectorN::<f64, Self::StateSize>::from_iterator(
+            self.state
+                .to_cartesian_vec()
+                .iter()
+                .chain(stm_as_vec.iter())
+                .cloned(),
+        )
+    }
+
+    /// Returns the celestial state and the state transition matrix
+    fn state(&self) -> Self::StateType {
+        (self.state, self.stm)
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
@@ -283,6 +316,8 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
                 stm_idx += 1;
             }
         }
-        VectorN::<f64, Self::StateSize>::from_iterator(state.iter().chain(stm_as_vec.iter()).cloned())
+        VectorN::<f64, Self::StateSize>::from_iterator(
+            state.iter().chain(stm_as_vec.iter()).cloned(),
+        )
     }
 }

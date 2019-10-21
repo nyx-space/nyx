@@ -257,7 +257,11 @@ impl Cosm {
         let start_mod_julian: f64 = interp.start_mod_julian;
         let coefficient_count: usize = interp.position_degree as usize;
 
-        let exb_states = match interp.state_data.as_ref().ok_or(CosmError::NoStateData(exb.number))? {
+        let exb_states = match interp
+            .state_data
+            .as_ref()
+            .ok_or(CosmError::NoStateData(exb.number))?
+        {
             EqualStates(states) => states,
             VarwindowStates(_) => panic!("var window not yet supported by Cosm"),
         };
@@ -287,7 +291,9 @@ impl Cosm {
         interp_dt[1] = 1.0;
         interp_dt[2] = 2.0 * (2.0 * t1);
         for i in 3..coefficient_count {
-            interp_dt[i] = (2.0 * t1) * interp_dt[i - 1] - interp_dt[i - 2] + interp_t[i - 1] + interp_t[i - 1];
+            interp_dt[i] = (2.0 * t1) * interp_dt[i - 1] - interp_dt[i - 2]
+                + interp_t[i - 1]
+                + interp_t[i - 1];
         }
         for interp_i in &mut interp_dt {
             *interp_i *= 2.0 / interval_length;
@@ -338,7 +344,16 @@ impl Cosm {
         let as_seen_from = self.try_geoid_from_id(as_seen_from_exb_id)?;
         // And now let's convert this storage state to the correct frame.
         let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
-        let mut state = State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Epoch::from_jde_tai(jde), as_seen_from);
+        let mut state = State::<Geoid>::from_cartesian(
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            Epoch::from_jde_tai(jde),
+            as_seen_from,
+        );
         let mut prev_frame_id = state.frame.id();
         for body in path {
             // This means the target or the origin is exactly this path.
@@ -353,8 +368,14 @@ impl Cosm {
         Ok(state)
     }
 
-    pub fn celestial_state(&self, target_exb_id: i32, jde: f64, as_seen_from_exb_id: i32) -> State<Geoid> {
-        self.try_celestial_state(target_exb_id, jde, as_seen_from_exb_id).unwrap()
+    pub fn celestial_state(
+        &self,
+        target_exb_id: i32,
+        jde: f64,
+        as_seen_from_exb_id: i32,
+    ) -> State<Geoid> {
+        self.try_celestial_state(target_exb_id, jde, as_seen_from_exb_id)
+            .unwrap()
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
@@ -376,7 +397,13 @@ impl Cosm {
 
         let start_idx = self.exbid_to_map_idx(to.id()).unwrap();
         let end_idx = self.exbid_to_map_idx(from.center_id()).unwrap();
-        match astar(&self.exb_map, start_idx, |finish| finish == end_idx, |e| *e.weight(), |_| 0) {
+        match astar(
+            &self.exb_map,
+            start_idx,
+            |finish| finish == end_idx,
+            |e| *e.weight(),
+            |_| 0,
+        ) {
             Some((weight, path)) => {
                 // Build the path with the frames
                 let mut f_path = Vec::new();
@@ -400,7 +427,10 @@ impl Cosm {
                 );
                 Ok(f_path)
             }
-            None => Err(CosmError::DisjointFrameCenters(from.center_id(), to.center_id())),
+            None => Err(CosmError::DisjointFrameCenters(
+                from.center_id(),
+                to.center_id(),
+            )),
         }
     }
 }
@@ -422,7 +452,8 @@ pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
 
     let decode_start = Instant::now();
 
-    let ephcnt = EphemerisContainer::decode(input_exb_buf.into_buf()).expect("could not decode EXB");
+    let ephcnt =
+        EphemerisContainer::decode(input_exb_buf.into_buf()).expect("could not decode EXB");
 
     let ephemerides = ephcnt.ephemerides;
     let num_eph = ephemerides.len();
@@ -461,7 +492,11 @@ pub fn load_frames(input_filename: &str) -> Vec<FXBFrame> {
     if num_eph == 0 {
         panic!("no frames found in FXB");
     }
-    info!("Loaded {} frames in {} seconds.", num_eph, decode_start.elapsed().as_secs());
+    info!(
+        "Loaded {} frames in {} seconds.",
+        num_eph,
+        decode_start.elapsed().as_secs()
+    );
     frames
 }
 
@@ -627,7 +662,11 @@ mod tests {
                 &cosm.geoid_from_id(bodies::EARTH_MOON),
             )
             .unwrap();
-        assert_eq!(ven2ear.len(), 3, "Venus -> (SSB) -> Earth Barycenter -> Earth Moon");
+        assert_eq!(
+            ven2ear.len(),
+            3,
+            "Venus -> (SSB) -> Earth Barycenter -> Earth Moon"
+        );
 
         let ven2ear_state = cosm.celestial_state(bodies::VENUS_BARYCENTER, jde, bodies::EARTH_MOON);
         assert_eq!(ven2ear_state.frame.id(), bodies::EARTH_MOON);
@@ -649,7 +688,11 @@ mod tests {
         assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < EPSILON || true);
         assert!(dbg!(moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < EPSILON || true);
 
-        let earth_from_emb = cosm.celestial_state(bodies::EARTH, test_epoch.as_jde_et_days(), bodies::EARTH_BARYCENTER);
+        let earth_from_emb = cosm.celestial_state(
+            bodies::EARTH,
+            test_epoch.as_jde_et_days(),
+            bodies::EARTH_BARYCENTER,
+        );
         // Idem
         assert!(dbg!(earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < EPSILON || true);
         assert!(dbg!(earth_from_emb.y - 4.249_363_764_688_855e3).abs() < EPSILON || true);

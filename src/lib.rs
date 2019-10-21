@@ -138,7 +138,7 @@ pub mod propagators;
 ///
 ///     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
 ///     prop.until_time_elapsed(prop_time);
-///     let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+///     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 ///
 ///     println!(
 ///         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",

@@ -22,7 +22,16 @@ fn two_body_custom() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let mut state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    let mut state = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088_611,
+        -5.088_611,
+        0.0,
+        dt,
+        earth_geoid,
+    );
     state.frame.gm = 398_600.441_5;
 
     let rslt = Vector6::new(
@@ -38,10 +47,10 @@ fn two_body_custom() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
-    assert_eq!(prop.state(), rslt, "two body prop failed");
+    assert_eq!(prop.state_vector(), rslt, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &state.to_cartesian_vec());
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -68,7 +77,16 @@ fn two_body_dynamics() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    let state = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088_611,
+        -5.088_611,
+        0.0,
+        dt,
+        earth_geoid,
+    );
 
     let rslt = Vector6::new(
         -5_971.194_376_797_643,
@@ -83,11 +101,16 @@ fn two_body_dynamics() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
-    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
-    assert!(abs_diff_eq!(prop.state(), rslt, epsilon = 2e-9f64), "two body prop failed");
+    assert!(
+        (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
+    );
+    assert!(
+        abs_diff_eq!(prop.state_vector(), rslt, epsilon = 2e-9f64),
+        "two body prop failed"
+    );
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &state.to_cartesian_vec());
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -99,8 +122,10 @@ fn two_body_dynamics() {
     assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days()).abs() <= EPSILON);
     // Forward propagation again to confirm that we can do repeated calls
     prop.until_time_elapsed(prop_time);
-    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    assert!(
+        (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
+    );
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
     assert!(
         err_r < 1e-5,
         "two body back+fwd prop failed to return to the initial state in position"
@@ -158,12 +183,15 @@ fn halo_earth_moon_dynamics() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK89>(
+        &mut dynamics,
+        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+    );
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -174,8 +202,14 @@ fn halo_earth_moon_dynamics() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 1e-5, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 1e-5,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-10,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -212,12 +246,12 @@ fn halo_earth_moon_dynamics_adaptive() {
     );
 
     let rslt = Vector6::new(
-        343016.0281933062,
-        6118.870782679712,
-        9463.253311291081,
-        -0.03388550441829203,
-        0.9619425779605422,
-        0.3517381217093635,
+        343_016.028_193_306_2,
+        6_118.870_782_679_712,
+        9_463.253_311_291_08,
+        -0.033_885_504_418_292_03,
+        0.961_942_577_960_542_2,
+        0.351_738_121_709_363_5,
     );
 
     let bodies = vec![bodies::EARTH_MOON];
@@ -225,10 +259,10 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -239,8 +273,14 @@ fn halo_earth_moon_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 1e-6, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-11, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 1e-6,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-11,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -278,12 +318,12 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     // GMAT data
     let rslt = Vector6::new(
-        322883.8868354332,
-        97580.280858158,
-        -30871.08580743158,
-        -0.9340396297270035,
-        1.980106615205608,
-        0.4726308955048544,
+        322_883.886_835_433_2,
+        97_580.280_858_158,
+        -30_871.085_807_431_58,
+        -0.934_039_629_727_003_5,
+        1.980_106_615_205_608,
+        0.472_630_895_504_854_4,
     );
 
     let bodies = vec![bodies::EARTH_MOON];
@@ -291,10 +331,10 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -305,8 +345,14 @@ fn llo_earth_moon_dynamics_adaptive() {
         err_r, err_v, llo_xmtr, prop.dynamics.state
     );
 
-    assert!(err_r < 1e-5, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-8, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 1e-5,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-8,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -358,12 +404,15 @@ fn halo_multi_body_dynamics() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK89>(
+        &mut dynamics,
+        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+    );
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -374,8 +423,14 @@ fn halo_multi_body_dynamics() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 1e-5, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 1e-5,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-10,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -416,12 +471,12 @@ fn halo_multi_body_dynamics_adaptive() {
 
     // GMAT data
     let rslt = Vector6::new(
-        343063.3150797269,
-        6045.912866799058,
-        9430.044002816507,
-        -0.03284104050047527,
-        0.9602726135306772,
-        0.3509814313220894,
+        343_063.315_079_726_9,
+        6_045.912_866_799_058,
+        9_430.044_002_816_507,
+        -0.032_841_040_500_475_27,
+        0.960_272_613_530_677_2,
+        0.350_981_431_322_089_4,
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
@@ -429,10 +484,10 @@ fn halo_multi_body_dynamics_adaptive() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -443,8 +498,14 @@ fn halo_multi_body_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.dynamics.state
     );
 
-    assert!(err_r < 1e-6, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-11, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 1e-6,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-11,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -484,12 +545,12 @@ fn llo_multi_body_dynamics_adaptive() {
 
     // GMAT data
     let rslt = Vector6::new(
-        322931.8517607412,
-        97497.69973881113,
-        -30899.3238203672,
-        -0.9330952021437368,
-        1.978291140770421,
-        0.4720361979683693,
+        322_931.851_760_741_2,
+        97_497.699_738_811_13,
+        -30_899.323_820_367_2,
+        -0.933_095_202_143_736_8,
+        1.978_291_140_770_421,
+        0.472_036_197_968_369_3,
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
@@ -497,10 +558,10 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -511,8 +572,14 @@ fn llo_multi_body_dynamics_adaptive() {
         err_r, err_v, llo_xmtr, prop.dynamics.state
     );
 
-    assert!(err_r < 2e-6, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 1e-9, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 2e-6,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-9,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -539,7 +606,9 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth);
+    let leo = State::<Geoid>::from_cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
+    );
 
     // GMAT data
     let rslt = Vector6::new(
@@ -556,10 +625,10 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -570,8 +639,14 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
         err_r, err_v, leo, prop.dynamics.state
     );
 
-    assert!(err_r < 5e-7, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 5e-10, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 5e-7,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 5e-10,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -597,7 +672,9 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth);
+    let leo = State::<Geoid>::from_cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
+    );
 
     // GMAT data
     let rslt = Vector6::new(
@@ -614,10 +691,10 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state() - rslt;
+    let delta = prop.state_vector() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -628,8 +705,14 @@ fn leo_multi_body_dynamics_adaptive() {
         err_r, err_v, leo, prop.dynamics.state
     );
 
-    assert!(err_r < 3e-6, format!("multi body failed in position: {:.5e}", err_r));
-    assert!(err_v < 3e-9, format!("multi body failed in velocity: {:.5e}", err_v));
+    assert!(
+        err_r < 3e-6,
+        format!("multi body failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 3e-9,
+        format!("multi body failed in velocity: {:.5e}", err_v)
+    );
 }
 
 #[test]
@@ -701,7 +784,10 @@ fn two_body_dual() {
 
     let prop_time = 24.0 * 3_600.0;
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK89>(
+        &mut dynamics,
+        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+    );
     prop.until_time_elapsed(prop_time);
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
@@ -749,7 +835,10 @@ fn multi_body_dynamics_dual() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamicsStm::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK89>(
+        &mut dynamics,
+        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+    );
     prop.until_time_elapsed(prop_time);
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.

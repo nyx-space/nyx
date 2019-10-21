@@ -6,7 +6,7 @@
 #[derive(Copy, Clone)]
 pub struct BasicDrag {
     pub rho: f64,  // atmospheric density in kg/m^3
-    pub cd: f64,   // In Earth's atmosphere, this can be set to 2.2. Spheres are between 2.0 and 2.1.
+    pub cd: f64, // In Earth's atmosphere, this can be set to 2.2. Spheres are between 2.0 and 2.1.
     pub area: f64, // in m^2
     pub mass: f64, // in kg
 }

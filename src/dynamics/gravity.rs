@@ -55,9 +55,15 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
         let max_order = self.stor.max_order() as usize; // In GMAT, the order is MM
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
-        let mut a_matrix: Vec<Vec<f64>> = (0..max_degree + 3).map(|_| Vec::with_capacity(max_degree + 3)).collect();
-        let mut vr01: Vec<Vec<f64>> = (0..max_degree + 3).map(|_| Vec::with_capacity(max_degree + 3)).collect();
-        let mut vr11: Vec<Vec<f64>> = (0..max_degree + 3).map(|_| Vec::with_capacity(max_degree + 3)).collect();
+        let mut a_matrix: Vec<Vec<f64>> = (0..max_degree + 3)
+            .map(|_| Vec::with_capacity(max_degree + 3))
+            .collect();
+        let mut vr01: Vec<Vec<f64>> = (0..max_degree + 3)
+            .map(|_| Vec::with_capacity(max_degree + 3))
+            .collect();
+        let mut vr11: Vec<Vec<f64>> = (0..max_degree + 3)
+            .map(|_| Vec::with_capacity(max_degree + 3))
+            .collect();
 
         let mut re = Vec::with_capacity(max_degree + 3);
         let mut im = Vec::with_capacity(max_degree + 3);
@@ -80,7 +86,8 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
             for mu16 in 0..=min(nu16, max_order) {
                 let m = mu16 as f64;
                 vr01[nu16][mu16] = ((n - m) * (n + m + 1.0)).sqrt();
-                vr11[nu16][mu16] = (((2.0 * n + 1.0) * (n + m + 2.0) * (n + m + 1.0)) / (2.0 * n + 3.0)).sqrt();
+                vr11[nu16][mu16] =
+                    (((2.0 * n + 1.0) * (n + m + 2.0) * (n + m + 1.0)) / (2.0 * n + 3.0)).sqrt();
                 if mu16 == 0 {
                     vr01[nu16][mu16] /= sqrt2;
                     vr11[nu16][mu16] /= sqrt2;
@@ -109,9 +116,12 @@ impl<S: GravityPotentialStor> Dynamics for Harmonics<S> {
                 let n = nu16 as f64;
                 let n1 = (((2.0 * n + 1.0) * (2.0 * n - 1.0)) / ((n - m) * (n + m))).sqrt();
 
-                let n2 = (((2.0 * n + 1.0) * (n - m - 1.0) * (n + m - 1.0)) / ((2.0 * n - 3.0) * (n + m) * (n - m))).sqrt();
+                let n2 = (((2.0 * n + 1.0) * (n - m - 1.0) * (n + m - 1.0))
+                    / ((2.0 * n - 3.0) * (n + m) * (n - m)))
+                    .sqrt();
 
-                a_matrix[nu16][mu16] = u_ * n1 * a_matrix[nu16 - 1][mu16] - n2 * a_matrix[nu16 - 2][mu16];
+                a_matrix[nu16][mu16] =
+                    u_ * n1 * a_matrix[nu16 - 1][mu16] - n2 * a_matrix[nu16 - 2][mu16];
             }
             // real part of (s + i*t)^m
             re[mu16] = if mu16 == 0 {

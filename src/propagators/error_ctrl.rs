@@ -17,7 +17,11 @@ where
     /// The `error_est` is the estimated error computed from the difference in the two stages of
     /// of the RK propagator. The `candidate` variable is the candidate state, and `cur_state` is
     /// the current state. This function must return the error.
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>;
 }
@@ -32,7 +36,11 @@ where
 #[derive(Clone, Copy)]
 pub struct LargestError;
 impl ErrorCtrl for LargestError {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
@@ -60,7 +68,11 @@ impl ErrorCtrl for LargestError {
 #[derive(Clone, Copy)]
 pub struct LargestStep;
 impl ErrorCtrl for LargestStep {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
@@ -86,7 +98,11 @@ impl ErrorCtrl for LargestStep {
 #[derive(Clone, Copy)]
 pub struct LargestState;
 impl ErrorCtrl for LargestState {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
@@ -114,7 +130,11 @@ impl ErrorCtrl for LargestState {
 #[derive(Clone, Copy)]
 pub struct RSSStep;
 impl ErrorCtrl for RSSStep {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
@@ -140,7 +160,11 @@ impl ErrorCtrl for RSSStep {
 #[derive(Clone, Copy)]
 pub struct RSSState;
 impl ErrorCtrl for RSSState {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
@@ -159,7 +183,11 @@ impl ErrorCtrl for RSSState {
 #[derive(Clone, Copy)]
 pub struct RSSStatePV;
 impl ErrorCtrl for RSSStatePV {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
@@ -187,7 +215,11 @@ impl ErrorCtrl for RSSStatePV {
 #[derive(Clone, Copy)]
 pub struct RSSStepPV;
 impl ErrorCtrl for RSSStepPV {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
@@ -215,7 +247,11 @@ impl ErrorCtrl for RSSStepPV {
 #[derive(Clone, Copy)]
 pub struct RSSStepPVStm;
 impl ErrorCtrl for RSSStepPVStm {
-    fn estimate<N: DimName>(error_est: &VectorN<f64, N>, candidate: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+    fn estimate<N: DimName>(
+        error_est: &VectorN<f64, N>,
+        candidate: &VectorN<f64, N>,
+        cur_state: &VectorN<f64, N>,
+    ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {

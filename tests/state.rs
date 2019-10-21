@@ -24,7 +24,16 @@ fn state_def_circ_inc() {
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    let cart = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088_611,
+        -5.088_611,
+        0.0,
+        dt,
+        earth_geoid,
+    );
     let cart2 = State::<Geoid>::from_cartesian(
         -2436.45,
         -2436.45,
@@ -61,9 +70,22 @@ fn state_def_circ_inc() {
     f64_eq!(cart.ma(), 0.0, "ma");
     f64_eq!(cart.apoapsis(), 7_719.895_086_731_299, "apo");
     f64_eq!(cart.periapsis(), 7_704.477_149_058_786, "peri");
-    f64_eq!(cart.semi_parameter(), 7_712.178_412_142_147, "semi parameter");
+    f64_eq!(
+        cart.semi_parameter(),
+        7_712.178_412_142_147,
+        "semi parameter"
+    );
 
-    let kep = State::<Geoid>::from_keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, earth_geoid);
+    let kep = State::<Geoid>::from_keplerian(
+        8_191.93,
+        1e-6,
+        12.85,
+        306.614,
+        314.19,
+        99.887_7,
+        dt,
+        earth_geoid,
+    );
     f64_eq!(kep.x, 8_057.976_452_202_976, "x");
     f64_eq!(kep.y, -0.196_740_370_290_888_9, "y");
     f64_eq!(kep.z, 1_475.383_214_274_138, "z");
@@ -86,7 +108,11 @@ fn state_def_circ_inc() {
     f64_eq!(kep.ma(), 99.887_587_115_926_96, "ma");
     f64_eq!(kep.apoapsis(), 8_191.938_191_930_002, "apo");
     f64_eq!(kep.periapsis(), 8_191.921_808_069_997, "peri");
-    f64_eq!(kep.semi_parameter(), 8_191.929_999_991_808, "semi parameter");
+    f64_eq!(
+        kep.semi_parameter(),
+        8_191.929_999_991_808,
+        "semi parameter"
+    );
 }
 
 #[test]
@@ -123,9 +149,22 @@ fn state_def_elliptical() {
     f64_eq!(cart.ma(), 18.385_336_330_516_39, "ma");
     f64_eq!(cart.apoapsis(), 8_938.423_710_640_353, "apo");
     f64_eq!(cart.periapsis(), 6_485.948_525_149_73, "peri");
-    f64_eq!(cart.semi_parameter(), 7_517.214_340_648_537, "semi parameter");
+    f64_eq!(
+        cart.semi_parameter(),
+        7_517.214_340_648_537,
+        "semi parameter"
+    );
 
-    let kep = State::<Geoid>::from_keplerian(8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, earth_geoid);
+    let kep = State::<Geoid>::from_keplerian(
+        8_191.93,
+        0.024_5,
+        12.85,
+        306.614,
+        314.19,
+        99.887_7,
+        dt,
+        earth_geoid,
+    );
     f64_eq!(kep.x, 8_087.161_618_048_522_5, "x");
     f64_eq!(kep.y, -0.197_452_943_772_520_73, "y");
     f64_eq!(kep.z, 1_480.726_901_246_883, "z");
@@ -148,7 +187,11 @@ fn state_def_elliptical() {
     f64_eq!(kep.ma(), 97.113_427_049_323_43, "ma");
     f64_eq!(kep.apoapsis(), 8_392.632_285_000_007, "apo");
     f64_eq!(kep.periapsis(), 7_991.227_715_000_001, "peri");
-    f64_eq!(kep.semi_parameter(), 8_187.012_794_017_503, "semi parameter");
+    f64_eq!(
+        kep.semi_parameter(),
+        8_187.012_794_017_503,
+        "semi parameter"
+    );
 }
 
 #[test]
@@ -185,9 +228,22 @@ fn state_def_circ_eq() {
     f64_eq!(cart.ma(), 12.299_999_908_698_359, "ma");
     f64_eq!(cart.apoapsis(), 42_378.130_423_781_27, "apo");
     f64_eq!(cart.periapsis(), 42_378.129_576_218_69, "peri");
-    f64_eq!(cart.semi_parameter(), 42_378.129_999_999_976, "semi parameter");
+    f64_eq!(
+        cart.semi_parameter(),
+        42_378.129_999_999_976,
+        "semi parameter"
+    );
 
-    let kep = State::<Geoid>::from_keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, earth_geoid);
+    let kep = State::<Geoid>::from_keplerian(
+        18191.098,
+        1e-6,
+        1e-6,
+        306.543,
+        314.32,
+        98.765,
+        dt,
+        earth_geoid,
+    );
     f64_eq!(kep.x, 18_190.717_357_886_37, "x");
     f64_eq!(kep.y, -118.107_162_539_218_69, "y");
     f64_eq!(kep.z, 0.000_253_845_647_633_053_35, "z");
@@ -210,7 +266,11 @@ fn state_def_circ_eq() {
     f64_eq!(kep.ma(), 98.764_886_721_264_56, "ma");
     f64_eq!(kep.apoapsis(), 18_191.116_191_098_008, "apo");
     f64_eq!(kep.periapsis(), 18_191.079_808_902_017, "peri");
-    f64_eq!(kep.semi_parameter(), 18_191.097_999_981_823, "semi parameter");
+    f64_eq!(
+        kep.semi_parameter(),
+        18_191.097_999_981_823,
+        "semi parameter"
+    );
 }
 
 #[test]
@@ -271,7 +331,16 @@ fn state_def_reciprocity() {
     );
 
     assert_eq!(
-        State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid),
+        State::<Geoid>::from_cartesian(
+            -2436.45,
+            -2436.45,
+            6891.037,
+            5.088_611,
+            -5.088_611,
+            0.0,
+            dt,
+            earth_geoid
+        ),
         State::<Geoid>::from_keplerian(
             7_712.186_117_895_043,
             0.000_999_582_831_432_052_5,

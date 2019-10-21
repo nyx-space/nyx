@@ -48,7 +48,11 @@ impl GroundStation {
         }
     }
 
-    pub fn dss65_madrid(elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+    pub fn dss65_madrid(
+        elevation_mask: f64,
+        range_noise: f64,
+        range_rate_noise: f64,
+    ) -> GroundStation {
         GroundStation::from_noise_values(
             "Madrid",
             elevation_mask,
@@ -60,7 +64,11 @@ impl GroundStation {
         )
     }
 
-    pub fn dss34_canberra(elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+    pub fn dss34_canberra(
+        elevation_mask: f64,
+        range_noise: f64,
+        range_rate_noise: f64,
+    ) -> GroundStation {
         GroundStation::from_noise_values(
             "Canberra",
             elevation_mask,
@@ -72,7 +80,11 @@ impl GroundStation {
         )
     }
 
-    pub fn dss13_goldstone(elevation_mask: f64, range_noise: f64, range_rate_noise: f64) -> GroundStation {
+    pub fn dss13_goldstone(
+        elevation_mask: f64,
+        range_noise: f64,
+        range_rate_noise: f64,
+    ) -> GroundStation {
         GroundStation::from_noise_values(
             "Goldstone",
             elevation_mask,
@@ -109,7 +121,8 @@ impl GroundStation {
         let rho_ecef = rx.radius() - tx.radius();
 
         // Convert to SEZ to compute elevation
-        let rho_sez = r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
+        let rho_sez =
+            r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
         StdMeasurement::new(dt, tx, rx, elevation >= self.elevation_mask)
@@ -145,7 +158,9 @@ impl StdMeasurement {
         self.obs[(1, 0)]
     }
 
-    fn compute_sensitivity(state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector2<f64>, Matrix2x6<f64>) {
+    fn compute_sensitivity(
+        state: &VectorN<Hyperdual<f64, U7>, U6>,
+    ) -> (Vector2<f64>, Matrix2x6<f64>) {
         // Extract data from hyperspace
         let range_vec = state.fixed_rows::<U3>(0).into_owned();
         let velocity_vec = state.fixed_rows::<U3>(3).into_owned();
@@ -159,7 +174,11 @@ impl StdMeasurement {
         let mut fx = Vector2::zeros();
         let mut pmat = Matrix2x6::zeros();
         for i in 0..U2::dim() {
-            fx[i] = if i == 0 { range.real() } else { range_rate.real() };
+            fx[i] = if i == 0 {
+                range.real()
+            } else {
+                range_rate.real()
+            };
             for j in 1..U7::dim() {
                 pmat[(i, j - 1)] = if i == 0 { range[j] } else { range_rate[j] };
             }
@@ -233,7 +252,9 @@ impl RangeMsr {
         self.obs[(0, 0)]
     }
 
-    fn compute_sensitivity(state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector1<f64>, Matrix1x6<f64>) {
+    fn compute_sensitivity(
+        state: &VectorN<Hyperdual<f64, U7>, U6>,
+    ) -> (Vector1<f64>, Matrix1x6<f64>) {
         // Extract data from hyperspace
         let range_vec = state.fixed_rows::<U3>(0).into_owned();
 
@@ -257,7 +278,11 @@ impl Measurement for RangeMsr {
     type MeasurementSize = U1;
 
     fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> RangeMsr {
-        assert_eq!(tx.frame.id(), rx.frame.id(), "tx and rx in different frames");
+        assert_eq!(
+            tx.frame.id(),
+            rx.frame.id(),
+            "tx and rx in different frames"
+        );
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
         let dt = tx.dt;
@@ -320,7 +345,9 @@ impl DopplerMsr {
         self.obs[(0, 0)]
     }
 
-    fn compute_sensitivity(state: &VectorN<Hyperdual<f64, U7>, U6>) -> (Vector1<f64>, Matrix1x6<f64>) {
+    fn compute_sensitivity(
+        state: &VectorN<Hyperdual<f64, U7>, U6>,
+    ) -> (Vector1<f64>, Matrix1x6<f64>) {
         // Extract data from hyperspace
         let range_vec = state.fixed_rows::<U3>(0).into_owned();
         let velocity_vec = state.fixed_rows::<U3>(3).into_owned();
@@ -345,7 +372,11 @@ impl Measurement for DopplerMsr {
     type MeasurementSize = U1;
 
     fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> DopplerMsr {
-        assert_eq!(tx.frame.id(), rx.frame.id(), "tx and rx in different frames");
+        assert_eq!(
+            tx.frame.id(),
+            rx.frame.id(),
+            "tx and rx in different frames"
+        );
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
         let dt = tx.dt;
