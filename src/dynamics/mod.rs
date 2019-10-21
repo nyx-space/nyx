@@ -1,3 +1,4 @@
+extern crate hifitime;
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
