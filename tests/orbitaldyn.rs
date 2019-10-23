@@ -1,10 +1,10 @@
+extern crate approx;
 extern crate hifitime;
 extern crate nalgebra as na;
-#[macro_use]
-extern crate approx; // For the macro relative_eq!
 
 extern crate nyx_space as nyx;
 
+use approx::abs_diff_eq;
 use nyx::utils::rss_state_errors;
 
 #[test]
@@ -74,7 +74,7 @@ fn two_body_dynamics() {
     let prop_time = 24.0 * 3_600.0;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = State::<Geoid>::from_cartesian(
@@ -105,7 +105,7 @@ fn two_body_dynamics() {
         (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
     );
     assert!(
-        abs_diff_eq!(prop.state_vector(), rslt, epsilon = 2e-9f64),
+        abs_diff_eq!(prop.state_vector(), rslt, epsilon = 2e-9),
         "two body prop failed"
     );
     // And now do the backprop
@@ -728,7 +728,7 @@ fn two_body_dual() {
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(399);
 
     let init = State::<Geoid>::from_cartesian(
         -9_042.862_233_600_335,

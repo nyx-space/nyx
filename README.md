@@ -24,9 +24,9 @@ reaches production-level quality.
 - [x] Statistical Orbit Determination: Classical and Extended Kalman Filter
 - [x] Multibody dynamics using XB files (caveat:https://gitlab.com/chrisrabotin/nyx/issues/61)
 - [x] Orbit Determination with multibody dynamics
-- [ ] Finite burns with fuel depletion (including low thrust / ion propulsion)
+- [x] Finite burns with fuel depletion (including low thrust / ion propulsion)
+- [x] Sub-Optimal Control of continuous thrust (e.g. Ruggerio, Petropoulos/Q-law)
 - [ ] Planetary and Solar eclipse and visibility computation
-- [ ] Sub-Optimal Control of continuous thrust (Ruggerio, Naasz, Petropoulos)
 - [ ] Spacecraft attitude control and some useful optimal control algorithms
 - [ ] Monte Carlo simulations on different parameters
 - [ ] Link budget computations
@@ -39,7 +39,10 @@ A astrodynamics engineer with a heavy background in software. Nyx relies on the 
 of Colorado at Boulder. I work for Advanced Space ([we do cool stuff](http://advanced-space.com/)), but this code is mostly developed on my leisure time.
 
 # Examples
-## Estimation plots of a Halo orbit using a CKF
+Refer to the tests for short examples.
+
+## Orbital Determination - Estimation plots of a Halo orbit using a classical Kalman filter
+**Note:** the Kalman Filtering capabilities have been validated against JPL Monte using a proprietary scenario.
 
 Data to recreate this simulation is deliberately not shared. This just provides an example of what is possible using this library.
 ![Halo position covar](./data/halo_ckf_pos.png "E[Halo position]")

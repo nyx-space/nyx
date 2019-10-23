@@ -20,7 +20,7 @@ fn state_def_() {
 fn state_def_circ_inc() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -119,7 +119,7 @@ fn state_def_circ_inc() {
 fn state_def_elliptical() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -198,7 +198,7 @@ fn state_def_elliptical() {
 fn state_def_circ_eq() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -277,7 +277,7 @@ fn state_def_circ_eq() {
 fn state_def_reciprocity() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -359,9 +359,10 @@ fn state_def_reciprocity() {
 fn geodetic_vallado() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth_geoid.gm = 398_600.441_5;
+    earth_geoid.semi_major_radius = 6378.1370;
     let dt = Epoch::from_mjd_tai(51_545.0);
     // Test case from Vallado, 4th Ed., page 173, Example 3-3
     let ri = 6524.834;

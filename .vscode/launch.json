@@ -47,6 +47,27 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug integration test 'prop'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=lib",
+                    "--package=nyx-space"
+                ],
+                "filter": {
+                    "name": "lib",
+                    "kind": "test"
+                }
+            },
+            "args": [
+                "rugg_case_g"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug integration test 'lib'",
             "cargo": {
                 "args": [

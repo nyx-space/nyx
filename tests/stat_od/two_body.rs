@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
-use self::nyx::celestia::{Cosm, Geoid, State};
+use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
@@ -105,7 +105,7 @@ fn ekf_fixed_step_perfect_stations() {
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
         State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
@@ -260,7 +260,7 @@ fn ckf_fixed_step_perfect_stations() {
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
         State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);

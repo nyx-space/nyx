@@ -1,11 +1,10 @@
 extern crate hifitime;
 extern crate hyperdual;
-extern crate nalgebra as na;
 
 use self::hifitime::Epoch;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
-use self::na::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
+use super::na::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
 use celestia::{Cosm, Geoid, State};
 use od::AutoDiffDynamics;
@@ -49,9 +48,17 @@ impl<'a> CelestialDynamics<'a> {
         }
     }
 
-    /// Provides a copy to the state.
-    pub fn as_state(&self) -> State<Geoid> {
-        self.state
+    pub fn state_ctor(&self, rel_time: f64, state_vec: &Vector6<f64>) -> State<Geoid> {
+        State::<Geoid>::from_cartesian(
+            state_vec[0],
+            state_vec[1],
+            state_vec[2],
+            state_vec[3],
+            state_vec[4],
+            state_vec[5],
+            Epoch::from_tai_seconds(self.init_tai_secs + rel_time),
+            self.state.frame,
+        )
     }
 }
 
