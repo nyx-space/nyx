@@ -15,7 +15,7 @@ fn regress_leo_day_adaptive() {
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(399);
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -128,7 +128,7 @@ fn gmat_val_leo_day_adaptive() {
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 24.0 * 3_600.0;
@@ -288,7 +288,7 @@ fn gmat_val_leo_day_fixed() {
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 3_600.0 * 24.0;

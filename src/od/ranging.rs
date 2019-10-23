@@ -101,7 +101,7 @@ impl GroundStation {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
-        if rx.frame.id() != 3 {
+        if rx.frame.id() != 399 {
             unimplemented!("the receiver is not around the Earth");
         }
         let tx = State::from_geodesic(self.latitude, self.longitude, self.height, dt, rx.frame);

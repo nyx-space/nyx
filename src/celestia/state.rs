@@ -4,20 +4,17 @@ extern crate serde;
 use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
-use super::na::{Vector3, Vector6};
-use super::Frame;
+use super::na::{Matrix3, Vector3, Vector6};
+use super::{Frame, LocalFrame};
 use celestia::frames::Geoid;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
 use std::ops::{Add, Neg, Sub};
-use utils::{between_0_360, between_pm_180};
+use utils::{between_0_360, between_pm_180, r1, r3};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-4;
-
-// A warning will be logged if a division operation is planned with a value smaller than this following value.
-const ZERO_DIV_TOL: f64 = 1e-15;
 
 /// State defines an orbital state parameterized  by a `CelestialBody`.
 ///
@@ -259,9 +256,9 @@ impl State<Geoid> {
         dt: Epoch,
         frame: Geoid,
     ) -> Self {
-        if frame.gm.abs() < ZERO_DIV_TOL {
+        if frame.gm.abs() < std::f64::EPSILON {
             warn!(
-                "GM very low ({}): expect math errors in Keplerian to Cartesian conversion",
+                "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
                 frame.gm
             );
         }
@@ -683,6 +680,29 @@ impl State<Geoid> {
             let c_earth = self.frame.semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
             let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
             r_delta / latitude.cos() - c_earth
+        }
+    }
+
+    /// Returns the direct cosine rotation matrix to convert to this inertial state.
+    pub fn dcm_to_inertial(&self, from: LocalFrame) -> Matrix3<f64> {
+        match from {
+            LocalFrame::RIC => {
+                r3(-self.raan().to_radians())
+                    * r1(-self.inc().to_radians())
+                    * r3(-self.aol().to_radians())
+            }
+            LocalFrame::VNC => {
+                let v = self.velocity() / self.vmag();
+                let n = self.hvec() / self.hmag();
+                let c = v.cross(&n);
+                Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose()
+            }
+            LocalFrame::RCN => {
+                let r = self.radius() / self.rmag();
+                let n = self.hvec() / self.hmag();
+                let c = n.cross(&r);
+                Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose()
+            }
         }
     }
 }

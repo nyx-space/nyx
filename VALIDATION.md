@@ -11,6 +11,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
   * [From a Cartesian state](#from-a-cartesian-state)
   * [From a Keplerian state](#from-a-keplerian-state)
 - [Multibody dynamics](#multibody-dynamics)
+- [Propulsion](#propulsion)
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
@@ -137,3 +138,15 @@ LLO | Adaptive | Earth Moon | 2002-02-07 | 2e-7  |  3e-7  |  8e-8  |  6e-13  |  
 LLO | Adaptive | Earth Moon Sun Jupiter | 2002-02-07 | 4e-7  |  9e-7  |  2e-7  |  1e-12 |  4e-13 |  1e-13 |  **9.86872e-7** | **1.42994e-12**
 LEO | Adaptive | Earth Moon Sun Jupiter | 2020-01-01 | 2e-8  |  2e-6  |  2e-6  |  2e-9  |  1e-9  |  9e-10 | **2.63186e-6** | **2.45434e-9**
 LEO | Adaptive | Earth Sun Jupiter | 2020-01-01 | 3e-9  |  3e-7  |  4e-7  |  3e-10 |  2e-10 |  2e-10 | **4.80273e-7** | **4.47932e-10**
+
+# Propulsion
+## Finite burns
+In both cases, we take a LEO spacecraft subjects to the point mass gravity of the Moon, the Sun and Jupiter. We set the dry mass to 1.0 ton/megagrams/"metric ton" and the fuel mass to 756 kg. The spaceraft is equipped with a single thrusted whose thrust is 10 Newton and Isp 300 seconds. The finite burn is set to last 3000 seconds (50 minutes).
+
+Mass depletion | Propagator | x | y | z | vx | vy | vz | RSS position error | RSS velocity error
+--|---|---|---|---|---|---|---|---|--
+Disabled | RK8 Fixed step | 5e-11 | 1e-10 | 3e-11 | 5e-14 | 3e-14 | 5e-14 | **1.35472e-10** | **7.54351e-14**
+Enabled | RK8 Fixed step | 1e-11 | 9e-11 | 8e-12 | 4e-15 | 2e-14 | 2e-14 | **9.57349e-11** | **2.79494e-14**
+
+## Control laws
+### Ruggiero

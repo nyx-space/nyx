@@ -81,3 +81,38 @@ impl fmt::Display for Spacecraft {
         write!(f, "SC {}", self.id)
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub enum LocalFrame {
+    /// Radial, In-track, Cross-track
+    RIC,
+    /// Velocity, Normal, Cross
+    VNC,
+    /// Radial, Cross, Normal
+    RCN,
+}
+
+impl fmt::Display for LocalFrame {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Frame for LocalFrame {
+    fn id(&self) -> i32 {
+        match *self {
+            LocalFrame::RIC => 1,
+            LocalFrame::VNC => 2,
+            LocalFrame::RCN => 3,
+        }
+    }
+
+    fn center_id(&self) -> i32 {
+        0
+    }
+
+    fn orientation_id(&self) -> i32 {
+        0
+    }
+}

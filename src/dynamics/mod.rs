@@ -1,3 +1,4 @@
+extern crate hifitime;
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
@@ -12,15 +13,30 @@ pub mod celestial;
 /// The gravity module handles spherical harmonics only. It _must_ be combined with a CelestialDynamics dynamics
 ///
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
-pub mod gravity;
+// pub mod gravity;
 
 /// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
-pub mod drag;
+// pub mod drag;
 
 /// The angular momentum module handles all angular momentum dynamics.
 ///
 /// Note that this module does not handle attitude parameters or control. Refer to the relevant modules.
 pub mod momentum;
+
+/// The spacecraft module allows for simulation of spacecraft dynamics in general, including propulsion/maneuvers.
+pub mod spacecraft;
+
+/// Defines what a propulsion subsystem must implement, with some common propulsion systems.
+pub mod propulsion;
+
+/// Defines a few examples of thrust controllers.
+pub mod thrustctrl;
+
+/// Defines some velocity change controllers.
+pub mod deltavctrl;
+
+/// Defines a MissionArc, i.e. a section of a spacecraft mission. Enables maneuvers design.
+pub mod missionarc;
 
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///

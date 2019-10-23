@@ -149,26 +149,6 @@ impl Cosm {
                             let geoid = Geoid::perfect_sphere(id.number, exb_id, axb_id, sun_gm);
                             cosm.geoids.insert(exb_tpl, geoid);
                         }
-                        399 => {
-                            // Compute the Earth GM by subtracting the Moon GM from the Earth System GM
-                            let earth_sys = cosm
-                                .try_geoid_from_id(3)
-                                .expect("Earth Barycenter must be in EXB prior to Earth itself");
-                            let moon_gm = cosm
-                                .try_geoid_from_id(301)
-                                .expect("Earth Moon must be in EXB prior to Earth itself")
-                                .gm;
-                            let earth = Geoid {
-                                id: id.number,
-                                center_id: exb_id,
-                                orientation_id: axb_id,
-                                gm: earth_sys.gm - moon_gm,
-                                flattening: earth_sys.flattening,
-                                equatorial_radius: earth_sys.equatorial_radius,
-                                semi_major_radius: earth_sys.semi_major_radius,
-                            };
-                            cosm.geoids.insert(exb_tpl, earth);
-                        }
                         _ => {
                             info!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
                         }
