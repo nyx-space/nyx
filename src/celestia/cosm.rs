@@ -360,13 +360,17 @@ impl Cosm {
     }
 
     /// Attempts to return the provided state in the provided frame.
-    pub fn try_frame_chg(&self, state: State<Geoid>, new_geoid: Geoid) -> Result<State<Geoid>, CosmError> {
+    pub fn try_frame_chg(
+        &self,
+        state: &State<Geoid>,
+        new_geoid: Geoid,
+    ) -> Result<State<Geoid>, CosmError> {
         if state.frame.id() == new_geoid.id {
-            return Ok(state);
+            return Ok(state.clone());
         }
         // Let's get the path between both both states.
         let path = self.intermediate_geoid(&new_geoid, &state.frame)?;
-        let mut new_state = -state;
+        let mut new_state = -state.clone();
         new_state.frame = new_geoid;
         // let mut new_state = State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, state.dt, new_geoid);
         let mut prev_frame_id = new_state.frame.id();
@@ -384,7 +388,7 @@ impl Cosm {
     }
 
     /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg(&self, state: State<Geoid>, new_geoid: Geoid) -> State<Geoid> {
+    pub fn frame_chg(&self, state: &State<Geoid>, new_geoid: Geoid) -> State<Geoid> {
         self.try_frame_chg(state, new_geoid).unwrap()
     }
 
@@ -763,7 +767,9 @@ mod tests {
             earth,
         );
 
-        let llo_wrt_moon = dbg!(cosm.frame_chg(llo, moon));
+        let llo_wrt_moon = dbg!(cosm.frame_chg(&llo, moon));
         println!("{:o}", llo_wrt_moon);
+        assert!(llo_wrt_moon.sma() > 0.0);
+        assert!(llo_wrt_moon.ecc() > 0.0 && llo_wrt_moon.ecc() < 1.0);
     }
 }
