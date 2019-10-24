@@ -13,15 +13,30 @@ pub mod celestial;
 /// The gravity module handles spherical harmonics only. It _must_ be combined with a CelestialDynamics dynamics
 ///
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
-pub mod gravity;
+// pub mod gravity;
 
 /// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
-pub mod drag;
+// pub mod drag;
 
 /// The angular momentum module handles all angular momentum dynamics.
 ///
 /// Note that this module does not handle attitude parameters or control. Refer to the relevant modules.
 pub mod momentum;
+
+/// The spacecraft module allows for simulation of spacecraft dynamics in general, including propulsion/maneuvers.
+pub mod spacecraft;
+
+/// Defines what a propulsion subsystem must implement, with some common propulsion systems.
+pub mod propulsion;
+
+/// Defines a few examples of thrust controllers.
+pub mod thrustctrl;
+
+/// Defines some velocity change controllers.
+pub mod deltavctrl;
+
+/// Defines a MissionArc, i.e. a section of a spacecraft mission. Enables maneuvers design.
+pub mod missionarc;
 
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
@@ -35,11 +50,13 @@ where
 {
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
     type StateSize: DimName;
+    /// Defines the type which will be published on the propagator channel
+    type StateType;
     /// Returns the time of the current state
     fn time(&self) -> f64;
 
-    /// Returns the current state of the dynamics so it can be integrated.
-    fn state(&self) -> VectorN<f64, Self::StateSize>
+    /// Returns the current state of the dynamics as a vector so it can be integrated.
+    fn state_vector(&self) -> VectorN<f64, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 
@@ -52,4 +69,7 @@ where
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
+
+    /// Returns the state of the dynamics
+    fn state(&self) -> Self::StateType;
 }

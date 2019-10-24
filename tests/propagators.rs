@@ -15,14 +15,23 @@ fn regress_leo_day_adaptive() {
     use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(399);
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    let init = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088_611,
+        -5.088_611,
+        0.0,
+        dt,
+        earth_geoid,
+    );
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -53,9 +62,12 @@ fn regress_leo_day_adaptive() {
 
     {
         let mut dynamics = CelestialDynamics::two_body(init);
-        let mut prop = Propagator::new::<RK2Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
+        let mut prop = Propagator::new::<RK2Fixed>(
+            &mut dynamics,
+            &PropOpts::with_fixed_step(1.0, RSSStatePV {}),
+        );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[0], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -73,7 +85,7 @@ fn regress_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -91,7 +103,7 @@ fn regress_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[2], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -116,7 +128,7 @@ fn gmat_val_leo_day_adaptive() {
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 24.0 * 3_600.0;
@@ -124,7 +136,16 @@ fn gmat_val_leo_day_adaptive() {
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    let init = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088_611,
+        -5.088_611,
+        0.0,
+        dt,
+        earth_geoid,
+    );
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -168,8 +189,11 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[0], "two body prop failed");
-        assert!((prop.dynamics.state.dt.as_tai_seconds() - init.dt.as_tai_seconds() - prop_time).abs() < f64::EPSILON);
+        assert_eq!(prop.state_vector(), all_rslts[0], "two body prop failed");
+        assert!(
+            (prop.dynamics.state.dt.as_tai_seconds() - init.dt.as_tai_seconds() - prop_time).abs()
+                < f64::EPSILON
+        );
         assert!((prop.time() - prop_time).abs() < f64::EPSILON);
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
@@ -179,12 +203,16 @@ fn gmat_val_leo_day_adaptive() {
                 prev_details
             );
         }
-        assert_eq!(prop.state(), all_rslts[0], "first forward two body prop failed");
+        assert_eq!(
+            prop.state_vector(),
+            all_rslts[0],
+            "first forward two body prop failed"
+        );
         prop.until_time_elapsed(-prop_time);
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(-prop_time);
-        let (err_r, err_v) = rss_state_errors(&prop.state(), &all_rslts[0]);
+        let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"
@@ -202,7 +230,7 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -220,7 +248,7 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[2], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -238,7 +266,7 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[3], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[3], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -260,12 +288,21 @@ fn gmat_val_leo_day_fixed() {
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(3);
+    let mut earth_geoid = cosm.geoid_from_id(399);
     earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 3_600.0 * 24.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth_geoid);
+    let init = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088_611,
+        -5.088_611,
+        0.0,
+        dt,
+        earth_geoid,
+    );
 
     let all_rslts = vec![
         Vector6::from_row_slice(&[
@@ -312,14 +349,21 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let mut dynamics = CelestialDynamics::two_body(init);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0, RSSStatePV {}));
+        let mut prop = Propagator::new::<RK4Fixed>(
+            &mut dynamics,
+            &PropOpts::with_fixed_step(1.0, RSSStatePV {}),
+        );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[0], "first forward two body prop failed");
+        assert_eq!(
+            prop.state_vector(),
+            all_rslts[0],
+            "first forward two body prop failed"
+        );
         prop.until_time_elapsed(-prop_time);
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(-prop_time);
-        let (err_r, err_v) = rss_state_errors(&prop.state(), &all_rslts[0]);
+        let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"
@@ -332,29 +376,41 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let mut dynamics = CelestialDynamics::two_body(init);
-        let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        let mut prop = Propagator::new::<Verner56>(
+            &mut dynamics,
+            &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+        );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[1], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
     }
 
     {
         let mut dynamics = CelestialDynamics::two_body(init);
-        let mut prop = Propagator::new::<Dormand45>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        let mut prop = Propagator::new::<Dormand45>(
+            &mut dynamics,
+            &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+        );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[2], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[2], "two body prop failed");
     }
 
     {
         let mut dynamics = CelestialDynamics::two_body(init);
-        let mut prop = Propagator::new::<Dormand78>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        let mut prop = Propagator::new::<Dormand78>(
+            &mut dynamics,
+            &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+        );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[3], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[3], "two body prop failed");
     }
 
     {
         let mut dynamics = CelestialDynamics::two_body(init);
-        let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+        let mut prop = Propagator::new::<RK89>(
+            &mut dynamics,
+            &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
+        );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state(), all_rslts[4], "two body prop failed");
+        assert_eq!(prop.state_vector(), all_rslts[4], "two body prop failed");
     }
 }

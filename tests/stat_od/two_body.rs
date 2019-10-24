@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
-use self::nyx::celestia::{Cosm, Geoid, State};
+use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
@@ -88,8 +88,10 @@ fn ekf_fixed_step_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
-    let dss34_canberra = GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
-    let dss13_goldstone = GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -98,14 +100,15 @@ fn ekf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+    let initial_state =
+        State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -116,17 +119,15 @@ fn ekf_fixed_step_perfect_stations() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = 0.0;
-    while let Ok((t, state_vec)) = truth_rx.recv() {
+    let mut prev_t = dt;
+    while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
-        let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
-        let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state, this_dt);
+            let meas = station.measure(rx_state, rx_state.dt);
             if meas.visible() {
-                let delta = t - prev_t;
+                let delta = rx_state.dt.as_tai_seconds() - prev_t.as_tai_seconds();
                 measurements.push((delta, meas));
-                prev_t = t;
+                prev_t = rx_state.dt;
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -173,17 +174,28 @@ fn ekf_fixed_step_perfect_stations() {
         // Get the computed observation
         assert!(delta_time > 0.0, "repeated time");
         this_dt.mut_add_secs(delta_time);
-        let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.state.to_cartesian_vec(), this_dt, earth_geoid);
+        let rx_state = State::<Geoid>::from_cartesian_vec(
+            &prop_est.dynamics.state.to_cartesian_vec(),
+            this_dt,
+            earth_geoid,
+        );
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 kf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = kf
-                    .measurement_update(this_dt, real_meas.observation(), computed_meas.observation())
+                    .measurement_update(
+                        this_dt,
+                        real_meas.observation(),
+                        computed_meas.observation(),
+                    )
                     .expect("wut?");
                 still_empty = false;
-                assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
+                assert_eq!(
+                    latest_est.predicted, false,
+                    "estimate should not be a prediction"
+                );
                 // BUG: The following fails. Must be a time computation issue.
                 assert!(
                     latest_est.state.norm() < EPSILON,
@@ -208,9 +220,15 @@ fn ekf_fixed_step_perfect_stations() {
     if let Some(est) = last_est {
         for i in 0..6 {
             if i < 3 {
-                assert!(est.covar[(i, i)].abs() < covar_radius, "covar radius did not decrease");
+                assert!(
+                    est.covar[(i, i)].abs() < covar_radius,
+                    "covar radius did not decrease"
+                );
             } else {
-                assert!(est.covar[(i, i)].abs() < covar_velocity, "covar velocity did not decrease");
+                assert!(
+                    est.covar[(i, i)].abs() < covar_velocity,
+                    "covar velocity did not decrease"
+                );
             }
         }
     }
@@ -225,8 +243,10 @@ fn ckf_fixed_step_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
-    let dss34_canberra = GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
-    let dss13_goldstone = GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -235,14 +255,15 @@ fn ckf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<(f64, Vector6<f64>)>, Receiver<(f64, Vector6<f64>)>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+    let initial_state =
+        State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -253,18 +274,16 @@ fn ckf_fixed_step_perfect_stations() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = 0.0;
-    while let Ok((t, state_vec)) = truth_rx.recv() {
+    let mut prev_t = dt;
+    while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
-        let this_dt = Epoch::from_mjd_tai(dt.as_mjd_tai_days() + t / SECONDS_PER_DAY);
-        let rx_state = State::<Geoid>::from_cartesian_vec(&state_vec, this_dt, earth_geoid);
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state, this_dt);
+            let meas = station.measure(rx_state, rx_state.dt);
             if meas.visible() {
-                let delta = t - prev_t;
+                let delta = rx_state.dt.as_tai_seconds() - prev_t.as_tai_seconds();
                 measurements.push((delta, meas));
-                prev_t = t;
-                break;
+                prev_t = rx_state.dt;
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }
@@ -309,24 +328,36 @@ fn ckf_fixed_step_perfect_stations() {
         // Get the computed observation
         assert!(delta_time > 0.0, "repeated time");
         this_dt.mut_add_secs(delta_time);
-        let rx_state = State::<Geoid>::from_cartesian_vec(&prop_est.dynamics.state.to_cartesian_vec(), this_dt, earth_geoid);
+        let rx_state = State::<Geoid>::from_cartesian_vec(
+            &prop_est.dynamics.state.to_cartesian_vec(),
+            this_dt,
+            earth_geoid,
+        );
         let mut still_empty = true;
         for station in all_stations.iter() {
             let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
                 let latest_est = ckf
-                    .measurement_update(this_dt, real_meas.observation(), computed_meas.observation())
+                    .measurement_update(
+                        this_dt,
+                        real_meas.observation(),
+                        computed_meas.observation(),
+                    )
                     .expect("wut?");
                 still_empty = false;
-                assert_eq!(latest_est.predicted, false, "estimate should not be a prediction");
+                assert_eq!(
+                    latest_est.predicted, false,
+                    "estimate should not be a prediction"
+                );
                 assert!(
                     latest_est.state.norm() < EPSILON,
                     "estimate error should be zero (perfect dynamics) ({:e})",
                     latest_est.state.norm()
                 );
                 if !printed {
-                    wtr.serialize(latest_est.clone()).expect("could not write to stdout");
+                    wtr.serialize(latest_est.clone())
+                        .expect("could not write to stdout");
                     printed = true;
                 }
                 last_est = Some(latest_est);
@@ -343,9 +374,15 @@ fn ckf_fixed_step_perfect_stations() {
     if let Some(est) = last_est {
         for i in 0..6 {
             if i < 3 {
-                assert!(est.covar[(i, i)].abs() < covar_radius, "covar radius did not decrease");
+                assert!(
+                    est.covar[(i, i)].abs() < covar_radius,
+                    "covar radius did not decrease"
+                );
             } else {
-                assert!(est.covar[(i, i)].abs() < covar_velocity, "covar velocity did not decrease");
+                assert!(
+                    est.covar[(i, i)].abs() < covar_velocity,
+                    "covar velocity did not decrease"
+                );
             }
         }
     }

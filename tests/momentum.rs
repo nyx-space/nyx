@@ -15,7 +15,10 @@ fn const_mom() {
     let mut dynamics = AngularMom::from_tensor_matrix(&tensor, &omega);
     let init_momentum = dynamics.momentum().norm();
 
-    let mut prop = Propagator::new::<CashKarp45>(&mut dynamics, &PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}));
+    let mut prop = Propagator::new::<CashKarp45>(
+        &mut dynamics,
+        &PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}),
+    );
 
     prop.until_time_elapsed(5.0);
 

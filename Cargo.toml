@@ -1,6 +1,6 @@
 [package]
 name = "nyx-space"
-version = "0.0.15"
+version = "0.0.16"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://gitlab.com/chrisrabotin/nyx"
@@ -32,10 +32,7 @@ petgraph = "0.4"
 
 [dev-dependencies]
 pretty_env_logger = "0.3"
-
-[features]
-default = []
-unvalidated = [] # Enable to run unvalidated parts of the code
+approx = "0.3.2"
 
 [profile.dev]
 opt-level = 0

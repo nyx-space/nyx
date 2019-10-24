@@ -22,7 +22,9 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
     for i in 1..2 {
         for j in 0..i {
             if (i == j && (m[(i, j)] - m[(0, 0)]) > f64::EPSILON)
-                || (i != j && (m[(i, j)].abs() > f64::EPSILON || (m[(i, j)] - m[(j, i)]).abs() > f64::EPSILON))
+                || (i != j
+                    && (m[(i, j)].abs() > f64::EPSILON
+                        || (m[(i, j)] - m[(j, i)]).abs() > f64::EPSILON))
             {
                 return false;
             }

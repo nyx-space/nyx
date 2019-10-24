@@ -19,6 +19,7 @@
 //!  * Orbital state definition with transformations to other frames
 //!  * Multi body dynamics (known bug for heliocentric propagation: https://gitlab.com/chrisrabotin/nyx/issues/61)
 //!  * Multi body dynamics estimation (i.e. state transition matrix computation, using hyperdual numbers, cf. conf. paper AAS 19-716)
+//!  * Maneuver design (via MissionArc), maneuver simulation with fuel depletion (via Spacecraft) and continuous thrust and control (ThrustControl)
 //!
 //! ## Usage
 //!
@@ -26,7 +27,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.11"
+//! nyx-space = "0.0.16"
 //! ```
 //!
 //! And add the following to your crate root:
@@ -46,7 +47,7 @@ pub mod propagators;
 /// extern crate hifitime;
 /// extern crate nyx_space as nyx;
 /// use hifitime::{Epoch, SECONDS_PER_DAY};
-/// use nyx::celestia::{Cosm, Geoid, State};
+/// use nyx::celestia::{bodies, Cosm, Geoid, State};
 /// use nyx::dynamics::celestial::CelestialDynamics;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
@@ -54,7 +55,7 @@ pub mod propagators;
 ///
 /// fn main() {
 ///     let cosm = Cosm::from_xb("./de438s");
-///     let earth_geoid = cosm.geoid_from_id(3);
+///     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 ///
 ///     let dt = Epoch::from_mjd_tai(21_545.0);
 ///     let initial_state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
@@ -138,7 +139,7 @@ pub mod propagators;
 ///
 ///     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
 ///     prop.until_time_elapsed(prop_time);
-///     let (err_r, err_v) = rss_state_errors(&prop.state(), &rslt);
+///     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 ///
 ///     println!(
 ///         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",

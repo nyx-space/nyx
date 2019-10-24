@@ -16,7 +16,7 @@ fn nil_measurement() {
     let height = 0.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(3);
+    let earth_geoid = cosm.geoid_from_id(399);
 
     let station = GroundStation::from_noise_values("nil", 0.0, lat, long, height, 0.0, 0.0);
 
@@ -36,6 +36,12 @@ fn nil_measurement() {
     assert!(h_tilde[(1, 4)].is_nan(), "expected NaN");
     assert!(h_tilde[(1, 5)].is_nan(), "expected NaN");
 
-    assert!(meas.observation()[(0, 0)] - 0.0 < EPSILON, "observation is not range=0");
-    assert!(meas.observation()[(1, 0)].is_nan(), "observation is not range=0");
+    assert!(
+        meas.observation()[(0, 0)] - 0.0 < EPSILON,
+        "observation is not range=0"
+    );
+    assert!(
+        meas.observation()[(1, 0)].is_nan(),
+        "observation is not range=0"
+    );
 }
