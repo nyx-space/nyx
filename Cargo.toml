@@ -17,7 +17,7 @@ maintenance = { status = "actively-developed" }
 travis-ci = { repository = "ChristopherRabotin/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "0.17"
+nalgebra = "0.19"
 log = "0.4"
 hifitime = "0.1"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
