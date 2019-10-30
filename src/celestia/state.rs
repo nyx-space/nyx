@@ -136,6 +136,23 @@ where
     pub fn to_cartesian_vec(&self) -> Vector6<f64> {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
+
+    /// Returns the distancein kilometers between this state and another state.
+    /// Will **panic** is the frames are different
+    pub fn distance_to(&self, other: &State<F>) -> f64 {
+        assert_eq!(
+            self.frame.id(),
+            other.frame.id(),
+            "cannot compute the distance between two states in different frames"
+        );
+        self.distance_to_point(&other.radius())
+    }
+
+    /// Returns the distance in kilometers between this state and a point assumed to be in the same frame.
+    pub fn distance_to_point(&self, other: &Vector3<f64>) -> f64 {
+        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2))
+            .sqrt()
+    }
 }
 
 impl<F: Frame> PartialEq for State<F> {
