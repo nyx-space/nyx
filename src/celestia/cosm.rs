@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
+pub use std::io::Error as IoError;
 use std::io::Read;
 use std::time::Instant;
 
@@ -52,8 +53,14 @@ impl Error for CosmError {
 }
 
 impl Cosm {
-    /// Builds a Cosm from the *XB files. Path should _not_ contain file extension.
+    /// Builds a Cosm from the *XB files. Path should _not_ contain file extension. Panics if the files could not be loaded.
     pub fn from_xb(filename: &str) -> Cosm {
+        Self::try_from_xb(filename)
+            .unwrap_or_else(|_| panic!("could not open EXB file {}", filename))
+    }
+
+    /// Attempts to build a Cosm from the *XB files.
+    pub fn try_from_xb(filename: &str) -> Result<Cosm, IoError> {
         let mut cosm = Cosm {
             ephemerides: HashMap::new(),
             frames: HashMap::new(),
@@ -74,7 +81,7 @@ impl Cosm {
 
         cosm.exb_map.add_node(0); // Add the SSB
 
-        let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"));
+        let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"))?;
         for ephem in &ephemerides {
             let id = ephem.id.clone().unwrap();
             let exb_tpl = (id.number, id.name.clone());
@@ -162,7 +169,7 @@ impl Cosm {
             cosm.frames.insert((id.number, id.name), frame.clone());
         }
 
-        cosm
+        Ok(cosm)
     }
 
     fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
@@ -366,11 +373,11 @@ impl Cosm {
         new_geoid: Geoid,
     ) -> Result<State<Geoid>, CosmError> {
         if state.frame.id() == new_geoid.id {
-            return Ok(state.clone());
+            return Ok(*state);
         }
         // Let's get the path between both both states.
         let path = self.intermediate_geoid(&new_geoid, &state.frame)?;
-        let mut new_state = -state.clone();
+        let mut new_state = -*state;
         new_state.frame = new_geoid;
         // let mut new_state = State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, state.dt, new_geoid);
         let mut prev_frame_id = new_state.frame.id();
@@ -452,12 +459,11 @@ impl Cosm {
 /// Loads the provided input_filename as an EXB
 ///
 /// This function may panic!
-pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
+pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
     let mut input_exb_buf = Vec::new();
 
-    File::open(input_filename)
-        .unwrap_or_else(|_| panic!("could not open EXB file {}", input_filename))
-        .read_to_end(&mut input_exb_buf)
+    let mut f = File::open(input_filename)?;
+    f.read_to_end(&mut input_exb_buf)
         .expect("something went wrong reading the file");
 
     if input_exb_buf.is_empty() {
@@ -479,7 +485,7 @@ pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
         num_eph,
         decode_start.elapsed().as_secs()
     );
-    ephemerides
+    Ok(ephemerides)
 }
 
 /// Loads the provided input_filename as an FXB

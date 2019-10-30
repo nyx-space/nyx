@@ -10,9 +10,10 @@ pub enum EclipseState {
 
 /// Computes the state of an eclipse at the provided time between two states.
 ///
-/// Example: to compute whether a spacecraft can see the Moon despite the Earth maybe in the way,
+/// **Example**: to compute whether a spacecraft can see the Moon despite the Earth maybe in the way,
 /// `observer` should be the spacecraft state, `observed` should be the Moon state (at the same time),
 /// and `eclipsing_geoid` should be the Earth.
+/// **Assumption:** the distance and size of both the observer and observed states is such that they respectively look like single points.
 pub fn eclipse_state(
     observer: &State<Geoid>,
     observed: &State<Geoid>,
