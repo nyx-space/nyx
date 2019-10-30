@@ -17,7 +17,7 @@ maintenance = { status = "actively-developed" }
 gitlab = { repository = "chrisrabotin/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "0.18"
+nalgebra = "0.19"
 log = "0.4"
 hifitime = "1.0.5"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
