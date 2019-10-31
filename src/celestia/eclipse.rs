@@ -143,14 +143,7 @@ pub fn eclipse_state(
     let mut l = observed_fok.radius() - observer_fok.radius();
     l /= l.norm();
 
-    // Get the eclipsing body position in the same frame (allows us to set the origin to a null vector)
-    let eclipsing_geoid_fok = cosm.celestial_state(
-        eclipsing_geoid.id,
-        observer.dt.as_jde_et_days(),
-        observer.frame.id,
-    );
-
-    // let omc = observer.radius() - eclipsing_geoid_fok.radius();
+    // observer minus center point of the eclipsing body is already in the eclipsing body frame, so center is zero.
     let omc = observer_fok.radius();
     let r = eclipsing_geoid.equatorial_radius;
 
