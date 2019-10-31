@@ -41,8 +41,7 @@ fn arc_example() {
     let mut schedule = InstantBurns::from_mnvrs(vec![mnvr0, mnvr1]);
 
     let mut arc = MissionArc::new(&mut celestial, &mut schedule);
-    let mut prop =
-        Propagator::new::<RK89>(&mut arc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK89>(&mut arc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     println!("final state: {:o}", prop.dynamics.celestial.state());

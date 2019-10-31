@@ -97,7 +97,7 @@ fn ekf_fixed_step_perfect_stations() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
+    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
@@ -136,7 +136,7 @@ fn ekf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
+    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = CelestialDynamicsStm::two_body(initial_state);
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
     let covar_radius = 1.0e-6;
@@ -252,7 +252,7 @@ fn ckf_fixed_step_perfect_stations() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
+    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
@@ -291,7 +291,7 @@ fn ckf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size, LargestError {});
+    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = CelestialDynamicsStm::two_body(initial_state);
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
     let covar_radius = 1.0e-3;

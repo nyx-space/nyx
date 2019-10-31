@@ -183,10 +183,7 @@ fn halo_earth_moon_dynamics() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
-    );
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -404,10 +401,7 @@ fn halo_multi_body_dynamics() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
-    );
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -784,10 +778,7 @@ fn two_body_dual() {
 
     let prop_time = 24.0 * 3_600.0;
 
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
-    );
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
@@ -835,10 +826,7 @@ fn multi_body_dynamics_dual() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamicsStm::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(
-        &mut dynamics,
-        &PropOpts::with_fixed_step(10.0, RSSStatePV {}),
-    );
+    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.

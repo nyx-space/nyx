@@ -78,8 +78,7 @@ fn transfer_schedule_no_depl() {
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
 
-    let mut prop =
-        Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Compute the errors
@@ -179,8 +178,7 @@ fn transfer_schedule_depl() {
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
 
-    let mut prop =
-        Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Compute the errors
