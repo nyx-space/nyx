@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
-use nyx::celestia::eclipse::{eclipse_state, EclipseState, GEOMETRIC_TOL};
+use nyx::celestia::eclipse::{EclipseLocator, EclipseState, GEOMETRIC_TOL};
 use nyx::celestia::{bodies, Cosm, Geoid, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator, RK89};
@@ -35,13 +35,20 @@ fn leo_moon_eclipses() {
         prop.until_time_elapsed(prop_time);
     });
 
+    // Initialize the EclipseLocator
+    let e_loc = EclipseLocator {
+        shadow_bodies: vec![earth],
+        tolerance: GEOMETRIC_TOL,
+        cosm: &cosm,
+    };
+
     // Receive the states on the main thread.
     let mut prev_eclipse_state = EclipseState::Umbra;
     let mut cnt_changes = 0;
     while let Ok(rx_state) = truth_rx.recv() {
         let jde = rx_state.dt.as_jde_et_days();
         let moon_state = cosm.celestial_state(bodies::EARTH_MOON, jde, rx_state.frame.id);
-        let new_eclipse_state = eclipse_state(&rx_state, &moon_state, earth, GEOMETRIC_TOL, &cosm);
+        let new_eclipse_state = e_loc.compute(&rx_state, &moon_state);
         if new_eclipse_state != prev_eclipse_state {
             println!(
                 "{:.6} now in {:?}",

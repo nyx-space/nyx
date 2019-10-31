@@ -137,9 +137,10 @@ pub fn eclipse_state(
     }
 
     // Convert the observed to the same frame as the origin (fok = frame OK)
-    let observed_fok = &cosm.frame_chg(observed, observer.frame);
+    let observed_fok = &cosm.frame_chg(observed, eclipsing_geoid);
+    let observer_fok = &cosm.frame_chg(observer, eclipsing_geoid);
     // Compute the unit direction between both
-    let mut l = observed_fok.radius() - observer.radius();
+    let mut l = observed_fok.radius() - observer_fok.radius();
     l /= l.norm();
 
     // Get the eclipsing body position in the same frame (allows us to set the origin to a null vector)
@@ -149,7 +150,8 @@ pub fn eclipse_state(
         observer.frame.id,
     );
 
-    let omc = observer.radius() - eclipsing_geoid_fok.radius();
+    // let omc = observer.radius() - eclipsing_geoid_fok.radius();
+    let omc = observer_fok.radius();
     let r = eclipsing_geoid.equatorial_radius;
 
     // l.dot(&l) should be 1.0, within rounding error.
@@ -164,10 +166,10 @@ pub fn eclipse_state(
         // Compute the distance from the origin to the intersection point.
         let intersect_dist = -(l.dot(&omc)) + discriminant_sq.sqrt();
         // And the intersection point itself.
-        let intersect_pt = observer.radius() + intersect_dist * l;
-        let dist_ori_inters = observer.distance_to_point(&intersect_pt);
+        let intersect_pt = observer_fok.radius() + intersect_dist * l;
+        let dist_ori_inters = observer_fok.distance_to_point(&intersect_pt);
         let dist_oth_inters = observed_fok.distance_to_point(&intersect_pt);
-        let dist_ori_oth = observer.distance_to(&observed_fok);
+        let dist_ori_oth = observer_fok.distance_to(&observed_fok);
         // If the intersection point is on the line between both, then it causes an eclipse.
         if (dist_ori_inters + dist_oth_inters - dist_ori_oth).abs() < 1e-15 {
             if discriminant_sq > max_bound {
@@ -232,7 +234,7 @@ mod tests {
         );
         match eclipse_state(&x6, &x2, earth, COARSE_TOL, &cosm) {
             EclipseState::Penumbra(perc) => assert!((0.5 - perc).abs() < 1e-2),
-            _ => assert!(false),
+            _ => panic!("bug"),
         };
     }
 
