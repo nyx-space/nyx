@@ -1,9 +1,8 @@
-extern crate hifitime;
 extern crate hyperdual;
 
-use self::hifitime::Epoch;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
+use super::hifitime::Epoch;
 use super::na::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
 use celestia::{Cosm, Geoid, State};

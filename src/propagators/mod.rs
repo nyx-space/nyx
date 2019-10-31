@@ -299,20 +299,6 @@ pub struct PropOpts<E: ErrorCtrl> {
 }
 
 impl<E: ErrorCtrl> PropOpts<E> {
-    /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
-    ///  step size.
-    pub fn with_fixed_step(step: f64, errctrl: E) -> PropOpts<E> {
-        PropOpts {
-            init_step: step,
-            min_step: step,
-            max_step: step,
-            tolerance: 0.0,
-            fixed_step: true,
-            attempts: 0,
-            errctrl,
-        }
-    }
-
     /// `with_adaptive_step` initializes an `PropOpts` such that the integrator is used with an
     ///  adaptive step size. The number of attempts is currently fixed to 50 (as in GMAT).
     pub fn with_adaptive_step(
@@ -329,6 +315,22 @@ impl<E: ErrorCtrl> PropOpts<E> {
             attempts: 50,
             fixed_step: false,
             errctrl,
+        }
+    }
+}
+
+impl PropOpts<RSSStepPV> {
+    /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
+    ///  step size.
+    pub fn with_fixed_step(step: f64) -> PropOpts<RSSStepPV> {
+        PropOpts {
+            init_step: step,
+            min_step: step,
+            max_step: step,
+            tolerance: 0.0,
+            fixed_step: true,
+            attempts: 0,
+            errctrl: RSSStepPV {},
         }
     }
 }
@@ -359,7 +361,7 @@ fn test_options() {
 
     use self::error_ctrl::RSSStep;
 
-    let opts = PropOpts::with_fixed_step(1e-1, RSSStep {});
+    let opts = PropOpts::with_fixed_step(1e-1);
     f64_eq!(opts.min_step, 1e-1);
     f64_eq!(opts.max_step, 1e-1);
     f64_eq!(opts.tolerance, 0.0);

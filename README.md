@@ -19,14 +19,15 @@ reaches production-level quality.
 
 # Features
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
-- [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/lib.rs](tests/lib.rs))
-- [x] Orbital state manipulation (from GMAT source code and validated in GMAT)
-- [x] Statistical Orbit Determination: Classical and Extended Kalman Filter
-- [x] Multibody dynamics using XB files (caveat:https://gitlab.com/chrisrabotin/nyx/issues/61)
-- [x] Orbit Determination with multibody dynamics
-- [x] Finite burns with fuel depletion (including low thrust / ion propulsion)
-- [x] Sub-Optimal Control of continuous thrust (e.g. Ruggerio, Petropoulos/Q-law)
-- [ ] Planetary and Solar eclipse and visibility computation
+- [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/orbitaldyn.rs](tests/orbitaldyn.rs))
+- [x] Orbital state manipulation (from GMAT source code and validated in GMAT) (cf. [tests/state.rs](tests/state.rs))
+- [x] Statistical Orbit Determination: Classical and Extended Kalman Filter (cf. [tests/stat_od/two_body.rs](tests/stat_od/two_body.rs))
+- [x] Multibody dynamics using XB files (caveat:https://gitlab.com/chrisrabotin/nyx/issues/61) (cf. [tests/orbitaldyn.rs](tests/orbitaldyn.rs))
+- [x] Orbit Determination with multibody dynamics (cf. [tests/stat_od/multi_body.rs](tests/stat_od/multi_body.rs))
+- [x] Finite burns with fuel depletion (including low thrust / ion propulsion) (cf. [tests/prop/](tests/prop/))
+- [x] Sub-Optimal Control of continuous thrust (e.g. Ruggerio, Petropoulos/Q-law) (cf. [tests/prop/closedloop_multi_oe_ruggiero.rs](tests/prop/closedloop_multi_oe_ruggiero.rs))
+- [x] Planetary and Solar eclipse and visibility computation (cf. [tests/eclipse.rs](tests/eclipse.rs))
+- [ ] Solar radiation pressure modeling 
 - [ ] Spacecraft attitude control and some useful optimal control algorithms
 - [ ] Monte Carlo simulations on different parameters
 - [ ] Link budget computations

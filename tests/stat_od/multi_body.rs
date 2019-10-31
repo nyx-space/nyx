@@ -33,7 +33,7 @@ fn multi_body_ckf_perfect_stations() {
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts = PropOpts::with_fixed_step(step_size, RSSStepPV {});
+    let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
     let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
@@ -70,7 +70,7 @@ fn multi_body_ckf_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size, RSSStepPVStm {});
+    let opts_est = PropOpts::with_fixed_step(step_size);
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut estimator = CelestialDynamicsStm::new(initial_state, bodies, &cosm);
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);

@@ -48,8 +48,7 @@ fn rugg_sma() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -97,8 +96,7 @@ fn rugg_sma_decr() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -148,8 +146,7 @@ fn rugg_inc() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -199,8 +196,7 @@ fn rugg_inc_decr() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -250,8 +246,7 @@ fn rugg_ecc() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -301,8 +296,7 @@ fn rugg_ecc_decr() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -354,8 +348,7 @@ fn rugg_aop() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -406,8 +399,7 @@ fn rugg_aop_decr() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
@@ -460,8 +452,7 @@ fn rugg_raan() {
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
     println!("{:o}", orbit);
 
-    let mut prop =
-        Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0, RSSStatePV {}));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();

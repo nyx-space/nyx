@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
+pub use std::io::Error as IoError;
 use std::io::Read;
 use std::time::Instant;
 
@@ -52,8 +53,14 @@ impl Error for CosmError {
 }
 
 impl Cosm {
-    /// Builds a Cosm from the *XB files. Path should _not_ contain file extension.
+    /// Builds a Cosm from the *XB files. Path should _not_ contain file extension. Panics if the files could not be loaded.
     pub fn from_xb(filename: &str) -> Cosm {
+        Self::try_from_xb(filename)
+            .unwrap_or_else(|_| panic!("could not open EXB file {}", filename))
+    }
+
+    /// Attempts to build a Cosm from the *XB files.
+    pub fn try_from_xb(filename: &str) -> Result<Cosm, IoError> {
         let mut cosm = Cosm {
             ephemerides: HashMap::new(),
             frames: HashMap::new(),
@@ -74,7 +81,7 @@ impl Cosm {
 
         cosm.exb_map.add_node(0); // Add the SSB
 
-        let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"));
+        let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"))?;
         for ephem in &ephemerides {
             let id = ephem.id.clone().unwrap();
             let exb_tpl = (id.number, id.name.clone());
@@ -129,7 +136,7 @@ impl Cosm {
                                 6378.1370
                             }
                         }
-                        None => 0.0,
+                        None => equatorial_radius, // assume spherical if unspecified
                     };
                     let geoid = Geoid {
                         id: id.number,
@@ -162,7 +169,7 @@ impl Cosm {
             cosm.frames.insert((id.number, id.name), frame.clone());
         }
 
-        cosm
+        Ok(cosm)
     }
 
     fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
@@ -313,7 +320,7 @@ impl Cosm {
         ))
     }
 
-    /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
+    /// Attempts to return the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
     pub fn try_celestial_state(
         &self,
         target_exb_id: i32,
@@ -348,6 +355,7 @@ impl Cosm {
         Ok(state)
     }
 
+    /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`, or panics
     pub fn celestial_state(
         &self,
         target_exb_id: i32,
@@ -356,6 +364,39 @@ impl Cosm {
     ) -> State<Geoid> {
         self.try_celestial_state(target_exb_id, jde, as_seen_from_exb_id)
             .unwrap()
+    }
+
+    /// Attempts to return the provided state in the provided frame.
+    pub fn try_frame_chg(
+        &self,
+        state: &State<Geoid>,
+        new_geoid: Geoid,
+    ) -> Result<State<Geoid>, CosmError> {
+        if state.frame.id() == new_geoid.id {
+            return Ok(*state);
+        }
+        // Let's get the path between both both states.
+        let path = self.intermediate_geoid(&new_geoid, &state.frame)?;
+        let mut new_state = -*state;
+        new_state.frame = new_geoid;
+        // let mut new_state = State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, state.dt, new_geoid);
+        let mut prev_frame_id = new_state.frame.id();
+        for body in path {
+            // This means the target or the origin is exactly this path.
+            let mut next_state = self.raw_celestial_state(body.id(), state.dt.as_jde_et_days())?;
+            if prev_frame_id != next_state.frame.id() {
+                // Let's negate the next state prior to adding it.
+                next_state = -next_state;
+            }
+            new_state = new_state + next_state;
+            prev_frame_id = next_state.frame.id();
+        }
+        Ok(new_state)
+    }
+
+    /// Return the provided state in the provided frame, or panics
+    pub fn frame_chg(&self, state: &State<Geoid>, new_geoid: Geoid) -> State<Geoid> {
+        self.try_frame_chg(state, new_geoid).unwrap()
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
@@ -418,12 +459,11 @@ impl Cosm {
 /// Loads the provided input_filename as an EXB
 ///
 /// This function may panic!
-pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
+pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
     let mut input_exb_buf = Vec::new();
 
-    File::open(input_filename)
-        .unwrap_or_else(|_| panic!("could not open EXB file {}", input_filename))
-        .read_to_end(&mut input_exb_buf)
+    let mut f = File::open(input_filename)?;
+    f.read_to_end(&mut input_exb_buf)
         .expect("something went wrong reading the file");
 
     if input_exb_buf.is_empty() {
@@ -445,7 +485,7 @@ pub fn load_ephemeris(input_filename: &str) -> Vec<Ephemeris> {
         num_eph,
         decode_start.elapsed().as_secs()
     );
-    ephemerides
+    Ok(ephemerides)
 }
 
 /// Loads the provided input_filename as an FXB
@@ -714,5 +754,28 @@ mod tests {
         dbg!(ear2sun_state.radius() - sun2ear_state.radius());
         dbg!(ear2sun_state.velocity() - sun2ear_state.velocity());
         // XXX: Reenable this test when bug is fixed: https://gitlab.com/chrisrabotin/nyx/issues/61 .
+    }
+
+    #[test]
+    fn test_frame_change() {
+        let cosm = Cosm::from_xb("./de438s");
+        let earth = cosm.geoid_from_id(399);
+        let moon = cosm.geoid_from_id(301);
+
+        let llo = State::<Geoid>::from_cartesian(
+            3.919_869_89e5,
+            -7.493_039_70e4,
+            -7.022_605_11e4,
+            -6.802_604_18e-1,
+            1.992_053_61,
+            4.369_389_94e-1,
+            Epoch::from_gregorian_tai_at_midnight(2020, 1, 1),
+            earth,
+        );
+
+        let llo_wrt_moon = dbg!(cosm.frame_chg(&llo, moon));
+        println!("{:o}", llo_wrt_moon);
+        assert!(llo_wrt_moon.sma() > 0.0);
+        assert!(llo_wrt_moon.ecc() > 0.0 && llo_wrt_moon.ecc() < 1.0);
     }
 }

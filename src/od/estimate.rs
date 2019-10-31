@@ -152,6 +152,21 @@ where
     }
 }
 
+impl<S> fmt::LowerExp for Estimate<S>
+where
+    S: DimName,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "=== PREDICTED: {} ===\nEstState {:e} Covariance {:e}\n=====================",
+            &self.predicted, &self.state, &self.covar
+        )
+    }
+}
+
 impl<S> Serialize for Estimate<S>
 where
     S: DimName,
