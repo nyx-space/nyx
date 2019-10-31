@@ -9,6 +9,8 @@ use std::marker::PhantomData;
 pub struct Spacecraft<'a, T: ThrustControl> {
     pub celestial: &'a mut CelestialDynamics<'a>,
     pub prop: Option<&'a mut Propulsion<'a, T>>,
+    /// in kg
+    pub dry_mass: f64,
     _marker: PhantomData<T>,
 }
 
@@ -17,10 +19,14 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
     pub fn with_prop(
         celestial: &'a mut CelestialDynamics<'a>,
         prop: &'a mut Propulsion<'a, T>,
+        dry_mass: f64,
     ) -> Self {
+        // Set the dry mass of the propulsion system
+        prop.dry_mass = dry_mass;
         Self {
             celestial,
             prop: Some(prop),
+            dry_mass,
             _marker: PhantomData,
         }
     }
@@ -78,9 +84,13 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
                 .chain(Vector1::new(0.0).iter())
                 .cloned(),
         );
+        let mut total_mass = self.dry_mass;
         // Now compute the other dynamics as needed.
         if let Some(prop) = &self.prop {
-            d_x += prop.eom(t, state);
+            let prop_dt = prop.eom(t, state);
+            // Add the fuel mass to the total mass, minus the change in fuel
+            total_mass += prop.fuel_mass + prop_dt[6];
+            d_x += prop_dt;
         }
         d_x
     }

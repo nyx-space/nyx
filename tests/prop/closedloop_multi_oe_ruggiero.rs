@@ -9,7 +9,6 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
 use self::nyx::dynamics::Dynamics;
-use self::nyx::propagators::error_ctrl::RSSStatePV;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
@@ -57,9 +56,9 @@ fn qlaw_as_ruggiero_case_a() {
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, dry_mass, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -117,9 +116,9 @@ fn qlaw_as_ruggiero_case_b() {
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, dry_mass, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -174,9 +173,9 @@ fn qlaw_as_ruggiero_case_c() {
     let fuel_mass = 299.9;
     let dry_mass = 0.1;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, dry_mass, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -241,9 +240,9 @@ fn qlaw_as_ruggiero_case_d() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, dry_mass, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -312,9 +311,9 @@ fn qlaw_as_ruggiero_case_e() {
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, dry_mass, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -368,9 +367,9 @@ fn qlaw_as_ruggiero_case_f() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, dry_mass, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -433,9 +432,9 @@ fn ruggiero_iepc_2011_102() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, dry_mass, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));

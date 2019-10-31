@@ -146,7 +146,6 @@ fn halo_earth_moon_dynamics() {
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let prop_time = 24.0 * 3_600.0;
@@ -362,7 +361,6 @@ fn halo_multi_body_dynamics() {
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let prop_time = 24.0 * 3_600.0;
@@ -718,7 +716,6 @@ fn two_body_dual() {
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamicsStm;
     use nyx::od::AutoDiffDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
@@ -802,7 +799,6 @@ fn multi_body_dynamics_dual() {
     use na::U3;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamicsStm;
-    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let prop_time = 24.0 * 3_600.0;

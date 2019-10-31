@@ -1,4 +1,3 @@
-extern crate approx;
 extern crate hifitime;
 extern crate nalgebra as na;
 
@@ -42,7 +41,7 @@ fn leo_moon_eclipses() {
     while let Ok(rx_state) = truth_rx.recv() {
         let jde = rx_state.dt.as_jde_et_days();
         let moon_state = cosm.celestial_state(bodies::EARTH_MOON, jde, rx_state.frame.id);
-        let new_eclipse_state = eclipse_state(&rx_state, &moon_state, earth, &cosm);
+        let new_eclipse_state = eclipse_state(&rx_state, &moon_state, earth, 0.0, &cosm);
         if new_eclipse_state != prev_eclipse_state {
             println!(
                 "{:.6} now in {:?}",

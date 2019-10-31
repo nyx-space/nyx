@@ -281,7 +281,6 @@ fn gmat_val_leo_day_fixed() {
     use hifitime::{Epoch, J2000_OFFSET};
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");

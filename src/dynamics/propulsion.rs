@@ -14,7 +14,7 @@ const NORM_ERR: f64 = 1e-12;
 const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edition
 
 pub struct Propulsion<'a, T: ThrustControl> {
-    /// in kg
+    /// in kg, set in Spacecraft constructors.
     pub dry_mass: f64,
     /// in kg
     pub fuel_mass: f64,
@@ -32,14 +32,13 @@ pub struct Propulsion<'a, T: ThrustControl> {
 impl<'a, T: ThrustControl> Propulsion<'a, T> {
     pub fn new(
         ctrl: &'a mut T,
-        dry_mass: f64,
         fuel_mass: f64,
         abs_time: Epoch,
         thrusters: Vec<Thruster>,
         decrement_mass: bool,
     ) -> Self {
         Self {
-            dry_mass,
+            dry_mass: 0.0,
             fuel_mass,
             abs_time,
             thrusters,
