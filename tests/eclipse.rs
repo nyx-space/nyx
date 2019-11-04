@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
-use nyx::celestia::eclipse::{EclipseLocator, EclipseState, GEOMETRIC_TOL};
+use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
 use nyx::celestia::{bodies, Cosm, Geoid, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator, RK89};
@@ -38,7 +38,6 @@ fn leo_moon_eclipses() {
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
         shadow_bodies: vec![earth],
-        tolerance: GEOMETRIC_TOL,
         cosm: &cosm,
     };
 
