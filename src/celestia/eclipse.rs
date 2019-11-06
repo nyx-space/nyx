@@ -5,7 +5,7 @@ use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EclipseState {
     Umbra,
-    /// The f64 is between ]0; 1[ and corresponds to the percentage of penumbra based on the tolerance.
+    /// The f64 is between ]0; 1[ and corresponds to the percentage of penumbra: the closer to 1, the more light is seen.
     Penumbra(f64),
     Visibilis,
 }
@@ -149,14 +149,14 @@ pub fn eclipse_state(
     // Compute the radius from the center of the eclipsing geoid to the intersection point
     let r_plane_ls = r_ls_p - r_eb;
     // Note that the eclipsing geoid's circle is centered at zero, so the norm of r_plane_ls is also the distance
-    // between the center of the eclipsing body's shaddow and the center of the light source's shadow.
+    // between the center of the eclipsing body's shadow and the center of the light source's shadow.
     let d_plane_ls = r_plane_ls.norm();
 
     let eb_radius = eclipsing_geoid.equatorial_radius;
 
     if d_plane_ls - ls_radius > eb_radius {
         // If the closest point where the projected light source's circle _starts_ is further
-        // away than the furthest point where the eclipsing body's shaddow can reach, then the light
+        // away than the furthest point where the eclipsing body's shadow can reach, then the light
         // source is totally visible.
         return EclipseState::Visibilis;
     } else if eb_radius > d_plane_ls + ls_radius {
@@ -174,14 +174,17 @@ pub fn eclipse_state(
 
     // Compute the distances between the center of the eclipsing geoid and the line crossing the intersection
     // points of both circles.
-    let d1 = (eb_radius.powi(2) - ls_radius.powi(2) + d_plane_ls.powi(2)) / (2.0 * d_plane_ls);
-    let d2 = (ls_radius.powi(2) - eb_radius.powi(2) + d_plane_ls.powi(2)) / (2.0 * d_plane_ls);
+    let d1 = (d_plane_ls.powi(2) - ls_radius.powi(2) + eb_radius.powi(2)) / (2.0 * d_plane_ls);
+    let d2 = (d_plane_ls.powi(2) + ls_radius.powi(2) - eb_radius.powi(2)) / (2.0 * d_plane_ls);
 
-    let shaddow_area = circ_seg_area(eb_radius, d1) + circ_seg_area(ls_radius, d2);
+    let shadow_area = circ_seg_area(eb_radius, d1) + circ_seg_area(ls_radius, d2);
+    if shadow_area.is_nan() {
+        return EclipseState::Umbra;
+    }
     // Compute the nominal area of the light source
     let nominal_area = std::f64::consts::PI * ls_radius.powi(2);
     // And return the percentage (between 0 and 1) of the eclipse.
-    EclipseState::Penumbra((nominal_area - shaddow_area) / nominal_area)
+    EclipseState::Penumbra((nominal_area - shadow_area) / nominal_area)
 }
 
 // Compute the area of the circular segment of radius r and chord length d

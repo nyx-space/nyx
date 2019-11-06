@@ -110,5 +110,5 @@ fn geo_sun_earth_eclipses() {
         }
     }
 
-    assert_eq!(cnt_changes, 78, "wrong number of eclipse state changes");
+    assert_eq!(cnt_changes, 62, "wrong number of eclipse state changes");
 }
