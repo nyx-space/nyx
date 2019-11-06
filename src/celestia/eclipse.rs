@@ -68,16 +68,18 @@ impl PartialOrd for EclipseState {
 }
 
 pub struct EclipseLocator<'a> {
+    pub light_source: Geoid,
     pub shadow_bodies: Vec<Geoid>,
     pub cosm: &'a Cosm,
 }
 
 impl<'a> EclipseLocator<'a> {
     /// Compute the visibility/eclipse between an observer and an observed state
-    pub fn compute(&self, observer: &State<Geoid>, observed: &State<Geoid>) -> EclipseState {
+    pub fn compute(&self, observer: &State<Geoid>) -> EclipseState {
         let mut state = EclipseState::Visibilis;
         for eclipsing_geoid in &self.shadow_bodies {
-            let this_state = line_of_sight(observer, observed, *eclipsing_geoid, self.cosm);
+            let this_state =
+                eclipse_state(observer, self.light_source, *eclipsing_geoid, self.cosm);
             if this_state > state {
                 state = this_state;
             }
@@ -89,7 +91,7 @@ impl<'a> EclipseLocator<'a> {
 /// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
 ///
 /// # Algorithm
-/// TODO
+/// TODO: add derivation
 pub fn eclipse_state(
     observer: &State<Geoid>,
     light_source: Geoid,
@@ -266,7 +268,6 @@ mod tests {
         let x3 = State::<Geoid>::from_cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
         let x4 = State::<Geoid>::from_cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
         let x5 = State::<Geoid>::from_cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x6 = State::<Geoid>::from_cartesian(-1.0, 0.99999, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
         assert_eq!(line_of_sight(&x1, &x2, earth, &cosm), EclipseState::Umbra);
         assert_eq!(
@@ -286,10 +287,6 @@ mod tests {
             EclipseState::Visibilis
         );
         assert_eq!(line_of_sight(&x5, &x4, earth, &cosm), EclipseState::Umbra);
-        match line_of_sight(&x6, &x2, earth, &cosm) {
-            EclipseState::Penumbra(perc) => assert!((0.5 - perc).abs() < 1e-2),
-            _ => panic!("bug"),
-        };
     }
 
     #[test]
