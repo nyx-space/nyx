@@ -153,8 +153,10 @@ impl Cosm {
                     match id.number {
                         10 => {
                             // Sun
-                            let geoid = Geoid::perfect_sphere(id.number, exb_id, axb_id, sun_gm);
-                            cosm.geoids.insert(exb_tpl, geoid);
+                            let mut sun = Geoid::perfect_sphere(id.number, exb_id, axb_id, sun_gm);
+                            // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+                            sun.equatorial_radius = 696_342.0;
+                            cosm.geoids.insert(exb_tpl, sun);
                         }
                         _ => {
                             info!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);

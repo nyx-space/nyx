@@ -1,0 +1,375 @@
+#LyX 2.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 544
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\begin_preamble
+\usepackage{fullpage}
+\end_preamble
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures true
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\use_minted 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Eclipse computations in nyx
+\end_layout
+
+\begin_layout Author
+Christopher Rabotin
+\end_layout
+
+\begin_layout Standard
+This computation assumes that all objects are spherical.
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Summary
+\end_layout
+
+\begin_layout Standard
+In short, we project the light source onto a plane which crosses the eclipsing
+ body perpendicularly to the direction between the spacecraft and the (potential
+ly) eclipsing body.
+ We then find whether the disks representing the eclipsing body and the
+ light source on that plane overlap.
+ If they do not, then we're in full illumination.
+ If they do, we compute the overlapping area of both disks, and compute
+ the nominal apparent disk.
+ The ratio of these areas is used to compute the percentage of penumbra.
+\end_layout
+
+\begin_layout Section
+Derivation
+\end_layout
+
+\begin_layout Subsection
+Umbra or visibilis computation
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement h
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename eclipse_computation.jpg
+	width 25col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Top-view of eclipsing problem
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+First, let's compute 
+\begin_inset Formula $\beta_{2}$
+\end_inset
+
+ the angle between 
+\begin_inset Formula $\vec{r}_{\text{EB-LS}}$
+\end_inset
+
+ and 
+\begin_inset Formula $\vec{r}_{\text{LS}}$
+\end_inset
+
+, respectively the vector from the eclipsing body to the light source and
+ the vector from the spacecraft to the light source.
+ If that angle is less than a right angle, then the light source is not
+ behind the eclipsing body, so we're in full illumination: 
+\emph on
+visibilis
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+Then, we compute 
+\begin_inset Formula $\beta_{3}$
+\end_inset
+
+ the angle between the spacecraft and the eclipsing body, and between the
+ spacecraft and the light source.
+ We need this to project the radius of the light source onto the plane centered
+ at the eclipsing geoid, and normal to the direction to the spacecraft.
+\end_layout
+
+\begin_layout Standard
+Using the triangle formed between the spacecraft, the center of the eclipsing
+ body, and the projection plane, we can compute 
+\begin_inset Formula $\vec{r^{\prime}}_{\text{LS}}$
+\end_inset
+
+, the vector from the spacecraft to the intersection point on the plane
+ in the direction of 
+\begin_inset Formula $\hat{\boldsymbol{r}}_{\text{LS}}$
+\end_inset
+
+.
+ We use 
+\begin_inset Formula $\beta_{3}$
+\end_inset
+
+ for this computation as we know the length of that hypotenuse is 
+\begin_inset Formula 
+\[
+|\vec{r}_{\text{EB-LS}}|=|\vec{r^{\prime}}_{\text{LS}}|\cos\beta_{3}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Using Thales' theorem, we can compute the 
+\begin_inset Quotes eld
+\end_inset
+
+pseudo light source radius
+\begin_inset Quotes erd
+\end_inset
+
+, that is the radius of the light source as seen from an angle 
+\begin_inset Formula $\gamma$
+\end_inset
+
+ from the plane.
+ Forming a triangle between the intersection point, the center of the eclipsing
+ body, and the orthogonal projection of that intersection point onto 
+\begin_inset Formula $\vec{r}_{\text{EB-LS}}$
+\end_inset
+
+, we can compute the actual radius of the light source on the projection
+ plane.
+\end_layout
+
+\begin_layout Standard
+Let 
+\begin_inset Formula $\vec{r}_{\text{Plane-LS}}$
+\end_inset
+
+ be the vector from the center of the eclipsing body to the projected center
+ of the light source on the plane.
+ We now check for any overlap.
+ If the norm of 
+\begin_inset Formula $\vec{r}_{\text{Plane-LS}}$
+\end_inset
+
+ minus the project radius is greater than the radius of the eclipsing body,
+ it means that, no matter what the direction is, the shaddow of the eclipsing
+ body 
+\emph on
+ends
+\emph default
+ before the closest point of the light source: the light source is fully
+ visible.
+ If the norm of 
+\begin_inset Formula $\vec{r}_{\text{Plane-LS}}$
+\end_inset
+
+ plus the projected radius of the light source is less than the radius of
+ the eclipsing body, then the light source is fully behind the eclipsing
+ body, so we're in total eclipse (
+\emph on
+umbra
+\emph default
+).
+ Note that we have ruled out the light source being in front of the eclipsing
+ body by computing the angle 
+\begin_inset Formula $\beta_{2}$
+\end_inset
+
+ at the start.
+\end_layout
+
+\begin_layout Subsection
+Penumbra percentage
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement h
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename eclipse_penumbra.jpg
+	width 25col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+In plane view
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Both circles represent the light source and the eclipsing body.
+ We then use the 
+\begin_inset CommandInset href
+LatexCommand href
+name "Circle-Circle intersection"
+target "http://mathworld.wolfram.com/Circle-CircleIntersection.html"
+literal "false"
+
+\end_inset
+
+ computation to compute the area of the asymmetric lens corresponding to
+ the overlap of both circles, 
+\begin_inset Formula $A_{\text{shadow}}$
+\end_inset
+
+.
+ Then, we compute the full area of the light source, 
+\begin_inset Formula $\mathcal{A_{\text{LS}}}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The penumbra value, 
+\begin_inset Formula $P$
+\end_inset
+
+, is such that a number close to one means that the light source is almost
+ in full visibility.
+ Conversely, if the number is close to zero, then we are near total umbra.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+P=\frac{\mathcal{A_{\text{LS}}}-\mathcal{A_{\text{shadow}}}}{\mathcal{A_{\text{LS}}}}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document

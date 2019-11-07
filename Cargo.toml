@@ -1,6 +1,6 @@
 [package]
 name = "nyx-space"
-version = "0.0.16"
+version = "0.0.17"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://gitlab.com/chrisrabotin/nyx"

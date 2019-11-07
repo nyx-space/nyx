@@ -68,3 +68,9 @@ mod hermite;
 
 /// The eclipse module allows finding eclipses and (conversely) visibility between a state and another one (e.g. a planet or the Sun).
 pub mod eclipse;
+
+/// Speed of light in meters per second
+pub const SPEED_OF_LIGHT: f64 = 299_792_458.0;
+
+/// Astronomical unit, in kilometers, according to the [IAU](https://www.iau.org/public/themes/measuring/).
+pub const AU: f64 = 149_597_870.700;

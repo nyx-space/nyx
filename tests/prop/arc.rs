@@ -9,7 +9,6 @@ use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::deltavctrl::{InstantBurns, Mnvr};
 use self::nyx::dynamics::missionarc::MissionArc;
 use self::nyx::dynamics::Dynamics;
-use self::nyx::propagators::error_ctrl::RSSStatePV;
 use self::nyx::propagators::{PropOpts, Propagator, RK89};
 
 #[test]
