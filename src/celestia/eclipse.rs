@@ -131,8 +131,8 @@ pub fn eclipse_state(
     let r_ls = r_eb + r_eb_ls;
     let r_ls_unit = r_ls / r_ls.norm();
     // Compute beta3, the angle between the spacecraft and the eclipsing body, and between the spacecraft and the light source.
-    // We need this to project the apparent radius of the light source onto the plane centered at the eclipsing geoid, and normal to
-    // the direction tothe spacecraft.
+    // We need this to project the radius of the light source onto the plane centered at the eclipsing geoid, and normal to
+    // the direction to the spacecraft.
     let cos_beta3 = r_ls_unit.dot(&r_eb_unit);
     // Now compute r_ls_p, the vector from the eclipsing body to the center of the projected light source onto the plane.
     let r_ls_p = (r_eb.norm() / cos_beta3) * r_ls_unit;
