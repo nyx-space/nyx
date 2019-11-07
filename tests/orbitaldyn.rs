@@ -16,7 +16,7 @@ fn two_body_custom() {
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
@@ -71,7 +71,7 @@ fn two_body_dynamics() {
     use nyx::propagators::*;
     use std::f64::EPSILON;
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
@@ -148,7 +148,7 @@ fn halo_earth_moon_dynamics() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -220,7 +220,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -291,7 +291,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -363,7 +363,7 @@ fn halo_multi_body_dynamics() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -437,7 +437,7 @@ fn halo_multi_body_dynamics_adaptive() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -512,7 +512,7 @@ fn llo_multi_body_dynamics_adaptive() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -586,7 +586,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -653,7 +653,7 @@ fn leo_multi_body_dynamics_adaptive() {
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -773,7 +773,7 @@ fn two_body_dual() {
 
     assert_eq!(dynamics.state, init);
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -801,7 +801,7 @@ fn multi_body_dynamics_dual() {
     use nyx::dynamics::celestial::CelestialDynamicsStm;
     use nyx::propagators::*;
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);

@@ -153,7 +153,7 @@ Enabled | RK8 Fixed step | 1e-11 | 9e-11 | 8e-12 | 4e-15 | 2e-14 | 2e-14 | **9.5
 Solar radiation pressure using a cannonball model (i.e, spherical spacecraft approximation).
 
 The difference between nyx and GMAT is larger here than for other models. I assume that this is due to the Sun ephemeris computation error having a larger impact than in multibody dynamics.
-In fact, in the validation case used here, the spacecraft is always in full visibility of the Sun, and therefore the difference in Sun illumination does not matter. The propagation uses an RK89 and propagates for 24 days.
+In fact, in the validation case used here, the spacecraft is always in full visibility of the Sun, and therefore the difference in Sun illumination does not matter. The propagation uses an RK89 and propagates for 24 hours.
 
 However, note that nyx uses the IAU definition of an astronomical unit, whereas GMAT uses a pre-2012 definition of 1 AU (which is 19 meters shorter).
 
