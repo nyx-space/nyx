@@ -12,6 +12,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
   * [From a Keplerian state](#from-a-keplerian-state)
 - [Multibody dynamics](#multibody-dynamics)
 - [Propulsion](#propulsion)
+- [SRP](#srp)
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
@@ -148,5 +149,17 @@ Mass depletion | Propagator | x | y | z | vx | vy | vz | RSS position error | RS
 Disabled | RK8 Fixed step | 5e-11 | 1e-10 | 3e-11 | 5e-14 | 3e-14 | 5e-14 | **1.35472e-10** | **7.54351e-14**
 Enabled | RK8 Fixed step | 1e-11 | 9e-11 | 8e-12 | 4e-15 | 2e-14 | 2e-14 | **9.57349e-11** | **2.79494e-14**
 
-## Control laws
-### Ruggiero
+# SRP
+Solar radiation pressure using a cannonball model (i.e, spherical spacecraft approximation).
+
+The difference between nyx and GMAT is larger here than for other models. I assume that this is due to the Sun ephemeris computation error having a larger impact than in multibody dynamics.
+In fact, in the validation case used here, the spacecraft is always in full visibility of the Sun, and therefore the difference in Sun illumination does not matter. The propagation uses an RK89 and propagates for 24 days.
+
+However, note that nyx uses the IAU definition of an astronomical unit, whereas GMAT uses a pre-2012 definition of 1 AU (which is 19 meters shorter).
+
+Note that further differences _may_ exist as GMAT uses a simpler algorithm for penumbra computations than nyx. The algorithm for nyx can be found in the [docs](./docs/).
+
+Case | RSS position error (km) | RSS velocity error (km/s)
+--|---|---|---|---|---|---|---|---|--
+IAU definition of AU | **4.890e-4** | **8.102e-8**
+GMAT definition of AU | **4.888e-4** | **8.099e-8**

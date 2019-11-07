@@ -1,21 +1,24 @@
 use super::celestial::CelestialDynamics;
 use super::na::{Vector1, VectorN, U6, U7};
 use super::propulsion::Propulsion;
+use super::solarpressure::SolarPressure;
 use super::thrustctrl::ThrustControl;
 use super::Dynamics;
 use celestia::{Geoid, State};
+use std::fmt;
 use std::marker::PhantomData;
 
 pub struct Spacecraft<'a, T: ThrustControl> {
     pub celestial: &'a mut CelestialDynamics<'a>,
     pub prop: Option<&'a mut Propulsion<'a, T>>,
+    pub srp: Option<&'a mut SolarPressure<'a>>,
     /// in kg
     pub dry_mass: f64,
     _marker: PhantomData<T>,
 }
 
 impl<'a, T: ThrustControl> Spacecraft<'a, T> {
-    /// Initialize a Spacecraft with a set of celestial dynamics and an optional propulsion subsystem.
+    /// Initialize a Spacecraft with a set of celestial dynamics and a propulsion subsystem.
     pub fn with_prop(
         celestial: &'a mut CelestialDynamics<'a>,
         prop: &'a mut Propulsion<'a, T>,
@@ -26,6 +29,23 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
         Self {
             celestial,
             prop: Some(prop),
+            srp: None,
+            dry_mass,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Initialize a Spacecraft with a set of celestial dynamics and with SRP enabled.
+    pub fn with_srp(
+        celestial: &'a mut CelestialDynamics<'a>,
+        srp: &'a mut SolarPressure<'a>,
+        dry_mass: f64,
+    ) -> Self {
+        // Set the dry mass of the propulsion system
+        Self {
+            celestial,
+            prop: None,
+            srp: Some(srp),
             dry_mass,
             _marker: PhantomData,
         }
@@ -43,7 +63,12 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
     fn state(&self) -> Self::StateType {
         SpacecraftState {
             orbit: self.celestial.state(),
-            fuel: if let Some(prop) = &self.prop {
+            dry_mass: if let Some(prop) = &self.prop {
+                prop.dry_mass
+            } else {
+                0.0
+            },
+            fuel_mass: if let Some(prop) = &self.prop {
                 prop.state()
             } else {
                 0.0
@@ -92,6 +117,13 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
             total_mass += prop.fuel_mass + prop_dt[6];
             d_x += prop_dt;
         }
+        // Now compute the SRP if applicable
+        if let Some(srp) = &self.srp {
+            // Hide the total spacecraft mass in the state.
+            let mut srp_state = state.to_owned();
+            srp_state[6] = total_mass;
+            d_x += srp.eom(t, &srp_state);
+        }
         d_x
     }
 }
@@ -99,5 +131,12 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
 #[derive(Clone, Copy, Debug)]
 pub struct SpacecraftState {
     pub orbit: State<Geoid>,
-    pub fuel: f64,
+    pub dry_mass: f64,
+    pub fuel_mass: f64,
+}
+
+impl fmt::Display for SpacecraftState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:o}\t{} kg", self.orbit, self.dry_mass + self.fuel_mass)
+    }
 }

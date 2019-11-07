@@ -21,6 +21,20 @@ where
     fn next(&mut self, dt: Epoch, state: &Vector6<f64>);
 }
 
+#[derive(Clone)]
+pub struct NoThrustControl {}
+impl ThrustControl for NoThrustControl {
+    fn direction(&self, _: Epoch, _: &Vector6<f64>) -> Vector3<f64> {
+        unimplemented!();
+    }
+    fn throttle(&self, _: Epoch, _: &Vector6<f64>) -> f64 {
+        unimplemented!();
+    }
+    fn next(&mut self, _: Epoch, _: &Vector6<f64>) {
+        unimplemented!();
+    }
+}
+
 /// Goals used for sub-optimal controls
 #[derive(Copy, Clone, Debug)]
 pub enum Achieve {

@@ -38,6 +38,9 @@ pub mod deltavctrl;
 /// Defines a MissionArc, i.e. a section of a spacecraft mission. Enables maneuvers design.
 pub mod missionarc;
 
+/// Defines solar radiation pressure models
+pub mod solarpressure;
+
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
 /// Its design is such that several of the provided dynamics can be combined fairly easily. However,

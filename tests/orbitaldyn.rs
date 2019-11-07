@@ -9,14 +9,14 @@ use nyx::utils::rss_state_errors;
 
 #[test]
 fn two_body_custom() {
-    use hifitime::{Epoch, J2000_OFFSET};
+    use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
@@ -63,7 +63,7 @@ fn two_body_custom() {
 
 #[test]
 fn two_body_dynamics() {
-    use hifitime::{Epoch, J2000_OFFSET};
+    use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
@@ -71,7 +71,7 @@ fn two_body_dynamics() {
     use nyx::propagators::*;
     use std::f64::EPSILON;
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
@@ -142,13 +142,13 @@ fn halo_earth_moon_dynamics() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -214,13 +214,13 @@ fn halo_earth_moon_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -285,13 +285,13 @@ fn llo_earth_moon_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -357,13 +357,13 @@ fn halo_multi_body_dynamics() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -431,13 +431,13 @@ fn halo_multi_body_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -506,13 +506,13 @@ fn llo_multi_body_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -580,13 +580,13 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -647,13 +647,13 @@ fn leo_multi_body_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::Vector6;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::{PropOpts, Propagator, RK89};
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
@@ -712,7 +712,7 @@ fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
     extern crate nalgebra as na;
     use self::na::{Matrix6, Vector6, U3};
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use nyx::celestia::{Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamicsStm;
     use nyx::od::AutoDiffDynamics;
@@ -773,7 +773,7 @@ fn two_body_dual() {
 
     assert_eq!(dynamics.state, init);
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -795,13 +795,13 @@ fn two_body_dual() {
 
 #[test]
 fn multi_body_dynamics_dual() {
-    use hifitime::Epoch;
+    use hifitime::{Epoch, SECONDS_PER_DAY};
     use na::U3;
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamicsStm;
     use nyx::propagators::*;
 
-    let prop_time = 24.0 * 3_600.0;
+    let prop_time = 24.0 * SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
