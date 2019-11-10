@@ -100,11 +100,7 @@ pub fn eclipse_state(
 ) -> EclipseState {
     // If the light source's radius is zero, just call the line of sight algorithm
     if light_source.equatorial_radius < std::f64::EPSILON {
-        let observed = cosm.celestial_state(
-            light_source.id,
-            observer.dt.as_jde_et_days(),
-            observer.frame.id,
-        );
+        let observed = cosm.celestial_state(light_source.id, observer.dt, observer.frame.id);
         return line_of_sight(observer, &observed, eclipsing_geoid, &cosm);
     }
     // All of the computations happen with the observer as the center.
@@ -114,11 +110,7 @@ pub fn eclipse_state(
     let r_eb_unit = r_eb / r_eb.norm();
     // Vector from EB to LS
     let r_eb_ls = cosm
-        .celestial_state(
-            light_source.id,
-            observer.dt.as_jde_et_days(),
-            eclipsing_geoid.id,
-        )
+        .celestial_state(light_source.id, observer.dt, eclipsing_geoid.id)
         .radius();
     let r_eb_ls_unit = r_eb_ls / r_eb_ls.norm();
     // Compute the angle between those vectors. If that angle is less than 90 degrees, then the light source

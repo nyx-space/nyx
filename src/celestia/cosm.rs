@@ -331,27 +331,19 @@ impl Cosm {
     pub fn try_celestial_state(
         &self,
         target_exb_id: i32,
-        jde: f64,
+        datetime: Epoch,
         as_seen_from_exb_id: i32,
     ) -> Result<State<Geoid>, CosmError> {
         let target_geoid = self.try_geoid_from_id(target_exb_id)?;
         let as_seen_from = self.try_geoid_from_id(as_seen_from_exb_id)?;
         // And now let's convert this storage state to the correct frame.
         let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
-        let mut state = State::<Geoid>::from_cartesian(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            Epoch::from_jde_tai(jde),
-            as_seen_from,
-        );
+        let mut state =
+            State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, as_seen_from);
         let mut prev_frame_id = state.frame.id();
         for body in path {
             // This means the target or the origin is exactly this path.
-            let mut next_state = self.raw_celestial_state(body.id(), jde)?;
+            let mut next_state = self.raw_celestial_state(body.id(), datetime.as_jde_et_days())?;
             if prev_frame_id != next_state.frame.id() {
                 // Let's negate the next state prior to adding it.
                 next_state = -next_state;
@@ -366,10 +358,10 @@ impl Cosm {
     pub fn celestial_state(
         &self,
         target_exb_id: i32,
-        jde: f64,
+        datetime: Epoch,
         as_seen_from_exb_id: i32,
     ) -> State<Geoid> {
-        self.try_celestial_state(target_exb_id, jde, as_seen_from_exb_id)
+        self.try_celestial_state(target_exb_id, datetime, as_seen_from_exb_id)
             .unwrap()
     }
 
@@ -617,7 +609,7 @@ mod tests {
             "Conversions within Earth does not require any transformation"
         );
 
-        let jde = 2_452_312.5;
+        let jde = Epoch::from_jde_et(2_452_312.5);
 
         assert!(
             cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_BARYCENTER)
@@ -676,10 +668,8 @@ mod tests {
     fn test_cosm_indirect() {
         use std::f64::EPSILON;
 
-        let test_epoch = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
-        let jde = test_epoch.as_jde_et_days();
+        let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
         dbg!(jde);
-        dbg!(test_epoch.as_et_seconds());
 
         let cosm = Cosm::from_xb("./de438s");
 
@@ -715,11 +705,7 @@ mod tests {
         assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < EPSILON || true);
         assert!(dbg!(moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < EPSILON || true);
 
-        let earth_from_emb = cosm.celestial_state(
-            bodies::EARTH,
-            test_epoch.as_jde_et_days(),
-            bodies::EARTH_BARYCENTER,
-        );
+        let earth_from_emb = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_BARYCENTER);
         // Idem
         assert!(dbg!(earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < EPSILON || true);
         assert!(dbg!(earth_from_emb.y - 4.249_363_764_688_855e3).abs() < EPSILON || true);
