@@ -198,6 +198,11 @@ impl Cosm {
         self.try_geoid_from_id(id).unwrap()
     }
 
+    /// Returns the list of loaded geoids
+    pub fn geoids(&self) -> Vec<Geoid> {
+        self.geoids.iter().map(|(_, g)| *g).collect()
+    }
+
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
     pub fn mut_gm_for_geoid_id(&mut self, id: i32, gm: f64) {
         let mut key = None;
