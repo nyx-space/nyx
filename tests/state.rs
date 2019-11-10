@@ -116,6 +116,62 @@ fn state_def_circ_inc() {
 }
 
 #[test]
+fn xb_conversion() {
+    use nyx::celestia::{Cosm, Geoid, State};
+    let cosm = Cosm::from_xb("./de438s");
+    let earth_geoid = cosm.geoid_from_id(399);
+    let dt = Epoch::from_mjd_tai(21_545.0);
+    let cart = State::<Geoid>::from_cartesian(
+        -2436.45,
+        -2436.45,
+        6891.037,
+        5.088_611,
+        -5.088_611,
+        0.0,
+        dt,
+        earth_geoid,
+    );
+    let cart_xb = cart.to_exb_state();
+    f64_eq!(
+        cart.x,
+        cart_xb.position.as_ref().unwrap().x,
+        "EXB conversion failed"
+    );
+    f64_eq!(
+        cart.y,
+        cart_xb.position.as_ref().unwrap().y,
+        "EXB conversion failed"
+    );
+    f64_eq!(
+        cart.z,
+        cart_xb.position.as_ref().unwrap().z,
+        "EXB conversion failed"
+    );
+    f64_eq!(
+        cart.vx,
+        cart_xb.velocity.as_ref().unwrap().x,
+        "EXB conversion failed"
+    );
+    f64_eq!(
+        cart.vy,
+        cart_xb.velocity.as_ref().unwrap().y,
+        "EXB conversion failed"
+    );
+    f64_eq!(
+        cart.vz,
+        cart_xb.velocity.as_ref().unwrap().z,
+        "EXB conversion failed"
+    );
+    f64_eq!(
+        dt.as_mjd_tai_days(),
+        cart_xb.mod_julian,
+        "EXB conversion failed"
+    );
+    assert!(cart_xb.covariance.is_none());
+    assert!(cart_xb.covariance_exponent.abs() < std::f64::EPSILON);
+}
+
+#[test]
 fn state_def_elliptical() {
     use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
