@@ -5,7 +5,7 @@ use self::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
 use super::hifitime::Epoch;
 use super::na::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
-use celestia::{Cosm, Geoid, State};
+use celestia::{Cosm, Geoid, LTCorr, State};
 use od::AutoDiffDynamics;
 use std::f64;
 
@@ -18,6 +18,7 @@ pub struct CelestialDynamics<'a> {
     // Allows us to rebuilt the true epoch
     init_tai_secs: f64,
     pub cosm: Option<&'a Cosm>,
+    pub correction: LTCorr,
 }
 
 impl<'a> CelestialDynamics<'a> {
@@ -33,6 +34,7 @@ impl<'a> CelestialDynamics<'a> {
             relative_time: 0.0,
             init_tai_secs: state.dt.as_tai_seconds(),
             cosm: Some(cosm),
+            correction: LTCorr::None,
         }
     }
 
@@ -44,6 +46,7 @@ impl<'a> CelestialDynamics<'a> {
             relative_time: 0.0,
             init_tai_secs: state.dt.as_tai_seconds(),
             cosm: None,
+            correction: LTCorr::None,
         }
     }
 
@@ -100,10 +103,12 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         for exb_id in &self.bodies {
             let third_body = self.cosm.unwrap().geoid_from_id(*exb_id);
             // State of j-th body as seen from primary body
-            let st_ij = self
-                .cosm
-                .unwrap()
-                .celestial_state(*exb_id, jde, self.state.frame.id);
+            let st_ij = self.cosm.unwrap().celestial_state(
+                *exb_id,
+                jde,
+                self.state.frame.id,
+                self.correction,
+            );
 
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
@@ -130,6 +135,7 @@ pub struct CelestialDynamicsStm<'a> {
     // Allows us to rebuilt the true epoch
     init_tai_secs: f64,
     pub cosm: Option<&'a Cosm>,
+    pub correction: LTCorr,
 }
 
 impl<'a> CelestialDynamicsStm<'a> {
@@ -147,6 +153,7 @@ impl<'a> CelestialDynamicsStm<'a> {
             relative_time: 0.0,
             init_tai_secs: state.dt.as_tai_seconds(),
             cosm: Some(cosm),
+            correction: LTCorr::None,
         }
     }
 
@@ -159,6 +166,7 @@ impl<'a> CelestialDynamicsStm<'a> {
             relative_time: 0.0,
             init_tai_secs: state.dt.as_tai_seconds(),
             cosm: None,
+            correction: LTCorr::None,
         }
     }
 
@@ -223,10 +231,12 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
             let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm);
 
             // State of j-th body as seen from primary body
-            let st_ij = self
-                .cosm
-                .unwrap()
-                .celestial_state(*exb_id, jde, self.state.frame.id);
+            let st_ij = self.cosm.unwrap().celestial_state(
+                *exb_id,
+                jde,
+                self.state.frame.id,
+                self.correction,
+            );
 
             let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
             let r_ij3 = norm(&r_ij).powi(3) / gm_d;

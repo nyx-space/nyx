@@ -2,7 +2,7 @@ use super::hifitime::Epoch;
 use super::na::{VectorN, U6, U7};
 use super::Dynamics;
 use celestia::eclipse::{EclipseLocator, EclipseState};
-use celestia::{bodies, Cosm, Geoid, State, AU, SPEED_OF_LIGHT};
+use celestia::{bodies, Cosm, Geoid, LTCorr, State, AU, SPEED_OF_LIGHT};
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 pub struct SolarPressure<'a> {
@@ -31,6 +31,7 @@ impl<'a> SolarPressure<'a> {
             light_source: sun,
             shadow_bodies,
             cosm: &cosm,
+            correction: LTCorr::None,
         };
         Self {
             sc_mass: 0.0,

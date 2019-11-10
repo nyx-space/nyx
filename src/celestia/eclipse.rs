@@ -1,4 +1,4 @@
-use super::{Cosm, Geoid, State};
+use super::{Cosm, Geoid, LTCorr, State};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 
 /// Stores the eclipse state
@@ -71,6 +71,7 @@ pub struct EclipseLocator<'a> {
     pub light_source: Geoid,
     pub shadow_bodies: Vec<Geoid>,
     pub cosm: &'a Cosm,
+    pub correction: LTCorr,
 }
 
 impl<'a> EclipseLocator<'a> {
@@ -78,8 +79,13 @@ impl<'a> EclipseLocator<'a> {
     pub fn compute(&self, observer: &State<Geoid>) -> EclipseState {
         let mut state = EclipseState::Visibilis;
         for eclipsing_geoid in &self.shadow_bodies {
-            let this_state =
-                eclipse_state(observer, self.light_source, *eclipsing_geoid, self.cosm);
+            let this_state = eclipse_state(
+                observer,
+                self.light_source,
+                *eclipsing_geoid,
+                self.cosm,
+                self.correction,
+            );
             if this_state > state {
                 state = this_state;
             }
@@ -89,18 +95,17 @@ impl<'a> EclipseLocator<'a> {
 }
 
 /// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
-///
-/// # Algorithm
-/// TODO: add derivation
 pub fn eclipse_state(
     observer: &State<Geoid>,
     light_source: Geoid,
     eclipsing_geoid: Geoid,
     cosm: &Cosm,
+    correction: LTCorr,
 ) -> EclipseState {
     // If the light source's radius is zero, just call the line of sight algorithm
     if light_source.equatorial_radius < std::f64::EPSILON {
-        let observed = cosm.celestial_state(light_source.id, observer.dt, observer.frame.id);
+        let observed =
+            cosm.celestial_state(light_source.id, observer.dt, observer.frame.id, correction);
         return line_of_sight(observer, &observed, eclipsing_geoid, &cosm);
     }
     // All of the computations happen with the observer as the center.
@@ -110,7 +115,7 @@ pub fn eclipse_state(
     let r_eb_unit = r_eb / r_eb.norm();
     // Vector from EB to LS
     let r_eb_ls = cosm
-        .celestial_state(light_source.id, observer.dt, eclipsing_geoid.id)
+        .celestial_state(light_source.id, observer.dt, eclipsing_geoid.id, correction)
         .radius();
     let r_eb_ls_unit = r_eb_ls / r_eb_ls.norm();
     // Compute the angle between those vectors. If that angle is less than 90 degrees, then the light source
@@ -321,12 +326,17 @@ mod tests {
         let sc2 = State::<Geoid>::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
         let sc3 = State::<Geoid>::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
 
+        let correction = LTCorr::None;
+
         assert_eq!(
-            eclipse_state(&sc1, sun, earth, &cosm),
+            eclipse_state(&sc1, sun, earth, &cosm, correction),
             EclipseState::Visibilis
         );
-        assert_eq!(eclipse_state(&sc2, sun, earth, &cosm), EclipseState::Umbra);
-        match eclipse_state(&sc3, sun, earth, &cosm) {
+        assert_eq!(
+            eclipse_state(&sc2, sun, earth, &cosm, correction),
+            EclipseState::Umbra
+        );
+        match eclipse_state(&sc3, sun, earth, &cosm, correction) {
             EclipseState::Penumbra(val) => assert!(val > 0.9),
             _ => panic!("should be in penumbra"),
         };
