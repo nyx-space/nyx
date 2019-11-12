@@ -21,7 +21,7 @@ use std::fs::File;
 pub use std::io::Error as IoError;
 use std::io::Read;
 use std::time::Instant;
-use utils::r3;
+use utils::rotv;
 
 /// Enable or not light time correction for the computation of the celestial states
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -344,6 +344,8 @@ impl Cosm {
     /// Attempts to return the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
     ///
     /// The light time correction is based on SPICE's implementation: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkezr_c.html .
+    /// Aberration computation is a conversion of the stelab function in SPICE, available here
+    /// https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/stelab.c#L255
     pub fn try_celestial_state(
         &self,
         target_exb_id: i32,
@@ -418,37 +420,28 @@ impl Cosm {
                 state.vz = tgt.vz * (1.0 - dltdt) - obs.vz;
 
                 if correction == LTCorr::Abberation {
-                    /* Let r be the light time corrected vector from the observer to the object, and v be the velocity of the observer with
-                    respect to the solar system barycenter. Let w be the angle between them. The aberration angle phi is given by
-                       sin(phi) = v sin(w) / c
-                    Let h be the vector given by the cross product
-                       h = r X v
-                    Rotate r by phi radians about h to obtain the apparent position of the object.
-                    */
-                    let r = state.radius() / state.rmag();
-                    let v = obs.velocity() / obs.vmag();
-                    let mut h = r.cross(&v);
-                    h /= h.norm();
-                    // Build the DCM to represent the position vector in this new frame
-                    let dcm = Matrix3::new(r[0], r[1], r[2], v[0], v[1], v[2], h[0], h[1], h[2])
-                        .transpose();
-                    println!(
-                        "{} {} {} {}",
-                        r.norm(),
-                        v.norm(),
-                        h.norm(),
-                        dcm * dcm.transpose()
-                    );
-
-                    let w = (r.dot(&v)).acos();
-                    // Compute the aberration angle
-                    let phi = (obs.vmag() * w.sin() / (SPEED_OF_LIGHT * 1e-3)).asin();
-                    // println!("{} {}", phi, dcm.transpose() * dcm);
-                    // And rotate in that new frame around the h axis and convert back into the nominal frame.
-                    let ab_radius = dcm.transpose() * r3(0.0) * dcm * state.radius();
-                    state.x = ab_radius.x;
-                    state.y = ab_radius.y;
-                    state.z = ab_radius.z;
+                    // Get a unit vector that points in the direction of the object
+                    let u_obj = state.radius() / state.rmag();
+                    // Get the velocity vector (of the observer) scaled with respect to the speed of light
+                    let vbyc = obs.velocity() / (SPEED_OF_LIGHT * 1e-3);
+                    /* If the square of the length of the velocity vector is greater than or equal
+                    to one, the speed of the observer is greater than or equal to the speed of light.
+                    The observer speed is definitely out of range. */
+                    if vbyc.dot(&vbyc) >= 1.0 {
+                        warn!("observer is traveling faster than the speed of light");
+                    } else {
+                        let h_hat = u_obj.cross(&vbyc);
+                        /* If the magnitude of the vector H is zero, the observer is moving along the line
+                        of sight to the object, and no correction is required. Otherwise, rotate the
+                        position of the object by phi radians about H to obtain the apparent position. */
+                        if h_hat.norm() > std::f64::EPSILON {
+                            let phi = h_hat.norm().asin();
+                            let ab_pos = rotv(&state.radius(), &h_hat, phi);
+                            state.x = ab_pos[0];
+                            state.y = ab_pos[1];
+                            state.z = ab_pos[2];
+                        }
+                    }
                 }
                 Ok(state)
             }
@@ -913,7 +906,7 @@ mod tests {
         // Note that the following data comes from SPICE (via spiceypy).
         // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
         // However, in writing this test, I also checked the computed light time, which matches SPICE to 2.999058779096231e-10 seconds.
-        assert!(dbg!(out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-3);
+        assert!(dbg!(out_state.x - -2.5772317127004844e+08).abs() < 1e-3);
         assert!(dbg!(out_state.y - -5.8123562375335597e+07).abs() < 1e-3);
         assert!(dbg!(out_state.z - -2.4931464105212048e+07).abs() < 1e-3);
         assert!(dbg!(out_state.vx - -3.4635859652064171e+00).abs() < 1e-3);

@@ -91,6 +91,12 @@ pub fn r3(angle: f64) -> Matrix3<f64> {
     Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
 }
 
+/// Rotate a vector about a given axis
+pub fn rotv(v: &Vector3<f64>, axis: &Vector3<f64>, theta: f64) -> Vector3<f64> {
+    let k_hat = axis / axis.norm();
+    v * theta.cos() + k_hat.cross(&v) * theta.sin() + k_hat.dot(&v) * k_hat * (1.0 - theta.cos())
+}
+
 /// Computes the RSS state errors in position and in velocity
 pub fn rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
     let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
