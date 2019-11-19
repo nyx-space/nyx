@@ -64,6 +64,10 @@ impl<'a, T: ThrustControl> Dynamics for Propulsion<'a, T> {
         self.fuel_mass
     }
 
+    fn build_state(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> f64 {
+        state[6]
+    }
+
     /// Propulsion state is a vector of six zeros followed by the fuel mass
     fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
         let mut s = VectorN::<f64, U7>::zeros();

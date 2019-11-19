@@ -2,7 +2,8 @@ extern crate hifitime;
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, VectorN};
+use self::na::{DefaultAllocator, DimName, Vector3, VectorN};
+use crate::celestia::{Geoid, State};
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -75,4 +76,18 @@ where
 
     /// Returns the state of the dynamics
     fn state(&self) -> Self::StateType;
+
+    /// Returns a StateType from the provided time and state vector
+    fn build_state(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> Self::StateType
+    where
+        DefaultAllocator: Allocator<f64, Self::StateSize>;
+}
+
+pub trait ForceModel
+where
+    Self: Sized,
+{
+    /// Defines the equations of motion for this force model from the provided osculating state.
+    /// TODO: Expand to all frames (useful for attitude)
+    fn eom(&self, osc: &State<Geoid>) -> Vector3<f64>;
 }

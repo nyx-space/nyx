@@ -3,7 +3,7 @@ use super::na::{Vector1, VectorN, U6, U7};
 use super::propulsion::Propulsion;
 use super::solarpressure::SolarPressure;
 use super::thrustctrl::ThrustControl;
-use super::Dynamics;
+use super::{Dynamics, ForceModel};
 use celestia::{Geoid, State};
 use std::fmt;
 use std::marker::PhantomData;
@@ -76,6 +76,24 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
         }
     }
 
+    fn build_state(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> Self::StateType {
+        let celestial_state = state.fixed_rows::<U6>(0).into_owned();
+        let orbit = self.celestial.build_state(t, &celestial_state);
+        SpacecraftState {
+            orbit,
+            dry_mass: if let Some(prop) = &self.prop {
+                prop.dry_mass
+            } else {
+                0.0
+            },
+            fuel_mass: if let Some(prop) = &self.prop {
+                prop.build_state(t, state)
+            } else {
+                0.0
+            },
+        }
+    }
+
     fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
         let fuel_mass = if let Some(prop) = &self.prop {
             prop.fuel_mass
@@ -101,8 +119,8 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         // Compute the celestial dynamics
-        let celestial_state = state.fixed_rows::<U6>(0).into_owned();
-        let d_x_celestial = self.celestial.eom(t, &celestial_state);
+        let celestial_vec = state.fixed_rows::<U6>(0).into_owned();
+        let d_x_celestial = self.celestial.eom(t, &celestial_vec);
         let mut d_x = VectorN::<f64, U7>::from_iterator(
             d_x_celestial
                 .iter()
@@ -119,10 +137,11 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
         }
         // Now compute the SRP if applicable
         if let Some(srp) = &self.srp {
-            // Hide the total spacecraft mass in the state.
-            let mut srp_state = state.to_owned();
-            srp_state[6] = total_mass;
-            d_x += srp.eom(t, &srp_state);
+            let celestial_state = self.celestial.build_state(t, &celestial_vec);
+            let srp_force = srp.eom(&celestial_state) / total_mass;
+            for i in 0..3 {
+                d_x[i + 3] += srp_force[i];
+            }
         }
         d_x
     }

@@ -1,6 +1,5 @@
-use super::hifitime::Epoch;
-use super::na::{VectorN, U6, U7};
-use super::Dynamics;
+use super::na::Vector3;
+use super::ForceModel;
 use celestia::eclipse::{EclipseLocator, EclipseState};
 use celestia::{bodies, Cosm, Geoid, State, AU, SPEED_OF_LIGHT};
 
@@ -15,17 +14,11 @@ pub struct SolarPressure<'a> {
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,
     pub e_loc: EclipseLocator<'a>,
-    init_state: State<Geoid>, // Needed until #90 is implemented
 }
 
 impl<'a> SolarPressure<'a> {
     /// Will use Cr = 1.8, Phi = 1367.0
-    pub fn default(
-        sc_area: f64,
-        init_state: State<Geoid>,
-        shadow_bodies: Vec<Geoid>,
-        cosm: &'a Cosm,
-    ) -> Self {
+    pub fn default(sc_area: f64, shadow_bodies: Vec<Geoid>, cosm: &'a Cosm) -> Self {
         let sun = cosm.geoid_from_id(bodies::SUN);
         let e_loc = EclipseLocator {
             light_source: sun,
@@ -38,32 +31,22 @@ impl<'a> SolarPressure<'a> {
             cr: 1.8,
             phi: 1367.0,
             e_loc,
-            init_state,
         }
     }
 }
 
-impl<'a> Dynamics for SolarPressure<'a> {
-    type StateSize = U7;
-    type StateType = VectorN<f64, U7>;
-
-    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
-        // The total spacecraft mass is "hidden" in the state
-        let sc_mass = state[6];
-        // Rebuild the state vector
-        let state = state.fixed_rows::<U6>(0).into_owned();
-        let dt = Epoch::from_tai_seconds(self.init_state.dt.as_tai_seconds() + t);
-        let osc = State::<Geoid>::from_cartesian_vec(&state, dt, self.init_state.frame);
+impl<'a> ForceModel for SolarPressure<'a> {
+    fn eom(&self, osc: &State<Geoid>) -> Vector3<f64> {
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
             .e_loc
             .cosm
-            .frame_chg(&osc, self.e_loc.light_source)
+            .frame_chg(osc, self.e_loc.light_source)
             .radius();
         let r_sun_unit = r_sun / r_sun.norm();
 
         // Compute the shaddowing factor.
-        let k = match self.e_loc.compute(&osc) {
+        let k = match self.e_loc.compute(osc) {
             EclipseState::Umbra => 0.0,
             EclipseState::Visibilis => 1.0,
             EclipseState::Penumbra(val) => val,
@@ -74,31 +57,8 @@ impl<'a> Dynamics for SolarPressure<'a> {
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        let a_srp = -1e-3 * self.cr * (self.sc_area / sc_mass) * flux_pressure * r_sun_unit;
+        let a_srp = -1e-3 * self.cr * self.sc_area * flux_pressure * r_sun_unit;
 
-        let mut rtn = VectorN::<f64, U7>::zeros();
-        for i in 0..3 {
-            rtn[i + 3] = a_srp[i];
-        }
-
-        rtn
-    }
-
-    /// Time of SolarPressure will always return zero!
-    fn time(&self) -> f64 {
-        0.0
-    }
-
-    /// SolarPressure state is a vector of six zeros followed by the fuel mass
-    fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
-        VectorN::<f64, Self::StateSize>::zeros()
-    }
-
-    /// There is no state to set for SolarPressure, so this function does nothing.
-    fn set_state(&mut self, _new_t: f64, _new_state: &VectorN<f64, Self::StateSize>) {}
-
-    /// Does nothing
-    fn state(&self) -> Self::StateType {
-        self.state_vector()
+        a_srp
     }
 }
