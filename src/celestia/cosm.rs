@@ -444,7 +444,9 @@ impl Cosm {
                             // https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/zzstelab.c#L270
                             let vp = obs.velocity() - obs.velocity().dot(&r_hat) * r_hat;
 
-                            let accobs = obs.velocity() / obs.rmag();
+                            // let accobs = obs.velocity() / obs.rmag();
+                            let v_hat = obs.velocity() / obs.vmag();
+                            let accobs = perpv(&(obs.velocity() / obs.rmag()), &v_hat) / obs.vmag();
                             let dvp = accobs
                                 - (obs.velocity().dot(&dr_hat) + accobs.dot(&r_hat)) * r_hat
                                 + obs.velocity().dot(&r_hat) * dr_hat;
@@ -452,16 +454,18 @@ impl Cosm {
                             // This is just the input velocity perpendicular to the input position, scaled by the norm,
                             // cf. https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/dvhat.c#L238
                             let vp_hat = vp / vp.norm();
+
                             let dvp_hat = perpv(&vp, &vp_hat) / vp.norm();
                             // Now compute the time derivative of phi
                             let dphi = (1.0 / SPEED_OF_LIGHT_KMS) * dvp.dot(&vp_hat);
-                            // Finally, let's compute the time derivative of the aberration
+                            let ptmag = state.radius().norm();
                             let dptmag = state.velocity().dot(&r_hat);
+                            // Finally, let's compute the time derivative of the aberration
                             let dscorr = (phi.sin() * dvp_hat
                                 + phi.cos() * dbg!(dphi) * vp_hat
                                 + (phi.cos() - 1.0) * dr_hat
                                 + (-phi.sin() * dphi) * r_hat)
-                                * state.radius().norm()
+                                * ptmag
                                 + (phi.sin() * vp_hat + (phi.cos() - 1.0) * r_hat) * dptmag;
                             println!("{}", dscorr);
                             state.vx += dscorr[0];
