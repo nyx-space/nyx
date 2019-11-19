@@ -5,7 +5,6 @@ use self::bytes::IntoBuf;
 use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
 use self::prost::Message;
-use super::na::Matrix3;
 use crate::hifitime::{Epoch, SECONDS_PER_DAY};
 use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
 use celestia::exb::{Ephemeris, EphemerisContainer};
@@ -13,7 +12,7 @@ use celestia::frames::Frame;
 use celestia::frames::*;
 use celestia::fxb::{Frame as FXBFrame, FrameContainer};
 use celestia::state::State;
-use celestia::SPEED_OF_LIGHT;
+use celestia::SPEED_OF_LIGHT_KMS;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -21,7 +20,7 @@ use std::fs::File;
 pub use std::io::Error as IoError;
 use std::io::Read;
 use std::time::Instant;
-use utils::rotv;
+use utils::{perpv, rotv};
 
 /// Enable or not light time correction for the computation of the celestial states
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -392,7 +391,7 @@ impl Cosm {
                 // It will take less than three iterations to converge
                 for _ in 0..3 {
                     // Compute the light time
-                    let lt = (tgt - obs).rmag() / (SPEED_OF_LIGHT * 1e-3);
+                    let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
                     let mut lt_dt = datetime;
                     lt_dt.mut_sub_secs(lt);
@@ -413,7 +412,7 @@ impl Cosm {
                 // Incluee the range-rate term in the velocity computation as explained in
                 // https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/abcorr.html#Reception%20case
                 let state_acc = state.velocity() / state.rmag();
-                let dltdt = state.radius().dot(&state_acc) / (SPEED_OF_LIGHT * 1e-3);
+                let dltdt = state.radius().dot(&state_acc) / SPEED_OF_LIGHT_KMS;
 
                 state.vx = tgt.vx * (1.0 - dltdt) - obs.vx;
                 state.vy = tgt.vy * (1.0 - dltdt) - obs.vy;
@@ -421,16 +420,16 @@ impl Cosm {
 
                 if correction == LTCorr::Abberation {
                     // Get a unit vector that points in the direction of the object
-                    let u_obj = state.radius() / state.rmag();
+                    let (r_hat, dr_hat) = state.dv_hat();
                     // Get the velocity vector (of the observer) scaled with respect to the speed of light
-                    let vbyc = obs.velocity() / (SPEED_OF_LIGHT * 1e-3);
+                    let vbyc = obs.velocity() / SPEED_OF_LIGHT_KMS;
                     /* If the square of the length of the velocity vector is greater than or equal
                     to one, the speed of the observer is greater than or equal to the speed of light.
                     The observer speed is definitely out of range. */
                     if vbyc.dot(&vbyc) >= 1.0 {
                         warn!("observer is traveling faster than the speed of light");
                     } else {
-                        let h_hat = u_obj.cross(&vbyc);
+                        let h_hat = r_hat.cross(&vbyc);
                         /* If the magnitude of the vector H is zero, the observer is moving along the line
                         of sight to the object, and no correction is required. Otherwise, rotate the
                         position of the object by phi radians about H to obtain the apparent position. */
@@ -440,6 +439,34 @@ impl Cosm {
                             state.x = ab_pos[0];
                             state.y = ab_pos[1];
                             state.z = ab_pos[2];
+
+                            // Account for the rate of change of the aberration from the zzstelab function in SPICE
+                            // https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/zzstelab.c#L270
+                            let vp = obs.velocity() - obs.velocity().dot(&r_hat) * r_hat;
+
+                            let accobs = obs.velocity() / obs.rmag();
+                            let dvp = accobs
+                                - (obs.velocity().dot(&dr_hat) + accobs.dot(&r_hat)) * r_hat
+                                + obs.velocity().dot(&r_hat) * dr_hat;
+                            // Compute the time derivative of vp_hat.
+                            // This is just the input velocity perpendicular to the input position, scaled by the norm,
+                            // cf. https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/dvhat.c#L238
+                            let vp_hat = vp / vp.norm();
+                            let dvp_hat = perpv(&vp, &vp_hat) / vp.norm();
+                            // Now compute the time derivative of phi
+                            let dphi = (1.0 / SPEED_OF_LIGHT_KMS) * dvp.dot(&vp_hat);
+                            // Finally, let's compute the time derivative of the aberration
+                            let dptmag = state.velocity().dot(&r_hat);
+                            let dscorr = (phi.sin() * dvp_hat
+                                + phi.cos() * dbg!(dphi) * vp_hat
+                                + (phi.cos() - 1.0) * dr_hat
+                                + (-phi.sin() * dphi) * r_hat)
+                                * state.radius().norm()
+                                + (phi.sin() * vp_hat + (phi.cos() - 1.0) * r_hat) * dptmag;
+                            println!("{}", dscorr);
+                            state.vx += dscorr[0];
+                            state.vy += dscorr[1];
+                            state.vz += dscorr[2];
                         }
                     }
                 }
@@ -877,10 +904,13 @@ mod tests {
         let cosm = Cosm::from_xb("./de438s");
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
-        let c = LTCorr::LightTime;
 
-        let out_state =
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::MARS_BARYCENTER, c);
+        let out_state = cosm.celestial_state(
+            bodies::EARTH_BARYCENTER,
+            jde,
+            bodies::MARS_BARYCENTER,
+            LTCorr::LightTime,
+        );
 
         // Note that the following data comes from SPICE (via spiceypy).
         // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
@@ -898,19 +928,19 @@ mod tests {
         let cosm = Cosm::from_xb("./de438s");
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
-        let c = LTCorr::Abberation;
 
-        let out_state =
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::MARS_BARYCENTER, c);
+        let out_state = cosm.celestial_state(
+            bodies::EARTH_BARYCENTER,
+            jde,
+            bodies::MARS_BARYCENTER,
+            LTCorr::Abberation,
+        );
 
-        // Note that the following data comes from SPICE (via spiceypy).
-        // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
-        // However, in writing this test, I also checked the computed light time, which matches SPICE to 2.999058779096231e-10 seconds.
-        assert!(dbg!(out_state.x - -2.5772317127004844e+08).abs() < 1e-3);
-        assert!(dbg!(out_state.y - -5.8123562375335597e+07).abs() < 1e-3);
-        assert!(dbg!(out_state.z - -2.4931464105212048e+07).abs() < 1e-3);
-        assert!(dbg!(out_state.vx - -3.4635859652064171e+00).abs() < 1e-3);
-        assert!(dbg!(out_state.vy - -3.6981691778032634e+01).abs() < 1e-3);
-        assert!(dbg!(out_state.vz - -1.6907836487560729e+01).abs() < 1e-3);
+        assert!(dbg!(out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
+        assert!(dbg!(out_state.y - -5.812_356_237_533_56e7).abs() < 1e-3);
+        assert!(dbg!(out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
+        assert!(dbg!(out_state.vx - -3.463_585_965_206_417).abs() < 1e-1);
+        assert!(dbg!(out_state.vy - -3.698_169_177_803_263e1).abs() < 1e-1);
+        assert!(dbg!(out_state.vz - -1.690_783_648_756_073e1).abs() < 1e-1);
     }
 }
