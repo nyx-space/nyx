@@ -35,7 +35,7 @@ impl<'a> SolarPressure<'a> {
     }
 }
 
-impl<'a> ForceModel for SolarPressure<'a> {
+impl<'a> ForceModel<Geoid> for SolarPressure<'a> {
     fn eom(&self, osc: &State<Geoid>) -> Vector3<f64> {
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
@@ -57,8 +57,6 @@ impl<'a> ForceModel for SolarPressure<'a> {
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        let a_srp = -1e-3 * self.cr * self.sc_area * flux_pressure * r_sun_unit;
-
-        a_srp
+        -1e-3 * self.cr * self.sc_area * flux_pressure * r_sun_unit
     }
 }

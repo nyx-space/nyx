@@ -69,7 +69,7 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
                 0.0
             },
             fuel_mass: if let Some(prop) = &self.prop {
-                prop.state()
+                prop.fuel_mass
             } else {
                 0.0
             },
@@ -86,8 +86,8 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
             } else {
                 0.0
             },
-            fuel_mass: if let Some(prop) = &self.prop {
-                prop.build_state(t, state)
+            fuel_mass: if let Some(_) = &self.prop {
+                state[6]
             } else {
                 0.0
             },
@@ -113,7 +113,7 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
         let celestial_state = new_state.fixed_rows::<U6>(0).into_owned();
         self.celestial.set_state(new_t, &celestial_state);
         if let Some(prop) = self.prop.as_mut() {
-            prop.set_state(new_t, new_state);
+            prop.set_state(&self.celestial.state(), new_state[6]);
         }
     }
 
@@ -127,17 +127,20 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
                 .chain(Vector1::new(0.0).iter())
                 .cloned(),
         );
+        let celestial_state = self.celestial.build_state(t, &celestial_vec);
+
         let mut total_mass = self.dry_mass;
         // Now compute the other dynamics as needed.
         if let Some(prop) = &self.prop {
-            let prop_dt = prop.eom(t, state);
+            let (thrust, fuel_usage) = prop.eom(&celestial_state, total_mass);
             // Add the fuel mass to the total mass, minus the change in fuel
-            total_mass += prop.fuel_mass + prop_dt[6];
-            d_x += prop_dt;
+            total_mass += prop.fuel_mass + fuel_usage;
+            for i in 0..3 {
+                d_x[i + 3] += thrust[i];
+            }
         }
         // Now compute the SRP if applicable
         if let Some(srp) = &self.srp {
-            let celestial_state = self.celestial.build_state(t, &celestial_vec);
             let srp_force = srp.eom(&celestial_state) / total_mass;
             for i in 0..3 {
                 d_x[i + 3] += srp_force[i];

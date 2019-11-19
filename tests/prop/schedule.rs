@@ -72,7 +72,7 @@ fn transfer_schedule_no_depl() {
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let mut prop_subsys = Propulsion::new(&mut schedule, fuel_mass, orbit.dt, biprop, false);
+    let mut prop_subsys = Propulsion::new(&mut schedule, fuel_mass, biprop, false);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
 
@@ -171,7 +171,7 @@ fn transfer_schedule_depl() {
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let mut prop_subsys = Propulsion::new(&mut schedule, fuel_mass, orbit.dt, biprop, true);
+    let mut prop_subsys = Propulsion::new(&mut schedule, fuel_mass, biprop, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
 

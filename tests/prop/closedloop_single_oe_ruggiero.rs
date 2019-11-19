@@ -42,7 +42,7 @@ fn rugg_sma() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -90,7 +90,7 @@ fn rugg_sma_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -140,7 +140,7 @@ fn rugg_inc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -190,7 +190,7 @@ fn rugg_inc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -240,7 +240,7 @@ fn rugg_ecc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -290,7 +290,7 @@ fn rugg_ecc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -342,7 +342,7 @@ fn rugg_aop() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -393,7 +393,7 @@ fn rugg_aop_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
@@ -446,7 +446,7 @@ fn rugg_raan() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, orbit.dt, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
 
     let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
     println!("{:o}", orbit);
