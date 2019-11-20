@@ -76,11 +76,6 @@ where
 
     /// Returns the state of the dynamics
     fn state(&self) -> Self::StateType;
-
-    /// Returns a StateType from the provided time and state vector
-    fn build_state(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> Self::StateType
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize>;
 }
 
 /// The `ForceModel` trait handles immutable dynamics, i.e. forces which do not need to save the current state, only act on it.

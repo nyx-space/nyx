@@ -71,16 +71,6 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
         }
     }
 
-    fn build_state(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> Self::StateType {
-        let celestial_state = state.fixed_rows::<U6>(0).into_owned();
-        let orbit = self.celestial.build_state(t, &celestial_state);
-        SpacecraftState {
-            orbit,
-            dry_mass: self.dry_mass,
-            fuel_mass: if self.prop.is_some() { state[6] } else { 0.0 },
-        }
-    }
-
     fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
         VectorN::<f64, U7>::from_iterator(
             self.celestial
@@ -119,7 +109,7 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
                 .chain(Vector1::new(0.0).iter())
                 .cloned(),
         );
-        let celestial_state = self.celestial.build_state(t, &celestial_vec);
+        let celestial_state = self.celestial.state_ctor(t, &celestial_vec);
 
         let mut total_mass = self.dry_mass;
         // Now compute the other dynamics as needed.

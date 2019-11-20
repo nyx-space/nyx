@@ -84,19 +84,6 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         self.state.vz = new_state[5];
     }
 
-    fn build_state(&self, t: f64, in_state: &VectorN<f64, Self::StateSize>) -> State<Geoid> {
-        // Copy the current state, and then modify it
-        let mut state = self.state();
-        state.dt = Epoch::from_tai_seconds(self.init_tai_secs + t);
-        state.x = in_state[0];
-        state.y = in_state[1];
-        state.z = in_state[2];
-        state.vx = in_state[3];
-        state.vy = in_state[4];
-        state.vz = in_state[5];
-        state
-    }
-
     fn state(&self) -> State<Geoid> {
         self.state
     }
@@ -293,26 +280,6 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
     /// Returns the celestial state and the state transition matrix
     fn state(&self) -> Self::StateType {
         (self.state, self.stm)
-    }
-
-    fn build_state(&self, t: f64, in_state: &VectorN<f64, Self::StateSize>) -> Self::StateType {
-        // Copy the current state, and then modify it
-        let (mut state, mut stm) = self.state();
-        state.dt = Epoch::from_tai_seconds(self.init_tai_secs + t);
-        state.x = in_state[0];
-        state.y = in_state[1];
-        state.z = in_state[2];
-        state.vx = in_state[3];
-        state.vy = in_state[4];
-        state.vz = in_state[5];
-
-        for i in 0..6 {
-            for j in 0..6 {
-                stm[(i, j)] = in_state[i * 6 + j + 6];
-            }
-        }
-
-        (state, stm)
     }
 
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {

@@ -54,10 +54,6 @@ impl Dynamics for AngularMom {
         self.velocity
     }
 
-    fn build_state(&self, _t: f64, state: &VectorN<f64, Self::StateSize>) -> Self::StateType {
-        *state
-    }
-
     /// Set the **angular velocity** ω of the system and the time.
     fn set_state(&mut self, new_t: f64, new_angular_velocity: &VectorN<f64, Self::StateSize>) {
         self.time = new_t;

@@ -29,10 +29,6 @@ impl<'a, D: DeltaVctrl> Dynamics for MissionArc<'a, D> {
         self.celestial.state()
     }
 
-    fn build_state(&self, t: f64, in_state: &VectorN<f64, Self::StateSize>) -> Self::StateType {
-        self.celestial.build_state(t, in_state)
-    }
-
     /// Mission arc state is a vector of six zeros followed by the fuel mass
     fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
         self.celestial.state_vector()
