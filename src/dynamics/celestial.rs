@@ -178,6 +178,27 @@ impl<'a> CelestialDynamicsStm<'a> {
         self.state.vy = new_state[4];
         self.state.vz = new_state[5];
     }
+
+    /// Rebuild the state and STM from the provided vector
+    pub fn state_ctor(&self, t: f64, in_state: &VectorN<f64, U42>) -> (State<Geoid>, Matrix6<f64>) {
+        // Copy the current state, and then modify it
+        let (mut state, mut stm) = self.state();
+        state.dt = Epoch::from_tai_seconds(self.init_tai_secs + t);
+        state.x = in_state[0];
+        state.y = in_state[1];
+        state.z = in_state[2];
+        state.vx = in_state[3];
+        state.vy = in_state[4];
+        state.vz = in_state[5];
+
+        for i in 0..6 {
+            for j in 0..6 {
+                stm[(i, j)] = in_state[i * 6 + j + 6];
+            }
+        }
+
+        (state, stm)
+    }
 }
 
 impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {

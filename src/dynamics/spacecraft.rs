@@ -109,19 +109,21 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
                 .chain(Vector1::new(0.0).iter())
                 .cloned(),
         );
-        let celestial_state = self.celestial.state_ctor(t, &celestial_vec);
 
+        let celestial_state = self.celestial.state_ctor(t, &celestial_vec);
         let mut total_mass = self.dry_mass;
+
         // Now compute the other dynamics as needed.
         if let Some(prop) = &self.prop {
-            let (thrust, fuel_usage) = prop.eom(&celestial_state);
+            let (thrust_force, fuel_usage) = prop.eom(&celestial_state);
             // Add the fuel mass to the total mass, minus the change in fuel
             total_mass += self.fuel_mass + fuel_usage;
             for i in 0..3 {
-                d_x[i + 3] += thrust[i] / (self.dry_mass + state[6]);
+                d_x[i + 3] += thrust_force[i] / (self.dry_mass + state[6]);
             }
             d_x[6] += fuel_usage;
         }
+
         // Now compute the SRP if applicable
         if let Some(srp) = &self.srp {
             let srp_force = srp.eom(&celestial_state) / total_mass;
