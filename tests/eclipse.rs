@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
-use nyx::celestia::{bodies, Cosm, Geoid, State};
+use nyx::celestia::{bodies, Cosm, Geoid, LTCorr, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator, RK89};
 use std::sync::mpsc;
@@ -41,6 +41,7 @@ fn leo_sun_earth_eclipses() {
         light_source: sun,
         shadow_bodies: vec![earth],
         cosm: &cosm,
+        correction: LTCorr::None,
     };
 
     // Receive the states on the main thread.
@@ -92,6 +93,7 @@ fn geo_sun_earth_eclipses() {
         light_source: sun,
         shadow_bodies: vec![earth],
         cosm: &cosm,
+        correction: LTCorr::None,
     };
 
     // Receive the states on the main thread.

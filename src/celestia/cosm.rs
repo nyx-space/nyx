@@ -12,6 +12,7 @@ use celestia::frames::Frame;
 use celestia::frames::*;
 use celestia::fxb::{Frame as FXBFrame, FrameContainer};
 use celestia::state::State;
+use celestia::SPEED_OF_LIGHT_KMS;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -19,6 +20,18 @@ use std::fs::File;
 pub use std::io::Error as IoError;
 use std::io::Read;
 use std::time::Instant;
+use utils::rotv;
+
+/// Enable or not light time correction for the computation of the celestial states
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum LTCorr {
+    /// No correction, i.e. assumes instantaneous propagation of photons
+    None,
+    /// Accounts for light-time correction. This is corresponds to CN in SPICE.
+    LightTime,
+    /// Accounts for light-time and stellar abberation where the solar system barycenter is the inertial frame. Corresponds to CN+S in SPICE.
+    Abberation,
+}
 
 // Defines Cosm, from the Greek word for "world" or "universe".
 pub struct Cosm {
@@ -328,48 +341,121 @@ impl Cosm {
     }
 
     /// Attempts to return the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
+    ///
+    /// The light time correction is based on SPICE's implementation: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkezr_c.html .
+    /// Aberration computation is a conversion of the stelab function in SPICE, available here
+    /// https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/stelab.c#L255
     pub fn try_celestial_state(
         &self,
         target_exb_id: i32,
-        jde: f64,
+        datetime: Epoch,
         as_seen_from_exb_id: i32,
+        correction: LTCorr,
     ) -> Result<State<Geoid>, CosmError> {
-        let target_geoid = self.try_geoid_from_id(target_exb_id)?;
         let as_seen_from = self.try_geoid_from_id(as_seen_from_exb_id)?;
-        // And now let's convert this storage state to the correct frame.
-        let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
-        let mut state = State::<Geoid>::from_cartesian(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            Epoch::from_jde_tai(jde),
-            as_seen_from,
-        );
-        let mut prev_frame_id = state.frame.id();
-        for body in path {
-            // This means the target or the origin is exactly this path.
-            let mut next_state = self.raw_celestial_state(body.id(), jde)?;
-            if prev_frame_id != next_state.frame.id() {
-                // Let's negate the next state prior to adding it.
-                next_state = -next_state;
+        match correction {
+            LTCorr::None => {
+                let target_geoid = self.try_geoid_from_id(target_exb_id)?;
+                // And now let's convert this storage state to the correct frame.
+                let path = self.intermediate_geoid(&target_geoid, &as_seen_from)?;
+                let mut state = State::<Geoid>::from_cartesian(
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    datetime,
+                    as_seen_from,
+                );
+                let mut prev_frame_id = state.frame.id();
+                for body in path {
+                    // This means the target or the origin is exactly this path.
+                    let mut next_state =
+                        self.raw_celestial_state(body.id(), datetime.as_jde_et_days())?;
+                    if prev_frame_id != next_state.frame.id() {
+                        // Let's negate the next state prior to adding it.
+                        next_state = -next_state;
+                    }
+                    state = state + next_state;
+                    prev_frame_id = next_state.frame.id();
+                }
+
+                Ok(state)
             }
-            state = state + next_state;
-            prev_frame_id = next_state.frame.id();
+            LTCorr::LightTime | LTCorr::Abberation => {
+                // Get the geometric states as seen from SSB
+                let obs =
+                    self.try_celestial_state(as_seen_from_exb_id, datetime, 0, LTCorr::None)?;
+                let mut tgt = self.try_celestial_state(target_exb_id, datetime, 0, LTCorr::None)?;
+                // It will take less than three iterations to converge
+                for _ in 0..3 {
+                    // Compute the light time
+                    let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
+                    // Compute the new target state
+                    let mut lt_dt = datetime;
+                    lt_dt.mut_sub_secs(lt);
+                    tgt = self.celestial_state(target_exb_id, lt_dt, 0, LTCorr::None);
+                }
+                // Compute the correct state
+                let mut state = State::<Geoid>::from_cartesian(
+                    (tgt - obs).x,
+                    (tgt - obs).y,
+                    (tgt - obs).z,
+                    (tgt - obs).vx,
+                    (tgt - obs).vy,
+                    (tgt - obs).vz,
+                    datetime,
+                    as_seen_from,
+                );
+
+                // Incluee the range-rate term in the velocity computation as explained in
+                // https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/abcorr.html#Reception%20case
+                let state_acc = state.velocity() / state.rmag();
+                let dltdt = state.radius().dot(&state_acc) / SPEED_OF_LIGHT_KMS;
+
+                state.vx = tgt.vx * (1.0 - dltdt) - obs.vx;
+                state.vy = tgt.vy * (1.0 - dltdt) - obs.vy;
+                state.vz = tgt.vz * (1.0 - dltdt) - obs.vz;
+
+                if correction == LTCorr::Abberation {
+                    // Get a unit vector that points in the direction of the object
+                    let (r_hat, _) = state.dv_hat();
+                    // Get the velocity vector (of the observer) scaled with respect to the speed of light
+                    let vbyc = obs.velocity() / SPEED_OF_LIGHT_KMS;
+                    /* If the square of the length of the velocity vector is greater than or equal
+                    to one, the speed of the observer is greater than or equal to the speed of light.
+                    The observer speed is definitely out of range. */
+                    if vbyc.dot(&vbyc) >= 1.0 {
+                        warn!("observer is traveling faster than the speed of light");
+                    } else {
+                        let h_hat = r_hat.cross(&vbyc);
+                        /* If the magnitude of the vector H is zero, the observer is moving along the line
+                        of sight to the object, and no correction is required. Otherwise, rotate the
+                        position of the object by phi radians about H to obtain the apparent position. */
+                        if h_hat.norm() > std::f64::EPSILON {
+                            let phi = h_hat.norm().asin();
+                            let ab_pos = rotv(&state.radius(), &h_hat, phi);
+                            state.x = ab_pos[0];
+                            state.y = ab_pos[1];
+                            state.z = ab_pos[2];
+                        }
+                    }
+                }
+                Ok(state)
+            }
         }
-        Ok(state)
     }
 
     /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`, or panics
     pub fn celestial_state(
         &self,
         target_exb_id: i32,
-        jde: f64,
+        datetime: Epoch,
         as_seen_from_exb_id: i32,
+        correction: LTCorr,
     ) -> State<Geoid> {
-        self.try_celestial_state(target_exb_id, jde, as_seen_from_exb_id)
+        self.try_celestial_state(target_exb_id, datetime, as_seen_from_exb_id, correction)
             .unwrap()
     }
 
@@ -617,15 +703,16 @@ mod tests {
             "Conversions within Earth does not require any transformation"
         );
 
-        let jde = 2_452_312.5;
+        let jde = Epoch::from_jde_et(2_452_312.5);
+        let c = LTCorr::None;
 
         assert!(
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_BARYCENTER)
+            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_BARYCENTER, c)
                 .rmag()
                 < EPSILON
         );
 
-        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB);
+        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB, c);
         assert_eq!(out_state.frame.id(), bodies::SSB);
         assert!((out_state.x - -109_837_695.021_661_42).abs() < 1e-12);
         assert!((out_state.y - 89_798_622.194_651_56).abs() < 1e-12);
@@ -634,7 +721,7 @@ mod tests {
         assert!((out_state.vy - -20.413_134_121_084_312).abs() < 1e-12);
         assert!((out_state.vz - -8.850_448_420_104_028).abs() < 1e-12);
 
-        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_MOON);
+        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::EARTH_MOON, c);
         assert_eq!(out_state.frame.id(), bodies::EARTH_MOON);
         assert!((out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
         assert!((out_state.y - 345_462.617_249_631_9).abs() < 1e-9);
@@ -643,7 +730,7 @@ mod tests {
         assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < 1e-12);
         assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < 1e-12);
         // Add the reverse test too
-        let out_state = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER);
+        let out_state = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER, c);
         assert_eq!(out_state.frame.id(), bodies::EARTH_BARYCENTER);
         assert!((out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
         assert!((out_state.y - -345_462.617_249_631_9).abs() < 1e-10);
@@ -653,7 +740,7 @@ mod tests {
         assert!((out_state.vz - -0.183_869_552_742_917_6).abs() < EPSILON);
 
         // The following test case comes from jplephem loaded with de438s.bsp
-        let out_state = cosm.celestial_state(bodies::SUN, jde, bodies::SSB);
+        let out_state = cosm.celestial_state(bodies::SUN, jde, bodies::SSB, c);
         assert_eq!(out_state.frame.id(), bodies::SSB);
         assert!((out_state.x - -182_936.040_274_732_14).abs() < EPSILON);
         assert!((out_state.y - -769_329.776_328_230_7).abs() < EPSILON);
@@ -662,7 +749,7 @@ mod tests {
         assert!((out_state.vy - 0.001_242_263_392_603_425).abs() < EPSILON);
         assert!((out_state.vz - 0.000_134_043_776_253_089_48).abs() < EPSILON);
 
-        let out_state = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_BARYCENTER);
+        let out_state = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_BARYCENTER, c);
         assert_eq!(out_state.frame.id(), bodies::EARTH_BARYCENTER);
         assert!((out_state.x - 1_004.153_534_699_454_6).abs() < EPSILON);
         assert!((out_state.y - 4_249.202_979_894_305).abs() < EPSILON);
@@ -676,10 +763,8 @@ mod tests {
     fn test_cosm_indirect() {
         use std::f64::EPSILON;
 
-        let test_epoch = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
-        let jde = test_epoch.as_jde_et_days();
+        let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
         dbg!(jde);
-        dbg!(test_epoch.as_et_seconds());
 
         let cosm = Cosm::from_xb("./de438s");
 
@@ -695,7 +780,10 @@ mod tests {
             "Venus -> (SSB) -> Earth Barycenter -> Earth Moon"
         );
 
-        let ven2ear_state = cosm.celestial_state(bodies::VENUS_BARYCENTER, jde, bodies::EARTH_MOON);
+        let c = LTCorr::None;
+
+        let ven2ear_state =
+            cosm.celestial_state(bodies::VENUS_BARYCENTER, jde, bodies::EARTH_MOON, c);
         assert_eq!(ven2ear_state.frame.id(), bodies::EARTH_MOON);
         assert!(dbg!(ven2ear_state.x - 2.051_262_195_720_077_5e8).abs() < EPSILON || true);
         assert!(dbg!(ven2ear_state.y - -1.356_125_479_230_852_7e8).abs() < EPSILON || true);
@@ -705,7 +793,8 @@ mod tests {
         assert!(dbg!(ven2ear_state.vz - 2.070_293_380_084_308_4e1).abs() < EPSILON || true);
 
         // Check that conversion via a center frame works
-        let moon_from_emb = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER);
+        let moon_from_emb =
+            cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH_BARYCENTER, c);
         // Check this state again, as in the direct test
         assert_eq!(moon_from_emb.frame.id(), bodies::EARTH_BARYCENTER);
         assert!(dbg!(moon_from_emb.x - -8.157_659_104_305_09e4).abs() < EPSILON || true);
@@ -715,11 +804,7 @@ mod tests {
         assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < EPSILON || true);
         assert!(dbg!(moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < EPSILON || true);
 
-        let earth_from_emb = cosm.celestial_state(
-            bodies::EARTH,
-            test_epoch.as_jde_et_days(),
-            bodies::EARTH_BARYCENTER,
-        );
+        let earth_from_emb = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_BARYCENTER, c);
         // Idem
         assert!(dbg!(earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < EPSILON || true);
         assert!(dbg!(earth_from_emb.y - 4.249_363_764_688_855e3).abs() < EPSILON || true);
@@ -728,8 +813,8 @@ mod tests {
         assert!(dbg!(earth_from_emb.vy - 2.504_081_208_571_763e-3).abs() < EPSILON || true);
         assert!(dbg!(earth_from_emb.vz - 2.260_814_668_513_329_6e-3).abs() < EPSILON || true);
 
-        let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH);
-        let earth_from_moon = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_MOON);
+        let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, bodies::EARTH, c);
+        let earth_from_moon = cosm.celestial_state(bodies::EARTH, jde, bodies::EARTH_MOON, c);
 
         assert_eq!(moon_from_emb - earth_from_emb, moon_from_earth);
         assert_eq!(earth_from_moon, -moon_from_earth);
@@ -744,9 +829,9 @@ mod tests {
         assert!(dbg!(moon_from_earth.vz - -1.860_663_321_259_074e-1).abs() < EPSILON || true);
 
         // Check that Sun works -- it does not work well!
-        let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, bodies::EARTH);
-        let emb_from_ssb = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB);
-        let sun_from_ssb = cosm.celestial_state(bodies::SUN, jde, bodies::SSB);
+        let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, bodies::EARTH, c);
+        let emb_from_ssb = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, bodies::SSB, c);
+        let sun_from_ssb = cosm.celestial_state(bodies::SUN, jde, bodies::SSB, c);
         let delta_state = sun2ear_state + dbg!(-sun_from_ssb + emb_from_ssb + earth_from_emb);
         assert!(delta_state.radius().norm() < EPSILON);
         assert!(delta_state.velocity().norm() < EPSILON);
@@ -757,7 +842,7 @@ mod tests {
         assert!(dbg!(sun2ear_state.vy - 2.061_819_980_543_440_4e1).abs() < EPSILON || true);
         assert!(dbg!(sun2ear_state.vz - 9.034_492_117_071_919).abs() < EPSILON || true);
         // And check the converse
-        let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SUN);
+        let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, bodies::SUN, c);
         dbg!(ear2sun_state.radius() - sun2ear_state.radius());
         dbg!(ear2sun_state.velocity() - sun2ear_state.velocity());
         // XXX: Reenable this test when bug is fixed: https://gitlab.com/chrisrabotin/nyx/issues/61 .
@@ -784,5 +869,51 @@ mod tests {
         println!("{:o}", llo_wrt_moon);
         assert!(llo_wrt_moon.sma() > 0.0);
         assert!(llo_wrt_moon.ecc() > 0.0 && llo_wrt_moon.ecc() < 1.0);
+    }
+
+    #[test]
+    fn test_cosm_lt_corr() {
+        let cosm = Cosm::from_xb("./de438s");
+
+        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
+
+        let out_state = cosm.celestial_state(
+            bodies::EARTH_BARYCENTER,
+            jde,
+            bodies::MARS_BARYCENTER,
+            LTCorr::LightTime,
+        );
+
+        // Note that the following data comes from SPICE (via spiceypy).
+        // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
+        // However, in writing this test, I also checked the computed light time, which matches SPICE to 2.999058779096231e-10 seconds.
+        assert!(dbg!(out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-3);
+        assert!(dbg!(out_state.y - -5.814_057_247_686_307e7).abs() < 1e-3);
+        assert!(dbg!(out_state.z - -2.493_960_187_215_911_6e7).abs() < 1e-3);
+        assert!(dbg!(out_state.vx - -3.460_563_654_257_750_7).abs() < 1e-7);
+        assert!(dbg!(out_state.vy - -3.698_207_386_702_523_5e1).abs() < 1e-7);
+        assert!(dbg!(out_state.vz - -1.690_807_917_994_789_7e1).abs() < 1e-7);
+    }
+
+    #[test]
+    fn test_cosm_aberration_corr() {
+        let cosm = Cosm::from_xb("./de438s");
+
+        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
+
+        let out_state = cosm.celestial_state(
+            bodies::EARTH_BARYCENTER,
+            jde,
+            bodies::MARS_BARYCENTER,
+            LTCorr::Abberation,
+        );
+
+        assert!((out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
+        assert!((out_state.y - -5.812_356_237_533_56e7).abs() < 1e-3);
+        assert!((out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
+        // Reenable this test after #96 is implemented.
+        dbg!(out_state.vx - -3.463_585_965_206_417);
+        dbg!(out_state.vy - -3.698_169_177_803_263e1);
+        dbg!(out_state.vz - -1.690_783_648_756_073e1);
     }
 }

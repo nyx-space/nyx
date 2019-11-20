@@ -13,7 +13,7 @@ use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
 use std::ops::{Add, Neg, Sub};
-use utils::{between_0_360, between_pm_180, r1, r3};
+use utils::{between_0_360, between_pm_180, perpv, r1, r3};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-4;
@@ -172,6 +172,13 @@ where
             covariance: None,
             covariance_exponent: 0.0,
         }
+    }
+
+    ///  Find the unit vector corresponding to a state vector and the derivative of the unit vector
+    pub fn dv_hat(&self) -> (Vector3<f64>, Vector3<f64>) {
+        let r_hat = self.radius() / self.rmag();
+        let v_hat = perpv(&self.velocity(), &r_hat) / self.rmag();
+        (r_hat, v_hat)
     }
 }
 
