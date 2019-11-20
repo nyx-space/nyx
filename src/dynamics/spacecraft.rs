@@ -86,11 +86,7 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
             } else {
                 0.0
             },
-            fuel_mass: if let Some(_) = &self.prop {
-                state[6]
-            } else {
-                0.0
-            },
+            fuel_mass: if self.prop.is_some() { state[6] } else { 0.0 },
         }
     }
 
@@ -132,12 +128,13 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
         let mut total_mass = self.dry_mass;
         // Now compute the other dynamics as needed.
         if let Some(prop) = &self.prop {
-            let (thrust, fuel_usage) = prop.eom(&celestial_state, total_mass);
+            let (thrust, fuel_usage) = prop.eom(&celestial_state, state[6]);
             // Add the fuel mass to the total mass, minus the change in fuel
             total_mass += prop.fuel_mass + fuel_usage;
             for i in 0..3 {
                 d_x[i + 3] += thrust[i];
             }
+            d_x[6] += fuel_usage;
         }
         // Now compute the SRP if applicable
         if let Some(srp) = &self.srp {
