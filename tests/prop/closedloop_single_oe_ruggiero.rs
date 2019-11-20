@@ -42,16 +42,16 @@ fn rugg_sma() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -90,16 +90,16 @@ fn rugg_sma_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -140,16 +140,16 @@ fn rugg_inc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -190,16 +190,16 @@ fn rugg_inc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -240,16 +240,16 @@ fn rugg_ecc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -290,16 +290,16 @@ fn rugg_ecc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -342,16 +342,16 @@ fn rugg_aop() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -393,16 +393,16 @@ fn rugg_aop_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
@@ -446,16 +446,16 @@ fn rugg_raan() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, fuel_mass, lowt, true);
+    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
-    let fuel_usage = fuel_mass - sc.prop.unwrap().fuel_mass;
+    let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 

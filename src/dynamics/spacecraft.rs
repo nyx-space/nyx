@@ -14,6 +14,8 @@ pub struct Spacecraft<'a, T: ThrustControl> {
     pub srp: Option<&'a mut SolarPressure<'a>>,
     /// in kg
     pub dry_mass: f64,
+    /// in kg
+    pub fuel_mass: f64,
     _marker: PhantomData<T>,
 }
 
@@ -23,14 +25,14 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
         celestial: &'a mut CelestialDynamics<'a>,
         prop: &'a mut Propulsion<'a, T>,
         dry_mass: f64,
+        fuel_mass: f64,
     ) -> Self {
-        // Set the dry mass of the propulsion system
-        prop.dry_mass = dry_mass;
         Self {
             celestial,
             prop: Some(prop),
             srp: None,
             dry_mass,
+            fuel_mass,
             _marker: PhantomData,
         }
     }
@@ -47,6 +49,7 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
             prop: None,
             srp: Some(srp),
             dry_mass,
+            fuel_mass: 0.0,
             _marker: PhantomData,
         }
     }
@@ -63,16 +66,8 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
     fn state(&self) -> Self::StateType {
         SpacecraftState {
             orbit: self.celestial.state(),
-            dry_mass: if let Some(prop) = &self.prop {
-                prop.dry_mass
-            } else {
-                0.0
-            },
-            fuel_mass: if let Some(prop) = &self.prop {
-                prop.fuel_mass
-            } else {
-                0.0
-            },
+            dry_mass: self.dry_mass,
+            fuel_mass: self.fuel_mass,
         }
     }
 
@@ -81,26 +76,17 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
         let orbit = self.celestial.build_state(t, &celestial_state);
         SpacecraftState {
             orbit,
-            dry_mass: if let Some(prop) = &self.prop {
-                prop.dry_mass
-            } else {
-                0.0
-            },
+            dry_mass: self.dry_mass,
             fuel_mass: if self.prop.is_some() { state[6] } else { 0.0 },
         }
     }
 
     fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
-        let fuel_mass = if let Some(prop) = &self.prop {
-            prop.fuel_mass
-        } else {
-            0.0
-        };
         VectorN::<f64, U7>::from_iterator(
             self.celestial
                 .state_vector()
                 .iter()
-                .chain(Vector1::new(fuel_mass).iter())
+                .chain(Vector1::new(self.fuel_mass).iter())
                 .cloned(),
         )
     }
@@ -108,8 +94,18 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
     fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
         let celestial_state = new_state.fixed_rows::<U6>(0).into_owned();
         self.celestial.set_state(new_t, &celestial_state);
+        self.fuel_mass = new_state[6];
+        if let Some(prop) = &self.prop {
+            if prop.decrement_mass {
+                assert!(
+                    self.fuel_mass >= 0.0,
+                    "negative fuel mass at {:?}",
+                    self.celestial.state().dt
+                );
+            }
+        }
         if let Some(prop) = self.prop.as_mut() {
-            prop.set_state(&self.celestial.state(), new_state[6]);
+            prop.set_state(&self.celestial.state());
         }
     }
 
@@ -128,11 +124,11 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
         let mut total_mass = self.dry_mass;
         // Now compute the other dynamics as needed.
         if let Some(prop) = &self.prop {
-            let (thrust, fuel_usage) = prop.eom(&celestial_state, state[6]);
+            let (thrust, fuel_usage) = prop.eom(&celestial_state);
             // Add the fuel mass to the total mass, minus the change in fuel
-            total_mass += prop.fuel_mass + fuel_usage;
+            total_mass += self.fuel_mass + fuel_usage;
             for i in 0..3 {
-                d_x[i + 3] += thrust[i];
+                d_x[i + 3] += thrust[i] / (self.dry_mass + state[6]);
             }
             d_x[6] += fuel_usage;
         }

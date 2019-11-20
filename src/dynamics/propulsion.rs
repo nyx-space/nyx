@@ -12,11 +12,8 @@ pub struct Thruster {
 const NORM_ERR: f64 = 1e-12;
 const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edition
 
+/// Propulsion allows returning a propulsion FORCE (not acceleration).
 pub struct Propulsion<'a, T: ThrustControl> {
-    /// in kg, set in Spacecraft constructors.
-    pub dry_mass: f64,
-    /// in kg
-    pub fuel_mass: f64,
     /// Will eventually support tank depletion
     pub thrusters: Vec<Thruster>,
     /// Set to true to decrement the fuel mass
@@ -25,35 +22,20 @@ pub struct Propulsion<'a, T: ThrustControl> {
 }
 
 impl<'a, T: ThrustControl> Propulsion<'a, T> {
-    pub fn new(
-        ctrl: &'a mut T,
-        fuel_mass: f64,
-        thrusters: Vec<Thruster>,
-        decrement_mass: bool,
-    ) -> Self {
+    pub fn new(ctrl: &'a mut T, thrusters: Vec<Thruster>, decrement_mass: bool) -> Self {
         Self {
-            dry_mass: 0.0,
-            fuel_mass,
             thrusters,
             decrement_mass,
             ctrl,
         }
     }
 
-    pub fn set_state(&mut self, new_orbit: &State<Geoid>, new_fuel: f64) {
+    pub fn set_state(&mut self, new_orbit: &State<Geoid>) {
         self.ctrl.next(new_orbit);
-        self.fuel_mass = new_fuel;
-        if self.decrement_mass {
-            assert!(
-                self.fuel_mass >= 0.0,
-                "negative fuel mass at {:?}",
-                new_orbit.dt
-            );
-        }
     }
 
     /// Returns the thrust and the fuel usage
-    pub fn eom(&self, osc: &State<Geoid>, mass: f64) -> (Vector3<f64>, f64) {
+    pub fn eom(&self, osc: &State<Geoid>) -> (Vector3<f64>, f64) {
         let thrust_power = self.ctrl.throttle(osc);
         if thrust_power > 0.0 {
             // Thrust arc
@@ -74,8 +56,6 @@ impl<'a, T: ThrustControl> Propulsion<'a, T> {
                 total_thrust += thrust_power * thruster.thrust;
                 fuel_usage += thrust_power * thruster.thrust / (thruster.isp * STD_GRAVITY);
             }
-            // TODO: Try to remove the need for mass here so this can be closer to a ForceModel
-            total_thrust /= self.dry_mass + mass;
             total_thrust *= 1e-3; // Convert m/s^-2 to km/s^-2
             (
                 thrust_inertial * total_thrust,

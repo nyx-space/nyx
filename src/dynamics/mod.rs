@@ -90,6 +90,8 @@ pub trait ForceModel<F: Frame>
 where
     Self: Sized,
 {
+    /// Defines the type which will be published on the propagator channel
+    // type StateType;
     /// Defines the equations of motion for this force model from the provided osculating state.
     /// TODO: Expand to all frames (useful for attitude)
     fn eom(&self, osc: &State<F>) -> Vector3<f64>;

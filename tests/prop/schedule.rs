@@ -72,9 +72,9 @@ fn transfer_schedule_no_depl() {
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let mut prop_subsys = Propulsion::new(&mut schedule, fuel_mass, biprop, false);
+    let mut prop_subsys = Propulsion::new(&mut schedule, biprop, false);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
 
     let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -107,7 +107,7 @@ fn transfer_schedule_no_depl() {
 
     // Ensure that there was no change in fuel mass since tank depletion was off
     assert!(
-        (prop.dynamics.prop.as_ref().unwrap().fuel_mass - fuel_mass).abs() < std::f64::EPSILON,
+        (prop.dynamics.fuel_mass - fuel_mass).abs() < std::f64::EPSILON,
         "incorrect fuel mass"
     );
 }
@@ -171,9 +171,9 @@ fn transfer_schedule_depl() {
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let mut prop_subsys = Propulsion::new(&mut schedule, fuel_mass, biprop, true);
+    let mut prop_subsys = Propulsion::new(&mut schedule, biprop, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass);
+    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
 
     let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -204,7 +204,7 @@ fn transfer_schedule_depl() {
         format!("finite burn velocity wrong: {:.5e}", err_v)
     );
     assert!(
-        ((prop.dynamics.prop.as_ref().unwrap().fuel_mass - 745.802_837_870_161).abs()) < 2e-10,
+        ((prop.dynamics.fuel_mass - 745.802_837_870_161).abs()) < 2e-10,
         "incorrect fuel mass"
     );
 }
