@@ -91,6 +91,33 @@ pub fn r3(angle: f64) -> Matrix3<f64> {
     Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
 }
 
+/// Rotate a vector about a given axis
+pub fn rotv(v: &Vector3<f64>, axis: &Vector3<f64>, theta: f64) -> Vector3<f64> {
+    let k_hat = axis / axis.norm();
+    v * theta.cos() + k_hat.cross(&v) * theta.sin() + k_hat.dot(&v) * k_hat * (1.0 - theta.cos())
+}
+
+/// Returns the components of vector a orthogonal to b
+pub fn perpv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
+    let big_a = a[0].abs().max(a[1].abs().max(a[2].abs()));
+    let big_b = b[0].abs().max(b[1].abs().max(b[2].abs()));
+    if big_a < f64::EPSILON {
+        Vector3::zeros()
+    } else if big_b < f64::EPSILON {
+        *a
+    } else {
+        let a_scl = a / big_a;
+        let b_scl = b / big_b;
+        let v = projv(&a_scl, &b_scl);
+        big_a * (a_scl - v)
+    }
+}
+
+/// Returns the projection of a onto b
+pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
+    b * a.dot(&b) / b.dot(&b)
+}
+
 /// Computes the RSS state errors in position and in velocity
 pub fn rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
     let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
@@ -131,5 +158,45 @@ fn test_diagonality() {
         is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         true,
         "diagonal"
+    );
+}
+
+#[test]
+fn test_perpv() {
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
+        Vector3::new(0.0, 6.0, 6.0)
+    );
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
+        Vector3::new(0.0, 6.0, 6.0)
+    );
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+    assert_eq!(
+        perpv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+}
+
+#[test]
+fn test_projv() {
+    assert_eq!(
+        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(2.0, 0.0, 0.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+    assert_eq!(
+        projv(&Vector3::new(6.0, 6.0, 6.0), &Vector3::new(-3.0, 0.0, 0.0)),
+        Vector3::new(6.0, 0.0, 0.0)
+    );
+    assert_eq!(
+        projv(&Vector3::new(6.0, 6.0, 0.0), &Vector3::new(0.0, 7.0, 0.0)),
+        Vector3::new(0.0, 6.0, 0.0)
+    );
+    assert_eq!(
+        projv(&Vector3::new(6.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 9.0)),
+        Vector3::new(0.0, 0.0, 0.0)
     );
 }
