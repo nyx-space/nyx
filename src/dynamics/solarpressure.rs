@@ -4,6 +4,7 @@ use celestia::eclipse::{EclipseLocator, EclipseState};
 use celestia::{bodies, Cosm, Geoid, LTCorr, State, AU, SPEED_OF_LIGHT};
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
+#[derive(Clone)]
 pub struct SolarPressure<'a> {
     /// in kg, set in the Spacecraft's eom.
     pub sc_mass: f64,

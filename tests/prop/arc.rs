@@ -32,14 +32,14 @@ fn arc_example() {
     end_time.mut_add_secs(prop_time);
 
     // Define the dynamics
-    let mut celestial = CelestialDynamics::two_body(orbit);
+    let celestial = CelestialDynamics::two_body(orbit);
 
     let mnvr0 = Mnvr::instantaneous(start_time, Vector3::new(2.42, 0.0, 0.0));
     let mnvr1 = Mnvr::instantaneous(mnvr1_dt, Vector3::new(-1.46, 0.0, 0.0));
 
-    let mut schedule = InstantBurns::from_mnvrs(vec![mnvr0, mnvr1]);
+    let schedule = InstantBurns::from_mnvrs(vec![mnvr0, mnvr1]);
 
-    let mut arc = MissionArc::new(&mut celestial, &mut schedule);
+    let mut arc = MissionArc::new(celestial, schedule);
     let mut prop = Propagator::new::<RK89>(&mut arc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
