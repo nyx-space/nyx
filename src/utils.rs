@@ -21,10 +21,10 @@ pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
 pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
     for i in 1..2 {
         for j in 0..i {
-            if (i == j && (m[(i, j)] - m[(0, 0)]) > f64::EPSILON)
-                || (i != j
+            if i == j && (m[(i, j)] - m[(0, 0)]) > f64::EPSILON
+                || i != j
                     && (m[(i, j)].abs() > f64::EPSILON
-                        || (m[(i, j)] - m[(j, i)]).abs() > f64::EPSILON))
+                        || (m[(i, j)] - m[(j, i)]).abs() > f64::EPSILON)
             {
                 return false;
             }
@@ -125,6 +125,40 @@ pub fn rss_state_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f
     let err_velocity = (prop_err.fixed_rows::<U3>(3) - cur_state.fixed_rows::<U3>(3)).norm();
 
     (err_radius, err_velocity)
+}
+
+#[test]
+fn test_tilde_matrix() {
+    let vec = Vector3::new(1.0, 2.0, 3.0);
+    let rslt = Matrix3::new(0.0, -3.0, 2.0, 3.0, 0.0, -1.0, -2.0, 1.0, 0.0);
+    assert_eq!(tilde_matrix(&vec), rslt);
+}
+
+#[test]
+fn test_diagonality() {
+    assert_eq!(
+        is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+        false,
+        "lower triangular"
+    );
+
+    assert_eq!(
+        is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+        false,
+        "symmetric but not diag"
+    );
+
+    assert_eq!(
+        is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+        false,
+        "upper triangular"
+    );
+
+    assert_eq!(
+        is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
+        true,
+        "diagonal"
+    );
 }
 
 #[test]

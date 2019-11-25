@@ -174,11 +174,14 @@ where
         }
     }
 
-    ///  Find the unit vector corresponding to a state vector and the derivative of the unit vector
-    pub fn dv_hat(&self) -> (Vector3<f64>, Vector3<f64>) {
-        let r_hat = self.radius() / self.rmag();
-        let v_hat = perpv(&self.velocity(), &r_hat) / self.rmag();
-        (r_hat, v_hat)
+    /// Returns the unit vector in the direction of the state radius
+    pub fn r_hat(&self) -> Vector3<f64> {
+        self.radius() / self.rmag()
+    }
+
+    /// Returns the unit vector in the direction of the state velocity
+    pub fn v_hat(&self) -> Vector3<f64> {
+        perpv(&self.velocity(), &self.r_hat()) / self.rmag()
     }
 }
 

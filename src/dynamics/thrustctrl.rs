@@ -1,5 +1,5 @@
 use super::hifitime::Epoch;
-use super::na::{Vector3, Vector6};
+use super::na::Vector3;
 use celestia::{Geoid, LocalFrame, State};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
@@ -11,26 +11,26 @@ where
     Self: Clone + Sized,
 {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, dt: Epoch, state: &Vector6<f64>) -> Vector3<f64>;
+    fn direction(&self, state: &State<Geoid>) -> Vector3<f64>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, dt: Epoch, state: &Vector6<f64>) -> f64;
+    fn throttle(&self, state: &State<Geoid>) -> f64;
 
     /// Prepares the controller for the next maneuver (called from set_state of the dynamics).
-    fn next(&mut self, dt: Epoch, state: &Vector6<f64>);
+    fn next(&mut self, state: &State<Geoid>);
 }
 
 #[derive(Clone)]
 pub struct NoThrustControl {}
 impl ThrustControl for NoThrustControl {
-    fn direction(&self, _: Epoch, _: &Vector6<f64>) -> Vector3<f64> {
+    fn direction(&self, _: &State<Geoid>) -> Vector3<f64> {
         unimplemented!();
     }
-    fn throttle(&self, _: Epoch, _: &Vector6<f64>) -> f64 {
+    fn throttle(&self, _: &State<Geoid>) -> f64 {
         unimplemented!();
     }
-    fn next(&mut self, _: Epoch, _: &Vector6<f64>) {
+    fn next(&mut self, _: &State<Geoid>) {
         unimplemented!();
     }
 }
@@ -133,12 +133,11 @@ impl Ruggiero {
 }
 
 impl ThrustControl for Ruggiero {
-    fn direction(&self, dt: Epoch, state: &Vector6<f64>) -> Vector3<f64> {
+    fn direction(&self, osc: &State<Geoid>) -> Vector3<f64> {
         if self.achieved {
             Vector3::zeros()
         } else {
             let mut ctrl = Vector3::zeros();
-            let osc = State::<Geoid>::from_cartesian_vec(state, dt, self.init_state.frame);
             for obj in &self.objectives {
                 match *obj {
                     Achieve::Sma { target, tol } => {
@@ -225,11 +224,10 @@ impl ThrustControl for Ruggiero {
     }
 
     // Either thrust full power or not at all
-    fn throttle(&self, dt: Epoch, state: &Vector6<f64>) -> f64 {
+    fn throttle(&self, osc: &State<Geoid>) -> f64 {
         if self.achieved {
             0.0
         } else {
-            let osc = State::<Geoid>::from_cartesian_vec(state, dt, self.init_state.frame);
             for obj in &self.objectives {
                 match *obj {
                     Achieve::Sma { target, tol } => {
@@ -270,16 +268,15 @@ impl ThrustControl for Ruggiero {
     }
 
     /// Update the state for the next iteration
-    fn next(&mut self, dt: Epoch, state: &Vector6<f64>) {
-        let cur_state = State::<Geoid>::from_cartesian_vec(state, dt, self.init_state.frame);
-        if self.throttle(dt, state) > 0.0 {
+    fn next(&mut self, osc: &State<Geoid>) {
+        if self.throttle(osc) > 0.0 {
             if self.achieved {
-                info!("enabling control: {:o}", cur_state);
+                info!("enabling control: {:o}", osc);
             }
             self.achieved = false;
         } else {
             if !self.achieved {
-                info!("disabling control: {:o}", cur_state);
+                info!("disabling control: {:o}", osc);
             }
             self.achieved = true;
         }
@@ -307,15 +304,14 @@ impl FiniteBurns {
 }
 
 impl ThrustControl for FiniteBurns {
-    fn direction(&self, dt: Epoch, state: &Vector6<f64>) -> Vector3<f64> {
+    fn direction(&self, osc: &State<Geoid>) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
         if self.mnvr_no >= self.mnvrs.len() {
             Vector3::zeros()
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
-            if next_mnvr.start <= dt {
-                let osc = State::<Geoid>::from_cartesian_vec(state, dt, self.geoid);
+            if next_mnvr.start <= osc.dt {
                 osc.dcm_to_inertial(LocalFrame::VNC) * next_mnvr.vector
             } else {
                 Vector3::zeros()
@@ -323,12 +319,12 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn throttle(&self, dt: Epoch, _state: &Vector6<f64>) -> f64 {
+    fn throttle(&self, osc: &State<Geoid>) -> f64 {
         if self.mnvr_no >= self.mnvrs.len() {
             0.0
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
-            if next_mnvr.start <= dt {
+            if next_mnvr.start <= osc.dt {
                 next_mnvr.thrust_lvl
             } else {
                 0.0
@@ -336,10 +332,10 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn next(&mut self, dt: Epoch, _state: &Vector6<f64>) {
+    fn next(&mut self, osc: &State<Geoid>) {
         if self.mnvr_no < self.mnvrs.len() {
             let cur_mnvr = self.mnvrs[self.mnvr_no];
-            if dt >= cur_mnvr.end {
+            if osc.dt >= cur_mnvr.end {
                 self.mnvr_no += 1;
             }
         }
@@ -381,22 +377,23 @@ mod tests {
 
         let ruggiero = Ruggiero::new(objectives, orbit);
         // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
-        let osc = Vector6::new(
+        let osc = State::<Geoid>::from_cartesian(
             7_303.253_461_441_64f64,
             127.478_714_816_381_75,
             0.111_246_193_227_445_4,
             -0.128_284_025_765_195_6,
             7.422_889_151_816_439,
             0.006_477_694_429_837_2,
+            start_time,
+            earth,
         );
-
         let expected = Vector3::new(
             -0.017_279_636_133_108_3,
             0.999_850_315_226_803,
             0.000_872_534_222_883_2,
         );
 
-        let got = ruggiero.direction(start_time, &osc);
+        let got = ruggiero.direction(&osc);
 
         println!("{}", expected - got);
         assert!(

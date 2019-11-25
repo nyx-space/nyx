@@ -30,7 +30,7 @@ fn srp_earth() {
 
     let shadow_bodies = vec![earth];
 
-    let mut srp = SolarPressure::default(1.0, orbit, shadow_bodies, &cosm);
+    let mut srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
 
     let dry_mass = 300.0;
 

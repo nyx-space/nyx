@@ -420,7 +420,7 @@ impl Cosm {
 
                 if correction == LTCorr::Abberation {
                     // Get a unit vector that points in the direction of the object
-                    let (r_hat, _) = state.dv_hat();
+                    let r_hat = state.r_hat();
                     // Get the velocity vector (of the observer) scaled with respect to the speed of light
                     let vbyc = obs.velocity() / SPEED_OF_LIGHT_KMS;
                     /* If the square of the length of the velocity vector is greater than or equal

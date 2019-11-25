@@ -2,7 +2,8 @@ extern crate hifitime;
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, VectorN};
+use self::na::{DefaultAllocator, DimName, Vector3, VectorN};
+use crate::celestia::{Frame, State};
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -75,4 +76,18 @@ where
 
     /// Returns the state of the dynamics
     fn state(&self) -> Self::StateType;
+}
+
+/// The `ForceModel` trait handles immutable dynamics, i.e. forces which do not need to save the current state, only act on it.
+///
+/// Examples include Solar Radiation Pressure, drag, spherical harmonics, etc.
+pub trait ForceModel<F: Frame>
+where
+    Self: Sized,
+{
+    /// Defines the type which will be published on the propagator channel
+    // type StateType;
+    /// Defines the equations of motion for this force model from the provided osculating state.
+    /// TODO: Expand to all frames (useful for attitude)
+    fn eom(&self, osc: &State<F>) -> Vector3<f64>;
 }
