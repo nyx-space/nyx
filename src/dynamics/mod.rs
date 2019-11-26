@@ -50,7 +50,7 @@ pub mod solarpressure;
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
 pub trait Dynamics
 where
-    Self: Sized,
+    Self: Clone + Sized,
 {
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
     type StateSize: DimName;

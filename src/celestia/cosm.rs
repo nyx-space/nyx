@@ -34,6 +34,7 @@ pub enum LTCorr {
 }
 
 // Defines Cosm, from the Greek word for "world" or "universe".
+#[derive(Clone)]
 pub struct Cosm {
     ephemerides: HashMap<(i32, String), Ephemeris>,
     frames: HashMap<(i32, String), FXBFrame>,

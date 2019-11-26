@@ -23,7 +23,7 @@ fn rugg_sma() {
     let prop_time = 45.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -37,14 +37,14 @@ fn rugg_sma() {
         tol: 1.0,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -55,7 +55,10 @@ fn rugg_sma() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 21.0).abs() < 1.0);
 }
 
@@ -71,7 +74,7 @@ fn rugg_sma_decr() {
     let prop_time = 45.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -85,14 +88,14 @@ fn rugg_sma_decr() {
         tol: 1.0,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -103,7 +106,10 @@ fn rugg_sma_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 21.0).abs() < 1.0);
 }
 
@@ -121,7 +127,7 @@ fn rugg_inc() {
     let prop_time = 55.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -135,14 +141,14 @@ fn rugg_inc() {
         tol: 5e-3,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -153,7 +159,10 @@ fn rugg_inc() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 25.0).abs() < 1.0);
 }
 
@@ -171,7 +180,7 @@ fn rugg_inc_decr() {
     let prop_time = 55.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -185,14 +194,14 @@ fn rugg_inc_decr() {
         tol: 5e-3,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -203,7 +212,10 @@ fn rugg_inc_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 25.0).abs() < 1.0);
 }
 
@@ -221,7 +233,7 @@ fn rugg_ecc() {
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -235,14 +247,14 @@ fn rugg_ecc() {
         tol: 5e-5,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -253,7 +265,10 @@ fn rugg_ecc() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 14.0).abs() < 1.0);
 }
 
@@ -271,7 +286,7 @@ fn rugg_ecc_decr() {
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -285,14 +300,14 @@ fn rugg_ecc_decr() {
         tol: 5e-5,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -303,7 +318,10 @@ fn rugg_ecc_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 14.0).abs() < 1.0);
 }
 
@@ -323,7 +341,7 @@ fn rugg_aop() {
     let prop_time = 2650.0;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -337,14 +355,14 @@ fn rugg_aop() {
         tol: 5e-3,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -355,7 +373,10 @@ fn rugg_aop() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 0.014).abs() < 1.0);
 }
 
@@ -374,7 +395,7 @@ fn rugg_aop_decr() {
     let prop_time = 2650.0;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -388,14 +409,14 @@ fn rugg_aop_decr() {
         tol: 5e-3,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -406,7 +427,10 @@ fn rugg_aop_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 0.014).abs() < 1.0);
 }
 
@@ -427,7 +451,7 @@ fn rugg_raan() {
     let prop_time = 49.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -441,14 +465,14 @@ fn rugg_raan() {
         tol: 5e-3,
     }];
 
-    let mut ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let mut prop_subsys = Propulsion::new(&mut ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
@@ -459,6 +483,9 @@ fn rugg_raan() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(ruggiero.achieved(&final_state), "objective not achieved");
+    assert!(
+        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 48.0).abs() < 1.0);
 }

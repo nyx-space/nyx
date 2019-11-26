@@ -13,16 +13,17 @@ const NORM_ERR: f64 = 1e-12;
 const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edition
 
 /// Propulsion allows returning a propulsion FORCE (not acceleration).
-pub struct Propulsion<'a, T: ThrustControl> {
+#[derive(Clone)]
+pub struct Propulsion<T: ThrustControl> {
     /// Will eventually support tank depletion
     pub thrusters: Vec<Thruster>,
     /// Set to true to decrement the fuel mass
     pub decrement_mass: bool,
-    pub ctrl: &'a mut T,
+    pub ctrl: T,
 }
 
-impl<'a, T: ThrustControl> Propulsion<'a, T> {
-    pub fn new(ctrl: &'a mut T, thrusters: Vec<Thruster>, decrement_mass: bool) -> Self {
+impl<'a, T: ThrustControl> Propulsion<T> {
+    pub fn new(ctrl: T, thrusters: Vec<Thruster>, decrement_mass: bool) -> Self {
         Self {
             thrusters,
             decrement_mass,

@@ -10,6 +10,7 @@ use od::AutoDiffDynamics;
 use std::f64;
 
 /// `CelestialDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
+#[derive(Clone)]
 pub struct CelestialDynamics<'a> {
     pub state: State<Geoid>,
     pub bodies: Vec<i32>,
@@ -126,6 +127,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
 }
 
 /// `CelestialDynamicsStm` provides the equations of motion for any celestial dynamic, **with** state transition matrix computation.
+#[derive(Clone)]
 pub struct CelestialDynamicsStm<'a> {
     pub state: State<Geoid>,
     pub bodies: Vec<i32>,
