@@ -8,10 +8,11 @@ use celestia::{Geoid, State};
 use std::fmt;
 use std::marker::PhantomData;
 
+#[derive(Clone)]
 pub struct Spacecraft<'a, T: ThrustControl> {
-    pub celestial: &'a mut CelestialDynamics<'a>,
-    pub prop: Option<&'a mut Propulsion<'a, T>>,
-    pub srp: Option<&'a mut SolarPressure<'a>>,
+    pub celestial: CelestialDynamics<'a>,
+    pub prop: Option<Propulsion<T>>,
+    pub srp: Option<SolarPressure<'a>>,
     /// in kg
     pub dry_mass: f64,
     /// in kg
@@ -22,8 +23,8 @@ pub struct Spacecraft<'a, T: ThrustControl> {
 impl<'a, T: ThrustControl> Spacecraft<'a, T> {
     /// Initialize a Spacecraft with a set of celestial dynamics and a propulsion subsystem.
     pub fn with_prop(
-        celestial: &'a mut CelestialDynamics<'a>,
-        prop: &'a mut Propulsion<'a, T>,
+        celestial: CelestialDynamics<'a>,
+        prop: Propulsion<T>,
         dry_mass: f64,
         fuel_mass: f64,
     ) -> Self {
@@ -39,8 +40,8 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
 
     /// Initialize a Spacecraft with a set of celestial dynamics and with SRP enabled.
     pub fn with_srp(
-        celestial: &'a mut CelestialDynamics<'a>,
-        srp: &'a mut SolarPressure<'a>,
+        celestial: CelestialDynamics<'a>,
+        srp: SolarPressure<'a>,
         dry_mass: f64,
     ) -> Self {
         // Set the dry mass of the propulsion system

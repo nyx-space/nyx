@@ -4,13 +4,14 @@ use super::na::{VectorN, U6};
 use super::Dynamics;
 use celestia::{Geoid, State};
 
+#[derive(Clone)]
 pub struct MissionArc<'a, D: DeltaVctrl> {
-    pub celestial: &'a mut CelestialDynamics<'a>,
-    pub ctrl: &'a mut D,
+    pub celestial: CelestialDynamics<'a>,
+    pub ctrl: D,
 }
 
 impl<'a, D: DeltaVctrl> MissionArc<'a, D> {
-    pub fn new(celestial: &'a mut CelestialDynamics<'a>, ctrl: &'a mut D) -> Self {
+    pub fn new(celestial: CelestialDynamics<'a>, ctrl: D) -> Self {
         Self { celestial, ctrl }
     }
 }

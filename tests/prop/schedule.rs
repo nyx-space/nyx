@@ -52,7 +52,7 @@ fn transfer_schedule_no_depl() {
 
     // Define the dynamics
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
+    let dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
 
     // Define the thruster
     let biprop = vec![Thruster {
@@ -68,13 +68,13 @@ fn transfer_schedule_no_depl() {
         vector: Vector3::new(1.0, 0.0, 0.0),
     };
 
-    let mut schedule = FiniteBurns::from_mnvrs(vec![mnvr0], earth);
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], earth);
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let mut prop_subsys = Propulsion::new(&mut schedule, biprop, false);
+    let prop_subsys = Propulsion::new(schedule, biprop, false);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
     let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -151,7 +151,7 @@ fn transfer_schedule_depl() {
 
     // Define the dynamics
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
+    let dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
 
     // Define the thruster
     let biprop = vec![Thruster {
@@ -167,13 +167,13 @@ fn transfer_schedule_depl() {
         vector: Vector3::new(1.0, 0.0, 0.0),
     };
 
-    let mut schedule = FiniteBurns::from_mnvrs(vec![mnvr0], earth);
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], earth);
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let mut prop_subsys = Propulsion::new(&mut schedule, biprop, true);
+    let prop_subsys = Propulsion::new(schedule, biprop, true);
 
-    let mut sc = Spacecraft::with_prop(&mut dynamics, &mut prop_subsys, dry_mass, fuel_mass);
+    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
     let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);

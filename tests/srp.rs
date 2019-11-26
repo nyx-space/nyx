@@ -34,7 +34,7 @@ fn srp_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::<NoThrustControl>::with_srp(&mut dynamics, &mut srp, dry_mass);
+    let mut sc = Spacecraft::<NoThrustControl>::with_srp(dynamics, srp, dry_mass);
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::default());

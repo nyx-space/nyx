@@ -67,6 +67,7 @@ impl PartialOrd for EclipseState {
     }
 }
 
+#[derive(Clone)]
 pub struct EclipseLocator<'a> {
     pub light_source: Geoid,
     pub shadow_bodies: Vec<Geoid>,
