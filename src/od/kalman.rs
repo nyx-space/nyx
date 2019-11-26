@@ -6,7 +6,8 @@ use crate::hifitime::Epoch;
 use std::fmt;
 
 pub use super::estimate::Estimate;
-use super::estimate::{CovarFormat, EpochFormat};
+pub use super::residual::Residual;
+use super::{CovarFormat, EpochFormat};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -112,7 +113,7 @@ where
         dt: Epoch,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
-    ) -> Result<Estimate<S>, FilterError> {
+    ) -> Result<(Estimate<S>, Residual<M>), FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
@@ -131,16 +132,19 @@ where
         let gain = covar_bar.clone() * h_tilde_t * invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
-        let delta_obs = real_obs - computed_obs;
+        let prefit = real_obs - computed_obs;
 
         // Compute the state estimate
-        let state_hat = if self.ekf {
-            gain.clone() * delta_obs
+        let (state_hat, res) = if self.ekf {
+            (gain.clone() * prefit, Residual::zeros())
         } else {
             // Must do a time update first
             let state_bar = self.stm.clone() * self.prev_estimate.state.clone();
-            let innovation = delta_obs - (self.h_tilde.clone() * state_bar.clone());
-            state_bar + gain.clone() * innovation
+            let postfit = prefit.clone() - (self.h_tilde.clone() * state_bar.clone());
+            (
+                state_bar + gain.clone() * postfit.clone(),
+                Residual::new(dt, prefit, postfit),
+            )
         };
 
         // Compute the covariance (Jacobi formulation)
@@ -159,7 +163,7 @@ where
         self.stm_updated = false;
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();
-        Ok(estimate)
+        Ok((estimate, res))
     }
 }
 

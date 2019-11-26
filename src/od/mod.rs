@@ -8,6 +8,7 @@ use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
 use celestia::{Frame, State};
 use dynamics::Dynamics;
+use std::fmt;
 
 /// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.
 pub mod kalman;
@@ -17,6 +18,9 @@ pub mod ranging;
 
 /// Provides Estimate handling functionalities.
 pub mod estimate;
+
+/// Provide Residual handling functionalities.
+pub mod residual;
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
 ///
@@ -142,5 +146,62 @@ where
             Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
     {
         panic!("retrieve the gradient by calling self.compute(...)");
+    }
+}
+
+/// Specifies the format of the Epoch during serialization
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum EpochFormat {
+    /// Default is MJD TAI, as defined in [hifitime](https://docs.rs/hifitime/).
+    MjdTai,
+    MjdTt,
+    MjdUtc,
+    JdeEt,
+    JdeTai,
+    JdeTt,
+    JdeUtc,
+    /// Seconds past TAI Epoch
+    TaiSecs,
+    /// Days past TAI Epoch
+    TaiDays,
+}
+
+impl fmt::Display for EpochFormat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            EpochFormat::MjdTai => write!(f, "MJD TAI"),
+            EpochFormat::MjdTt => write!(f, "MJD TT"),
+            EpochFormat::MjdUtc => write!(f, "MJD UTC"),
+            EpochFormat::JdeEt => write!(f, "JDE ET"),
+            EpochFormat::JdeTai => write!(f, "JDE TAI"),
+            EpochFormat::JdeTt => write!(f, "JDE TT"),
+            EpochFormat::JdeUtc => write!(f, "JDE UTC"),
+            EpochFormat::TaiSecs => write!(f, "TAI+ s"),
+            EpochFormat::TaiDays => write!(f, "TAI+ days"),
+        }
+    }
+}
+
+/// Specifies the format of the covariance during serialization
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CovarFormat {
+    /// Default: allows plotting the variance of the elements instead of the covariance
+    Sqrt,
+    /// Keeps the covariance as computed, i.e. one sigma (~68%), causes e.g. positional elements in km^2.
+    Sigma1,
+    /// Three sigma covers about 99.7% of the distribution
+    Sigma3,
+    /// Allows specifying a custom multiplication factor of each element of the covariance.
+    MulSigma(f64),
+}
+
+impl fmt::Display for CovarFormat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CovarFormat::Sqrt => write!(f, "exptd_val_"),
+            CovarFormat::Sigma1 => write!(f, "covar_"),
+            CovarFormat::Sigma3 => write!(f, "3sig_covar"),
+            CovarFormat::MulSigma(x) => write!(f, "{}sig_covar", x),
+        }
     }
 }
