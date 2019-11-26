@@ -119,7 +119,7 @@ fn multi_body_ckf_perfect_stations() {
             let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
-                let latest_est = ckf
+                let (est, res) = ckf
                     .measurement_update(
                         this_dt,
                         real_meas.observation(),
@@ -127,23 +127,26 @@ fn multi_body_ckf_perfect_stations() {
                     )
                     .expect("wut?");
                 still_empty = false;
-                assert_eq!(
-                    latest_est.predicted, false,
-                    "estimate should not be a prediction"
-                );
+                assert_eq!(est.predicted, false, "estimate should not be a prediction");
                 assert!(
-                    latest_est.state.norm() < 1e-6,
+                    est.state.norm() < 1e-6,
                     "estimate error should be zero (perfect dynamics) ({:e})",
-                    latest_est.state.norm()
+                    est.state.norm()
+                );
+
+                assert!(
+                    res.postfit.norm() < 1e-12,
+                    "postfit should be zero (perfect dynamics) ({:e})",
+                    res
                 );
 
                 if !printed {
-                    wtr.serialize(latest_est.clone())
+                    wtr.serialize(est.clone())
                         .expect("could not write to stdout");
                     printed = true;
                 }
 
-                last_est = Some(latest_est);
+                last_est = Some(est);
 
                 break; // We know that only one station is in visibility at each time.
             }

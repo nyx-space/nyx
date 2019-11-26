@@ -23,7 +23,7 @@ macro_rules! f64_nil {
 
 #[test]
 fn empty_estimate() {
-    let empty = Estimate::<U6>::empty();
+    let empty = Estimate::<U6>::zeros();
     f64_nil!(empty.state.norm(), "expected state norm to be nil");
     f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
     f64_nil!(empty.stm.norm(), "expected STM norm to be nil");
@@ -33,14 +33,14 @@ fn empty_estimate() {
 #[test]
 fn csv_serialize_empty_estimate() {
     use std::io;
-    let empty = Estimate::<U6>::empty();
+    let empty = Estimate::<U6>::zeros();
     let mut wtr = csv::Writer::from_writer(io::stdout());
     wtr.serialize(empty).expect("could not write to stdout");
 }
 
 #[test]
 fn filter_errors() {
-    let initial_estimate = Estimate::<U6>::empty();
+    let initial_estimate = Estimate::<U6>::zeros();
     let measurement_noise = Matrix2::zeros();
     let real_obs = Vector2::zeros();
     let computed_obs = Vector2::zeros();
@@ -183,7 +183,7 @@ fn ekf_fixed_step_perfect_stations() {
             let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 kf.update_h_tilde(computed_meas.sensitivity());
-                let latest_est = kf
+                let (est, res) = kf
                     .measurement_update(
                         this_dt,
                         real_meas.observation(),
@@ -191,21 +191,22 @@ fn ekf_fixed_step_perfect_stations() {
                     )
                     .expect("wut?");
                 still_empty = false;
-                assert_eq!(
-                    latest_est.predicted, false,
-                    "estimate should not be a prediction"
-                );
-                // BUG: The following fails. Must be a time computation issue.
+                assert_eq!(est.predicted, false, "estimate should not be a prediction");
                 assert!(
-                    latest_est.state.norm() < EPSILON,
+                    est.state.norm() < EPSILON,
                     "estimate error should be zero (perfect dynamics)"
+                );
+                assert!(
+                    res.postfit.norm() < EPSILON,
+                    "postfit should be zero (perfect dynamics) ({:e})",
+                    res
                 );
                 // It's an EKF, so let's update the state in the dynamics.
                 let now = prop_est.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
-                let new_state = prop_est.dynamics.state.to_cartesian_vec() + latest_est.state;
+                let new_state = prop_est.dynamics.state.to_cartesian_vec() + est.state;
                 prop_est.dynamics.set_orbital_state(now, &new_state);
 
-                last_est = Some(latest_est);
+                last_est = Some(est);
                 break;
             }
         }
@@ -337,7 +338,7 @@ fn ckf_fixed_step_perfect_stations() {
             let computed_meas = station.measure(rx_state, this_dt);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
-                let latest_est = ckf
+                let (est, res) = ckf
                     .measurement_update(
                         this_dt,
                         real_meas.observation(),
@@ -345,21 +346,23 @@ fn ckf_fixed_step_perfect_stations() {
                     )
                     .expect("wut?");
                 still_empty = false;
-                assert_eq!(
-                    latest_est.predicted, false,
-                    "estimate should not be a prediction"
+                assert_eq!(est.predicted, false, "estimate should not be a prediction");
+                assert!(
+                    est.state.norm() < EPSILON,
+                    "estimate error should be zero (perfect dynamics) ({:e})",
+                    est.state.norm()
                 );
                 assert!(
-                    latest_est.state.norm() < EPSILON,
-                    "estimate error should be zero (perfect dynamics) ({:e})",
-                    latest_est.state.norm()
+                    res.postfit.norm() < EPSILON,
+                    "postfit should be zero (perfect dynamics) ({:e})",
+                    res
                 );
                 if !printed {
-                    wtr.serialize(latest_est.clone())
+                    wtr.serialize(est.clone())
                         .expect("could not write to stdout");
                     printed = true;
                 }
-                last_est = Some(latest_est);
+                last_est = Some(est);
                 break; // We know that only one station is in visibility at each time.
             }
         }
