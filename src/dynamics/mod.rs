@@ -42,6 +42,9 @@ pub mod missionarc;
 /// Defines solar radiation pressure models
 pub mod solarpressure;
 
+/// Define drag models
+pub mod drag;
+
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
 /// Its design is such that several of the provided dynamics can be combined fairly easily. However,

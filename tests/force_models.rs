@@ -6,6 +6,7 @@ use hifitime::{Epoch, SECONDS_PER_DAY};
 use na::Vector6;
 use nyx::celestia::{bodies, Cosm, Geoid, State};
 use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::drag::ExpEarthDrag;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
 use nyx::dynamics::thrustctrl::NoThrustControl;
@@ -26,11 +27,11 @@ fn srp_earth() {
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let mut dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = CelestialDynamics::two_body(orbit);
 
     let shadow_bodies = vec![earth];
 
-    let mut srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
+    let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
 
     let dry_mass = 300.0;
 
@@ -45,12 +46,12 @@ fn srp_earth() {
 
     // GMAT result
     let rslt = Vector6::new(
-        -10256.01279521848,
-        -22135.87506832323,
-        0.0004868617601061399,
-        3.667559854760713,
-        -1.699197984179455,
-        -5.729183400502337e-08,
+        -10_256.012_795_218_48,
+        -22_135.875_068_323_23,
+        0.000_486_861_760_106_139_9,
+        3.667_559_854_760_713,
+        -1.699_197_984_179_455,
+        -5.729_183_400_502_337e-8,
     );
 
     let (err_r, err_v) = rss_state_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
@@ -59,4 +60,43 @@ fn srp_earth() {
     // Cf. VALIDATION.MD for details.
     assert!(err_r < 5e-4, "position error too large for SRP");
     assert!(err_v < 1e-7, "velocity error too large for SRP");
+}
+
+#[test]
+fn drag_earth() {
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
+    let earth = cosm.geoid_from_id(bodies::EARTH);
+
+    let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
+
+    let orbit = State::<Geoid>::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+
+    let prop_time = 24.0 * SECONDS_PER_DAY;
+
+    // Define the dynamics
+    let dynamics = CelestialDynamics::two_body(orbit);
+
+    let shadow_bodies = vec![earth];
+
+    let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
+    let drag = ExpEarthDrag {
+        sc_area: 1.0,
+        cd: 2.2,
+        cosm: &cosm,
+    };
+
+    let dry_mass = 300.0;
+
+    let mut sc = Spacecraft::<NoThrustControl>::with_srp(dynamics, srp, dry_mass);
+    // Add the drag model to the spacecraft
+    sc.exp_drag = Some(drag);
+    println!("{:o}", orbit);
+
+    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::default());
+    prop.until_time_elapsed(prop_time);
+
+    let final_state = prop.dynamics.state();
+    println!("{}", final_state);
+    println!("{}", final_state.orbit);
 }
