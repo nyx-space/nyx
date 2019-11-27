@@ -6,8 +6,6 @@ use celestia::{bodies, Cosm, Geoid, LTCorr, State, AU, SPEED_OF_LIGHT};
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
 pub struct SolarPressure<'a> {
-    /// in kg, set in the Spacecraft's eom.
-    pub sc_mass: f64,
     /// in m^2
     pub sc_area: f64,
     /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back).
@@ -28,7 +26,6 @@ impl<'a> SolarPressure<'a> {
             correction: LTCorr::None,
         };
         Self {
-            sc_mass: 0.0,
             sc_area,
             cr: 1.8,
             phi: 1367.0,

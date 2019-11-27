@@ -1,4 +1,5 @@
 use super::celestial::CelestialDynamics;
+use super::drag::{ConstantDrag, ExpEarthDrag};
 use super::na::{Vector1, VectorN, U6, U7};
 use super::propulsion::Propulsion;
 use super::solarpressure::SolarPressure;
@@ -13,6 +14,8 @@ pub struct Spacecraft<'a, T: ThrustControl> {
     pub celestial: CelestialDynamics<'a>,
     pub prop: Option<Propulsion<T>>,
     pub srp: Option<SolarPressure<'a>>,
+    pub cst_drag: Option<ConstantDrag<'a>>,
+    pub exp_drag: Option<ExpEarthDrag<'a>>,
     /// in kg
     pub dry_mass: f64,
     /// in kg
@@ -32,6 +35,8 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
             celestial,
             prop: Some(prop),
             srp: None,
+            cst_drag: None,
+            exp_drag: None,
             dry_mass,
             fuel_mass,
             _marker: PhantomData,
@@ -49,6 +54,8 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
             celestial,
             prop: None,
             srp: Some(srp),
+            cst_drag: None,
+            exp_drag: None,
             dry_mass,
             fuel_mass: 0.0,
             _marker: PhantomData,
@@ -130,6 +137,22 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
             let srp_force = srp.eom(&celestial_state) / total_mass;
             for i in 0..3 {
                 d_x[i + 3] += srp_force[i];
+            }
+        }
+
+        // Now compute the constant drag if applicable
+        if let Some(drag) = &self.cst_drag {
+            let drag_force = drag.eom(&celestial_state) / total_mass;
+            for i in 0..3 {
+                d_x[i + 3] += drag_force[i];
+            }
+        }
+
+        // Now compute the constant drag if applicable
+        if let Some(drag) = &self.exp_drag {
+            let drag_force = drag.eom(&celestial_state) / total_mass;
+            for i in 0..3 {
+                d_x[i + 3] += drag_force[i];
             }
         }
         d_x
