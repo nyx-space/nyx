@@ -54,7 +54,11 @@ impl<'a> ForceModel<Geoid> for ExpEarthDrag<'a> {
         let rho = rho0 * (-(osc.rmag() - r0) / h).exp(); // # Exponential decay model for density
 
         let osc = self.cosm.frame_chg(&osc, earth);
-        let velocity = osc.velocity();
+
+        // Incorrectly transform to some ECEF frame
+        let earth_rot = 7.292_115_855_3e-5;
+
+        let velocity = osc.velocity() - Vector3::new(earth_rot * osc.y, -earth_rot * osc.x, 0.0);
         -0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity
     }
 }
