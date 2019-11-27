@@ -144,8 +144,8 @@ fn gast(at: Epoch) -> f64 {
 /// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {
-    dt: Epoch,
-    obs: Vector2<f64>,
+    pub dt: Epoch,
+    pub obs: Vector2<f64>,
     visible: bool,
     h_tilde: Matrix2x6<f64>,
 }
@@ -241,8 +241,8 @@ impl Serialize for StdMeasurement {
 /// Stores a standard measurement of range (km)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RangeMsr {
-    dt: Epoch,
-    obs: Vector1<f64>,
+    pub dt: Epoch,
+    pub obs: Vector1<f64>,
     visible: bool,
     h_tilde: Matrix1x6<f64>,
 }
@@ -334,8 +334,8 @@ impl Serialize for RangeMsr {
 /// Stores a standard measurement of range (km)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DopplerMsr {
-    dt: Epoch,
-    obs: Vector1<f64>,
+    pub dt: Epoch,
+    pub obs: Vector1<f64>,
     visible: bool,
     h_tilde: Matrix1x6<f64>,
 }
