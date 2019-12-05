@@ -270,7 +270,7 @@ fn rugg_ecc() {
         sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
         "objective not achieved"
     );
-    assert!((fuel_usage - 14.0).abs() < 1.0);
+    assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
 #[test]
@@ -323,7 +323,7 @@ fn rugg_ecc_decr() {
         sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
         "objective not achieved"
     );
-    assert!((fuel_usage - 14.0).abs() < 1.0);
+    assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
 #[test]
