@@ -1,4 +1,5 @@
 use crate::celestia::{Geoid, State};
+use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;
 
@@ -81,13 +82,19 @@ impl<S: Copy> fmt::Display for EventTrackers<S> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum StateEventKind {
+pub enum EventKind {
+    Sma(f64),
+    Ecc(f64),
+    Inc(f64),
+    Raan(f64),
+    Aop(f64),
+    TA(f64),
     Periapse,
     Apoapse,
-    TA(f64),
+    Fuel(f64),
 }
 
-impl fmt::Display for StateEventKind {
+impl fmt::Display for EventKind {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
@@ -96,7 +103,7 @@ impl fmt::Display for StateEventKind {
 
 #[derive(Debug)]
 pub struct OrbitalEvent {
-    pub kind: StateEventKind,
+    pub kind: EventKind,
 }
 
 impl Event for OrbitalEvent {
@@ -104,11 +111,42 @@ impl Event for OrbitalEvent {
 
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
         match self.kind {
-            StateEventKind::TA(angle) => prev_state.ta() <= angle && next_state.ta() > angle,
-            StateEventKind::Apoapse => {
-                between_pm_180(prev_state.ta()) > between_pm_180(next_state.ta())
+            EventKind::Sma(sma) => prev_state.sma() <= sma && next_state.sma() > sma,
+            EventKind::Ecc(ecc) => prev_state.ecc() <= ecc && next_state.ecc() > ecc,
+            EventKind::Inc(inc) => prev_state.inc() <= inc && next_state.inc() > inc,
+            EventKind::Raan(raan) => prev_state.raan() <= raan && next_state.raan() > raan,
+            EventKind::Aop(aop) => prev_state.aop() <= aop && next_state.aop() > aop,
+            EventKind::TA(angle) => prev_state.ta() <= angle && next_state.ta() > angle,
+            EventKind::Periapse => prev_state.ta() > next_state.ta(),
+            EventKind::Apoapse => between_pm_180(prev_state.ta()) > between_pm_180(next_state.ta()),
+            _ => panic!("event {:?} not supported"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SCEvent {
+    pub kind: EventKind,
+}
+
+impl Event for SCEvent {
+    type StateType = SpacecraftState;
+
+    fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
+        match self.kind {
+            EventKind::Sma(sma) => prev_state.orbit.sma() <= sma && next_state.orbit.sma() > sma,
+            EventKind::Ecc(ecc) => prev_state.orbit.ecc() <= ecc && next_state.orbit.ecc() > ecc,
+            EventKind::Inc(inc) => prev_state.orbit.inc() <= inc && next_state.orbit.inc() > inc,
+            EventKind::Raan(raan) => {
+                prev_state.orbit.raan() <= raan && next_state.orbit.raan() > raan
             }
-            StateEventKind::Periapse => prev_state.ta() > next_state.ta(),
+            EventKind::Aop(aop) => prev_state.orbit.aop() <= aop && next_state.orbit.aop() > aop,
+            EventKind::TA(angle) => prev_state.orbit.ta() <= angle && next_state.orbit.ta() > angle,
+            EventKind::Periapse => prev_state.orbit.ta() > next_state.orbit.ta(),
+            EventKind::Apoapse => {
+                between_pm_180(prev_state.orbit.ta()) > between_pm_180(next_state.orbit.ta())
+            }
+            EventKind::Fuel(mass) => prev_state.fuel_mass <= mass && next_state.fuel_mass > mass,
         }
     }
 }

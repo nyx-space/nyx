@@ -9,7 +9,7 @@ fn event_tracker_true_anomaly() {
     use nyx::celestia::{bodies, Cosm, Geoid, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::events::{EventTrackers, OrbitalEvent, StateEventKind};
+    use nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent};
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
@@ -31,16 +31,16 @@ fn event_tracker_true_anomaly() {
 
     // Track how many times we've passed by that TA again
     let peri_event = OrbitalEvent {
-        kind: StateEventKind::Periapse,
+        kind: EventKind::Periapse,
     };
     let apo_event = OrbitalEvent {
-        kind: StateEventKind::Apoapse,
+        kind: EventKind::Apoapse,
     };
     let ta_event0 = OrbitalEvent {
-        kind: StateEventKind::TA(35.1),
+        kind: EventKind::TA(35.1),
     };
     let ta_event1 = OrbitalEvent {
-        kind: StateEventKind::TA(235.1),
+        kind: EventKind::TA(235.1),
     };
 
     let tracker = EventTrackers::from_events(vec![

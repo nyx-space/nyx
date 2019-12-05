@@ -9,6 +9,7 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
 use self::nyx::dynamics::Dynamics;
+use self::nyx::propagators::events::{EventKind, EventTrackers, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
@@ -24,9 +25,8 @@ fn qlaw_as_ruggiero_case_a() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius + 1000.0;
-
-    let orbit = State::<Geoid>::from_keplerian(sma, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+    let orbit =
+        State::<Geoid>::from_keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
 
     let prop_time = 39.91 * SECONDS_PER_DAY;
 
@@ -42,7 +42,7 @@ fn qlaw_as_ruggiero_case_a() {
     // Define the objectives
     let objectives = vec![
         Achieve::Sma {
-            target: 42164.0,
+            target: 42000.0,
             tol: 1.0,
         },
         Achieve::Ecc {
@@ -50,6 +50,16 @@ fn qlaw_as_ruggiero_case_a() {
             tol: 5e-5,
         },
     ];
+
+    // Track these events
+    let sma_event = SCEvent {
+        kind: EventKind::Sma(42000.0),
+    };
+    let ecc_event = SCEvent {
+        kind: EventKind::Ecc(0.01),
+    };
+
+    let tracker = EventTrackers::from_events(vec![Box::new(sma_event), Box::new(ecc_event)]);
 
     let ruggiero = Ruggiero::new(objectives, orbit);
 
@@ -62,7 +72,9 @@ fn qlaw_as_ruggiero_case_a() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time);
+    println!("{}", prop.event_trackers);
     let final_state = prop.dynamics.celestial.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
@@ -73,7 +85,7 @@ fn qlaw_as_ruggiero_case_a() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 113.0).abs() < 1.0);
+    assert!((fuel_usage - 93.449).abs() < 1.0);
 }
 
 #[test]
@@ -137,7 +149,7 @@ fn qlaw_as_ruggiero_case_b() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 247.0).abs() < 1.0);
+    assert!((fuel_usage - 223.515).abs() < 1.0);
 }
 
 #[test]
@@ -197,7 +209,7 @@ fn qlaw_as_ruggiero_case_c() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 64.0).abs() < 1.0);
+    assert!((fuel_usage - 41.742).abs() < 1.0);
 }
 
 #[test]
@@ -400,7 +412,7 @@ fn qlaw_as_ruggiero_case_f() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 14.0).abs() < 1.0);
+    assert!((fuel_usage - 10.378).abs() < 1.0);
 }
 
 #[test]
