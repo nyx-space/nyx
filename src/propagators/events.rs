@@ -31,7 +31,7 @@ impl<S: Copy> EventTrackers<S> {
         Self {
             events: vec![event],
             prev_values: Vec::with_capacity(1),
-            found_bounds: Vec::with_capacity(1),
+            found_bounds: vec![Vec::new()],
         }
     }
 
