@@ -215,7 +215,7 @@ fn qlaw_as_ruggiero_case_c() {
 #[test]
 #[ignore]
 fn qlaw_as_ruggiero_case_d() {
-    // BUG due to broken RAAN correction: https://gitlab.com/chrisrabotin/nyx/issues/83
+    // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
@@ -285,7 +285,7 @@ fn qlaw_as_ruggiero_case_d() {
 #[test]
 #[ignore]
 fn qlaw_as_ruggiero_case_e() {
-    // BUG due to broken RAAN correction: https://gitlab.com/chrisrabotin/nyx/issues/83
+    // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
@@ -416,10 +416,8 @@ fn qlaw_as_ruggiero_case_f() {
 }
 
 #[test]
-#[ignore]
 fn ruggiero_iepc_2011_102() {
     // Source: IEPC 2011 102
-    // WARNING: The paper claims that only 103.9 days are needed. I could not reproduce this, their here nor in another tool.
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
@@ -428,9 +426,7 @@ fn ruggiero_iepc_2011_102() {
     let orbit =
         State::<Geoid>::from_keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, earth);
 
-    // let prop_time = 104.0 * SECONDS_PER_DAY;
-    let prop_time = 140.0 * SECONDS_PER_DAY;
-    // let prop_time = 3404.0 * 3600.0 + 21. * 60.;
+    let prop_time = 105.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
