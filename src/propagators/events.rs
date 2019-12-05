@@ -52,7 +52,12 @@ impl<S> EventTrackers<S> {
                 if self.prev_values[event_no].signum() * val < 0.0 {
                     // The previous value and the new value have opposite signs
                     // Let's store this as an event passage
-                    self.found_bounds[event_no].push((prev_time, next_time));
+                    if self.found_bounds.is_empty() {
+                        self.found_bounds = Vec::new();
+                        self.found_bounds.push(vec![(prev_time, next_time)]);
+                    } else {
+                        self.found_bounds[event_no].push((prev_time, next_time));
+                    }
                 }
                 self.prev_values[event_no] = val;
             } else {
@@ -77,7 +82,7 @@ impl Event for StateEvent {
 
     fn eval(&self, state: &Self::StateType) -> f64 {
         match self.kind {
-            StateEventKind::TA(angle) => between_pm_180(state.ta()) - angle,
+            StateEventKind::TA(angle) => dbg!(state.ta()) - angle,
         }
     }
 }

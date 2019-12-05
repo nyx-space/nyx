@@ -31,7 +31,7 @@ fn event_tracker_true_anomaly() {
 
     // Track how many times we've passed by that TA again
     let ta_event = StateEvent {
-        kind: StateEventKind::TA(state.ta()),
+        kind: StateEventKind::TA(0.0),
     };
 
     let tracker = EventTrackers::from_event(Box::new(ta_event));
@@ -40,7 +40,7 @@ fn event_tracker_true_anomaly() {
 
     let mut prop = Propagator::new::<RK89>(
         &mut dynamics,
-        &PropOpts::with_adaptive_step(1.0, 180.0, 1e-9, RSSStepPV {}),
+        &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
     prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time);

@@ -200,3 +200,9 @@ fn test_projv() {
         Vector3::new(0.0, 0.0, 0.0)
     );
 }
+
+#[test]
+fn angle_bounds() {
+    assert!((between_pm_180(181.0) - -179.0).abs() < std::f64::EPSILON);
+    assert!((between_0_360(-179.0) - 181.0).abs() < std::f64::EPSILON);
+}
