@@ -3,23 +3,24 @@ extern crate nalgebra as na;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, VectorN};
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
+use super::events::EventTrackers;
 use super::{IntegrationDetails, RK};
 use dynamics::Dynamics;
 use std::f64;
 use std::sync::mpsc::Sender;
 
-/// Includes the options, the integrator details of the previous step, and
-/// the set of coefficients used for the monomorphic instance. **WARNING:** must be stored in a mutuable variable.
+/// A Propagator allows propagating a set of dynamics forward or backward in time.
+/// It is an EventTracker, without any event tracking. It includes the options, the integrator
+/// details of the previous step, and the set of coefficients used for the monomorphic instance.
 #[derive(Debug)]
-pub struct Propagator<'a, M, E>
+pub struct Propagator<'a, M: Dynamics, E: ErrorCtrl>
 where
-    M: Dynamics,
-    E: ErrorCtrl,
     DefaultAllocator: Allocator<f64, M::StateSize>,
 {
     pub dynamics: &'a mut M, // Stores the dynamics used. *Must* use this to get the latest values
     // An output channel for all of the states computed by this propagator
     pub tx_chan: Option<&'a Sender<M::StateType>>,
+    pub event_trackers: EventTrackers<M::StateType>,
     opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
     step_size: f64,    // Stores the adapted step for the _next_ call
@@ -30,16 +31,17 @@ where
     fixed_step: bool,
 }
 
-/// The `Propagator` trait defines the functions of a propagator.
+/// The `Propagator` trait defines the functions of a propagator and of an event tracker.
 impl<'a, M: Dynamics, E: ErrorCtrl> Propagator<'a, M, E>
 where
     DefaultAllocator: Allocator<f64, M::StateSize>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: &'a mut M, opts: &PropOpts<E>) -> Propagator<'a, M, E> {
-        Propagator {
+    pub fn new<T: RK>(dynamics: &'a mut M, opts: &PropOpts<E>) -> Self {
+        Self {
             tx_chan: None,
             dynamics,
+            event_trackers: EventTrackers::none(),
             opts: *opts,
             details: IntegrationDetails {
                 step: 0.0,
@@ -100,6 +102,9 @@ where
                 self.set_step(stop_time - dt, true);
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
                 self.dynamics.set_state(t, &state);
+                // Evaluate the event trackers
+                self.event_trackers
+                    .eval_and_save(dt, t, &self.dynamics.state());
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
                 if let Some(ref chan) = self.tx_chan {
@@ -115,6 +120,9 @@ where
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state);
+                // Evaluate the event trackers
+                self.event_trackers
+                    .eval_and_save(dt, t, &self.dynamics.state());
                 if let Some(ref chan) = self.tx_chan {
                     if let Err(e) = chan.send(self.dynamics.state()) {
                         warn!("could not publish to channel: {}", e)
