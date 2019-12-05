@@ -9,7 +9,7 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
 use self::nyx::dynamics::Dynamics;
-use self::nyx::propagators::events::{EventKind, EventTrackers, SCEvent};
+use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
@@ -52,14 +52,10 @@ fn qlaw_as_ruggiero_case_a() {
     ];
 
     // Track these events
-    let sma_event = SCEvent {
-        kind: EventKind::Sma(42000.0),
-    };
-    let ecc_event = SCEvent {
-        kind: EventKind::Ecc(0.01),
-    };
-
-    let tracker = EventTrackers::from_events(vec![Box::new(sma_event), Box::new(ecc_event)]);
+    let tracker = EventTrackers::from_events(vec![
+        SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(42000.0))),
+        SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(0.01))),
+    ]);
 
     let ruggiero = Ruggiero::new(objectives, orbit);
 

@@ -159,28 +159,37 @@ impl<'a> Event for OrbitalEvent<'a> {
 }
 
 #[derive(Debug)]
-pub struct SCEvent {
+pub struct SCEvent<'a> {
     pub kind: EventKind,
+    pub orbital: Option<Box<OrbitalEvent<'a>>>,
 }
 
-impl Event for SCEvent {
+impl<'a> SCEvent<'a> {
+    pub fn fuel_mass(mass: f64) -> Box<Self> {
+        Box::new(Self {
+            kind: EventKind::Fuel(mass),
+            orbital: None,
+        })
+    }
+    pub fn orbital(event: Box<OrbitalEvent<'a>>) -> Box<Self> {
+        Box::new(Self {
+            kind: event.kind,
+            orbital: Some(event),
+        })
+    }
+}
+
+impl<'a> Event for SCEvent<'a> {
     type StateType = SpacecraftState;
 
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
         match self.kind {
-            EventKind::Sma(sma) => prev_state.orbit.sma() <= sma && next_state.orbit.sma() > sma,
-            EventKind::Ecc(ecc) => prev_state.orbit.ecc() <= ecc && next_state.orbit.ecc() > ecc,
-            EventKind::Inc(inc) => prev_state.orbit.inc() <= inc && next_state.orbit.inc() > inc,
-            EventKind::Raan(raan) => {
-                prev_state.orbit.raan() <= raan && next_state.orbit.raan() > raan
-            }
-            EventKind::Aop(aop) => prev_state.orbit.aop() <= aop && next_state.orbit.aop() > aop,
-            EventKind::TA(angle) => prev_state.orbit.ta() <= angle && next_state.orbit.ta() > angle,
-            EventKind::Periapse => prev_state.orbit.ta() > next_state.orbit.ta(),
-            EventKind::Apoapse => {
-                between_pm_180(prev_state.orbit.ta()) > between_pm_180(next_state.orbit.ta())
-            }
             EventKind::Fuel(mass) => prev_state.fuel_mass <= mass && next_state.fuel_mass > mass,
+            _ => self
+                .orbital
+                .as_ref()
+                .unwrap()
+                .eval_crossing(&prev_state.orbit, &next_state.orbit),
         }
     }
 }

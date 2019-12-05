@@ -9,7 +9,7 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
 use self::nyx::dynamics::Dynamics;
-use self::nyx::propagators::events::{EventKind, EventTrackers, SCEvent};
+use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 
 #[test]
@@ -464,11 +464,8 @@ fn rugg_raan() {
         tol: 5e-3,
     }];
 
-    let event = SCEvent {
-        kind: EventKind::Raan(5.0),
-    };
-
-    let tracker = EventTrackers::from_event(Box::new(event));
+    let tracker =
+        EventTrackers::from_event(SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(5.0))));
 
     let ruggiero = Ruggiero::new(objectives, orbit);
 
