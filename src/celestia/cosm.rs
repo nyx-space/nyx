@@ -42,6 +42,12 @@ pub struct Cosm {
     exb_map: Graph<i32, u8, Undirected>,
 }
 
+impl fmt::Debug for Cosm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Cosm with {} ephemerides", self.ephemerides.keys().len())
+    }
+}
+
 #[derive(Debug)]
 pub enum CosmError {
     ObjectIDNotFound(i32),

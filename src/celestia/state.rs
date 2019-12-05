@@ -17,8 +17,6 @@ use utils::{between_0_360, between_pm_180, perpv, r1, r3};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
-/// If an orbit has an eccentricity below the following value, it is considered equatorial (only affects warning messages)
-pub const INC_EPSILON: f64 = 1e-11;
 
 /// State defines an orbital state parameterized  by a `CelestialBody`.
 ///

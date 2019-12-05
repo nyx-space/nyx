@@ -1,8 +1,9 @@
-use crate::celestia::{Geoid, State};
+use crate::celestia::{Cosm, Geoid, State};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;
 
+/// A general Event
 pub trait Event: fmt::Debug {
     /// Defines the type which will be accepted by the condition
     type StateType: Copy;
@@ -11,6 +12,7 @@ pub trait Event: fmt::Debug {
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool;
 }
 
+/// A tracker for events during the propagation. Attach it directly to the propagator.
 #[derive(Debug)]
 pub struct EventTrackers<S: Copy> {
     pub events: Vec<Box<dyn Event<StateType = S>>>,
@@ -19,6 +21,7 @@ pub struct EventTrackers<S: Copy> {
 }
 
 impl<S: Copy> EventTrackers<S> {
+    /// Used to initialize no event trackers. Should not be needed publicly.
     pub fn none() -> Self {
         Self {
             events: Vec::with_capacity(0),
@@ -27,6 +30,7 @@ impl<S: Copy> EventTrackers<S> {
         }
     }
 
+    /// Track only one event
     pub fn from_event(event: Box<dyn Event<StateType = S>>) -> Self {
         Self {
             events: vec![event],
@@ -35,6 +39,7 @@ impl<S: Copy> EventTrackers<S> {
         }
     }
 
+    /// Track several events
     pub fn from_events(events: Vec<Box<dyn Event<StateType = S>>>) -> Self {
         let len = events.len();
         let mut found_bounds = Vec::new();
@@ -48,6 +53,7 @@ impl<S: Copy> EventTrackers<S> {
         }
     }
 
+    /// Evaluate whether we have crossed the boundary of an event
     pub fn eval_and_save(&mut self, prev_time: f64, next_time: f64, state: &S) {
         for event_no in 0..self.events.len() {
             if self.prev_values.len() > event_no {
@@ -69,7 +75,7 @@ impl<S: Copy> fmt::Display for EventTrackers<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for event_no in 0..self.events.len() {
             if event_no > 0 {
-                write!(f, "\n")?;
+                writeln!(f)?;
             }
             write!(
                 f,
@@ -81,6 +87,7 @@ impl<S: Copy> fmt::Display for EventTrackers<S> {
     }
 }
 
+/// Built-in events, will likely be expanded as development continues.
 #[derive(Clone, Copy, Debug)]
 pub enum EventKind {
     Sma(f64),
@@ -101,25 +108,52 @@ impl fmt::Display for EventKind {
     }
 }
 
+/// An orbital event, in the same frame or in another frame.
 #[derive(Debug)]
-pub struct OrbitalEvent {
+pub struct OrbitalEvent<'a> {
     pub kind: EventKind,
+    pub tgt: Option<Geoid>,
+    pub cosm: Option<&'a Cosm>,
 }
 
-impl Event for OrbitalEvent {
+impl<'a> OrbitalEvent<'a> {
+    pub fn new(kind: EventKind) -> Box<Self> {
+        Box::new(OrbitalEvent {
+            kind,
+            tgt: None,
+            cosm: None,
+        })
+    }
+    pub fn in_frame(kind: EventKind, tgt: Geoid, cosm: &'a Cosm) -> Box<Self> {
+        Box::new(OrbitalEvent {
+            kind,
+            tgt: Some(tgt),
+            cosm: Some(cosm),
+        })
+    }
+}
+
+impl<'a> Event for OrbitalEvent<'a> {
     type StateType = State<Geoid>;
 
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
+        let (prev, next) = match self.tgt {
+            Some(tgt) => (
+                self.cosm.unwrap().frame_chg(prev_state, tgt),
+                self.cosm.unwrap().frame_chg(next_state, tgt),
+            ),
+            None => (*prev_state, *next_state),
+        };
         match self.kind {
-            EventKind::Sma(sma) => prev_state.sma() <= sma && next_state.sma() > sma,
-            EventKind::Ecc(ecc) => prev_state.ecc() <= ecc && next_state.ecc() > ecc,
-            EventKind::Inc(inc) => prev_state.inc() <= inc && next_state.inc() > inc,
-            EventKind::Raan(raan) => prev_state.raan() <= raan && next_state.raan() > raan,
-            EventKind::Aop(aop) => prev_state.aop() <= aop && next_state.aop() > aop,
-            EventKind::TA(angle) => prev_state.ta() <= angle && next_state.ta() > angle,
-            EventKind::Periapse => prev_state.ta() > next_state.ta(),
-            EventKind::Apoapse => between_pm_180(prev_state.ta()) > between_pm_180(next_state.ta()),
-            _ => panic!("event {:?} not supported"),
+            EventKind::Sma(sma) => prev.sma() <= sma && next.sma() > sma,
+            EventKind::Ecc(ecc) => prev.ecc() <= ecc && next.ecc() > ecc,
+            EventKind::Inc(inc) => prev.inc() <= inc && next.inc() > inc,
+            EventKind::Raan(raan) => prev.raan() <= raan && next.raan() > raan,
+            EventKind::Aop(aop) => prev.aop() <= aop && next.aop() > aop,
+            EventKind::TA(angle) => prev.ta() <= angle && next.ta() > angle,
+            EventKind::Periapse => prev.ta() > next.ta(),
+            EventKind::Apoapse => between_pm_180(prev.ta()) > between_pm_180(next.ta()),
+            _ => panic!("event {:?} not supported", self.kind),
         }
     }
 }
@@ -149,4 +183,13 @@ impl Event for SCEvent {
             EventKind::Fuel(mass) => prev_state.fuel_mass <= mass && next_state.fuel_mass > mass,
         }
     }
+}
+
+/// A condition to stop a propagator
+#[derive(Debug)]
+pub struct StopCondition<S: Copy> {
+    pub event: Box<dyn Event<StateType = S>>,
+    pub trigger: usize,
+    pub max_iter: usize,
+    pub epsilon: f64,
 }

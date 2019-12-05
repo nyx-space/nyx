@@ -132,6 +132,8 @@ where
         }
     }
 
+    pub fn until_event(&mut self) {}
+
     /// This method integrates whichever function is provided as `d_xdt`.
     ///
     /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
