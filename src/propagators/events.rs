@@ -4,20 +4,20 @@ use std::fmt::Debug;
 
 pub trait Event: Debug {
     /// Defines the type which will be accepted by the condition
-    type StateType;
+    type StateType: Copy;
 
-    // Evaluation of the event, must return whether the event value at the provided state.
-    fn eval(&self, state: &Self::StateType) -> f64;
+    // Evaluation of the event, must return whether the condition happened between between both states.
+    fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool;
 }
 
 #[derive(Debug)]
-pub struct EventTrackers<S> {
+pub struct EventTrackers<S: Copy> {
     pub events: Vec<Box<dyn Event<StateType = S>>>,
-    pub found_bounds: Vec<Vec<(f64, f64, f64)>>,
-    prev_values: Vec<f64>,
+    pub found_bounds: Vec<Vec<(f64, f64)>>,
+    prev_values: Vec<S>,
 }
 
-impl<S> EventTrackers<S> {
+impl<S: Copy> EventTrackers<S> {
     pub fn none() -> Self {
         Self {
             events: Vec::with_capacity(0),
@@ -36,40 +36,36 @@ impl<S> EventTrackers<S> {
 
     pub fn from_events(events: Vec<Box<dyn Event<StateType = S>>>) -> Self {
         let len = events.len();
+        let mut found_bounds = Vec::new();
+        for _ in 0..len {
+            found_bounds.push(Vec::new());
+        }
         Self {
             events,
             prev_values: Vec::with_capacity(len),
-            found_bounds: Vec::with_capacity(len),
+            found_bounds,
         }
     }
 
     pub fn eval_and_save(&mut self, prev_time: f64, next_time: f64, state: &S) {
         for event_no in 0..self.events.len() {
-            // Evaluate the event
-            let val = self.events[event_no].eval(state);
-            if !self.prev_values.is_empty() {
-                // Check if we've changed the sign of the event
-                if self.prev_values[event_no].signum() * val < 0.0 {
-                    // The previous value and the new value have opposite signs
-                    // Let's store this as an event passage
-                    if self.found_bounds.is_empty() {
-                        self.found_bounds = Vec::new();
-                        self.found_bounds.push(vec![(prev_time, next_time, val)]);
-                    } else {
-                        self.found_bounds[event_no].push((prev_time, next_time, val));
-                    }
+            if self.prev_values.len() > event_no {
+                // Evaluate the event crossing
+                if self.events[event_no].eval_crossing(&self.prev_values[event_no], &state) {
+                    // Append the crossing times
+                    self.found_bounds[event_no].push((prev_time, next_time));
                 }
-                self.prev_values[event_no] = val;
+                self.prev_values[event_no] = *state;
             } else {
-                self.prev_values.push(val);
+                self.prev_values.push(*state);
             }
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum StateEventKind {
-    Periapase,
+    Periapse,
     Apoapse,
     TA(f64),
 }
@@ -82,11 +78,13 @@ pub struct StateEvent {
 impl Event for StateEvent {
     type StateType = State<Geoid>;
 
-    fn eval(&self, state: &Self::StateType) -> f64 {
+    fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
         match self.kind {
-            StateEventKind::TA(angle) => between_pm_180(state.ta()) - angle,
-            StateEventKind::Apoapse => state.ta() - 180.0,
-            StateEventKind::Periapase => state.ta(),
+            StateEventKind::TA(angle) => prev_state.ta() <= angle && next_state.ta() > angle,
+            StateEventKind::Apoapse => {
+                between_pm_180(prev_state.ta()) > between_pm_180(next_state.ta())
+            }
+            StateEventKind::Periapse => prev_state.ta() > next_state.ta(),
         }
     }
 }

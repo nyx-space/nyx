@@ -30,11 +30,25 @@ fn event_tracker_true_anomaly() {
     let prop_time = state.period();
 
     // Track how many times we've passed by that TA again
-    let ta_event = StateEvent {
+    let peri_event = StateEvent {
+        kind: StateEventKind::Periapse,
+    };
+    let apo_event = StateEvent {
         kind: StateEventKind::Apoapse,
     };
+    let ta_event0 = StateEvent {
+        kind: StateEventKind::TA(35.1),
+    };
+    let ta_event1 = StateEvent {
+        kind: StateEventKind::TA(235.1),
+    };
 
-    let tracker = EventTrackers::from_event(Box::new(ta_event));
+    let tracker = EventTrackers::from_events(vec![
+        Box::new(peri_event),
+        Box::new(apo_event),
+        Box::new(ta_event0),
+        Box::new(ta_event1),
+    ]);
 
     let mut dynamics = CelestialDynamics::two_body(state);
 
