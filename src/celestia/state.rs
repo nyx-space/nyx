@@ -557,7 +557,7 @@ impl State<Geoid> {
         }
     }
 
-    /// Returns the true anomaly in degrees
+    /// Returns the true anomaly in degrees between 0 and 360.0
     ///
     /// NOTE: This function will emit a warning stating that the TA should be avoided if in a very near circular orbit
     /// Code from https://github.com/ChristopherRabotin/GMAT/blob/80bde040e12946a61dae90d9fc3538f16df34190/src/gmatutil/util/StateConversionUtil.cpp#L6835

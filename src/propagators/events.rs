@@ -13,7 +13,7 @@ pub trait Event: Debug {
 #[derive(Debug)]
 pub struct EventTrackers<S> {
     pub events: Vec<Box<dyn Event<StateType = S>>>,
-    pub found_bounds: Vec<Vec<(f64, f64)>>,
+    pub found_bounds: Vec<Vec<(f64, f64, f64)>>,
     prev_values: Vec<f64>,
 }
 
@@ -54,9 +54,9 @@ impl<S> EventTrackers<S> {
                     // Let's store this as an event passage
                     if self.found_bounds.is_empty() {
                         self.found_bounds = Vec::new();
-                        self.found_bounds.push(vec![(prev_time, next_time)]);
+                        self.found_bounds.push(vec![(prev_time, next_time, val)]);
                     } else {
-                        self.found_bounds[event_no].push((prev_time, next_time));
+                        self.found_bounds[event_no].push((prev_time, next_time, val));
                     }
                 }
                 self.prev_values[event_no] = val;
@@ -69,6 +69,8 @@ impl<S> EventTrackers<S> {
 
 #[derive(Debug)]
 pub enum StateEventKind {
+    Periapase,
+    Apoapse,
     TA(f64),
 }
 
@@ -82,7 +84,9 @@ impl Event for StateEvent {
 
     fn eval(&self, state: &Self::StateType) -> f64 {
         match self.kind {
-            StateEventKind::TA(angle) => dbg!(state.ta()) - angle,
+            StateEventKind::TA(angle) => between_pm_180(state.ta()) - angle,
+            StateEventKind::Apoapse => state.ta() - 180.0,
+            StateEventKind::Periapase => state.ta(),
         }
     }
 }

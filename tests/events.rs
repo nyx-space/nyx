@@ -27,11 +27,11 @@ fn event_tracker_true_anomaly() {
         earth_geoid,
     );
 
-    let prop_time = 5.0 * state.period();
+    let prop_time = state.period();
 
     // Track how many times we've passed by that TA again
     let ta_event = StateEvent {
-        kind: StateEventKind::TA(0.0),
+        kind: StateEventKind::Apoapse,
     };
 
     let tracker = EventTrackers::from_event(Box::new(ta_event));
