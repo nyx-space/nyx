@@ -8,8 +8,11 @@ pub trait Event: fmt::Debug {
     /// Defines the type which will be accepted by the condition
     type StateType: Copy;
 
-    // Evaluation of the event, must return whether the condition happened between between both states.
+    // Evaluation of event crossing, must return whether the condition happened between between both states.
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool;
+
+    // Evaluation of the event, must return a value corresponding to whether the state is before or after the event
+    fn eval(&self, state: &Self::StateType) -> f64;
 }
 
 /// A tracker for events during the propagation. Attach it directly to the propagator.
@@ -65,6 +68,14 @@ impl<S: Copy> EventTrackers<S> {
                 self.prev_values[event_no] = *state;
             } else {
                 self.prev_values.push(*state);
+            }
+        }
+    }
+
+    pub fn reset(&mut self) {
+        for event_no in 0..self.events.len() {
+            while !self.found_bounds[event_no].is_empty() {
+                self.found_bounds[event_no].remove(0);
             }
         }
     }
@@ -136,24 +147,32 @@ impl<'a> OrbitalEvent<'a> {
 impl<'a> Event for OrbitalEvent<'a> {
     type StateType = State<Geoid>;
 
-    fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
-        let (prev, next) = match self.tgt {
-            Some(tgt) => (
-                self.cosm.unwrap().frame_chg(prev_state, tgt),
-                self.cosm.unwrap().frame_chg(next_state, tgt),
-            ),
-            None => (*prev_state, *next_state),
+    fn eval(&self, state: &Self::StateType) -> f64 {
+        let state = match self.tgt {
+            Some(tgt) => self.cosm.unwrap().frame_chg(state, tgt),
+            None => *state,
         };
+
         match self.kind {
-            EventKind::Sma(sma) => prev.sma() <= sma && next.sma() > sma,
-            EventKind::Ecc(ecc) => prev.ecc() <= ecc && next.ecc() > ecc,
-            EventKind::Inc(inc) => prev.inc() <= inc && next.inc() > inc,
-            EventKind::Raan(raan) => prev.raan() <= raan && next.raan() > raan,
-            EventKind::Aop(aop) => prev.aop() <= aop && next.aop() > aop,
-            EventKind::TA(angle) => prev.ta() <= angle && next.ta() > angle,
-            EventKind::Periapse => prev.ta() > next.ta(),
-            EventKind::Apoapse => between_pm_180(prev.ta()) > between_pm_180(next.ta()),
+            EventKind::Sma(sma) => state.sma() - sma,
+            EventKind::Ecc(ecc) => state.ecc() - ecc,
+            EventKind::Inc(inc) => state.inc() - inc,
+            EventKind::Raan(raan) => state.raan() - raan,
+            EventKind::Aop(aop) => state.aop() - aop,
+            EventKind::TA(angle) => state.ta() - angle,
+            EventKind::Periapse => state.ta(),
+            EventKind::Apoapse => between_pm_180(state.ta()),
             _ => panic!("event {:?} not supported", self.kind),
+        }
+    }
+
+    fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
+        let prev_val = self.eval(prev_state);
+        let next_val = self.eval(next_state);
+        match self.kind {
+            // XXX: Should this condition be applied to all angles?
+            EventKind::Periapse | EventKind::Apoapse => prev_val > next_val,
+            _ => self.eval(prev_state) * self.eval(next_state) <= 0.0,
         }
     }
 }
@@ -182,6 +201,13 @@ impl<'a> SCEvent<'a> {
 impl<'a> Event for SCEvent<'a> {
     type StateType = SpacecraftState;
 
+    fn eval(&self, state: &Self::StateType) -> f64 {
+        match self.kind {
+            EventKind::Fuel(mass) => state.fuel_mass - mass,
+            _ => self.orbital.as_ref().unwrap().eval(&state.orbit),
+        }
+    }
+
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
         match self.kind {
             EventKind::Fuel(mass) => prev_state.fuel_mass <= mass && next_state.fuel_mass > mass,
@@ -194,11 +220,59 @@ impl<'a> Event for SCEvent<'a> {
     }
 }
 
-/// A condition to stop a propagator
+/// A condition to stop a propagator.
+/// Note: min_step of propagator options will guide how precise the solution can be!
 #[derive(Debug)]
 pub struct StopCondition<S: Copy> {
+    /// Set to a negative number to search backward
+    pub max_prop_time: f64,
+    /// The event which should be the stopping condition
     pub event: Box<dyn Event<StateType = S>>,
+    /// The number of times the event must be hit prior to stopping (should be at least 1)
     pub trigger: usize,
+    /// Maximum number of iterations of the Brent solver.
     pub max_iter: usize,
+    /// Maximum error in the event, used as convergence criteria.
     pub epsilon: f64,
+}
+
+impl<S: Copy> StopCondition<S> {
+    /// Finds the closest time at which this condition is met. Stops on first occurence.
+    pub fn new(event: Box<dyn Event<StateType = S>>, prop_time: f64, epsilon: f64) -> Self {
+        Self {
+            max_prop_time: prop_time,
+            event,
+            trigger: 1,
+            max_iter: 50,
+            epsilon,
+        }
+    }
+
+    /// Finds the closest time at which this condition is met. Stops on `hits` occurence (must be strictly greater than 1)
+    pub fn after_hits(
+        event: Box<dyn Event<StateType = S>>,
+        hits: usize,
+        prop_time: f64,
+        epsilon: f64,
+    ) -> Self {
+        assert!(hits >= 1, "cannot stop on zero-th event passing");
+        Self {
+            max_prop_time: prop_time,
+            event,
+            trigger: hits,
+            max_iter: 50,
+            epsilon,
+        }
+    }
+}
+
+/// Built-in events, will likely be expanded as development continues.
+#[derive(Clone, Copy, Debug)]
+pub enum ConvergenceError {
+    /// Event not triggered in max prop time
+    NeverTriggered,
+    /// Event not hit enough times (requested, found)
+    UnsufficientTriggers(usize, usize),
+    /// Value corresponds to the number of iterations used
+    MaxIterReached(usize),
 }

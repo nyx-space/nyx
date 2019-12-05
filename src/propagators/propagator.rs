@@ -3,10 +3,11 @@ extern crate nalgebra as na;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, VectorN};
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
-use super::events::EventTrackers;
+use super::events::{ConvergenceError, EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK};
 use dynamics::Dynamics;
 use std::f64;
+use std::f64::EPSILON;
 use std::sync::mpsc::Sender;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
@@ -132,7 +133,135 @@ where
         }
     }
 
-    pub fn until_event(&mut self) {}
+    pub fn until_event(
+        &mut self,
+        condition: StopCondition<M::StateType>,
+    ) -> Result<M::StateType, ConvergenceError> {
+        // Store the initial time and state
+        let init_time = self.dynamics.time();
+        let init_state_vec = self.dynamics.state_vector();
+        // Rewrite the event tracker
+        if !self.event_trackers.events.is_empty() {
+            warn!("Rewriting event tracker with the StopCondition");
+        }
+        self.event_trackers = EventTrackers::from_event(condition.event);
+        self.until_time_elapsed(condition.max_prop_time);
+        // Check if the event has been triggered
+        if self.event_trackers.found_bounds[0].len() < condition.trigger {
+            if condition.trigger == 1 {
+                // Event was never triggered
+                return Err(ConvergenceError::NeverTriggered);
+            } else {
+                // Event not triggered enough times
+                return Err(ConvergenceError::UnsufficientTriggers(
+                    condition.trigger,
+                    self.event_trackers.found_bounds[0].len(),
+                ));
+            }
+        }
+        let (mut xa, mut xb) = self.event_trackers.found_bounds[0][condition.trigger - 1];
+        // Reinitialize the dynamics and start the search
+        self.dynamics.set_state(init_time, &init_state_vec);
+        self.event_trackers.reset();
+        // Compute the initial values of the condition at those bounds.
+        self.until_time_elapsed(xa);
+        let mut ya = self.event_trackers.events[0].eval(&self.dynamics.state());
+        // And prop until next bound
+        self.until_time_elapsed(xb - xa);
+        let mut yb = self.event_trackers.events[0].eval(&self.dynamics.state());
+        // The Brent solver, from the roots crate (sadly could not directly integrate it here)
+        // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
+
+        // Helper lambdas, for f64s only
+        let eps = condition.epsilon;
+        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() < eps.abs();
+        let arrange = |a: f64, ya: f64, b: f64, yb: f64| {
+            if ya.abs() > yb.abs() {
+                (a, ya, b, yb)
+            } else {
+                (b, yb, a, ya)
+            }
+        };
+
+        let (mut c, mut yc, mut d) = (xa, ya, xa);
+        let mut flag = true;
+        let mut iter = 0;
+        let closest_t;
+        loop {
+            if ya.abs() < condition.epsilon.abs() {
+                closest_t = xa;
+                break;
+            }
+            if yb.abs() < condition.epsilon.abs() {
+                closest_t = xb;
+                break;
+            }
+            if has_converged(xa, xb) {
+                closest_t = c;
+                break;
+            }
+            let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
+                xa * yb * yc / ((ya - yb) * (ya - yc))
+                    + xb * ya * yc / ((yb - ya) * (yb - yc))
+                    + c * ya * yb / ((yc - ya) * (yc - yb))
+            } else {
+                xb - yb * (xb - xa) / (yb - ya)
+            };
+            let cond1 = (s - xb) * (s - (3.0 * xa + xb) / 4.0) > 0.0;
+            let cond2 = flag && (s - xb).abs() >= (xb - c).abs() / 2.0;
+            let cond3 = !flag && (s - xb).abs() >= (c - d).abs() / 2.0;
+            let cond4 = flag && has_converged(xb, c);
+            let cond5 = !flag && has_converged(c, d);
+            if cond1 || cond2 || cond3 || cond4 || cond5 {
+                s = (xa + xb) / 2.0;
+                flag = true;
+            } else {
+                flag = false;
+            }
+            // Propagate until time s
+            self.until_time_elapsed(s - self.dynamics.time());
+            let ys = self.event_trackers.events[0].eval(&self.dynamics.state());
+            d = c;
+            c = xb;
+            yc = yb;
+            if ya * ys < 0.0 {
+                // Root bracketed between a and s
+                // Propagate until time xa
+                self.until_time_elapsed(xa - self.dynamics.time());
+                let ya_p = self.event_trackers.events[0].eval(&self.dynamics.state());
+                match arrange(xa, ya_p, s, ys) {
+                    (_a, _ya, _b, _yb) => {
+                        xa = _a;
+                        ya = _ya;
+                        xb = _b;
+                        yb = _yb;
+                    }
+                }
+            } else {
+                // Root bracketed between s and b
+                // Propagate until time xb
+                self.until_time_elapsed(xb - self.dynamics.time());
+                let yb_p = self.event_trackers.events[0].eval(&self.dynamics.state());
+                match arrange(s, ys, xb, yb_p) {
+                    (_a, _ya, _b, _yb) => {
+                        xa = _a;
+                        ya = _ya;
+                        xb = _b;
+                        yb = _yb;
+                    }
+                }
+            }
+            iter += 1;
+            if iter >= condition.max_iter {
+                return Err(ConvergenceError::MaxIterReached(iter));
+            }
+        }
+
+        // Now that we have the time at which the condition is matched, let's propagate until then
+        self.until_time_elapsed(self.dynamics.time() - closest_t);
+
+        Ok(self.dynamics.state())
+    }
 
     /// This method integrates whichever function is provided as `d_xdt`.
     ///
