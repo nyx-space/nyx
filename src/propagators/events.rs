@@ -1,8 +1,8 @@
 use crate::celestia::{Geoid, State};
 use crate::utils::between_pm_180;
-use std::fmt::Debug;
+use std::fmt;
 
-pub trait Event: Debug {
+pub trait Event: fmt::Debug {
     /// Defines the type which will be accepted by the condition
     type StateType: Copy;
 
@@ -63,6 +63,23 @@ impl<S: Copy> EventTrackers<S> {
     }
 }
 
+impl<S: Copy> fmt::Display for EventTrackers<S> {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for event_no in 0..self.events.len() {
+            if event_no > 0 {
+                write!(f, "\n")?;
+            }
+            write!(
+                f,
+                "For {:?}, found times: {:?}",
+                self.events[event_no], self.found_bounds[event_no]
+            )?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum StateEventKind {
     Periapse,
@@ -70,12 +87,19 @@ pub enum StateEventKind {
     TA(f64),
 }
 
+impl fmt::Display for StateEventKind {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Debug)]
-pub struct StateEvent {
+pub struct OrbitalEvent {
     pub kind: StateEventKind,
 }
 
-impl Event for StateEvent {
+impl Event for OrbitalEvent {
     type StateType = State<Geoid>;
 
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
