@@ -9,6 +9,7 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
 use self::nyx::dynamics::Dynamics;
+use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 
 #[test]
@@ -269,7 +270,7 @@ fn rugg_ecc() {
         sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
         "objective not achieved"
     );
-    assert!((fuel_usage - 14.0).abs() < 1.0);
+    assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
 #[test]
@@ -322,7 +323,7 @@ fn rugg_ecc_decr() {
         sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
         "objective not achieved"
     );
-    assert!((fuel_usage - 14.0).abs() < 1.0);
+    assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
 #[test]
@@ -435,9 +436,7 @@ fn rugg_aop_decr() {
 }
 
 #[test]
-#[ignore]
 fn rugg_raan() {
-    // BUG: https://gitlab.com/chrisrabotin/nyx/issues/83
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
@@ -465,6 +464,9 @@ fn rugg_raan() {
         tol: 5e-3,
     }];
 
+    let tracker =
+        EventTrackers::from_event(SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(5.0))));
+
     let ruggiero = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
@@ -476,7 +478,10 @@ fn rugg_raan() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time);
+
+    println!("{}", prop.event_trackers);
 
     let final_state = prop.dynamics.celestial.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -487,5 +492,5 @@ fn rugg_raan() {
         sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
         "objective not achieved"
     );
-    assert!((fuel_usage - 48.0).abs() < 1.0);
+    assert!((fuel_usage - 22.189).abs() < 1.0);
 }

@@ -9,6 +9,7 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
 use self::nyx::dynamics::Dynamics;
+use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
@@ -24,9 +25,8 @@ fn qlaw_as_ruggiero_case_a() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius + 1000.0;
-
-    let orbit = State::<Geoid>::from_keplerian(sma, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+    let orbit =
+        State::<Geoid>::from_keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
 
     let prop_time = 39.91 * SECONDS_PER_DAY;
 
@@ -42,7 +42,7 @@ fn qlaw_as_ruggiero_case_a() {
     // Define the objectives
     let objectives = vec![
         Achieve::Sma {
-            target: 42164.0,
+            target: 42000.0,
             tol: 1.0,
         },
         Achieve::Ecc {
@@ -50,6 +50,12 @@ fn qlaw_as_ruggiero_case_a() {
             tol: 5e-5,
         },
     ];
+
+    // Track these events
+    let tracker = EventTrackers::from_events(vec![
+        SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(42000.0))),
+        SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(0.01))),
+    ]);
 
     let ruggiero = Ruggiero::new(objectives, orbit);
 
@@ -62,7 +68,9 @@ fn qlaw_as_ruggiero_case_a() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time);
+    println!("{}", prop.event_trackers);
     let final_state = prop.dynamics.celestial.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
@@ -73,7 +81,7 @@ fn qlaw_as_ruggiero_case_a() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 113.0).abs() < 1.0);
+    assert!((fuel_usage - 93.449).abs() < 1.0);
 }
 
 #[test]
@@ -137,7 +145,7 @@ fn qlaw_as_ruggiero_case_b() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 247.0).abs() < 1.0);
+    assert!((fuel_usage - 223.515).abs() < 1.0);
 }
 
 #[test]
@@ -197,13 +205,13 @@ fn qlaw_as_ruggiero_case_c() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 64.0).abs() < 1.0);
+    assert!((fuel_usage - 41.742).abs() < 1.0);
 }
 
 #[test]
 #[ignore]
 fn qlaw_as_ruggiero_case_d() {
-    // BUG due to broken RAAN correction: https://gitlab.com/chrisrabotin/nyx/issues/83
+    // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
@@ -273,7 +281,7 @@ fn qlaw_as_ruggiero_case_d() {
 #[test]
 #[ignore]
 fn qlaw_as_ruggiero_case_e() {
-    // BUG due to broken RAAN correction: https://gitlab.com/chrisrabotin/nyx/issues/83
+    // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
@@ -400,14 +408,12 @@ fn qlaw_as_ruggiero_case_f() {
         "objective not achieved"
     );
 
-    assert!((fuel_usage - 14.0).abs() < 1.0);
+    assert!((fuel_usage - 10.378).abs() < 1.0);
 }
 
 #[test]
-#[ignore]
 fn ruggiero_iepc_2011_102() {
     // Source: IEPC 2011 102
-    // WARNING: The paper claims that only 103.9 days are needed. I could not reproduce this, their here nor in another tool.
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
@@ -416,9 +422,7 @@ fn ruggiero_iepc_2011_102() {
     let orbit =
         State::<Geoid>::from_keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, earth);
 
-    // let prop_time = 104.0 * SECONDS_PER_DAY;
-    let prop_time = 140.0 * SECONDS_PER_DAY;
-    // let prop_time = 3404.0 * 3600.0 + 21. * 60.;
+    let prop_time = 105.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);

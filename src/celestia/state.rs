@@ -16,7 +16,7 @@ use std::ops::{Add, Neg, Sub};
 use utils::{between_0_360, between_pm_180, perpv, r1, r3};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
-pub const ECC_EPSILON: f64 = 1e-4;
+pub const ECC_EPSILON: f64 = 1e-11;
 
 /// State defines an orbital state parameterized  by a `CelestialBody`.
 ///
@@ -555,13 +555,14 @@ impl State<Geoid> {
         }
     }
 
-    /// Returns the true anomaly in degrees
+    /// Returns the true anomaly in degrees between 0 and 360.0
     ///
     /// NOTE: This function will emit a warning stating that the TA should be avoided if in a very near circular orbit
+    /// Code from https://github.com/ChristopherRabotin/GMAT/blob/80bde040e12946a61dae90d9fc3538f16df34190/src/gmatutil/util/StateConversionUtil.cpp#L6835
     pub fn ta(&self) -> f64 {
         if self.ecc() < ECC_EPSILON {
             warn!(
-                "true anomaly ill-defined (eccentricity too low, e = {})",
+                "true anomaly ill-defined for circular orbit (e = {})",
                 self.ecc()
             );
         }
@@ -578,7 +579,7 @@ impl State<Geoid> {
             if ta.is_nan() {
                 warn!("TA is NaN");
                 0.0
-            } else if self.hmag() < 0.0 {
+            } else if self.radius().dot(&self.velocity()) < 0.0 {
                 (2.0 * PI - ta).to_degrees()
             } else {
                 ta.to_degrees()

@@ -58,7 +58,7 @@ where
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
     type StateSize: DimName;
     /// Defines the type which will be published on the propagator channel
-    type StateType;
+    type StateType: Copy;
     /// Returns the time of the current state
     fn time(&self) -> f64;
 

@@ -10,6 +10,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
 - [Orbital state](#orbital-state)
   * [From a Cartesian state](#from-a-cartesian-state)
   * [From a Keplerian state](#from-a-keplerian-state)
+  * [Frame transformations](#frame-transformations)
 - [Multibody dynamics](#multibody-dynamics)
 - [Propulsion](#propulsion)
 - [SRP](#srp)
@@ -116,6 +117,11 @@ Earth.SemilatusRectum | 1e-12 | 0.0 | 0.0
 
 (3) Similarly to (1), we get a very significant error in the orbital momentum computation of both HX and HY. These components are small for the orbital momentum (both on the order of 1e-3 in GMAT and in `nyx`). I am not too concerned about these differences given that the orbital momentum component of the Z axis is exactly that returned by GMAT (all 16 digits are equal).
 
+## Frame transformations
+The frame transformation test, with methods to generate the test data, are in `src/celestia/cosm.rs` in the `test` module (starting with line `#[cfg(test)]`). Tests either compare with exact data and algorithm from [jplephem](https://github.com/brandon-rhodes/python-jplephem), SPICE or [JPL HORIZONS](https://ssd.jpl.nasa.gov/horizons.cgi), respectively for the "direct", "indirect" and "frame transformation" tests. The largest errors are found to be when comparing with SPICE, and these differences are similar to those (currently) found in [jplephem](https://github.com/brandon-rhodes/python-jplephem/issues/33).
+
+Until version 0.0.19, the frame transformation _do not_ account for orientation transformation, only center of frame transformation.
+
 # Multibody dynamics
 
 *Note:* In the LLO scenarios, if propagation start on 2020 Jan 01 midnight TAI, the GMAT results and nyx results vary significantly. Nyx relies on the `hifitime` library for date time conversions, which has its own set of thorough validation. Hence, I have yet to find a good explanation for why the validation fails in 2020. In the following table, to avoid any misunderstandings, the start time of the one-day propagation is added.
@@ -142,7 +148,7 @@ LEO | Adaptive | Earth Sun Jupiter | 2020-01-01 | 3e-9  |  3e-7  |  4e-7  |  3e-
 
 # Propulsion
 ## Finite burns
-In both cases, we take a LEO spacecraft subjects to the point mass gravity of the Moon, the Sun and Jupiter. We set the dry mass to 1.0 ton/megagrams/"metric ton" and the fuel mass to 756 kg. The spaceraft is equipped with a single thrusted whose thrust is 10 Newton and Isp 300 seconds. The finite burn is set to last 3000 seconds (50 minutes).
+In both cases, we take a LEO spacecraft subjects to the point mass gravity of the Moon, the Sun and Jupiter. We set the dry mass to 1.0 ton/megagram/"metric ton" and the fuel mass to 756 kg. The spaceraft is equipped with a single thrusted whose thrust is 10 Newton and Isp 300 seconds. The finite burn is set to last 3000 seconds (50 minutes).
 
 Mass depletion | Propagator | x | y | z | vx | vy | vz | RSS position error | RSS velocity error
 --|---|---|---|---|---|---|---|---|--
@@ -152,14 +158,11 @@ Enabled | RK8 Fixed step | 1e-11 | 9e-11 | 8e-12 | 4e-15 | 2e-14 | 2e-14 | **9.5
 # SRP
 Solar radiation pressure using a cannonball model (i.e, spherical spacecraft approximation).
 
-The difference between nyx and GMAT is larger here than for other models. I assume that this is due to the Sun ephemeris computation error having a larger impact than in multibody dynamics.
+The difference between nyx and GMAT is **much** larger here than for other models: **1.83 km** in 24 hours! I assume that this is due to the ephemeris having a larger impact here than in multibody dynamics. **However**, the current frame transformations seem to be very good.
+
 In fact, in the validation case used here, the spacecraft is always in full visibility of the Sun, and therefore the difference in Sun illumination does not matter. The propagation uses an RK89 and propagates for 24 hours.
 
 However, note that nyx uses the IAU definition of an astronomical unit, whereas GMAT uses a pre-2012 definition of 1 AU (which is 19 meters shorter).
 
 Note that further differences _may_ exist as GMAT uses a simpler algorithm for penumbra computations than nyx. The algorithm for nyx can be found in the [docs](./docs/).
 
-Case | RSS position error (km) | RSS velocity error (km/s)
---|---|---|---|---|---|---|---|---|--
-IAU definition of AU | **4.890e-4** | **8.102e-8**
-GMAT definition of AU | **4.888e-4** | **8.099e-8**
