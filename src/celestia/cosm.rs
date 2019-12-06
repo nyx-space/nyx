@@ -477,16 +477,17 @@ impl Cosm {
         }
         // Let's get the path between both both states.
         let path = self.intermediate_geoid(&new_geoid, &state.frame)?;
-        let mut new_state = -*state;
+        let mut new_state = *state;
         new_state.frame = new_geoid;
-        // let mut new_state = State::<Geoid>::from_cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, state.dt, new_geoid);
         let mut prev_frame_id = new_state.frame.id();
+        let mut neg_needed = false;
         for body in path {
             // This means the target or the origin is exactly this path.
             let mut next_state = self.raw_celestial_state(body.id(), state.dt.as_jde_et_days())?;
-            if prev_frame_id != next_state.frame.id() {
+            if prev_frame_id == next_state.frame.id() || neg_needed {
                 // Let's negate the next state prior to adding it.
                 next_state = -next_state;
+                neg_needed = true;
             }
             new_state = new_state + next_state;
             prev_frame_id = next_state.frame.id();
@@ -856,28 +857,86 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_change() {
+    fn test_frame_change_earth2luna() {
         let cosm = Cosm::from_xb("./de438s");
         let earth = cosm.geoid_from_id(399);
-        let moon = cosm.geoid_from_id(301);
+        let luna = cosm.geoid_from_id(301);
 
-        let llo = State::<Geoid>::from_cartesian(
-            3.919_869_89e5,
-            -7.493_039_70e4,
-            -7.022_605_11e4,
-            -6.802_604_18e-1,
-            1.992_053_61,
-            4.369_389_94e-1,
-            Epoch::from_gregorian_tai_at_midnight(2020, 1, 1),
+        let jde = Epoch::from_jde_et(2_458_823.5);
+        // From JPL HORIZONS
+        let lro = State::<Geoid>::from_cartesian(
+            4.017_685_334_718_784E5,
+            2.642_441_356_763_487E4,
+            -3.024_209_691_251_325E4,
+            -6.168_920_999_978_097E-1,
+            -6.678_258_076_726_339E-1,
+            4.208_264_479_358_517E-1,
+            jde,
             earth,
         );
 
-        let llo_wrt_moon = dbg!(cosm.frame_chg(&llo, moon));
-        println!("{:o}", llo_wrt_moon);
-        assert!(llo_wrt_moon.sma() > 0.0);
-        assert!(llo_wrt_moon.ecc() > 0.0 && llo_wrt_moon.ecc() < 1.0);
+        let lro_jpl = State::<Geoid>::from_cartesian(
+            -3.692_315_939_257_387E2,
+            8.329_785_181_291_3E1,
+            -1.764_329_108_632_533E3,
+            -5.729_048_963_901_611E-1,
+            -1.558_441_873_361_044,
+            4.456_498_438_933_088E-2,
+            jde,
+            luna,
+        );
+
+        let lro_wrt_moon = cosm.frame_chg(&lro, luna);
+        println!("{}", lro_jpl);
+        println!("{}", lro_wrt_moon);
+        let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
+        // Note that the passing conditions are large. JPL uses de431MX, but nyx uses de438s.
+        assert!(lro_moon_earth_delta.rmag() < 1e-2);
+        assert!(lro_moon_earth_delta.vmag() < 1e-5);
+        // And the converse
+        let lro_wrt_earth = cosm.frame_chg(&lro_wrt_moon, earth);
+        assert!((lro_wrt_earth - lro).rmag() < std::f64::EPSILON);
+        assert!((lro_wrt_earth - lro).vmag() < std::f64::EPSILON);
     }
 
+    #[test]
+    fn test_frame_change_ven2luna() {
+        let cosm = Cosm::from_xb("./de438s");
+        let luna = cosm.geoid_from_id(301);
+        let venus = cosm.geoid_from_id(2);
+
+        let jde = Epoch::from_jde_et(2_458_823.5);
+        // From JPL HORIZONS
+        let lro = State::<Geoid>::from_cartesian(
+            -4.393_308_217_174_602E7,
+            1.874_075_194_166_327E8,
+            8.763_986_396_329_135E7,
+            -5.054_051_490_556_286E1,
+            -1.874_720_232_671_061E1,
+            -6.518_342_268_306_54,
+            jde,
+            venus,
+        );
+
+        let lro_jpl = State::<Geoid>::from_cartesian(
+            -3.692_315_939_257_387E2,
+            8.329_785_181_291_3E1,
+            -1.764_329_108_632_533E3,
+            -5.729_048_963_901_611E-1,
+            -1.558_441_873_361_044,
+            4.456_498_438_933_088E-2,
+            jde,
+            luna,
+        );
+
+        let lro_wrt_moon = cosm.frame_chg(&lro, luna);
+        println!("{}", lro_jpl);
+        println!("{}", lro_wrt_moon);
+        let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
+        // Note that the passing conditions are large. JPL uses de431MX, but nyx uses de438s.
+        assert!(dbg!(lro_moon_earth_delta.rmag()) < 1e0);
+        assert!(dbg!(lro_moon_earth_delta.vmag()) < 1e-5);
+    }
     #[test]
     fn test_cosm_lt_corr() {
         let cosm = Cosm::from_xb("./de438s");
