@@ -75,6 +75,19 @@ fn nrho_apo() {
         earth,
     );
 
+    // Note that this expected state was generated using SRP and a lunar gravity field
+    // Hence, we allow for a greater error since these are not modeled here.
+    let expect = State::<Geoid>::from_cartesian(
+        266_375.578_868_798,
+        -213_365.467_957_944,
+        -203_571.279_542_228,
+        0.741_790_420_281_572,
+        0.588_200_782_187_968,
+        0.202_695_184_897_909,
+        dt + 118_753.007_910_251,
+        earth,
+    );
+
     let state_luna = cosm.frame_chg(&state, luna);
 
     // Track how many times we've passed by that TA again
@@ -82,7 +95,7 @@ fn nrho_apo() {
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
     let condition = StopCondition::new(apo_event, 2.0 * 86_400.0, 1e-1);
 
-    let mut dynamics = CelestialDynamics::new(state_luna, vec![bodies::EARTH], &cosm);
+    let mut dynamics = CelestialDynamics::new(state_luna, vec![bodies::EARTH, bodies::SUN], &cosm);
 
     let mut prop = Propagator::new::<RK89>(
         &mut dynamics,
@@ -92,12 +105,12 @@ fn nrho_apo() {
     let rslt = prop.until_event(condition);
 
     // Check how many times we have found that event
-    println!("{}", prop.event_trackers);
     let orbit = rslt.expect("condition should have been found");
     println!("Luna: {:o}", orbit);
     let rslt_eme = cosm.frame_chg(&orbit, earth);
-    println!("EME2k: {:o}", rslt_eme);
     println!("EME2k: {}", rslt_eme);
+    assert!((rslt_eme - expect).rmag() < 1.0);
+    assert!((rslt_eme - expect).vmag() < 1e-5);
     let delta_t = orbit.dt - dt;
     println!(
         "Found {} seconds / {} days after",
