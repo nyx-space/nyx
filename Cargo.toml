@@ -19,7 +19,7 @@ gitlab = { repository = "chrisrabotin/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.19"
 log = "0.4"
-hifitime = "1.0.8"
+hifitime = "1.0.9"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 rand = "0.6"
 serde = "1.0"
