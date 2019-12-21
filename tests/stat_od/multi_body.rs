@@ -101,14 +101,13 @@ fn multi_body_ckf_perfect_stations() {
     for (abs_dt, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
         let delta_time = abs_dt.as_tai_seconds() - prev_dt.as_tai_seconds();
-        let (new_t, _) = prop_est.until_time_elapsed(delta_time);
+        let new_state = prop_est.until_time_elapsed(delta_time);
         prev_dt = *abs_dt;
         // Update the STM of the KF
         ckf.update_stm(prop_est.dynamics.stm);
         // Get the computed observation
         assert!(delta_time > 0.0, "repeated time");
-        let mut this_dt = dt;
-        this_dt.mut_add_secs(new_t);
+        let this_dt = new_state.0.dt;
         let rx_state = State::<Geoid>::from_cartesian_vec(
             &prop_est.dynamics.state.to_cartesian_vec(),
             this_dt,

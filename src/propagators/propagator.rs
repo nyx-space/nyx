@@ -81,7 +81,7 @@ where
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `self.dynamics.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> (f64, VectorN<f64, M::StateSize>) {
+    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> M::StateType {
         let backprop = elapsed_time < 0.0;
         if backprop {
             self.step_size *= -1.0; // Invert the step size
@@ -95,7 +95,7 @@ where
             {
                 if (stop_time - dt).abs() < f64::EPSILON {
                     // No propagation necessary
-                    return (dt, self.dynamics.state_vector());
+                    return self.dynamics.state();
                 }
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;
@@ -116,7 +116,7 @@ where
                 if backprop {
                     self.step_size *= -1.0; // Restore to a positive step size
                 }
-                return (t, state);
+                return self.dynamics.state();
             } else {
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
                 // We haven't passed the time based stopping condition.
