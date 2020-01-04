@@ -85,11 +85,11 @@ where
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
-        let covar_bar = self.stm.clone() * self.prev_estimate.covar.clone() * self.stm.transpose();
+        let covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
         } else {
-            self.stm.clone() * self.prev_estimate.state.clone()
+            &self.stm * &self.prev_estimate.state
         };
         let estimate = Estimate {
             dt,
@@ -121,34 +121,32 @@ where
             return Err(FilterError::SensitivityNotUpdated);
         }
         // Compute Kalman gain
-        let covar_bar = self.stm.clone() * self.prev_estimate.covar.clone() * self.stm.transpose();
-        let mut h_tilde_t = MatrixMN::<f64, S, M>::zeros();
-        self.h_tilde.transpose_to(&mut h_tilde_t);
-        let mut invertible_part = self.h_tilde.clone() * covar_bar.clone() * h_tilde_t.clone()
-            + self.measurement_noise.clone();
+        let covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        let h_tilde_t = &self.h_tilde.transpose();
+        let mut invertible_part = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
         if !invertible_part.try_inverse_mut() {
             return Err(FilterError::GainSingular);
         }
-        let gain = covar_bar.clone() * h_tilde_t * invertible_part;
+        let gain = &covar_bar * h_tilde_t * invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
-            (gain.clone() * prefit, Residual::zeros())
+            (&gain * prefit, Residual::zeros())
         } else {
             // Must do a time update first
-            let state_bar = self.stm.clone() * self.prev_estimate.state.clone();
-            let postfit = prefit.clone() - (self.h_tilde.clone() * state_bar.clone());
+            let state_bar = &self.stm * &self.prev_estimate.state;
+            let postfit = &prefit - (&self.h_tilde * &state_bar);
             (
-                state_bar + gain.clone() * postfit.clone(),
+                state_bar + &gain * &postfit,
                 Residual::new(dt, prefit, postfit),
             )
         };
 
         // Compute the covariance (Jacobi formulation)
-        let covar = (MatrixMN::<f64, S, S>::identity() - gain * self.h_tilde.clone()) * covar_bar;
+        let covar = (MatrixMN::<f64, S, S>::identity() - gain * &self.h_tilde) * covar_bar;
 
         // And wrap up
         let estimate = Estimate {
