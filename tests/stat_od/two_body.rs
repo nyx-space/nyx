@@ -7,9 +7,11 @@ use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
+/*
 use self::nyx::od::kalman::{Estimate, FilterError, KF};
 use self::nyx::od::ranging::GroundStation;
-use self::nyx::od::Measurement;
+use self::nyx::od::Measurement;*/
+use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
 use std::sync::mpsc;
@@ -72,7 +74,7 @@ fn filter_errors() {
     match ckf.measurement_update(dt, real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
-            assert_eq!(e, FilterError::GainIsSingular);
+            assert_eq!(e, FilterError::GainSingular);
         }
     }
 }
@@ -317,7 +319,7 @@ fn ckf_fixed_step_perfect_stations() {
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
 
-    let mut last_est = None;
+    let mut estimates = Vec::with_capacity(measurements.len());
 
     for (duration, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
@@ -362,7 +364,7 @@ fn ckf_fixed_step_perfect_stations() {
                         .expect("could not write to stdout");
                     printed = true;
                 }
-                last_est = Some(est);
+                estimates.push(est);
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -373,19 +375,26 @@ fn ckf_fixed_step_perfect_stations() {
     }
 
     // Check that the covariance deflated
-    if let Some(est) = last_est {
-        for i in 0..6 {
-            if i < 3 {
-                assert!(
-                    est.covar[(i, i)].abs() < covar_radius,
-                    "covar radius did not decrease"
-                );
-            } else {
-                assert!(
-                    est.covar[(i, i)].abs() < covar_velocity,
-                    "covar velocity did not decrease"
-                );
-            }
+    let est = &estimates[estimates.len() - 1];
+    for i in 0..6 {
+        if i < 3 {
+            assert!(
+                est.covar[(i, i)].abs() < covar_radius,
+                "covar radius did not decrease"
+            );
+        } else {
+            assert!(
+                est.covar[(i, i)].abs() < covar_velocity,
+                "covar velocity did not decrease"
+            );
         }
     }
+
+    // And smooth
+    let smoothed_estimates = smooth(&estimates).expect("smoothing failed");
+    println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
+    println!(
+        "N-1 smoothed: \n{}",
+        smoothed_estimates[estimates.len() - 2]
+    );
 }

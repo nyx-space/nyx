@@ -127,7 +127,7 @@ where
         let mut invertible_part = self.h_tilde.clone() * covar_bar.clone() * h_tilde_t.clone()
             + self.measurement_noise.clone();
         if !invertible_part.try_inverse_mut() {
-            return Err(FilterError::GainIsSingular);
+            return Err(FilterError::GainSingular);
         }
         let gain = covar_bar.clone() * h_tilde_t * invertible_part;
 
@@ -172,7 +172,8 @@ where
 pub enum FilterError {
     StateTransitionMatrixNotUpdated,
     SensitivityNotUpdated,
-    GainIsSingular,
+    GainSingular,
+    StateTransitionMatrixSingular,
 }
 
 impl fmt::Display for FilterError {
@@ -185,10 +186,13 @@ impl fmt::Display for FilterError {
                 f,
                 "The measurement matrix H_tilde was not updated prior to measurement update"
             ),
-            FilterError::GainIsSingular => write!(
+            FilterError::GainSingular => write!(
                 f,
                 "Gain could not be computed because H*P_bar*H + R is singular"
             ),
+            FilterError::StateTransitionMatrixSingular => {
+                write!(f, "STM is singular, smoothing cannot proceed")
+            }
         }
     }
 }
