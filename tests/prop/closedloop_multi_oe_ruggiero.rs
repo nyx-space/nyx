@@ -6,7 +6,7 @@ use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
-use self::nyx::dynamics::spacecraft::Spacecraft;
+use self::nyx::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
 use self::nyx::dynamics::Dynamics;
 use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
@@ -360,6 +360,12 @@ fn qlaw_as_ruggiero_case_f() {
         components of a spacecraft before defining the spacecraft itself.
     */
 
+    // We'll export this trajectory as a POC. Adding the needed crates here
+    extern crate csv;
+    use std::sync::mpsc;
+    use std::sync::mpsc::{Receiver, Sender};
+    use std::{io, thread};
+
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);
 
@@ -395,7 +401,20 @@ fn qlaw_as_ruggiero_case_f() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
+    let (tx, rx): (Sender<SpacecraftState>, Receiver<SpacecraftState>) = mpsc::channel();
+
+    // Set up the writing channel
+    thread::spawn(move || {
+        let mut wtr = csv::Writer::from_path("./rugg_case_f.csv").expect("could not create file");
+        while let Ok(rx_state) = rx.recv() {
+            // Serialize only the orbital state
+            wtr.serialize(rx_state.orbit)
+                .expect("could not serialize state");
+        }
+    });
+
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    prop.tx_chan = Some(&tx);
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.celestial.state();
