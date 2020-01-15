@@ -7,10 +7,6 @@ use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
-/*
-use self::nyx::od::kalman::{Estimate, FilterError, KF};
-use self::nyx::od::ranging::GroundStation;
-use self::nyx::od::Measurement;*/
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
@@ -276,15 +272,12 @@ fn ckf_fixed_step_perfect_stations() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = dt;
     while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state);
             if meas.visible() {
-                let delta = rx_state.dt.as_tai_seconds() - prev_t.as_tai_seconds();
-                measurements.push((delta, meas));
-                prev_t = rx_state.dt;
+                measurements.push((rx_state.dt, meas));
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -312,65 +305,35 @@ fn ckf_fixed_step_perfect_stations() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    println!("Will process {} measurements", measurements.len());
-
-    let mut this_dt = dt;
-    let mut printed = false;
+    let (estimates, residuals) =
+        process_measurements(&mut ckf, &mut prop_est, measurements, all_stations)
+            .expect("kf failed");
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
-
-    let mut estimates = Vec::with_capacity(measurements.len());
-
-    for (duration, real_meas) in measurements.iter() {
-        // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time);
-        // Update the STM of the KF
-        ckf.update_stm(prop_est.dynamics.stm);
-        // Get the computed observation
-        assert!(delta_time > 0.0, "repeated time");
-        this_dt.mut_add_secs(delta_time);
-        let rx_state = State::<Geoid>::from_cartesian_vec(
-            &prop_est.dynamics.state.to_cartesian_vec(),
-            this_dt,
-            earth_geoid,
+    let mut printed = false;
+    for (no, est) in estimates.iter().enumerate() {
+        assert_eq!(
+            est.predicted, false,
+            "estimate {} should not be a prediction",
+            no
         );
-        let mut still_empty = true;
-        for station in all_stations.iter() {
-            let computed_meas = station.measure(&rx_state);
-            if computed_meas.visible() {
-                ckf.update_h_tilde(computed_meas.sensitivity());
-                let (est, res) = ckf
-                    .measurement_update(
-                        this_dt,
-                        real_meas.observation(),
-                        computed_meas.observation(),
-                    )
-                    .expect("wut?");
-                still_empty = false;
-                assert_eq!(est.predicted, false, "estimate should not be a prediction");
-                assert!(
-                    est.state.norm() < EPSILON,
-                    "estimate error should be zero (perfect dynamics) ({:e})",
-                    est.state.norm()
-                );
-                assert!(
-                    res.postfit.norm() < EPSILON,
-                    "postfit should be zero (perfect dynamics) ({:e})",
-                    res
-                );
-                if !printed {
-                    wtr.serialize(est.clone())
-                        .expect("could not write to stdout");
-                    printed = true;
-                }
-                estimates.push(est);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-        if still_empty {
-            // We're doing perfect everything, so we should always be in visibility
-            panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
+        assert!(
+            est.state.norm() < 1e-6,
+            "estimate error should be zero (perfect dynamics) ({:e})",
+            est.state.norm()
+        );
+
+        let res = &residuals[no];
+        assert!(
+            res.postfit.norm() < 1e-12,
+            "postfit should be zero (perfect dynamics) ({:e})",
+            res
+        );
+
+        if !printed {
+            wtr.serialize(est.clone())
+                .expect("could not write to stdout");
+            printed = true;
         }
     }
 

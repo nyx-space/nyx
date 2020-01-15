@@ -40,7 +40,8 @@ where
     Ok(smoothed)
 }
 
-pub fn process_station_measurements<
+/// Allows processing all measurements without covariance mapping. Only works for CKFs.
+pub fn process_measurements<
     D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
     E: ErrorCtrl,
     M: Measurement,
@@ -49,7 +50,7 @@ pub fn process_station_measurements<
     kf: &mut KF<D::LinStateSize, M::MeasurementSize>,
     prop: &mut Propagator<D, E>,
     measurements: Vec<(Epoch, M)>,
-    stations: Vec<N>,
+    devices: Vec<N>,
 ) -> Result<
     (
         Vec<Estimate<D::LinStateSize>>,
@@ -72,18 +73,19 @@ where
     let mut estimates = Vec::with_capacity(measurements.len());
     let mut residuals = Vec::with_capacity(measurements.len());
 
-    let start_dt = kf.prev_estimate.dt;
+    let mut prev_dt = kf.prev_estimate.dt;
 
     for (next_epoch, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = *next_epoch - start_dt;
+        let delta_time = *next_epoch - prev_dt;
+        prev_dt = *next_epoch; // Update the epoch for the next computation
         prop.until_time_elapsed(delta_time);
         // Update the STM of the KF
         kf.update_stm(prop.dynamics.stm());
         let (dt, meas_input) = prop.dynamics.to_measurement(&prop.dynamics.state());
         // Get the computed observations
-        for station in stations.iter() {
-            let computed_meas: M = station.measure(&meas_input);
+        for device in devices.iter() {
+            let computed_meas: M = device.measure(&meas_input);
             if computed_meas.visible() {
                 kf.update_h_tilde(computed_meas.sensitivity());
                 let (est, res) = kf.measurement_update(

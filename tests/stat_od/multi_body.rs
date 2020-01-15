@@ -89,14 +89,18 @@ fn multi_body_ckf_perfect_stations() {
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
     let (estimates, residuals) =
-        process_station_measurements(&mut ckf, &mut prop_est, measurements, all_stations)
+        process_measurements(&mut ckf, &mut prop_est, measurements, all_stations)
             .expect("kf failed");
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
     let mut last_est = None;
     for (no, est) in estimates.iter().enumerate() {
-        assert_eq!(est.predicted, false, "estimate should not be a prediction");
+        assert_eq!(
+            est.predicted, false,
+            "estimate {} should not be a prediction",
+            no
+        );
         assert!(
             est.state.norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
