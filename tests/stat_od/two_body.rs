@@ -124,7 +124,7 @@ fn ekf_fixed_step_perfect_stations() {
     while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state);
+            let meas = station.measure(&rx_state);
             if meas.visible() {
                 let delta = rx_state.dt.as_tai_seconds() - prev_t.as_tai_seconds();
                 measurements.push((delta, meas));
@@ -182,7 +182,7 @@ fn ekf_fixed_step_perfect_stations() {
         );
         let mut still_empty = true;
         for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state);
+            let computed_meas = station.measure(&rx_state);
             if computed_meas.visible() {
                 kf.update_h_tilde(computed_meas.sensitivity());
                 let (est, res) = kf
@@ -280,7 +280,7 @@ fn ckf_fixed_step_perfect_stations() {
     while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state);
+            let meas = station.measure(&rx_state);
             if meas.visible() {
                 let delta = rx_state.dt.as_tai_seconds() - prev_t.as_tai_seconds();
                 measurements.push((delta, meas));
@@ -337,7 +337,7 @@ fn ckf_fixed_step_perfect_stations() {
         );
         let mut still_empty = true;
         for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state);
+            let computed_meas = station.measure(&rx_state);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
                 let (est, res) = ckf

@@ -56,7 +56,7 @@ fn multi_body_ckf_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state);
+            let meas = station.measure(&rx_state);
             if meas.visible() {
                 measurements.push((rx_state.dt, meas));
                 break;
@@ -88,74 +88,35 @@ fn multi_body_ckf_perfect_stations() {
         Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    let (estimates, _) =
+    let (estimates, residuals) =
         process_station_measurements(&mut ckf, &mut prop_est, measurements, all_stations)
             .expect("kf failed");
 
-    println!("Will process {} measurements", measurements.len());
-
-    let mut printed = false;
-
     let mut wtr = csv::Writer::from_writer(io::stdout());
-
+    let mut printed = false;
     let mut last_est = None;
-    let mut prev_dt = dt;
-    for (abs_dt, real_meas) in measurements.iter() {
-        // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = abs_dt.as_tai_seconds() - prev_dt.as_tai_seconds();
-        let new_state = prop_est.until_time_elapsed(delta_time);
-        prev_dt = *abs_dt;
-        // Update the STM of the KF
-        ckf.update_stm(prop_est.dynamics.stm);
-        // Get the computed observation
-        assert!(delta_time > 0.0, "repeated time");
-        let this_dt = new_state.0.dt;
-        let rx_state = State::<Geoid>::from_cartesian_vec(
-            &prop_est.dynamics.state.to_cartesian_vec(),
-            this_dt,
-            earth_geoid,
+    for (no, est) in estimates.iter().enumerate() {
+        assert_eq!(est.predicted, false, "estimate should not be a prediction");
+        assert!(
+            est.state.norm() < 1e-6,
+            "estimate error should be zero (perfect dynamics) ({:e})",
+            est.state.norm()
         );
-        let mut still_empty = true;
-        for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state);
-            if computed_meas.visible() {
-                ckf.update_h_tilde(computed_meas.sensitivity());
-                let (est, res) = ckf
-                    .measurement_update(
-                        this_dt,
-                        real_meas.observation(),
-                        computed_meas.observation(),
-                    )
-                    .expect("wut?");
-                still_empty = false;
-                assert_eq!(est.predicted, false, "estimate should not be a prediction");
-                assert!(
-                    est.state.norm() < 1e-6,
-                    "estimate error should be zero (perfect dynamics) ({:e})",
-                    est.state.norm()
-                );
 
-                assert!(
-                    res.postfit.norm() < 1e-12,
-                    "postfit should be zero (perfect dynamics) ({:e})",
-                    res
-                );
+        let res = &residuals[no];
+        assert!(
+            res.postfit.norm() < 1e-12,
+            "postfit should be zero (perfect dynamics) ({:e})",
+            res
+        );
 
-                if !printed {
-                    wtr.serialize(est.clone())
-                        .expect("could not write to stdout");
-                    printed = true;
-                }
-
-                last_est = Some(est);
-
-                break; // We know that only one station is in visibility at each time.
-            }
+        if !printed {
+            wtr.serialize(est.clone())
+                .expect("could not write to stdout");
+            printed = true;
         }
-        if still_empty {
-            // We're doing perfect everything, so we should always be in visibility
-            panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
-        }
+
+        last_est = Some(est);
     }
 
     // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
