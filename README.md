@@ -31,8 +31,9 @@ The [LICENSE](./LICENSE) will be strictly enforced once this toolkit reaches pro
 ## Orbit determination
 - [x] Statistical Orbit Determination: Classical and Extended Kalman Filter (cf. [tests/stat_od/two_body.rs](tests/stat_od/two_body.rs))
 - [x] Orbit Determination with multibody dynamics (cf. [tests/stat_od/multi_body.rs](tests/stat_od/multi_body.rs))
-- [ ] Smoothing and iterations of CKFs ([#105](https://gitlab.com/chrisrabotin/nyx/issues/105))
+- [x] Smoothing and iterations of CKFs ([#105](https://gitlab.com/chrisrabotin/nyx/issues/105))
 - [ ] Square Root Information Filer (SRIF) ([#91](https://gitlab.com/chrisrabotin/nyx/issues/91))
+- [ ] An easy-to-use OD user interface ([#109](https://gitlab.com/chrisrabotin/nyx/issues/109))
 ## Celestial computations
 - [x] Orbital state manipulation (from GMAT source code and validated in GMAT) (cf. [tests/state.rs](tests/state.rs))
 - [x] Planetary and Solar eclipse and visibility computation (cf. [tests/eclipse.rs](tests/eclipse.rs))
