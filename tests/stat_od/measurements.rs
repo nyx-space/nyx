@@ -22,7 +22,7 @@ fn nil_measurement() {
 
     let at_station = State::<Geoid>::from_geodesic(lat, long, height, dt, earth_geoid);
 
-    let meas = station.measure(at_station, dt);
+    let meas = station.measure(at_station);
 
     let h_tilde = meas.sensitivity();
     println!("{}", h_tilde);

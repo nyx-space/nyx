@@ -58,7 +58,7 @@ fn multi_body_ckf_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(rx_state, rx_state.dt);
+            let meas = station.measure(rx_state);
             if meas.visible() {
                 measurements.push((rx_state.dt, meas));
                 break;
@@ -115,7 +115,7 @@ fn multi_body_ckf_perfect_stations() {
         );
         let mut still_empty = true;
         for station in all_stations.iter() {
-            let computed_meas = station.measure(rx_state, this_dt);
+            let computed_meas = station.measure(rx_state);
             if computed_meas.visible() {
                 ckf.update_h_tilde(computed_meas.sensitivity());
                 let (est, res) = ckf

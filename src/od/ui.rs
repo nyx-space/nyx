@@ -9,11 +9,14 @@ pub use super::ranging::*;
 pub use super::residual::*;
 pub use super::*;
 
+use crate::propagators::error_ctrl::ErrorCtrl;
+use crate::propagators::Propagator;
+
 /// Allows to smooth the provided estimates. Returns an array of smoothed estimates.
 ///
 /// Estimates must be ordered in chronological order. This function will smooth the
 /// estimates from the last in the list to the first one.
-pub fn smooth<S: DimName>(estimates: &Vec<Estimate<S>>) -> Result<Vec<Estimate<S>>, FilterError>
+pub fn smooth<S: DimName>(estimates: &[Estimate<S>]) -> Result<Vec<Estimate<S>>, FilterError>
 where
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
@@ -35,4 +38,65 @@ where
     // And reverse to maintain order
     smoothed.reverse();
     Ok(smoothed)
+}
+
+pub fn process_station_measurements<
+    D: Estimable<N::MeasurementInput>,
+    E: ErrorCtrl,
+    M: Measurement,
+    N: MeasurementDevice<M::StateSize, M::MeasurementSize>,
+>(
+    kf: &mut KF<D::LinStateSize, M::MeasurementSize>,
+    prop: &mut Propagator<D, E>,
+    measurements: Vec<(f64, M)>,
+    stations: Vec<N>,
+) -> Result<
+    (
+        Vec<Estimate<D::LinStateSize>>,
+        Vec<Residual<M::MeasurementSize>>,
+    ),
+    FilterError,
+>
+where
+    DefaultAllocator: Allocator<f64, D::StateSize>
+        + Allocator<f64, M::MeasurementSize>
+        + Allocator<f64, M::MeasurementSize, M::StateSize>
+        + Allocator<f64, D::LinStateSize>
+        + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
+        + Allocator<f64, M::MeasurementSize, D::LinStateSize>
+        + Allocator<f64, D::LinStateSize, M::MeasurementSize>
+        + Allocator<f64, D::LinStateSize, D::LinStateSize>,
+{
+    info!("Processing {} measurements", measurements.len());
+
+    let mut printed = false;
+
+    let mut estimates = Vec::with_capacity(measurements.len());
+    let mut residuals = Vec::with_capacity(measurements.len());
+
+    for (duration, real_meas) in measurements.iter() {
+        // Propagate the dynamics to the measurement, and then start the filter.
+        let delta_time = (*duration) as f64;
+        prop.until_time_elapsed(delta_time);
+        // Update the STM of the KF
+        kf.update_stm(prop.dynamics.stm());
+        let (dt, meas_input) = prop.dynamics.to_measurement(&prop.dynamics.state());
+        // Get the computed observations
+        for station in stations.iter() {
+            let computed_meas: M = station.measure(&meas_input);
+            if computed_meas.visible() {
+                kf.update_h_tilde(computed_meas.sensitivity());
+                let (est, res) = kf.measurement_update(
+                    dt,
+                    real_meas.observation(),
+                    computed_meas.observation(),
+                )?;
+                estimates.push(est);
+                residuals.push(res);
+                break; // We know that only one station is in visibility at each time.
+            }
+        }
+    }
+
+    Ok((estimates, residuals))
 }
