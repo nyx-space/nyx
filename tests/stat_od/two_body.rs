@@ -306,7 +306,7 @@ fn ckf_fixed_step_perfect_stations() {
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
     let (estimates, residuals) =
-        process_measurements(&mut ckf, &mut prop_est, measurements, all_stations)
+        process_measurements(&mut ckf, &mut prop_est, &measurements, &all_stations)
             .expect("kf failed");
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
@@ -353,11 +353,25 @@ fn ckf_fixed_step_perfect_stations() {
         }
     }
 
-    // And smooth
+    // Smooth
     let smoothed_estimates = smooth(&estimates).expect("smoothing failed");
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
     println!(
         "N-1 smoothed: \n{}",
         smoothed_estimates[estimates.len() - 2]
     );
+    let init_smoothed = smoothed_estimates[0].clone();
+
+    // Re-initialize the propagator and the filter for iteration
+    let mut tb_estimator = CelestialDynamicsStm::two_body(initial_state);
+    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    // Get the propagator to catch up to the first estimate
+    prop_est.until_time_elapsed(init_smoothed.dt - initial_state.dt);
+    let mut ckf = KF::initialize(init_smoothed, measurement_noise);
+
+    let (it_estimates, _) =
+        process_measurements(&mut ckf, &mut prop_est, &measurements, &all_stations)
+            .expect("kf failed");
+
+    println!("N-1 one iteration: \n{}", it_estimates[estimates.len() - 2]);
 }

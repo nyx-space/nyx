@@ -49,8 +49,8 @@ pub fn process_measurements<
 >(
     kf: &mut KF<D::LinStateSize, M::MeasurementSize>,
     prop: &mut Propagator<D, E>,
-    measurements: Vec<(Epoch, M)>,
-    devices: Vec<N>,
+    measurements: &[(Epoch, M)],
+    devices: &[N],
 ) -> Result<
     (
         Vec<Estimate<D::LinStateSize>>,

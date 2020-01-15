@@ -89,7 +89,7 @@ fn multi_body_ckf_perfect_stations() {
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
     let (estimates, residuals) =
-        process_measurements(&mut ckf, &mut prop_est, measurements, all_stations)
+        process_measurements(&mut ckf, &mut prop_est, &measurements, &all_stations)
             .expect("kf failed");
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
