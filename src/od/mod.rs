@@ -2,7 +2,7 @@ extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate serde;
 
-use self::hyperdual::{hyperspace_from_vector, Dual, Hyperdual, Owned};
+use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
@@ -22,24 +22,25 @@ pub mod estimate;
 /// Provide Residual handling functionalities.
 pub mod residual;
 
+/// Provides some helper for filtering.
+pub mod ui;
+
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
 ///
 /// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
-pub trait Linearization
+pub trait Estimable<N>
 where
-    Self: Sized,
+    Self: Dynamics + Sized,
 {
     /// Defines the state size of the estimated state
-    type StateSize: DimName;
+    type LinStateSize: DimName;
     /// Defines the gradient of the equations of motion for these dynamics.
-    fn gradient(
-        &self,
-        t: f64,
-        state: &VectorN<f64, Self::StateSize>,
-    ) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
+    fn stm(&self) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
     where
-        DefaultAllocator:
-            Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>;
+        DefaultAllocator: Allocator<f64, Self::LinStateSize>
+            + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
+
+    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, N);
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
@@ -72,6 +73,20 @@ where
 
     /// Returns the time at which the measurement was performed.
     fn at(&self) -> Epoch;
+}
+
+/// A trait to generalize measurement devices such as a ground station
+pub trait MeasurementDevice<N>
+where
+    Self: Sized,
+    N: Measurement,
+    DefaultAllocator: Allocator<f64, N::StateSize>
+        + Allocator<f64, N::StateSize, N::MeasurementSize>
+        + Allocator<f64, N::MeasurementSize>
+        + Allocator<f64, N::MeasurementSize, N::StateSize>,
+{
+    type MeasurementInput: Copy;
+    fn measure(&self, state: &Self::MeasurementInput) -> N;
 }
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
@@ -125,7 +140,7 @@ where
         (state, grad)
     }
 }
-
+/*
 impl<T: AutoDiffDynamics> Linearization for T
 where
     DefaultAllocator:
@@ -147,7 +162,7 @@ where
     {
         panic!("retrieve the gradient by calling self.compute(...)");
     }
-}
+}*/
 
 /// Specifies the format of the Epoch during serialization
 #[derive(Clone, Copy, Debug, PartialEq)]

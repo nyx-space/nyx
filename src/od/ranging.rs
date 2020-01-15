@@ -10,7 +10,7 @@ use self::na::{DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2,
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
-use super::Measurement;
+use super::{Measurement, MeasurementDevice};
 use celestia::{Frame, Geoid, State};
 use utils::{r2, r3};
 
@@ -95,15 +95,18 @@ impl GroundStation {
             range_rate_noise,
         )
     }
-
+}
+impl MeasurementDevice<StdMeasurement> for GroundStation {
+    type MeasurementInput = State<Geoid>;
     /// Perform a measurement from the ground station to the receiver (rx).
-    pub fn measure(self, rx: State<Geoid>, dt: Epoch) -> StdMeasurement {
+    fn measure(&self, rx: &State<Geoid>) -> StdMeasurement {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
         if rx.frame.id() != 399 {
             unimplemented!("the receiver is not around the Earth");
         }
+        let dt = rx.dt;
         let tx = State::from_geodesic(self.latitude, self.longitude, self.height, dt, rx.frame);
         /*
         // Convert the station to "ECEF"
@@ -125,10 +128,10 @@ impl GroundStation {
             r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::new(dt, tx, rx, elevation >= self.elevation_mask)
+        StdMeasurement::new(dt, tx, *rx, elevation >= self.elevation_mask)
     }
 }
-
+/*
 /// Computes the (approximate) Greenwich Apparent Sideral Time as per IAU2000.
 ///
 /// NOTE: This is an approximation valid to within 0.9 seconds in absolute value.
@@ -140,7 +143,7 @@ fn gast(at: Epoch) -> f64 {
     let tu = at.as_mjd_tai_days() - 51_544.5;
     2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_6 * tu)
 }
-
+*/
 /// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {

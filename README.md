@@ -16,25 +16,28 @@ and portability to all platforms supported by [Rust](https://forge.rust-lang.org
 The [LICENSE](./LICENSE) will be strictly enforced once this toolkit reaches production-level quality.
 
 # Features
+## Propagation
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
 - [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/orbitaldyn.rs](tests/orbitaldyn.rs))
-- [x] Orbital state manipulation (from GMAT source code and validated in GMAT) (cf. [tests/state.rs](tests/state.rs))
-- [x] Statistical Orbit Determination: Classical and Extended Kalman Filter (cf. [tests/stat_od/two_body.rs](tests/stat_od/two_body.rs))
+- [x] Propagation to different stopping conditions
+## Dynamical models
 - [x] Multibody dynamics using XB files (caveat: [#61](https://gitlab.com/chrisrabotin/nyx/issues/61)) (cf. [tests/orbitaldyn.rs](tests/orbitaldyn.rs))
-- [x] Orbit Determination with multibody dynamics (cf. [tests/stat_od/multi_body.rs](tests/stat_od/multi_body.rs))
 - [x] Finite burns with fuel depletion (including low thrust / ion propulsion) (cf. [tests/prop/](tests/prop/))
 - [x] Sub-Optimal Control of continuous thrust (e.g. Ruggerio, Petropoulos/Q-law) (cf. [tests/prop/closedloop_multi_oe_ruggiero.rs](tests/prop/closedloop_multi_oe_ruggiero.rs))
-- [x] Planetary and Solar eclipse and visibility computation (cf. [tests/eclipse.rs](tests/eclipse.rs))
 - [x] Solar radiation pressure modeling (cf. [tests/srp.rs](tests/srp.rs))
-- [ ] Propagation to different stopping conditions
-- [ ] Spherical harmonics
-- [ ] Basic drag models
-- [ ] Light-time corrections and abberations
+- [x] Basic drag models (cannonball)
+- [ ] Spherical harmonics ([#28](https://gitlab.com/chrisrabotin/nyx/issues/28), [#93](https://gitlab.com/chrisrabotin/nyx/issues/93))
 - [ ] Spacecraft attitude control and some useful optimal control algorithms
-- [ ] Monte Carlo simulations on different parameters
-- [ ] Link budget computations
-
-_Note:_ Some of these features may only be made available only through a commercial license in the future.
+## Orbit determination
+- [x] Statistical Orbit Determination: Classical and Extended Kalman Filter (cf. [tests/stat_od/two_body.rs](tests/stat_od/two_body.rs))
+- [x] Orbit Determination with multibody dynamics (cf. [tests/stat_od/multi_body.rs](tests/stat_od/multi_body.rs))
+- [x] Smoothing and iterations of CKFs ([#105](https://gitlab.com/chrisrabotin/nyx/issues/105))
+- [ ] Square Root Information Filer (SRIF) ([#91](https://gitlab.com/chrisrabotin/nyx/issues/91))
+- [ ] An easy-to-use OD user interface ([#109](https://gitlab.com/chrisrabotin/nyx/issues/109))
+## Celestial computations
+- [x] Orbital state manipulation (from GMAT source code and validated in GMAT) (cf. [tests/state.rs](tests/state.rs))
+- [x] Planetary and Solar eclipse and visibility computation (cf. [tests/eclipse.rs](tests/eclipse.rs))
+- [x] Light-time corrections and abberations
 
 # Who am I?
 An astrodynamics engineer with a heavy background in software. Nyx relies on the fallbacks of
