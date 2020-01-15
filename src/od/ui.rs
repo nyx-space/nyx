@@ -41,7 +41,7 @@ where
 }
 
 pub fn process_station_measurements<
-    D: Estimable<N::MeasurementInput>,
+    D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
     E: ErrorCtrl,
     M: Measurement,
     N: MeasurementDevice<M::StateSize, M::MeasurementSize>,
@@ -68,8 +68,6 @@ where
         + Allocator<f64, D::LinStateSize, D::LinStateSize>,
 {
     info!("Processing {} measurements", measurements.len());
-
-    let mut printed = false;
 
     let mut estimates = Vec::with_capacity(measurements.len());
     let mut residuals = Vec::with_capacity(measurements.len());
