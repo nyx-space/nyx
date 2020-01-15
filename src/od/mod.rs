@@ -76,18 +76,17 @@ where
 }
 
 /// A trait to generalize measurement devices such as a ground station
-pub trait MeasurementDevice<S, M>
+pub trait MeasurementDevice<N>
 where
     Self: Sized,
-    S: DimName,
-    M: DimName,
-    DefaultAllocator: Allocator<f64, M> + Allocator<f64, M, S>,
+    N: Measurement,
+    DefaultAllocator: Allocator<f64, N::StateSize>
+        + Allocator<f64, N::StateSize, N::MeasurementSize>
+        + Allocator<f64, N::MeasurementSize>
+        + Allocator<f64, N::MeasurementSize, N::StateSize>,
 {
     type MeasurementInput: Copy;
-    fn measure<N: Measurement<StateSize = S, MeasurementSize = M>>(
-        &self,
-        state: &Self::MeasurementInput,
-    ) -> N;
+    fn measure(&self, state: &Self::MeasurementInput) -> N;
 }
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.

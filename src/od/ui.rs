@@ -44,11 +44,11 @@ pub fn process_station_measurements<
     D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
     E: ErrorCtrl,
     M: Measurement,
-    N: MeasurementDevice<M::StateSize, M::MeasurementSize>,
+    N: MeasurementDevice<M>,
 >(
     kf: &mut KF<D::LinStateSize, M::MeasurementSize>,
     prop: &mut Propagator<D, E>,
-    measurements: Vec<(f64, M)>,
+    measurements: Vec<(Epoch, M)>,
     stations: Vec<N>,
 ) -> Result<
     (
@@ -72,9 +72,11 @@ where
     let mut estimates = Vec::with_capacity(measurements.len());
     let mut residuals = Vec::with_capacity(measurements.len());
 
-    for (duration, real_meas) in measurements.iter() {
+    let start_dt = kf.prev_estimate.dt;
+
+    for (next_epoch, real_meas) in measurements.iter() {
         // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = (*duration) as f64;
+        let delta_time = *next_epoch - start_dt;
         prop.until_time_elapsed(delta_time);
         // Update the STM of the KF
         kf.update_stm(prop.dynamics.stm());

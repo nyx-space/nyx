@@ -10,7 +10,7 @@ use self::na::{DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2,
 use self::rand::distributions::Normal;
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
-use super::Measurement;
+use super::{Measurement, MeasurementDevice};
 use celestia::{Frame, Geoid, State};
 use utils::{r2, r3};
 
@@ -95,9 +95,11 @@ impl GroundStation {
             range_rate_noise,
         )
     }
-
+}
+impl MeasurementDevice<StdMeasurement> for GroundStation {
+    type MeasurementInput = State<Geoid>;
     /// Perform a measurement from the ground station to the receiver (rx).
-    pub fn measure(self, rx: State<Geoid>) -> StdMeasurement {
+    fn measure(&self, rx: &State<Geoid>) -> StdMeasurement {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
@@ -126,7 +128,7 @@ impl GroundStation {
             r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::new(dt, tx, rx, elevation >= self.elevation_mask)
+        StdMeasurement::new(dt, tx, *rx, elevation >= self.elevation_mask)
     }
 }
 /*

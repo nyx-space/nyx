@@ -7,9 +7,7 @@ use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
-use self::nyx::od::kalman::{Estimate, KF};
-use self::nyx::od::ranging::GroundStation;
-use self::nyx::od::Measurement;
+use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -89,6 +87,10 @@ fn multi_body_ckf_perfect_stations() {
     let measurement_noise =
         Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
+
+    let (estimates, _) =
+        process_station_measurements(&mut ckf, &mut prop_est, measurements, all_stations)
+            .expect("kf failed");
 
     println!("Will process {} measurements", measurements.len());
 

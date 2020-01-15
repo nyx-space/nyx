@@ -6,7 +6,7 @@ use super::hifitime::Epoch;
 use super::na::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
 use celestia::{Cosm, Geoid, LTCorr, State};
-use od::AutoDiffDynamics;
+use od::{AutoDiffDynamics, Estimable};
 use std::f64;
 
 /// `CelestialDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
@@ -358,5 +358,17 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
         VectorN::<f64, Self::StateSize>::from_iterator(
             state.iter().chain(stm_as_vec.iter()).cloned(),
         )
+    }
+}
+
+impl<'a> Estimable<State<Geoid>> for CelestialDynamicsStm<'a> {
+    type LinStateSize = U6;
+
+    fn stm(&self) -> Matrix6<f64> {
+        self.stm
+    }
+
+    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, State<Geoid>) {
+        (prop_state.0.dt, prop_state.0)
     }
 }
