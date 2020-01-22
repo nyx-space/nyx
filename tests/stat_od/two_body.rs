@@ -305,13 +305,20 @@ fn ckf_fixed_step_perfect_stations() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    let (estimates, residuals) =
-        process_measurements(&mut ckf, &mut prop_est, &measurements, &all_stations)
-            .expect("kf failed");
+    let mut odp = ODProcess::new(
+        &mut prop_est,
+        &mut ckf,
+        &all_stations,
+        false,
+        measurements.len(),
+    );
+
+    let rtn = odp.process_measurements(&measurements);
+    assert!(rtn.is_none(), "kf failed");
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
-    for (no, est) in estimates.iter().enumerate() {
+    for (no, est) in odp.estimates.iter().enumerate() {
         assert_eq!(
             est.predicted, false,
             "estimate {} should not be a prediction",
@@ -323,7 +330,7 @@ fn ckf_fixed_step_perfect_stations() {
             est.state.norm()
         );
 
-        let res = &residuals[no];
+        let res = &odp.residuals[no];
         assert!(
             res.postfit.norm() < 1e-12,
             "postfit should be zero (perfect dynamics) ({:e})",
@@ -338,6 +345,7 @@ fn ckf_fixed_step_perfect_stations() {
     }
 
     // Check that the covariance deflated
+    let estimates = odp.estimates.clone();
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
         if i < 3 {
@@ -353,9 +361,13 @@ fn ckf_fixed_step_perfect_stations() {
         }
     }
 
-    // Smooth
-    let smoothed_estimates = smooth(&estimates).expect("smoothing failed");
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
+
+    // Smooth
+    if !odp.smooth().is_none() {
+        panic!("smoothing failed");
+    }
+    let smoothed_estimates = odp.estimates.clone();
     println!(
         "N-1 smoothed: \n{}",
         smoothed_estimates[estimates.len() - 2]
@@ -369,9 +381,19 @@ fn ckf_fixed_step_perfect_stations() {
     prop_est.until_time_elapsed(init_smoothed.dt - initial_state.dt);
     let mut ckf = KF::initialize(init_smoothed, measurement_noise);
 
-    let (it_estimates, _) =
-        process_measurements(&mut ckf, &mut prop_est, &measurements, &all_stations)
-            .expect("kf failed");
+    let mut odp2 = ODProcess {
+        prop: &mut prop_est,
+        kf: &mut ckf,
+        devices: &all_stations,
+        simultaneous_msr: false,
+        estimates: Vec::with_capacity(measurements.len()),
+        residuals: Vec::with_capacity(measurements.len()),
+    };
 
-    println!("N-1 one iteration: \n{}", it_estimates[estimates.len() - 2]);
+    odp2.process_measurements(&measurements);
+
+    println!(
+        "N-1 one iteration: \n{}",
+        odp2.estimates[odp2.estimates.len() - 2]
+    );
 }

@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName};
+use self::na::DefaultAllocator;
 
 pub use super::estimate::*;
 pub use super::kalman::*;
@@ -59,11 +59,28 @@ where
         + Allocator<f64, D::LinStateSize, M::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>,
 {
+    pub fn new(
+        prop: &'a mut Propagator<'a, D, E>,
+        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        devices: &'a [N],
+        simultaneous_msr: bool,
+        num_expected_msr: usize,
+    ) -> Self {
+        Self {
+            prop: prop,
+            kf: kf,
+            devices: &devices,
+            simultaneous_msr,
+            estimates: Vec::with_capacity(num_expected_msr),
+            residuals: Vec::with_capacity(num_expected_msr),
+        }
+    }
+
     /// Allows to smooth the provided estimates. Returns an array of smoothed estimates.
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&mut self) -> Result<Vec<Estimate<D::LinStateSize>>, FilterError> {
+    pub fn smooth(&mut self) -> Option<FilterError> {
         debug!("Smoothing {} estimates", self.estimates.len());
         let mut smoothed = Vec::with_capacity(self.estimates.len());
 
@@ -72,7 +89,7 @@ where
             // TODO: Ensure that SNC was _not_ enabled
             let mut stm_inv = estimate.stm.clone();
             if !stm_inv.try_inverse_mut() {
-                return Err(FilterError::StateTransitionMatrixSingular);
+                return Some(FilterError::StateTransitionMatrixSingular);
             }
             sm_est.covar = &stm_inv * &estimate.covar * &stm_inv.transpose();
             sm_est.state = &stm_inv * &estimate.state;
@@ -81,7 +98,10 @@ where
 
         // And reverse to maintain order
         smoothed.reverse();
-        Ok(smoothed)
+        // And store
+        self.estimates = smoothed;
+
+        None
     }
 
     /// Allows processing all measurements without covariance mapping. Only works for CKFs.

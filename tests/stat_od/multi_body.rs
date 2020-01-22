@@ -88,14 +88,22 @@ fn multi_body_ckf_perfect_stations() {
         Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    let (estimates, residuals) =
-        process_measurements(&mut ckf, &mut prop_est, &measurements, &all_stations)
-            .expect("kf failed");
+    let mut odp = ODProcess {
+        prop: &mut prop_est,
+        kf: &mut ckf,
+        devices: &all_stations,
+        simultaneous_msr: false,
+        estimates: Vec::with_capacity(measurements.len()),
+        residuals: Vec::with_capacity(measurements.len()),
+    };
+
+    let rtn = odp.process_measurements(&measurements);
+    assert!(rtn.is_none(), "kf failed");
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
     let mut last_est = None;
-    for (no, est) in estimates.iter().enumerate() {
+    for (no, est) in odp.estimates.iter().enumerate() {
         assert_eq!(
             est.predicted, false,
             "estimate {} should not be a prediction",
@@ -107,7 +115,7 @@ fn multi_body_ckf_perfect_stations() {
             est.state.norm()
         );
 
-        let res = &residuals[no];
+        let res = &odp.residuals[no];
         assert!(
             res.postfit.norm() < 1e-12,
             "postfit should be zero (perfect dynamics) ({:e})",
