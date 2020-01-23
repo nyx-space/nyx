@@ -4,14 +4,14 @@ extern crate prost;
 use self::bytes::IntoBuf;
 use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
-use self::prost::Message;
 use crate::hifitime::{Epoch, SECONDS_PER_DAY};
-use celestia::exb::interpolation::StateData::{EqualStates, VarwindowStates};
-use celestia::exb::{Ephemeris, EphemerisContainer};
+use celestia::cosm::prost::Message;
 use celestia::frames::Frame;
 use celestia::frames::*;
-use celestia::fxb::{Frame as FXBFrame, FrameContainer};
 use celestia::state::State;
+use celestia::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
+use celestia::xb::{Ephemeris, EphemerisContainer, Identifier};
+use celestia::xb::{Frame as FXBFrame, FrameContainer};
 use celestia::SPEED_OF_LIGHT_KMS;
 use std::collections::HashMap;
 use std::error::Error;
@@ -125,10 +125,10 @@ impl Cosm {
             // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
 
             // Ephemeris exists
-            match ephem.ephem_parameters.get("GM") {
+            match ephem.parameters.get("GM") {
                 Some(gm) => {
                     // It's a geoid, and we assume everything else is there
-                    let flattening = match ephem.ephem_parameters.get("Flattening") {
+                    let flattening = match ephem.parameters.get("Flattening") {
                         Some(param) => param.value,
                         None => {
                             if id.name != "Moon" {
@@ -138,7 +138,7 @@ impl Cosm {
                             }
                         }
                     };
-                    let equatorial_radius = match ephem.ephem_parameters.get("Equatorial radius") {
+                    let equatorial_radius = match ephem.parameters.get("Equatorial radius") {
                         Some(param) => param.value,
                         None => {
                             if id.name != "Moon" {
@@ -148,7 +148,7 @@ impl Cosm {
                             }
                         }
                     };
-                    let semi_major_radius = match ephem.ephem_parameters.get("Equatorial radius") {
+                    let semi_major_radius = match ephem.parameters.get("Equatorial radius") {
                         Some(param) => {
                             if id.name != "Earth Barycenter" {
                                 param.value
@@ -244,7 +244,7 @@ impl Cosm {
         Err(CosmError::ObjectNameNotFound(name))
     }
 
-    pub fn exbid_from_id(&self, id: i32) -> Result<EXBID, CosmError> {
+    pub fn exbid_from_id(&self, id: i32) -> Result<Identifier, CosmError> {
         for ((exb_id, _), ephem) in &self.ephemerides {
             if *exb_id == id {
                 return Ok(ephem.id.clone().unwrap());
@@ -268,7 +268,8 @@ impl Cosm {
             .as_ref()
             .ok_or(CosmError::NoInterpolationData(exb.number))?;
 
-        let start_mod_julian: f64 = interp.start_mod_julian;
+        // the DE file epochs are all in ET mod julian
+        let start_mod_julian = ephem.start_epoch.as_ref().unwrap().value;
         let coefficient_count: usize = interp.position_degree as usize;
 
         let exb_states = match interp

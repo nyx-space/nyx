@@ -146,7 +146,7 @@ fn xb_conversion() {
     );
     f64_eq!(
         dt.as_mjd_tai_days(),
-        cart_xb.mod_julian,
+        cart_xb.epoch.as_ref().unwrap().value,
         "EXB conversion failed"
     );
     assert!(cart_xb.covariance.is_none());

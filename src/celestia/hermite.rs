@@ -1,7 +1,7 @@
-use celestia::exb::Coefficients;
+use celestia::xb::VectorCoefficients;
 
 /// Compute the interpolation at the requested time
-pub fn interpolate(time: f64, coeffs: &Coefficients) -> (f64, f64, f64) {
+pub fn interpolate(time: f64, coeffs: &VectorCoefficients) -> (f64, f64, f64) {
     let x = hermval(time, &coeffs.x);
     let y = hermval(time, &coeffs.y);
     let z = hermval(time, &coeffs.z);

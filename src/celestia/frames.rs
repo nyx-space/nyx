@@ -1,5 +1,4 @@
-pub use celestia::exb::ephemeris::Identifier as EXBID;
-pub use celestia::fxb::frame::Identifier as FrameID;
+pub use celestia::xb::Identifier;
 use std::fmt;
 
 pub trait Frame: Clone + fmt::Debug + fmt::Display {
