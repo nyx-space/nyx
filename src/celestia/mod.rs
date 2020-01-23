@@ -1,4 +1,5 @@
 extern crate nalgebra as na;
+
 /// `CelestialBody` represents a celestial body.
 ///
 /// Note that all planets are defined as types. This leverages higher speed of execution via monomorphism.
@@ -59,11 +60,9 @@ pub use self::state::*;
 mod frames;
 pub use self::frames::*;
 
-mod axb;
 mod cosm;
+mod xb;
 pub use self::cosm::*;
-mod exb;
-mod fxb;
 mod hermite;
 
 /// The eclipse module allows finding eclipses and (conversely) visibility between a state and another one (e.g. a planet or the Sun).

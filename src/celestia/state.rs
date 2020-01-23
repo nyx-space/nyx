@@ -6,9 +6,12 @@ use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Vector3, Vector6};
 use super::{Frame, LocalFrame};
-use celestia::exb::state::Vector as XBVector;
-use celestia::exb::State as XBState;
 use celestia::frames::Geoid;
+use celestia::xb::ephem_registry::State as XBState;
+use celestia::xb::Epoch as XBEpoch;
+use celestia::xb::Vector as XBVector;
+use celestia::xb::{TimeRepr, TimeSystem, Unit};
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
@@ -158,19 +161,28 @@ where
 
     pub fn to_exb_state(&self) -> XBState {
         XBState {
-            mod_julian: self.dt.as_mjd_tai_days(),
+            epoch: Some(XBEpoch {
+                ts: i32::from(TimeSystem::Tai),
+                repr: i32::from(TimeRepr::DaysJ1900),
+                value: self.dt.as_mjd_tai_days(),
+            }),
             position: Some(XBVector {
                 x: self.x,
                 y: self.y,
                 z: self.z,
+                is_zero: false,
+                unit: i32::from(Unit::Km),
             }),
             velocity: Some(XBVector {
                 x: self.vx,
                 y: self.vy,
                 z: self.vz,
+                is_zero: false,
+                unit: i32::from(Unit::KmS),
             }),
             covariance: None,
             covariance_exponent: 0.0,
+            parameters: HashMap::new(),
         }
     }
 
