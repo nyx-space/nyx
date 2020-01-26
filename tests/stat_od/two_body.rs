@@ -7,6 +7,7 @@ use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
+use self::nyx::dynamics::Dynamics;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
@@ -200,9 +201,16 @@ fn ekf_fixed_step_perfect_stations() {
                     res
                 );
                 // It's an EKF, so let's update the state in the dynamics.
-                let now = prop_est.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
-                let new_state = prop_est.dynamics.state.to_cartesian_vec() + est.state;
-                prop_est.dynamics.set_orbital_state(now, &new_state);
+                //let now = prop_est.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
+                //let new_state = prop_est.dynamics.state.to_cartesian_vec() + est.state;
+                //prop_est.dynamics.set_orbital_state(now, &new_state);
+
+                // NOTE: The following does not work becayse state)vector returns everything with
+                // the STM, and est.state is only the estimate state (e.g. 42 vs 6)
+                prop_est.dynamics.set_state(
+                    prop_est.time(),
+                    &(prop_est.dynamics.state_vector() + est.state),
+                );
 
                 last_est = Some(est);
                 break;
