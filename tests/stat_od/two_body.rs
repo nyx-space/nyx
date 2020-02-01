@@ -7,7 +7,6 @@ use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
-use self::nyx::dynamics::Dynamics;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::f64::EPSILON;
@@ -207,10 +206,9 @@ fn ekf_fixed_step_perfect_stations() {
 
                 // NOTE: The following does not work becayse state)vector returns everything with
                 // the STM, and est.state is only the estimate state (e.g. 42 vs 6)
-                prop_est.dynamics.set_state(
-                    prop_est.time(),
-                    &(prop_est.dynamics.state_vector() + est.state),
-                );
+                prop_est
+                    .dynamics
+                    .set_estimated_state(prop_est.dynamics.estimated_state() + est.state);
 
                 last_est = Some(est);
                 break;
@@ -224,6 +222,7 @@ fn ekf_fixed_step_perfect_stations() {
 
     // Check that the covariance deflated
     if let Some(est) = last_est {
+        println!("{}", est.state);
         for i in 0..6 {
             if i < 3 {
                 assert!(

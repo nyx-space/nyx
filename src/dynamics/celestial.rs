@@ -371,4 +371,18 @@ impl<'a> Estimable<State<Geoid>> for CelestialDynamicsStm<'a> {
     fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, State<Geoid>) {
         (prop_state.0.dt, prop_state.0)
     }
+
+    fn estimated_state(&self) -> VectorN<f64, Self::LinStateSize> {
+        self.state.to_cartesian_vec()
+    }
+
+    /// Returns the estimated state
+    fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>) {
+        self.state.x = new_state[0];
+        self.state.y = new_state[1];
+        self.state.z = new_state[2];
+        self.state.vx = new_state[3];
+        self.state.vy = new_state[4];
+        self.state.vz = new_state[5];
+    }
 }
