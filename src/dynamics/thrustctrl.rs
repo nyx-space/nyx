@@ -99,7 +99,7 @@ pub struct Ruggiero {
 impl Ruggiero {
     pub fn new(objectives: Vec<Achieve>, initial: State<Geoid>) -> Self {
         Self {
-            objectives: objectives.clone(),
+            objectives,
             init_state: initial,
             achieved: false,
         }

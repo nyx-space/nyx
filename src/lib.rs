@@ -20,6 +20,7 @@
 //!  * Multi body dynamics (known bug for heliocentric propagation: https://gitlab.com/chrisrabotin/nyx/issues/61)
 //!  * Multi body dynamics estimation (i.e. state transition matrix computation, using hyperdual numbers, cf. conf. paper AAS 19-716)
 //!  * Maneuver design (via MissionArc), maneuver simulation with fuel depletion (via Spacecraft) and continuous thrust and control (ThrustControl)
+//!  * And many, many more. Refer to README.md for more a up to date list of features
 //!
 //! ## Usage
 //!
@@ -27,7 +28,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! nyx-space = "0.0.17"
+//! nyx-space = "0.0.19"
 //! ```
 //!
 //! And add the following to your crate root:

@@ -48,6 +48,7 @@ where
         DefaultAllocator: Allocator<f64, Self::LinStateSize>
             + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
 
+    /// Converts the Dynamics' state type to a measurement to be ingested in a filter
     fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, N);
 }
 
