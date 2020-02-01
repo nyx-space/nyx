@@ -62,7 +62,7 @@ where
         + Allocator<f64, D::LinStateSize, M::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>,
 {
-    pub fn new_ekf(
+    pub fn ekf(
         prop: &'a mut Propagator<'a, D, E>,
         kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
         devices: &'a [N],
@@ -154,6 +154,17 @@ where
                         computed_meas.observation(),
                     ) {
                         Ok((est, res)) => {
+                            // Switch to EKF if necessary, and update the dynamics and such
+                            if !self.kf.ekf && self.ekf_trigger.enable_ekf(&est) {
+                                self.kf.ekf = true;
+                                info!("EKF now enabled");
+                            }
+                            if self.kf.ekf {
+                                let est_state = est.state.clone();
+                                self.prop.dynamics.set_estimated_state(
+                                    self.prop.dynamics.estimated_state() + est_state,
+                                );
+                            }
                             self.estimates.push(est);
                             self.residuals.push(res);
                         }

@@ -2,6 +2,7 @@ extern crate csv;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
@@ -77,6 +78,7 @@ fn filter_errors() {
 
 #[test]
 fn ekf_fixed_step_perfect_stations() {
+    pretty_env_logger::init();
     use std::thread;
 
     // Define the ground stations.
@@ -116,15 +118,12 @@ fn ekf_fixed_step_perfect_stations() {
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    let mut prev_t = dt;
     while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state);
             if meas.visible() {
-                let delta = rx_state.dt.as_tai_seconds() - prev_t.as_tai_seconds();
-                measurements.push((delta, meas));
-                prev_t = rx_state.dt;
+                measurements.push((rx_state.dt, meas));
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -152,95 +151,39 @@ fn ekf_fixed_step_perfect_stations() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut kf = KF::initialize(initial_estimate, measurement_noise);
 
-    println!("Will process {} measurements", measurements.len());
+    let mut odp = ODProcess::ekf(
+        &mut prop_est,
+        &mut kf,
+        &all_stations,
+        false,
+        measurements.len(),
+        NumMsrEkfTrigger::init(num_meas_for_ekf),
+    );
 
-    let mut this_dt = dt;
-
-    let mut last_est = None;
-
-    for (meas_no, (duration, real_meas)) in measurements.iter().enumerate() {
-        // Propagate the dynamics to the measurement, and then start the filter.
-        let delta_time = (*duration) as f64;
-        prop_est.until_time_elapsed(delta_time);
-        if meas_no > num_meas_for_ekf && !kf.ekf {
-            println!("switched to EKF");
-            kf.ekf = true;
-        }
-        // Update the STM of the KF
-        kf.update_stm(prop_est.dynamics.stm);
-        // Get the computed observation
-        assert!(delta_time > 0.0, "repeated time");
-        this_dt.mut_add_secs(delta_time);
-        let rx_state = State::<Geoid>::from_cartesian_vec(
-            &prop_est.dynamics.state.to_cartesian_vec(),
-            this_dt,
-            earth_geoid,
-        );
-        let mut still_empty = true;
-        for station in all_stations.iter() {
-            let computed_meas = station.measure(&rx_state);
-            if computed_meas.visible() {
-                kf.update_h_tilde(computed_meas.sensitivity());
-                let (est, res) = kf
-                    .measurement_update(
-                        this_dt,
-                        real_meas.observation(),
-                        computed_meas.observation(),
-                    )
-                    .expect("wut?");
-                still_empty = false;
-                assert_eq!(est.predicted, false, "estimate should not be a prediction");
-                assert!(
-                    est.state.norm() < EPSILON,
-                    "estimate error should be zero (perfect dynamics)"
-                );
-                assert!(
-                    res.postfit.norm() < EPSILON,
-                    "postfit should be zero (perfect dynamics) ({:e})",
-                    res
-                );
-                // It's an EKF, so let's update the state in the dynamics.
-                //let now = prop_est.time(); // Needed because we can't do a mutable borrow while doing an immutable one too.
-                //let new_state = prop_est.dynamics.state.to_cartesian_vec() + est.state;
-                //prop_est.dynamics.set_orbital_state(now, &new_state);
-
-                // NOTE: The following does not work becayse state)vector returns everything with
-                // the STM, and est.state is only the estimate state (e.g. 42 vs 6)
-                prop_est
-                    .dynamics
-                    .set_estimated_state(prop_est.dynamics.estimated_state() + est.state);
-
-                last_est = Some(est);
-                break;
-            }
-        }
-        if still_empty {
-            // We're doing perfect everything, so we should always be in visibility
-            panic!("T {} : not in visibility", this_dt.as_mjd_tai_days());
-        }
-    }
+    let rtn = odp.process_measurements(&measurements);
+    assert!(rtn.is_none(), "ekf failed");
 
     // Check that the covariance deflated
-    if let Some(est) = last_est {
-        println!("{}", est.state);
-        for i in 0..6 {
-            if i < 3 {
-                assert!(
-                    est.covar[(i, i)].abs() < covar_radius,
-                    "covar radius did not decrease"
-                );
-            } else {
-                assert!(
-                    est.covar[(i, i)].abs() < covar_velocity,
-                    "covar velocity did not decrease"
-                );
-            }
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}", est.state);
+    for i in 0..6 {
+        if i < 3 {
+            assert!(
+                est.covar[(i, i)].abs() < covar_radius,
+                "covar radius did not decrease"
+            );
+        } else {
+            assert!(
+                est.covar[(i, i)].abs() < covar_velocity,
+                "covar velocity did not decrease"
+            );
         }
     }
 }
 
 #[test]
 fn ckf_fixed_step_perfect_stations() {
+    pretty_env_logger::init();
     use std::{io, thread};
 
     // Define the ground stations.

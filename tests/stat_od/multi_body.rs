@@ -2,6 +2,7 @@ extern crate csv;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix6, Vector2, Vector6};
@@ -14,6 +15,7 @@ use std::sync::mpsc::{Receiver, Sender};
 
 #[test]
 fn multi_body_ckf_perfect_stations() {
+    pretty_env_logger::init();
     use std::{io, thread};
 
     // Define the ground stations.
