@@ -364,7 +364,7 @@ fn qlaw_as_ruggiero_case_f() {
     extern crate csv;
     use std::sync::mpsc;
     use std::sync::mpsc::{Receiver, Sender};
-    use std::{io, thread};
+    use std::thread;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(bodies::EARTH);

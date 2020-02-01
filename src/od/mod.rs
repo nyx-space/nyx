@@ -34,6 +34,14 @@ where
 {
     /// Defines the state size of the estimated state
     type LinStateSize: DimName;
+    /// Returns the estimated state
+    fn estimated_state(&self) -> VectorN<f64, Self::LinStateSize>
+    where
+        DefaultAllocator: Allocator<f64, Self::LinStateSize>;
+    /// Sets the estimated state
+    fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>)
+    where
+        DefaultAllocator: Allocator<f64, Self::LinStateSize>;
     /// Defines the gradient of the equations of motion for these dynamics.
     fn stm(&self) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
     where
