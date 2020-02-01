@@ -312,7 +312,7 @@ fn ckf_fixed_step_perfect_stations() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::new(
+    let mut odp = ODProcess::ckf(
         &mut prop_est,
         &mut ckf,
         &all_stations,
@@ -371,10 +371,10 @@ fn ckf_fixed_step_perfect_stations() {
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
 
     // Smooth
-    if !odp.smooth().is_none() {
+    if odp.smooth().is_some() {
         panic!("smoothing failed");
     }
-    let smoothed_estimates = odp.estimates.clone();
+    let smoothed_estimates = odp.estimates;
     println!(
         "N-1 smoothed: \n{}",
         smoothed_estimates[estimates.len() - 2]
@@ -388,14 +388,13 @@ fn ckf_fixed_step_perfect_stations() {
     prop_est.until_time_elapsed(init_smoothed.dt - initial_state.dt);
     let mut ckf = KF::initialize(init_smoothed, measurement_noise);
 
-    let mut odp2 = ODProcess {
-        prop: &mut prop_est,
-        kf: &mut ckf,
-        devices: &all_stations,
-        simultaneous_msr: false,
-        estimates: Vec::with_capacity(measurements.len()),
-        residuals: Vec::with_capacity(measurements.len()),
-    };
+    let mut odp2 = ODProcess::ckf(
+        &mut prop_est,
+        &mut ckf,
+        &all_stations,
+        false,
+        measurements.len(),
+    );
 
     odp2.process_measurements(&measurements);
 

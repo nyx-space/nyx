@@ -18,6 +18,7 @@ pub struct ODProcess<
     E: ErrorCtrl,
     M: Measurement,
     N: MeasurementDevice<M>,
+    T: EkfTrigger,
 > where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -40,6 +41,7 @@ pub struct ODProcess<
     pub estimates: Vec<Estimate<D::LinStateSize>>,
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<M::MeasurementSize>>,
+    pub ekf_trigger: T,
 }
 
 impl<
@@ -48,7 +50,8 @@ impl<
         E: ErrorCtrl,
         M: Measurement,
         N: MeasurementDevice<M>,
-    > ODProcess<'a, D, E, M, N>
+        T: EkfTrigger,
+    > ODProcess<'a, D, E, M, N, T>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -59,20 +62,39 @@ where
         + Allocator<f64, D::LinStateSize, M::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>,
 {
-    pub fn new(
+    pub fn new_ekf(
         prop: &'a mut Propagator<'a, D, E>,
         kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
         devices: &'a [N],
         simultaneous_msr: bool,
         num_expected_msr: usize,
+        trigger: T,
     ) -> Self {
         Self {
-            prop: prop,
-            kf: kf,
+            prop,
+            kf,
             devices: &devices,
             simultaneous_msr,
             estimates: Vec::with_capacity(num_expected_msr),
             residuals: Vec::with_capacity(num_expected_msr),
+            ekf_trigger: trigger,
+        }
+    }
+
+    pub fn default_ekf(
+        prop: &'a mut Propagator<'a, D, E>,
+        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        devices: &'a [N],
+        trigger: T,
+    ) -> Self {
+        Self {
+            prop,
+            kf,
+            devices: &devices,
+            simultaneous_msr: false,
+            estimates: Vec::with_capacity(10_000),
+            residuals: Vec::with_capacity(10_000),
+            ekf_trigger: trigger,
         }
     }
 
@@ -145,5 +167,103 @@ where
         }
 
         None
+    }
+}
+
+impl<
+        'a,
+        D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
+        E: ErrorCtrl,
+        M: Measurement,
+        N: MeasurementDevice<M>,
+    > ODProcess<'a, D, E, M, N, CkfTrigger>
+where
+    DefaultAllocator: Allocator<f64, D::StateSize>
+        + Allocator<f64, M::MeasurementSize>
+        + Allocator<f64, M::MeasurementSize, M::StateSize>
+        + Allocator<f64, D::LinStateSize>
+        + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
+        + Allocator<f64, M::MeasurementSize, D::LinStateSize>
+        + Allocator<f64, D::LinStateSize, M::MeasurementSize>
+        + Allocator<f64, D::LinStateSize, D::LinStateSize>,
+{
+    pub fn ckf(
+        prop: &'a mut Propagator<'a, D, E>,
+        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        devices: &'a [N],
+        simultaneous_msr: bool,
+        num_expected_msr: usize,
+    ) -> Self {
+        Self {
+            prop,
+            kf,
+            devices: &devices,
+            simultaneous_msr,
+            estimates: Vec::with_capacity(num_expected_msr),
+            residuals: Vec::with_capacity(num_expected_msr),
+            ekf_trigger: CkfTrigger {},
+        }
+    }
+
+    pub fn default_ckf(
+        prop: &'a mut Propagator<'a, D, E>,
+        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        devices: &'a [N],
+    ) -> Self {
+        Self {
+            prop,
+            kf,
+            devices: &devices,
+            simultaneous_msr: false,
+            estimates: Vec::with_capacity(10_000),
+            residuals: Vec::with_capacity(10_000),
+            ekf_trigger: CkfTrigger {},
+        }
+    }
+}
+/// A trait detailing when to switch to from a CKF to an EKF
+pub trait EkfTrigger {
+    fn enable_ekf<S>(&mut self, est: &Estimate<S>) -> bool
+    where
+        S: DimName,
+        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
+}
+
+/// CkfTrigger will never switch a KF to an EKF
+pub struct CkfTrigger;
+
+impl EkfTrigger for CkfTrigger {
+    fn enable_ekf<S>(&mut self, _est: &Estimate<S>) -> bool
+    where
+        S: DimName,
+        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    {
+        false
+    }
+}
+
+/// An EkfTrigger on the number of measurements processed
+pub struct NumMsrEkfTrigger {
+    pub num_msrs: usize,
+    cur_msrs: usize,
+}
+
+impl NumMsrEkfTrigger {
+    pub fn init(num_msrs: usize) -> Self {
+        Self {
+            num_msrs,
+            cur_msrs: 0,
+        }
+    }
+}
+
+impl EkfTrigger for NumMsrEkfTrigger {
+    fn enable_ekf<S>(&mut self, _est: &Estimate<S>) -> bool
+    where
+        S: DimName,
+        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    {
+        self.cur_msrs += 1;
+        self.cur_msrs >= self.num_msrs
     }
 }

@@ -88,14 +88,13 @@ fn multi_body_ckf_perfect_stations() {
         Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess {
-        prop: &mut prop_est,
-        kf: &mut ckf,
-        devices: &all_stations,
-        simultaneous_msr: false,
-        estimates: Vec::with_capacity(measurements.len()),
-        residuals: Vec::with_capacity(measurements.len()),
-    };
+    let mut odp = ODProcess::ckf(
+        &mut prop_est,
+        &mut ckf,
+        &all_stations,
+        false,
+        measurements.len(),
+    );
 
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
