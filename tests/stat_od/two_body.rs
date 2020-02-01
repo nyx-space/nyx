@@ -78,7 +78,9 @@ fn filter_errors() {
 
 #[test]
 fn ekf_fixed_step_perfect_stations() {
-    pretty_env_logger::init();
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
     use std::thread;
 
     // Define the ground stations.
@@ -183,7 +185,9 @@ fn ekf_fixed_step_perfect_stations() {
 
 #[test]
 fn ckf_fixed_step_perfect_stations() {
-    pretty_env_logger::init();
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
     use std::{io, thread};
 
     // Define the ground stations.
