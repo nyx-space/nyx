@@ -52,6 +52,20 @@ where
     fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, N);
 }
 
+pub trait Filter<S, M>
+where
+    S: DimName,
+    M: DimName,
+    DefaultAllocator: Allocator<f64, M>
+        + Allocator<f64, S>
+        + Allocator<f64, M, M>
+        + Allocator<f64, M, S>
+        + Allocator<f64, S, S>,
+{
+    /// Returns the previous estimate
+    fn previous_estimate(&self) -> estimate::Estimate<S>;
+}
+
 /// A trait defining a measurement of size `MeasurementSize`
 pub trait Measurement
 where
@@ -149,29 +163,6 @@ where
         (state, grad)
     }
 }
-/*
-impl<T: AutoDiffDynamics> Linearization for T
-where
-    DefaultAllocator:
-        Allocator<Dual<f64>, T::StateSize> + Allocator<Dual<f64>, T::StateSize, T::StateSize>,
-{
-    type StateSize = T::HyperStateSize;
-
-    /// Returns the gradient of the dynamics at the given state.
-    ///
-    /// **WARNING:** Requires a prior call to self.compute() ! This is where the auto-differentiation happens.
-    fn gradient(
-        &self,
-        _t: f64,
-        _state: &VectorN<f64, Self::StateSize>,
-    ) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
-    where
-        DefaultAllocator:
-            Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
-    {
-        panic!("retrieve the gradient by calling self.compute(...)");
-    }
-}*/
 
 /// Specifies the format of the Epoch during serialization
 #[derive(Clone, Copy, Debug, PartialEq)]
