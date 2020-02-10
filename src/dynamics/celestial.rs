@@ -364,16 +364,19 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
 impl<'a> Estimable<State<Geoid>> for CelestialDynamicsStm<'a> {
     type LinStateSize = U6;
 
-    fn stm(&self) -> Matrix6<f64> {
-        self.stm
-    }
-
     fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, State<Geoid>) {
         (prop_state.0.dt, prop_state.0)
     }
 
-    fn estimated_state(&self) -> VectorN<f64, Self::LinStateSize> {
-        self.state.to_cartesian_vec()
+    fn extract_stm(&self, prop_state: &Self::StateType) -> Matrix6<f64> {
+        prop_state.1
+    }
+
+    fn extract_estimated_state(
+        &self,
+        prop_state: &Self::StateType,
+    ) -> VectorN<f64, Self::LinStateSize> {
+        prop_state.0.to_cartesian_vec()
     }
 
     /// Returns the estimated state

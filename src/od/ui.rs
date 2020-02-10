@@ -12,6 +12,8 @@ pub use super::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
 
+use std::sync::mpsc::Receiver;
+
 pub struct ODProcess<
     'a,
     D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
@@ -126,7 +128,7 @@ where
         None
     }
 
-    /// Allows processing all measurements without covariance mapping. Only works for CKFs.
+    /// Allows processing all measurements without covariance mapping.
     pub fn process_measurements(&mut self, measurements: &[(Epoch, M)]) -> Option<FilterError> {
         info!("Processing {} measurements", measurements.len());
 
@@ -173,6 +175,132 @@ where
                     if !self.simultaneous_msr {
                         break;
                     }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Allows processing all measurements with covariance mapping.
+    ///
+    /// Important notes:
+    /// + the measurements have be to mapped to a fixed time corresponding to the step of the propagator
+    pub fn process_measurements_covar(
+        &mut self,
+        prop_rx: &Receiver<D::StateType>,
+        measurements: &[(Epoch, M)],
+    ) -> Option<FilterError> {
+        assert!(
+            !measurements.is_empty(),
+            "must have at least one measurement (for propagation time)"
+        );
+        // Start by propagating the estimator (on the same thread).
+        let prop_time = measurements[measurements.len() - 1].0 - self.kf.prev_estimate.dt;
+        info!("Propagating for {} seconds", prop_time);
+
+        self.prop.until_time_elapsed(prop_time);
+        info!(
+            "Processing {} measurements with covariance mapping",
+            measurements.len()
+        );
+
+        let mut msr_cnt = 0_usize;
+
+        'chan: while let Ok(prop_state) = prop_rx.recv() {
+            // Get the datetime and info needed to compute the theoretical measurement according to the model
+            let (dt, meas_input) = self.prop.dynamics.to_measurement(&prop_state);
+
+            let mut num_msr_processed = 0_u32;
+            loop {
+                // Update the STM of the KF (needed between each measurement or time update)
+                let stm = self.prop.dynamics.extract_stm(&prop_state);
+                self.kf.update_stm(stm);
+                if msr_cnt < measurements.len() {
+                    // Get the next measurement
+                    let (next_epoch, real_meas) = &measurements[msr_cnt];
+                    if *next_epoch < dt {
+                        // We missed a measurement! Let's try to catch up.
+                        error!("Skipped measurement #{} -- measurement timestamps not in sync with propagator!\n{:?}\n{:?}", msr_cnt, *next_epoch, dt);
+                        msr_cnt += 1;
+                        continue;
+                    } else if *next_epoch > dt {
+                        // No measurement can be used here, let's just do a time update (unless we have already done a time update)
+                        if num_msr_processed == 0 {
+                            info!("time update {:?}", dt);
+                            match self.kf.time_update(dt) {
+                                Ok(est) => {
+                                    if self.kf.ekf {
+                                        let est_state = est.state.clone();
+                                        self.prop.dynamics.set_estimated_state(
+                                            self.prop.dynamics.estimated_state() + est_state,
+                                        );
+                                    }
+                                    self.estimates.push(est);
+                                }
+                                Err(e) => return Some(e),
+                            }
+                        }
+                        break; // Move on to the next propagator output
+                    } else {
+                        // The epochs match, so this is a valid measurement to use
+                        // Get the computed observations
+                        for device in self.devices.iter() {
+                            let computed_meas: M = device.measure(&meas_input);
+                            if computed_meas.visible() {
+                                self.kf.update_h_tilde(computed_meas.sensitivity());
+                                match self.kf.measurement_update(
+                                    dt,
+                                    real_meas.observation(),
+                                    computed_meas.observation(),
+                                ) {
+                                    Ok((est, res)) => {
+                                        info!("msr update msr #{} {:?}", msr_cnt, dt);
+                                        // Switch to EKF if necessary, and update the dynamics and such
+                                        if !self.kf.ekf && self.ekf_trigger.enable_ekf(&est) {
+                                            self.kf.ekf = true;
+                                            info!("EKF now enabled");
+                                        }
+                                        if self.kf.ekf {
+                                            let est_state = est.state.clone();
+                                            self.prop.dynamics.set_estimated_state(
+                                                self.prop
+                                                    .dynamics
+                                                    .extract_estimated_state(&prop_state)
+                                                    + est_state,
+                                            );
+                                        }
+                                        self.estimates.push(est);
+                                        self.residuals.push(res);
+                                    }
+                                    Err(e) => return Some(e),
+                                }
+                                if !self.simultaneous_msr {
+                                    break;
+                                }
+                            }
+                        }
+                        // And increment the measurement counter
+                        msr_cnt += 1;
+                        num_msr_processed += 1;
+                    }
+                } else {
+                    // No more measurements, we can only do a time update
+                    info!("final time update {:?}", dt);
+                    match self.kf.time_update(dt) {
+                        Ok(est) => {
+                            if self.kf.ekf {
+                                let est_state = est.state.clone();
+                                self.prop.dynamics.set_estimated_state(
+                                    self.prop.dynamics.extract_estimated_state(&prop_state)
+                                        + est_state,
+                                );
+                            }
+                            self.estimates.push(est);
+                        }
+                        Err(e) => return Some(e),
+                    }
+                    break 'chan;
                 }
             }
         }
