@@ -35,21 +35,46 @@ where
     /// Defines the state size of the estimated state
     type LinStateSize: DimName;
     /// Returns the estimated state
-    fn estimated_state(&self) -> VectorN<f64, Self::LinStateSize>
+    fn extract_estimated_state(
+        &self,
+        prop_state: &Self::StateType,
+    ) -> VectorN<f64, Self::LinStateSize>
     where
         DefaultAllocator: Allocator<f64, Self::LinStateSize>;
+
+    /// Returns the estimated state
+    fn estimated_state(&self) -> VectorN<f64, Self::LinStateSize>
+    where
+        DefaultAllocator: Allocator<f64, Self::LinStateSize>,
+    {
+        self.extract_estimated_state(&self.state())
+    }
+
     /// Sets the estimated state
     fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>)
     where
         DefaultAllocator: Allocator<f64, Self::LinStateSize>;
+
     /// Defines the gradient of the equations of motion for these dynamics.
     fn stm(&self) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
     where
         DefaultAllocator: Allocator<f64, Self::LinStateSize>
-            + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
+            + Allocator<f64, Self::LinStateSize, Self::LinStateSize>,
+    {
+        self.extract_stm(&self.state())
+    }
 
     /// Converts the Dynamics' state type to a measurement to be ingested in a filter
     fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, N);
+
+    /// Extracts the STM from the dynamics state
+    fn extract_stm(
+        &self,
+        prop_state: &Self::StateType,
+    ) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
+    where
+        DefaultAllocator: Allocator<f64, Self::LinStateSize>
+            + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
 }
 
 pub trait Filter<S, M>
