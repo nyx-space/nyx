@@ -3,11 +3,10 @@ extern crate nalgebra as na;
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
-use std::fmt;
 
 pub use super::estimate::Estimate;
 pub use super::residual::Residual;
-use super::{CovarFormat, EpochFormat};
+use super::{CovarFormat, EpochFormat, Filter, FilterError};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -64,16 +63,34 @@ where
             covar_fmt: CovarFormat::Sqrt,
         }
     }
+}
+
+impl<S, M> Filter<S, M> for KF<S, M>
+where
+    S: DimName,
+    M: DimName,
+    DefaultAllocator: Allocator<f64, M>
+        + Allocator<f64, S>
+        + Allocator<f64, M, M>
+        + Allocator<f64, M, S>
+        + Allocator<f64, S, M>
+        + Allocator<f64, S, S>,
+{
+    /// Returns the previous estimate
+    fn previous_estimate(&self) -> Estimate<S> {
+        self.prev_estimate.clone()
+    }
+
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
-    pub fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
+    fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
         self.stm = new_stm;
         self.stm_updated = true;
     }
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
-    pub fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>) {
+    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>) {
         self.h_tilde = h_tilde;
         self.h_tilde_updated = true;
     }
@@ -81,7 +98,7 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    pub fn time_update(&mut self, dt: Epoch) -> Result<Estimate<S>, FilterError> {
+    fn time_update(&mut self, dt: Epoch) -> Result<Estimate<S>, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
@@ -108,7 +125,7 @@ where
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
     /// May return a FilterError if the STM or sensitivity matrices were not updated.
-    pub fn measurement_update(
+    fn measurement_update(
         &mut self,
         dt: Epoch,
         real_obs: VectorN<f64, M>,
@@ -162,35 +179,5 @@ where
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();
         Ok((estimate, res))
-    }
-}
-
-/// Stores the different kinds of filter errors.
-#[derive(Debug, PartialEq)]
-pub enum FilterError {
-    StateTransitionMatrixNotUpdated,
-    SensitivityNotUpdated,
-    GainSingular,
-    StateTransitionMatrixSingular,
-}
-
-impl fmt::Display for FilterError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            FilterError::StateTransitionMatrixNotUpdated => {
-                write!(f, "STM was not updated prior to time or measurement update")
-            }
-            FilterError::SensitivityNotUpdated => write!(
-                f,
-                "The measurement matrix H_tilde was not updated prior to measurement update"
-            ),
-            FilterError::GainSingular => write!(
-                f,
-                "Gain could not be computed because H*P_bar*H + R is singular"
-            ),
-            FilterError::StateTransitionMatrixSingular => {
-                write!(f, "STM is singular, smoothing cannot proceed")
-            }
-        }
     }
 }

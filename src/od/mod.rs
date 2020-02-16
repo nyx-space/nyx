@@ -89,6 +89,59 @@ where
 {
     /// Returns the previous estimate
     fn previous_estimate(&self) -> estimate::Estimate<S>;
+
+    /// Update the State Transition Matrix (STM). This function **must** be called in between each
+    /// call to `time_update` or `measurement_update`.
+    fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>);
+
+    /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
+    /// call to `measurement_update`.
+    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>);
+
+    /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
+    ///
+    /// May return a FilterError if the STM was not updated.
+    fn time_update(&mut self, dt: Epoch) -> Result<estimate::Estimate<S>, FilterError>;
+
+    /// Computes the measurement update with a provided real observation and computed observation.
+    ///
+    /// May return a FilterError if the STM or sensitivity matrices were not updated.
+    fn measurement_update(
+        &mut self,
+        dt: Epoch,
+        real_obs: VectorN<f64, M>,
+        computed_obs: VectorN<f64, M>,
+    ) -> Result<(estimate::Estimate<S>, residual::Residual<M>), FilterError>;
+}
+
+/// Stores the different kinds of filter errors.
+#[derive(Debug, PartialEq)]
+pub enum FilterError {
+    StateTransitionMatrixNotUpdated,
+    SensitivityNotUpdated,
+    GainSingular,
+    StateTransitionMatrixSingular,
+}
+
+impl fmt::Display for FilterError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            FilterError::StateTransitionMatrixNotUpdated => {
+                write!(f, "STM was not updated prior to time or measurement update")
+            }
+            FilterError::SensitivityNotUpdated => write!(
+                f,
+                "The measurement matrix H_tilde was not updated prior to measurement update"
+            ),
+            FilterError::GainSingular => write!(
+                f,
+                "Gain could not be computed because H*P_bar*H + R is singular"
+            ),
+            FilterError::StateTransitionMatrixSingular => {
+                write!(f, "STM is singular, smoothing cannot proceed")
+            }
+        }
+    }
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
