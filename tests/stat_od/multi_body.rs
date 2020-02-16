@@ -96,7 +96,7 @@ fn multi_body_ckf_perfect_stations() {
     // Define the process noise in order to define how many variables of the EOMs are accelerations
     // (this is required due to the many compile-time matrix size verifications)
     let process_noise = Matrix3::zeros();
-    // But we disable the state noise compensation / process noise by setting the start time to zero
+    // But we disable the state noise compensation / process noise by setting the delta time to None
     let process_noise_dt = None;
 
     let mut ckf = KF::initialize(
@@ -243,7 +243,7 @@ fn multi_body_ckf_covar_map() {
     // Define the process noise in order to define how many variables of the EOMs are accelerations
     // (this is required due to the many compile-time matrix size verifications)
     let process_noise = Matrix3::zeros();
-    // But we disable the state noise compensation / process noise by setting the start time to zero
+    // But we disable the state noise compensation / process noise by setting the delta time to None
     let process_noise_dt = None;
 
     let mut ckf = KF::initialize(

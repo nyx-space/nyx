@@ -161,7 +161,8 @@ where
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         if let Some(pcr_dt) = self.process_noise_dt {
             let delta_t = dt - self.prev_estimate.dt;
-            if delta_t > pcr_dt {
+
+            if delta_t <= pcr_dt {
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = MatrixMN::<f64, S, A>::zeros();
@@ -170,9 +171,11 @@ where
                     gamma[(i + A::dim(), i)] = delta_t;
                 }
                 // Let's add the process noise
-                covar_bar += &gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose();
+                covar_bar += delta_t.powi(2)
+                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose());
             }
         }
+
         let h_tilde_t = &self.h_tilde.transpose();
         let mut invertible_part = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
         if !invertible_part.try_inverse_mut() {
