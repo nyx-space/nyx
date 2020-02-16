@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::DefaultAllocator;
+use self::na::{DefaultAllocator, DimName};
 
 pub use super::estimate::*;
 pub use super::kalman::*;
@@ -12,6 +12,7 @@ pub use super::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
 
+use std::marker::PhantomData;
 use std::sync::mpsc::Receiver;
 
 pub struct ODProcess<
@@ -21,7 +22,8 @@ pub struct ODProcess<
     M: Measurement,
     N: MeasurementDevice<M>,
     T: EkfTrigger,
-    K: Filter<D::LinStateSize, M::MeasurementSize>,
+    A: DimName,
+    K: Filter<D::LinStateSize, A, M::MeasurementSize>,
 > where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -30,7 +32,10 @@ pub struct ODProcess<
         + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
         + Allocator<f64, M::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, M::MeasurementSize>
-        + Allocator<f64, D::LinStateSize, D::LinStateSize>,
+        + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A, A>
+        + Allocator<f64, D::LinStateSize, A>
+        + Allocator<f64, A, D::LinStateSize>,
 {
     /// Propagator used for the estimation
     pub prop: &'a mut Propagator<'a, D, E>,
@@ -45,6 +50,7 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<M::MeasurementSize>>,
     pub ekf_trigger: T,
+    _marker: PhantomData<A>,
 }
 
 impl<
@@ -54,8 +60,9 @@ impl<
         M: Measurement,
         N: MeasurementDevice<M>,
         T: EkfTrigger,
-        K: Filter<D::LinStateSize, M::MeasurementSize>,
-    > ODProcess<'a, D, E, M, N, T, K>
+        A: DimName,
+        K: Filter<D::LinStateSize, A, M::MeasurementSize>,
+    > ODProcess<'a, D, E, M, N, T, A, K>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -64,7 +71,10 @@ where
         + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
         + Allocator<f64, M::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, M::MeasurementSize>
-        + Allocator<f64, D::LinStateSize, D::LinStateSize>,
+        + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A, A>
+        + Allocator<f64, D::LinStateSize, A>
+        + Allocator<f64, A, D::LinStateSize>,
 {
     pub fn ekf(
         prop: &'a mut Propagator<'a, D, E>,
@@ -82,6 +92,7 @@ where
             estimates: Vec::with_capacity(num_expected_msr),
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: trigger,
+            _marker: PhantomData::<A>,
         }
     }
 
@@ -99,6 +110,7 @@ where
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
+            _marker: PhantomData::<A>,
         }
     }
 
@@ -319,8 +331,9 @@ impl<
         E: ErrorCtrl,
         M: Measurement,
         N: MeasurementDevice<M>,
-        K: Filter<D::LinStateSize, M::MeasurementSize>,
-    > ODProcess<'a, D, E, M, N, CkfTrigger, K>
+        A: DimName,
+        K: Filter<D::LinStateSize, A, M::MeasurementSize>,
+    > ODProcess<'a, D, E, M, N, CkfTrigger, A, K>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -329,7 +342,10 @@ where
         + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
         + Allocator<f64, M::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, M::MeasurementSize>
-        + Allocator<f64, D::LinStateSize, D::LinStateSize>,
+        + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A, A>
+        + Allocator<f64, D::LinStateSize, A>
+        + Allocator<f64, A, D::LinStateSize>,
 {
     pub fn ckf(
         prop: &'a mut Propagator<'a, D, E>,
@@ -346,6 +362,7 @@ where
             estimates: Vec::with_capacity(num_expected_msr),
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: CkfTrigger {},
+            _marker: PhantomData::<A>,
         }
     }
 
@@ -362,6 +379,7 @@ where
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},
+            _marker: PhantomData::<A>,
         }
     }
 }

@@ -77,15 +77,20 @@ where
             + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
 }
 
-pub trait Filter<S, M>
+/// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
+pub trait Filter<S, A, M>
 where
     S: DimName,
+    A: DimName,
     M: DimName,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
-        + Allocator<f64, S, S>,
+        + Allocator<f64, S, S>
+        + Allocator<f64, A, A>
+        + Allocator<f64, S, A>
+        + Allocator<f64, A, S>,
 {
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &estimate::Estimate<S>;
@@ -118,6 +123,9 @@ where
 
     /// Sets the filter to be extended or not depending on the value of status
     fn set_extended(&mut self, status: bool);
+
+    /// Sets the process noise matrix in the frame of the estimated state
+    fn set_process_noise(&mut self, prc: MatrixMN<f64, A, A>);
 }
 
 /// Stores the different kinds of filter errors.

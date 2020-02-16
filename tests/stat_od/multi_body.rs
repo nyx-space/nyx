@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix6, Vector2, Vector6};
+use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::ui::*;
@@ -86,11 +86,25 @@ fn multi_body_ckf_perfect_stations() {
         covar_velocity,
     ));
 
+    // Define the initial estimate
     let initial_estimate = Estimate::from_covar(dt, init_covar);
 
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
         Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
-    let mut ckf = KF::initialize(initial_estimate, measurement_noise);
+
+    // Define the process noise in order to define how many variables of the EOMs are accelerations
+    // (this is required due to the many compile-time matrix size verifications)
+    let process_noise = Matrix3::zeros();
+    // But we disable the state noise compensation / process noise by setting the start time to zero
+    let process_noise_dt = None;
+
+    let mut ckf = KF::initialize(
+        initial_estimate,
+        process_noise,
+        measurement_noise,
+        process_noise_dt,
+    );
 
     let mut odp = ODProcess::ckf(
         &mut prop_est,
@@ -219,11 +233,25 @@ fn multi_body_ckf_covar_map() {
         covar_velocity,
     ));
 
+    // Define the initial estimate
     let initial_estimate = Estimate::from_covar(dt, init_covar);
 
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
         Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
-    let mut ckf = KF::initialize(initial_estimate, measurement_noise);
+
+    // Define the process noise in order to define how many variables of the EOMs are accelerations
+    // (this is required due to the many compile-time matrix size verifications)
+    let process_noise = Matrix3::zeros();
+    // But we disable the state noise compensation / process noise by setting the start time to zero
+    let process_noise_dt = None;
+
+    let mut ckf = KF::initialize(
+        initial_estimate,
+        process_noise,
+        measurement_noise,
+        process_noise_dt,
+    );
 
     let mut odp = ODProcess::ckf(
         &mut prop_est,

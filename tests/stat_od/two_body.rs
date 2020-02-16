@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2, Vector6, U6};
+use self::na::{Matrix2, Matrix2x6, Matrix3, Matrix6, Vector2, Vector6, U6};
 use self::nyx::celestia::{bodies, Cosm, Geoid, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::ui::*;
@@ -40,6 +40,7 @@ fn csv_serialize_empty_estimate() {
 #[test]
 fn filter_errors() {
     let initial_estimate = Estimate::<U6>::zeros();
+    let process_noise = Matrix3::zeros();
     let measurement_noise = Matrix2::zeros();
     let real_obs = Vector2::zeros();
     let computed_obs = Vector2::zeros();
@@ -47,7 +48,7 @@ fn filter_errors() {
     let stm = Matrix6::zeros();
     let dt = Epoch::from_tai_seconds(0.0);
 
-    let mut ckf = KF::initialize(initial_estimate, measurement_noise);
+    let mut ckf = KF::initialize(initial_estimate, process_noise, measurement_noise, None);
     match ckf.time_update(dt) {
         Ok(_) => panic!("expected the time update to fail"),
         Err(e) => {
@@ -148,10 +149,24 @@ fn ekf_fixed_step_perfect_stations() {
         covar_velocity,
     ));
 
+    // Define the initial estimate
     let initial_estimate = Estimate::from_covar(dt, init_covar);
 
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-    let mut kf = KF::initialize(initial_estimate, measurement_noise);
+
+    // Define the process noise in order to define how many variables of the EOMs are accelerations
+    // (this is required due to the many compile-time matrix size verifications)
+    let process_noise = Matrix3::zeros();
+    // But we disable the state noise compensation / process noise by setting the start time to zero
+    let process_noise_dt = None;
+
+    let mut kf = KF::initialize(
+        initial_estimate,
+        process_noise,
+        measurement_noise,
+        process_noise_dt,
+    );
 
     let mut odp = ODProcess::ekf(
         &mut prop_est,
@@ -254,10 +269,24 @@ fn ckf_fixed_step_perfect_stations() {
         covar_velocity,
     ));
 
+    // Define the initial estimate
     let initial_estimate = Estimate::from_covar(dt, init_covar);
 
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-    let mut ckf = KF::initialize(initial_estimate, measurement_noise);
+
+    // Define the process noise in order to define how many variables of the EOMs are accelerations
+    // (this is required due to the many compile-time matrix size verifications)
+    let process_noise = Matrix3::zeros();
+    // But we disable the state noise compensation / process noise by setting the start time to zero
+    let process_noise_dt = None;
+
+    let mut ckf = KF::initialize(
+        initial_estimate,
+        process_noise,
+        measurement_noise,
+        process_noise_dt,
+    );
 
     let mut odp = ODProcess::ckf(
         &mut prop_est,
@@ -333,7 +362,13 @@ fn ckf_fixed_step_perfect_stations() {
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
     // Get the propagator to catch up to the first estimate
     prop_est.until_time_elapsed(init_smoothed.dt - initial_state.dt);
-    let mut ckf = KF::initialize(init_smoothed, measurement_noise);
+
+    let mut ckf = KF::initialize(
+        init_smoothed,
+        process_noise,
+        measurement_noise,
+        process_noise_dt,
+    );
 
     let mut odp2 = ODProcess::ckf(
         &mut prop_est,
