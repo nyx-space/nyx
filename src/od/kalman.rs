@@ -77,8 +77,8 @@ where
         + Allocator<f64, S, S>,
 {
     /// Returns the previous estimate
-    fn previous_estimate(&self) -> Estimate<S> {
-        self.prev_estimate.clone()
+    fn previous_estimate(&self) -> &Estimate<S> {
+        &self.prev_estimate
     }
 
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
@@ -179,5 +179,13 @@ where
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();
         Ok((estimate, res))
+    }
+
+    fn is_extended(&self) -> bool {
+        self.ekf
+    }
+
+    fn set_extended(&mut self, status: bool) {
+        self.ekf = status;
     }
 }

@@ -21,6 +21,7 @@ pub struct ODProcess<
     M: Measurement,
     N: MeasurementDevice<M>,
     T: EkfTrigger,
+    K: Filter<D::LinStateSize, M::MeasurementSize>,
 > where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -34,7 +35,7 @@ pub struct ODProcess<
     /// Propagator used for the estimation
     pub prop: &'a mut Propagator<'a, D, E>,
     /// Kalman filter itself
-    pub kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+    pub kf: &'a mut K,
     /// List of measurement devices used
     pub devices: &'a [N],
     /// Whether or not these devices can make simultaneous measurements of the spacecraft
@@ -53,7 +54,8 @@ impl<
         M: Measurement,
         N: MeasurementDevice<M>,
         T: EkfTrigger,
-    > ODProcess<'a, D, E, M, N, T>
+        K: Filter<D::LinStateSize, M::MeasurementSize>,
+    > ODProcess<'a, D, E, M, N, T, K>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -66,7 +68,7 @@ where
 {
     pub fn ekf(
         prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        kf: &'a mut K,
         devices: &'a [N],
         simultaneous_msr: bool,
         num_expected_msr: usize,
@@ -85,7 +87,7 @@ where
 
     pub fn default_ekf(
         prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        kf: &'a mut K,
         devices: &'a [N],
         trigger: T,
     ) -> Self {
@@ -132,7 +134,7 @@ where
     pub fn process_measurements(&mut self, measurements: &[(Epoch, M)]) -> Option<FilterError> {
         info!("Processing {} measurements", measurements.len());
 
-        let mut prev_dt = self.kf.prev_estimate.dt;
+        let mut prev_dt = self.kf.previous_estimate().dt;
 
         for (next_epoch, real_meas) in measurements.iter() {
             // Propagate the dynamics to the measurement, and then start the filter.
@@ -156,12 +158,12 @@ where
                         computed_meas.observation(),
                     ) {
                         Ok((est, res)) => {
-                            // Switch to EKF if necessary, and update the dynamics and such
-                            if !self.kf.ekf && self.ekf_trigger.enable_ekf(&est) {
-                                self.kf.ekf = true;
+                            // Switch to extended if necessary, and update the dynamics and such
+                            if !self.kf.is_extended() && self.ekf_trigger.enable_ekf(&est) {
+                                self.kf.set_extended(true);
                                 info!("EKF now enabled");
                             }
-                            if self.kf.ekf {
+                            if self.kf.is_extended() {
                                 let est_state = est.state.clone();
                                 self.prop.dynamics.set_estimated_state(
                                     self.prop.dynamics.estimated_state() + est_state,
@@ -196,7 +198,7 @@ where
             "must have at least one measurement (for propagation time)"
         );
         // Start by propagating the estimator (on the same thread).
-        let prop_time = measurements[measurements.len() - 1].0 - self.kf.prev_estimate.dt;
+        let prop_time = measurements[measurements.len() - 1].0 - self.kf.previous_estimate().dt;
         info!("Propagating for {} seconds", prop_time);
 
         self.prop.until_time_elapsed(prop_time);
@@ -230,7 +232,7 @@ where
                             info!("time update {:?}", dt);
                             match self.kf.time_update(dt) {
                                 Ok(est) => {
-                                    if self.kf.ekf {
+                                    if self.kf.is_extended() {
                                         let est_state = est.state.clone();
                                         self.prop.dynamics.set_estimated_state(
                                             self.prop.dynamics.estimated_state() + est_state,
@@ -257,11 +259,13 @@ where
                                     Ok((est, res)) => {
                                         info!("msr update msr #{} {:?}", msr_cnt, dt);
                                         // Switch to EKF if necessary, and update the dynamics and such
-                                        if !self.kf.ekf && self.ekf_trigger.enable_ekf(&est) {
-                                            self.kf.ekf = true;
+                                        if !self.kf.is_extended()
+                                            && self.ekf_trigger.enable_ekf(&est)
+                                        {
+                                            self.kf.set_extended(true);
                                             info!("EKF now enabled");
                                         }
-                                        if self.kf.ekf {
+                                        if self.kf.is_extended() {
                                             let est_state = est.state.clone();
                                             self.prop.dynamics.set_estimated_state(
                                                 self.prop
@@ -289,7 +293,7 @@ where
                     info!("final time update {:?}", dt);
                     match self.kf.time_update(dt) {
                         Ok(est) => {
-                            if self.kf.ekf {
+                            if self.kf.is_extended() {
                                 let est_state = est.state.clone();
                                 self.prop.dynamics.set_estimated_state(
                                     self.prop.dynamics.extract_estimated_state(&prop_state)
@@ -315,7 +319,8 @@ impl<
         E: ErrorCtrl,
         M: Measurement,
         N: MeasurementDevice<M>,
-    > ODProcess<'a, D, E, M, N, CkfTrigger>
+        K: Filter<D::LinStateSize, M::MeasurementSize>,
+    > ODProcess<'a, D, E, M, N, CkfTrigger, K>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
@@ -328,7 +333,7 @@ where
 {
     pub fn ckf(
         prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        kf: &'a mut K,
         devices: &'a [N],
         simultaneous_msr: bool,
         num_expected_msr: usize,
@@ -346,7 +351,7 @@ where
 
     pub fn default_ckf(
         prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut KF<D::LinStateSize, M::MeasurementSize>,
+        kf: &'a mut K,
         devices: &'a [N],
     ) -> Self {
         Self {

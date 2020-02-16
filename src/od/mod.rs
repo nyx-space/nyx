@@ -88,7 +88,7 @@ where
         + Allocator<f64, S, S>,
 {
     /// Returns the previous estimate
-    fn previous_estimate(&self) -> estimate::Estimate<S>;
+    fn previous_estimate(&self) -> &estimate::Estimate<S>;
 
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
@@ -100,18 +100,24 @@ where
 
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
-    /// May return a FilterError if the STM was not updated.
+    /// Returns a FilterError if the STM was not updated.
     fn time_update(&mut self, dt: Epoch) -> Result<estimate::Estimate<S>, FilterError>;
 
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
-    /// May return a FilterError if the STM or sensitivity matrices were not updated.
+    ///Returns a FilterError if the STM or sensitivity matrices were not updated.
     fn measurement_update(
         &mut self,
         dt: Epoch,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
     ) -> Result<(estimate::Estimate<S>, residual::Residual<M>), FilterError>;
+
+    /// Returns whether the filter is an extended filter (e.g. EKF)
+    fn is_extended(&self) -> bool;
+
+    /// Sets the filter to be extended or not depending on the value of status
+    fn set_extended(&mut self, status: bool);
 }
 
 /// Stores the different kinds of filter errors.
