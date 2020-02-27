@@ -124,6 +124,8 @@ where
     {
         let mut seq = serializer.serialize_seq(Some(S::dim() * 3 + 1))?;
         match self.epoch_fmt {
+            EpochFormat::GregorianUtc => seq.serialize_element(&self.dt.as_gregorian_utc_str())?,
+            EpochFormat::GregorianTai => seq.serialize_element(&self.dt.as_gregorian_utc_tai())?,
             EpochFormat::MjdTai => seq.serialize_element(&self.dt.as_mjd_tai_days())?,
             EpochFormat::MjdTt => seq.serialize_element(&self.dt.as_mjd_tt_days())?,
             EpochFormat::MjdUtc => seq.serialize_element(&self.dt.as_mjd_utc_days())?,
@@ -131,8 +133,8 @@ where
             EpochFormat::JdeTai => seq.serialize_element(&self.dt.as_jde_tai_days())?,
             EpochFormat::JdeTt => seq.serialize_element(&self.dt.as_jde_tt_days())?,
             EpochFormat::JdeUtc => seq.serialize_element(&self.dt.as_jde_utc_days())?,
-            EpochFormat::TaiSecs => seq.serialize_element(&self.dt.as_tai_seconds())?,
-            EpochFormat::TaiDays => seq.serialize_element(&self.dt.as_tai_days())?,
+            EpochFormat::TaiSecs(e) => seq.serialize_element(&(self.dt.as_tai_seconds() - e))?,
+            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.dt.as_tai_days() - e))?,
         }
         // Serialize the state
         for i in 0..S::dim() {
