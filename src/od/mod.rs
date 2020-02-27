@@ -201,7 +201,9 @@ where
 /// Specifies the format of the Epoch during serialization
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EpochFormat {
-    /// Default is MJD TAI, as defined in [hifitime](https://docs.rs/hifitime/).
+    /// Default is GregorianUtc, as defined in [hifitime](https://docs.rs/hifitime/).
+    GregorianUtc,
+    GregorianTai,
     MjdTai,
     MjdTt,
     MjdUtc,
@@ -209,15 +211,17 @@ pub enum EpochFormat {
     JdeTai,
     JdeTt,
     JdeUtc,
-    /// Seconds past TAI Epoch
-    TaiSecs,
-    /// Days past TAI Epoch
-    TaiDays,
+    /// Seconds past a provided TAI Epoch
+    TaiSecs(f64),
+    /// Days past a provided TAI Epoch
+    TaiDays(f64),
 }
 
 impl fmt::Display for EpochFormat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            EpochFormat::GregorianUtc => write!(f, "Gregorian UTC"),
+            EpochFormat::GregorianTai => write!(f, "Gregorian TAI"),
             EpochFormat::MjdTai => write!(f, "MJD TAI"),
             EpochFormat::MjdTt => write!(f, "MJD TT"),
             EpochFormat::MjdUtc => write!(f, "MJD UTC"),
@@ -225,8 +229,8 @@ impl fmt::Display for EpochFormat {
             EpochFormat::JdeTai => write!(f, "JDE TAI"),
             EpochFormat::JdeTt => write!(f, "JDE TT"),
             EpochFormat::JdeUtc => write!(f, "JDE UTC"),
-            EpochFormat::TaiSecs => write!(f, "TAI+ s"),
-            EpochFormat::TaiDays => write!(f, "TAI+ days"),
+            EpochFormat::TaiSecs(_) => write!(f, "TAI+ s"),
+            EpochFormat::TaiDays(_) => write!(f, "TAI+ days"),
         }
     }
 }
