@@ -86,7 +86,7 @@ fn ekf_fixed_step_perfect_stations() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = Estimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -206,7 +206,7 @@ fn ckf_fixed_step_perfect_stations() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = Estimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -400,7 +400,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = Estimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));

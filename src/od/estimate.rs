@@ -9,8 +9,55 @@ use crate::hifitime::Epoch;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
+pub trait Estimate<S>
+where
+    Self: Clone + PartialEq + Sized,
+    S: DimName,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+{
+    /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
+    fn zeros() -> Self;
+    /// Date time of this Estimate
+    fn dt(&self) -> Epoch;
+    /// The estimated state, or state deviation (check filter docs).
+    fn state(&self) -> &VectorN<f64, S>;
+    /// The Covariance of this estimate
+    fn covar(&self) -> &MatrixMN<f64, S, S>;
+    /// The estimated state, or state deviation (check filter docs).
+    fn set_state(&mut self, new_state: VectorN<f64, S>);
+    /// The Covariance of this estimate
+    fn set_covar(&mut self, new_covar: MatrixMN<f64, S, S>);
+    /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
+    fn predicted(&self) -> bool;
+    /// The STM used to compute this Estimate
+    fn stm(&self) -> &MatrixMN<f64, S, S>;
+    /// The Epoch format upon serialization
+    fn epoch_fmt(&self) -> EpochFormat;
+    /// The covariance format upon serialization
+    fn covar_fmt(&self) -> CovarFormat;
+    /// Returns the header
+    fn header(epoch_fmt: EpochFormat, covar_fmt: CovarFormat) -> Vec<String> {
+        let mut hdr_v = Vec::with_capacity(3 * S::dim() + 1);
+        hdr_v.push(format!("{}", epoch_fmt));
+        for i in 0..S::dim() {
+            hdr_v.push(format!("state_{}", i));
+        }
+        // Serialize the covariance
+        for i in 0..S::dim() {
+            for j in 0..S::dim() {
+                hdr_v.push(format!("{}_{}_{}", covar_fmt, i, j));
+            }
+        }
+        hdr_v
+    }
+    /// Returns the default header
+    fn default_header() -> Vec<String> {
+        Self::header(EpochFormat::GregorianUtc, CovarFormat::Sqrt)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct Estimate<S>
+pub struct KfEstimate<S>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
@@ -31,45 +78,13 @@ where
     pub covar_fmt: CovarFormat,
 }
 
-impl<S> Estimate<S>
+impl<S> KfEstimate<S>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
-    /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
-    pub fn zeros() -> Estimate<S> {
-        Estimate {
-            dt: Epoch::from_tai_seconds(0.0),
-            state: VectorN::<f64, S>::zeros(),
-            covar: MatrixMN::<f64, S, S>::zeros(),
-            predicted: true,
-            stm: MatrixMN::<f64, S, S>::zeros(),
-            epoch_fmt: EpochFormat::MjdTai,
-            covar_fmt: CovarFormat::Sqrt,
-        }
-    }
-
-    pub fn header(epoch_fmt: EpochFormat, covar_fmt: CovarFormat) -> Vec<String> {
-        let mut hdr_v = Vec::with_capacity(3 * S::dim() + 1);
-        hdr_v.push(format!("{}", epoch_fmt));
-        for i in 0..S::dim() {
-            hdr_v.push(format!("state_{}", i));
-        }
-        // Serialize the covariance
-        for i in 0..S::dim() {
-            for j in 0..S::dim() {
-                hdr_v.push(format!("{}_{}_{}", covar_fmt, i, j));
-            }
-        }
-        hdr_v
-    }
-
-    pub fn default_header() -> Vec<String> {
-        Self::header(EpochFormat::MjdTai, CovarFormat::Sqrt)
-    }
-
-    pub fn from_covar(dt: Epoch, covar: MatrixMN<f64, S, S>) -> Estimate<S> {
-        Estimate {
+    pub fn from_covar(dt: Epoch, covar: MatrixMN<f64, S, S>) -> Self {
+        Self {
             dt,
             state: VectorN::<f64, S>::zeros(),
             covar,
@@ -81,7 +96,56 @@ where
     }
 }
 
-impl<S> fmt::Display for Estimate<S>
+impl<S> Estimate<S> for KfEstimate<S>
+where
+    S: DimName,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+{
+    fn zeros() -> Self {
+        Self {
+            dt: Epoch::from_tai_seconds(0.0),
+            state: VectorN::<f64, S>::zeros(),
+            covar: MatrixMN::<f64, S, S>::zeros(),
+            predicted: true,
+            stm: MatrixMN::<f64, S, S>::zeros(),
+            epoch_fmt: EpochFormat::MjdTai,
+            covar_fmt: CovarFormat::Sqrt,
+        }
+    }
+
+    fn dt(&self) -> Epoch {
+        self.dt
+    }
+
+    fn state(&self) -> &VectorN<f64, S> {
+        &self.state
+    }
+
+    fn covar(&self) -> &MatrixMN<f64, S, S> {
+        &self.covar
+    }
+
+    fn predicted(&self) -> bool {
+        self.predicted
+    }
+    fn stm(&self) -> &MatrixMN<f64, S, S> {
+        &self.stm
+    }
+    fn epoch_fmt(&self) -> EpochFormat {
+        self.epoch_fmt
+    }
+    fn covar_fmt(&self) -> CovarFormat {
+        self.covar_fmt
+    }
+    fn set_state(&mut self, new_state: VectorN<f64, S>) {
+        self.state = new_state;
+    }
+    fn set_covar(&mut self, new_covar: MatrixMN<f64, S, S>) {
+        self.covar = new_covar;
+    }
+}
+
+impl<S> fmt::Display for KfEstimate<S>
 where
     S: DimName,
     DefaultAllocator:
@@ -96,7 +160,7 @@ where
     }
 }
 
-impl<S> fmt::LowerExp for Estimate<S>
+impl<S> fmt::LowerExp for KfEstimate<S>
 where
     S: DimName,
     DefaultAllocator:
@@ -111,7 +175,7 @@ where
     }
 }
 
-impl<S> Serialize for Estimate<S>
+impl<S> Serialize for KfEstimate<S>
 where
     S: DimName,
     DefaultAllocator:

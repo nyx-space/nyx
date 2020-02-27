@@ -25,6 +25,9 @@ pub mod residual;
 /// Provides some helper for filtering.
 pub mod ui;
 
+/// Provides the Square Root Information Filter
+// pub mod srif;
+
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
 ///
 /// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
@@ -92,8 +95,10 @@ where
         + Allocator<f64, S, A>
         + Allocator<f64, A, S>,
 {
+    type Estimate: estimate::Estimate<S>;
+
     /// Returns the previous estimate
-    fn previous_estimate(&self) -> &estimate::Estimate<S>;
+    fn previous_estimate(&self) -> &Self::Estimate;
 
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
@@ -106,7 +111,7 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// Returns a FilterError if the STM was not updated.
-    fn time_update(&mut self, dt: Epoch) -> Result<estimate::Estimate<S>, FilterError>;
+    fn time_update(&mut self, dt: Epoch) -> Result<Self::Estimate, FilterError>;
 
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
@@ -116,7 +121,7 @@ where
         dt: Epoch,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
-    ) -> Result<(estimate::Estimate<S>, residual::Residual<M>), FilterError>;
+    ) -> Result<(Self::Estimate, residual::Residual<M>), FilterError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)
     fn is_extended(&self) -> bool;

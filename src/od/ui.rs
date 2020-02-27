@@ -46,7 +46,7 @@ pub struct ODProcess<
     /// Whether or not these devices can make simultaneous measurements of the spacecraft
     pub simultaneous_msr: bool,
     /// Vector of estimates available after a pass
-    pub estimates: Vec<Estimate<D::LinStateSize>>,
+    pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<M::MeasurementSize>>,
     pub ekf_trigger: T,
@@ -125,12 +125,12 @@ where
         for estimate in self.estimates.iter().rev() {
             let mut sm_est = estimate.clone();
             // TODO: Ensure that SNC was _not_ enabled
-            let mut stm_inv = estimate.stm.clone();
+            let mut stm_inv = estimate.stm().clone();
             if !stm_inv.try_inverse_mut() {
                 return Some(FilterError::StateTransitionMatrixSingular);
             }
-            sm_est.covar = &stm_inv * &estimate.covar * &stm_inv.transpose();
-            sm_est.state = &stm_inv * &estimate.state;
+            sm_est.set_covar(&stm_inv * estimate.covar() * &stm_inv.transpose());
+            sm_est.set_state(&stm_inv * estimate.state());
             smoothed.push(sm_est);
         }
 
@@ -146,7 +146,7 @@ where
     pub fn process_measurements(&mut self, measurements: &[(Epoch, M)]) -> Option<FilterError> {
         info!("Processing {} measurements", measurements.len());
 
-        let mut prev_dt = self.kf.previous_estimate().dt;
+        let mut prev_dt = self.kf.previous_estimate().dt();
 
         for (next_epoch, real_meas) in measurements.iter() {
             // Propagate the dynamics to the measurement, and then start the filter.
@@ -176,9 +176,8 @@ where
                                 info!("EKF now enabled");
                             }
                             if self.kf.is_extended() {
-                                let est_state = est.state.clone();
                                 self.prop.dynamics.set_estimated_state(
-                                    self.prop.dynamics.estimated_state() + est_state,
+                                    self.prop.dynamics.estimated_state() + est.state(),
                                 );
                             }
                             self.estimates.push(est);
@@ -210,7 +209,7 @@ where
             "must have at least one measurement (for propagation time)"
         );
         // Start by propagating the estimator (on the same thread).
-        let prop_time = measurements[measurements.len() - 1].0 - self.kf.previous_estimate().dt;
+        let prop_time = measurements[measurements.len() - 1].0 - self.kf.previous_estimate().dt();
         info!("Propagating for {} seconds", prop_time);
 
         self.prop.until_time_elapsed(prop_time);
@@ -245,9 +244,8 @@ where
                             match self.kf.time_update(dt) {
                                 Ok(est) => {
                                     if self.kf.is_extended() {
-                                        let est_state = est.state.clone();
                                         self.prop.dynamics.set_estimated_state(
-                                            self.prop.dynamics.estimated_state() + est_state,
+                                            self.prop.dynamics.estimated_state() + est.state(),
                                         );
                                     }
                                     self.estimates.push(est);
@@ -278,12 +276,11 @@ where
                                             info!("EKF now enabled");
                                         }
                                         if self.kf.is_extended() {
-                                            let est_state = est.state.clone();
                                             self.prop.dynamics.set_estimated_state(
                                                 self.prop
                                                     .dynamics
                                                     .extract_estimated_state(&prop_state)
-                                                    + est_state,
+                                                    + est.state(),
                                             );
                                         }
                                         self.estimates.push(est);
@@ -306,10 +303,9 @@ where
                     match self.kf.time_update(dt) {
                         Ok(est) => {
                             if self.kf.is_extended() {
-                                let est_state = est.state.clone();
                                 self.prop.dynamics.set_estimated_state(
                                     self.prop.dynamics.extract_estimated_state(&prop_state)
-                                        + est_state,
+                                        + est.state(),
                                 );
                             }
                             self.estimates.push(est);
@@ -385,9 +381,10 @@ where
 }
 /// A trait detailing when to switch to from a CKF to an EKF
 pub trait EkfTrigger {
-    fn enable_ekf<S>(&mut self, est: &Estimate<S>) -> bool
+    fn enable_ekf<S, E>(&mut self, est: &E) -> bool
     where
         S: DimName,
+        E: Estimate<S>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
 }
 
@@ -395,9 +392,10 @@ pub trait EkfTrigger {
 pub struct CkfTrigger;
 
 impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<S>(&mut self, _est: &Estimate<S>) -> bool
+    fn enable_ekf<S, E>(&mut self, _est: &E) -> bool
     where
         S: DimName,
+        E: Estimate<S>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
         false
@@ -420,9 +418,10 @@ impl NumMsrEkfTrigger {
 }
 
 impl EkfTrigger for NumMsrEkfTrigger {
-    fn enable_ekf<S>(&mut self, _est: &Estimate<S>) -> bool
+    fn enable_ekf<S, E>(&mut self, _est: &E) -> bool
     where
         S: DimName,
+        E: Estimate<S>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
         self.cur_msrs += 1;

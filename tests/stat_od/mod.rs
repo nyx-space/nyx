@@ -21,7 +21,7 @@ macro_rules! f64_nil {
 
 #[test]
 fn empty_estimate() {
-    let empty = Estimate::<U6>::zeros();
+    let empty = KfEstimate::<U6>::zeros();
     f64_nil!(empty.state.norm(), "expected state norm to be nil");
     f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
     f64_nil!(empty.stm.norm(), "expected STM norm to be nil");
@@ -31,14 +31,14 @@ fn empty_estimate() {
 #[test]
 fn csv_serialize_empty_estimate() {
     use std::io;
-    let empty = Estimate::<U6>::zeros();
+    let empty = KfEstimate::<U6>::zeros();
     let mut wtr = csv::Writer::from_writer(io::stdout());
     wtr.serialize(empty).expect("could not write to stdout");
 }
 
 #[test]
 fn filter_errors() {
-    let initial_estimate = Estimate::<U6>::zeros();
+    let initial_estimate = KfEstimate::<U6>::zeros();
     let process_noise = Matrix3::zeros();
     let measurement_noise = Matrix2::zeros();
     let real_obs = Vector2::zeros();
