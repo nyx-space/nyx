@@ -1,7 +1,5 @@
-extern crate nalgebra as na;
-
-use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use super::na::allocator::Allocator;
+use super::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
 
 pub use super::estimate::{Estimate, KfEstimate};

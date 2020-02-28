@@ -4,7 +4,7 @@ use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
 
-pub use super::estimate::Estimate;
+pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
 use super::{CovarFormat, EpochFormat, Filter, FilterError};
 
@@ -25,7 +25,7 @@ where
         + Allocator<f64, A, S>,
 {
     /// The previous estimate used in the KF computations.
-    pub prev_estimate: Estimate<S>,
+    pub prev_estimate: KfEstimate<S>,
     /// Sets the Measurement noise (usually noted R)
     pub measurement_noise: MatrixMN<f64, M, M>,
     /// Sets the process noise (usually noted Q) in the frame of the estimated state
@@ -60,12 +60,11 @@ where
 {
     /// Initializes this KF with an initial estimate and measurement noise.
     pub fn initialize(
-        initial_estimate: Estimate<S>,
+        initial_estimate: KfEstimate<S>,
         process_noise: MatrixMN<f64, A, A>,
         measurement_noise: MatrixMN<f64, M, M>,
         process_noise_dt: Option<f64>,
     ) -> Self {
-        // Start by inverting the information matrix
         Self {
             prev_estimate: initial_estimate,
             measurement_noise,
@@ -97,8 +96,10 @@ where
         + Allocator<f64, S, A>
         + Allocator<f64, A, S>,
 {
+    type Estimate = KfEstimate<S>;
+
     /// Returns the previous estimate
-    fn previous_estimate(&self) -> &Estimate<S> {
+    fn previous_estimate(&self) -> &Self::Estimate {
         &self.prev_estimate
     }
 
@@ -119,7 +120,7 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    fn time_update(&mut self, dt: Epoch) -> Result<Estimate<S>, FilterError> {
+    fn time_update(&mut self, dt: Epoch) -> Result<Self::Estimate, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
@@ -129,7 +130,7 @@ where
         } else {
             &self.stm * &self.prev_estimate.state
         };
-        let estimate = Estimate {
+        let estimate = KfEstimate {
             dt,
             state: state_bar,
             covar: covar_bar,
@@ -151,7 +152,7 @@ where
         dt: Epoch,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
-    ) -> Result<(Estimate<S>, Residual<M>), FilterError> {
+    ) -> Result<(Self::Estimate, Residual<M>), FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
@@ -204,7 +205,7 @@ where
         let covar = (MatrixMN::<f64, S, S>::identity() - gain * &self.h_tilde) * covar_bar;
 
         // And wrap up
-        let estimate = Estimate {
+        let estimate = KfEstimate {
             dt,
             state: state_hat,
             covar,
