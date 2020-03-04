@@ -16,6 +16,8 @@ and portability to all platforms supported by [Rust](https://forge.rust-lang.org
 The [LICENSE](./LICENSE) will be strictly enforced once this toolkit reaches production-level quality.
 
 # Features
+Unless specified otherwise in the documentation of specific functions, all vectors and matrices are [statically allocated](https://discourse.nphysics.org/t/statically-typed-matrices-whose-size-is-a-multiple-or-another-one/460/4).
+
 ## Propagation
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
 - [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/orbitaldyn.rs](tests/orbitaldyn.rs))

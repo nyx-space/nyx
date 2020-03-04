@@ -26,7 +26,7 @@ pub mod residual;
 pub mod ui;
 
 /// Provides the Square Root Information Filter
-// pub mod srif;
+pub mod srif;
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
 ///
