@@ -1,9 +1,7 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::dimension::{
-    Dim, DimMin, DimMinimum, DimNameAdd, DimNameMin, DimNameMinimum, DimNameSum, DimSum,
-};
+use self::na::dimension::{DimMin, DimMinimum, DimNameAdd, DimNameSum};
 use self::na::linalg::QR;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
 use crate::hifitime::Epoch;
@@ -226,28 +224,15 @@ where
         // Extract the data
         let rk = hh_rtn.fixed_slice::<S, S>(0, 0).into_owned();
         let bk = hh_rtn.fixed_slice::<S, U1>(0, S::dim()).to_owned();
-        // 	bkMat := A.Slice(0, n, n, n+1)
-        //	ekMat := A.Slice(n, n+m, n, n+1)
-        let ek = hh_rtn.fixed_slice::<M, U1>(S::dim(), S::dim()).to_owned();
+        // Get the error estimate -- Don't know where I'd store this for now
+        // let ek = hh_rtn[(S::dim() + 1, S::dim() + 1)];
 
         let mut info_state = VectorN::<f64, S>::zeros();
-        let mut postfit = VectorN::<f64, M>::zeros();
-        // Can probably be simplified with a from_slice call
         for i in 0..S::dim() {
             info_state[i] = bk[(i, 0)];
         }
 
-        for i in 0..M::dim() {
-            postfit[i] = ek[(i, 0)];
-        }
-
-        /*
-            tmpEst := NewSRIFEstimate(kf.Φ, bk, realObservation, &y, Rk, &RBar)
-        est = &tmpEst
-        kf.prevEst = est.(*SRIFEstimate)
-        kf.step++
-        kf.locked = true
-        */
+        let postfit = &prefit - (&self.h_tilde * &state_bar);
 
         // And wrap up
         let estimate = IfEstimate {
@@ -267,42 +252,14 @@ where
     }
 
     fn is_extended(&self) -> bool {
-        self.ekf
+        false
     }
 
-    fn set_extended(&mut self, status: bool) {
-        self.ekf = status;
+    fn set_extended(&mut self, _: bool) {
+        unimplemented!();
     }
 
     fn set_process_noise(&mut self, prc: MatrixMN<f64, A, A>) {
         self.process_noise = Some(prc);
     }
-}
-
-#[test]
-fn test_hh2() {
-    use self::na::{Matrix2, Vector1, VectorN, U1, U2, U3};
-
-    let r_bar = Matrix2::<f64>::new(1.0, -1.0, 1.0, -1.0);
-    let b_bar = VectorN::<f64, U2>::new(2.0, 2.0);
-    let h_tilde = MatrixMN::<f64, U1, U2>::new(3.0, -3.0);
-    let prefit = Vector1::new(4.0);
-
-    let mut stacked = MatrixMN::<f64, U3, U3>::zeros();
-    stacked.fixed_slice_mut::<U2, U2>(0, 0).copy_from(&r_bar);
-    stacked
-        .fixed_slice_mut::<U2, U1>(0, U2::dim())
-        .copy_from(&b_bar);
-    stacked
-        .fixed_slice_mut::<U1, U2>(U2::dim(), 0)
-        .copy_from(&h_tilde);
-    stacked
-        .fixed_slice_mut::<U1, U1>(U2::dim(), U2::dim())
-        .copy_from(&prefit);
-
-    println!("{}", &stacked);
-
-    let qr = QR::new(stacked);
-
-    println!("Q {} R {}", qr.q(), qr.r());
 }

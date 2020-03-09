@@ -8,6 +8,7 @@ use self::nyx::od::ui::*;
 
 mod measurements;
 mod multi_body;
+mod srif;
 mod two_body;
 
 use self::na::{Matrix2, Matrix2x6, Matrix3, Matrix6, Vector2, U6};
