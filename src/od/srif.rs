@@ -1,7 +1,9 @@
 extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
-use self::na::dimension::{DimMin, DimMinimum, DimNameAdd, DimNameSum};
+use self::na::dimension::{
+    Dim, DimMin, DimMinimum, DimNameAdd, DimNameMin, DimNameMinimum, DimNameSum, DimSum,
+};
 use self::na::linalg::QR;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
 use crate::hifitime::Epoch;
@@ -83,14 +85,20 @@ where
 
 impl<S, A, M> Filter<S, A, M> for SRIF<S, A, M>
 where
-    S: DimName + DimNameAdd<M> + DimNameAdd<S> + DimNameAdd<U1>,
+    S: DimName + DimNameAdd<M> + DimNameAdd<S> + DimNameAdd<U1> + DimMin<U1>,
     A: DimName,
     M: DimName + DimNameAdd<S> + DimNameAdd<M> + DimNameAdd<U1>,
+    DimNameSum<S, M>: DimMin<DimNameSum<S, U1>>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, DimNameSum<S, M>, DimNameSum<S, U1>>
+        + Allocator<f64, DimNameSum<S, U1>, DimNameSum<S, M>>
+        + Allocator<f64, DimNameSum<S, M>>
+        + Allocator<f64, DimNameSum<S, U1>>
+        + Allocator<f64, DimMinimum<DimNameSum<S, M>, DimNameSum<S, U1>>>
+        + Allocator<f64, DimMinimum<DimNameSum<S, M>, DimNameSum<S, U1>>, DimNameSum<S, U1>>
         + Allocator<f64, S, M>
         + Allocator<f64, S, S>
         + Allocator<f64, A, A>
@@ -196,17 +204,6 @@ where
         let prefit = &self.inv_measurement_noise * &(real_obs - computed_obs);
         // Whiten the h tilde and y
         let h_tilde = &self.inv_measurement_noise * &self.h_tilde;
-        /*
-        dynamics::na::Matrix<f64,
-            <S as dynamics::na::DimNameAdd<M>>::Output,
-            <S as dynamics::na::DimNameAdd<dynamics::na::U1>>::Output,
-            <dynamics::na::DefaultAllocator as
-                od::hyperdual::Allocator<f64,
-                    <S as dynamics::na::DimNameAdd<M>>::Output,
-                    <S as dynamics::na::DimNameAdd<dynamics::na::U1>>::Output
-                >
-            >::Buffer>
-        */
 
         // Householder transformation
         let mut stacked = MatrixMN::<f64, DimNameSum<S, M>, DimNameSum<S, U1>>::zeros();
@@ -222,11 +219,9 @@ where
             .copy_from(&prefit);
 
         // nalgebra uses a Householder transformation to compute the Q, R
-        let qr = QR::new(stacked);
-
         // The householder transform used in the SRIF implementation seems to be opposite of the R computed here (as per gokalman tests).
-        // let hh_rtn = -qr.r();
-        let hh_rtn = stacked.clone();
+        let qr = QR::new(stacked);
+        let hh_rtn = -qr.r();
 
         // Extract the data
         let rk = hh_rtn.fixed_slice::<S, S>(0, 0).into_owned();
