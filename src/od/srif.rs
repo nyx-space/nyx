@@ -186,7 +186,27 @@ where
             .try_inverse()
             .expect("state transition matrix singular");
 
-        let r_bar = &self.prev_estimate.info_mat * &stm_inv;
+        let mut r_bar = &self.prev_estimate.info_mat * &stm_inv;
+        if let Some(pcr_dt) = self.process_noise_dt {
+            let delta_t = dt - self.prev_estimate.dt;
+
+            if delta_t <= pcr_dt {
+                // Let's compute the Gamma matrix, an approximation of the time integral
+                // which assumes that the acceleration is constant between these two measurements.
+                let mut gamma = MatrixMN::<f64, S, A>::zeros();
+                for i in 0..A::dim() {
+                    gamma[(i, i)] = delta_t.powi(2);
+                    gamma[(i + A::dim(), i)] = delta_t;
+                }
+                // Let's add the process noise
+                let mut covar_prc = delta_t.powi(2)
+                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose());
+                if !covar_prc.try_inverse_mut() {
+                    panic!("process noise singular");
+                }
+                r_bar += covar_prc;
+            }
+        }
 
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
