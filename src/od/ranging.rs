@@ -251,6 +251,16 @@ impl StdMeasurement {
             h_tilde,
         }
     }
+
+    /// Initializes a StdMeasurement from real tracking data (sensitivity is zero)
+    pub fn real(dt: Epoch, range: f64, range_rate: f64) -> Self {
+        Self {
+            dt,
+            obs: Vector2::new(range, range_rate),
+            visible: true,
+            h_tilde: Matrix2x6::zeros(),
+        }
+    }
 }
 
 impl Measurement for StdMeasurement {
