@@ -201,8 +201,9 @@ where
         + Allocator<f64, N::MeasurementSize>
         + Allocator<f64, N::MeasurementSize, N::StateSize>,
 {
-    type MeasurementInput: Copy;
-    fn measure(&self, state: &Self::MeasurementInput) -> N;
+    type MeasurementInput;
+    /// Returns the measurement if the device and generate one, else returns None
+    fn measure(&self, state: &Self::MeasurementInput) -> Option<N>;
 }
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.

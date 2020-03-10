@@ -148,8 +148,10 @@ where
         info!("Processing {} measurements", measurements.len());
 
         let mut prev_dt = self.kf.previous_estimate().dt();
+        let mut reported = vec![false; 11];
+        let num_msrs = measurements.len();
 
-        for (next_epoch, real_meas) in measurements.iter() {
+        for (msr_cnt, (next_epoch, real_meas)) in measurements.iter().enumerate() {
             // Propagate the dynamics to the measurement, and then start the filter.
             let delta_time = *next_epoch - prev_dt;
             prev_dt = *next_epoch; // Update the epoch for the next computation
@@ -162,34 +164,45 @@ where
                 .to_measurement(&self.prop.dynamics.state());
             // Get the computed observations
             for device in self.devices.iter() {
-                let computed_meas: M = device.measure(&meas_input);
-                if computed_meas.visible() {
-                    self.kf.update_h_tilde(computed_meas.sensitivity());
-                    match self.kf.measurement_update(
-                        dt,
-                        real_meas.observation(),
-                        computed_meas.observation(),
-                    ) {
-                        Ok((est, res)) => {
-                            // Switch to extended if necessary, and update the dynamics and such
-                            if !self.kf.is_extended() && self.ekf_trigger.enable_ekf(&est) {
-                                self.kf.set_extended(true);
-                                info!("EKF now enabled");
+                if let Some(computed_meas) = device.measure(&meas_input) {
+                    if computed_meas.visible() {
+                        self.kf.update_h_tilde(computed_meas.sensitivity());
+                        match self.kf.measurement_update(
+                            dt,
+                            real_meas.observation(),
+                            computed_meas.observation(),
+                        ) {
+                            Ok((est, res)) => {
+                                // Switch to extended if necessary, and update the dynamics and such
+                                if !self.kf.is_extended() && self.ekf_trigger.enable_ekf(&est) {
+                                    self.kf.set_extended(true);
+                                    info!("EKF now enabled");
+                                }
+                                if self.kf.is_extended() {
+                                    self.prop.dynamics.set_estimated_state(
+                                        self.prop.dynamics.estimated_state() + est.state(),
+                                    );
+                                }
+                                self.estimates.push(est);
+                                self.residuals.push(res);
                             }
-                            if self.kf.is_extended() {
-                                self.prop.dynamics.set_estimated_state(
-                                    self.prop.dynamics.estimated_state() + est.state(),
-                                );
-                            }
-                            self.estimates.push(est);
-                            self.residuals.push(res);
+                            Err(e) => return Some(e),
                         }
-                        Err(e) => return Some(e),
-                    }
-                    if !self.simultaneous_msr {
-                        break;
+                        if !self.simultaneous_msr {
+                            break;
+                        }
                     }
                 }
+            }
+
+            let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
+            if !reported[msr_prct] {
+                info!(
+                    "[ODProcess] {:>2}% done ({:.0} measurements processed)",
+                    10 * msr_prct,
+                    msr_cnt
+                );
+                reported[msr_prct] = true;
             }
         }
 
@@ -210,16 +223,18 @@ where
             "must have at least one measurement (for propagation time)"
         );
         // Start by propagating the estimator (on the same thread).
-        let prop_time = measurements[measurements.len() - 1].0 - self.kf.previous_estimate().dt();
+        let num_msrs = measurements.len();
+        let prop_time = measurements[num_msrs - 1].0 - self.kf.previous_estimate().dt();
         info!("Propagating for {} seconds", prop_time);
 
         self.prop.until_time_elapsed(prop_time);
         info!(
             "Processing {} measurements with covariance mapping",
-            measurements.len()
+            num_msrs
         );
 
         let mut msr_cnt = 0_usize;
+        let mut reported = vec![false; 11];
 
         'chan: while let Ok(prop_state) = prop_rx.recv() {
             // Get the datetime and info needed to compute the theoretical measurement according to the model
@@ -230,7 +245,7 @@ where
                 // Update the STM of the KF (needed between each measurement or time update)
                 let stm = self.prop.dynamics.extract_stm(&prop_state);
                 self.kf.update_stm(stm);
-                if msr_cnt < measurements.len() {
+                if msr_cnt < num_msrs {
                     // Get the next measurement
                     let (next_epoch, real_meas) = &measurements[msr_cnt];
                     if *next_epoch < dt {
@@ -241,7 +256,7 @@ where
                     } else if *next_epoch > dt {
                         // No measurement can be used here, let's just do a time update (unless we have already done a time update)
                         if num_msr_processed == 0 {
-                            info!("time update {:?}", dt);
+                            debug!("time update {:?}", dt);
                             match self.kf.time_update(dt) {
                                 Ok(est) => {
                                     if self.kf.is_extended() {
@@ -259,48 +274,58 @@ where
                         // The epochs match, so this is a valid measurement to use
                         // Get the computed observations
                         for device in self.devices.iter() {
-                            let computed_meas: M = device.measure(&meas_input);
-                            if computed_meas.visible() {
-                                self.kf.update_h_tilde(computed_meas.sensitivity());
-                                match self.kf.measurement_update(
-                                    dt,
-                                    real_meas.observation(),
-                                    computed_meas.observation(),
-                                ) {
-                                    Ok((est, res)) => {
-                                        info!("msr update msr #{} {:?}", msr_cnt, dt);
-                                        // Switch to EKF if necessary, and update the dynamics and such
-                                        if !self.kf.is_extended()
-                                            && self.ekf_trigger.enable_ekf(&est)
-                                        {
-                                            self.kf.set_extended(true);
-                                            info!("EKF now enabled");
+                            if let Some(computed_meas) = device.measure(&meas_input) {
+                                if computed_meas.visible() {
+                                    self.kf.update_h_tilde(computed_meas.sensitivity());
+                                    match self.kf.measurement_update(
+                                        dt,
+                                        real_meas.observation(),
+                                        computed_meas.observation(),
+                                    ) {
+                                        Ok((est, res)) => {
+                                            debug!("msr update msr #{} {:?}", msr_cnt, dt);
+                                            // Switch to EKF if necessary, and update the dynamics and such
+                                            if !self.kf.is_extended()
+                                                && self.ekf_trigger.enable_ekf(&est)
+                                            {
+                                                self.kf.set_extended(true);
+                                                info!("EKF now enabled");
+                                            }
+                                            if self.kf.is_extended() {
+                                                self.prop.dynamics.set_estimated_state(
+                                                    self.prop
+                                                        .dynamics
+                                                        .extract_estimated_state(&prop_state)
+                                                        + est.state(),
+                                                );
+                                            }
+                                            self.estimates.push(est);
+                                            self.residuals.push(res);
                                         }
-                                        if self.kf.is_extended() {
-                                            self.prop.dynamics.set_estimated_state(
-                                                self.prop
-                                                    .dynamics
-                                                    .extract_estimated_state(&prop_state)
-                                                    + est.state(),
-                                            );
-                                        }
-                                        self.estimates.push(est);
-                                        self.residuals.push(res);
+                                        Err(e) => return Some(e),
                                     }
-                                    Err(e) => return Some(e),
-                                }
-                                if !self.simultaneous_msr {
-                                    break;
+                                    if !self.simultaneous_msr {
+                                        break;
+                                    }
                                 }
                             }
                         }
                         // And increment the measurement counter
                         msr_cnt += 1;
                         num_msr_processed += 1;
+                        let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
+                        if !reported[msr_prct] {
+                            info!(
+                                "[ODProcess] {:>2}% done ({:.0} measurements processed)",
+                                10 * msr_prct,
+                                msr_cnt
+                            );
+                            reported[msr_prct] = true;
+                        }
                     }
                 } else {
                     // No more measurements, we can only do a time update
-                    info!("final time update {:?}", dt);
+                    debug!("final time update {:?}", dt);
                     match self.kf.time_update(dt) {
                         Ok(est) => {
                             if self.kf.is_extended() {

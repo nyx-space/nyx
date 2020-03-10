@@ -59,7 +59,7 @@ fn srif_fixed_step_perfect_stations() {
     while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state);
+            let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
                 measurements.push((rx_state.dt, meas));
                 break; // We know that only one station is in visibility at each time.
@@ -208,7 +208,7 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
     while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state);
+            let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
                 measurements.push((rx_state.dt, meas));
                 break; // We know that only one station is in visibility at each time.

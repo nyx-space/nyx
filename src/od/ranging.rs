@@ -101,7 +101,7 @@ impl GroundStation {
 impl MeasurementDevice<StdMeasurement> for GroundStation {
     type MeasurementInput = State<Geoid>;
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &State<Geoid>) -> StdMeasurement {
+    fn measure(&self, rx: &State<Geoid>) -> Option<StdMeasurement> {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
@@ -130,14 +130,14 @@ impl MeasurementDevice<StdMeasurement> for GroundStation {
             r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::with_noise(
+        Some(StdMeasurement::new(
             dt,
             tx,
             *rx,
             elevation >= self.elevation_mask,
-            self.range_noise,
-            self.range_rate_noise,
-        )
+            &self.range_noise,
+            &self.range_rate_noise,
+        ))
     }
 }
 /*
@@ -172,6 +172,8 @@ impl StdMeasurement {
 
     fn compute_sensitivity(
         state: &VectorN<Hyperdual<f64, U7>, U6>,
+        range_noise: f64,
+        range_rate_noise: f64,
     ) -> (Vector2<f64>, Matrix2x6<f64>) {
         // Extract data from hyperspace
         let range_vec = state.fixed_rows::<U3>(0).into_owned();
@@ -179,8 +181,8 @@ impl StdMeasurement {
 
         // Code up math as usual
         let delta_v_vec = velocity_vec / norm(&range_vec);
-        let range = norm(&range_vec);
-        let range_rate = range_vec.dot(&delta_v_vec);
+        let range = norm(&range_vec) + Hyperdual::from(range_noise);
+        let range_rate = range_vec.dot(&delta_v_vec) + Hyperdual::from(range_rate_noise);
 
         // Extract result into Vector2 and Matrix2x6
         let mut fx = Vector2::zeros();
@@ -198,12 +200,49 @@ impl StdMeasurement {
         (fx, pmat)
     }
 
-    fn new<F: Frame>(dt: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
+    /// Generate noiseless measurement
+    pub fn noiseless<F: Frame>(
+        dt: Epoch,
+        tx: State<F>,
+        rx: State<F>,
+        visible: bool,
+    ) -> StdMeasurement {
+        Self::raw(dt, tx, rx, visible, 0.0, 0.0)
+    }
+
+    /// Generate a new measurement with the provided noise distribution.
+    pub fn new<F: Frame, D: Distribution<f64>>(
+        dt: Epoch,
+        tx: State<F>,
+        rx: State<F>,
+        visible: bool,
+        range_dist: &D,
+        range_rate_dist: &D,
+    ) -> StdMeasurement {
+        Self::raw(
+            dt,
+            tx,
+            rx,
+            visible,
+            range_dist.sample(&mut thread_rng()),
+            range_rate_dist.sample(&mut thread_rng()),
+        )
+    }
+
+    /// Generate a new measurement with the provided noise values.
+    pub fn raw<F: Frame>(
+        dt: Epoch,
+        tx: State<F>,
+        rx: State<F>,
+        visible: bool,
+        range_noise: f64,
+        range_rate_noise: f64,
+    ) -> StdMeasurement {
         assert_eq!(tx.frame.id(), rx.frame.id(), "tx & rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx & rx states have different times");
 
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
-        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
+        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate, range_noise, range_rate_noise);
 
         StdMeasurement {
             dt,
@@ -211,21 +250,6 @@ impl StdMeasurement {
             visible,
             h_tilde,
         }
-    }
-
-    /// Generate a new measurement with the provided noise distribution
-    pub fn with_noise<F: Frame, D: Distribution<f64>>(
-        dt: Epoch,
-        tx: State<F>,
-        rx: State<F>,
-        visible: bool,
-        range_dist: D,
-        range_rate_dist: D,
-    ) -> StdMeasurement {
-        let mut me = Self::new(dt, tx, rx, visible);
-        me.obs[0] += range_dist.sample(&mut thread_rng());
-        me.obs[1] += range_rate_dist.sample(&mut thread_rng());
-        me
     }
 }
 

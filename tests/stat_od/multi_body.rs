@@ -60,7 +60,7 @@ fn multi_body_ckf_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state);
+            let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
                 measurements.push((rx_state.dt, meas));
                 break;
@@ -200,7 +200,7 @@ fn multi_body_ckf_covar_map() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state);
+            let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
                 measurements.push((rx_state.dt, meas));
                 break;
