@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
-use nyx::celestia::{bodies, Cosm, Geoid, LTCorr, State};
+use nyx::celestia::{bodies, Cosm, LTCorr, OrbitState};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator, RK89};
 use std::sync::mpsc;
@@ -22,9 +22,9 @@ fn leo_sun_earth_eclipses() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::<Geoid>::from_keplerian(6778.0, 0.1, 60.0, 0.0, 0.0, 0.0, start_time, earth);
+    let leo = OrbitState::from_keplerian(6778.0, 0.1, 60.0, 0.0, 0.0, 0.0, start_time, earth);
 
-    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<OrbitState>, Receiver<OrbitState>) = mpsc::channel();
 
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
 
@@ -74,9 +74,9 @@ fn geo_sun_earth_eclipses() {
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
 
-    let leo = State::<Geoid>::from_keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
+    let leo = OrbitState::from_keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
 
-    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<OrbitState>, Receiver<OrbitState>) = mpsc::channel();
 
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
 

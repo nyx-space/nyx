@@ -1,5 +1,5 @@
 use super::na::Vector3;
-use celestia::{Geoid, LocalFrame, State};
+use celestia::{LocalFrame, OrbitState};
 
 pub use super::thrustctrl::Mnvr;
 
@@ -10,10 +10,10 @@ where
     Self: Clone + Sized,
 {
     /// Returns the control vector corresponding to the change in velocity direction in the inertial frame.
-    fn ctrl_vector(&self, state: &State<Geoid>) -> Vector3<f64>;
+    fn ctrl_vector(&self, state: &OrbitState) -> Vector3<f64>;
 
     /// Prepares the controller for the next maneuver (called from set_state of the dynamics).
-    fn next(&mut self, state: &State<Geoid>);
+    fn next(&mut self, state: &OrbitState);
 }
 
 #[derive(Clone, Debug)]
@@ -31,7 +31,7 @@ impl InstantBurns {
 }
 
 impl DeltaVctrl for InstantBurns {
-    fn ctrl_vector(&self, state: &State<Geoid>) -> Vector3<f64> {
+    fn ctrl_vector(&self, state: &OrbitState) -> Vector3<f64> {
         if self.mnvr_no >= self.mnvrs.len() {
             Vector3::zeros()
         } else {
@@ -44,7 +44,7 @@ impl DeltaVctrl for InstantBurns {
         }
     }
 
-    fn next(&mut self, state: &State<Geoid>) {
+    fn next(&mut self, state: &OrbitState) {
         if self.mnvr_no < self.mnvrs.len() {
             let cur_mnvr = self.mnvrs[self.mnvr_no];
             if state.dt >= cur_mnvr.end {

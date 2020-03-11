@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use na::Vector6;
-use nyx::celestia::{bodies, Cosm, Geoid, State};
+use nyx::celestia::{bodies, Cosm, OrbitState};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::dynamics::drag::ExpEarthDrag;
 use nyx::dynamics::solarpressure::SolarPressure;
@@ -22,7 +22,7 @@ fn srp_earth() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::<Geoid>::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = OrbitState::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
@@ -70,7 +70,7 @@ fn drag_earth() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::<Geoid>::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = OrbitState::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 

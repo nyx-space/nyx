@@ -4,6 +4,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use hifitime::Epoch;
+use nyx::celestia::{Cosm, OrbitState};
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
@@ -18,16 +19,15 @@ fn state_def_() {
 
 #[test]
 fn state_def_circ_inc() {
-    use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
     let mut earth = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::<Geoid>::from_cartesian(
+    let cart = OrbitState::from_cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth,
     );
-    let cart2 = State::<Geoid>::from_cartesian(
+    let cart2 = OrbitState::from_cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -70,7 +70,7 @@ fn state_def_circ_inc() {
     );
 
     let kep =
-        State::<Geoid>::from_keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, earth);
+        OrbitState::from_keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, earth);
     f64_eq!(kep.x, 8_057.976_452_202_976, "x");
     f64_eq!(kep.y, -0.196_740_370_290_888_9, "y");
     f64_eq!(kep.z, 1_475.383_214_274_138, "z");
@@ -100,17 +100,16 @@ fn state_def_circ_inc() {
     );
 
     let kep =
-        State::<Geoid>::from_keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, earth);
+        OrbitState::from_keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, earth);
     f64_eq!(kep.ta(), 260.1123, "ta");
 }
 
 #[test]
 fn xb_conversion() {
-    use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
     let earth = cosm.geoid_from_id(399);
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::<Geoid>::from_cartesian(
+    let cart = OrbitState::from_cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth,
     );
     let cart_xb = cart.to_exb_state();
@@ -155,13 +154,12 @@ fn xb_conversion() {
 
 #[test]
 fn state_def_elliptical() {
-    use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
     let mut earth = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::<Geoid>::from_cartesian(
+    let cart = OrbitState::from_cartesian(
         5_946.673_548_288_958,
         1_656.154_606_023_661,
         2_259.012_129_598_249,
@@ -193,7 +191,7 @@ fn state_def_elliptical() {
         "semi parameter"
     );
 
-    let kep = State::<Geoid>::from_keplerian(
+    let kep = OrbitState::from_keplerian(
         8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, earth,
     );
     f64_eq!(kep.x, 8_087.161_618_048_522_5, "x");
@@ -227,13 +225,12 @@ fn state_def_elliptical() {
 
 #[test]
 fn state_def_circ_eq() {
-    use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
     let mut earth = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::<Geoid>::from_cartesian(
+    let cart = OrbitState::from_cartesian(
         -38_892.724_449_149_02,
         16_830.384_772_891_86,
         0.722_659_929_135_562_2,
@@ -265,8 +262,7 @@ fn state_def_circ_eq() {
         "semi parameter"
     );
 
-    let kep =
-        State::<Geoid>::from_keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, earth);
+    let kep = OrbitState::from_keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, earth);
     f64_eq!(kep.x, 18_190.717_357_886_37, "x");
     f64_eq!(kep.y, -118.107_162_539_218_69, "y");
     f64_eq!(kep.z, 0.000_253_845_647_633_053_35, "z");
@@ -298,7 +294,6 @@ fn state_def_circ_eq() {
 
 #[test]
 fn state_def_reciprocity() {
-    use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
     let mut earth = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
@@ -306,7 +301,7 @@ fn state_def_reciprocity() {
     let dt = Epoch::from_mjd_tai(21_545.0);
 
     assert_eq!(
-        State::<Geoid>::from_cartesian(
+        OrbitState::from_cartesian(
             -38_892.724_449_149_02,
             16_830.384_772_891_86,
             0.722_659_929_135_562_2,
@@ -316,7 +311,7 @@ fn state_def_reciprocity() {
             dt,
             earth
         ),
-        State::<Geoid>::from_keplerian(
+        OrbitState::from_keplerian(
             42_378.129_999_999_98,
             9.999_999_809_555_511e-9,
             0.001_000_000_401_564_538_6,
@@ -330,7 +325,7 @@ fn state_def_reciprocity() {
     );
 
     assert_eq!(
-        State::<Geoid>::from_cartesian(
+        OrbitState::from_cartesian(
             5_946.673_548_288_958,
             1_656.154_606_023_661,
             2_259.012_129_598_249,
@@ -340,7 +335,7 @@ fn state_def_reciprocity() {
             dt,
             earth
         ),
-        State::<Geoid>::from_keplerian(
+        OrbitState::from_keplerian(
             7_712.186_117_895_041,
             0.158_999_999_999_999_95,
             53.75369,
@@ -354,10 +349,10 @@ fn state_def_reciprocity() {
     );
 
     assert_eq!(
-        State::<Geoid>::from_cartesian(
+        OrbitState::from_cartesian(
             -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth
         ),
-        State::<Geoid>::from_keplerian(
+        OrbitState::from_keplerian(
             7_712.186_117_895_043,
             0.000_999_582_831_432_052_5,
             63.434_003_407_751_14,
@@ -373,7 +368,6 @@ fn state_def_reciprocity() {
 
 #[test]
 fn geodetic_vallado() {
-    use nyx::celestia::{Cosm, Geoid, State};
     let cosm = Cosm::from_xb("./de438s");
     let mut earth = cosm.geoid_from_id(399);
     // Let's use the GMAT GM value for which these tests we written.
@@ -389,11 +383,11 @@ fn geodetic_vallado() {
     let lat = 34.352_495_150_861_564;
     let long = 46.446_416_856_789_96;
     let height = 5_085.218_731_091_624;
-    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth);
+    let r = OrbitState::from_position(ri, rj, rk, dt, earth);
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height, "height");
-    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth);
+    let r = OrbitState::from_geodesic(lat, long, height, dt, earth);
     f64_eq!(r.x, ri_val, "r_i");
     f64_eq!(r.y, rj_val, "r_j");
     f64_eq!(r.z, rk, "r_k");
@@ -407,11 +401,11 @@ fn geodetic_vallado() {
     let ri = 6_119.400_259_009_384;
     let rj = -1_571.479_552_801_429;
     let rk = -871.561_257_578_933_4;
-    let r = State::<Geoid>::from_geodesic(lat, long, height, dt, earth);
+    let r = OrbitState::from_geodesic(lat, long, height, dt, earth);
     f64_eq!(r.x, ri, "r_i");
     f64_eq!(r.y, rj, "r_j");
     f64_eq!(r.z, rk, "r_k");
-    let r = State::<Geoid>::from_position(ri, rj, rk, dt, earth);
+    let r = OrbitState::from_position(ri, rj, rk, dt, earth);
     f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height_val, "height");

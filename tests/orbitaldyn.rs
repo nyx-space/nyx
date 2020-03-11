@@ -5,24 +5,25 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use approx::abs_diff_eq;
+use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
+use na::{Matrix6, Vector6, U3};
+use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
+use nyx::od::AutoDiffDynamics;
+use nyx::propagators::error_ctrl::RSSStepPV;
+use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
+use std::f64::EPSILON;
 
 #[test]
 fn two_body_custom() {
-    use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::*;
-
     let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let mut state = State::<Geoid>::from_cartesian(
+    let mut state = OrbitState::from_cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -63,21 +64,13 @@ fn two_body_custom() {
 
 #[test]
 fn two_body_dynamics() {
-    use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::*;
-    use std::f64::EPSILON;
-
     let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::<Geoid>::from_cartesian(
+    let state = OrbitState::from_cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -142,12 +135,6 @@ fn halo_earth_moon_dynamics() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
-
     let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
@@ -158,7 +145,7 @@ fn halo_earth_moon_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = State::<Geoid>::from_cartesian(
+    let halo_rcvr = OrbitState::from_cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -214,12 +201,6 @@ fn halo_earth_moon_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
-
     let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
@@ -230,7 +211,7 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = State::<Geoid>::from_cartesian(
+    let halo_rcvr = OrbitState::from_cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -285,12 +266,6 @@ fn llo_earth_moon_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
-
     let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
@@ -301,7 +276,7 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = State::<Geoid>::from_cartesian(
+    let llo_xmtr = OrbitState::from_cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -357,12 +332,6 @@ fn halo_multi_body_dynamics() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
-
     let prop_time = SECONDS_PER_DAY;
 
     let mut cosm = Cosm::from_xb("./de438s");
@@ -375,7 +344,7 @@ fn halo_multi_body_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = State::<Geoid>::from_cartesian(
+    let halo_rcvr = OrbitState::from_cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -431,11 +400,6 @@ fn halo_multi_body_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let prop_time = SECONDS_PER_DAY;
 
@@ -450,7 +414,7 @@ fn halo_multi_body_dynamics_adaptive() {
     // let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = State::<Geoid>::from_cartesian(
+    let halo_rcvr = OrbitState::from_cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -506,11 +470,6 @@ fn llo_multi_body_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let prop_time = SECONDS_PER_DAY;
 
@@ -524,7 +483,7 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = State::<Geoid>::from_cartesian(
+    let llo_xmtr = OrbitState::from_cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -580,11 +539,6 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let prop_time = SECONDS_PER_DAY;
 
@@ -598,7 +552,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::<Geoid>::from_cartesian(
+    let leo = OrbitState::from_cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -647,11 +601,6 @@ fn leo_multi_body_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::Vector6;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::{PropOpts, Propagator, RK89};
 
     let prop_time = SECONDS_PER_DAY;
 
@@ -664,7 +613,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::<Geoid>::from_cartesian(
+    let leo = OrbitState::from_cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -710,18 +659,11 @@ fn leo_multi_body_dynamics_adaptive() {
 #[test]
 fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
-    extern crate nalgebra as na;
-    use self::na::{Matrix6, Vector6, U3};
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamicsStm;
-    use nyx::od::AutoDiffDynamics;
-    use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(399);
 
-    let init = State::<Geoid>::from_cartesian(
+    let init = OrbitState::from_cartesian(
         -9_042.862_233_600_335,
         18_536.333_069_123_244,
         6_999.957_069_486_411_5,
@@ -795,12 +737,6 @@ fn two_body_dual() {
 
 #[test]
 fn multi_body_dynamics_dual() {
-    use hifitime::{Epoch, SECONDS_PER_DAY};
-    use na::U3;
-    use nyx::celestia::{bodies, Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamicsStm;
-    use nyx::propagators::*;
-
     let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
@@ -808,7 +744,7 @@ fn multi_body_dynamics_dual() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = State::<Geoid>::from_cartesian(
+    let halo_rcvr = OrbitState::from_cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,

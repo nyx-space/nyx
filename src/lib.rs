@@ -1,41 +1,54 @@
-//! # nyx-space
-//!
-//! [Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity, fast, reliable and validated astrodynamical toolkit library written in Rust.
-//! It will _eventually_ provide most functionality in Python for rapid prototyping.
-//!
-//! The target audience is researchers and astrodynamics engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
-//! and portability to all platforms supported by [Rust](https://forge.rust-lang.org/platform-support.html).
-//!
-//! To some extend, the ultimate goal of this library is to retire [SPICE Toolkit](https://naif.jpl.nasa.gov/naif/toolkit.html).
-//!
-//! NOTE: It is recommended to compile all code in `nyx` with the `--release` flag. A lot of heavy
-//! computation is done in this library, and no one likes waiting for production code to run.
-//! ## Features
-//!
-//!  * Propagators / Integrators of equations of motions (cf. the `propagators` module)
-//!  * Two Body dynamics with planets defined as in GMAT / STK.
-//!  * Angular momentum dynamics for a rigid body
-//!  * Convenient and explicit definition of the dynamics for a simulation (cf. the [dynamics documentation](./dynamics/index.html))
-//!  * Orbital state definition with transformations to other frames
-//!  * Multi body dynamics (known bug for heliocentric propagation: https://gitlab.com/chrisrabotin/nyx/issues/61)
-//!  * Multi body dynamics estimation (i.e. state transition matrix computation, using hyperdual numbers, cf. conf. paper AAS 19-716)
-//!  * Maneuver design (via MissionArc), maneuver simulation with fuel depletion (via Spacecraft) and continuous thrust and control (ThrustControl)
-//!  * And many, many more. Refer to README.md for more a up to date list of features
-//!
-//! ## Usage
-//!
-//! Put this in your `Cargo.toml`:
-//!
-//! ```toml
-//! [dependencies]
-//! nyx-space = "0.0.19"
-//! ```
-//!
-//! And add the following to your crate root:
-//!
-//! ```rust
-//! extern crate nyx_space as nyx;
-//! ```
+/*! # nyx-space
+
+[Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity, fast, reliable and validated astrodynamical toolkit library written in Rust.
+
+The ultimate goal of this library is to provide a high-speed and scalable replacement for [General Mission Analysis Tool (GMAT)](http://gmat.sourceforge.net/doc/R2018a/help.html).
+
+# Tutorial
+The [tutorial](tutorial/index.html) is a great place to start learning how to use nyx. The target audience is astrodynamics & aerospace engineers.
+
+If you are new to Rust, learn the basics on the ["Rust By Example" interactive tutorial](https://doc.rust-lang.org/stable/rust-by-example/).
+Using nyx isn't hard, despite the code of the library being quite complicated.
+
+# Features
+Unless specified otherwise in the documentation of specific functions, all vectors and matrices are [statically allocated](https://discourse.nphysics.org/t/statically-typed-matrices-whose-size-is-a-multiple-or-another-one/460/4).
+
+## Propagation
+- Propagation with different Runge Kutta methods (validated in GMAT)
+- Convenient and explicit definition of the dynamics for a simulation
+- Propagation to different stopping conditions
+## Dynamical models
+- Multibody dynamics using XB files
+- Finite burns with fuel depletion (including low thrust / ion propulsion)
+- Sub-Optimal Control of continuous thrust (e.g. Ruggerio, Petropoulos/Q-law)
+- Solar radiation pressure modeling
+- Basic drag models (cannonball)
+## Orbit determination
+- Statistical Orbit Determination: Classical and Extended Kalman Filter
+- Orbit Determination with multibody dynamics
+- Smoothing and iterations of CKFs
+- Square Root Information Filer (SRIF)
+- An easy-to-use OD user interface
+- State noise compensation (SNC)
+## Celestial computations
+- Orbital state manipulation (from GMAT source code and validated in GMAT)
+- Planetary and Solar eclipse and visibility computation
+- Light-time corrections and abberations
+
+# Usage
+Put this in your `Cargo.toml`:
+
+```toml
+[dependencies]
+nyx-space = "0.0.19"
+```
+
+And add the following to your crate root:
+
+```rust
+extern crate nyx_space as nyx;
+```
+*/
 
 /// Provides all the propagators / integrators available in `nyx`.
 pub mod propagators;
@@ -58,7 +71,7 @@ pub mod propagators;
 /// let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 ///
 /// let dt = Epoch::from_mjd_tai(21_545.0);
-/// let initial_state = State::<Geoid>::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
+/// let initial_state = OrbitState::from_cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
 ///
 /// println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
@@ -67,7 +80,7 @@ pub mod propagators;
 /// let min_step = 0.1;
 /// let max_step = 60.0;
 ///
-/// let rslt = State::<Geoid>::from_cartesian(
+/// let rslt = OrbitState::from_cartesian(
 ///         -5_971.194_376_797_643,
 ///         3_945.517_912_574_178_4,
 ///         2_864.620_957_744_429_2,
@@ -112,7 +125,7 @@ pub mod propagators;
 ///
 /// let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///
-/// let halo_rcvr = State::<Geoid>::from_cartesian(
+/// let halo_rcvr = OrbitState::from_cartesian(
 ///     333_321.004_516,
 ///     -76_134.198_887,
 ///     -20_873.831_939,
@@ -164,7 +177,7 @@ pub mod dynamics;
 /// let mut earth_geoid = cosm.geoid_from_id(399);
 /// earth_geoid.gm = 398_600.441_5;
 /// let dt = Epoch::from_mjd_tai(21545.0);
-/// let cart = State::<Geoid>::from_cartesian(
+/// let cart = OrbitState::from_cartesian(
 ///         5_946.673_548_288_958,
 ///         1_656.154_606_023_661,
 ///         2_259.012_129_598_249,
@@ -175,7 +188,7 @@ pub mod dynamics;
 ///         earth_geoid,
 /// );
 ///
-/// let kep = State::<Geoid>::from_keplerian(
+/// let kep = OrbitState::from_keplerian(
 ///        7_712.186_117_895_041,
 ///        0.158_999_999_999_999_95,
 ///        53.75369,
@@ -208,6 +221,8 @@ pub mod io;
 
 /// Provides all the orbital determination tools.
 pub mod od;
+
+pub mod tutorial;
 
 #[macro_use]
 extern crate log;

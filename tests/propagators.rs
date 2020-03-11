@@ -3,17 +3,17 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
 
+use hifitime::{Epoch, J2000_OFFSET};
+use na::Vector6;
+use nyx::celestia::{Cosm, OrbitState};
+use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::propagators::error_ctrl::RSSStatePV;
+use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
 
 #[test]
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
-    use hifitime::{Epoch, J2000_OFFSET};
-    use na::Vector6;
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
-    use nyx::propagators::*;
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(399);
 
@@ -22,7 +22,7 @@ fn regress_leo_day_adaptive() {
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(
+    let init = OrbitState::from_cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -117,13 +117,6 @@ fn gmat_val_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    use self::na::Vector6;
-    use hifitime::{Epoch, J2000_OFFSET};
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
-    use nyx::propagators::*;
-
     let cosm = Cosm::from_xb("./de438s");
     let mut earth_geoid = cosm.geoid_from_id(399);
     earth_geoid.gm = 398_600.441_5; // Using GMAT's value
@@ -133,7 +126,7 @@ fn gmat_val_leo_day_adaptive() {
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(
+    let init = OrbitState::from_cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -277,19 +270,13 @@ fn gmat_val_leo_day_adaptive() {
 
 #[test]
 fn gmat_val_leo_day_fixed() {
-    use crate::na::Vector6;
-    use hifitime::{Epoch, J2000_OFFSET};
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::*;
-
     let cosm = Cosm::from_xb("./de438s");
     let mut earth_geoid = cosm.geoid_from_id(399);
     earth_geoid.gm = 398_600.441_5; // Using GMAT's value
 
     let prop_time = 3_600.0 * 24.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(
+    let init = OrbitState::from_cartesian(
         -2436.45,
         -2436.45,
         6891.037,

@@ -1,4 +1,4 @@
-use super::{Cosm, Geoid, LTCorr, State};
+use super::{Cosm, Geoid, LTCorr, OrbitState};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 
 /// Stores the eclipse state
@@ -77,7 +77,7 @@ pub struct EclipseLocator<'a> {
 
 impl<'a> EclipseLocator<'a> {
     /// Compute the visibility/eclipse between an observer and an observed state
-    pub fn compute(&self, observer: &State<Geoid>) -> EclipseState {
+    pub fn compute(&self, observer: &OrbitState) -> EclipseState {
         let mut state = EclipseState::Visibilis;
         for eclipsing_geoid in &self.shadow_bodies {
             let this_state = eclipse_state(
@@ -97,7 +97,7 @@ impl<'a> EclipseLocator<'a> {
 
 /// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
 pub fn eclipse_state(
-    observer: &State<Geoid>,
+    observer: &OrbitState,
     light_source: Geoid,
     eclipsing_geoid: Geoid,
     cosm: &Cosm,
@@ -204,8 +204,8 @@ fn circ_seg_area(r: f64, d: f64) -> f64 {
 ///
 /// In practice, this code uses a tolerance of 1e-12 instead of 0.0 to account for rounding issues.
 pub fn line_of_sight(
-    observer: &State<Geoid>,
-    observed: &State<Geoid>,
+    observer: &OrbitState,
+    observed: &OrbitState,
     eclipsing_geoid: Geoid,
     cosm: &Cosm,
 ) -> EclipseState {
@@ -264,11 +264,11 @@ mod tests {
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-        let x1 = State::<Geoid>::from_cartesian(-1.0, -1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x2 = State::<Geoid>::from_cartesian(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x3 = State::<Geoid>::from_cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x4 = State::<Geoid>::from_cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x5 = State::<Geoid>::from_cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x1 = OrbitState::from_cartesian(-1.0, -1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x2 = OrbitState::from_cartesian(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x3 = OrbitState::from_cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x4 = OrbitState::from_cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x5 = OrbitState::from_cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
         assert_eq!(line_of_sight(&x1, &x2, earth, &cosm), EclipseState::Umbra);
         assert_eq!(
@@ -299,9 +299,9 @@ mod tests {
 
         let sma = earth.equatorial_radius + 300.0;
 
-        let sc1 = State::<Geoid>::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc2 = State::<Geoid>::from_keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc3 = State::<Geoid>::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
+        let sc1 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+        let sc2 = OrbitState::from_keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+        let sc3 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
 
         // Out of phase by pi.
         assert_eq!(line_of_sight(&sc1, &sc3, earth, &cosm), EclipseState::Umbra);
@@ -323,9 +323,9 @@ mod tests {
 
         let sma = earth.equatorial_radius + 300.0;
 
-        let sc1 = State::<Geoid>::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, earth);
-        let sc2 = State::<Geoid>::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
-        let sc3 = State::<Geoid>::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
+        let sc1 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, earth);
+        let sc2 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
+        let sc3 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
 
         let correction = LTCorr::None;
 

@@ -13,7 +13,7 @@ use self::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice};
-use celestia::{Frame, Geoid, State};
+use celestia::{Frame, OrbitState, State};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
@@ -99,9 +99,9 @@ impl GroundStation {
     }
 }
 impl MeasurementDevice<StdMeasurement> for GroundStation {
-    type MeasurementInput = State<Geoid>;
+    type MeasurementInput = OrbitState;
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &State<Geoid>) -> Option<StdMeasurement> {
+    fn measure(&self, rx: &OrbitState) -> Option<StdMeasurement> {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!

@@ -356,7 +356,7 @@ where
     }
 }
 
-impl State<Geoid> {
+impl OrbitState {
     /// Creates a new State around the provided CelestialBody from the Keplerian orbital elements.
     ///
     /// **Units:** km, none, degrees, degrees, degrees, degrees
@@ -503,7 +503,7 @@ impl State<Geoid> {
         height: f64,
         dt: Epoch,
         frame: Geoid,
-    ) -> State<Geoid> {
+    ) -> OrbitState {
         let e2 = 2.0 * frame.flattening - frame.flattening.powi(2);
         let (sin_long, cos_long) = longitude.to_radians().sin_cos();
         let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
@@ -516,7 +516,7 @@ impl State<Geoid> {
         let rk = (s_earth + height) * sin_lat;
         let radius = Vector3::new(ri, rj, rk);
         let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
-        State::<Geoid>::from_cartesian(
+        OrbitState::from_cartesian(
             radius[(0, 0)],
             radius[(1, 0)],
             radius[(2, 0)],
@@ -848,7 +848,7 @@ where
     }
 }
 
-impl fmt::Octal for State<Geoid> {
+impl fmt::Octal for OrbitState {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -865,3 +865,6 @@ impl fmt::Octal for State<Geoid> {
         )
     }
 }
+
+/// An orbit is simply a State typed around a Geoid.
+pub type OrbitState = State<Geoid>;

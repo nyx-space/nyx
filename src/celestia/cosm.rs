@@ -8,7 +8,7 @@ use crate::hifitime::{Epoch, SECONDS_PER_DAY};
 use celestia::cosm::prost::Message;
 use celestia::frames::Frame;
 use celestia::frames::*;
-use celestia::state::State;
+use celestia::state::OrbitState;
 use celestia::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use celestia::xb::{Ephemeris, EphemerisContainer, Identifier};
 use celestia::xb::{Frame as FXBFrame, FrameContainer};
@@ -254,7 +254,7 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
-    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<State<Geoid>, CosmError> {
+    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<OrbitState, CosmError> {
         let exb = self.exbid_from_id(exb_id)?;
 
         let ephem = self
@@ -336,7 +336,7 @@ impl Cosm {
         let ref_frame_exb_id = ref_frame_id % 100_000;
         let storage_geoid = self.geoid_from_id(ref_frame_exb_id);
         let dt = Epoch::from_jde_tai(jde);
-        Ok(State::<Geoid>::from_cartesian(
+        Ok(OrbitState::from_cartesian(
             x,
             y,
             z,
@@ -359,12 +359,12 @@ impl Cosm {
         datetime: Epoch,
         as_seen_from_exb_id: i32,
         correction: LTCorr,
-    ) -> Result<State<Geoid>, CosmError> {
+    ) -> Result<OrbitState, CosmError> {
         let as_seen_from = self.try_geoid_from_id(as_seen_from_exb_id)?;
         match correction {
             LTCorr::None => {
                 let target_geoid = self.try_geoid_from_id(target_exb_id)?;
-                let state = State::<Geoid>::from_cartesian(
+                let state = OrbitState::from_cartesian(
                     0.0,
                     0.0,
                     0.0,
@@ -391,7 +391,7 @@ impl Cosm {
                     tgt = self.celestial_state(target_exb_id, lt_dt, 0, LTCorr::None);
                 }
                 // Compute the correct state
-                let mut state = State::<Geoid>::from_cartesian(
+                let mut state = OrbitState::from_cartesian(
                     (tgt - obs).x,
                     (tgt - obs).y,
                     (tgt - obs).z,
@@ -447,7 +447,7 @@ impl Cosm {
         datetime: Epoch,
         as_seen_from_exb_id: i32,
         correction: LTCorr,
-    ) -> State<Geoid> {
+    ) -> OrbitState {
         self.try_celestial_state(target_exb_id, datetime, as_seen_from_exb_id, correction)
             .unwrap()
     }
@@ -455,9 +455,9 @@ impl Cosm {
     /// Attempts to return the provided state in the provided frame.
     pub fn try_frame_chg(
         &self,
-        state: &State<Geoid>,
+        state: &OrbitState,
         new_geoid: Geoid,
-    ) -> Result<State<Geoid>, CosmError> {
+    ) -> Result<OrbitState, CosmError> {
         if state.frame.id() == new_geoid.id {
             return Ok(*state);
         }
@@ -502,7 +502,7 @@ impl Cosm {
     }
 
     /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg(&self, state: &State<Geoid>, new_geoid: Geoid) -> State<Geoid> {
+    pub fn frame_chg(&self, state: &OrbitState, new_geoid: Geoid) -> OrbitState {
         self.try_frame_chg(state, new_geoid).unwrap()
     }
 
@@ -825,7 +825,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::<Geoid>::from_cartesian(
+        let lro = OrbitState::from_cartesian(
             4.017_685_334_718_784E5,
             2.642_441_356_763_487E4,
             -3.024_209_691_251_325E4,
@@ -836,7 +836,7 @@ mod tests {
             earth,
         );
 
-        let lro_jpl = State::<Geoid>::from_cartesian(
+        let lro_jpl = OrbitState::from_cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -868,7 +868,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::<Geoid>::from_cartesian(
+        let lro = OrbitState::from_cartesian(
             -4.393_308_217_174_602E7,
             1.874_075_194_166_327E8,
             8.763_986_396_329_135E7,
@@ -879,7 +879,7 @@ mod tests {
             venus,
         );
 
-        let lro_jpl = State::<Geoid>::from_cartesian(
+        let lro_jpl = OrbitState::from_cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -911,7 +911,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::<Geoid>::from_cartesian(
+        let lro = OrbitState::from_cartesian(
             4.227_396_973_787_854E7,
             1.305_852_533_250_192E8,
             5.657_002_470_685_254E7,
@@ -922,7 +922,7 @@ mod tests {
             ssb,
         );
 
-        let lro_jpl = State::<Geoid>::from_cartesian(
+        let lro_jpl = OrbitState::from_cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,

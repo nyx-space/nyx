@@ -5,14 +5,14 @@ use self::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
 use super::hifitime::Epoch;
 use super::na::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
 use super::Dynamics;
-use celestia::{Cosm, Geoid, LTCorr, State};
+use celestia::{Cosm, LTCorr, OrbitState};
 use od::{AutoDiffDynamics, Estimable};
 use std::f64;
 
 /// `CelestialDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 #[derive(Clone)]
 pub struct CelestialDynamics<'a> {
-    pub state: State<Geoid>,
+    pub state: OrbitState,
     pub bodies: Vec<i32>,
     // Loss in precision is avoided by using a relative time parameter initialized to zero
     relative_time: f64,
@@ -24,7 +24,7 @@ pub struct CelestialDynamics<'a> {
 
 impl<'a> CelestialDynamics<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
-    pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+    pub fn new(state: OrbitState, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         for exb_id in &bodies {
             cosm.try_geoid_from_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
@@ -40,7 +40,7 @@ impl<'a> CelestialDynamics<'a> {
     }
 
     /// Initializes a CelestialDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
-    pub fn two_body(state: State<Geoid>) -> Self {
+    pub fn two_body(state: OrbitState) -> Self {
         Self {
             state,
             bodies: Vec::new(),
@@ -51,8 +51,8 @@ impl<'a> CelestialDynamics<'a> {
         }
     }
 
-    pub fn state_ctor(&self, rel_time: f64, state_vec: &Vector6<f64>) -> State<Geoid> {
-        State::<Geoid>::from_cartesian(
+    pub fn state_ctor(&self, rel_time: f64, state_vec: &Vector6<f64>) -> OrbitState {
+        OrbitState::from_cartesian(
             state_vec[0],
             state_vec[1],
             state_vec[2],
@@ -67,7 +67,7 @@ impl<'a> CelestialDynamics<'a> {
 
 impl<'a> Dynamics for CelestialDynamics<'a> {
     type StateSize = U6;
-    type StateType = State<Geoid>;
+    type StateType = OrbitState;
     /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
     fn time(&self) -> f64 {
         self.relative_time
@@ -88,7 +88,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         self.state.vz = new_state[5];
     }
 
-    fn state(&self) -> State<Geoid> {
+    fn state(&self) -> OrbitState {
         self.state
     }
 
@@ -129,7 +129,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
 /// `CelestialDynamicsStm` provides the equations of motion for any celestial dynamic, **with** state transition matrix computation.
 #[derive(Clone)]
 pub struct CelestialDynamicsStm<'a> {
-    pub state: State<Geoid>,
+    pub state: OrbitState,
     pub bodies: Vec<i32>,
     pub stm: Matrix6<f64>,
     // Loss in precision is avoided by using a relative time parameter initialized to zero
@@ -142,7 +142,7 @@ pub struct CelestialDynamicsStm<'a> {
 
 impl<'a> CelestialDynamicsStm<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
-    pub fn new(state: State<Geoid>, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+    pub fn new(state: OrbitState, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         // Check that these bodies are present in the EXB.
         for exb_id in &bodies {
             cosm.try_geoid_from_id(*exb_id)
@@ -160,7 +160,7 @@ impl<'a> CelestialDynamicsStm<'a> {
     }
 
     /// Initializes a CelestialDynamicsStm which does not simulate the gravity pull of other celestial objects but the primary one.
-    pub fn two_body(state: State<Geoid>) -> Self {
+    pub fn two_body(state: OrbitState) -> Self {
         Self {
             state,
             bodies: Vec::new(),
@@ -173,7 +173,7 @@ impl<'a> CelestialDynamicsStm<'a> {
     }
 
     /// Provides a copy to the state.
-    pub fn as_state(&self) -> State<Geoid> {
+    pub fn as_state(&self) -> OrbitState {
         self.state
     }
 
@@ -190,7 +190,7 @@ impl<'a> CelestialDynamicsStm<'a> {
     }
 
     /// Rebuild the state and STM from the provided vector
-    pub fn state_ctor(&self, t: f64, in_state: &VectorN<f64, U42>) -> (State<Geoid>, Matrix6<f64>) {
+    pub fn state_ctor(&self, t: f64, in_state: &VectorN<f64, U42>) -> (OrbitState, Matrix6<f64>) {
         // Copy the current state, and then modify it
         let (mut state, mut stm) = self.state();
         state.dt = Epoch::from_tai_seconds(self.init_tai_secs + t);
@@ -286,7 +286,7 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
 
 impl<'a> Dynamics for CelestialDynamicsStm<'a> {
     type StateSize = U42;
-    type StateType = (State<Geoid>, Matrix6<f64>);
+    type StateType = (OrbitState, Matrix6<f64>);
     /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
     fn time(&self) -> f64 {
         self.relative_time
@@ -361,10 +361,10 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
     }
 }
 
-impl<'a> Estimable<State<Geoid>> for CelestialDynamicsStm<'a> {
+impl<'a> Estimable<OrbitState> for CelestialDynamicsStm<'a> {
     type LinStateSize = U6;
 
-    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, State<Geoid>) {
+    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, OrbitState) {
         (prop_state.0.dt, prop_state.0)
     }
 

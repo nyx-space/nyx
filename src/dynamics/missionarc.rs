@@ -2,7 +2,7 @@ use super::celestial::CelestialDynamics;
 use super::deltavctrl::DeltaVctrl;
 use super::na::{VectorN, U6};
 use super::Dynamics;
-use celestia::{Geoid, State};
+use celestia::OrbitState;
 
 #[derive(Clone)]
 pub struct MissionArc<'a, D: DeltaVctrl> {
@@ -18,7 +18,7 @@ impl<'a, D: DeltaVctrl> MissionArc<'a, D> {
 
 impl<'a, D: DeltaVctrl> Dynamics for MissionArc<'a, D> {
     type StateSize = U6;
-    type StateType = State<Geoid>;
+    type StateType = OrbitState;
 
     /// Returns the relative time
     fn time(&self) -> f64 {
