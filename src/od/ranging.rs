@@ -2,12 +2,14 @@ extern crate hifitime;
 extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate rand;
+extern crate rand_distr;
 
 use self::hifitime::Epoch;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual};
 use self::na::{DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7};
-use self::rand::distributions::Normal;
+use self::rand::thread_rng;
+use self::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice};
@@ -22,8 +24,8 @@ pub struct GroundStation {
     pub latitude: f64,
     pub longitude: f64,
     pub height: f64,
-    range_noise: Normal,
-    range_rate_noise: Normal,
+    range_noise: Normal<f64>,
+    range_rate_noise: Normal<f64>,
 }
 
 impl GroundStation {
@@ -43,8 +45,8 @@ impl GroundStation {
             latitude,
             longitude,
             height,
-            range_noise: Normal::new(0.0, range_noise),
-            range_rate_noise: Normal::new(0.0, range_rate_noise),
+            range_noise: Normal::new(0.0, range_noise).unwrap(),
+            range_rate_noise: Normal::new(0.0, range_rate_noise).unwrap(),
         }
     }
 
@@ -99,7 +101,7 @@ impl GroundStation {
 impl MeasurementDevice<StdMeasurement> for GroundStation {
     type MeasurementInput = State<Geoid>;
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &State<Geoid>) -> StdMeasurement {
+    fn measure(&self, rx: &State<Geoid>) -> Option<StdMeasurement> {
         use std::f64::consts::PI;
         // TODO: Get the frame from cosm instead of using the one from Rx!
         // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
@@ -128,7 +130,14 @@ impl MeasurementDevice<StdMeasurement> for GroundStation {
             r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
         let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
 
-        StdMeasurement::new(dt, tx, *rx, elevation >= self.elevation_mask)
+        Some(StdMeasurement::new(
+            dt,
+            tx,
+            *rx,
+            elevation >= self.elevation_mask,
+            &self.range_noise,
+            &self.range_rate_noise,
+        ))
     }
 }
 /*
@@ -163,6 +172,8 @@ impl StdMeasurement {
 
     fn compute_sensitivity(
         state: &VectorN<Hyperdual<f64, U7>, U6>,
+        range_noise: f64,
+        range_rate_noise: f64,
     ) -> (Vector2<f64>, Matrix2x6<f64>) {
         // Extract data from hyperspace
         let range_vec = state.fixed_rows::<U3>(0).into_owned();
@@ -170,8 +181,8 @@ impl StdMeasurement {
 
         // Code up math as usual
         let delta_v_vec = velocity_vec / norm(&range_vec);
-        let range = norm(&range_vec);
-        let range_rate = range_vec.dot(&delta_v_vec);
+        let range = norm(&range_vec) + Hyperdual::from(range_noise);
+        let range_rate = range_vec.dot(&delta_v_vec) + Hyperdual::from(range_rate_noise);
 
         // Extract result into Vector2 and Matrix2x6
         let mut fx = Vector2::zeros();
@@ -188,15 +199,50 @@ impl StdMeasurement {
         }
         (fx, pmat)
     }
-}
 
-impl Measurement for StdMeasurement {
-    type StateSize = U6;
-    type MeasurementSize = U2;
+    /// Generate noiseless measurement
+    pub fn noiseless<F: Frame>(
+        dt: Epoch,
+        tx: State<F>,
+        rx: State<F>,
+        visible: bool,
+    ) -> StdMeasurement {
+        Self::raw(dt, tx, rx, visible, 0.0, 0.0)
+    }
 
-    fn new<F: Frame>(dt: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> StdMeasurement {
+    /// Generate a new measurement with the provided noise distribution.
+    pub fn new<F: Frame, D: Distribution<f64>>(
+        dt: Epoch,
+        tx: State<F>,
+        rx: State<F>,
+        visible: bool,
+        range_dist: &D,
+        range_rate_dist: &D,
+    ) -> StdMeasurement {
+        Self::raw(
+            dt,
+            tx,
+            rx,
+            visible,
+            range_dist.sample(&mut thread_rng()),
+            range_rate_dist.sample(&mut thread_rng()),
+        )
+    }
+
+    /// Generate a new measurement with the provided noise values.
+    pub fn raw<F: Frame>(
+        dt: Epoch,
+        tx: State<F>,
+        rx: State<F>,
+        visible: bool,
+        range_noise: f64,
+        range_rate_noise: f64,
+    ) -> StdMeasurement {
+        assert_eq!(tx.frame.id(), rx.frame.id(), "tx & rx in different frames");
+        assert_eq!(tx.dt, rx.dt, "tx & rx states have different times");
+
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
-        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
+        let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate, range_noise, range_rate_noise);
 
         StdMeasurement {
             dt,
@@ -205,6 +251,21 @@ impl Measurement for StdMeasurement {
             h_tilde,
         }
     }
+
+    /// Initializes a StdMeasurement from real tracking data (sensitivity is zero)
+    pub fn real(dt: Epoch, range: f64, range_rate: f64) -> Self {
+        Self {
+            dt,
+            obs: Vector2::new(range, range_rate),
+            visible: true,
+            h_tilde: Matrix2x6::zeros(),
+        }
+    }
+}
+
+impl Measurement for StdMeasurement {
+    type StateSize = U6;
+    type MeasurementSize = U2;
 
     /// Returns this measurement as a vector of Range and Range Rate
     ///
@@ -274,13 +335,8 @@ impl RangeMsr {
 
         (fx, pmat)
     }
-}
 
-impl Measurement for RangeMsr {
-    type StateSize = U6;
-    type MeasurementSize = U1;
-
-    fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> RangeMsr {
+    pub fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> RangeMsr {
         assert_eq!(
             tx.frame.id(),
             rx.frame.id(),
@@ -299,6 +355,11 @@ impl Measurement for RangeMsr {
             h_tilde,
         }
     }
+}
+
+impl Measurement for RangeMsr {
+    type StateSize = U6;
+    type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate
     ///
@@ -368,13 +429,8 @@ impl DopplerMsr {
         }
         (fx, pmat)
     }
-}
 
-impl Measurement for DopplerMsr {
-    type StateSize = U6;
-    type MeasurementSize = U1;
-
-    fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> DopplerMsr {
+    pub fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> DopplerMsr {
         assert_eq!(
             tx.frame.id(),
             rx.frame.id(),
@@ -393,6 +449,11 @@ impl Measurement for DopplerMsr {
             h_tilde,
         }
     }
+}
+
+impl Measurement for DopplerMsr {
+    type StateSize = U6;
+    type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate
     ///

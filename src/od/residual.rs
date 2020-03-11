@@ -36,7 +36,7 @@ where
             dt: Epoch::from_tai_seconds(0.0),
             prefit: VectorN::<f64, M>::zeros(),
             postfit: VectorN::<f64, M>::zeros(),
-            epoch_fmt: EpochFormat::MjdTai,
+            epoch_fmt: EpochFormat::GregorianUtc,
         }
     }
 
@@ -55,7 +55,7 @@ where
     }
 
     pub fn default_header() -> Vec<String> {
-        Self::header(EpochFormat::MjdTai)
+        Self::header(EpochFormat::GregorianUtc)
     }
 
     pub fn new(dt: Epoch, prefit: VectorN<f64, M>, postfit: VectorN<f64, M>) -> Self {
@@ -63,7 +63,7 @@ where
             dt,
             prefit,
             postfit,
-            epoch_fmt: EpochFormat::MjdTai,
+            epoch_fmt: EpochFormat::GregorianUtc,
         }
     }
 }

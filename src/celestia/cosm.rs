@@ -532,7 +532,7 @@ impl Cosm {
             |e| *e.weight(),
             |_| 0,
         ) {
-            Some((weight, path)) => {
+            Some((_, path)) => {
                 // Build the path with the frames
                 let mut f_path = Vec::new();
                 let shared_centers = from.center_id == to.center_id;
@@ -546,13 +546,6 @@ impl Cosm {
 
                 // Let's add the final geoid.
                 f_path.push(*from);
-                debug!(
-                    "path from {:?} to {:?} is {:?} with cost {}",
-                    from.id(),
-                    to.id(),
-                    f_path,
-                    weight
-                );
                 Ok(f_path)
             }
             None => Err(CosmError::DisjointFrameCenters(

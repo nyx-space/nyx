@@ -6,7 +6,6 @@ use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
-use celestia::{Frame, State};
 use dynamics::Dynamics;
 use std::fmt;
 
@@ -24,6 +23,9 @@ pub mod residual;
 
 /// Provides some helper for filtering.
 pub mod ui;
+
+/// Provides the Square Root Information Filter
+pub mod srif;
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
 ///
@@ -64,7 +66,7 @@ where
         self.extract_stm(&self.state())
     }
 
-    /// Prepares the state to be processed by the measurement devices
+    /// Converts the Dynamics' state type to a measurement to be ingested in a filter
     fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, N);
 
     /// Extracts the STM from the dynamics state
@@ -75,6 +77,89 @@ where
     where
         DefaultAllocator: Allocator<f64, Self::LinStateSize>
             + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
+}
+
+/// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
+pub trait Filter<S, A, M>
+where
+    S: DimName,
+    A: DimName,
+    M: DimName,
+    DefaultAllocator: Allocator<f64, M>
+        + Allocator<f64, S>
+        + Allocator<f64, M, M>
+        + Allocator<f64, M, S>
+        + Allocator<f64, S, S>
+        + Allocator<f64, A, A>
+        + Allocator<f64, S, A>
+        + Allocator<f64, A, S>,
+{
+    type Estimate: estimate::Estimate<S>;
+
+    /// Returns the previous estimate
+    fn previous_estimate(&self) -> &Self::Estimate;
+
+    /// Update the State Transition Matrix (STM). This function **must** be called in between each
+    /// call to `time_update` or `measurement_update`.
+    fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>);
+
+    /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
+    /// call to `measurement_update`.
+    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>);
+
+    /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
+    ///
+    /// Returns a FilterError if the STM was not updated.
+    fn time_update(&mut self, dt: Epoch) -> Result<Self::Estimate, FilterError>;
+
+    /// Computes the measurement update with a provided real observation and computed observation.
+    ///
+    ///Returns a FilterError if the STM or sensitivity matrices were not updated.
+    fn measurement_update(
+        &mut self,
+        dt: Epoch,
+        real_obs: VectorN<f64, M>,
+        computed_obs: VectorN<f64, M>,
+    ) -> Result<(Self::Estimate, residual::Residual<M>), FilterError>;
+
+    /// Returns whether the filter is an extended filter (e.g. EKF)
+    fn is_extended(&self) -> bool;
+
+    /// Sets the filter to be extended or not depending on the value of status
+    fn set_extended(&mut self, status: bool);
+
+    /// Sets the process noise matrix in the frame of the estimated state
+    fn set_process_noise(&mut self, prc: MatrixMN<f64, A, A>);
+}
+
+/// Stores the different kinds of filter errors.
+#[derive(Debug, PartialEq)]
+pub enum FilterError {
+    StateTransitionMatrixNotUpdated,
+    SensitivityNotUpdated,
+    GainSingular,
+    StateTransitionMatrixSingular,
+}
+
+impl fmt::Display for FilterError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            FilterError::StateTransitionMatrixNotUpdated => {
+                write!(f, "STM was not updated prior to time or measurement update")
+            }
+            FilterError::SensitivityNotUpdated => write!(
+                f,
+                "The measurement matrix H_tilde was not updated prior to measurement update"
+            ),
+            FilterError::GainSingular => write!(
+                f,
+                "Gain could not be computed because H*P_bar*H + R is singular"
+            ),
+            FilterError::StateTransitionMatrixSingular => {
+                write!(f, "STM is singular, smoothing cannot proceed")
+            }
+        }
+    }
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
@@ -88,9 +173,6 @@ where
     type StateSize: DimName;
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;
-
-    /// Computes a new measurement from the provided information.
-    fn new<F: Frame>(dt: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> Self;
 
     /// Returns the measurement/observation as a vector.
     fn observation(&self) -> VectorN<f64, Self::MeasurementSize>
@@ -119,8 +201,9 @@ where
         + Allocator<f64, N::MeasurementSize>
         + Allocator<f64, N::MeasurementSize, N::StateSize>,
 {
-    type MeasurementInput: Copy;
-    fn measure(&self, state: &Self::MeasurementInput) -> N;
+    type MeasurementInput;
+    /// Returns the measurement if the device and generate one, else returns None
+    fn measure(&self, state: &Self::MeasurementInput) -> Option<N>;
 }
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
@@ -174,29 +257,6 @@ where
         (state, grad)
     }
 }
-/*
-impl<T: AutoDiffDynamics> Linearization for T
-where
-    DefaultAllocator:
-        Allocator<Dual<f64>, T::StateSize> + Allocator<Dual<f64>, T::StateSize, T::StateSize>,
-{
-    type StateSize = T::HyperStateSize;
-
-    /// Returns the gradient of the dynamics at the given state.
-    ///
-    /// **WARNING:** Requires a prior call to self.compute() ! This is where the auto-differentiation happens.
-    fn gradient(
-        &self,
-        _t: f64,
-        _state: &VectorN<f64, Self::StateSize>,
-    ) -> MatrixMN<f64, Self::StateSize, Self::StateSize>
-    where
-        DefaultAllocator:
-            Allocator<f64, Self::StateSize> + Allocator<f64, Self::StateSize, Self::StateSize>,
-    {
-        panic!("retrieve the gradient by calling self.compute(...)");
-    }
-}*/
 
 /// Specifies the format of the Epoch during serialization
 #[derive(Clone, Copy, Debug, PartialEq)]

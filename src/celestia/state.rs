@@ -275,6 +275,66 @@ impl<F: Frame> Neg for State<F> {
     }
 }
 
+impl<F: Frame> Add for &State<F> {
+    type Output = State<F>;
+
+    /// Add one state from another. Frame must be manually changed if needed.
+    fn add(self, other: &State<F>) -> State<F>
+    where
+        F: Frame,
+    {
+        State {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+            vx: self.vx + other.vx,
+            vy: self.vy + other.vy,
+            vz: self.vz + other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl<F: Frame> Sub for &State<F> {
+    type Output = State<F>;
+
+    /// Subtract one state from another
+    fn sub(self, other: &State<F>) -> State<F>
+    where
+        F: Frame,
+    {
+        State {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+            vx: self.vx - other.vx,
+            vy: self.vy - other.vy,
+            vz: self.vz - other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl<F: Frame> Neg for &State<F> {
+    type Output = State<F>;
+
+    /// Subtract one state from another
+    fn neg(self) -> Self::Output {
+        State {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            vx: -self.vx,
+            vy: -self.vy,
+            vz: -self.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
 impl<F> Serialize for State<F>
 where
     F: Frame,

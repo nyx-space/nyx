@@ -1,7 +1,7 @@
 pub use celestia::xb::Identifier;
 use std::fmt;
 
-pub trait Frame: Clone + fmt::Debug + fmt::Display {
+pub trait Frame: Copy + Clone + fmt::Debug + fmt::Display {
     fn id(&self) -> i32; // Returns the ID of this frame
     fn center_id(&self) -> i32; // Returns the integer of the center of this frame
     fn orientation_id(&self) -> i32; // Returns the orientation (1: J2000)
@@ -53,7 +53,7 @@ impl Frame for Geoid {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Spacecraft {
     pub id: i32,
     pub center_id: i32,
