@@ -63,6 +63,8 @@ where
         measurement_noise: MatrixMN<f64, M, M>,
         process_noise_dt: Option<f64>,
     ) -> Self {
+        let epoch_fmt = initial_estimate.epoch_fmt;
+        let covar_fmt = initial_estimate.covar_fmt;
         Self {
             prev_estimate: initial_estimate,
             measurement_noise,
@@ -73,8 +75,27 @@ where
             stm: MatrixMN::<f64, S, S>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
-            epoch_fmt: EpochFormat::MjdTai,
-            covar_fmt: CovarFormat::Sqrt,
+            epoch_fmt,
+            covar_fmt,
+        }
+    }
+
+    /// Initializes this KF without SNC
+    pub fn no_snc(initial_estimate: KfEstimate<S>, measurement_noise: MatrixMN<f64, M, M>) -> Self {
+        let epoch_fmt = initial_estimate.epoch_fmt;
+        let covar_fmt = initial_estimate.covar_fmt;
+        Self {
+            prev_estimate: initial_estimate,
+            measurement_noise,
+            process_noise: None,
+            process_noise_dt: None,
+            ekf: false,
+            h_tilde: MatrixMN::<f64, M, S>::zeros(),
+            stm: MatrixMN::<f64, S, S>::identity(),
+            stm_updated: false,
+            h_tilde_updated: false,
+            epoch_fmt,
+            covar_fmt,
         }
     }
 }

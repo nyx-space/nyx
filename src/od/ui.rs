@@ -198,12 +198,19 @@ where
             let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
             if !reported[msr_prct] {
                 info!(
-                    "[ODProcess] {:>2}% done ({:.0} measurements processed)",
+                    "[ODProcess] {:>3}% done ({:.0} measurements processed)",
                     10 * msr_prct,
                     msr_cnt
                 );
                 reported[msr_prct] = true;
             }
+        }
+        // Always report the 100% mark
+        if !reported[10] {
+            info!(
+                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
+                100, num_msrs
+            );
         }
 
         None
@@ -225,7 +232,11 @@ where
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
         let prop_time = measurements[num_msrs - 1].0 - self.kf.previous_estimate().dt();
-        info!("Propagating for {} seconds", prop_time);
+        info!(
+            "Propagating for {} seconds (~ {:.3} days)",
+            prop_time,
+            prop_time / 86_400.0
+        );
 
         self.prop.until_time_elapsed(prop_time);
         info!(
@@ -283,7 +294,11 @@ where
                                         computed_meas.observation(),
                                     ) {
                                         Ok((est, res)) => {
-                                            debug!("msr update msr #{} {:?}", msr_cnt, dt);
+                                            debug!(
+                                                "msr update msr #{} {}",
+                                                msr_cnt,
+                                                dt.as_gregorian_utc_str()
+                                            );
                                             // Switch to EKF if necessary, and update the dynamics and such
                                             if !self.kf.is_extended()
                                                 && self.ekf_trigger.enable_ekf(&est)
@@ -316,7 +331,7 @@ where
                         let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
                         if !reported[msr_prct] {
                             info!(
-                                "[ODProcess] {:>2}% done ({:.0} measurements processed)",
+                                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
                                 10 * msr_prct,
                                 msr_cnt
                             );
@@ -341,6 +356,14 @@ where
                     break 'chan;
                 }
             }
+        }
+
+        // Always report the 100% mark
+        if !reported[10] {
+            info!(
+                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
+                100, num_msrs
+            );
         }
 
         None

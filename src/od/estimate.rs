@@ -24,9 +24,11 @@ where
     fn state(&self) -> VectorN<f64, S>;
     /// The Covariance of this estimate
     fn covar(&self) -> MatrixMN<f64, S, S>;
-    /// The estimated state, or state deviation (check filter docs).
+    // Sets the epoch
+    fn set_dt(&mut self, dt: Epoch);
+    /// Sets the estimated state, or state deviation (check filter docs).
     fn set_state(&mut self, new_state: VectorN<f64, S>);
-    /// The Covariance of this estimate
+    /// Sets the Covariance of this estimate
     fn set_covar(&mut self, new_covar: MatrixMN<f64, S, S>);
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     fn predicted(&self) -> bool;
@@ -109,7 +111,7 @@ where
             covar,
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
-            epoch_fmt: EpochFormat::MjdTai,
+            epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
     }
@@ -127,7 +129,7 @@ where
             covar: MatrixMN::<f64, S, S>::zeros(),
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
-            epoch_fmt: EpochFormat::MjdTai,
+            epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
     }
@@ -156,6 +158,9 @@ where
     fn covar_fmt(&self) -> CovarFormat {
         self.covar_fmt
     }
+    fn set_dt(&mut self, dt: Epoch) {
+        self.dt = dt;
+    }
     fn set_state(&mut self, new_state: VectorN<f64, S>) {
         self.state = new_state;
     }
@@ -171,10 +176,19 @@ where
         Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let word = if self.predicted {
+            "Prediction"
+        } else {
+            "Estimate"
+        };
         write!(
             f,
-            "=== PREDICTED: {} ===\nEstState {} Covariance {}\n=====================",
-            &self.predicted, &self.state, &self.covar
+            "=== {} @ {} UTC -- within 3 sigma: {} ===\nEstState {} Covariance {}\n=====================",
+            word,
+            &self.dt.as_gregorian_utc_str(),
+            self.within_3sigma(),
+            &self.state,
+            &self.covar
         )
     }
 }
@@ -207,8 +221,12 @@ where
     {
         let mut seq = serializer.serialize_seq(Some(S::dim() * 3 + 1))?;
         match self.epoch_fmt {
-            EpochFormat::GregorianUtc => seq.serialize_element(&self.dt.as_gregorian_utc_str())?,
-            EpochFormat::GregorianTai => seq.serialize_element(&self.dt.as_gregorian_utc_tai())?,
+            EpochFormat::GregorianUtc => {
+                seq.serialize_element(&self.dt.as_gregorian_utc_str().replace("T", " "))?
+            }
+            EpochFormat::GregorianTai => {
+                seq.serialize_element(&self.dt.as_gregorian_utc_tai().replace("T", " "))?
+            }
             EpochFormat::MjdTai => seq.serialize_element(&self.dt.as_mjd_tai_days())?,
             EpochFormat::MjdTt => seq.serialize_element(&self.dt.as_mjd_tt_days())?,
             EpochFormat::MjdUtc => seq.serialize_element(&self.dt.as_mjd_utc_days())?,
@@ -345,6 +363,9 @@ where
     fn covar_fmt(&self) -> CovarFormat {
         self.covar_fmt
     }
+    fn set_dt(&mut self, dt: Epoch) {
+        self.dt = dt;
+    }
     /// WARNING: This sets the information state, not the filter state
     fn set_state(&mut self, new_info_state: VectorN<f64, S>) {
         self.info_state = new_info_state;
@@ -408,8 +429,12 @@ where
     {
         let mut seq = serializer.serialize_seq(Some(S::dim() * 3 + 1))?;
         match self.epoch_fmt {
-            EpochFormat::GregorianUtc => seq.serialize_element(&self.dt.as_gregorian_utc_str())?,
-            EpochFormat::GregorianTai => seq.serialize_element(&self.dt.as_gregorian_utc_tai())?,
+            EpochFormat::GregorianUtc => {
+                seq.serialize_element(&self.dt.as_gregorian_utc_str().replace("T", " "))?
+            }
+            EpochFormat::GregorianTai => {
+                seq.serialize_element(&self.dt.as_gregorian_utc_tai().replace("T", " "))?
+            }
             EpochFormat::MjdTai => seq.serialize_element(&self.dt.as_mjd_tai_days())?,
             EpochFormat::MjdTt => seq.serialize_element(&self.dt.as_mjd_tt_days())?,
             EpochFormat::MjdUtc => seq.serialize_element(&self.dt.as_mjd_utc_days())?,

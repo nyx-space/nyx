@@ -65,6 +65,9 @@ where
             .try_inverse()
             .expect("measurement noise singular");
 
+        let epoch_fmt = initial_estimate.epoch_fmt;
+        let covar_fmt = initial_estimate.covar_fmt;
+
         Self {
             prev_estimate: initial_estimate,
             inv_measurement_noise,
@@ -75,8 +78,8 @@ where
             stm: MatrixMN::<f64, S, S>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
-            epoch_fmt: EpochFormat::MjdTai,
-            covar_fmt: CovarFormat::Sqrt,
+            epoch_fmt,
+            covar_fmt,
         }
     }
 }
