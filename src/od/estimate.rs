@@ -297,7 +297,7 @@ where
             info_mat,
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
-            epoch_fmt: EpochFormat::MjdTai,
+            epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
     }
@@ -332,7 +332,7 @@ where
             info_mat,
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
-            epoch_fmt: EpochFormat::MjdTai,
+            epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
     }
