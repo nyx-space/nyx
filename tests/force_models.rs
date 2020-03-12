@@ -11,7 +11,7 @@ use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
 use nyx::dynamics::thrustctrl::NoThrustControl;
 use nyx::dynamics::Dynamics;
-use nyx::propagators::{PropOpts, Propagator, RK89};
+use nyx::propagators::{PropOpts, Propagator};
 use nyx::utils::rss_state_errors;
 
 #[test]
@@ -22,7 +22,7 @@ fn srp_earth() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = OrbitState::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = OrbitState::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
@@ -38,7 +38,7 @@ fn srp_earth() {
     let mut sc = Spacecraft::<NoThrustControl>::with_srp(dynamics, srp, dry_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.state();
@@ -70,7 +70,7 @@ fn drag_earth() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = OrbitState::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = OrbitState::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
@@ -93,7 +93,7 @@ fn drag_earth() {
     sc.exp_drag = Some(drag);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.state();

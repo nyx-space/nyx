@@ -9,7 +9,7 @@ use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::deltavctrl::{InstantBurns, Mnvr};
 use self::nyx::dynamics::missionarc::MissionArc;
 use self::nyx::dynamics::Dynamics;
-use self::nyx::propagators::{PropOpts, Propagator, RK89};
+use self::nyx::propagators::{PropOpts, Propagator};
 
 #[test]
 fn arc_example() {
@@ -20,7 +20,7 @@ fn arc_example() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-    let orbit = OrbitState::from_keplerian(6678.0, 0.0, 0.1, 60.0, 30.0, 0.0, start_time, earth);
+    let orbit = OrbitState::keplerian(6678.0, 0.0, 0.1, 60.0, 30.0, 0.0, start_time, earth);
 
     let prop_time = 86_400.0;
 
@@ -39,7 +39,7 @@ fn arc_example() {
     let schedule = InstantBurns::from_mnvrs(vec![mnvr0, mnvr1]);
 
     let mut arc = MissionArc::new(celestial, schedule);
-    let mut prop = Propagator::new::<RK89>(&mut arc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::default(&mut arc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     println!("final state: {:o}", prop.dynamics.celestial.state());

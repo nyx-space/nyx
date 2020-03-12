@@ -7,7 +7,7 @@ use hifitime::{Epoch, SECONDS_PER_DAY};
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
 use nyx::celestia::{bodies, Cosm, LTCorr, OrbitState};
 use nyx::dynamics::celestial::CelestialDynamics;
-use nyx::propagators::{PropOpts, Propagator, RK89};
+use nyx::propagators::{PropOpts, Propagator};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
@@ -22,7 +22,7 @@ fn leo_sun_earth_eclipses() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = OrbitState::from_keplerian(6778.0, 0.1, 60.0, 0.0, 0.0, 0.0, start_time, earth);
+    let leo = OrbitState::keplerian(6778.0, 0.1, 60.0, 0.0, 0.0, 0.0, start_time, earth);
 
     let (truth_tx, truth_rx): (Sender<OrbitState>, Receiver<OrbitState>) = mpsc::channel();
 
@@ -31,7 +31,7 @@ fn leo_sun_earth_eclipses() {
     thread::spawn(move || {
         let cosm = Cosm::from_xb("./de438s");
         let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
-        let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(60.0));
+        let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
     });
@@ -74,7 +74,7 @@ fn geo_sun_earth_eclipses() {
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
 
-    let leo = OrbitState::from_keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
+    let leo = OrbitState::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
 
     let (truth_tx, truth_rx): (Sender<OrbitState>, Receiver<OrbitState>) = mpsc::channel();
 
@@ -83,7 +83,7 @@ fn geo_sun_earth_eclipses() {
     thread::spawn(move || {
         let cosm = Cosm::from_xb("./de438s");
         let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
-        let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(60.0));
+        let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
     });

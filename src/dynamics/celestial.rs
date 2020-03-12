@@ -52,7 +52,7 @@ impl<'a> CelestialDynamics<'a> {
     }
 
     pub fn state_ctor(&self, rel_time: f64, state_vec: &Vector6<f64>) -> OrbitState {
-        OrbitState::from_cartesian(
+        OrbitState::cartesian(
             state_vec[0],
             state_vec[1],
             state_vec[2],

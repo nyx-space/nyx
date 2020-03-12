@@ -360,8 +360,7 @@ mod tests {
         cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.433);
         let earth = cosm.geoid_from_id(bodies::EARTH);
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-        let orbit =
-            OrbitState::from_keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+        let orbit = OrbitState::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
 
         // Define the objectives
         let objectives = vec![
@@ -377,7 +376,7 @@ mod tests {
 
         let ruggiero = Ruggiero::new(objectives, orbit);
         // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
-        let osc = OrbitState::from_cartesian(
+        let osc = OrbitState::cartesian(
             7_303.253_461_441_64f64,
             127.478_714_816_381_75,
             0.111_246_193_227_445_4,

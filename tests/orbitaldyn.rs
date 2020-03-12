@@ -23,7 +23,7 @@ fn two_body_custom() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH_BARYCENTER);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let mut state = OrbitState::from_cartesian(
+    let mut state = OrbitState::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -46,7 +46,7 @@ fn two_body_custom() {
 
     let mut dynamics = CelestialDynamics::two_body(state);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
     assert_eq!(prop.state_vector(), rslt, "two body prop failed");
     // And now do the backprop
@@ -70,7 +70,7 @@ fn two_body_dynamics() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = OrbitState::from_cartesian(
+    let state = OrbitState::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -92,7 +92,7 @@ fn two_body_dynamics() {
 
     let mut dynamics = CelestialDynamics::two_body(state);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::<RSSStepPV>::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
     assert!(
         (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
@@ -145,7 +145,7 @@ fn halo_earth_moon_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = OrbitState::from_cartesian(
+    let halo_rcvr = OrbitState::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -169,7 +169,7 @@ fn halo_earth_moon_dynamics() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -211,7 +211,7 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = OrbitState::from_cartesian(
+    let halo_rcvr = OrbitState::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -234,7 +234,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -276,7 +276,7 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = OrbitState::from_cartesian(
+    let llo_xmtr = OrbitState::cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -300,7 +300,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = CelestialDynamics::new(llo_xmtr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -344,7 +344,7 @@ fn halo_multi_body_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = OrbitState::from_cartesian(
+    let halo_rcvr = OrbitState::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -368,7 +368,7 @@ fn halo_multi_body_dynamics() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -414,7 +414,7 @@ fn halo_multi_body_dynamics_adaptive() {
     // let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = OrbitState::from_cartesian(
+    let halo_rcvr = OrbitState::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -438,7 +438,7 @@ fn halo_multi_body_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -483,7 +483,7 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = OrbitState::from_cartesian(
+    let llo_xmtr = OrbitState::cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -507,7 +507,7 @@ fn llo_multi_body_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(llo_xmtr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -552,7 +552,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = OrbitState::from_cartesian(
+    let leo = OrbitState::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -569,7 +569,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -613,7 +613,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = OrbitState::from_cartesian(
+    let leo = OrbitState::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -630,7 +630,7 @@ fn leo_multi_body_dynamics_adaptive() {
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
 
@@ -663,7 +663,7 @@ fn two_body_dual() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.geoid_from_id(399);
 
-    let init = OrbitState::from_cartesian(
+    let init = OrbitState::cartesian(
         -9_042.862_233_600_335,
         18_536.333_069_123_244,
         6_999.957_069_486_411_5,
@@ -717,7 +717,7 @@ fn two_body_dual() {
 
     let prop_time = SECONDS_PER_DAY;
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
@@ -744,7 +744,7 @@ fn multi_body_dynamics_dual() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = OrbitState::from_cartesian(
+    let halo_rcvr = OrbitState::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -758,7 +758,7 @@ fn multi_body_dynamics_dual() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = CelestialDynamicsStm::new(halo_rcvr, bodies, &cosm);
 
-    let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.

@@ -10,7 +10,7 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
 use self::nyx::dynamics::Dynamics;
-use self::nyx::propagators::{PropOpts, Propagator, RK89};
+use self::nyx::propagators::{PropOpts, Propagator};
 use self::nyx::utils::rss_state_errors;
 
 #[test]
@@ -30,7 +30,7 @@ fn transfer_schedule_no_depl() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-    let orbit = OrbitState::from_cartesian(
+    let orbit = OrbitState::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -39,7 +39,7 @@ fn transfer_schedule_no_depl() {
     let mut end_time = start_time;
     end_time.mut_add_secs(prop_time);
 
-    let rslt = OrbitState::from_cartesian(
+    let rslt = OrbitState::cartesian(
         4_172.396_780_515_64f64,
         436.944_560_056_202_8,
         -6_518.328_156_815_674,
@@ -76,7 +76,7 @@ fn transfer_schedule_no_depl() {
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
-    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::default(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Compute the errors
@@ -129,7 +129,7 @@ fn transfer_schedule_depl() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-    let orbit = OrbitState::from_cartesian(
+    let orbit = OrbitState::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -138,7 +138,7 @@ fn transfer_schedule_depl() {
     let mut end_time = start_time;
     end_time.mut_add_secs(prop_time);
 
-    let rslt = OrbitState::from_cartesian(
+    let rslt = OrbitState::cartesian(
         4_172.433_936_615_18,
         436.936_159_720_413,
         -6_518.368_821_953_345,
@@ -175,7 +175,7 @@ fn transfer_schedule_depl() {
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
-    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::default(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
     // Compute the errors

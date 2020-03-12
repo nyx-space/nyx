@@ -336,7 +336,7 @@ impl Cosm {
         let ref_frame_exb_id = ref_frame_id % 100_000;
         let storage_geoid = self.geoid_from_id(ref_frame_exb_id);
         let dt = Epoch::from_jde_tai(jde);
-        Ok(OrbitState::from_cartesian(
+        Ok(OrbitState::cartesian(
             x,
             y,
             z,
@@ -364,7 +364,7 @@ impl Cosm {
         match correction {
             LTCorr::None => {
                 let target_geoid = self.try_geoid_from_id(target_exb_id)?;
-                let state = OrbitState::from_cartesian(
+                let state = OrbitState::cartesian(
                     0.0,
                     0.0,
                     0.0,
@@ -391,7 +391,7 @@ impl Cosm {
                     tgt = self.celestial_state(target_exb_id, lt_dt, 0, LTCorr::None);
                 }
                 // Compute the correct state
-                let mut state = OrbitState::from_cartesian(
+                let mut state = OrbitState::cartesian(
                     (tgt - obs).x,
                     (tgt - obs).y,
                     (tgt - obs).z,
@@ -825,7 +825,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = OrbitState::from_cartesian(
+        let lro = OrbitState::cartesian(
             4.017_685_334_718_784E5,
             2.642_441_356_763_487E4,
             -3.024_209_691_251_325E4,
@@ -836,7 +836,7 @@ mod tests {
             earth,
         );
 
-        let lro_jpl = OrbitState::from_cartesian(
+        let lro_jpl = OrbitState::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -868,7 +868,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = OrbitState::from_cartesian(
+        let lro = OrbitState::cartesian(
             -4.393_308_217_174_602E7,
             1.874_075_194_166_327E8,
             8.763_986_396_329_135E7,
@@ -879,7 +879,7 @@ mod tests {
             venus,
         );
 
-        let lro_jpl = OrbitState::from_cartesian(
+        let lro_jpl = OrbitState::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -911,7 +911,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = OrbitState::from_cartesian(
+        let lro = OrbitState::cartesian(
             4.227_396_973_787_854E7,
             1.305_852_533_250_192E8,
             5.657_002_470_685_254E7,
@@ -922,7 +922,7 @@ mod tests {
             ssb,
         );
 
-        let lro_jpl = OrbitState::from_cartesian(
+        let lro_jpl = OrbitState::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,

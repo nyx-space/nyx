@@ -46,7 +46,7 @@ fn ekf_fixed_step_perfect_stations() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
-        OrbitState::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+        OrbitState::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -166,7 +166,7 @@ fn ckf_fixed_step_perfect_stations() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
-        OrbitState::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+        OrbitState::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -355,7 +355,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
-        OrbitState::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+        OrbitState::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {

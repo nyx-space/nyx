@@ -51,7 +51,7 @@ where
     /// Creates a new State in the provided frame at the provided Epoch.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    pub fn from_cartesian<G>(
+    pub fn cartesian<G>(
         x: f64,
         y: f64,
         z: f64,
@@ -97,9 +97,9 @@ where
 
     /// Creates a new State around in the provided frame from the borrowed state vector
     ///
-    /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `from_cartesian`
+    /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: F) -> State<F>
+    pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: F) -> State<F>
     where
         F: Frame,
     {
@@ -365,7 +365,7 @@ impl OrbitState {
     /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
-    pub fn from_keplerian(
+    pub fn keplerian(
         sma: f64,
         ecc: f64,
         inc: f64,
@@ -477,10 +477,10 @@ impl OrbitState {
 
     /// Creates a new State around the provided CelestialBody from the borrowed state vector
     ///
-    /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `from_cartesian`
+    /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn from_keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Geoid) -> Self {
-        Self::from_keplerian(
+    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Geoid) -> Self {
+        Self::keplerian(
             state[(0, 0)],
             state[(1, 0)],
             state[(2, 0)],
@@ -516,7 +516,7 @@ impl OrbitState {
         let rk = (s_earth + height) * sin_lat;
         let radius = Vector3::new(ri, rj, rk);
         let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
-        OrbitState::from_cartesian(
+        OrbitState::cartesian(
             radius[(0, 0)],
             radius[(1, 0)],
             radius[(2, 0)],
@@ -837,7 +837,27 @@ where
             f,
             "[{}] {}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
             self.frame,
-            self.dt.as_mjd_tai_days(),
+            self.dt.as_gregorian_utc_tai(),
+            self.x,
+            self.y,
+            self.z,
+            self.vx,
+            self.vy,
+            self.vz
+        )
+    }
+}
+
+impl<F> fmt::LowerExp for State<F>
+where
+    F: Frame,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {}\tposition = [{:e}, {:e}, {:e}] km\tvelocity = [{:e}, {:e}, {:e}] km/s",
+            self.frame,
+            self.dt.as_gregorian_utc_str(),
             self.x,
             self.y,
             self.z,
@@ -855,7 +875,7 @@ impl fmt::Octal for OrbitState {
             f,
             "[{}] {}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
             self.frame,
-            self.dt.as_mjd_tai_days(),
+            self.dt.as_gregorian_utc_tai(),
             self.sma(),
             self.ecc(),
             self.inc(),

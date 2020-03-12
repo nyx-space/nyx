@@ -4,7 +4,7 @@ use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, VectorN};
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
 use super::events::{ConvergenceError, EventTrackers, StopCondition};
-use super::{IntegrationDetails, RK};
+use super::{IntegrationDetails, RK, RK89};
 use dynamics::Dynamics;
 use std::f64;
 use std::f64::EPSILON;
@@ -56,6 +56,11 @@ where
             b_coeffs: T::b_coeffs(),
             fixed_step: opts.fixed_step,
         }
+    }
+
+    /// Default propagator is an RK89.
+    pub fn default(dynamics: &'a mut M, opts: &PropOpts<E>) -> Self {
+        Self::new::<RK89>(dynamics, opts)
     }
 
     pub fn set_step(&mut self, step_size: f64, fixed: bool) {

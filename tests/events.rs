@@ -16,7 +16,7 @@ fn event_tracker_true_anomaly() {
     let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = OrbitState::from_cartesian(
+    let state = OrbitState::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -39,7 +39,7 @@ fn event_tracker_true_anomaly() {
 
     let mut dynamics = CelestialDynamics::two_body(state);
 
-    let mut prop = Propagator::new::<RK89>(
+    let mut prop = Propagator::default(
         &mut dynamics,
         &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
     );

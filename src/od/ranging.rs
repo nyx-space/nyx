@@ -116,7 +116,7 @@ impl MeasurementDevice<StdMeasurement> for GroundStation {
         let tx_ecef_r = r3(-theta) * tx.radius();
         let tx_ecef_v = r3(-theta) * tx.velocity(); // XXX: Shouldn't we be using the transport theorem?
                                                     // HACK: change after Cosm supports rotations
-        let tx_ecef = State::from_cartesian_vec(
+        let tx_ecef = State::cartesian_vec(
             &Vector6::from_iterator(tx_ecef_r.iter().chain(tx_ecef_v.iter()).cloned()),
             mjd_dt,
             rx.frame,

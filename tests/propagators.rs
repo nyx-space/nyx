@@ -22,7 +22,7 @@ fn regress_leo_day_adaptive() {
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = OrbitState::from_cartesian(
+    let init = OrbitState::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -126,7 +126,7 @@ fn gmat_val_leo_day_adaptive() {
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = OrbitState::from_cartesian(
+    let init = OrbitState::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -276,7 +276,7 @@ fn gmat_val_leo_day_fixed() {
 
     let prop_time = 3_600.0 * 24.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = OrbitState::from_cartesian(
+    let init = OrbitState::cartesian(
         -2436.45,
         -2436.45,
         6891.037,

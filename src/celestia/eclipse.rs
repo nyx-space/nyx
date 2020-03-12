@@ -264,11 +264,11 @@ mod tests {
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-        let x1 = OrbitState::from_cartesian(-1.0, -1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x2 = OrbitState::from_cartesian(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x3 = OrbitState::from_cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x4 = OrbitState::from_cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x5 = OrbitState::from_cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x1 = OrbitState::cartesian(-1.0, -1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x2 = OrbitState::cartesian(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x3 = OrbitState::cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x4 = OrbitState::cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x5 = OrbitState::cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
         assert_eq!(line_of_sight(&x1, &x2, earth, &cosm), EclipseState::Umbra);
         assert_eq!(
@@ -299,9 +299,9 @@ mod tests {
 
         let sma = earth.equatorial_radius + 300.0;
 
-        let sc1 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc2 = OrbitState::from_keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc3 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
+        let sc1 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+        let sc2 = OrbitState::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+        let sc3 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
 
         // Out of phase by pi.
         assert_eq!(line_of_sight(&sc1, &sc3, earth, &cosm), EclipseState::Umbra);
@@ -323,9 +323,9 @@ mod tests {
 
         let sma = earth.equatorial_radius + 300.0;
 
-        let sc1 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, earth);
-        let sc2 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
-        let sc3 = OrbitState::from_keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
+        let sc1 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, earth);
+        let sc2 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
+        let sc3 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
 
         let correction = LTCorr::None;
 
