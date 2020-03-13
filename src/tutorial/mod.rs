@@ -215,7 +215,7 @@ println!("{}\n{}\n{}", earth_as_seen_from_sun, with_lt, with_abbr);
 
 By executing `cargo run` in the `nyxtutorial` folder, the following should be printed to console:
 
-```
+```text
 [Geoid 10] 2019-12-31T23:59:23 TAI      position = [-24885932.304049, 133017335.386064, 57663346.118202] km     velocity = [-29.848886, -4.736858, -2.052876] km/s
 [Geoid 10] 2019-12-31T23:59:23 TAI      position = [-24871279.186939, 133019660.572113, 57664353.602189] km     velocity = [-29.849413, -4.734134, -2.051694] km/s
 [Geoid 10] 2019-12-31T23:59:23 TAI      position = [-24871286.361793, 133019659.365008, 57664353.292134] km     velocity = [-29.849413, -4.734134, -2.051694] km/s
@@ -252,7 +252,7 @@ println!("{}\n{}", state, seen_from_moon);
 ```
 
 Executing this, the output should be:
-```
+```text
 [Geoid 399] 2020-01-30T23:59:23 TAI     position = [-2436.450000, -2436.450000, 6891.037000] km velocity = [5.088611, -5.088611, 0.000000] km/s
 [Geoid 301] 2020-01-30T23:59:23 TAI     position = [-386674.710813, -128504.451448, -8399.855914] km    velocity = [5.393609, -5.923479, -0.379899] km/s
 ```
@@ -363,7 +363,7 @@ println!("{:?}", prop.latest_details());
 ```
 
 Execute `cargo run`, and you should get something like this:
-```
+```text
 default options: [min_step: 1e-3, max_step: 2.7e3, tol: 1e-12, attempts: 50]
 [Geoid 399] 2020-01-31T23:59:23 TAI     position = [-5971.194377, 3945.517913, 2864.620958] km  velocity = [0.049083, -4.185084, 5.848947] km/s
 [Geoid 399] 2020-01-31T23:59:23 TAI     position = [-5971.194377, 3945.517913, 2864.620958] km  velocity = [0.049083, -4.185084, 5.848947] km/s
@@ -418,7 +418,7 @@ println!("{}", last_state);
 ```
 
 The output execution should be something like this:
-```
+```text
 propagator options: [min_step: 1e1, max_step: 1e1, tol: 0e0, attempts: 0]
 [Geoid 399] 2020-01-31T23:59:23 TAI     position = [-5971.194374, 3945.517805, 2864.621106] km  velocity = [0.049083, -4.185084, 5.848947] km/s
 ```
@@ -485,7 +485,7 @@ match prop.until_event(condition) {
 ```
 
 The output should be something like:
-```
+```text
 Converged on (3370.134633983629, 3370.134662763675) for event OrbitalEvent { kind: Apoapse, tgt: None, cosm: None }
 Final time: 2020-01-31T00:55:33
 All crossings:
@@ -548,7 +548,7 @@ match prop.until_event(condition) {
 ```
 
 Whose output should be:
-```
+```text
 Converged on (16850.673179626465, 16850.673294067383) for event OrbitalEvent { kind: Apoapse, tgt: None, cosm: None }
 Final time: 2020-01-31T04:40:13
 ```
@@ -630,7 +630,7 @@ println!("{}", last_state);
 ```
 
 Finally, after running this, we can confirm that the final state reported by the propagator is in the file, and so are all of the other states.
-```
+```text
 chris@localhost [~/Workspace/nyxtutorial]$ cargo run
 (...)
 propagator options: [min_step: 1e-3, max_step: 2.7e3, tol: 1e-12, attempts: 50]
@@ -714,7 +714,7 @@ assert_eq!(cnt_changes, 62, "wrong number of eclipse state changes");
 
 Running this example, we should get the following output, where the time is in JDE days TAI:
 
-```
+```text
 2458927.500694 now in Penumbra(0.05597248362684378)
 2458927.501389 now in Umbra
 2458927.514583 now in Penumbra(0.02019090399088673)
