@@ -1,5 +1,6 @@
 use super::{Cosm, Geoid, LTCorr, OrbitState};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
+use std::fmt;
 
 /// Stores the eclipse state
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -64,6 +65,16 @@ impl Ord for EclipseState {
 impl PartialOrd for EclipseState {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl fmt::Display for EclipseState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Self::Umbra => write!(f, "Umbra"),
+            Self::Visibilis => write!(f, "Visibilis"),
+            Self::Penumbra(v) => write!(f, "Penumbra {}%", v * 100.0),
+        }
     }
 }
 

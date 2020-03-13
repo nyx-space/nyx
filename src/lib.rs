@@ -229,3 +229,14 @@ extern crate log;
 #[macro_use]
 extern crate prost_derive;
 extern crate hifitime;
+extern crate nalgebra as na;
+
+/// Re-export of hifitime
+pub mod time {
+    pub use hifitime::*;
+}
+
+/// Re-export nalgebra
+pub mod dimensions {
+    pub use na::base::*;
+}

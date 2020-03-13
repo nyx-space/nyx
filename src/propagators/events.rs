@@ -85,13 +85,11 @@ impl<S: Copy> fmt::Display for EventTrackers<S> {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for event_no in 0..self.events.len() {
-            if event_no > 0 {
-                writeln!(f)?;
-            }
+            let last_e = self.found_bounds[event_no][self.found_bounds[event_no].len() - 1];
             write!(
                 f,
-                "For {:?}, found times: {:?}",
-                self.events[event_no], self.found_bounds[event_no]
+                "Converged on ({}, {}) for event {:?}",
+                last_e.0, last_e.1, self.events[event_no]
             )?;
         }
         Ok(())

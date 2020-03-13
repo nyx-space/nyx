@@ -400,12 +400,7 @@ pub struct PropOpts<E: ErrorCtrl> {
 impl<E: ErrorCtrl> PropOpts<E> {
     /// `with_adaptive_step` initializes an `PropOpts` such that the integrator is used with an
     ///  adaptive step size. The number of attempts is currently fixed to 50 (as in GMAT).
-    pub fn with_adaptive_step(
-        min_step: f64,
-        max_step: f64,
-        tolerance: f64,
-        errctrl: E,
-    ) -> PropOpts<E> {
+    pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64, errctrl: E) -> Self {
         PropOpts {
             init_step: max_step,
             min_step,
@@ -415,6 +410,14 @@ impl<E: ErrorCtrl> PropOpts<E> {
             fixed_step: false,
             errctrl,
         }
+    }
+
+    /// Returns a string with the information about these options
+    pub fn info(&self) -> String {
+        format!(
+            "[min_step: {:.e}, max_step: {:.e}, tol: {:.e}, attempts: {}]",
+            self.min_step, self.max_step, self.tolerance, self.attempts,
+        )
     }
 }
 
