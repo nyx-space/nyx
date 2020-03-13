@@ -22,6 +22,11 @@ use std::io::Read;
 use std::time::Instant;
 use utils::rotv;
 
+/// Mass of the solar system from https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
+pub const SS_MASS: f64 = 1.0014;
+/// Mass of the Sun
+pub const SUN_GM: f64 = 132_712_440_041.939_38;
+
 /// Enable or not light time correction for the computation of the celestial states
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LTCorr {
@@ -92,106 +97,120 @@ impl Cosm {
         // Further, when adding the SSB, I should probably _not_ add it to the Geoid, since it isn't one. That said, this will break things.
         // Hence, I should probably add as a "virtual geoid", and computing the approximate GM from some estimated mass of the solar system (which includes asteroids, etc.).
         // Solar System Barycenter
-        let ss_mass = 1.0014; // https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
-        let sun_gm = 132_712_440_041.939_38;
         cosm.geoids.insert(
             (0, "Solar System Barycenter".to_string()),
-            Geoid::perfect_sphere(0, 0, 1, ss_mass * sun_gm),
+            Geoid::perfect_sphere(0, 0, 1, SS_MASS * SUN_GM),
         );
 
         cosm.exb_map.add_node(0); // Add the SSB
+        match cosm.append_xb(filename) {
+            None => Ok(cosm),
+            Some(err) => Err(err),
+        }
+    }
 
-        let ephemerides = load_ephemeris(&(filename.to_string() + ".exb"))?;
-        for ephem in &ephemerides {
-            let id = ephem.id.as_ref().unwrap();
-            let exb_tpl = (id.number, id.name.clone());
+    pub fn append_xb(&mut self, filename: &str) -> Option<IoError> {
+        match load_ephemeris(&(filename.to_string() + ".exb")) {
+            Err(e) => Some(e),
+            Ok(ephemerides) => {
+                for ephem in &ephemerides {
+                    let id = ephem.id.as_ref().unwrap();
+                    let exb_tpl = (id.number, id.name.clone());
 
-            cosm.ephemerides.insert(exb_tpl.clone(), ephem.clone());
+                    self.ephemerides.insert(exb_tpl.clone(), ephem.clone());
 
-            // Compute the exb_id and axb_id from the ref frame.
-            let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
-            let exb_id = ref_frame_id % 100_000;
-            let axb_id = ref_frame_id / 100_000;
+                    // Compute the exb_id and axb_id from the ref frame.
+                    let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
+                    let exb_id = ref_frame_id % 100_000;
+                    let axb_id = ref_frame_id / 100_000;
 
-            // Add this EXB to the map, and link it to its parent
-            let this_node = cosm.exb_map.add_node(id.number);
-            let parent_node = match cosm.exbid_to_map_idx(exb_id) {
-                Ok(p) => p,
-                Err(e) => panic!(e),
-            };
-            // All edges are of value 1
-            cosm.exb_map.add_edge(parent_node, this_node, 1);
+                    // Add this EXB to the map, and link it to its parent
+                    let this_node = self.exb_map.add_node(id.number);
+                    let parent_node = match self.exbid_to_map_idx(exb_id) {
+                        Ok(p) => p,
+                        Err(e) => panic!(e),
+                    };
+                    // All edges are of value 1
+                    self.exb_map.add_edge(parent_node, this_node, 1);
 
-            // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
+                    // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
 
-            // Ephemeris exists
-            match ephem.parameters.get("GM") {
-                Some(gm) => {
-                    // It's a geoid, and we assume everything else is there
-                    let flattening = match ephem.parameters.get("Flattening") {
-                        Some(param) => param.value,
+                    // Ephemeris exists
+                    match ephem.parameters.get("GM") {
+                        Some(gm) => {
+                            // It's a geoid, and we assume everything else is there
+                            let flattening = match ephem.parameters.get("Flattening") {
+                                Some(param) => param.value,
+                                None => {
+                                    if id.name != "Moon" {
+                                        0.0
+                                    } else {
+                                        0.0012
+                                    }
+                                }
+                            };
+                            let equatorial_radius = match ephem.parameters.get("Equatorial radius")
+                            {
+                                Some(param) => param.value,
+                                None => {
+                                    if id.name != "Moon" {
+                                        0.0
+                                    } else {
+                                        1738.1
+                                    }
+                                }
+                            };
+                            let semi_major_radius = match ephem.parameters.get("Equatorial radius")
+                            {
+                                Some(param) => {
+                                    if id.name != "Earth Barycenter" {
+                                        param.value
+                                    } else {
+                                        6378.1370
+                                    }
+                                }
+                                None => equatorial_radius, // assume spherical if unspecified
+                            };
+                            let geoid = Geoid {
+                                id: id.number,
+                                center_id: exb_id,
+                                orientation_id: axb_id,
+                                gm: gm.value,
+                                flattening,
+                                equatorial_radius,
+                                semi_major_radius,
+                            };
+                            self.geoids.insert(exb_tpl, geoid);
+                        }
                         None => {
-                            if id.name != "Moon" {
-                                0.0
-                            } else {
-                                0.0012
+                            match id.number {
+                                10 => {
+                                    // Sun
+                                    let mut sun =
+                                        Geoid::perfect_sphere(id.number, exb_id, axb_id, SUN_GM);
+                                    // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+                                    sun.equatorial_radius = 696_342.0;
+                                    self.geoids.insert(exb_tpl, sun);
+                                }
+                                _ => {
+                                    info!(
+                                        "no GM value for EXB ID {} (exb ID: {})",
+                                        id.number, exb_id
+                                    );
+                                }
                             }
-                        }
-                    };
-                    let equatorial_radius = match ephem.parameters.get("Equatorial radius") {
-                        Some(param) => param.value,
-                        None => {
-                            if id.name != "Moon" {
-                                0.0
-                            } else {
-                                1738.1
-                            }
-                        }
-                    };
-                    let semi_major_radius = match ephem.parameters.get("Equatorial radius") {
-                        Some(param) => {
-                            if id.name != "Earth Barycenter" {
-                                param.value
-                            } else {
-                                6378.1370
-                            }
-                        }
-                        None => equatorial_radius, // assume spherical if unspecified
-                    };
-                    let geoid = Geoid {
-                        id: id.number,
-                        center_id: exb_id,
-                        orientation_id: axb_id,
-                        gm: gm.value,
-                        flattening,
-                        equatorial_radius,
-                        semi_major_radius,
-                    };
-                    cosm.geoids.insert(exb_tpl, geoid);
-                }
-                None => {
-                    match id.number {
-                        10 => {
-                            // Sun
-                            let mut sun = Geoid::perfect_sphere(id.number, exb_id, axb_id, sun_gm);
-                            // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
-                            sun.equatorial_radius = 696_342.0;
-                            cosm.geoids.insert(exb_tpl, sun);
-                        }
-                        _ => {
-                            info!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
                         }
                     }
                 }
+
+                for frame in load_frames(&(filename.to_string() + ".fxb")) {
+                    let id = frame.id.clone().unwrap();
+                    self.frames.insert((id.number, id.name), frame.clone());
+                }
+
+                None
             }
         }
-
-        for frame in load_frames(&(filename.to_string() + ".fxb")) {
-            let id = frame.id.clone().unwrap();
-            cosm.frames.insert((id.number, id.name), frame.clone());
-        }
-
-        Ok(cosm)
     }
 
     fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
@@ -364,16 +383,8 @@ impl Cosm {
         match correction {
             LTCorr::None => {
                 let target_geoid = self.try_geoid_from_id(target_exb_id)?;
-                let state = OrbitState::cartesian(
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    datetime,
-                    target_geoid,
-                );
+                let state =
+                    OrbitState::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_geoid);
                 Ok(-self.try_frame_chg(&state, as_seen_from)?)
             }
             LTCorr::LightTime | LTCorr::Abberation => {
@@ -973,6 +984,30 @@ mod tests {
     #[test]
     fn test_cosm_aberration_corr() {
         let cosm = Cosm::from_xb("./de438s");
+
+        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
+
+        let out_state = cosm.celestial_state(
+            bodies::EARTH_BARYCENTER,
+            jde,
+            bodies::MARS_BARYCENTER,
+            LTCorr::Abberation,
+        );
+
+        assert!((out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
+        assert!((out_state.y - -5.812_356_237_533_56e7).abs() < 1e-3);
+        assert!((out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
+        // Reenable this test after #96 is implemented.
+        dbg!(out_state.vx - -3.463_585_965_206_417);
+        dbg!(out_state.vy - -3.698_169_177_803_263e1);
+        dbg!(out_state.vz - -1.690_783_648_756_073e1);
+    }
+
+    #[test]
+    fn test_cosm_append() {
+        let mut cosm = Cosm::from_xb("./de438s");
+        // Let's load the same XB again to demonstrate idempotency.
+        cosm.append_xb("./de438s");
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
 
