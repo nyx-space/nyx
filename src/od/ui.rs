@@ -307,6 +307,47 @@ where
 
         None
     }
+
+    /// Allows for covariance mapping without processing measurements
+    pub fn map_covar(
+        &mut self,
+        prop_rx: &Receiver<D::StateType>,
+        end_epoch: &Epoch,
+    ) -> Option<FilterError> {
+        // Start by propagating the estimator (on the same thread).
+        let prop_time = *end_epoch - self.kf.prev_estimate.dt;
+        info!("Propagating for {} seconds", prop_time);
+
+        self.prop.until_time_elapsed(prop_time);
+        info!(
+            "Mapping covariance"
+        );
+
+        while let Ok(prop_state) = prop_rx.recv() {
+            // Get the datetime and info needed to compute the theoretical measurement according to the model
+            let (dt, meas_input) = self.prop.dynamics.to_measurement(&prop_state);
+
+            // Update the STM of the KF (needed between each measurement or time update)
+            let stm = self.prop.dynamics.extract_stm(&prop_state);
+            self.kf.update_stm(stm);
+            info!("final time update {:?}", dt);
+            match self.kf.time_update(dt) {
+                Ok(est) => {
+                    if self.kf.ekf {
+                        let est_state = est.state.clone();
+                        self.prop.dynamics.set_estimated_state(
+                            self.prop.dynamics.extract_estimated_state(&prop_state)
+                                + est_state,
+                        );
+                    }
+                    self.estimates.push(est);
+                }
+                Err(e) => return Some(e),
+            }
+        }
+
+        None
+    }
 }
 
 impl<
