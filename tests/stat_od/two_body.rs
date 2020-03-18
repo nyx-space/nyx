@@ -356,7 +356,6 @@ fn ckf_map_covar() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::{io, thread};
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -370,7 +369,7 @@ fn ckf_map_covar() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 2.0 * SECONDS_PER_DAY;
     let step_size = 10.0;
     let opts_est = PropOpts::with_fixed_step(step_size);
 
@@ -384,7 +383,6 @@ fn ckf_map_covar() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    
     let mut tb_estimator = CelestialDynamicsStm::two_body(initial_state);
 
     let (pest_tx, pest_rx): (
@@ -410,18 +408,13 @@ fn ckf_map_covar() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut ckf = KF::initialize(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::default_ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-    );
+    let mut odp = ODProcess::default_ckf(&mut prop_est, &mut ckf, &all_stations);
 
-    let prop_duration: f64 = 2.*SECONDS_PER_DAY;
-    let filter_return = odp.map_covar(&pest_rx, &(dt+prop_time));
+    let filter_return = odp.map_covar(&pest_rx, dt + prop_time);
     assert!(filter_return.is_none(), "covar mapping failed");
 
     // Check that the covariance inflated
-    let estimates = odp.estimates.clone();
+    let estimates = odp.estimates;
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
         if i < 3 {
