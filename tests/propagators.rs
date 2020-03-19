@@ -1,8 +1,10 @@
+extern crate approx;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
 
+use approx::{abs_diff_eq, relative_eq};
 use hifitime::{Epoch, J2000_OFFSET};
 use na::Vector6;
 use nyx::celestia::{Cosm, OrbitState};
@@ -10,6 +12,32 @@ use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::error_ctrl::RSSStatePV;
 use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
+
+macro_rules! assert_eq_or_abs {
+    ($left:expr, $right:expr, $msg:expr) => {
+        if !(*$left == *$right) && !abs_diff_eq!($left, $right, epsilon = 1e-8) {
+            panic!(
+                r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`: {}"#,
+                &*$left, &*$right, $msg
+            )
+        }
+    };
+}
+
+macro_rules! assert_eq_or_rel {
+    ($left:expr, $right:expr, $msg:expr) => {
+        if !(*$left == *$right) && !relative_eq!($left, $right, max_relative = 1e-6) {
+            panic!(
+                r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`: {}"#,
+                &*$left, &*$right, $msg
+            )
+        }
+    };
+}
 
 #[test]
 fn regress_leo_day_adaptive() {
@@ -82,7 +110,7 @@ fn regress_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
+        assert_eq_or_abs!(prop.state_vector(), all_rslts[1], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -100,7 +128,7 @@ fn regress_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[2], "two body prop failed");
+        assert_eq_or_rel!(prop.state_vector(), all_rslts[2], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -193,7 +221,7 @@ fn gmat_val_leo_day_adaptive() {
                 prev_details
             );
         }
-        assert_eq!(
+        assert_eq_or_abs!(
             prop.state_vector(),
             all_rslts[0],
             "first forward two body prop failed"
@@ -220,7 +248,7 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
+        assert_eq_or_abs!(prop.state_vector(), all_rslts[1], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -358,7 +386,7 @@ fn gmat_val_leo_day_fixed() {
         let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
+        assert_eq_or_rel!(prop.state_vector(), all_rslts[1], "two body prop failed");
     }
 
     {
