@@ -207,7 +207,7 @@ where
 
         let mut msr_cnt = 0_usize;
 
-        'chan: while let Ok(prop_state) = prop_rx.recv() {
+        while let Ok(prop_state) = prop_rx.try_recv() {
             // Get the datetime and info needed to compute the theoretical measurement according to the model
             let (dt, meas_input) = self.prop.dynamics.to_measurement(&prop_state);
 
@@ -300,7 +300,8 @@ where
                         }
                         Err(e) => return Some(e),
                     }
-                    break 'chan;
+                    // Leave the loop {...} which processes several measurements at once
+                    break;
                 }
             }
         }
@@ -321,8 +322,8 @@ where
         self.prop.until_time_elapsed(prop_time);
         info!("Mapping covariance");
 
-        while let Ok(prop_state) = prop_rx.recv() {
-            // Get the datetime and info needed to compute the theoretical measurement according to the model
+        while let Ok(prop_state) = prop_rx.try_recv() {
+            // Get the datetime
             let (dt, _) = self.prop.dynamics.to_measurement(&prop_state);
 
             // Update the STM of the KF (needed between each measurement or time update)
@@ -340,11 +341,6 @@ where
                     self.estimates.push(est);
                 }
                 Err(e) => return Some(e),
-            }
-
-            if dt == end_epoch {
-                // Fixes the dead lock between the recv() and the lifetime of the channel
-                break;
             }
         }
 
