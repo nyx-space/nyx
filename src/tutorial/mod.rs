@@ -2,6 +2,9 @@
 
 This tutorial covers some of the basics of using nyx and its builtin features.
 
+The main advantage of nyx is it's incredible execution speed. It's therefore very well suited to run
+Monte Carlos analyzes, i.e. dozens of variations of a given scenario.
+
 We'll start by setting up a test project and play around with creating some states.
 Then we'll look into setting up a two body propagation with the different propagator/integrators available.
 At that time we'll see how to save the states of the propagator into a file, or how to setup
@@ -44,10 +47,10 @@ Note that nyx is still going through rapid iteration, and every feedback on how 
     - [Saving all the states](#saving-all-the-states)
     - [Eclipse locator](#eclipse-locators)
 3. [Dynamical models](#dynamical-models)
-    - Multibody ponit mass
-    - Basic attitude dynamics
-    - Finite burns with fuel depletion
-    - Sub-Optimal Control of continuous thrust
+    - [Multibody dynamics](#multibody-dynamics)
+    - [Basic attitude dynamics](#basic-attitude-dynamics)
+    - [Finite burns with fuel depletion](#finite-burns-with-fuel-depletion)
+    - [Sub-Optimal Control of continuous thrust](#sub-optimal-control-of-continuous-thrust)
     - Solar radiation pressure modeling
     - Basic drag models (cannonball)
     - Defining new dynamical models
@@ -781,13 +784,300 @@ Running this example, we should get the following output, where the time is in J
 
 
 # Dynamical models
-## Multibody dynamics using XB files
+## Multibody dynamics
+In almost all cases, we don't want to simply propagate and analyze a two body dynamics scenario (that just isn't how spacecraft fly).
+
+Setting up a celestial dynamics with multibody point masses is quite straightforward.
+
+```
+extern crate nyx_space as nyx;
+use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::propagators::{PropOpts, Propagator};
+use nyx::time::{Epoch, SECONDS_PER_DAY};
+
+let cosm = Cosm::from_xb("./de438s");
+let earth = cosm.geoid_from_id(bodies::EARTH);
+
+let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
+
+let state = OrbitState::cartesian(
+    -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
+    5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
+    dt, earth,
+);
+
+// Define which other masses we want.
+let pt_masses = vec![bodies::EARTH_MOON, bodies::SUN];
+
+// Let's initialize celestial dynamics with the extra point masses
+// in addition to the those of the Earth, which are included by default because the
+// initial state is defined around the Earth.
+let mut dynamics = CelestialDynamics::new(state, pt_masses, &cosm);
+
+let opts = PropOpts::default();
+println!("propagator options: {}", opts.info());
+
+// Now let's setup the propagator.
+let mut prop = Propagator::default(&mut dynamics, &opts);
+// And finally, let's propagate for a day.
+let last_state = prop.until_time_elapsed(SECONDS_PER_DAY);
+println!("{}", last_state);
+```
+
 ## Basic attitude dynamics
+Currently the attitude model is extremely limited. If you need high fidelity attitude
+dynamics, we recommend using [Basilisk](http://hanspeterschaub.info/research-basilisk.html),
+developed at the University of Colorado at Boulder and used for simulation and flight of
+the Emirati Mars Mission.
+
+Regardless, because nyx supports any kind of equation of motion via the Dynamics trait, there
+are basic dynamics for computing the momentum over time from the inertia tensor and the angular velocity.
+
+```
+extern crate nyx_space as nyx;
+use nyx::dimensions::{Matrix3, Vector3};
+use nyx::dynamics::momentum::AngularMom;
+use nyx::propagators::error_ctrl::LargestStep;
+use nyx::propagators::{CashKarp45, PropOpts, Propagator};
+
+// Define the angular velocity of this rigid body
+let omega = Vector3::new(0.1, 0.4, -0.2);
+// Define the inertia tensor of the spacecraft
+let tensor = Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0);
+
+let mut dynamics = AngularMom::from_tensor_matrix(&tensor, &omega);
+
+// Compute the norm of the initial momentum.
+// Because the dynamics are defined as `mut`, they will be overwritten
+// once we move the variable to the Propagator.
+let init_momentum = dynamics.momentum().norm();
+
+// Define a CashKarp 4-5 integrator, and move the dynamics there.
+let mut prop = Propagator::new::<CashKarp45>(
+    &mut dynamics,
+    &PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}),
+);
+
+// Propagate for five seconds.
+prop.until_time_elapsed(5.0);
+
+println!("{:?}", prop.latest_details());
+
+// Compute the different in momentum from the start of the simulation to the end.
+let delta_mom = ((prop.dynamics.momentum().norm() - init_momentum) / init_momentum).abs();
+
+// Without any external torque, the momentum of the rigid body is conserved.
+// So if the relative difference is high, then our propagator is broken (it isn't).
+if delta_mom > 1e-8 {
+    panic!(
+        "angular momentum prop failed: momentum changed by {:e}",
+        delta_mom
+    );
+}
+```
+
 ## Finite burns with fuel depletion
+In this example, we'll see how to setup a thrusting arc. As you will see in the last subsection of this section,
+it's relatively easy to code up new dynamical models. Hence, you may want to develop your own thrusting models
+better suited to your scenario.
+
+We will need to define a spacercraft, which implement the `Dynamics` trait. However, that spacecraft requires us to define
+all of the subsystems of the spacecraft prior to be able to run the propagator.
+
+**Important documentation to read to understand this example:**
+
++ [Mnvr](../dynamics/thrustctrl/struct.Mnvr.html)
++ [FiniteBurns](../dynamics/thrustctrl/struct.FiniteBurns.html)
++ [ThrustControl](../dynamics/thrustctrl/trait.ThrustControl.html), the trait which defines thrusting control strategy
++ [Spacecraft](../dynamics/spacecraft/struct.Spacecraft.html)
++ [SpacecraftState](../dynamics/spacecraft/struct.SpacecraftState.html)
+
+```
+extern crate nyx_space as nyx;
+use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::dimensions::Vector3;
+use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::propulsion::{Propulsion, Thruster};
+use nyx::dynamics::spacecraft::Spacecraft;
+use nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
+use nyx::dynamics::Dynamics;
+use nyx::propagators::{PropOpts, Propagator};
+use nyx::time::Epoch;
+
+let cosm = Cosm::from_xb("./de438s");
+let earth = cosm.geoid_from_id(bodies::EARTH);
+
+let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
+
+let orbit = OrbitState::cartesian(
+    -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
+);
+
+// Define the list of thrusters (hence the `vec![]` call).
+// Note that we actually only have one thruster whose thrust level is set to 10.0 Newton
+// and specific impulse is set to 300 seconds.
+let biprop = vec![Thruster {
+    thrust: 10.0,
+    isp: 300.0,
+}];
+
+// Define the propagation time
+let prop_time = 3000.0;
+
+// Define a single maneuver and its schedule (start and end epoch)
+// The `thrust_lvl` determines the percentage of thrust we should provide during this maneuver
+// The vector defines the orientation of the maneuver in the VNC frame.
+let mnvr = Mnvr {
+    start: start_time,
+    end: start_time + prop_time,
+    thrust_lvl: 1.0, // Full thrust
+    vector: Vector3::new(1.0, 0.0, 0.0),
+};
+
+// Now, let's define a schedule, which expects a vector of maneuvers.
+// In this case, we only have one maneuver, but we still need to build a vector.
+let schedule = FiniteBurns::from_mnvrs(vec![mnvr], earth);
+
+// Define the spacecraft mass
+let dry_mass = 1e3;
+let fuel_mass = 756.0;
+let fuel_depl = true;
+
+// Now, we can finally define the propulsion subsystem.
+// It requires something which implement `ThrustControl` (the schedule),
+// the list of thruster (`biprop`), and whether or not we want to
+// compute the fuel depletion.
+let prop_subsys = Propulsion::new(schedule, biprop, fuel_depl);
+
+// Define the celestial dynamics
+let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+let dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
+
+// And finally, we can define the spacecraft, with the celestial dynamics, the
+// propulsion subsystem, and the masses.
+let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
+
+// And setup the propagator as usual.
+let mut prop = Propagator::default(&mut sc, &PropOpts::with_fixed_step(10.0));
+prop.until_time_elapsed(prop_time);
+
+println!("{}", prop.dynamics.state());
+```
+
+The output should be:
+```text
+[Geoid 399] 2002-01-01T00:49:28 TAI     sma = 7749.128452 km    ecc = 0.003673  inc = 63.434018 deg     raan = 135.000003 deg   aop = 154.631735 deg    ta = 95.445722 deg      1745.8028378702975 kg
+```
+
 ## Sub-Optimal Control of continuous thrust
+Nyx currently only provides the [Ruggiero control law](../dynamics/thrustctrl/struct.Ruggiero.html) as a suboptimal control. This example is very similar to the previous one
+with the difference that we add event tracker to see whether the propagator found that we hit those targets (defined as [`Achieve`](../dynamics/thrustctrl/enum.Achieve.html) items).
+
+Also note that we define a set of objectives for the Ruggiero control to know what it should target. The controller will automatically change the thrust direction
+based on the osculating orbital state, and therefore do a local optimization of the thrust. A succession of local optimizations is a sub-optimal control.
+
+```
+extern crate nyx_space as nyx;
+use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::propulsion::{Propulsion, Thruster};
+use nyx::dynamics::spacecraft::Spacecraft;
+use nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
+use nyx::dynamics::Dynamics;
+use nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
+use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::time::{Epoch, SECONDS_PER_DAY};
+// Source: AAS-2004-5089
+
+let cosm = Cosm::from_xb("./de438s");
+let earth = cosm.geoid_from_id(bodies::EARTH);
+
+let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+let orbit = OrbitState::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+
+let prop_time = 39.91 * SECONDS_PER_DAY;
+
+// Define the dynamics
+let dynamics = CelestialDynamics::two_body(orbit);
+
+// Define the thruster
+let lowt = vec![Thruster {
+    thrust: 1.0,
+    isp: 3100.0,
+}];
+
+// Define the objectives such that the control law knows what to target.
+let objectives = vec![
+    Achieve::Sma {
+        target: 42000.0,
+        tol: 1.0,
+    },
+    Achieve::Ecc {
+        target: 0.01,
+        tol: 5e-5,
+    },
+];
+
+// Track the completion events
+let tracker = EventTrackers::from_events(vec![
+    SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(42000.0))),
+    SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(0.01))),
+]);
+
+// Setup the Ruggiero control law with the objectives and the initial orbit state
+let ruggiero = Ruggiero::new(objectives, orbit);
+
+let dry_mass = 1.0;
+let fuel_mass = 299.0;
+
+// Define the propulsion subsystem where the control is Ruggiero and the propulsion
+// is the 1 Newton EP thruster defined above.
+let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+
+let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
+println!("{:o}", orbit);
+
+let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+prop.event_trackers = tracker;
+prop.until_time_elapsed(prop_time);
+
+println!("{}", prop.event_trackers);
+let final_state = prop.dynamics.celestial.state();
+let fuel_usage = fuel_mass - sc.fuel_mass;
+println!("{:o}", final_state);
+println!("fuel usage: {:.3} kg", fuel_usage);
+
+assert!(
+    sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
+    "objective not achieved"
+);
+
+assert!((fuel_usage - 93.449).abs() < 1.0);
+```
+
+Note that the Ruggiero control law is a bit complex to compute, so we recommend that this example
+be executed in `release` mode, which will optimize the binary.
+
+```test
+$ cargo run --release
+   Compiling nyx-space v0.0.20-alpha.1 (/home/chris/Workspace/rust/nyx)
+(...)
+   Compiling nyxtutorial v0.1.0 (/home/chris/Workspace/rust/nyxtutorial)
+    Finished release [optimized] target(s) in 8.89s
+     Running `target/release/nyxtutorial`
+[Geoid 399] 2019-12-31T23:59:23 TAI     sma = 7000.000000 km    ecc = 0.010000  inc = 0.050000 deg      raan = 0.000000 deg     aop = 360.000000 deg    ta = 1.000000 deg
+[ERROR] Event SCEvent { kind: Sma(42000.0), orbital: Some(OrbitalEvent { kind: Sma(42000.0), tgt: None, cosm: None }) } did NOT converge
+[ OK  ] Event SCEvent { kind: Ecc(0.01), orbital: Some(OrbitalEvent { kind: Ecc(0.01), tgt: None, cosm: None }) } converged on (2226230, 2226240)
+[Geoid 399] 2020-02-09T21:49:47 TAI     sma = 41999.469324 km   ecc = 0.010045  inc = 0.050000 deg      raan = 0.000000 deg     aop = 218.070483 deg    ta = 89.325437 deg
+fuel usage: 93.448 kg
+```
+
 ## Solar radiation pressure modeling
 ## Basic drag models (cannonball)
 ## Defining new dynamical models
+## New thrusting models
 # Orbit determination
 ## Generating orbit determination measurements
 ## Classical and Extended Kalman Filter

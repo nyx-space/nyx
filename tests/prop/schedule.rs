@@ -36,8 +36,7 @@ fn transfer_schedule_no_depl() {
 
     let prop_time = 3000.0;
 
-    let mut end_time = start_time;
-    end_time.mut_add_secs(prop_time);
+    let end_time = start_time + prop_time;
 
     let rslt = OrbitState::cartesian(
         4_172.396_780_515_64f64,
@@ -135,8 +134,7 @@ fn transfer_schedule_depl() {
 
     let prop_time = 3000.0;
 
-    let mut end_time = start_time;
-    end_time.mut_add_secs(prop_time);
+    let end_time = start_time + prop_time;
 
     let rslt = OrbitState::cartesian(
         4_172.433_936_615_18,

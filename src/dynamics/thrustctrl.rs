@@ -94,7 +94,7 @@ pub struct Ruggiero {
     achieved: bool,
 }
 
-/// The QLaw is an optimal control of a state for specific osculating elements.
+/// The Ruggiero is a locally optimal control of a state for specific osculating elements.
 /// WARNING: Objectives must be in degrees!
 impl Ruggiero {
     pub fn new(objectives: Vec<Achieve>, initial: OrbitState) -> Self {
