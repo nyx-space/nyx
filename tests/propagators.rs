@@ -28,7 +28,7 @@ macro_rules! assert_eq_or_abs {
 
 macro_rules! assert_eq_or_rel {
     ($left:expr, $right:expr, $msg:expr) => {
-        if !(*$left == *$right) && !relative_eq!($left, $right, max_relative = 1e-6) {
+        if !(*$left == *$right) && !relative_eq!($left, $right, max_relative = 1e-7) {
             panic!(
                 r#"assertion failed: `(left == right)`
   left: `{:?}`,
@@ -207,7 +207,7 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[0], "two body prop failed");
+        assert_eq_or_abs!(prop.state_vector(), all_rslts[0], "two body prop failed");
         assert!(
             (prop.dynamics.state.dt.as_tai_seconds() - init.dt.as_tai_seconds() - prop_time).abs()
                 < f64::EPSILON
