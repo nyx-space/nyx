@@ -247,7 +247,7 @@ where
         let mut msr_cnt = 0_usize;
         let mut reported = vec![false; 11];
 
-        'chan: while let Ok(prop_state) = prop_rx.recv() {
+        while let Ok(prop_state) = prop_rx.try_recv() {
             // Get the datetime and info needed to compute the theoretical measurement according to the model
             let (dt, meas_input) = self.prop.dynamics.to_measurement(&prop_state);
 
@@ -353,7 +353,8 @@ where
                         }
                         Err(e) => return Some(e),
                     }
-                    break 'chan;
+                    // Leave the loop {...} which processes several measurements at once
+                    break;
                 }
             }
         }
@@ -364,6 +365,44 @@ where
                 "[ODProcess] {:>3}% done ({:.0} measurements processed)",
                 100, num_msrs
             );
+        }
+
+        None
+    }
+
+    /// Allows for covariance mapping without processing measurements
+    pub fn map_covar(
+        &mut self,
+        prop_rx: &Receiver<D::StateType>,
+        end_epoch: Epoch,
+    ) -> Option<FilterError> {
+        // Start by propagating the estimator (on the same thread).
+        let prop_time = end_epoch - self.kf.previous_estimate().dt();
+        info!("Propagating for {} seconds", prop_time);
+
+        self.prop.until_time_elapsed(prop_time);
+        info!("Mapping covariance");
+
+        while let Ok(prop_state) = prop_rx.try_recv() {
+            // Get the datetime
+            let (dt, _) = self.prop.dynamics.to_measurement(&prop_state);
+
+            // Update the STM of the KF (needed between each measurement or time update)
+            let stm = self.prop.dynamics.extract_stm(&prop_state);
+            self.kf.update_stm(stm);
+            info!("final time update {:?}", dt);
+            match self.kf.time_update(dt) {
+                Ok(est) => {
+                    if self.kf.is_extended() {
+                        let est_state = est.state().clone();
+                        self.prop.dynamics.set_estimated_state(
+                            self.prop.dynamics.extract_estimated_state(&prop_state) + est_state,
+                        );
+                    }
+                    self.estimates.push(est);
+                }
+                Err(e) => return Some(e),
+            }
         }
 
         None
