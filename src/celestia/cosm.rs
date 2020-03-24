@@ -107,6 +107,10 @@ impl Cosm {
             None => Ok(cosm),
             Some(err) => Err(err),
         }
+
+        // Now, let's append the IAU frames as defined in
+        // Celest Mech Dyn Astr (2018) 130:22
+        // https://doi.org/10.1007/s10569-017-9805-5
     }
 
     pub fn append_xb(&mut self, filename: &str) -> Option<IoError> {
@@ -1025,5 +1029,12 @@ mod tests {
         dbg!(out_state.vx - -3.463_585_965_206_417);
         dbg!(out_state.vy - -3.698_169_177_803_263e1);
         dbg!(out_state.vz - -1.690_783_648_756_073e1);
+    }
+
+    #[test]
+    fn test_rotations() {
+        let cosm = Cosm::from_xb("./de438s");
+        let earth = cosm.geoid_from_id(301);
+        dbg!(earth);
     }
 }

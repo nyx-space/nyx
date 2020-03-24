@@ -30,6 +30,7 @@ prost-derive = "0.5"
 petgraph = "0.4"
 rand = "0.7"
 rand_distr = "0.2"
+meval = "0.2"
 
 [dev-dependencies]
 pretty_env_logger = "0.3"
