@@ -5,8 +5,7 @@ use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Vector3, Vector6};
-use super::{Frame, LocalFrame};
-use celestia::frames::Geoid;
+use super::{Frame, FrameKind};
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
 use celestia::xb::Vector as XBVector;
@@ -29,10 +28,7 @@ pub const ECC_EPSILON: f64 = 1e-11;
 /// _Note:_ although not yet supported, this struct may change once True of Date or other nutation frames
 /// are added to the toolkit.
 #[derive(Copy, Clone, Debug)]
-pub struct State<F>
-where
-    F: Frame,
-{
+pub struct State<'a> {
     pub x: f64,
     pub y: f64,
     pub z: f64,
@@ -40,18 +36,14 @@ where
     pub vy: f64,
     pub vz: f64,
     pub dt: Epoch,
-    /// The frame will later allow for coordinate frame transformations.
-    pub frame: F,
+    pub frame: &'a Frame<'a>,
 }
 
-impl<F> State<F>
-where
-    F: Frame,
-{
+impl<'a> State<'a> {
     /// Creates a new State in the provided frame at the provided Epoch.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    pub fn cartesian<G>(
+    pub fn cartesian(
         x: f64,
         y: f64,
         z: f64,
@@ -59,11 +51,8 @@ where
         vy: f64,
         vz: f64,
         dt: Epoch,
-        frame: G,
-    ) -> State<G>
-    where
-        G: Frame,
-    {
+        frame: &'a Frame<'a>,
+    ) -> Self {
         State {
             x,
             y,
@@ -79,10 +68,7 @@ where
     /// Creates a new State in the provided frame at the provided Epoch in time with 0.0 velocity.
     ///
     /// **Units:** km, km, km
-    pub fn from_position<G>(x: f64, y: f64, z: f64, dt: Epoch, frame: G) -> State<G>
-    where
-        G: Frame,
-    {
+    pub fn from_position(x: f64, y: f64, z: f64, dt: Epoch, frame: &'a Frame<'a>) -> Self {
         State {
             x,
             y,
@@ -99,10 +85,7 @@ where
     ///
     /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: F) -> State<F>
-    where
-        F: Frame,
-    {
+    pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: &'a Frame<'a>) -> Self {
         State {
             x: state[(0, 0)],
             y: state[(1, 0)],
@@ -144,10 +127,9 @@ where
 
     /// Returns the distancein kilometers between this state and another state.
     /// Will **panic** is the frames are different
-    pub fn distance_to(&self, other: &State<F>) -> f64 {
+    pub fn distance_to(&self, other: &'a State) -> f64 {
         assert_eq!(
-            self.frame.id(),
-            other.frame.id(),
+            self.frame, other.frame,
             "cannot compute the distance between two states in different frames"
         );
         self.distance_to_point(&other.radius())
@@ -197,12 +179,9 @@ where
     }
 }
 
-impl<F: Frame> PartialEq for State<F> {
+impl<'a> PartialEq for State<'a> {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    fn eq(&self, other: &State<F>) -> bool
-    where
-        F: Frame,
-    {
+    fn eq(&self, other: &'a State<'a>) -> bool {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
         self.dt == other.dt
@@ -212,17 +191,15 @@ impl<F: Frame> PartialEq for State<F> {
             && (self.vx - other.vx).abs() < velocity_tol
             && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
+            && self.frame == other.frame
     }
 }
 
-impl<F: Frame> Add for State<F> {
-    type Output = State<F>;
+impl<'a> Add for State<'a> {
+    type Output = State<'a>;
 
     /// Add one state from another. Frame must be manually changed if needed.
-    fn add(self, other: State<F>) -> State<F>
-    where
-        F: Frame,
-    {
+    fn add(self, other: State<'a>) -> State<'a> {
         State {
             x: self.x + other.x,
             y: self.y + other.y,
@@ -236,14 +213,11 @@ impl<F: Frame> Add for State<F> {
     }
 }
 
-impl<F: Frame> Sub for State<F> {
-    type Output = State<F>;
+impl<'a> Sub for State<'a> {
+    type Output = State<'a>;
 
     /// Subtract one state from another
-    fn sub(self, other: State<F>) -> State<F>
-    where
-        F: Frame,
-    {
+    fn sub(self, other: State<'a>) -> State<'a> {
         State {
             x: self.x - other.x,
             y: self.y - other.y,
@@ -257,8 +231,8 @@ impl<F: Frame> Sub for State<F> {
     }
 }
 
-impl<F: Frame> Neg for State<F> {
-    type Output = State<F>;
+impl<'a> Neg for State<'a> {
+    type Output = State<'a>;
 
     /// Subtract one state from another
     fn neg(self) -> Self::Output {
@@ -275,14 +249,11 @@ impl<F: Frame> Neg for State<F> {
     }
 }
 
-impl<F: Frame> Add for &State<F> {
-    type Output = State<F>;
+impl<'a> Add for &State<'a> {
+    type Output = State<'a>;
 
     /// Add one state from another. Frame must be manually changed if needed.
-    fn add(self, other: &State<F>) -> State<F>
-    where
-        F: Frame,
-    {
+    fn add(self, other: &State<'a>) -> State<'a> {
         State {
             x: self.x + other.x,
             y: self.y + other.y,
@@ -296,14 +267,11 @@ impl<F: Frame> Add for &State<F> {
     }
 }
 
-impl<F: Frame> Sub for &State<F> {
-    type Output = State<F>;
+impl<'a> Sub for &State<'a> {
+    type Output = State<'a>;
 
     /// Subtract one state from another
-    fn sub(self, other: &State<F>) -> State<F>
-    where
-        F: Frame,
-    {
+    fn sub(self, other: &State<'a>) -> State<'a> {
         State {
             x: self.x - other.x,
             y: self.y - other.y,
@@ -317,8 +285,8 @@ impl<F: Frame> Sub for &State<F> {
     }
 }
 
-impl<F: Frame> Neg for &State<F> {
-    type Output = State<F>;
+impl<'a> Neg for &State<'a> {
+    type Output = State<'a>;
 
     /// Subtract one state from another
     fn neg(self) -> Self::Output {
@@ -335,10 +303,7 @@ impl<F: Frame> Neg for &State<F> {
     }
 }
 
-impl<F> Serialize for State<F>
-where
-    F: Frame,
-{
+impl<'a> Serialize for State<'a> {
     /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -356,8 +321,8 @@ where
     }
 }
 
-impl OrbitState {
-    /// Creates a new State around the provided CelestialBody from the Keplerian orbital elements.
+impl<'a> State<'a> {
+    /// Creates a new State around the provided Celestial or Geoid frame from the Keplerian orbital elements.
     ///
     /// **Units:** km, none, degrees, degrees, degrees, degrees
     ///
@@ -373,105 +338,97 @@ impl OrbitState {
         aop: f64,
         ta: f64,
         dt: Epoch,
-        frame: Geoid,
+        frame: Frame,
     ) -> Self {
-        if frame.gm.abs() < std::f64::EPSILON {
-            warn!(
-                "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
-                frame.gm
-            );
-        }
-        // Algorithm from GMAT's StateConversionUtil::KeplerianToCartesian
-        let ecc = if ecc < 0.0 {
-            warn!("eccentricity cannot be negative: sign of eccentricity changed");
-            ecc * -1.0
-        } else {
-            ecc
-        };
+        match frame {
+            FrameKind::Geoid { gm, .. } | FrameKind::Celestial { gm } => {
+                if gm.abs() < std::f64::EPSILON {
+                    warn!(
+                        "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
+                        gm
+                    );
+                }
+                // Algorithm from GMAT's StateConversionUtil::KeplerianToCartesian
+                let ecc = if ecc < 0.0 {
+                    warn!("eccentricity cannot be negative: sign of eccentricity changed");
+                    ecc * -1.0
+                } else {
+                    ecc
+                };
+                let sma = if ecc > 1.0 && sma > 0.0 {
+                    warn!("eccentricity > 1 (hyperbolic) BUT SMA > 0 (elliptical): sign of SMA changed");
+                    sma * -1.0
+                } else if ecc < 1.0 && sma < 0.0 {
+                    warn!("eccentricity < 1 (elliptical) BUT SMA < 0 (hyperbolic): sign of SMA changed");
+                    sma * -1.0
+                } else {
+                    sma
+                };
+                if (sma * (1.0 - ecc)).abs() < 1e-3 {
+                    // GMAT errors below one meter. Let's warn for below that, but not panic, might be useful for landing scenarios?
+                    warn!("radius of periapsis is less than one meter");
+                }
+                if (1.0 - ecc).abs() < EPSILON {
+                    panic!("parabolic orbits have ill-defined Keplerian orbital elements");
+                }
+                if ecc > 1.0 {
+                    let ta = between_0_360(ta);
+                    if ta > (PI - (1.0 / ecc).acos()).to_degrees() {
+                        panic!(
+                            "true anomaly value ({}) physically impossible for a hyperbolic orbit",
+                            ta
+                        );
+                    }
+                }
+                if (1.0 + ecc * ta.to_radians().cos()).is_infinite() {
+                    panic!("radius of orbit is infinite");
+                }
+                // Done with all the warnings and errors supported by GMAT
+                // The conversion algorithm itself comes from GMAT's StateConversionUtil::ComputeKeplToCart
+                // NOTE: GMAT supports mean anomaly instead of true anomaly, but only for backward compatibility reasons
+                // so it isn't supported here.
+                let inc = inc.to_radians();
+                let raan = raan.to_radians();
+                let aop = aop.to_radians();
+                let ta = ta.to_radians();
+                let p = sma * (1.0 - ecc.powi(2));
+                if p.abs() < EPSILON {
+                    panic!("Semilatus rectum ~= 0.0: parabolic orbit");
+                }
+                // NOTE: At this point GMAT computes 1+ecc**2 and checks whether it's very small.
+                // It then reports that the radius may be too large. We've effectively already done
+                // this check above (and panicked if needed), so it isn't repeated here.
+                let radius = p / (1.0 + ecc * ta.cos());
+                let (sin_aop_ta, cos_aop_ta) = (aop + ta).sin_cos();
+                let (sin_inc, cos_inc) = inc.sin_cos();
+                let (sin_raan, cos_raan) = raan.sin_cos();
+                let (sin_aop, cos_aop) = aop.sin_cos();
+                let x = radius * (cos_aop_ta * cos_raan - cos_inc * sin_aop_ta * sin_raan);
+                let y = radius * (cos_aop_ta * sin_raan + cos_inc * sin_aop_ta * cos_raan);
+                let z = radius * sin_aop_ta * sin_inc;
+                let sqrt_gm_p = (gm / p).sqrt();
+                let cos_ta_ecc = ta.cos() + ecc;
+                let sin_ta = ta.sin();
 
-        let sma = if ecc > 1.0 && sma > 0.0 {
-            warn!("eccentricity > 1 (hyperbolic) BUT SMA > 0 (elliptical): sign of SMA changed");
-            sma * -1.0
-        } else if ecc < 1.0 && sma < 0.0 {
-            warn!("eccentricity < 1 (elliptical) BUT SMA < 0 (hyperbolic): sign of SMA changed");
-            sma * -1.0
-        } else {
-            sma
-        };
-
-        if (sma * (1.0 - ecc)).abs() < 1e-3 {
-            // GMAT errors below one meter. Let's warn for below that, but not panic, might be useful for landing scenarios?
-            warn!("radius of periapsis is less than one meter");
-        }
-
-        if (1.0 - ecc).abs() < EPSILON {
-            panic!("parabolic orbits have ill-defined Keplerian orbital elements");
-        }
-
-        if ecc > 1.0 {
-            let ta = between_0_360(ta);
-            if ta > (PI - (1.0 / ecc).acos()).to_degrees() {
-                panic!(
-                    "true anomaly value ({}) physically impossible for a hyperbolic orbit",
-                    ta
-                );
+                let vx =
+                    sqrt_gm_p * cos_ta_ecc * (-sin_aop * cos_raan - cos_inc * sin_raan * cos_aop)
+                        - sqrt_gm_p * sin_ta * (cos_aop * cos_raan - cos_inc * sin_raan * sin_aop);
+                let vy =
+                    sqrt_gm_p * cos_ta_ecc * (-sin_aop * sin_raan + cos_inc * cos_raan * cos_aop)
+                        - sqrt_gm_p * sin_ta * (cos_aop * sin_raan + cos_inc * cos_raan * sin_aop);
+                let vz = sqrt_gm_p * (cos_ta_ecc * sin_inc * cos_aop - sin_ta * sin_inc * sin_aop);
+                State {
+                    x,
+                    y,
+                    z,
+                    vx,
+                    vy,
+                    vz,
+                    dt,
+                    frame,
+                }
             }
-        }
-
-        if (1.0 + ecc * ta.to_radians().cos()).is_infinite() {
-            panic!("radius of orbit is infinite");
-        }
-
-        // Done with all the warnings and errors supported by GMAT
-
-        // The conversion algorithm itself comes from GMAT's StateConversionUtil::ComputeKeplToCart
-        // NOTE: GMAT supports mean anomaly instead of true anomaly, but only for backward compatibility reasons
-        // so it isn't supported here.
-
-        let inc = inc.to_radians();
-        let raan = raan.to_radians();
-        let aop = aop.to_radians();
-        let ta = ta.to_radians();
-
-        let p = sma * (1.0 - ecc.powi(2));
-        if p.abs() < EPSILON {
-            panic!("Semilatus rectum ~= 0.0: parabolic orbit");
-        }
-
-        // NOTE: At this point GMAT computes 1+ecc**2 and checks whether it's very small.
-        // It then reports that the radius may be too large. We've effectively already done
-        // this check above (and panicked if needed), so it isn't repeated here.
-        let radius = p / (1.0 + ecc * ta.cos());
-
-        let (sin_aop_ta, cos_aop_ta) = (aop + ta).sin_cos();
-        let (sin_inc, cos_inc) = inc.sin_cos();
-        let (sin_raan, cos_raan) = raan.sin_cos();
-        let (sin_aop, cos_aop) = aop.sin_cos();
-
-        let x = radius * (cos_aop_ta * cos_raan - cos_inc * sin_aop_ta * sin_raan);
-        let y = radius * (cos_aop_ta * sin_raan + cos_inc * sin_aop_ta * cos_raan);
-        let z = radius * sin_aop_ta * sin_inc;
-
-        let sqrt_gm_p = (frame.gm / p).sqrt();
-        let cos_ta_ecc = ta.cos() + ecc;
-        let sin_ta = ta.sin();
-
-        let vx = sqrt_gm_p * cos_ta_ecc * (-sin_aop * cos_raan - cos_inc * sin_raan * cos_aop)
-            - sqrt_gm_p * sin_ta * (cos_aop * cos_raan - cos_inc * sin_raan * sin_aop);
-        let vy = sqrt_gm_p * cos_ta_ecc * (-sin_aop * sin_raan + cos_inc * cos_raan * cos_aop)
-            - sqrt_gm_p * sin_ta * (cos_aop * sin_raan + cos_inc * cos_raan * sin_aop);
-
-        let vz = sqrt_gm_p * (cos_ta_ecc * sin_inc * cos_aop - sin_ta * sin_inc * sin_aop);
-
-        State {
-            x,
-            y,
-            z,
-            vx,
-            vy,
-            vz,
-            dt,
-            frame,
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }
 
@@ -479,17 +436,20 @@ impl OrbitState {
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Geoid) -> Self {
-        Self::keplerian(
-            state[(0, 0)],
-            state[(1, 0)],
-            state[(2, 0)],
-            state[(3, 0)],
-            state[(4, 0)],
-            state[(5, 0)],
-            dt,
-            frame,
-        )
+    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
+        match frame {
+            FrameKind::Geoid { .. } | FrameKind::Celestial { .. } => Self::keplerian(
+                state[(0, 0)],
+                state[(1, 0)],
+                state[(2, 0)],
+                state[(3, 0)],
+                state[(4, 0)],
+                state[(5, 0)],
+                dt,
+                frame,
+            ),
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
     }
 
     /// Creates a new State from the geodetic latitude (φ), longitude (λ) and height with respect to Earth's ellipsoid.
@@ -502,30 +462,40 @@ impl OrbitState {
         longitude: f64,
         height: f64,
         dt: Epoch,
-        frame: Geoid,
-    ) -> OrbitState {
-        let e2 = 2.0 * frame.flattening - frame.flattening.powi(2);
-        let (sin_long, cos_long) = longitude.to_radians().sin_cos();
-        let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
-        // page 144
-        let c_earth = frame.semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
-        let s_earth = (frame.semi_major_radius * (1.0 - frame.flattening).powi(2))
-            / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
-        let ri = (c_earth + height) * cos_lat * cos_long;
-        let rj = (c_earth + height) * cos_lat * sin_long;
-        let rk = (s_earth + height) * sin_lat;
-        let radius = Vector3::new(ri, rj, rk);
-        let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
-        OrbitState::cartesian(
-            radius[(0, 0)],
-            radius[(1, 0)],
-            radius[(2, 0)],
-            velocity[(0, 0)],
-            velocity[(1, 0)],
-            velocity[(2, 0)],
-            dt,
-            frame,
-        )
+        frame: Frame,
+    ) -> Self {
+        match frame {
+            FrameKind::Geoid {
+                _gm,
+                flattening,
+                _eq_rad,
+                semi_major_radius,
+            } => {
+                let e2 = 2.0 * flattening - flattening.powi(2);
+                let (sin_long, cos_long) = longitude.to_radians().sin_cos();
+                let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
+                // page 144
+                let c_earth = semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+                let s_earth = (semi_major_radius * (1.0 - flattening).powi(2))
+                    / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+                let ri = (c_earth + height) * cos_lat * cos_long;
+                let rj = (c_earth + height) * cos_lat * sin_long;
+                let rk = (s_earth + height) * sin_lat;
+                let radius = Vector3::new(ri, rj, rk);
+                let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
+                OrbitState::cartesian(
+                    radius[(0, 0)],
+                    radius[(1, 0)],
+                    radius[(2, 0)],
+                    velocity[(0, 0)],
+                    velocity[(1, 0)],
+                    velocity[(2, 0)],
+                    dt,
+                    frame,
+                )
+            }
+            _ => panic!("Frame is not Geoid in kind"),
+        }
     }
 
     /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
@@ -804,33 +774,31 @@ impl OrbitState {
     }
 
     /// Returns the direct cosine rotation matrix to convert to this inertial state.
-    pub fn dcm_to_inertial(&self, from: LocalFrame) -> Matrix3<f64> {
+    pub fn dcm_to_inertial(&self, from: FrameKind) -> Matrix3<f64> {
         match from {
-            LocalFrame::RIC => {
+            FrameKind::RIC => {
                 r3(-self.raan().to_radians())
                     * r1(-self.inc().to_radians())
                     * r3(-self.aol().to_radians())
             }
-            LocalFrame::VNC => {
+            FrameKind::VNC => {
                 let v = self.velocity() / self.vmag();
                 let n = self.hvec() / self.hmag();
                 let c = v.cross(&n);
                 Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose()
             }
-            LocalFrame::RCN => {
+            FrameKind::RCN => {
                 let r = self.radius() / self.rmag();
                 let n = self.hvec() / self.hmag();
                 let c = n.cross(&r);
                 Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose()
             }
+            _ => panic!("did not provide a local frame"),
         }
     }
 }
 
-impl<F> fmt::Display for State<F>
-where
-    F: Frame,
-{
+impl<'a> fmt::Display for State<'a> {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -848,10 +816,7 @@ where
     }
 }
 
-impl<F> fmt::LowerExp for State<F>
-where
-    F: Frame,
-{
+impl<'a> fmt::LowerExp for State<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -868,7 +833,7 @@ where
     }
 }
 
-impl fmt::Octal for OrbitState {
+impl<'a> fmt::Octal for State<'a> {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -886,5 +851,6 @@ impl fmt::Octal for OrbitState {
     }
 }
 
+// TODO: REMOVE ME
 /// An orbit is simply a State typed around a Geoid.
-pub type OrbitState = State<Geoid>;
+pub type OrbitState<'a> = State<'a>;

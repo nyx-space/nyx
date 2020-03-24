@@ -5,9 +5,60 @@ use crate::na::Matrix3;
 use crate::time::{Epoch, J2000_OFFSET, MJD_OFFSET};
 use crate::utils::{r1, r2, r3};
 pub use celestia::xb::Identifier;
-use std::any::Any;
+use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
+
+/// Defines a Frame of some FrameKind, with an identifier, and an optional parent frame.
+#[derive(Debug)]
+pub struct Frame<'a> {
+    pub id: Identifier,
+    pub kind: FrameKind,
+    pub parent: Option<(&'a Self, Box<dyn ParentRotation>)>,
+}
+
+impl<'a> PartialEq for Frame<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        let parent_eq = if let Some(my_parent) = self.parent {
+            if let Some(oth_parent) = other.parent {
+                my_parent.0 == oth_parent.0
+            }
+            false
+        } else {
+            false
+        };
+        (self.id.number == other.id.number || self.id.name == other.id.name) && self.kind =
+            other.kind && parent_eq
+    }
+}
+
+impl<'a> Frame<'a> {
+    pub fn try_dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
+        if let Some(parent) = self.parent.as_ref() {
+            if let Some(dcm) = parent.1.dcm_to_parent(datetime) {
+                return Some(dcm);
+            }
+        }
+        None
+    }
+
+    pub fn dcm_to_parent(&self, datetime: Epoch) -> Matrix3<f64> {
+        self.try_dcm_to_parent(datetime).unwrap()
+    }
+
+    pub fn try_dcm_from_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
+        if let Some(dcm) = self.try_dcm_to_parent(datetime) {
+            Some(dcm.transpose())
+        } else {
+            None
+        }
+    }
+
+    pub fn dcm_from_parent(&self, datetime: Epoch) -> Matrix3<f64> {
+        self.try_dcm_from_parent(datetime).unwrap()
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FrameKind {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)
@@ -202,40 +253,14 @@ impl<'a> ParentRotation for Euler3AxisDt<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct NewFrame<'a> {
-    pub id: Identifier,
-    pub kind: FrameKind,
-    pub parent: Option<(&'a Self, Box<dyn ParentRotation>)>,
+/*
+pub struct LocalStateFrame {
+    pub state: State,
 }
 
-impl<'a> NewFrame<'a> {
-    pub fn try_dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-        if let Some(parent) = self.parent.as_ref() {
-            if let Some(dcm) = parent.1.dcm_to_parent(datetime) {
-                return Some(dcm);
-            }
-        }
-        None
-    }
+*/
 
-    pub fn dcm_to_parent(&self, datetime: Epoch) -> Matrix3<f64> {
-        self.try_dcm_to_parent(datetime).unwrap()
-    }
-
-    pub fn try_dcm_from_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-        if let Some(dcm) = self.try_dcm_to_parent(datetime) {
-            Some(dcm.transpose())
-        } else {
-            None
-        }
-    }
-
-    pub fn dcm_from_parent(&self, datetime: Epoch) -> Matrix3<f64> {
-        self.try_dcm_from_parent(datetime).unwrap()
-    }
-}
-
+/*
 pub trait Frame: Any + Copy + Clone + fmt::Debug + fmt::Display
 where
     Self: Sized,
@@ -353,10 +378,10 @@ impl Frame for LocalFrame {
         0
     }
 }
-
+*/
 #[test]
 fn frame_def() {
-    let ssb = NewFrame {
+    let ssb = Frame {
         id: Identifier {
             number: 0,
             name: "Solar System Barycenter".to_owned(),
@@ -374,7 +399,7 @@ fn frame_def() {
     let sun2ssb_rot =
         Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &sun2ssb_ctx, AngleUnit::Degrees);
 
-    let sun_fixed = NewFrame {
+    let sun_fixed = Frame {
         id: Identifier {
             number: 10,
             name: "Sun body fixed".to_owned(),
@@ -390,4 +415,9 @@ fn frame_def() {
         "{}",
         sun_fixed.dcm_to_parent(dt) * sun_fixed.dcm_from_parent(dt)
     );
+
+    let mut map: HashMap<i32, Frame> = HashMap::new();
+    map.insert(ssb.id.number, ssb);
+
+    println!("{:?}", map);
 }

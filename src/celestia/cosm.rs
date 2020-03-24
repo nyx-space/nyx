@@ -40,14 +40,14 @@ pub enum LTCorr {
 
 // Defines Cosm, from the Greek word for "world" or "universe".
 #[derive(Clone)]
-pub struct Cosm {
+pub struct Cosm<'a> {
     ephemerides: HashMap<(i32, String), Ephemeris>,
     frames: HashMap<(i32, String), FXBFrame>,
-    geoids: HashMap<(i32, String), Geoid>,
+    geoids: HashMap<(i32, String), Frame<'a>>,
     exb_map: Graph<i32, u8, Undirected>,
 }
 
-impl fmt::Debug for Cosm {
+impl<'a> fmt::Debug for Cosm<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Cosm with {} ephemerides", self.ephemerides.keys().len())
     }
@@ -77,7 +77,7 @@ impl Error for CosmError {
     }
 }
 
-impl Cosm {
+impl<'a> Cosm<'a> {
     /// Builds a Cosm from the *XB files. Path should _not_ contain file extension. Panics if the files could not be loaded.
     pub fn from_xb(filename: &str) -> Cosm {
         Self::try_from_xb(filename)
