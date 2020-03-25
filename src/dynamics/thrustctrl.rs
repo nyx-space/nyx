@@ -1,6 +1,6 @@
 use super::hifitime::Epoch;
 use super::na::Vector3;
-use celestia::{Geoid, LocalFrame, OrbitState};
+use celestia::{FrameInfo, OrbitState, State};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
 /// The `ThrustControl` trait handles control laws, optimizations, and other such methods for
@@ -90,7 +90,7 @@ impl Mnvr {
 pub struct Ruggiero {
     /// Stores the objectives
     objectives: Vec<Achieve>,
-    init_state: OrbitState,
+    init_state: State,
     achieved: bool,
 }
 
@@ -219,7 +219,7 @@ impl ThrustControl for Ruggiero {
                 ctrl
             };
             // Convert to inertial
-            osc.dcm_to_inertial(LocalFrame::RCN) * ctrl
+            osc.dcm_to_inertial(FrameInfo::RCN) * ctrl
         }
     }
 
@@ -289,17 +289,12 @@ pub struct FiniteBurns {
     /// Maneuvers should be provided in chronological order, first maneuver first in the list
     pub mnvrs: Vec<Mnvr>,
     pub mnvr_no: usize,
-    geoid: Geoid,
 }
 
 impl FiniteBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
-    pub fn from_mnvrs(mnvrs: Vec<Mnvr>, geoid: Geoid) -> Self {
-        Self {
-            mnvrs,
-            mnvr_no: 0,
-            geoid,
-        }
+    pub fn from_mnvrs(mnvrs: Vec<Mnvr>) -> Self {
+        Self { mnvrs, mnvr_no: 0 }
     }
 }
 
@@ -312,7 +307,7 @@ impl ThrustControl for FiniteBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= osc.dt {
-                osc.dcm_to_inertial(LocalFrame::VNC) * next_mnvr.vector
+                osc.dcm_to_inertial(FrameInfo::VNC) * next_mnvr.vector
             } else {
                 Vector3::zeros()
             }

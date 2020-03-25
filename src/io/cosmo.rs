@@ -21,7 +21,7 @@ impl Cosmographia {
         }
     }
 
-    pub fn append<F: Frame>(&mut self, s: State<F>) {
+    pub fn append(&mut self, s: State) {
         self.wtr.serialize(s).expect("could not write to XYZV file");
     }
 }

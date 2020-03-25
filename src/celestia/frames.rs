@@ -4,16 +4,17 @@ use crate::log::error;
 use crate::na::Matrix3;
 use crate::time::{Epoch, J2000_OFFSET, MJD_OFFSET};
 use crate::utils::{r1, r2, r3};
-pub use celestia::xb::Identifier;
+pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
 
-/// Defines a Frame of some FrameKind, with an identifier, and an optional parent frame.
-#[derive(Debug)]
+/// Defines a Frame of some FrameInfo, with an identifier, and an optional parent frame.
+#[derive(Clone, Debug)]
 pub struct Frame<'a> {
-    pub id: Identifier,
-    pub kind: FrameKind,
+    pub id: XbId,
+    pub kind: FrameInfo,
+    pub exb_id: Option<XbId>,
     pub parent: Option<(&'a Self, Box<dyn ParentRotation>)>,
 }
 
@@ -25,10 +26,19 @@ impl<'a> PartialEq for Frame<'a> {
             }
             false
         } else {
-            false
+            // Does not have any parent, other shouldn't either
+            other.parent.is_none()
         };
-        (self.id.number == other.id.number || self.id.name == other.id.name) && self.kind =
-            other.kind && parent_eq
+        let exb_eq = if let Some(my_exb_id) = self.exb_id {
+            if let Some(oth_exb_id) = other.exb_id {
+                my_exb_id == oth_exb_id
+            }
+            false
+        } else {
+            // Does not have any exb_id, other shouldn't either
+            other.exb_id.is_none()
+        };
+        self.id == other.id && self.kind == other.kind && parent_eq && exb_eq
     }
 }
 
@@ -59,12 +69,21 @@ impl<'a> Frame<'a> {
     }
 }
 
+// TODO: Rename to FrameInfo, and add an ID. Then then &Frame will be stored only in the Cosm
+// and the state can be Clonable again. Also removes any lifetime problem.
+// All transformations need to happen with the Cosm again, which isn't a bad thing!
+// Should this also have a exb ID so that we know the center object of the frame?
+// Celestial {id: i32, exb: i32, gm: f64}
+// Think about printing the state. If [399] this gives only the center, not rotation.
+// So maybe Celestial{fxb:i32, exb:i32, ...} since eventually everything here will be in an fxb?
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum FrameKind {
+pub enum FrameInfo {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)
-    Celestial { gm: f64 },
+    Celestial { fxb_id: i32, exb_id: i32, gm: f64 },
     /// Any Geoid which has a GM, flattening value, etc.
     Geoid {
+        fxb_id: i32,
+        exb_id: i32,
         gm: f64,
         flattening: f64,
         equatorial_radius: f64,
@@ -382,11 +401,12 @@ impl Frame for LocalFrame {
 #[test]
 fn frame_def() {
     let ssb = Frame {
-        id: Identifier {
+        id: XbId {
             number: 0,
             name: "Solar System Barycenter".to_owned(),
         },
-        kind: FrameKind::Celestial {
+        exb_id: None,
+        kind: FrameInfo::Celestial {
             gm: 1.0014 * 132_712_440_041.939_38,
         },
         parent: None,
@@ -400,11 +420,12 @@ fn frame_def() {
         Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &sun2ssb_ctx, AngleUnit::Degrees);
 
     let sun_fixed = Frame {
-        id: Identifier {
+        id: XbId {
             number: 10,
             name: "Sun body fixed".to_owned(),
         },
-        kind: FrameKind::Celestial { gm: 1.0 },
+        exb_id: None,
+        kind: FrameInfo::Celestial { gm: 1.0 },
         parent: Some((&ssb, Box::new(sun2ssb_rot))),
     };
 

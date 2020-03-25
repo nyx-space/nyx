@@ -1,7 +1,7 @@
 use super::na::Vector3;
 use super::ForceModel;
 use celestia::eclipse::{EclipseLocator, EclipseState};
-use celestia::{bodies, Cosm, Geoid, LTCorr, OrbitState, AU, SPEED_OF_LIGHT};
+use celestia::{bodies, Cosm, LTCorr, State, AU, SPEED_OF_LIGHT};
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
@@ -17,11 +17,10 @@ pub struct SolarPressure<'a> {
 
 impl<'a> SolarPressure<'a> {
     /// Will use Cr = 1.8, Phi = 1367.0
-    pub fn default(sc_area: f64, shadow_bodies: Vec<Geoid>, cosm: &'a Cosm) -> Self {
-        let sun = cosm.geoid_from_id(bodies::SUN);
+    pub fn default(sc_area: f64, shadow_body_ids: Vec<i32>, cosm: &'a Cosm) -> Self {
         let e_loc = EclipseLocator {
-            light_source: sun,
-            shadow_bodies,
+            light_source: bodies::SUN,
+            shadow_body_ids,
             cosm: &cosm,
             correction: LTCorr::None,
         };
@@ -34,8 +33,8 @@ impl<'a> SolarPressure<'a> {
     }
 }
 
-impl<'a> ForceModel<Geoid> for SolarPressure<'a> {
-    fn eom(&self, osc: &OrbitState) -> Vector3<f64> {
+impl<'a> ForceModel for SolarPressure<'a> {
+    fn eom(&self, osc: &State) -> Vector3<f64> {
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
             .e_loc

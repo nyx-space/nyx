@@ -6,11 +6,10 @@ use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
 use crate::hifitime::{Epoch, SECONDS_PER_DAY};
 use celestia::cosm::prost::Message;
-use celestia::frames::Frame;
-use celestia::frames::*;
+use celestia::frames::{Frame, FrameInfo};
 use celestia::state::OrbitState;
 use celestia::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
-use celestia::xb::{Ephemeris, EphemerisContainer, Identifier};
+use celestia::xb::{Ephemeris, EphemerisContainer, Identifier as XbId};
 use celestia::xb::{Frame as FXBFrame, FrameContainer};
 use celestia::SPEED_OF_LIGHT_KMS;
 use std::collections::HashMap;
@@ -41,10 +40,12 @@ pub enum LTCorr {
 // Defines Cosm, from the Greek word for "world" or "universe".
 #[derive(Clone)]
 pub struct Cosm<'a> {
-    ephemerides: HashMap<(i32, String), Ephemeris>,
-    frames: HashMap<(i32, String), FXBFrame>,
-    geoids: HashMap<(i32, String), Frame<'a>>,
+    ephemerides: HashMap<i32, Ephemeris>,
+    ephemerides_names: HashMap<String, i32>,
+    frames: HashMap<i32, Frame<'a>>,
+    frames_names: HashMap<String, i32>,
     exb_map: Graph<i32, u8, Undirected>,
+    frame_map: Graph<i32, u8, Undirected>,
 }
 
 impl<'a> fmt::Debug for Cosm<'a> {
@@ -88,21 +89,32 @@ impl<'a> Cosm<'a> {
     pub fn try_from_xb(filename: &str) -> Result<Cosm, IoError> {
         let mut cosm = Cosm {
             ephemerides: HashMap::new(),
+            ephemerides_names: HashMap::new(),
             frames: HashMap::new(),
-            geoids: HashMap::new(),
+            frames_names: HashMap::new(),
             exb_map: Graph::new_undirected(),
+            frame_map: Graph::new_undirected(),
         };
 
-        // BUG: This adds the Sun, but the Sun should be added by the loop below (the de file DOES contain the Sun).
-        // Further, when adding the SSB, I should probably _not_ add it to the Geoid, since it isn't one. That said, this will break things.
-        // Hence, I should probably add as a "virtual geoid", and computing the approximate GM from some estimated mass of the solar system (which includes asteroids, etc.).
         // Solar System Barycenter
-        cosm.geoids.insert(
-            (0, "Solar System Barycenter".to_string()),
-            Geoid::perfect_sphere(0, 0, 1, SS_MASS * SUN_GM),
-        );
+        let ssb = Frame {
+            id: XbId {
+                number: 0,
+                name: "Solar System Barycenter".to_owned(),
+            },
+            exb_id: None,
+            kind: FrameInfo::Celestial {
+                gm: SS_MASS * SUN_GM,
+            },
+            parent: None,
+        };
 
+        cosm.frames.insert(0, ssb);
+        cosm.frames_names
+            .insert("Solar System Barycenter".to_owned(), 0);
         cosm.exb_map.add_node(0); // Add the SSB
+        cosm.frame_map.add_node(0);
+
         match cosm.append_xb(filename) {
             None => Ok(cosm),
             Some(err) => Err(err),
@@ -121,12 +133,14 @@ impl<'a> Cosm<'a> {
                     let id = ephem.id.as_ref().unwrap();
                     let exb_tpl = (id.number, id.name.clone());
 
-                    self.ephemerides.insert(exb_tpl.clone(), ephem.clone());
+                    self.ephemerides.insert(id.number, ephem.clone());
+                    self.ephemerides_names.insert(id.name.clone(), id.name);
+
+                    // TODO: HERE NEED TO MAKE SURE THAT THE FRAMES EXIST FIRST
+                    // MAYBE DOES IT NEED XB UPDATE?
 
                     // Compute the exb_id and axb_id from the ref frame.
-                    let ref_frame_id = ephem.ref_frame.clone().unwrap().number;
-                    let exb_id = ref_frame_id % 100_000;
-                    let axb_id = ref_frame_id / 100_000;
+                    let exb_id = ephem.ref_frame.clone().unwrap().number;
 
                     // Add this EXB to the map, and link it to its parent
                     let this_node = self.exb_map.add_node(id.number);
@@ -207,11 +221,6 @@ impl<'a> Cosm<'a> {
                     }
                 }
 
-                for frame in load_frames(&(filename.to_string() + ".fxb")) {
-                    let id = frame.id.clone().unwrap();
-                    self.frames.insert((id.number, id.name), frame.clone());
-                }
-
                 None
             }
         }
@@ -227,22 +236,20 @@ impl<'a> Cosm<'a> {
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else an error
-    pub fn try_geoid_from_id(&self, id: i32) -> Result<Geoid, CosmError> {
-        for ((geoid_id, _), geoid) in &self.geoids {
-            if *geoid_id == id {
-                return Ok(*geoid);
-            }
+    pub fn try_frame_from_id(&self, id: i32) -> Result<&'a Frame<'a>, CosmError> {
+        match self.frames[id] {
+            Some(f) => Ok(f),
+            None => Err(CosmError::ObjectIDNotFound(id)),
         }
-        Err(CosmError::ObjectIDNotFound(id))
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn geoid_from_id(&self, id: i32) -> Geoid {
-        self.try_geoid_from_id(id).unwrap()
+    pub fn frame_by_id(&self, id: i32) -> &'a Frame<'a> {
+        self.try_frame_from_id(id).unwrap()
     }
 
     /// Returns the list of loaded geoids
-    pub fn geoids(&self) -> Vec<Geoid> {
+    pub fn frames(&self) -> Vec<&'a Frame<'a> {
         self.geoids.iter().map(|(_, g)| *g).collect()
     }
 
@@ -517,8 +524,14 @@ impl<'a> Cosm<'a> {
     }
 
     /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg(&self, state: &OrbitState, new_geoid: Geoid) -> OrbitState {
+    pub fn frame_chg(&self, state: &'a State<'a>, new_frame: &'a Frame<'a>) -> OrbitState {
         self.try_frame_chg(state, new_geoid).unwrap()
+    }
+
+    /// Return the provided state in the provided frame, or panics
+    pub fn frame_chg_by_id(&self, state: &'a State<'a>, new_frame: i32) -> OrbitState {
+        let frame = self.frame_by_id(new_frame);
+        self.try_frame_chg(state, frame).unwrap()
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
@@ -601,38 +614,6 @@ pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
         decode_start.elapsed().as_secs()
     );
     Ok(ephemerides)
-}
-
-/// Loads the provided input_filename as an FXB
-///
-/// This function may panic!
-pub fn load_frames(input_filename: &str) -> Vec<FXBFrame> {
-    let mut input_fxb_buf = Vec::new();
-
-    File::open(input_filename)
-        .unwrap_or_else(|_| panic!("could not open FXB file {}", input_filename))
-        .read_to_end(&mut input_fxb_buf)
-        .expect("something went wrong reading the file");
-
-    if input_fxb_buf.is_empty() {
-        panic!("FXB file {} is empty (zero bytes read)", input_filename);
-    }
-
-    let decode_start = Instant::now();
-
-    let cnt = FrameContainer::decode(input_fxb_buf.into_buf()).expect("could not decode FXB");
-
-    let frames = cnt.frames;
-    let num_eph = frames.len();
-    if num_eph == 0 {
-        panic!("no frames found in FXB");
-    }
-    info!(
-        "Loaded {} frames in {} seconds.",
-        num_eph,
-        decode_start.elapsed().as_secs()
-    );
-    frames
 }
 
 #[cfg(test)]
@@ -1036,5 +1017,14 @@ mod tests {
         let cosm = Cosm::from_xb("./de438s");
         let earth = cosm.geoid_from_id(301);
         dbg!(earth);
+    }
+
+    fn test_new_frames_usage() {
+        // Later there will be a single XB which also contains the frames
+        let cosm = Cosm::from_xb("./de438s.exb");
+        // Get the frame we want
+        let eme2k = cosm.frame_by_name("EME2000");
+        // Define the state
+        let state = State::keplerian(sma, ecc, inc, raan, aop, ta, dt, eme2k);
     }
 }

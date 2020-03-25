@@ -1,4 +1,4 @@
-use super::{Cosm, Geoid, LTCorr, OrbitState};
+use super::{Cosm, LTCorr, State};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::fmt;
 
@@ -80,15 +80,15 @@ impl fmt::Display for EclipseState {
 
 #[derive(Clone)]
 pub struct EclipseLocator<'a> {
-    pub light_source: Geoid,
-    pub shadow_bodies: Vec<Geoid>,
-    pub cosm: &'a Cosm,
+    pub light_source_id: i32,
+    pub shadow_body_ids: Vec<i32>,
+    pub cosm: &'a Cosm<'a>,
     pub correction: LTCorr,
 }
 
 impl<'a> EclipseLocator<'a> {
     /// Compute the visibility/eclipse between an observer and an observed state
-    pub fn compute(&self, observer: &OrbitState) -> EclipseState {
+    pub fn compute(&self, observer: &State) -> EclipseState {
         let mut state = EclipseState::Visibilis;
         for eclipsing_geoid in &self.shadow_bodies {
             let this_state = eclipse_state(
@@ -108,26 +108,28 @@ impl<'a> EclipseLocator<'a> {
 
 /// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
 pub fn eclipse_state(
-    observer: &OrbitState,
-    light_source: Geoid,
-    eclipsing_geoid: Geoid,
+    observer: &State,
+    light_source_id: i32,
+    eclipsing_body_id: i32,
     cosm: &Cosm,
     correction: LTCorr,
 ) -> EclipseState {
     // If the light source's radius is zero, just call the line of sight algorithm
+    let light_source = &cosm.frame_from_id(light_source_id);
+    let eclipsing_body = &cosm.frame_from_id(eclipsing_body_id);
     if light_source.equatorial_radius < std::f64::EPSILON {
         let observed =
             cosm.celestial_state(light_source.id, observer.dt, observer.frame.id, correction);
-        return line_of_sight(observer, &observed, eclipsing_geoid, &cosm);
+        return line_of_sight(observer, &observed, eclipsing_body, &cosm);
     }
     // All of the computations happen with the observer as the center.
     // `eb` stands for eclipsing body; `ls` stands for light source.
     // Vector from spacecraft to EB
-    let r_eb = -cosm.frame_chg(observer, eclipsing_geoid).radius();
+    let r_eb = -cosm.frame_chg(observer, eclipsing_body).radius();
     let r_eb_unit = r_eb / r_eb.norm();
     // Vector from EB to LS
     let r_eb_ls = cosm
-        .celestial_state(light_source.id, observer.dt, eclipsing_geoid.id, correction)
+        .celestial_state(light_source.id, observer.dt, eclipsing_body_id, correction)
         .radius();
     let r_eb_ls_unit = r_eb_ls / r_eb_ls.norm();
     // Compute the angle between those vectors. If that angle is less than 90 degrees, then the light source
@@ -161,7 +163,7 @@ pub fn eclipse_state(
     // between the center of the eclipsing body's shadow and the center of the light source's shadow.
     let d_plane_ls = r_plane_ls.norm();
 
-    let eb_radius = eclipsing_geoid.equatorial_radius;
+    let eb_radius = eclipsing_body.equatorial_radius;
 
     if d_plane_ls - ls_radius > eb_radius {
         // If the closest point where the projected light source's circle _starts_ is further
@@ -214,10 +216,10 @@ fn circ_seg_area(r: f64, d: f64) -> f64 {
 /// 6. If the discriminant is exactly zero, then the line "skims" the sphere.
 ///
 /// In practice, this code uses a tolerance of 1e-12 instead of 0.0 to account for rounding issues.
-pub fn line_of_sight(
-    observer: &OrbitState,
-    observed: &OrbitState,
-    eclipsing_geoid: Geoid,
+pub fn line_of_sight<'a>(
+    observer: &'a State,
+    observed: &'a State,
+    eclipsing_body_id: i32,
     cosm: &Cosm,
 ) -> EclipseState {
     if observer == observed {
@@ -225,15 +227,16 @@ pub fn line_of_sight(
     }
 
     // Convert the observed to the same frame as the origin (fok = frame OK)
-    let observed_fok = &cosm.frame_chg(observed, eclipsing_geoid);
-    let observer_fok = &cosm.frame_chg(observer, eclipsing_geoid);
+    let observed_fok = &cosm.frame_chg_by_id(observed, eclipsing_body_id);
+    let observer_fok = &cosm.frame_chg_by_id(observer, eclipsing_body_id);
     // Compute the unit direction between both
     let mut l = observed_fok.radius() - observer_fok.radius();
     l /= l.norm();
 
     // observer minus center point of the eclipsing body is already in the eclipsing body frame, so center is zero.
     let omc = observer_fok.radius();
-    let r = eclipsing_geoid.equatorial_radius;
+    // let r = eclipsing_geoid.equatorial_radius;
+    let r = &cosm.frame_by_id(eclipsing_body_id);
 
     // l.dot(&l) should be 1.0, within rounding error.
     let discriminant_sq = (l.dot(&omc)).powi(2) - l.dot(&l) * (omc.dot(&omc) - (r.powi(2)));
@@ -275,11 +278,11 @@ mod tests {
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-        let x1 = OrbitState::cartesian(-1.0, -1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x2 = OrbitState::cartesian(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x3 = OrbitState::cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x4 = OrbitState::cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
-        let x5 = OrbitState::cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x1 = State::cartesian(-1.0, -1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x2 = State::cartesian(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x3 = State::cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x4 = State::cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+        let x5 = State::cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
 
         assert_eq!(line_of_sight(&x1, &x2, earth, &cosm), EclipseState::Umbra);
         assert_eq!(
@@ -310,9 +313,9 @@ mod tests {
 
         let sma = earth.equatorial_radius + 300.0;
 
-        let sc1 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc2 = OrbitState::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc3 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
+        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+        let sc2 = State::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
 
         // Out of phase by pi.
         assert_eq!(line_of_sight(&sc1, &sc3, earth, &cosm), EclipseState::Umbra);
@@ -334,9 +337,9 @@ mod tests {
 
         let sma = earth.equatorial_radius + 300.0;
 
-        let sc1 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, earth);
-        let sc2 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
-        let sc3 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
+        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, earth);
+        let sc2 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
+        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
 
         let correction = LTCorr::None;
 

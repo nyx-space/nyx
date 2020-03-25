@@ -84,13 +84,11 @@ where
 /// The `ForceModel` trait handles immutable dynamics, i.e. forces which do not need to save the current state, only act on it.
 ///
 /// Examples include Solar Radiation Pressure, drag, spherical harmonics, etc.
-pub trait ForceModel<F: Frame>
+pub trait ForceModel
 where
     Self: Sized,
 {
-    /// Defines the type which will be published on the propagator channel
-    // type StateType;
     /// Defines the equations of motion for this force model from the provided osculating state.
     /// TODO: Expand to all frames (useful for attitude)
-    fn eom(&self, osc: &State<F>) -> Vector3<f64>;
+    fn eom(&self, osc: &State) -> Vector3<f64>;
 }

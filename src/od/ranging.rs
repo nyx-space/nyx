@@ -13,7 +13,7 @@ use self::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice};
-use celestia::{Frame, OrbitState, State};
+use celestia::{FrameInfo, State};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
@@ -99,45 +99,55 @@ impl GroundStation {
     }
 }
 impl MeasurementDevice<StdMeasurement> for GroundStation {
-    type MeasurementInput = OrbitState;
+    type MeasurementInput = State;
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &OrbitState) -> Option<StdMeasurement> {
-        use std::f64::consts::PI;
-        // TODO: Get the frame from cosm instead of using the one from Rx!
-        // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
-        if rx.frame.id() != 399 {
-            unimplemented!("the receiver is not around the Earth");
+    fn measure(&self, rx: &State) -> Option<StdMeasurement> {
+        match rx.frame {
+            FrameInfo::Geoid { fxb_id, exb_id, .. } => {
+                use std::f64::consts::PI;
+                // TODO: Get the frame from cosm instead of using the one from Rx!
+                // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
+                if exb_id != 399 {
+                    unimplemented!("the receiver is not around the Earth");
+                }
+                let dt = rx.dt;
+                let tx =
+                    State::from_geodesic(self.latitude, self.longitude, self.height, dt, rx.frame);
+                /*
+                // Convert the station to "ECEF"
+                let theta = gast(dt);
+                let tx_ecef_r = r3(-theta) * tx.radius();
+                let tx_ecef_v = r3(-theta) * tx.velocity(); // XXX: Shouldn't we be using the transport theorem?
+                                                            // HACK: change after Cosm supports rotations
+                let tx_ecef = State::cartesian_vec(
+                    &Vector6::from_iterator(tx_ecef_r.iter().chain(tx_ecef_v.iter()).cloned()),
+                    mjd_dt,
+                    rx.frame,
+                );
+                */
+                // Let's start by computing the range and range rate
+                let rho_ecef = rx.radius() - tx.radius();
+
+                // Convert to SEZ to compute elevation
+                let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
+                    * r3(self.longitude.to_radians())
+                    * rho_ecef;
+                let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
+
+                Some(StdMeasurement::new(
+                    dt,
+                    tx,
+                    *rx,
+                    elevation >= self.elevation_mask,
+                    &self.range_noise,
+                    &self.range_rate_noise,
+                ))
+            }
+            _ => {
+                error!("Receiver is not on a geoid");
+                None
+            }
         }
-        let dt = rx.dt;
-        let tx = State::from_geodesic(self.latitude, self.longitude, self.height, dt, rx.frame);
-        /*
-        // Convert the station to "ECEF"
-        let theta = gast(dt);
-        let tx_ecef_r = r3(-theta) * tx.radius();
-        let tx_ecef_v = r3(-theta) * tx.velocity(); // XXX: Shouldn't we be using the transport theorem?
-                                                    // HACK: change after Cosm supports rotations
-        let tx_ecef = State::cartesian_vec(
-            &Vector6::from_iterator(tx_ecef_r.iter().chain(tx_ecef_v.iter()).cloned()),
-            mjd_dt,
-            rx.frame,
-        );
-        */
-        // Let's start by computing the range and range rate
-        let rho_ecef = rx.radius() - tx.radius();
-
-        // Convert to SEZ to compute elevation
-        let rho_sez =
-            r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
-        let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
-
-        Some(StdMeasurement::new(
-            dt,
-            tx,
-            *rx,
-            elevation >= self.elevation_mask,
-            &self.range_noise,
-            &self.range_rate_noise,
-        ))
     }
 }
 /*
@@ -201,20 +211,15 @@ impl StdMeasurement {
     }
 
     /// Generate noiseless measurement
-    pub fn noiseless<F: Frame>(
-        dt: Epoch,
-        tx: State<F>,
-        rx: State<F>,
-        visible: bool,
-    ) -> StdMeasurement {
+    pub fn noiseless(dt: Epoch, tx: State, rx: State, visible: bool) -> StdMeasurement {
         Self::raw(dt, tx, rx, visible, 0.0, 0.0)
     }
 
     /// Generate a new measurement with the provided noise distribution.
-    pub fn new<F: Frame, D: Distribution<f64>>(
+    pub fn new<D: Distribution<f64>>(
         dt: Epoch,
-        tx: State<F>,
-        rx: State<F>,
+        tx: State,
+        rx: State,
         visible: bool,
         range_dist: &D,
         range_rate_dist: &D,
@@ -230,15 +235,15 @@ impl StdMeasurement {
     }
 
     /// Generate a new measurement with the provided noise values.
-    pub fn raw<F: Frame>(
+    pub fn raw(
         dt: Epoch,
-        tx: State<F>,
-        rx: State<F>,
+        tx: State,
+        rx: State,
         visible: bool,
         range_noise: f64,
         range_rate_noise: f64,
     ) -> StdMeasurement {
-        assert_eq!(tx.frame.id(), rx.frame.id(), "tx & rx in different frames");
+        assert_eq!(tx.frame, rx.frame, "tx & rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx & rx states have different times");
 
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
@@ -336,12 +341,8 @@ impl RangeMsr {
         (fx, pmat)
     }
 
-    pub fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> RangeMsr {
-        assert_eq!(
-            tx.frame.id(),
-            rx.frame.id(),
-            "tx and rx in different frames"
-        );
+    pub fn new(_: Epoch, tx: State, rx: State, visible: bool) -> RangeMsr {
+        assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
         let dt = tx.dt;
@@ -430,12 +431,8 @@ impl DopplerMsr {
         (fx, pmat)
     }
 
-    pub fn new<F: Frame>(_: Epoch, tx: State<F>, rx: State<F>, visible: bool) -> DopplerMsr {
-        assert_eq!(
-            tx.frame.id(),
-            rx.frame.id(),
-            "tx and rx in different frames"
-        );
+    pub fn new(_: Epoch, tx: State, rx: State, visible: bool) -> DopplerMsr {
+        assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
         let dt = tx.dt;
