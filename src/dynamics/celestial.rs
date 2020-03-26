@@ -26,7 +26,7 @@ impl<'a> CelestialDynamics<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
     pub fn new(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         for exb_id in &bodies {
-            cosm.try_geoid_from_id(*exb_id)
+            cosm.try_frame_by_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
         }
         Self {
@@ -95,27 +95,25 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let radius = state.fixed_rows::<U3>(0).into_owned();
         let velocity = state.fixed_rows::<U3>(3).into_owned();
-        let body_acceleration = (-self.state.frame.gm / radius.norm().powi(3)) * radius;
+        let body_acceleration = (-self.state.frame.gm() / radius.norm().powi(3)) * radius;
         let mut d_x =
             Vector6::from_iterator(velocity.iter().chain(body_acceleration.iter()).cloned());
 
         // Get all of the position vectors between the center body and the third bodies
         let jde = Epoch::from_tai_seconds(self.init_tai_secs + t);
         for exb_id in &self.bodies {
-            let third_body = self.cosm.unwrap().geoid_from_id(*exb_id);
+            let third_body = self.cosm.unwrap().frame_by_id(*exb_id);
             // State of j-th body as seen from primary body
-            let st_ij = self.cosm.unwrap().celestial_state(
-                *exb_id,
-                jde,
-                self.state.frame.id,
-                self.correction,
-            );
+            let st_ij =
+                self.cosm
+                    .unwrap()
+                    .celestial_state(*exb_id, jde, self.state.frame, self.correction);
 
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
             let r_j = radius - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
-            let third_body_acc = -third_body.gm * (r_j / r_j3 + r_ij / r_ij3);
+            let third_body_acc = -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
 
             d_x[3] += third_body_acc[0];
             d_x[4] += third_body_acc[1];
@@ -145,7 +143,7 @@ impl<'a> CelestialDynamicsStm<'a> {
     pub fn new(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         // Check that these bodies are present in the EXB.
         for exb_id in &bodies {
-            cosm.try_geoid_from_id(*exb_id)
+            cosm.try_frame_by_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
         }
         Self {
@@ -227,7 +225,7 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
         // Code up math as usual
         let rmag = norm(&radius);
         let body_acceleration =
-            radius * (Hyperdual::<f64, U7>::from_real(-self.state.frame.gm) / rmag.powi(3));
+            radius * (Hyperdual::<f64, U7>::from_real(-self.state.frame.gm()) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector6::zeros();
@@ -250,16 +248,14 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
         // Get all of the position vectors between the center body and the third bodies
         let jde = Epoch::from_tai_seconds(self.init_tai_secs + t);
         for exb_id in &self.bodies {
-            let third_body = self.cosm.unwrap().geoid_from_id(*exb_id);
-            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm);
+            let third_body = self.cosm.unwrap().frame_by_id(*exb_id);
+            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
 
             // State of j-th body as seen from primary body
-            let st_ij = self.cosm.unwrap().celestial_state(
-                *exb_id,
-                jde,
-                self.state.frame.id,
-                self.correction,
-            );
+            let st_ij =
+                self.cosm
+                    .unwrap()
+                    .celestial_state(*exb_id, jde, self.state.frame, self.correction);
 
             let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
             let r_ij3 = norm(&r_ij).powi(3) / gm_d;

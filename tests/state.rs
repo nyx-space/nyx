@@ -19,7 +19,7 @@ fn state_def_() {
 #[test]
 fn state_def_circ_inc() {
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.geoid_from_id(399);
+    let mut earth = cosm.frame_by_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -104,7 +104,7 @@ fn state_def_circ_inc() {
 #[test]
 fn xb_conversion() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.geoid_from_id(399);
+    let earth = cosm.frame_by_id(399);
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = OrbitState::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth,
@@ -152,7 +152,7 @@ fn xb_conversion() {
 #[test]
 fn state_def_elliptical() {
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.geoid_from_id(399);
+    let mut earth = cosm.frame_by_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -223,7 +223,7 @@ fn state_def_elliptical() {
 #[test]
 fn state_def_circ_eq() {
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.geoid_from_id(399);
+    let mut earth = cosm.frame_by_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -292,7 +292,7 @@ fn state_def_circ_eq() {
 #[test]
 fn state_def_reciprocity() {
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.geoid_from_id(399);
+    let mut earth = cosm.frame_by_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -364,7 +364,7 @@ fn state_def_reciprocity() {
 #[test]
 fn geodetic_vallado() {
     let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.geoid_from_id(399);
+    let mut earth = cosm.frame_by_id(399);
     // Let's use the GMAT GM value for which these tests we written.
     earth.gm = 398_600.441_5;
     earth.semi_major_radius = 6378.1370;

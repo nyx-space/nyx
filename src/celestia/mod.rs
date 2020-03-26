@@ -60,6 +60,9 @@ pub use self::state::*;
 mod frames;
 pub use self::frames::*;
 
+mod rotations;
+pub use self::rotations::*;
+
 mod cosm;
 mod xb;
 pub use self::cosm::*;

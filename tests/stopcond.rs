@@ -13,7 +13,7 @@ use nyx::propagators::{PropOpts, Propagator};
 #[test]
 fn stop_cond_3rd_apo() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = OrbitState::cartesian(
@@ -60,8 +60,8 @@ fn stop_cond_3rd_apo() {
 #[test]
 fn nrho_apo() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.geoid_from_id(bodies::EARTH);
-    let luna = cosm.geoid_from_id(bodies::EARTH_MOON);
+    let earth = cosm.frame_by_id(bodies::EARTH);
+    let luna = cosm.frame_by_id(bodies::EARTH_MOON);
 
     let dt = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
     let state = OrbitState::cartesian(

@@ -43,7 +43,7 @@ fn ekf_fixed_step_perfect_stations() {
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
         OrbitState::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
@@ -163,7 +163,7 @@ fn ckf_fixed_step_perfect_stations() {
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
         OrbitState::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
@@ -352,7 +352,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
         OrbitState::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
@@ -480,7 +480,7 @@ fn ckf_map_covar() {
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state =
         OrbitState::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);

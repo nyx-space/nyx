@@ -68,7 +68,7 @@ pub mod propagators;
 /// use nyx::propagators::{PropOpts, Propagator};
 ///
 /// let cosm = Cosm::from_xb("./de438s");
-/// let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+/// let earth_geoid = cosm.frame_by_id(bodies::EARTH);
 ///
 /// let dt = Epoch::from_mjd_tai(21_545.0);
 /// let initial_state = OrbitState::cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
@@ -121,7 +121,7 @@ pub mod propagators;
 /// let prop_time = 24.0 * 3_600.0;
 ///
 /// let cosm = Cosm::from_xb("./de438s");
-/// let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+/// let earth_geoid = cosm.frame_by_id(bodies::EARTH);
 ///
 /// let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///
@@ -174,7 +174,7 @@ pub mod dynamics;
 /// let cosm = Cosm::from_xb("./de438s");
 /// // In this case, we're creating these states around a Geoid which is Earth.
 /// // But for simplicity, we're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
-/// let mut earth_geoid = cosm.geoid_from_id(399);
+/// let mut earth_geoid = cosm.frame_by_id(399);
 /// earth_geoid.gm = 398_600.441_5;
 /// let dt = Epoch::from_mjd_tai(21545.0);
 /// let cart = OrbitState::cartesian(

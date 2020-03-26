@@ -19,7 +19,7 @@ impl<'a> SolarPressure<'a> {
     /// Will use Cr = 1.8, Phi = 1367.0
     pub fn default(sc_area: f64, shadow_body_ids: Vec<i32>, cosm: &'a Cosm) -> Self {
         let e_loc = EclipseLocator {
-            light_source: bodies::SUN,
+            light_source_id: bodies::SUN,
             shadow_body_ids,
             cosm: &cosm,
             correction: LTCorr::None,
@@ -36,11 +36,8 @@ impl<'a> SolarPressure<'a> {
 impl<'a> ForceModel for SolarPressure<'a> {
     fn eom(&self, osc: &State) -> Vector3<f64> {
         // Compute the position of the Sun as seen from the spacecraft
-        let r_sun = self
-            .e_loc
-            .cosm
-            .frame_chg(osc, self.e_loc.light_source)
-            .radius();
+        let ls_frame = self.e_loc.cosm.frame_by_id(self.e_loc.light_source_id);
+        let r_sun = self.e_loc.cosm.frame_chg(osc, ls_frame).radius();
         let r_sun_unit = r_sun / r_sun.norm();
 
         // Compute the shaddowing factor.

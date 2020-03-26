@@ -446,7 +446,7 @@ impl State {
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
+    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: FrameInfo) -> Self {
         match frame {
             FrameInfo::Geoid { .. } | FrameInfo::Celestial { .. } => Self::keplerian(
                 state[(0, 0)],
@@ -556,7 +556,7 @@ impl State {
                 fxb_id, exb_id, gm, ..
             }
             | FrameInfo::Celestial { fxb_id, exb_id, gm } => {
-                self.vmag().powi(2) / 2.0 - self.frame.gm / self.rmag()
+                self.vmag().powi(2) / 2.0 - gm / self.rmag()
             }
             _ => panic!("orbital energy not defined in this frame"),
         }
@@ -568,7 +568,7 @@ impl State {
             FrameInfo::Geoid {
                 fxb_id, exb_id, gm, ..
             }
-            | FrameInfo::Celestial { fxb_id, exb_id, gm } => -self.frame.gm / (2.0 * self.energy()),
+            | FrameInfo::Celestial { fxb_id, exb_id, gm } => -gm / (2.0 * self.energy()),
             _ => panic!("sma not defined in this frame"),
         }
     }
@@ -580,7 +580,7 @@ impl State {
                 fxb_id, exb_id, gm, ..
             }
             | FrameInfo::Celestial { fxb_id, exb_id, gm } => {
-                2.0 * PI * (self.sma().powi(3) / self.frame.gm).sqrt()
+                2.0 * PI * (self.sma().powi(3) / gm).sqrt()
             }
             _ => panic!("orbital period not defined in this frame"),
         }
@@ -595,8 +595,7 @@ impl State {
             | FrameInfo::Celestial { fxb_id, exb_id, gm } => {
                 let r = self.radius();
                 let v = self.velocity();
-                ((v.norm().powi(2) - self.frame.gm / r.norm()) * r - (r.dot(&v)) * v)
-                    / self.frame.gm
+                ((v.norm().powi(2) - gm / r.norm()) * r - (r.dot(&v)) * v) / gm
             }
             _ => panic!("eccentricity not defined in this frame"),
         }
@@ -834,11 +833,11 @@ impl State {
     pub fn geodetic_latitude(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                _fxb_id,
-                _exb_id,
-                _gm,
+                fxb_id,
+                exb_id,
+                gm,
                 flattening,
-                _equatorial_radius,
+                equatorial_radius,
                 semi_major_radius,
             } => {
                 let eps = 1e-12;
@@ -874,11 +873,11 @@ impl State {
     pub fn geodetic_height(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                _fxb_id,
-                _exb_id,
-                _gm,
+                fxb_id,
+                exb_id,
+                gm,
                 flattening,
-                _equatorial_radius,
+                equatorial_radius,
                 semi_major_radius,
             } => {
                 let e2 = flattening * (2.0 - flattening);

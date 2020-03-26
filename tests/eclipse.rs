@@ -17,8 +17,8 @@ fn leo_sun_earth_eclipses() {
     let prop_time = 2.0 * SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.geoid_from_id(bodies::EARTH);
-    let sun = cosm.geoid_from_id(bodies::SUN);
+    let earth = cosm.frame_by_id(bodies::EARTH);
+    let sun = cosm.frame_by_id(bodies::SUN);
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -68,8 +68,8 @@ fn geo_sun_earth_eclipses() {
     let prop_time = 2.0 * SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.geoid_from_id(bodies::EARTH);
-    let sun = cosm.geoid_from_id(bodies::SUN);
+    let earth = cosm.frame_by_id(bodies::EARTH);
+    let sun = cosm.frame_by_id(bodies::SUN);
 
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);

@@ -46,10 +46,10 @@ pub struct ExpEarthDrag<'a> {
 
 impl<'a> ForceModel for ExpEarthDrag<'a> {
     fn eom(&self, osc: &State) -> Vector3<f64> {
-        let earth = self.cosm.geoid_from_id(bodies::EARTH);
+        let earth = self.cosm.frame_by_id(bodies::EARTH);
         // Compute the density
         let rho0 = 3.614e-13; // # kg/m^3
-        let r0 = 700_000.0 + earth.equatorial_radius;
+        let r0 = 700_000.0 + earth.equatorial_radius();
         let h = 88_667.0; // m
         let rho = rho0 * (-(osc.rmag() - r0) / h).exp(); // # Exponential decay model for density
 

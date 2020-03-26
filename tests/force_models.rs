@@ -17,8 +17,8 @@ use nyx::utils::rss_state_errors;
 #[test]
 fn srp_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
-    let earth = cosm.geoid_from_id(bodies::EARTH);
+    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
+    let earth = cosm.frame_by_id(bodies::EARTH);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -65,8 +65,8 @@ fn srp_earth() {
 #[test]
 fn drag_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
-    let earth = cosm.geoid_from_id(bodies::EARTH);
+    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
+    let earth = cosm.frame_by_id(bodies::EARTH);
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 

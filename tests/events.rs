@@ -13,7 +13,7 @@ fn event_tracker_true_anomaly() {
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = OrbitState::cartesian(
