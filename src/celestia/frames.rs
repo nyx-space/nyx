@@ -71,10 +71,10 @@ pub fn dcm_from_parent(&self, datetime: Epoch) -> Matrix3<f64> {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FrameInfo {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)
-    Celestial { fxb_id: i32, exb_id: i32, gm: f64 },
+    Celestial { axb_id: i32, exb_id: i32, gm: f64 },
     /// Any Geoid which has a GM, flattening value, etc.
     Geoid {
-        fxb_id: i32,
+        axb_id: i32,
         exb_id: i32,
         gm: f64,
         flattening: f64,
@@ -111,9 +111,9 @@ impl FrameInfo {
         }
     }
 
-    pub fn fxb_id(&self) -> i32 {
+    pub fn axb_id(&self) -> i32 {
         match self {
-            FrameInfo::Geoid { fxb_id, .. } | FrameInfo::Celestial { fxb_id, .. } => *fxb_id,
+            FrameInfo::Geoid { axb_id, .. } | FrameInfo::Celestial { axb_id, .. } => *axb_id,
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }
@@ -155,8 +155,8 @@ impl fmt::Display for FrameInfo {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FrameInfo::Celestial { fxb_id, exb_id, .. }
-            | FrameInfo::Geoid { fxb_id, exb_id, .. } => write!(f, "{} ({})", exb_id, fxb_id),
+            FrameInfo::Celestial { axb_id, exb_id, .. }
+            | FrameInfo::Geoid { axb_id, exb_id, .. } => write!(f, "{} ({})", exb_id, axb_id),
             othframe => write!(f, "{:?}", othframe),
         }
     }

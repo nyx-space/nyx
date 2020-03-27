@@ -41,11 +41,12 @@ pub enum LTCorr {
 pub struct Cosm {
     ephemerides: HashMap<i32, Ephemeris>,
     ephemerides_names: HashMap<String, i32>,
-    frames: HashMap<i32, Frame>,
-    frames_names: HashMap<String, i32>,
+    frames: HashMap<String, FrameInfo>,
+    // frames_names: HashMap<String, i32>,
+    axb_names: HashMap<String, i32>,
     exb_map: Graph<i32, u8, Undirected>,
-    // frame_map: Graph<i32, u8, Undirected>,
-    frame_map: Graph<i32, Box<dyn ParentRotation>, Directed>,
+    axb_map: Graph<i32, Box<dyn ParentRotation>, Directed>,
+    j2k_nidx: NodeIndex<u32>,
 }
 
 impl fmt::Debug for Cosm {
@@ -87,34 +88,29 @@ impl Cosm {
 
     /// Attempts to build a Cosm from the *XB files.
     pub fn try_from_xb(filename: &str) -> Result<Cosm, IoError> {
+        let mut axb_map: Graph<i32, Box<dyn ParentRotation>, Directed> = Graph::new();
+        let j2k_nidx = axb_map.add_node(0);
+
         let mut cosm = Cosm {
             ephemerides: HashMap::new(),
             ephemerides_names: HashMap::new(),
             frames: HashMap::new(),
-            frames_names: HashMap::new(),
+            axb_names: HashMap::new(),
             exb_map: Graph::new_undirected(),
-            frame_map: Graph::new(),
+            axb_map,
+            j2k_nidx,
         };
 
-        // Solar System Barycenter
-        let ssb = Frame {
-            id: XbId {
-                number: 0,
-                name: "Solar System Barycenter".to_owned(),
-            },
-            info: FrameInfo::Celestial {
-                fxb_id: 0,
-                exb_id: 0,
-                gm: SS_MASS * SUN_GM,
-            },
-            exb_id: None,
+        // Add J2000 as the main AXB reference frame
+        let ssb2k = FrameInfo::Celestial {
+            axb_id: 0,
+            exb_id: 0,
+            gm: SS_MASS * SUN_GM,
         };
 
-        cosm.frames.insert(0, ssb);
-        cosm.frames_names
-            .insert("Solar System Barycenter".to_owned(), 0);
-        cosm.exb_map.add_node(0); // Add the SSB
-        cosm.frame_map.add_node(0);
+        cosm.axb_names.insert("J2000".to_owned(), 0);
+        cosm.frames
+            .insert("Solar System Barycenter J2k".to_owned(), ssb2k);
 
         match cosm.append_xb(filename) {
             None => Ok(cosm),
@@ -189,33 +185,37 @@ impl Cosm {
                                 }
                                 None => equatorial_radius, // assume spherical if unspecified
                             };
-                            // Get a ref to the parent
-                            // let parent_frame: &'a Frame<'a> = &self.frames[&exb_id];
-                            // Assume no rotation for now
-                            let ideemrot = NoRotation {};
-                            let frame = Frame {
-                                id: id.clone(), // TODO: Change this to a Frame ID instead of the EXB info
-                                info: FrameInfo::Geoid {
-                                    fxb_id: id.number,
-                                    exb_id,
-                                    gm: gm.value,
-                                    flattening,
-                                    equatorial_radius,
-                                    semi_major_radius,
-                                },
-                                exb_id: Some(id.clone()),
+
+                            // Let's now build the J2000 version of this body
+                            let obj = FrameInfo::Geoid {
+                                axb_id: 0, // TODO: Get this from the EXB
+                                exb_id,
+                                gm: gm.value,
+                                flattening,
+                                equatorial_radius,
+                                semi_major_radius,
                             };
-                            // And add this frame to the list of avaiable frames
-                            self.frames_names
-                                .insert(id.name.to_owned(), frame.id.number);
-                            self.frames.insert(frame.id.number, frame);
+
+                            self.frames.insert(id.name.clone(), obj);
                         }
                         None => {
                             match id.number {
                                 10 => {
-                                    // Get the SSB
-                                    // let ssb_frame = self.frames[&0];
-                                    // Define the IAU frame
+                                    // Build the Sun frame in J2000
+                                    let sun2k = FrameInfo::Geoid {
+                                        axb_id: 0,
+                                        exb_id,
+                                        gm: SUN_GM,
+                                        flattening: 0.0,
+                                        // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+                                        equatorial_radius: 696_342.0,
+                                        semi_major_radius: 696_342.0,
+                                    };
+
+                                    self.frames.insert(id.name.clone(), sun2k);
+                                    // And now in IAU body fixed
+
+                                    // Define the IAU_SUN frame
                                     let sun2ssb_ctx = HashMap::new();
                                     let right_asc: meval::Expr = "289.13".parse().unwrap();
                                     let declin: meval::Expr = "63.87".parse().unwrap();
@@ -228,28 +228,26 @@ impl Cosm {
                                         &sun2ssb_ctx,
                                         AngleUnit::Degrees,
                                     );
-                                    // Sun
-                                    let sun = Frame {
-                                        id: XbId {
-                                            number: id.number,
-                                            name: "IAU SUN".to_owned(),
-                                        },
-                                        info: FrameInfo::Geoid {
-                                            fxb_id: id.number,
-                                            exb_id,
-                                            gm: SUN_GM,
-                                            flattening: 0.0,
-                                            // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
-                                            equatorial_radius: 696_342.0,
-                                            semi_major_radius: 696_342.0,
-                                        },
-                                        exb_id: Some(id.clone()),
+                                    // Executively state that the IAU_SUN frame has the ID 10
+                                    let sun_iau = FrameInfo::Geoid {
+                                        axb_id: 10,
+                                        exb_id,
+                                        gm: SUN_GM,
+                                        flattening: 0.0,
+                                        // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+                                        equatorial_radius: 696_342.0,
+                                        semi_major_radius: 696_342.0,
                                     };
 
-                                    // self.geoids.insert(exb_tpl, sun);
-
-                                    self.frames_names.insert(sun.id.name.clone(), sun.id.number);
-                                    self.frames.insert(sun.id.number, sun);
+                                    let sun_iau_node = self.axb_map.add_node(10);
+                                    self.axb_names.insert("IAU SUN".to_owned(), 0);
+                                    // And create the edge between the IAU SUN and J2k
+                                    self.axb_map.add_edge(
+                                        sun_iau_node,
+                                        self.j2k_nidx,
+                                        Box::new(sun2ssb_rot),
+                                    );
+                                    self.frames.insert("IAU SUN".to_owned(), sun_iau);
                                 }
                                 _ => {
                                     info!(
@@ -276,12 +274,35 @@ impl Cosm {
         Err(CosmError::ObjectIDNotFound(id))
     }
 
-    /// Returns the geoid from the loaded XB, if it is in there, else an error
+    fn axbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
+        for (idx, node) in self.axb_map.raw_nodes().iter().enumerate() {
+            if node.weight == id {
+                return Ok(NodeIndex::new(idx));
+            }
+        }
+        Err(CosmError::ObjectIDNotFound(id))
+    }
+
+    pub fn try_frame(&self, name: String) -> Result<FrameInfo, CosmError> {
+        match self.frames.get(&name) {
+            Some(f) => Ok(*f),
+            None => Err(CosmError::ObjectNameNotFound(name)),
+        }
+    }
+
     pub fn try_frame_by_id(&self, id: i32) -> Result<FrameInfo, CosmError> {
-        match self.frames.get(&id) {
-            Some(f) => Ok(f.info),
+        match self.ephemerides.get(&id) {
+            Some(e) => {
+                // Now that we have the ephem for this ID, let's get the original frame
+                Ok(self.frames[&e.id.as_ref().unwrap().name])
+            }
             None => Err(CosmError::ObjectIDNotFound(id)),
         }
+    }
+
+    /// Returns the geoid from the loaded XB, if it is in there, else panics!
+    pub fn frame(&self, name: String) -> FrameInfo {
+        self.try_frame(name).unwrap()
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
@@ -291,25 +312,22 @@ impl Cosm {
 
     /// Returns the list of loaded geoids
     pub fn frames(&self) -> Vec<FrameInfo> {
-        self.frames.iter().map(|(_, g)| g.info).collect()
+        self.frames.iter().map(|(_, g)| *g).collect()
     }
 
-    // TODO: Code this up
-    pub fn mut_add_frame(&mut self, new_frame: Frame) {}
-
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
-    pub fn mut_gm_for_frame_id(&mut self, id: i32, new_gm: f64) {
-        match self.frames.get_mut(&id) {
-            Some(frame) => match frame.info {
+    pub fn mut_gm_for_frame(&mut self, name: String, new_gm: f64) {
+        match self.frames.get_mut(&name) {
+            Some(ref mut frame) => match frame {
                 FrameInfo::Celestial { gm: mut gm, .. } => {
                     gm = new_gm;
                 }
                 FrameInfo::Geoid { gm: mut gm, .. } => {
                     gm = new_gm;
                 }
-                _ => panic!("frame ID {} does not have a GM", id),
+                _ => panic!("frame ID {} does not have a GM", name),
             },
-            None => panic!("no frame ID {}", id),
+            None => panic!("no frame ID {}", name),
         }
     }
 
@@ -572,47 +590,46 @@ impl Cosm {
             return Ok(Vec::new());
         }
 
-        // Get the frames themselves
-        let from_frame = self
-            .frames
-            .get(&from.exb_id())
-            .ok_or_else(|| CosmError::ObjectIDNotFound(from.exb_id()))?;
+        /*
+                        // Get the frames themselves
+                        let from_frame = self
+                            .frames
+                            .get(&from.exb_id())
+                            .ok_or_else(|| CosmError::ObjectIDNotFound(from.exb_id()))?;
 
-        let to_frame = self
-            .frames
-            .get(&to.exb_id())
-            .ok_or_else(|| CosmError::ObjectIDNotFound(to.exb_id()))?;
+                        let to_frame = self
+                            .frames
+                            .get(&to.exb_id())
+                            .ok_or_else(|| CosmError::ObjectIDNotFound(to.exb_id()))?;
 
-        // Check both frames have parents, if they don't and they aren't the same frame,
-        // then we can't do anything.
+                        // Check both frames have parents, if they don't and they aren't the same frame,
+                        // then we can't do anything.
 
-        self.frame_map[to_frame.id()];
-        self.frame_map.neighbors_directed(a: NodeIndex<Ix>, dir: Direction)
+                        //self.frame_map[to_frame.id()];
+                        //self.frame_map.neighbors_directed(a: NodeIndex<Ix>, dir: Direction)
 
-        if to_frame.parent.is_none() || from_frame.parent.is_none() {
-            return Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id()));
-        }
+                        if to_frame.parent.is_none() || from_frame.parent.is_none() {
+                            return Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id()));
+                        }
 
-        let (to_parent_frame, _to_parent_rot) = to_frame.parent.as_ref().unwrap();
-        let (from_parent_frame, _to_parent_rot) = from_frame.parent.as_ref().unwrap();
+                        let (to_parent_frame, _to_parent_rot) = to_frame.parent.as_ref().unwrap();
+                        let (from_parent_frame, _to_parent_rot) = from_frame.parent.as_ref().unwrap();
 
-        // Check if the center of the target frame is the destination frame, or vice versa, so the path is simply one frame.
-        if &from_parent_frame.info == to {
-            return Ok(vec![*from]);
-        } else if &to_parent_frame.info == from {
-            return Ok(vec![*to]);
-        }
+                // Check if the center of the target frame is the destination frame, or vice versa, so the path is simply one frame.
+                if &from_parent_frame.info == to {
+                    return Ok(vec![*from]);
+                } else if &to_parent_frame.info == from {
+                    return Ok(vec![*to]);
+                }
+        */
+        let start_exb_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
+        let end_exb_idx = self.exbid_to_map_idx(from.exb_id()).unwrap();
 
-        let start_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
-        let end_idx = self
-            .exbid_to_map_idx(from_parent_frame.info.exb_id())
-            .unwrap();
-
-        let shared_centers = from_parent_frame.info.exb_id() == to_parent_frame.info.exb_id();
+        let shared_centers = from.exb_id() == to.exb_id();
         match astar(
             &self.exb_map,
-            start_idx,
-            |finish| finish == end_idx,
+            start_exb_idx,
+            |finish| finish == end_exb_idx,
             |e| *e.weight(),
             |_| 0,
         ) {
@@ -621,7 +638,7 @@ impl Cosm {
                 let mut f_path = Vec::new();
                 for idx in path {
                     let exb_id = self.exb_map[idx];
-                    if !(shared_centers && to_parent_frame.info.exb_id() == exb_id || exb_id == 0) {
+                    if !(shared_centers && to.exb_id() == exb_id || exb_id == 0) {
                         // Ignore going through SSB since it isn't a geoid
                         f_path.push(self.frame_by_id(exb_id));
                     }
@@ -631,10 +648,7 @@ impl Cosm {
                 f_path.push(*from);
                 Ok(f_path)
             }
-            None => Err(CosmError::DisjointFrameCenters(
-                from_parent_frame.info.exb_id(),
-                to_parent_frame.info.exb_id(),
-            )),
+            None => Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
         }
     }
 }

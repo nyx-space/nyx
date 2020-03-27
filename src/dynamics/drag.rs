@@ -18,7 +18,7 @@ pub struct ConstantDrag<'a> {
     /// Geoid causing the drag
     pub drag_frame_id: i32,
     /// a Cosm reference is needed to convert to the state around the correct planet
-    pub cosm: &'a Cosm<'a>,
+    pub cosm: &'a Cosm,
 }
 
 impl<'a> ForceModel for ConstantDrag<'a> {
@@ -41,7 +41,7 @@ pub struct ExpEarthDrag<'a> {
     /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere).
     pub cd: f64,
     /// a Cosm reference is needed to convert to the state around the correct planet
-    pub cosm: &'a Cosm<'a>,
+    pub cosm: &'a Cosm,
 }
 
 impl<'a> ForceModel for ExpEarthDrag<'a> {

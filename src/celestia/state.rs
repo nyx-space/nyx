@@ -349,9 +349,9 @@ impl State {
     ) -> Self {
         match frame {
             FrameInfo::Geoid {
-                fxb_id, exb_id, gm, ..
+                axb_id, exb_id, gm, ..
             }
-            | FrameInfo::Celestial { fxb_id, exb_id, gm } => {
+            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
                 if gm.abs() < std::f64::EPSILON {
                     warn!(
                         "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
@@ -476,7 +476,7 @@ impl State {
     ) -> Self {
         match frame {
             FrameInfo::Geoid {
-                fxb_id,
+                axb_id,
                 exb_id,
                 gm,
                 flattening,
@@ -553,9 +553,9 @@ impl State {
     pub fn energy(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                fxb_id, exb_id, gm, ..
+                axb_id, exb_id, gm, ..
             }
-            | FrameInfo::Celestial { fxb_id, exb_id, gm } => {
+            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
                 self.vmag().powi(2) / 2.0 - gm / self.rmag()
             }
             _ => panic!("orbital energy not defined in this frame"),
@@ -566,9 +566,9 @@ impl State {
     pub fn sma(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                fxb_id, exb_id, gm, ..
+                axb_id, exb_id, gm, ..
             }
-            | FrameInfo::Celestial { fxb_id, exb_id, gm } => -gm / (2.0 * self.energy()),
+            | FrameInfo::Celestial { axb_id, exb_id, gm } => -gm / (2.0 * self.energy()),
             _ => panic!("sma not defined in this frame"),
         }
     }
@@ -577,9 +577,9 @@ impl State {
     pub fn period(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                fxb_id, exb_id, gm, ..
+                axb_id, exb_id, gm, ..
             }
-            | FrameInfo::Celestial { fxb_id, exb_id, gm } => {
+            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
                 2.0 * PI * (self.sma().powi(3) / gm).sqrt()
             }
             _ => panic!("orbital period not defined in this frame"),
@@ -590,9 +590,9 @@ impl State {
     pub fn evec(&self) -> Vector3<f64> {
         match self.frame {
             FrameInfo::Geoid {
-                fxb_id, exb_id, gm, ..
+                axb_id, exb_id, gm, ..
             }
-            | FrameInfo::Celestial { fxb_id, exb_id, gm } => {
+            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
                 let r = self.radius();
                 let v = self.velocity();
                 ((v.norm().powi(2) - gm / r.norm()) * r - (r.dot(&v)) * v) / gm
@@ -833,7 +833,7 @@ impl State {
     pub fn geodetic_latitude(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                fxb_id,
+                axb_id,
                 exb_id,
                 gm,
                 flattening,
@@ -873,7 +873,7 @@ impl State {
     pub fn geodetic_height(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                fxb_id,
+                axb_id,
                 exb_id,
                 gm,
                 flattening,

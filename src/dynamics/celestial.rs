@@ -18,7 +18,7 @@ pub struct CelestialDynamics<'a> {
     relative_time: f64,
     // Allows us to rebuilt the true epoch
     init_tai_secs: f64,
-    pub cosm: Option<&'a Cosm<'a>>,
+    pub cosm: Option<&'a Cosm>,
     pub correction: LTCorr,
 }
 
@@ -134,7 +134,7 @@ pub struct CelestialDynamicsStm<'a> {
     relative_time: f64,
     // Allows us to rebuilt the true epoch
     init_tai_secs: f64,
-    pub cosm: Option<&'a Cosm<'a>>,
+    pub cosm: Option<&'a Cosm>,
     pub correction: LTCorr,
 }
 
