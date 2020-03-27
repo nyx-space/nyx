@@ -315,6 +315,18 @@ impl Cosm {
         self.frames.iter().map(|(_, g)| *g).collect()
     }
 
+    /// Mutates the GM value for the frame used in the ephemeris only (not for every frame at this center)
+    pub fn mut_gm_for_frame_id(&mut self, exb_id: i32, new_gm: f64) {
+        match self.ephemerides.get(&exb_id) {
+            Some(e) => {
+                // Now that we have the ephem for this ID, let's get the original frame
+                let name = e.id.as_ref().unwrap().name.clone(); //.to_string();
+                self.mut_gm_for_frame(name, new_gm);
+            }
+            None => panic!("no frame ID {}", exb_id),
+        }
+    }
+
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
     pub fn mut_gm_for_frame(&mut self, name: String, new_gm: f64) {
         match self.frames.get_mut(&name) {

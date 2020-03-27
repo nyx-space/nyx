@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 
 use self::na::allocator::Allocator;
 use self::na::{DefaultAllocator, DimName, Vector3, VectorN};
-use crate::celestia::{Frame, State};
+use crate::celestia::State;
 
 /// The celestial module handles all Cartesian based dynamics.
 ///

@@ -103,7 +103,7 @@ impl MeasurementDevice<StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &State) -> Option<StdMeasurement> {
         match rx.frame {
-            FrameInfo::Geoid { axb_id, exb_id, .. } => {
+            FrameInfo::Geoid { exb_id, .. } => {
                 use std::f64::consts::PI;
                 // TODO: Get the frame from cosm instead of using the one from Rx!
                 // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!

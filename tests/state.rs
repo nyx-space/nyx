@@ -18,13 +18,13 @@ fn state_def_() {
 
 #[test]
 fn state_def_circ_inc() {
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.frame_by_id(399);
-    // Let's use the GMAT GM value for which these tests we written.
-    earth.gm = 398_600.441_5;
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
+    let eme2k = cosm.frame_by_id(399);
+
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = OrbitState::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
     let cart2 = OrbitState::cartesian(
         -2436.45,
@@ -34,7 +34,7 @@ fn state_def_circ_inc() {
         -5.088_611,
         0.0,
         Epoch::from_jde_tai(dt.as_jde_tai_days()),
-        earth,
+        eme2k,
     );
     assert_eq!(
         cart, cart2,
@@ -68,7 +68,7 @@ fn state_def_circ_inc() {
         "semi parameter"
     );
 
-    let kep = OrbitState::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, earth);
+    let kep = OrbitState::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
     f64_eq!(kep.x, 8_057.976_452_202_976, "x");
     f64_eq!(kep.y, -0.196_740_370_290_888_9, "y");
     f64_eq!(kep.z, 1_475.383_214_274_138, "z");
@@ -97,17 +97,17 @@ fn state_def_circ_inc() {
         "semi parameter"
     );
 
-    let kep = OrbitState::keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, earth);
+    let kep = OrbitState::keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, eme2k);
     f64_eq!(kep.ta(), 260.1123, "ta");
 }
 
 #[test]
 fn xb_conversion() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(399);
+    let eme2k = cosm.frame_by_id(399);
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = OrbitState::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
     let cart_xb = cart.to_exb_state();
     f64_eq!(
@@ -151,10 +151,10 @@ fn xb_conversion() {
 
 #[test]
 fn state_def_elliptical() {
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.frame_by_id(399);
-    // Let's use the GMAT GM value for which these tests we written.
-    earth.gm = 398_600.441_5;
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
+    let eme2k = cosm.frame_by_id(399);
+
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = OrbitState::cartesian(
         5_946.673_548_288_958,
@@ -164,7 +164,7 @@ fn state_def_elliptical() {
         4.579_534_132_135_011,
         6.246_541_551_539_432,
         dt,
-        earth,
+        eme2k,
     );
     f64_eq!(cart.energy(), -25.842_247_282_849_144, "energy");
     f64_eq!(cart.period(), 6_740.269_063_643_042_5, "period");
@@ -189,7 +189,7 @@ fn state_def_elliptical() {
     );
 
     let kep = OrbitState::keplerian(
-        8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, earth,
+        8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
     );
     f64_eq!(kep.x, 8_087.161_618_048_522_5, "x");
     f64_eq!(kep.y, -0.197_452_943_772_520_73, "y");
@@ -222,10 +222,10 @@ fn state_def_elliptical() {
 
 #[test]
 fn state_def_circ_eq() {
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.frame_by_id(399);
-    // Let's use the GMAT GM value for which these tests we written.
-    earth.gm = 398_600.441_5;
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
+    let eme2k = cosm.frame_by_id(399);
+
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = OrbitState::cartesian(
         -38_892.724_449_149_02,
@@ -235,7 +235,7 @@ fn state_def_circ_eq() {
         -2.814_651_172_605_98,
         1.140_294_223_185_661e-5,
         dt,
-        earth,
+        eme2k,
     );
     f64_eq!(cart.energy(), -4.702_902_670_552_006, "energy");
     f64_eq!(cart.period(), 86_820.776_152_986_1, "period");
@@ -259,7 +259,7 @@ fn state_def_circ_eq() {
         "semi parameter"
     );
 
-    let kep = OrbitState::keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, earth);
+    let kep = OrbitState::keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, eme2k);
     f64_eq!(kep.x, 18_190.717_357_886_37, "x");
     f64_eq!(kep.y, -118.107_162_539_218_69, "y");
     f64_eq!(kep.z, 0.000_253_845_647_633_053_35, "z");
@@ -291,10 +291,10 @@ fn state_def_circ_eq() {
 
 #[test]
 fn state_def_reciprocity() {
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.frame_by_id(399);
-    // Let's use the GMAT GM value for which these tests we written.
-    earth.gm = 398_600.441_5;
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
+    let eme2k = cosm.frame_by_id(399);
+
     let dt = Epoch::from_mjd_tai(21_545.0);
 
     assert_eq!(
@@ -306,7 +306,7 @@ fn state_def_reciprocity() {
             -2.814_651_172_605_98,
             1.140_294_223_185_661e-5,
             dt,
-            earth
+            eme2k
         ),
         OrbitState::keplerian(
             42_378.129_999_999_98,
@@ -316,7 +316,7 @@ fn state_def_reciprocity() {
             65.399_999_847_186_78,
             12.300_000_152_813_197,
             dt,
-            earth
+            eme2k
         ),
         "circ_eq"
     );
@@ -330,7 +330,7 @@ fn state_def_reciprocity() {
             4.579_534_132_135_011,
             6.246_541_551_539_432,
             dt,
-            earth
+            eme2k
         ),
         OrbitState::keplerian(
             7_712.186_117_895_041,
@@ -340,13 +340,13 @@ fn state_def_reciprocity() {
             359.787_880_000_004,
             25.434_003_407_751_188,
             dt,
-            earth
+            eme2k
         ),
         "elliptical"
     );
 
     assert_eq!(
-        OrbitState::cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, earth),
+        OrbitState::cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k),
         OrbitState::keplerian(
             7_712.186_117_895_043,
             0.000_999_582_831_432_052_5,
@@ -355,7 +355,7 @@ fn state_def_reciprocity() {
             90.0,
             0.0,
             dt,
-            earth
+            eme2k
         ),
         "circ_inc"
     );
@@ -363,11 +363,11 @@ fn state_def_reciprocity() {
 
 #[test]
 fn geodetic_vallado() {
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth = cosm.frame_by_id(399);
-    // Let's use the GMAT GM value for which these tests we written.
-    earth.gm = 398_600.441_5;
-    earth.semi_major_radius = 6378.1370;
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
+    let eme2k = cosm.frame_by_id(399);
+
+    dbg!(eme2k.semi_major_radius());
     let dt = Epoch::from_mjd_tai(51_545.0);
     // Test case from Vallado, 4th Ed., page 173, Example 3-3
     let ri = 6524.834;
@@ -378,11 +378,11 @@ fn geodetic_vallado() {
     let lat = 34.352_495_150_861_564;
     let long = 46.446_416_856_789_96;
     let height = 5_085.218_731_091_624;
-    let r = OrbitState::from_position(ri, rj, rk, dt, earth);
+    let r = OrbitState::from_position(ri, rj, rk, dt, eme2k);
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height, "height");
-    let r = OrbitState::from_geodesic(lat, long, height, dt, earth);
+    let r = OrbitState::from_geodesic(lat, long, height, dt, eme2k);
     f64_eq!(r.x, ri_val, "r_i");
     f64_eq!(r.y, rj_val, "r_j");
     f64_eq!(r.z, rk, "r_k");
@@ -396,11 +396,11 @@ fn geodetic_vallado() {
     let ri = 6_119.400_259_009_384;
     let rj = -1_571.479_552_801_429;
     let rk = -871.561_257_578_933_4;
-    let r = OrbitState::from_geodesic(lat, long, height, dt, earth);
+    let r = OrbitState::from_geodesic(lat, long, height, dt, eme2k);
     f64_eq!(r.x, ri, "r_i");
     f64_eq!(r.y, rj, "r_j");
     f64_eq!(r.z, rk, "r_k");
-    let r = OrbitState::from_position(ri, rj, rk, dt, earth);
+    let r = OrbitState::from_position(ri, rj, rk, dt, eme2k);
     f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height_val, "height");

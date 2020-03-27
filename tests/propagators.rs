@@ -43,7 +43,7 @@ macro_rules! assert_eq_or_rel {
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame_by_id(399);
+    let eme2k = cosm.frame_by_id(399);
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -51,14 +51,7 @@ fn regress_leo_day_adaptive() {
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = OrbitState::cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let all_rslts = vec![
@@ -145,9 +138,9 @@ fn gmat_val_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.frame_by_id(399);
-    earth_geoid.gm = 398_600.441_5; // Using GMAT's value
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
+    let eme2k = cosm.frame_by_id(399);
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -155,14 +148,7 @@ fn gmat_val_leo_day_adaptive() {
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = OrbitState::cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let all_rslts = vec![
@@ -298,21 +284,14 @@ fn gmat_val_leo_day_adaptive() {
 
 #[test]
 fn gmat_val_leo_day_fixed() {
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.frame_by_id(399);
-    earth_geoid.gm = 398_600.441_5; // Using GMAT's value
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
+    let eme2k = cosm.frame_by_id(399);
 
     let prop_time = 3_600.0 * 24.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = OrbitState::cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let all_rslts = vec![

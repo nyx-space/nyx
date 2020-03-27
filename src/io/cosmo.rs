@@ -1,7 +1,7 @@
 extern crate csv;
 
 use self::csv::{QuoteStyle, Writer, WriterBuilder};
-use celestia::{Frame, State};
+use celestia::State;
 use std::fs::File;
 
 /// Exports to the XYZV data type used in Cosmographia

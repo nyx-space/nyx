@@ -16,53 +16,6 @@ use nyx::utils::rss_state_errors;
 use std::f64::EPSILON;
 
 #[test]
-fn two_body_custom() {
-    let prop_time = SECONDS_PER_DAY;
-
-    let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame_by_id(bodies::EARTH_BARYCENTER);
-
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let mut state = OrbitState::cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
-    );
-    state.frame.gm = 398_600.441_5;
-
-    let rslt = Vector6::new(
-        -5_971.194_191_684_025,
-        3_945.506_653_624_713,
-        2_864.636_617_867_305,
-        0.049_096_957_141_074_773,
-        -4.185_093_318_149_709,
-        5.848_940_867_979_16,
-    );
-
-    let mut dynamics = CelestialDynamics::two_body(state);
-
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
-    prop.until_time_elapsed(prop_time);
-    assert_eq!(prop.state_vector(), rslt, "two body prop failed");
-    // And now do the backprop
-    prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &state.to_cartesian_vec());
-    assert!(
-        err_r < 1e-5,
-        "two body back prop failed to return to the initial state in position"
-    );
-    assert!(
-        err_v < 1e-8,
-        "two body back prop failed to return to the initial state in velocity"
-    );
-}
-
-#[test]
 fn two_body_dynamics() {
     let prop_time = SECONDS_PER_DAY;
 

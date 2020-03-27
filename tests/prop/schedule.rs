@@ -67,7 +67,7 @@ fn transfer_schedule_no_depl() {
         vector: Vector3::new(1.0, 0.0, 0.0),
     };
 
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], earth);
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
@@ -165,7 +165,7 @@ fn transfer_schedule_depl() {
         vector: Vector3::new(1.0, 0.0, 0.0),
     };
 
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], earth);
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 

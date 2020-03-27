@@ -38,8 +38,8 @@ fn leo_sun_earth_eclipses() {
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: sun,
-        shadow_bodies: vec![earth],
+        light_source_id: bodies::SUN,
+        shadow_body_ids: vec![bodies::EARTH],
         cosm: &cosm,
         correction: LTCorr::None,
     };
@@ -90,8 +90,8 @@ fn geo_sun_earth_eclipses() {
 
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
-        light_source: sun,
-        shadow_bodies: vec![earth],
+        light_source_id: bodies::SUN,
+        shadow_body_ids: vec![bodies::EARTH],
         cosm: &cosm,
         correction: LTCorr::None,
     };

@@ -29,7 +29,7 @@ fn srp_earth() {
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth];
+    let shadow_bodies = vec![earth.exb_id()];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
 
@@ -77,7 +77,7 @@ fn drag_earth() {
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth];
+    let shadow_bodies = vec![earth.exb_id()];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
     let drag = ExpEarthDrag {

@@ -1,4 +1,4 @@
-use crate::celestia::{Cosm, Frame, FrameInfo, State};
+use crate::celestia::{Cosm, FrameInfo, State};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;

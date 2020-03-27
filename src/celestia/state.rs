@@ -5,7 +5,7 @@ use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Vector3, Vector6};
-use super::{Frame, FrameInfo};
+use super::FrameInfo;
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
 use celestia::xb::Vector as XBVector;
@@ -348,10 +348,7 @@ impl State {
         frame: FrameInfo,
     ) -> Self {
         match frame {
-            FrameInfo::Geoid {
-                axb_id, exb_id, gm, ..
-            }
-            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
+            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
                 if gm.abs() < std::f64::EPSILON {
                     warn!(
                         "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
@@ -476,12 +473,9 @@ impl State {
     ) -> Self {
         match frame {
             FrameInfo::Geoid {
-                axb_id,
-                exb_id,
-                gm,
                 flattening,
-                equatorial_radius,
                 semi_major_radius,
+                ..
             } => {
                 let e2 = 2.0 * flattening - flattening.powi(2);
                 let (sin_long, cos_long) = longitude.to_radians().sin_cos();
@@ -552,10 +546,7 @@ impl State {
     /// Returns the specific mechanical energy
     pub fn energy(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid {
-                axb_id, exb_id, gm, ..
-            }
-            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
+            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
                 self.vmag().powi(2) / 2.0 - gm / self.rmag()
             }
             _ => panic!("orbital energy not defined in this frame"),
@@ -565,10 +556,9 @@ impl State {
     /// Returns the semi-major axis in km
     pub fn sma(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid {
-                axb_id, exb_id, gm, ..
+            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
+                -gm / (2.0 * self.energy())
             }
-            | FrameInfo::Celestial { axb_id, exb_id, gm } => -gm / (2.0 * self.energy()),
             _ => panic!("sma not defined in this frame"),
         }
     }
@@ -576,10 +566,7 @@ impl State {
     /// Returns the period in seconds
     pub fn period(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid {
-                axb_id, exb_id, gm, ..
-            }
-            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
+            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
                 2.0 * PI * (self.sma().powi(3) / gm).sqrt()
             }
             _ => panic!("orbital period not defined in this frame"),
@@ -589,10 +576,7 @@ impl State {
     /// Returns the eccentricity vector (no unit)
     pub fn evec(&self) -> Vector3<f64> {
         match self.frame {
-            FrameInfo::Geoid {
-                axb_id, exb_id, gm, ..
-            }
-            | FrameInfo::Celestial { axb_id, exb_id, gm } => {
+            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
                 let r = self.radius();
                 let v = self.velocity();
                 ((v.norm().powi(2) - gm / r.norm()) * r - (r.dot(&v)) * v) / gm
@@ -833,12 +817,9 @@ impl State {
     pub fn geodetic_latitude(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                axb_id,
-                exb_id,
-                gm,
                 flattening,
-                equatorial_radius,
                 semi_major_radius,
+                ..
             } => {
                 let eps = 1e-12;
                 let max_attempts = 20;
@@ -854,7 +835,7 @@ impl State {
                     if (latitude - new_latitude).abs() < eps {
                         return between_pm_180(new_latitude.to_degrees());
                     } else if attempt_no >= max_attempts {
-                        println!(
+                        error!(
                             "geodetic latitude failed to converge -- error = {}",
                             (latitude - new_latitude).abs()
                         );
@@ -873,12 +854,9 @@ impl State {
     pub fn geodetic_height(&self) -> f64 {
         match self.frame {
             FrameInfo::Geoid {
-                axb_id,
-                exb_id,
-                gm,
                 flattening,
-                equatorial_radius,
                 semi_major_radius,
+                ..
             } => {
                 let e2 = flattening * (2.0 - flattening);
                 let latitude = self.geodetic_latitude().to_radians();
