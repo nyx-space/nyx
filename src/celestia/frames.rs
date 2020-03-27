@@ -71,12 +71,20 @@ pub fn dcm_from_parent(&self, datetime: Epoch) -> Matrix3<f64> {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FrameInfo {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)
-    Celestial { axb_id: i32, exb_id: i32, gm: f64 },
+    Celestial {
+        axb_id: i32,
+        exb_id: i32,
+        gm: f64,
+        parent_axb_id: Option<i32>,
+        parent_exb_id: Option<i32>,
+    },
     /// Any Geoid which has a GM, flattening value, etc.
     Geoid {
         axb_id: i32,
         exb_id: i32,
         gm: f64,
+        parent_axb_id: Option<i32>,
+        parent_exb_id: Option<i32>,
         flattening: f64,
         equatorial_radius: f64,
         semi_major_radius: f64,
@@ -121,6 +129,24 @@ impl FrameInfo {
     pub fn exb_id(&self) -> i32 {
         match self {
             FrameInfo::Geoid { exb_id, .. } | FrameInfo::Celestial { exb_id, .. } => *exb_id,
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
+    }
+
+    pub fn parent_axb_id(&self) -> Option<i32> {
+        match self {
+            FrameInfo::Geoid { parent_axb_id, .. } | FrameInfo::Celestial { parent_axb_id, .. } => {
+                *parent_axb_id
+            }
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
+    }
+
+    pub fn parent_exb_id(&self) -> Option<i32> {
+        match self {
+            FrameInfo::Geoid { parent_exb_id, .. } | FrameInfo::Celestial { parent_exb_id, .. } => {
+                *parent_exb_id
+            }
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }

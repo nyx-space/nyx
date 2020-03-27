@@ -9,7 +9,7 @@ use super::frames::*;
 use super::rotations::*;
 use super::state::State;
 use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
-use super::xb::{Ephemeris, EphemerisContainer, Identifier as XbId};
+use super::xb::{Ephemeris, EphemerisContainer};
 use super::SPEED_OF_LIGHT_KMS;
 use crate::hifitime::{Epoch, SECONDS_PER_DAY};
 use std::collections::HashMap;
@@ -106,8 +106,11 @@ impl Cosm {
             axb_id: 0,
             exb_id: 0,
             gm: SS_MASS * SUN_GM,
+            parent_axb_id: None,
+            parent_exb_id: None,
         };
 
+        cosm.exb_map.add_node(0);
         cosm.axb_names.insert("J2000".to_owned(), 0);
         cosm.frames
             .insert("Solar System Barycenter J2k".to_owned(), ssb2k);
@@ -128,7 +131,6 @@ impl Cosm {
             Ok(ephemerides) => {
                 for ephem in &ephemerides {
                     let id = ephem.id.as_ref().unwrap();
-                    let exb_tpl = (id.number, id.name.clone());
 
                     self.ephemerides.insert(id.number, ephem.clone());
                     self.ephemerides_names.insert(id.name.clone(), id.number);
@@ -136,7 +138,7 @@ impl Cosm {
                     // TODO: Clone all of the frames and add their IAU fixed definitions
 
                     // Compute the exb_id.
-                    let exb_id = ephem.ref_frame.clone().unwrap().number;
+                    let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
 
                     // Add this EXB to the map, and link it to its parent
                     let this_node = self.exb_map.add_node(id.number);
@@ -189,13 +191,14 @@ impl Cosm {
                             // Let's now build the J2000 version of this body
                             let obj = FrameInfo::Geoid {
                                 axb_id: 0, // TODO: Get this from the EXB
-                                exb_id,
+                                exb_id: id.number,
                                 gm: gm.value,
+                                parent_axb_id: None,
+                                parent_exb_id: Some(exb_id),
                                 flattening,
                                 equatorial_radius,
                                 semi_major_radius,
                             };
-
                             self.frames.insert(id.name.clone(), obj);
                         }
                         None => {
@@ -204,8 +207,10 @@ impl Cosm {
                                     // Build the Sun frame in J2000
                                     let sun2k = FrameInfo::Geoid {
                                         axb_id: 0,
-                                        exb_id,
+                                        exb_id: id.number,
                                         gm: SUN_GM,
+                                        parent_axb_id: None,
+                                        parent_exb_id: Some(exb_id),
                                         flattening: 0.0,
                                         // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
                                         equatorial_radius: 696_342.0,
@@ -231,8 +236,10 @@ impl Cosm {
                                     // Executively state that the IAU_SUN frame has the ID 10
                                     let sun_iau = FrameInfo::Geoid {
                                         axb_id: 10,
-                                        exb_id,
+                                        exb_id: id.number,
                                         gm: SUN_GM,
+                                        parent_axb_id: Some(0),
+                                        parent_exb_id: Some(exb_id),
                                         flattening: 0.0,
                                         // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
                                         equatorial_radius: 696_342.0,
@@ -291,6 +298,10 @@ impl Cosm {
     }
 
     pub fn try_frame_by_id(&self, id: i32) -> Result<FrameInfo, CosmError> {
+        if id == 0 {
+            // Requesting the SSB in J2k
+            return Ok(self.frames["Solar System Barycenter J2k"]);
+        }
         match self.ephemerides.get(&id) {
             Some(e) => {
                 // Now that we have the ephem for this ID, let's get the original frame
@@ -331,10 +342,10 @@ impl Cosm {
     pub fn mut_gm_for_frame(&mut self, name: String, new_gm: f64) {
         match self.frames.get_mut(&name) {
             Some(ref mut frame) => match frame {
-                FrameInfo::Celestial { gm: mut gm, .. } => {
+                FrameInfo::Celestial { mut gm, .. } => {
                     gm = new_gm;
                 }
-                FrameInfo::Geoid { gm: mut gm, .. } => {
+                FrameInfo::Geoid { mut gm, .. } => {
                     gm = new_gm;
                 }
                 _ => panic!("frame ID {} does not have a GM", name),
@@ -634,10 +645,15 @@ impl Cosm {
                     return Ok(vec![*to]);
                 }
         */
+        println!("working with {}, {}", to.exb_id(), from.exb_id());
         let start_exb_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
         let end_exb_idx = self.exbid_to_map_idx(from.exb_id()).unwrap();
 
-        let shared_centers = from.exb_id() == to.exb_id();
+        // BUG is here. Need to avoid getting the parent celestial state by checking the path.
+
+        // let shared_centers = from.exb_id() == to.exb_id();
+        // let shared_centers = self.exb_map.find_edge(start_exb_idx, end_exb_idx).is_some();
+        // dbg!(shared_centers);
         match astar(
             &self.exb_map,
             start_exb_idx,
@@ -650,14 +666,33 @@ impl Cosm {
                 let mut f_path = Vec::new();
                 for idx in path {
                     let exb_id = self.exb_map[idx];
-                    if !(shared_centers && to.exb_id() == exb_id || exb_id == 0) {
+                    let this_frame = self.frame_by_id(exb_id);
+                    if exb_id != 0 {
                         // Ignore going through SSB since it isn't a geoid
-                        f_path.push(self.frame_by_id(exb_id));
+                        println!("adding frame by id {}", exb_id);
+                        f_path.push(this_frame);
+                    }
+                }
+
+                if f_path.len() > 1 {
+                    // Check that the last transformation is indeed needed
+                    let scd = f_path[f_path.len() - 2];
+                    let lst = f_path[f_path.len() - 1];
+                    if scd.parent_exb_id().is_some() && scd.parent_exb_id().unwrap() == lst.exb_id()
+                    {
+                        f_path.pop();
+                    } else if lst.parent_exb_id().is_some()
+                        && lst.parent_exb_id().unwrap() == scd.exb_id()
+                    {
+                        f_path.remove(f_path.len() - 2);
                     }
                 }
 
                 // Let's add the final geoid.
-                f_path.push(*from);
+                // if f_path.last().unwrap() != from {
+                //     f_path.push(*from);
+                // }
+                dbg!(&f_path);
                 Ok(f_path)
             }
             None => Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
@@ -754,7 +789,7 @@ mod tests {
         // Add the reverse test too
         let out_state = cosm.celestial_state(bodies::EARTH_MOON, jde, earth_bary2k, c);
         assert_eq!(out_state.frame.exb_id(), bodies::EARTH_BARYCENTER);
-        assert!((out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
+        assert!(dbg!(out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
         assert!((out_state.y - -345_462.617_249_631_9).abs() < 1e-10);
         assert!((out_state.z - -144_380.059_413_586_45).abs() < 1e-10);
         assert!((out_state.vx - 0.960_674_300_894_127_2).abs() < EPSILON);
@@ -1085,9 +1120,9 @@ mod tests {
         let out_state =
             cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, mars2k, LTCorr::Abberation);
 
-        assert!((out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
-        assert!((out_state.y - -5.812_356_237_533_56e7).abs() < 1e-3);
-        assert!((out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
+        assert!((dbg!(out_state.x) - -2.577_231_712_700_484_4e8).abs() < 1e-3);
+        assert!((dbg!(out_state.y) - -5.812_356_237_533_56e7).abs() < 1e-3);
+        assert!((dbg!(out_state.z) - -2.493_146_410_521_204_8e7).abs() < 1e-3);
         // Reenable this test after #96 is implemented.
         dbg!(out_state.vx - -3.463_585_965_206_417);
         dbg!(out_state.vy - -3.698_169_177_803_263e1);
