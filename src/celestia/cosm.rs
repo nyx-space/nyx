@@ -645,15 +645,29 @@ impl Cosm {
                     return Ok(vec![*to]);
                 }
         */
-        println!("working with {}, {}", to.exb_id(), from.exb_id());
+
         let start_exb_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
         let end_exb_idx = self.exbid_to_map_idx(from.exb_id()).unwrap();
 
         // BUG is here. Need to avoid getting the parent celestial state by checking the path.
 
-        // let shared_centers = from.exb_id() == to.exb_id();
+        let shared_center_id = if from.parent_exb_id().is_some() && to.parent_exb_id().is_some() {
+            if from.parent_exb_id().unwrap() == to.parent_exb_id().unwrap() {
+                Some(from.parent_exb_id().unwrap())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        println!(
+            "working with {}, {}: {:?}",
+            to.exb_id(),
+            from.exb_id(),
+            shared_center_id
+        );
         // let shared_centers = self.exb_map.find_edge(start_exb_idx, end_exb_idx).is_some();
-        // dbg!(shared_centers);
         match astar(
             &self.exb_map,
             start_exb_idx,
@@ -664,34 +678,21 @@ impl Cosm {
             Some((_, path)) => {
                 // Build the path with the frames
                 let mut f_path = Vec::new();
-                for idx in path {
-                    let exb_id = self.exb_map[idx];
+                let mut common_denom = 1000;
+                let mut denom_idx = 0;
+                for (i, idx) in path.iter().enumerate() {
+                    let exb_id = self.exb_map[*idx];
+                    if exb_id < common_denom {
+                        common_denom = exb_id;
+                        denom_idx = i;
+                    }
                     let this_frame = self.frame_by_id(exb_id);
-                    if exb_id != 0 {
-                        // Ignore going through SSB since it isn't a geoid
-                        println!("adding frame by id {}", exb_id);
-                        f_path.push(this_frame);
-                    }
-                }
 
-                if f_path.len() > 1 {
-                    // Check that the last transformation is indeed needed
-                    let scd = f_path[f_path.len() - 2];
-                    let lst = f_path[f_path.len() - 1];
-                    if scd.parent_exb_id().is_some() && scd.parent_exb_id().unwrap() == lst.exb_id()
-                    {
-                        f_path.pop();
-                    } else if lst.parent_exb_id().is_some()
-                        && lst.parent_exb_id().unwrap() == scd.exb_id()
-                    {
-                        f_path.remove(f_path.len() - 2);
-                    }
+                    // Ignore going through SSB since it isn't a geoid
+                    f_path.push(this_frame);
                 }
-
-                // Let's add the final geoid.
-                // if f_path.last().unwrap() != from {
-                //     f_path.push(*from);
-                // }
+                // Remove the common denominator
+                println!("removed {}", f_path.remove(denom_idx));
                 dbg!(&f_path);
                 Ok(f_path)
             }
@@ -780,7 +781,7 @@ mod tests {
 
         let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, earth_moon2k, c);
         assert_eq!(out_state.frame.exb_id(), bodies::EARTH_MOON);
-        assert!((out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
+        assert!(dbg!(out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
         assert!((out_state.y - 345_462.617_249_631_9).abs() < 1e-9);
         assert!((out_state.z - 144_380.059_413_586_45).abs() < 1e-9);
         assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < 1e-12);
@@ -895,8 +896,8 @@ mod tests {
         let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, eme2k, c);
         let earth_from_moon = cosm.celestial_state(bodies::EARTH, jde, earth_moon, c);
 
-        // assert_eq!(moon_from_emb - earth_from_emb, moon_from_earth);
-        assert_eq!(earth_from_moon, -moon_from_earth);
+        assert_eq!(earth_from_moon.radius(), -moon_from_earth.radius());
+        assert_eq!(earth_from_moon.velocity(), -moon_from_earth.velocity());
 
         /*
         >>> ['{:.16e}'.format(x) for x in sp.spkez(301, et, "J2000", "NONE", 399)[0]]
@@ -930,8 +931,11 @@ mod tests {
         assert!((sun2ear_state.vz - 8.848_425_784_946_011).abs() < tol_vel);
         // And check the converse
         let sun2k = cosm.frame_by_id(bodies::SUN);
+        let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, eme2k, c);
         let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, sun2k, c);
         let state_sum = ear2sun_state + sun2ear_state;
+        dbg!(sun2ear_state);
+        dbg!(ear2sun_state);
         assert!(state_sum.rmag() < EPSILON);
         assert!(state_sum.vmag() < EPSILON);
     }
@@ -1127,23 +1131,5 @@ mod tests {
         dbg!(out_state.vx - -3.463_585_965_206_417);
         dbg!(out_state.vy - -3.698_169_177_803_263e1);
         dbg!(out_state.vz - -1.690_783_648_756_073e1);
-    }
-
-    #[test]
-    fn test_rotations() {
-        let cosm = Cosm::from_xb("./de438s");
-        let earth = cosm.frame_by_id(301);
-        dbg!(earth);
-    }
-
-    fn test_new_frames_usage() {
-        /*
-        // Later there will be a single XB which also contains the frames
-        let cosm = Cosm::from_xb("./de438s.exb");
-        // Get the frame we want
-        let eme2k = cosm.frame_by_name("EME2000");
-        // Define the state
-        let state = State::keplerian(sma, ecc, inc, raan, aop, ta, dt, eme2k);
-        */
     }
 }
