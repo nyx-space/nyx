@@ -42,7 +42,6 @@ pub struct Cosm {
     ephemerides: HashMap<i32, Ephemeris>,
     ephemerides_names: HashMap<String, i32>,
     frames: HashMap<String, FrameInfo>,
-    // frames_names: HashMap<String, i32>,
     axb_names: HashMap<String, i32>,
     exb_map: Graph<i32, u8, Undirected>,
     axb_map: Graph<i32, Box<dyn ParentRotation>, Directed>,
@@ -290,10 +289,10 @@ impl Cosm {
         Err(CosmError::ObjectIDNotFound(id))
     }
 
-    pub fn try_frame(&self, name: String) -> Result<FrameInfo, CosmError> {
-        match self.frames.get(&name) {
+    pub fn try_frame(&self, name: &str) -> Result<FrameInfo, CosmError> {
+        match self.frames.get(name) {
             Some(f) => Ok(*f),
-            None => Err(CosmError::ObjectNameNotFound(name)),
+            None => Err(CosmError::ObjectNameNotFound(name.to_owned())),
         }
     }
 
@@ -312,7 +311,7 @@ impl Cosm {
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame(&self, name: String) -> FrameInfo {
+    pub fn frame(&self, name: &str) -> FrameInfo {
         self.try_frame(name).unwrap()
     }
 
@@ -341,16 +340,13 @@ impl Cosm {
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
     pub fn mut_gm_for_frame(&mut self, name: String, new_gm: f64) {
         match self.frames.get_mut(&name) {
-            Some(ref mut frame) => match frame {
-                FrameInfo::Celestial { mut gm, .. } => {
-                    gm = new_gm;
-                }
-                FrameInfo::Geoid { mut gm, .. } => {
-                    gm = new_gm;
-                }
-                _ => panic!("frame ID {} does not have a GM", name),
-            },
-            None => panic!("no frame ID {}", name),
+            Some(FrameInfo::Celestial { gm, .. }) => {
+                *gm = new_gm;
+            }
+            Some(FrameInfo::Geoid { gm, .. }) => {
+                *gm = new_gm;
+            }
+            _ => panic!("frame ID {} does not have a GM", name),
         }
     }
 
@@ -609,65 +605,13 @@ impl Cosm {
         // TODO: Add orientation computation
 
         if from == to {
-            // Same geoids, nothing to do
+            // Same frames, nothing to do
             return Ok(Vec::new());
         }
-
-        /*
-                        // Get the frames themselves
-                        let from_frame = self
-                            .frames
-                            .get(&from.exb_id())
-                            .ok_or_else(|| CosmError::ObjectIDNotFound(from.exb_id()))?;
-
-                        let to_frame = self
-                            .frames
-                            .get(&to.exb_id())
-                            .ok_or_else(|| CosmError::ObjectIDNotFound(to.exb_id()))?;
-
-                        // Check both frames have parents, if they don't and they aren't the same frame,
-                        // then we can't do anything.
-
-                        //self.frame_map[to_frame.id()];
-                        //self.frame_map.neighbors_directed(a: NodeIndex<Ix>, dir: Direction)
-
-                        if to_frame.parent.is_none() || from_frame.parent.is_none() {
-                            return Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id()));
-                        }
-
-                        let (to_parent_frame, _to_parent_rot) = to_frame.parent.as_ref().unwrap();
-                        let (from_parent_frame, _to_parent_rot) = from_frame.parent.as_ref().unwrap();
-
-                // Check if the center of the target frame is the destination frame, or vice versa, so the path is simply one frame.
-                if &from_parent_frame.info == to {
-                    return Ok(vec![*from]);
-                } else if &to_parent_frame.info == from {
-                    return Ok(vec![*to]);
-                }
-        */
 
         let start_exb_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
         let end_exb_idx = self.exbid_to_map_idx(from.exb_id()).unwrap();
 
-        // BUG is here. Need to avoid getting the parent celestial state by checking the path.
-
-        let shared_center_id = if from.parent_exb_id().is_some() && to.parent_exb_id().is_some() {
-            if from.parent_exb_id().unwrap() == to.parent_exb_id().unwrap() {
-                Some(from.parent_exb_id().unwrap())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        println!(
-            "working with {}, {}: {:?}",
-            to.exb_id(),
-            from.exb_id(),
-            shared_center_id
-        );
-        // let shared_centers = self.exb_map.find_edge(start_exb_idx, end_exb_idx).is_some();
         match astar(
             &self.exb_map,
             start_exb_idx,
@@ -678,7 +622,8 @@ impl Cosm {
             Some((_, path)) => {
                 // Build the path with the frames
                 let mut f_path = Vec::new();
-                let mut common_denom = 1000;
+                // Arbitrarily high number
+                let mut common_denom = 1_000_000_000;
                 let mut denom_idx = 0;
                 for (i, idx) in path.iter().enumerate() {
                     let exb_id = self.exb_map[*idx];
@@ -692,8 +637,7 @@ impl Cosm {
                     f_path.push(this_frame);
                 }
                 // Remove the common denominator
-                println!("removed {}", f_path.remove(denom_idx));
-                dbg!(&f_path);
+                f_path.remove(denom_idx);
                 Ok(f_path)
             }
             None => Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
@@ -781,7 +725,7 @@ mod tests {
 
         let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, earth_moon2k, c);
         assert_eq!(out_state.frame.exb_id(), bodies::EARTH_MOON);
-        assert!(dbg!(out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
+        assert!((out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
         assert!((out_state.y - 345_462.617_249_631_9).abs() < 1e-9);
         assert!((out_state.z - 144_380.059_413_586_45).abs() < 1e-9);
         assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < 1e-12);
@@ -790,7 +734,7 @@ mod tests {
         // Add the reverse test too
         let out_state = cosm.celestial_state(bodies::EARTH_MOON, jde, earth_bary2k, c);
         assert_eq!(out_state.frame.exb_id(), bodies::EARTH_BARYCENTER);
-        assert!(dbg!(out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
+        assert!((out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
         assert!((out_state.y - -345_462.617_249_631_9).abs() < 1e-10);
         assert!((out_state.z - -144_380.059_413_586_45).abs() < 1e-10);
         assert!((out_state.vx - 0.960_674_300_894_127_2).abs() < EPSILON);
@@ -934,8 +878,6 @@ mod tests {
         let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, eme2k, c);
         let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, sun2k, c);
         let state_sum = ear2sun_state + sun2ear_state;
-        dbg!(sun2ear_state);
-        dbg!(ear2sun_state);
         assert!(state_sum.rmag() < EPSILON);
         assert!(state_sum.vmag() < EPSILON);
     }
@@ -1018,8 +960,8 @@ mod tests {
         println!("{}", lro_wrt_moon);
         let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
         // Note that the passing conditions are very large. JPL uses de431MX, but nyx uses de438s.
-        assert!(dbg!(lro_moon_earth_delta.rmag()) < 0.3);
-        assert!(dbg!(lro_moon_earth_delta.vmag()) < 1e-5);
+        assert!(lro_moon_earth_delta.rmag() < 0.3);
+        assert!(lro_moon_earth_delta.vmag() < 1e-5);
         // And the converse
         let lro_wrt_venus = cosm.frame_chg(&lro_wrt_moon, venus);
         assert!((lro_wrt_venus - lro).rmag() < std::f64::EPSILON);

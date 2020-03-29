@@ -362,7 +362,7 @@ mod tests {
         let cosm = Cosm::from_xb("./de438s");
         let sun = 10;
         let earth_id = 399;
-        let earth = cosm.frame_by_id(earth_id);
+        let earth = cosm.frame("Earth");
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 

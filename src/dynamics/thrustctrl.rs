@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn ruggiero_weight() {
         let mut cosm = Cosm::from_xb("./de438s");
-        cosm.mut_gm_for_frame("Earth J2000".to_string(), 398_600.433);
+        cosm.mut_gm_for_frame("Earth".to_string(), 398_600.433);
         let earth = cosm.frame_by_id(bodies::EARTH);
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
         let orbit = OrbitState::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
