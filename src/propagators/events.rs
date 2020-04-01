@@ -1,4 +1,4 @@
-use crate::celestia::{Cosm, FrameInfo, State};
+use crate::celestia::{Cosm, Frame, State};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;
@@ -132,7 +132,7 @@ impl fmt::Display for EventKind {
 #[derive(Debug)]
 pub struct OrbitalEvent<'a> {
     pub kind: EventKind,
-    pub tgt: Option<FrameInfo>,
+    pub tgt: Option<Frame>,
     pub cosm: Option<&'a Cosm>,
 }
 
@@ -144,7 +144,7 @@ impl<'a> OrbitalEvent<'a> {
             cosm: None,
         })
     }
-    pub fn in_frame(kind: EventKind, tgt: FrameInfo, cosm: &'a Cosm) -> Box<Self> {
+    pub fn in_frame(kind: EventKind, tgt: Frame, cosm: &'a Cosm) -> Box<Self> {
         Box::new(OrbitalEvent {
             kind,
             tgt: Some(tgt),

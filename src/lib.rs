@@ -40,7 +40,7 @@ Put this in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nyx-space = "0.0.19"
+nyx-space = "0.0.20"
 ```
 
 And add the following to your crate root:
@@ -171,11 +171,11 @@ pub mod dynamics;
 ///
 /// use hifitime::Epoch;
 /// use nyx::celestia::{Cosm, State};
-/// let cosm = Cosm::from_xb("./de438s");
+/// let mut cosm = Cosm::from_xb("./de438s");
+/// // We're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
+/// cosm.mut_gm_for_frame_id(399, 398_600.441_5);
 /// // In this case, we're creating these states around a Geoid which is Earth.
-/// // But for simplicity, we're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
-/// let mut earth_geoid = cosm.frame_by_id(399);
-/// earth_geoid.gm = 398_600.441_5;
+/// let earth_geoid = cosm.frame_by_id(399);
 /// let dt = Epoch::from_mjd_tai(21545.0);
 /// let cart = State::cartesian(
 ///         5_946.673_548_288_958,

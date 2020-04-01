@@ -285,7 +285,7 @@ mod tests {
                 name: "Ficticious".to_owned(),
             },
             exb_id: None,
-            info: FrameInfo::Geoid {
+            info: Frame::Geoid {
                 axb_id: 0,
                 exb_id: 0,
                 gm: 1.0,

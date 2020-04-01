@@ -7,60 +7,7 @@ pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
 use std::fmt;
 
-/// Defines a Frame of some FrameInfo, with an identifier, and an optional parent frame.
-#[derive(Debug)]
-pub struct Frame {
-    pub id: XbId,
-    pub info: FrameInfo,
-    pub exb_id: Option<XbId>,
-}
-
-impl PartialEq for Frame {
-    fn eq(&self, other: &Self) -> bool {
-        let exb_eq = if let Some(my_exb_id) = &self.exb_id {
-            if let Some(oth_exb_id) = &other.exb_id {
-                my_exb_id == oth_exb_id
-            } else {
-                false
-            }
-        } else {
-            // Does not have any exb_id, other shouldn't either
-            other.exb_id.is_none()
-        };
-        self.id == other.id && self.info == other.info && exb_eq
-    }
-}
-
-// impl<'a> Frame<'a> {
-/*
-pub fn try_dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-    if let Some(parent) = self.parent.as_ref() {
-        if let Some(dcm) = parent.1.dcm_to_parent(datetime) {
-            return Some(dcm);
-        }
-    }
-    None
-}
-
-pub fn dcm_to_parent(&self, datetime: Epoch) -> Matrix3<f64> {
-    self.try_dcm_to_parent(datetime).unwrap()
-}
-
-pub fn try_dcm_from_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-    if let Some(dcm) = self.try_dcm_to_parent(datetime) {
-        Some(dcm.transpose())
-    } else {
-        None
-    }
-}
-
-pub fn dcm_from_parent(&self, datetime: Epoch) -> Matrix3<f64> {
-    self.try_dcm_from_parent(datetime).unwrap()
-}
-*/
-// }
-
-// TODO: Rename to FrameInfo, and add an ID. Then then &Frame will be stored only in the Cosm
+// TODO: Rename to Frame, and add an ID. Then then &Frame will be stored only in the Cosm
 // and the state can be Clonable again. Also removes any lifetime problem.
 // All transformations need to happen with the Cosm again, which isn't a bad thing!
 // Should this also have a exb ID so that we know the center object of the frame?
@@ -69,7 +16,7 @@ pub fn dcm_from_parent(&self, datetime: Epoch) -> Matrix3<f64> {
 // So maybe Celestial{fxb:i32, exb:i32, ...} since eventually everything here will be in an fxb?
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum FrameInfo {
+pub enum Frame {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)
     Celestial {
         axb_id: i32,
@@ -97,45 +44,45 @@ pub enum FrameInfo {
     RIC,
 }
 
-impl FrameInfo {
+impl Frame {
     pub fn is_geoid(&self) -> bool {
         match self {
-            FrameInfo::Geoid { .. } => true,
+            Frame::Geoid { .. } => true,
             _ => false,
         }
     }
 
     pub fn is_celestial(&self) -> bool {
         match self {
-            FrameInfo::Celestial { .. } => true,
+            Frame::Celestial { .. } => true,
             _ => false,
         }
     }
 
     pub fn gm(&self) -> f64 {
         match self {
-            FrameInfo::Celestial { gm, .. } | FrameInfo::Geoid { gm, .. } => *gm,
+            Frame::Celestial { gm, .. } | Frame::Geoid { gm, .. } => *gm,
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }
 
     pub fn axb_id(&self) -> i32 {
         match self {
-            FrameInfo::Geoid { axb_id, .. } | FrameInfo::Celestial { axb_id, .. } => *axb_id,
+            Frame::Geoid { axb_id, .. } | Frame::Celestial { axb_id, .. } => *axb_id,
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }
 
     pub fn exb_id(&self) -> i32 {
         match self {
-            FrameInfo::Geoid { exb_id, .. } | FrameInfo::Celestial { exb_id, .. } => *exb_id,
+            Frame::Geoid { exb_id, .. } | Frame::Celestial { exb_id, .. } => *exb_id,
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }
 
     pub fn parent_axb_id(&self) -> Option<i32> {
         match self {
-            FrameInfo::Geoid { parent_axb_id, .. } | FrameInfo::Celestial { parent_axb_id, .. } => {
+            Frame::Geoid { parent_axb_id, .. } | Frame::Celestial { parent_axb_id, .. } => {
                 *parent_axb_id
             }
             _ => panic!("Frame is not Celestial or Geoid in kind"),
@@ -144,7 +91,7 @@ impl FrameInfo {
 
     pub fn parent_exb_id(&self) -> Option<i32> {
         match self {
-            FrameInfo::Geoid { parent_exb_id, .. } | FrameInfo::Celestial { parent_exb_id, .. } => {
+            Frame::Geoid { parent_exb_id, .. } | Frame::Celestial { parent_exb_id, .. } => {
                 *parent_exb_id
             }
             _ => panic!("Frame is not Celestial or Geoid in kind"),
@@ -153,7 +100,7 @@ impl FrameInfo {
 
     pub fn equatorial_radius(&self) -> f64 {
         match self {
-            FrameInfo::Geoid {
+            Frame::Geoid {
                 equatorial_radius, ..
             } => *equatorial_radius,
             _ => panic!("Frame is not Geoid in kind"),
@@ -162,14 +109,14 @@ impl FrameInfo {
 
     pub fn flattening(&self) -> f64 {
         match self {
-            FrameInfo::Geoid { flattening, .. } => *flattening,
+            Frame::Geoid { flattening, .. } => *flattening,
             _ => panic!("Frame is not Geoid in kind"),
         }
     }
 
     pub fn semi_major_radius(&self) -> f64 {
         match self {
-            FrameInfo::Geoid {
+            Frame::Geoid {
                 semi_major_radius, ..
             } => *semi_major_radius,
             _ => panic!("Frame is not Geoid in kind"),
@@ -177,12 +124,13 @@ impl FrameInfo {
     }
 }
 
-impl fmt::Display for FrameInfo {
+impl fmt::Display for Frame {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FrameInfo::Celestial { axb_id, exb_id, .. }
-            | FrameInfo::Geoid { axb_id, exb_id, .. } => write!(f, "{} ({})", exb_id, axb_id),
+            Frame::Celestial { axb_id, exb_id, .. } | Frame::Geoid { axb_id, exb_id, .. } => {
+                write!(f, "{} ({})", exb_id, axb_id)
+            }
             othframe => write!(f, "{:?}", othframe),
         }
     }
@@ -197,7 +145,7 @@ fn frame_def() {
             name: "Solar System Barycenter".to_owned(),
         },
         exb_id: None,
-        info: FrameInfo::Celestial {
+        info: Frame::Celestial {
             gm: 1.0014 * 132_712_440_041.939_38,
         },
         parent: None,
@@ -216,7 +164,7 @@ fn frame_def() {
             name: "Sun body fixed".to_owned(),
         },
         exb_id: None,
-        info: FrameInfo::Celestial { gm: 1.0 },
+        info: Frame::Celestial { gm: 1.0 },
         parent: Some((&ssb, Box::new(sun2ssb_rot))),
     };
 

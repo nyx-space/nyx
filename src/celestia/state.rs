@@ -5,7 +5,7 @@ use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Vector3, Vector6};
-use super::FrameInfo;
+use super::Frame;
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
 use celestia::xb::Vector as XBVector;
@@ -42,8 +42,8 @@ pub struct State {
     /// in km/s
     pub vz: f64,
     pub dt: Epoch,
-    /// FrameInfo contains everything we need to compute state information
-    pub frame: FrameInfo,
+    /// Frame contains everything we need to compute state information
+    pub frame: Frame,
 }
 
 impl State {
@@ -58,7 +58,7 @@ impl State {
         vy: f64,
         vz: f64,
         dt: Epoch,
-        frame: FrameInfo,
+        frame: Frame,
     ) -> Self {
         State {
             x,
@@ -75,7 +75,7 @@ impl State {
     /// Creates a new State in the provided frame at the provided Epoch in time with 0.0 velocity.
     ///
     /// **Units:** km, km, km
-    pub fn from_position(x: f64, y: f64, z: f64, dt: Epoch, frame: FrameInfo) -> Self {
+    pub fn from_position(x: f64, y: f64, z: f64, dt: Epoch, frame: Frame) -> Self {
         State {
             x,
             y,
@@ -92,7 +92,7 @@ impl State {
     ///
     /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: FrameInfo) -> Self {
+    pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
         State {
             x: state[(0, 0)],
             y: state[(1, 0)],
@@ -345,10 +345,10 @@ impl State {
         aop: f64,
         ta: f64,
         dt: Epoch,
-        frame: FrameInfo,
+        frame: Frame,
     ) -> Self {
         match frame {
-            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
+            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
                 if gm.abs() < std::f64::EPSILON {
                     warn!(
                         "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
@@ -443,9 +443,9 @@ impl State {
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: FrameInfo) -> Self {
+    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
         match frame {
-            FrameInfo::Geoid { .. } | FrameInfo::Celestial { .. } => Self::keplerian(
+            Frame::Geoid { .. } | Frame::Celestial { .. } => Self::keplerian(
                 state[(0, 0)],
                 state[(1, 0)],
                 state[(2, 0)],
@@ -469,10 +469,10 @@ impl State {
         longitude: f64,
         height: f64,
         dt: Epoch,
-        frame: FrameInfo,
+        frame: Frame,
     ) -> Self {
         match frame {
-            FrameInfo::Geoid {
+            Frame::Geoid {
                 flattening,
                 semi_major_radius,
                 ..
@@ -546,7 +546,7 @@ impl State {
     /// Returns the specific mechanical energy
     pub fn energy(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
+            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
                 self.vmag().powi(2) / 2.0 - gm / self.rmag()
             }
             _ => panic!("orbital energy not defined in this frame"),
@@ -556,9 +556,7 @@ impl State {
     /// Returns the semi-major axis in km
     pub fn sma(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
-                -gm / (2.0 * self.energy())
-            }
+            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => -gm / (2.0 * self.energy()),
             _ => panic!("sma not defined in this frame"),
         }
     }
@@ -566,7 +564,7 @@ impl State {
     /// Returns the period in seconds
     pub fn period(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
+            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
                 2.0 * PI * (self.sma().powi(3) / gm).sqrt()
             }
             _ => panic!("orbital period not defined in this frame"),
@@ -576,7 +574,7 @@ impl State {
     /// Returns the eccentricity vector (no unit)
     pub fn evec(&self) -> Vector3<f64> {
         match self.frame {
-            FrameInfo::Geoid { gm, .. } | FrameInfo::Celestial { gm, .. } => {
+            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
                 let r = self.radius();
                 let v = self.velocity();
                 ((v.norm().powi(2) - gm / r.norm()) * r - (r.dot(&v)) * v) / gm
@@ -593,7 +591,7 @@ impl State {
     /// Returns the inclination in degrees
     pub fn inc(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 (self.hvec()[(2, 0)] / self.hmag()).acos().to_degrees()
             }
             _ => panic!("inclination not defined in this frame"),
@@ -603,7 +601,7 @@ impl State {
     /// Returns the argument of periapsis in degrees
     pub fn aop(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
                 let aop = (n.dot(&self.evec()) / (n.norm() * self.ecc())).acos();
                 if aop.is_nan() {
@@ -622,7 +620,7 @@ impl State {
     /// Returns the right ascension of ther ascending node in degrees
     pub fn raan(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
                 let raan = (n[(0, 0)] / n.norm()).acos();
                 if raan.is_nan() {
@@ -644,7 +642,7 @@ impl State {
     /// Code from https://github.com/ChristopherRabotin/GMAT/blob/80bde040e12946a61dae90d9fc3538f16df34190/src/gmatutil/util/StateConversionUtil.cpp#L6835
     pub fn ta(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 if self.ecc() < ECC_EPSILON {
                     warn!(
                         "true anomaly ill-defined for circular orbit (e = {})",
@@ -678,7 +676,7 @@ impl State {
     /// Returns the true longitude in degrees
     pub fn tlong(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 // Angles already in degrees
                 between_0_360(self.aop() + self.raan() + self.ta())
             }
@@ -692,7 +690,7 @@ impl State {
     /// instead of relying on the ill-defined true anomaly.
     pub fn aol(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 between_0_360(if self.ecc() < ECC_EPSILON {
                     self.tlong() - self.raan()
                 } else {
@@ -706,9 +704,7 @@ impl State {
     /// Returns the radius of periapsis (or perigee around Earth), in kilometers.
     pub fn periapsis(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
-                self.sma() * (1.0 - self.ecc())
-            }
+            Frame::Celestial { .. } | Frame::Geoid { .. } => self.sma() * (1.0 - self.ecc()),
             _ => panic!("periapsis not defined in this frame"),
         }
     }
@@ -716,9 +712,7 @@ impl State {
     /// Returns the radius of apoapsis (or apogee around Earth), in kilometers.
     pub fn apoapsis(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
-                self.sma() * (1.0 + self.ecc())
-            }
+            Frame::Celestial { .. } | Frame::Geoid { .. } => self.sma() * (1.0 + self.ecc()),
             _ => panic!("apoapsis not defined in this frame"),
         }
     }
@@ -728,7 +722,7 @@ impl State {
     /// This is a conversion from GMAT's StateConversionUtil::TrueToEccentricAnomaly
     pub fn ea(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let (sin_ta, cos_ta) = self.ta().to_radians().sin_cos();
                 let ecc_cos_ta = self.ecc() * cos_ta;
                 let sin_ea = ((1.0 - self.ecc().powi(2)).sqrt() * sin_ta) / (1.0 + ecc_cos_ta);
@@ -745,7 +739,7 @@ impl State {
     /// This is a conversion from GMAT's StateConversionUtil::TrueToMeanAnomaly
     pub fn ma(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 if self.ecc() < 1.0 {
                     between_0_360(
                         (self.ea().to_radians() - self.ecc() * self.ea().to_radians().sin())
@@ -770,7 +764,7 @@ impl State {
     /// Returns the semi parameter (or semilatus rectum)
     pub fn semi_parameter(&self) -> f64 {
         match self.frame {
-            FrameInfo::Celestial { .. } | FrameInfo::Geoid { .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 self.sma() * (1.0 - self.ecc().powi(2))
             }
             _ => panic!("semi parameter is not defined in this frame"),
@@ -806,7 +800,7 @@ impl State {
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn geodetic_longitude(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid { .. } => between_0_360(self.y.atan2(self.x).to_degrees()),
+            Frame::Geoid { .. } => between_0_360(self.y.atan2(self.x).to_degrees()),
             _ => panic!("geodetic elements only defined in a Geoid frame"),
         }
     }
@@ -816,7 +810,7 @@ impl State {
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
     pub fn geodetic_latitude(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid {
+            Frame::Geoid {
                 flattening,
                 semi_major_radius,
                 ..
@@ -853,7 +847,7 @@ impl State {
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
     pub fn geodetic_height(&self) -> f64 {
         match self.frame {
-            FrameInfo::Geoid {
+            Frame::Geoid {
                 flattening,
                 semi_major_radius,
                 ..
@@ -877,20 +871,20 @@ impl State {
     }
 
     /// Returns the direct cosine rotation matrix to convert to this inertial state.
-    pub fn dcm_to_inertial(&self, from: FrameInfo) -> Matrix3<f64> {
+    pub fn dcm_to_inertial(&self, from: Frame) -> Matrix3<f64> {
         match from {
-            FrameInfo::RIC => {
+            Frame::RIC => {
                 r3(-self.raan().to_radians())
                     * r1(-self.inc().to_radians())
                     * r3(-self.aol().to_radians())
             }
-            FrameInfo::VNC => {
+            Frame::VNC => {
                 let v = self.velocity() / self.vmag();
                 let n = self.hvec() / self.hmag();
                 let c = v.cross(&n);
                 Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose()
             }
-            FrameInfo::RCN => {
+            Frame::RCN => {
                 let r = self.radius() / self.rmag();
                 let n = self.hvec() / self.hmag();
                 let c = n.cross(&r);

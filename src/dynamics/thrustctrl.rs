@@ -1,6 +1,6 @@
 use super::hifitime::Epoch;
 use super::na::Vector3;
-use celestia::{FrameInfo, State};
+use celestia::{Frame, State};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
 /// The `ThrustControl` trait handles control laws, optimizations, and other such methods for
@@ -219,7 +219,7 @@ impl ThrustControl for Ruggiero {
                 ctrl
             };
             // Convert to inertial
-            osc.dcm_to_inertial(FrameInfo::RCN) * ctrl
+            osc.dcm_to_inertial(Frame::RCN) * ctrl
         }
     }
 
@@ -307,7 +307,7 @@ impl ThrustControl for FiniteBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= osc.dt {
-                osc.dcm_to_inertial(FrameInfo::VNC) * next_mnvr.vector
+                osc.dcm_to_inertial(Frame::VNC) * next_mnvr.vector
             } else {
                 Vector3::zeros()
             }

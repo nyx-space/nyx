@@ -41,7 +41,7 @@ pub enum LTCorr {
 pub struct Cosm {
     ephemerides: HashMap<i32, Ephemeris>,
     ephemerides_names: HashMap<String, i32>,
-    frames: HashMap<String, FrameInfo>,
+    frames: HashMap<String, Frame>,
     axb_names: HashMap<String, i32>,
     exb_map: Graph<i32, u8, Undirected>,
     axb_map: Graph<i32, Box<dyn ParentRotation>, Directed>,
@@ -101,7 +101,7 @@ impl Cosm {
         };
 
         // Add J2000 as the main AXB reference frame
-        let ssb2k = FrameInfo::Celestial {
+        let ssb2k = Frame::Celestial {
             axb_id: 0,
             exb_id: 0,
             gm: SS_MASS * SUN_GM,
@@ -188,7 +188,7 @@ impl Cosm {
                             };
 
                             // Let's now build the J2000 version of this body
-                            let obj = FrameInfo::Geoid {
+                            let obj = Frame::Geoid {
                                 axb_id: 0, // TODO: Get this from the EXB
                                 exb_id: id.number,
                                 gm: gm.value,
@@ -204,7 +204,7 @@ impl Cosm {
                             match id.number {
                                 10 => {
                                     // Build the Sun frame in J2000
-                                    let sun2k = FrameInfo::Geoid {
+                                    let sun2k = Frame::Geoid {
                                         axb_id: 0,
                                         exb_id: id.number,
                                         gm: SUN_GM,
@@ -233,7 +233,7 @@ impl Cosm {
                                         AngleUnit::Degrees,
                                     );
                                     // Executively state that the IAU_SUN frame has the ID 10
-                                    let sun_iau = FrameInfo::Geoid {
+                                    let sun_iau = Frame::Geoid {
                                         axb_id: 10,
                                         exb_id: id.number,
                                         gm: SUN_GM,
@@ -289,14 +289,14 @@ impl Cosm {
         Err(CosmError::ObjectIDNotFound(id))
     }
 
-    pub fn try_frame(&self, name: &str) -> Result<FrameInfo, CosmError> {
+    pub fn try_frame(&self, name: &str) -> Result<Frame, CosmError> {
         match self.frames.get(name) {
             Some(f) => Ok(*f),
             None => Err(CosmError::ObjectNameNotFound(name.to_owned())),
         }
     }
 
-    pub fn try_frame_by_id(&self, id: i32) -> Result<FrameInfo, CosmError> {
+    pub fn try_frame_by_id(&self, id: i32) -> Result<Frame, CosmError> {
         if id == 0 {
             // Requesting the SSB in J2k
             return Ok(self.frames["Solar System Barycenter J2k"]);
@@ -311,17 +311,17 @@ impl Cosm {
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame(&self, name: &str) -> FrameInfo {
+    pub fn frame(&self, name: &str) -> Frame {
         self.try_frame(name).unwrap()
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame_by_id(&self, id: i32) -> FrameInfo {
+    pub fn frame_by_id(&self, id: i32) -> Frame {
         self.try_frame_by_id(id).unwrap()
     }
 
     /// Returns the list of loaded geoids
-    pub fn frames(&self) -> Vec<FrameInfo> {
+    pub fn frames(&self) -> Vec<Frame> {
         self.frames.iter().map(|(_, g)| *g).collect()
     }
 
@@ -340,10 +340,10 @@ impl Cosm {
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
     pub fn mut_gm_for_frame(&mut self, name: String, new_gm: f64) {
         match self.frames.get_mut(&name) {
-            Some(FrameInfo::Celestial { gm, .. }) => {
+            Some(Frame::Celestial { gm, .. }) => {
                 *gm = new_gm;
             }
-            Some(FrameInfo::Geoid { gm, .. }) => {
+            Some(Frame::Geoid { gm, .. }) => {
                 *gm = new_gm;
             }
             _ => panic!("frame ID {} does not have a GM", name),
@@ -452,7 +452,7 @@ impl Cosm {
         &self,
         target_exb_id: i32,
         datetime: Epoch,
-        frame: FrameInfo,
+        frame: Frame,
         correction: LTCorr,
     ) -> Result<State, CosmError> {
         match correction {
@@ -532,7 +532,7 @@ impl Cosm {
         &self,
         target_exb_id: i32,
         datetime: Epoch,
-        frame: FrameInfo,
+        frame: Frame,
         correction: LTCorr,
     ) -> State {
         self.try_celestial_state(target_exb_id, datetime, frame, correction)
@@ -540,7 +540,7 @@ impl Cosm {
     }
 
     /// Attempts to return the provided state in the provided frame.
-    pub fn try_frame_chg(&self, state: &State, new_frame: FrameInfo) -> Result<State, CosmError> {
+    pub fn try_frame_chg(&self, state: &State, new_frame: Frame) -> Result<State, CosmError> {
         if state.frame == new_frame {
             return Ok(*state);
         }
@@ -586,7 +586,7 @@ impl Cosm {
     }
 
     /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg(&self, state: &State, new_frame: FrameInfo) -> State {
+    pub fn frame_chg(&self, state: &State, new_frame: Frame) -> State {
         self.try_frame_chg(state, new_frame).unwrap()
     }
 
@@ -597,11 +597,7 @@ impl Cosm {
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
-    fn translation_path(
-        &self,
-        from: &FrameInfo,
-        to: &FrameInfo,
-    ) -> Result<Vec<FrameInfo>, CosmError> {
+    fn translation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<Frame>, CosmError> {
         // TODO: Add orientation computation
 
         if from == to {

@@ -1,5 +1,5 @@
 use super::na::Vector3;
-use celestia::{FrameInfo, State};
+use celestia::{Frame, State};
 
 pub use super::thrustctrl::Mnvr;
 
@@ -37,7 +37,7 @@ impl DeltaVctrl for InstantBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= state.dt && next_mnvr.end >= state.dt {
-                state.dcm_to_inertial(FrameInfo::VNC) * next_mnvr.vector
+                state.dcm_to_inertial(Frame::VNC) * next_mnvr.vector
             } else {
                 Vector3::zeros()
             }
