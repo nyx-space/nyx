@@ -61,7 +61,7 @@ pub mod propagators;
 /// extern crate hifitime;
 /// extern crate nyx_space as nyx;
 /// use hifitime::{Epoch, SECONDS_PER_DAY};
-/// use nyx::celestia::{bodies, Cosm, OrbitState};
+/// use nyx::celestia::{bodies, Cosm, State};
 /// use nyx::dynamics::celestial::CelestialDynamics;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
@@ -71,7 +71,7 @@ pub mod propagators;
 /// let earth_geoid = cosm.frame_by_id(bodies::EARTH);
 ///
 /// let dt = Epoch::from_mjd_tai(21_545.0);
-/// let initial_state = OrbitState::cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
+/// let initial_state = State::cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
 ///
 /// println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
@@ -80,7 +80,7 @@ pub mod propagators;
 /// let min_step = 0.1;
 /// let max_step = 60.0;
 ///
-/// let rslt = OrbitState::cartesian(
+/// let rslt = State::cartesian(
 ///         -5_971.194_376_797_643,
 ///         3_945.517_912_574_178_4,
 ///         2_864.620_957_744_429_2,
@@ -113,7 +113,7 @@ pub mod propagators;
 
 /// use hifitime::Epoch;
 /// use na::Vector6;
-/// use nyx::celestia::{bodies, Cosm, OrbitState};
+/// use nyx::celestia::{bodies, Cosm, State};
 /// use nyx::dynamics::celestial::CelestialDynamics;
 /// use nyx::propagators::*;
 /// use nyx::utils::rss_state_errors;
@@ -125,7 +125,7 @@ pub mod propagators;
 ///
 /// let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///
-/// let halo_rcvr = OrbitState::cartesian(
+/// let halo_rcvr = State::cartesian(
 ///     333_321.004_516,
 ///     -76_134.198_887,
 ///     -20_873.831_939,
@@ -170,14 +170,14 @@ pub mod dynamics;
 /// extern crate nyx_space as nyx;
 ///
 /// use hifitime::Epoch;
-/// use nyx::celestia::{Cosm, OrbitState};
+/// use nyx::celestia::{Cosm, State};
 /// let cosm = Cosm::from_xb("./de438s");
 /// // In this case, we're creating these states around a Geoid which is Earth.
 /// // But for simplicity, we're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
 /// let mut earth_geoid = cosm.frame_by_id(399);
 /// earth_geoid.gm = 398_600.441_5;
 /// let dt = Epoch::from_mjd_tai(21545.0);
-/// let cart = OrbitState::cartesian(
+/// let cart = State::cartesian(
 ///         5_946.673_548_288_958,
 ///         1_656.154_606_023_661,
 ///         2_259.012_129_598_249,
@@ -188,7 +188,7 @@ pub mod dynamics;
 ///         earth_geoid,
 /// );
 ///
-/// let kep = OrbitState::keplerian(
+/// let kep = State::keplerian(
 ///        7_712.186_117_895_041,
 ///        0.158_999_999_999_999_95,
 ///        53.75369,

@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use self::hifitime::Epoch;
 use self::na::Vector3;
-use self::nyx::celestia::{bodies, Cosm, OrbitState};
+use self::nyx::celestia::{bodies, Cosm, State};
 use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::deltavctrl::{InstantBurns, Mnvr};
 use self::nyx::dynamics::missionarc::MissionArc;
@@ -20,7 +20,7 @@ fn arc_example() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-    let orbit = OrbitState::keplerian(6678.0, 0.0, 0.1, 60.0, 30.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(6678.0, 0.0, 0.1, 60.0, 30.0, 0.0, start_time, earth);
 
     let prop_time = 86_400.0;
 

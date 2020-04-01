@@ -135,7 +135,7 @@ Although these files are currently proprietary to Advanced Space, there is an on
 Start by downloading [de438s.exb](https://gitlab.com/chrisrabotin/nyx/-/blob/master/de438.exb) and [de438s.fxb](https://gitlab.com/chrisrabotin/nyx/-/blob/master/de438.fxb)
 and placing them in your `nyxtutorial` directory.
 
-Orbital states are stored in an [`OrbitState`](../celestia/type.OrbitState.html) structure. It has a lot of useful methods, like computing the angular momentum of that orbit, or its period.
+Orbital states are stored in an [`State`](../celestia/type.State.html) structure. It has a lot of useful methods, like computing the angular momentum of that orbit, or its period.
 It can be initialized from Cartesian coordinates or Keplerian elements, but the data is stored in Cartesian. Therefore, a state initialized from Keplerian elements might not return exactly the same input values you specified.
 
 _Note_: the following code goes inside the `fn main()` function. The same applies for all of the examples in this tutorial. However, it is common in Rust to move the `extern crate` outside of functions.
@@ -143,10 +143,10 @@ _Note_: the following code goes inside the `fn main()` function. The same applie
 ```
 // Import nyx
 extern crate nyx_space as nyx;
-// Tell Rust that we're using the structures called Epoch, Cosm and OrbitState
+// Tell Rust that we're using the structures called Epoch, Cosm and State
 // from the respective modules. We're also importing _bodies_ which has a mapping from
 // the name of the object to its ID in the EXB file.
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::time::Epoch;
 
 // Load both the de438s.exb and de438s.fxb (resp. the ephemeris and frame information).
@@ -158,7 +158,7 @@ let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 // And initialize a Cartesian state with position, velocity, epoch and center object.
 // The position units are in kilometers and the velocity units in kilometers per second.
-let cart = OrbitState::cartesian(
+let cart = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -171,7 +171,7 @@ println!("{:o}", cart);
 
 // Now let's recreate the state but from the Keplerian elements
 
-let kep = OrbitState::keplerian(
+let kep = State::keplerian(
     cart.sma(),
     cart.ecc(),
     cart.inc(),
@@ -225,11 +225,11 @@ By executing `cargo run` in the `nyxtutorial` folder, the following should be pr
 ```
 
 ## Reference frame changes
-We can also use `Cosm` in order to convert `OrbitState`s into other frames. In the following example, we take a orbital state around the Earth, compute it a Moon centered frame.
+We can also use `Cosm` in order to convert `State`s into other frames. In the following example, we take a orbital state around the Earth, compute it a Moon centered frame.
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
@@ -237,7 +237,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 // And initialize a Cartesian state with position, velocity, epoch and center object.
-let state = OrbitState::cartesian(
+let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -261,14 +261,14 @@ Executing this, the output should be:
 ```
 
 ## Visibility computation
-Now that we know how to setup an OrbitState, we can set up several orbit states, and convert them into other frames.
+Now that we know how to setup an State, we can set up several orbit states, and convert them into other frames.
 
 Let's build three states in a circular orbit and check whether they are in line of sight given the position of some celestial object.
 ```
 extern crate nyx_space as nyx;
 
 use nyx::celestia::eclipse::{line_of_sight, EclipseState};
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::time::Epoch;
 
 // Load the ephemeris
@@ -281,9 +281,9 @@ let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 // Define the semi major axis of these orbits
 let sma = earth.equatorial_radius + 300.0;
 
-let sc1 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-let sc2 = OrbitState::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-let sc3 = OrbitState::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
+let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+let sc2 = State::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
+let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
 
 // Both states are out of phase by pi, so the Earth actually prevents both spacecraft
 // from being in line of sight of each other.
@@ -307,7 +307,7 @@ Let's first just use a default propagator with the default options.
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
@@ -316,7 +316,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
-let state = OrbitState::cartesian(
+let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -385,7 +385,7 @@ The default propagator works fine for most cases, but sometimes you will want so
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
@@ -395,7 +395,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
-let state = OrbitState::cartesian(
+let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -438,7 +438,7 @@ The condition stopper uses a Brent root solver. Documentation on StopCondition i
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
@@ -450,7 +450,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
-let state = OrbitState::cartesian(
+let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -499,7 +499,7 @@ Let's now allow for the apoapse event to happen several times and stop on the th
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
@@ -511,7 +511,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
-let state = OrbitState::cartesian(
+let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -575,7 +575,7 @@ Open the `Cargo.toml` file and add `csv = "1"` to specify that we're using the [
 extern crate nyx_space as nyx;
 extern crate csv;
 // ^^^ Allows us to the CSV crate
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
@@ -585,7 +585,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
-let state = OrbitState::cartesian(
+let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -651,7 +651,7 @@ In Penumbra, the closer the reported value is, the more light is received by the
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, LTCorr, OrbitState};
+use nyx::celestia::{bodies, Cosm, LTCorr, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
@@ -664,7 +664,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 // GEO are in shadow or near shadow during the equinoxes.
 let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
 
-let geo_bird = OrbitState::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
+let geo_bird = State::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
 
 let (truth_tx, truth_rx) = mpsc::channel();
 
@@ -791,7 +791,7 @@ Setting up a celestial dynamics with multibody point masses is quite straightfor
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
@@ -801,7 +801,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
-let state = OrbitState::cartesian(
+let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
     dt, earth,
@@ -895,7 +895,7 @@ all of the subsystems of the spacecraft prior to be able to run the propagator.
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dimensions::Vector3;
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::dynamics::propulsion::{Propulsion, Thruster};
@@ -910,7 +910,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-let orbit = OrbitState::cartesian(
+let orbit = State::cartesian(
     -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
 );
 
@@ -979,7 +979,7 @@ based on the osculating orbital state, and therefore do a local optimization of 
 
 ```
 extern crate nyx_space as nyx;
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::dynamics::propulsion::{Propulsion, Thruster};
 use nyx::dynamics::spacecraft::Spacecraft;
@@ -995,7 +995,7 @@ let earth = cosm.frame_by_id(bodies::EARTH);
 
 let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-let orbit = OrbitState::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
 
 let prop_time = 39.91 * SECONDS_PER_DAY;
 

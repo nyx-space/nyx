@@ -489,7 +489,7 @@ impl State {
                 let rk = (s_earth + height) * sin_lat;
                 let radius = Vector3::new(ri, rj, rk);
                 let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
-                OrbitState::cartesian(
+                State::cartesian(
                     radius[(0, 0)],
                     radius[(1, 0)],
                     radius[(2, 0)],
@@ -953,7 +953,3 @@ impl fmt::Octal for State {
         )
     }
 }
-
-// TODO: REMOVE ME
-/// An orbit is simply a State typed around a Geoid.
-pub type OrbitState = State;

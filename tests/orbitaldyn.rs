@@ -7,7 +7,7 @@ extern crate nyx_space as nyx;
 use approx::abs_diff_eq;
 use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 use na::{Matrix6, Vector6, U3};
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use nyx::od::AutoDiffDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
@@ -23,7 +23,7 @@ fn two_body_dynamics() {
     let earth_geoid = cosm.frame_by_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = OrbitState::cartesian(
+    let state = State::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -98,7 +98,7 @@ fn halo_earth_moon_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = OrbitState::cartesian(
+    let halo_rcvr = State::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -164,7 +164,7 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = OrbitState::cartesian(
+    let halo_rcvr = State::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -229,7 +229,7 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = OrbitState::cartesian(
+    let llo_xmtr = State::cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -297,7 +297,7 @@ fn halo_multi_body_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = OrbitState::cartesian(
+    let halo_rcvr = State::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -367,7 +367,7 @@ fn halo_multi_body_dynamics_adaptive() {
     // let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = OrbitState::cartesian(
+    let halo_rcvr = State::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -436,7 +436,7 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = OrbitState::cartesian(
+    let llo_xmtr = State::cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -505,7 +505,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = OrbitState::cartesian(
+    let leo = State::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -566,7 +566,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = OrbitState::cartesian(
+    let leo = State::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -616,7 +616,7 @@ fn two_body_dual() {
     let cosm = Cosm::from_xb("./de438s");
     let earth_geoid = cosm.frame_by_id(399);
 
-    let init = OrbitState::cartesian(
+    let init = State::cartesian(
         -9_042.862_233_600_335,
         18_536.333_069_123_244,
         6_999.957_069_486_411_5,
@@ -697,7 +697,7 @@ fn multi_body_dynamics_dual() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = OrbitState::cartesian(
+    let halo_rcvr = State::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,

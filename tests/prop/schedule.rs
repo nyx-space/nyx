@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use self::hifitime::Epoch;
 use self::na::Vector3;
-use self::nyx::celestia::{bodies, Cosm, OrbitState};
+use self::nyx::celestia::{bodies, Cosm, State};
 use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
@@ -30,7 +30,7 @@ fn transfer_schedule_no_depl() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-    let orbit = OrbitState::cartesian(
+    let orbit = State::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -38,7 +38,7 @@ fn transfer_schedule_no_depl() {
 
     let end_time = start_time + prop_time;
 
-    let rslt = OrbitState::cartesian(
+    let rslt = State::cartesian(
         4_172.396_780_515_64f64,
         436.944_560_056_202_8,
         -6_518.328_156_815_674,
@@ -128,7 +128,7 @@ fn transfer_schedule_depl() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-    let orbit = OrbitState::cartesian(
+    let orbit = State::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
     );
 
@@ -136,7 +136,7 @@ fn transfer_schedule_depl() {
 
     let end_time = start_time + prop_time;
 
-    let rslt = OrbitState::cartesian(
+    let rslt = State::cartesian(
         4_172.433_936_615_18,
         436.936_159_720_413,
         -6_518.368_821_953_345,

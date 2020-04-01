@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, J2000_OFFSET};
-use nyx::celestia::{bodies, Cosm, OrbitState};
+use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
@@ -16,7 +16,7 @@ fn stop_cond_3rd_apo() {
     let earth_geoid = cosm.frame_by_id(bodies::EARTH);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = OrbitState::cartesian(
+    let state = State::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -64,7 +64,7 @@ fn nrho_apo() {
     let luna = cosm.frame_by_id(bodies::EARTH_MOON);
 
     let dt = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
-    let state = OrbitState::cartesian(
+    let state = State::cartesian(
         166_473.631_302_239_7,
         -274_715.487_253_382_7,
         -211_233.210_176_686_7,
@@ -77,7 +77,7 @@ fn nrho_apo() {
 
     // Note that this expected state was generated using SRP and a lunar gravity field
     // Hence, we allow for a greater error since these are not modeled here.
-    let expect = OrbitState::cartesian(
+    let expect = State::cartesian(
         266_375.578_868_798,
         -213_365.467_957_944,
         -203_571.279_542_228,

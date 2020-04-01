@@ -548,9 +548,9 @@ impl Cosm {
         let path = if state.rmag() > 0.0 {
             // This is a state transformation, not a celestial position, so let's iterate backward
             // Not entirely sure why, but this works.
-            self.intermediate_geoid(&new_frame, &state.frame)?
+            self.translation_path(&new_frame, &state.frame)?
         } else {
-            self.intermediate_geoid(&state.frame, &new_frame)?
+            self.translation_path(&state.frame, &new_frame)?
         };
 
         let mut new_state = if state.frame.exb_id() == 0 {
@@ -597,7 +597,7 @@ impl Cosm {
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
-    pub fn intermediate_geoid(
+    fn translation_path(
         &self,
         from: &FrameInfo,
         to: &FrameInfo,
@@ -691,7 +691,7 @@ mod tests {
         let cosm = Cosm::from_xb("./de438s");
 
         assert_eq!(
-            cosm.intermediate_geoid(
+            cosm.translation_path(
                 &cosm.frame_by_id(bodies::EARTH_BARYCENTER),
                 &cosm.frame_by_id(bodies::EARTH_BARYCENTER),
             )
@@ -770,7 +770,7 @@ mod tests {
         let cosm = Cosm::from_xb("./de438s");
 
         let ven2ear = cosm
-            .intermediate_geoid(
+            .translation_path(
                 &cosm.frame_by_id(bodies::VENUS_BARYCENTER),
                 &cosm.frame_by_id(bodies::EARTH_MOON),
             )
