@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::nyx::celestia::{bodies, Cosm, State};
+use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::{Spacecraft, SpacecraftState};
@@ -20,8 +20,8 @@ fn qlaw_as_ruggiero_case_a() {
     // Source: AAS-2004-5089
 
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.433);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.433);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -87,7 +87,7 @@ fn qlaw_as_ruggiero_case_a() {
 fn qlaw_as_ruggiero_case_b() {
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -150,7 +150,7 @@ fn qlaw_as_ruggiero_case_b() {
 fn qlaw_as_ruggiero_case_c() {
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -211,7 +211,7 @@ fn qlaw_as_ruggiero_case_d() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -280,7 +280,7 @@ fn qlaw_as_ruggiero_case_e() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -362,7 +362,7 @@ fn qlaw_as_ruggiero_case_f() {
     use std::thread;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -428,7 +428,7 @@ fn qlaw_as_ruggiero_case_f() {
 fn ruggiero_iepc_2011_102() {
     // Source: IEPC 2011 102
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 

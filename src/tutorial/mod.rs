@@ -152,7 +152,7 @@ use nyx::time::Epoch;
 // Load both the de438s.exb and de438s.fxb (resp. the ephemeris and frame information).
 let cosm = Cosm::from_xb("./de438s");
 // Get a copy of the Earth body and frame information from the cosm.
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 // Initialize a Epoch for 31 January 2020 at midnight TAI.
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -233,7 +233,7 @@ use nyx::celestia::{bodies, Cosm, State};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 // And initialize a Cartesian state with position, velocity, epoch and center object.
@@ -244,7 +244,7 @@ let state = State::cartesian(
 );
 
 // Get a copy of the Moon
-let moon = cosm.frame_by_id(bodies::EARTH_MOON);
+let moon = cosm.frame("Luna");
 // And convert that to a Moon centered frame using the Cosm
 // Note that the amperstand in front of state is to specify that we're
 // taking a reference of the state, instead of copying it.
@@ -274,7 +274,7 @@ use nyx::time::Epoch;
 // Load the ephemeris
 let cosm = Cosm::from_xb("./de438s");
 // Get a copy of the Earth
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -312,7 +312,7 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -391,7 +391,7 @@ use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -446,7 +446,7 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -507,7 +507,7 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -581,7 +581,7 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -659,7 +659,7 @@ use std::sync::mpsc;
 use std::thread;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 // GEO are in shadow or near shadow during the equinoxes.
 let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
@@ -680,7 +680,7 @@ thread::spawn(move || {
 });
 
 // Get a copy of the Sun to pass it to the locator.
-let sun = cosm.frame_by_id(bodies::SUN);
+let sun = cosm.frame("Sun J2000");
 
 // Import everything needed for the eclipse locator
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
@@ -797,7 +797,7 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -906,7 +906,7 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
@@ -991,7 +991,7 @@ use nyx::time::{Epoch, SECONDS_PER_DAY};
 // Source: AAS-2004-5089
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame_by_id(bodies::EARTH);
+let earth = cosm.frame("EME2000");
 
 let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 

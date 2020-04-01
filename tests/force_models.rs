@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use na::Vector6;
-use nyx::celestia::{bodies, Cosm, State};
+use nyx::celestia::{Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::dynamics::drag::ExpEarthDrag;
 use nyx::dynamics::solarpressure::SolarPressure;
@@ -17,8 +17,8 @@ use nyx::utils::rss_state_errors;
 #[test]
 fn srp_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let earth = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -29,7 +29,7 @@ fn srp_earth() {
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth.exb_id()];
+    let shadow_bodies = vec![earth];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
 
@@ -65,8 +65,8 @@ fn srp_earth() {
 #[test]
 fn drag_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let earth = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
@@ -77,7 +77,7 @@ fn drag_earth() {
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth.exb_id()];
+    let shadow_bodies = vec![earth];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
     let drag = ExpEarthDrag {

@@ -20,18 +20,11 @@ fn two_body_dynamics() {
     let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = State::cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let rslt = Vector6::new(
@@ -92,9 +85,9 @@ fn halo_earth_moon_dynamics() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -158,9 +151,9 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -223,9 +216,9 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -289,11 +282,11 @@ fn halo_multi_body_dynamics() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
-    cosm.mut_gm_for_frame_id(bodies::SUN, 132_712_440_017.99);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -358,11 +351,11 @@ fn halo_multi_body_dynamics_adaptive() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
-    cosm.mut_gm_for_frame_id(bodies::SUN, 132_712_440_017.99);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    let earth = cosm.frame("EME2000");
 
     // let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -428,11 +421,11 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
-    cosm.mut_gm_for_frame_id(bodies::SUN, 132_712_440_017.99);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
@@ -497,11 +490,11 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::EARTH_MOON, 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
-    cosm.mut_gm_for_frame_id(bodies::SUN, 132_712_440_017.99);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -559,10 +552,10 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame_id(bodies::EARTH, 398_600.441_5);
-    cosm.mut_gm_for_frame_id(bodies::JUPITER_BARYCENTER, 126_712_767.857_80);
-    cosm.mut_gm_for_frame_id(bodies::SUN, 132_712_440_017.99);
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -614,7 +607,7 @@ fn two_body_dual() {
     // This is a duplicate of the differentials test in hyperdual.
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame_by_id(399);
+    let eme2k = cosm.frame("EME2000");
 
     let init = State::cartesian(
         -9_042.862_233_600_335,
@@ -624,7 +617,7 @@ fn two_body_dual() {
         -2.226_285_193_102_822,
         1.646_738_380_722_676_5,
         Epoch::from_mjd_tai(21_546.0),
-        earth_geoid,
+        eme2k,
     );
 
     let expected_fx = Vector6::new(
@@ -693,7 +686,7 @@ fn multi_body_dynamics_dual() {
     let prop_time = SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -705,7 +698,7 @@ fn multi_body_dynamics_dual() {
         0.930_284_066,
         0.346_177,
         start_time,
-        earth_geoid,
+        eme2k,
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];

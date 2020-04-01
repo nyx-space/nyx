@@ -19,8 +19,8 @@ fn state_def_() {
 #[test]
 fn state_def_circ_inc() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
-    let eme2k = cosm.frame_by_id(399);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = State::cartesian(
@@ -104,7 +104,7 @@ fn state_def_circ_inc() {
 #[test]
 fn xb_conversion() {
     let cosm = Cosm::from_xb("./de438s");
-    let eme2k = cosm.frame_by_id(399);
+    let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = State::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
@@ -152,8 +152,8 @@ fn xb_conversion() {
 #[test]
 fn state_def_elliptical() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
-    let eme2k = cosm.frame_by_id(399);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = State::cartesian(
@@ -223,8 +223,8 @@ fn state_def_elliptical() {
 #[test]
 fn state_def_circ_eq() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
-    let eme2k = cosm.frame_by_id(399);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
     let cart = State::cartesian(
@@ -292,8 +292,8 @@ fn state_def_circ_eq() {
 #[test]
 fn state_def_reciprocity() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
-    let eme2k = cosm.frame_by_id(399);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
 
@@ -364,8 +364,8 @@ fn state_def_reciprocity() {
 #[test]
 fn geodetic_vallado() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
-    let eme2k = cosm.frame_by_id(399);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     dbg!(eme2k.semi_major_radius());
     let dt = Epoch::from_mjd_tai(51_545.0);

@@ -1,6 +1,6 @@
 use super::na::Vector3;
 use super::ForceModel;
-use celestia::{bodies, Cosm, State};
+use celestia::{Cosm, State};
 
 /// `ConstantDrag` implements a constant drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
 ///
@@ -46,7 +46,7 @@ pub struct ExpEarthDrag<'a> {
 
 impl<'a> ForceModel for ExpEarthDrag<'a> {
     fn eom(&self, osc: &State) -> Vector3<f64> {
-        let earth = self.cosm.frame_by_id(bodies::EARTH);
+        let earth = self.cosm.frame("EME2000");
         // Compute the density
         let rho0 = 3.614e-13; // # kg/m^3
         let r0 = 700_000.0 + earth.equatorial_radius();

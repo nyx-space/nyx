@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::nyx::celestia::{bodies, Cosm, State};
+use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
@@ -15,7 +15,7 @@ use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 #[test]
 fn rugg_sma() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -66,7 +66,7 @@ fn rugg_sma() {
 #[test]
 fn rugg_sma_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -117,7 +117,7 @@ fn rugg_sma_decr() {
 #[test]
 fn rugg_inc() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -170,7 +170,7 @@ fn rugg_inc() {
 #[test]
 fn rugg_inc_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -223,7 +223,7 @@ fn rugg_inc_decr() {
 #[test]
 fn rugg_ecc() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -276,7 +276,7 @@ fn rugg_ecc() {
 #[test]
 fn rugg_ecc_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -329,7 +329,7 @@ fn rugg_ecc_decr() {
 #[test]
 fn rugg_aop() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -384,7 +384,7 @@ fn rugg_aop() {
 #[test]
 fn rugg_aop_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
@@ -438,7 +438,7 @@ fn rugg_aop_decr() {
 #[test]
 fn rugg_raan() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2017, 1, 1);
 

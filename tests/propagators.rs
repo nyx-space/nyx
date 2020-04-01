@@ -43,7 +43,7 @@ macro_rules! assert_eq_or_rel {
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
     let cosm = Cosm::from_xb("./de438s");
-    let eme2k = cosm.frame_by_id(399);
+    let eme2k = cosm.frame("EME2000");
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -139,8 +139,8 @@ fn gmat_val_leo_day_adaptive() {
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
-    let eme2k = cosm.frame_by_id(399);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
@@ -285,8 +285,8 @@ fn gmat_val_leo_day_adaptive() {
 #[test]
 fn gmat_val_leo_day_fixed() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_frame_id(399, 398_600.441_5);
-    let eme2k = cosm.frame_by_id(399);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let prop_time = 3_600.0 * 24.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);

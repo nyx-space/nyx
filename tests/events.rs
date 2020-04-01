@@ -6,14 +6,14 @@ extern crate nyx_space as nyx;
 #[test]
 fn event_tracker_true_anomaly() {
     use hifitime::{Epoch, J2000_OFFSET};
-    use nyx::celestia::{bodies, Cosm, State};
+    use nyx::celestia::{Cosm, State};
     use nyx::dynamics::celestial::CelestialDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent};
     use nyx::propagators::*;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame_by_id(bodies::EARTH);
+    let earth_geoid = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = State::cartesian(

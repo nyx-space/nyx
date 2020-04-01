@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use self::hifitime::Epoch;
 use self::na::Vector3;
-use self::nyx::celestia::{bodies, Cosm, State};
+use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::deltavctrl::{InstantBurns, Mnvr};
 use self::nyx::dynamics::missionarc::MissionArc;
@@ -16,7 +16,7 @@ fn arc_example() {
     // This is an example of two delta Vs happening one after another. Other implementations of
     // a DeltaVctrl would be much more useful than this schedule of maneuvers.
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame_by_id(bodies::EARTH);
+    let earth = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 

@@ -348,12 +348,12 @@ fn unit_vector_from_angles(alpha: f64, beta: f64) -> Vector3<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use celestia::{bodies, Cosm};
+    use celestia::Cosm;
     #[test]
     fn ruggiero_weight() {
         let mut cosm = Cosm::from_xb("./de438s");
-        cosm.mut_gm_for_frame("Earth".to_string(), 398_600.433);
-        let earth = cosm.frame_by_id(bodies::EARTH);
+        cosm.mut_gm_for_frame("EME2000", 398_600.433);
+        let earth = cosm.frame("EME2000");
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
         let orbit = State::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
 
