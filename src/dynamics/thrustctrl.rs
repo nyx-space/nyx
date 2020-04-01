@@ -353,9 +353,9 @@ mod tests {
     fn ruggiero_weight() {
         let mut cosm = Cosm::from_xb("./de438s");
         cosm.mut_gm_for_frame("EME2000", 398_600.433);
-        let earth = cosm.frame("EME2000");
+        let eme2k = cosm.frame("EME2000");
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-        let orbit = State::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+        let orbit = State::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
         // Define the objectives
         let objectives = vec![
@@ -379,7 +379,7 @@ mod tests {
             7.422_889_151_816_439,
             0.006_477_694_429_837_2,
             start_time,
-            earth,
+            eme2k,
         );
         let expected = Vector3::new(
             -0.017_279_636_133_108_3,

@@ -46,14 +46,14 @@ pub struct ExpEarthDrag<'a> {
 
 impl<'a> ForceModel for ExpEarthDrag<'a> {
     fn eom(&self, osc: &State) -> Vector3<f64> {
-        let earth = self.cosm.frame("EME2000");
+        let eme2k = self.cosm.frame("EME2000");
         // Compute the density
         let rho0 = 3.614e-13; // # kg/m^3
-        let r0 = 700_000.0 + earth.equatorial_radius();
+        let r0 = 700_000.0 + eme2k.equatorial_radius();
         let h = 88_667.0; // m
         let rho = rho0 * (-(osc.rmag() - r0) / h).exp(); // # Exponential decay model for density
 
-        let osc = self.cosm.frame_chg(&osc, earth);
+        let osc = self.cosm.frame_chg(&osc, eme2k);
 
         // Incorrectly transform to some ECEF frame
         let earth_rot = 7.292_115_855_3e-5;

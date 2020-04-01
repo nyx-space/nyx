@@ -21,11 +21,11 @@ fn qlaw_as_ruggiero_case_a() {
 
     let mut cosm = Cosm::from_xb("./de438s");
     cosm.mut_gm_for_frame("EME2000", 398_600.433);
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+    let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
     let prop_time = 39.91 * SECONDS_PER_DAY;
 
@@ -87,11 +87,11 @@ fn qlaw_as_ruggiero_case_a() {
 fn qlaw_as_ruggiero_case_b() {
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 160.0 * SECONDS_PER_DAY;
 
@@ -150,11 +150,11 @@ fn qlaw_as_ruggiero_case_b() {
 fn qlaw_as_ruggiero_case_c() {
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(9222.7, 0.2, 0.573, 0.0, 0.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(9222.7, 0.2, 0.573, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 3.0 * SECONDS_PER_DAY;
 
@@ -211,11 +211,11 @@ fn qlaw_as_ruggiero_case_d() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 113.0 * SECONDS_PER_DAY;
 
@@ -280,11 +280,11 @@ fn qlaw_as_ruggiero_case_e() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 400.0 * SECONDS_PER_DAY;
 
@@ -362,11 +362,11 @@ fn qlaw_as_ruggiero_case_f() {
     use std::thread;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(15378.0, 0.01, 98.7, 0.0, 0.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(15378.0, 0.01, 98.7, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
@@ -428,11 +428,11 @@ fn qlaw_as_ruggiero_case_f() {
 fn ruggiero_iepc_2011_102() {
     // Source: IEPC 2011 102
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, earth);
+    let orbit = State::keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
     let prop_time = 105.0 * SECONDS_PER_DAY;
 

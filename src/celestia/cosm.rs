@@ -906,7 +906,7 @@ mod tests {
     #[test]
     fn test_frame_change_earth2luna() {
         let cosm = Cosm::from_xb("./de438s");
-        let earth = cosm.frame("EME2000");
+        let eme2k = cosm.frame("EME2000");
         let luna = cosm.frame("Luna");
 
         let jde = Epoch::from_jde_et(2_458_823.5);
@@ -919,7 +919,7 @@ mod tests {
             -6.678_258_076_726_339E-1,
             4.208_264_479_358_517E-1,
             jde,
-            earth,
+            eme2k,
         );
 
         let lro_jpl = State::cartesian(
@@ -941,7 +941,7 @@ mod tests {
         assert!(lro_moon_earth_delta.rmag() < 1e-2);
         assert!(lro_moon_earth_delta.vmag() < 1e-5);
         // And the converse
-        let lro_wrt_earth = cosm.frame_chg(&lro_wrt_moon, earth);
+        let lro_wrt_earth = cosm.frame_chg(&lro_wrt_moon, eme2k);
         assert!((lro_wrt_earth - lro).rmag() < std::f64::EPSILON);
         assert!((lro_wrt_earth - lro).vmag() < std::f64::EPSILON);
     }

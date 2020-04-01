@@ -68,10 +68,10 @@ pub mod propagators;
 /// use nyx::propagators::{PropOpts, Propagator};
 ///
 /// let cosm = Cosm::from_xb("./de438s");
-/// let earth_geoid = cosm.frame("EME2000");
+/// let eme2k = cosm.frame("EME2000");
 ///
 /// let dt = Epoch::from_mjd_tai(21_545.0);
-/// let initial_state = State::cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, earth_geoid);
+/// let initial_state = State::cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, eme2k);
 ///
 /// println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
@@ -88,7 +88,7 @@ pub mod propagators;
 ///         -4.185_084_125_817_658,
 ///         5.848_947_462_472_877,
 ///         Epoch::from_mjd_tai(21_546.0),
-///         earth_geoid,
+///         eme2k,
 /// );
 ///
 /// let mut dynamics = CelestialDynamics::two_body(initial_state);
@@ -121,7 +121,7 @@ pub mod propagators;
 /// let prop_time = 24.0 * 3_600.0;
 ///
 /// let cosm = Cosm::from_xb("./de438s");
-/// let earth_geoid = cosm.frame("EME2000");
+/// let eme2k = cosm.frame("EME2000");
 ///
 /// let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///
@@ -133,7 +133,7 @@ pub mod propagators;
 ///     0.930_284_066,
 ///     0.346_177,
 ///     start_time,
-///     earth_geoid,
+///     eme2k,
 /// );
 ///
 /// // GMAT data
@@ -175,7 +175,7 @@ pub mod dynamics;
 /// // We're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
 /// cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
 /// // In this case, we're creating these states around a Geoid which is Earth.
-/// let earth_geoid = cosm.frame("EME2000");
+/// let eme2k = cosm.frame("EME2000");
 /// let dt = Epoch::from_mjd_tai(21545.0);
 /// let cart = State::cartesian(
 ///         5_946.673_548_288_958,
@@ -185,7 +185,7 @@ pub mod dynamics;
 ///         4.579_534_132_135_011,
 ///         6.246_541_551_539_432,
 ///         dt,
-///         earth_geoid,
+///         eme2k,
 /// );
 ///
 /// let kep = State::keplerian(
@@ -196,7 +196,7 @@ pub mod dynamics;
 ///        359.787_880_000_004,
 ///        25.434_003_407_751_188,
 ///        dt,
-///        earth_geoid
+///        eme2k
 /// );
 /// // We can check whether two states are equal.
 /// if cart != kep {

@@ -16,11 +16,11 @@ fn arc_example() {
     // This is an example of two delta Vs happening one after another. Other implementations of
     // a DeltaVctrl would be much more useful than this schedule of maneuvers.
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
-    let orbit = State::keplerian(6678.0, 0.0, 0.1, 60.0, 30.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(6678.0, 0.0, 0.1, 60.0, 30.0, 0.0, start_time, eme2k);
 
     let prop_time = 86_400.0;
 

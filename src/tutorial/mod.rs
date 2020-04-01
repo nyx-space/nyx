@@ -95,7 +95,7 @@ version = "0.1.0"
 authors = ["Your Name"]
 
 [dependencies]
-nyx-space = "0.0.20-alpha.1"
+nyx-space = "0.0.20-alpha.2"
 ```
 
 Next, let's build your project. Since you added the `nyx_space` crate as a
@@ -151,8 +151,8 @@ use nyx::time::Epoch;
 
 // Load both the de438s.exb and de438s.fxb (resp. the ephemeris and frame information).
 let cosm = Cosm::from_xb("./de438s");
-// Get a copy of the Earth body and frame information from the cosm.
-let earth = cosm.frame("EME2000");
+// Get a copy of the Earth inertial frame information from the cosm.
+let eme2k = cosm.frame("EME2000");
 // Initialize a Epoch for 31 January 2020 at midnight TAI.
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
@@ -161,7 +161,7 @@ let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 let cart = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 // And print this state in Cartesian
@@ -179,7 +179,7 @@ let kep = State::keplerian(
     cart.aop(),
     cart.ta(),
     dt,
-    earth,
+    eme2k,
 );
 
 // This should be very close to zero
@@ -203,15 +203,18 @@ let cosm = Cosm::from_xb("./de438s");
 // Define a time
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
+// Get a Sun centered frame
+let sun_frame = cosm.frame("Sun J2000");
+
 // And finally get the Earth state
 // Note the LTCorr:None means we are _not_ correction for light time.
-let earth_as_seen_from_sun = cosm.celestial_state(bodies::EARTH, dt, bodies::SUN, LTCorr::None);
+let earth_as_seen_from_sun = cosm.celestial_state(bodies::EARTH, dt, sun_frame, LTCorr::None);
 
 // Get the same state with light time correction, but no abberation.
-let with_lt = cosm.celestial_state(bodies::EARTH, dt, bodies::SUN, LTCorr::LightTime);
+let with_lt = cosm.celestial_state(bodies::EARTH, dt, sun_frame, LTCorr::LightTime);
 
 // Get the same state with light time correction, with light time corrections and abberation.
-let with_abbr = cosm.celestial_state(bodies::EARTH, dt, bodies::SUN, LTCorr::Abberation);
+let with_abbr = cosm.celestial_state(bodies::EARTH, dt, sun_frame, LTCorr::Abberation);
 
 println!("{}\n{}\n{}", earth_as_seen_from_sun, with_lt, with_abbr);
 ```
@@ -233,14 +236,14 @@ use nyx::celestia::{bodies, Cosm, State};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 // And initialize a Cartesian state with position, velocity, epoch and center object.
 let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 // Get a copy of the Moon
@@ -274,20 +277,20 @@ use nyx::time::Epoch;
 // Load the ephemeris
 let cosm = Cosm::from_xb("./de438s");
 // Get a copy of the Earth
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
 // Define the semi major axis of these orbits
-let sma = earth.equatorial_radius + 300.0;
+let sma = eme2k.equatorial_radius() + 300.0;
 
-let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-let sc2 = State::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
+let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
+let sc2 = State::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
+let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, eme2k);
 
 // Both states are out of phase by pi, so the Earth actually prevents both spacecraft
 // from being in line of sight of each other.
-let sc1_sc3_visibility = line_of_sight(&sc1, &sc3, earth, &cosm);
+let sc1_sc3_visibility = line_of_sight(&sc1, &sc3, eme2k, &cosm);
 println!("SC1 <-> SC3: {}", sc1_sc3_visibility);
 
 // This `assert_eq!` is a Rust macro which will cause the program to fail if
@@ -296,7 +299,7 @@ println!("SC1 <-> SC3: {}", sc1_sc3_visibility);
 assert_eq!(sc1_sc3_visibility, EclipseState::Umbra);
 
 // Nearly identical orbits in the same phasing
-let sc1_sc2_visibility = line_of_sight(&sc1, &sc2, earth, &cosm);
+let sc1_sc2_visibility = line_of_sight(&sc1, &sc2, eme2k, &cosm);
 println!("SC1 <-> SC2: {}", sc1_sc2_visibility);
 assert_eq!(sc1_sc2_visibility, EclipseState::Visibilis);
 ```
@@ -312,14 +315,14 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 // Let's initialize two body celestial dynamics.
@@ -391,14 +394,14 @@ use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 // Let's initialize two body celestial dynamics.
@@ -446,14 +449,14 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 // Save the period of this orbit.
@@ -507,14 +510,14 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 let period = state.period();
@@ -581,14 +584,14 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 // Let's initialize celestial dynamics with the point masses of the Moon and the Sun
@@ -659,12 +662,12 @@ use std::sync::mpsc;
 use std::thread;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 // GEO are in shadow or near shadow during the equinoxes.
 let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
 
-let geo_bird = State::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
+let geo_bird = State::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, eme2k);
 
 let (truth_tx, truth_rx) = mpsc::channel();
 
@@ -687,7 +690,7 @@ use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
 // Initialize the EclipseLocator with light time correction
 let e_loc = EclipseLocator {
     light_source: sun,
-    shadow_bodies: vec![earth],
+    shadow_bodies: vec![eme2k],
     cosm: &cosm,
     correction: LTCorr::LightTime,
 };
@@ -797,14 +800,14 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 31);
 
 let state = State::cartesian(
     -2436.45, -2436.45, 6891.037, // X, Y, Z (km)
     5.088_611, -5.088_611, 0.0, // VX, VY, VZ (km/s)
-    dt, earth,
+    dt, eme2k,
 );
 
 // Define which other masses we want.
@@ -906,12 +909,12 @@ use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::Epoch;
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
 let orbit = State::cartesian(
-    -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
+    -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
 );
 
 // Define the list of thrusters (hence the `vec![]` call).
@@ -937,7 +940,7 @@ let mnvr = Mnvr {
 
 // Now, let's define a schedule, which expects a vector of maneuvers.
 // In this case, we only have one maneuver, but we still need to build a vector.
-let schedule = FiniteBurns::from_mnvrs(vec![mnvr], earth);
+let schedule = FiniteBurns::from_mnvrs(vec![mnvr]);
 
 // Define the spacecraft mass
 let dry_mass = 1e3;
@@ -991,11 +994,11 @@ use nyx::time::{Epoch, SECONDS_PER_DAY};
 // Source: AAS-2004-5089
 
 let cosm = Cosm::from_xb("./de438s");
-let earth = cosm.frame("EME2000");
+let eme2k = cosm.frame("EME2000");
 
 let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
 let prop_time = 39.91 * SECONDS_PER_DAY;
 

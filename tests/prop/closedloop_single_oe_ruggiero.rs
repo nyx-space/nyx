@@ -15,11 +15,11 @@ use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 #[test]
 fn rugg_sma() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 45.0 * SECONDS_PER_DAY;
 
@@ -66,11 +66,11 @@ fn rugg_sma() {
 #[test]
 fn rugg_sma_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(42164.0, 0.0, 0.0, 0.0, 0.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(42164.0, 0.0, 0.0, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 45.0 * SECONDS_PER_DAY;
 
@@ -117,13 +117,13 @@ fn rugg_sma_decr() {
 #[test]
 fn rugg_inc() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius() + 350.0;
+    let sma = eme2k.equatorial_radius() + 350.0;
 
-    let orbit = State::keplerian(sma, 0.001, 46.0, 1.0, 1.0, 1.0, start_time, earth);
+    let orbit = State::keplerian(sma, 0.001, 46.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
     let prop_time = 55.0 * SECONDS_PER_DAY;
 
@@ -170,13 +170,13 @@ fn rugg_inc() {
 #[test]
 fn rugg_inc_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius() + 350.0;
+    let sma = eme2k.equatorial_radius() + 350.0;
 
-    let orbit = State::keplerian(sma, 0.001, 51.6, 1.0, 1.0, 1.0, start_time, earth);
+    let orbit = State::keplerian(sma, 0.001, 51.6, 1.0, 1.0, 1.0, start_time, eme2k);
 
     let prop_time = 55.0 * SECONDS_PER_DAY;
 
@@ -223,13 +223,13 @@ fn rugg_inc_decr() {
 #[test]
 fn rugg_ecc() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius() + 9000.0;
+    let sma = eme2k.equatorial_radius() + 9000.0;
 
-    let orbit = State::keplerian(sma, 0.01, 98.7, 0.0, 1.0, 1.0, start_time, earth);
+    let orbit = State::keplerian(sma, 0.01, 98.7, 0.0, 1.0, 1.0, start_time, eme2k);
 
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
@@ -276,13 +276,13 @@ fn rugg_ecc() {
 #[test]
 fn rugg_ecc_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius() + 9000.0;
+    let sma = eme2k.equatorial_radius() + 9000.0;
 
-    let orbit = State::keplerian(sma, 0.15, 98.7, 0.0, 1.0, 1.0, start_time, earth);
+    let orbit = State::keplerian(sma, 0.15, 98.7, 0.0, 1.0, 1.0, start_time, eme2k);
 
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
@@ -329,14 +329,14 @@ fn rugg_ecc_decr() {
 #[test]
 fn rugg_aop() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius() + 900.0;
+    let sma = eme2k.equatorial_radius() + 900.0;
 
     // Note that AOP computation requires the orbit to not be equatorial or circular, hence the non-zero ECC and INC.
-    let orbit = State::keplerian(sma, 5e-5, 5e-3, 0.0, 178.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(sma, 5e-5, 5e-3, 0.0, 178.0, 0.0, start_time, eme2k);
 
     // This is a very quick change because we aren't using the Ruggiero formulation for AOP change and benefit both in-plane and out of plane control.
     let prop_time = 2650.0;
@@ -384,14 +384,14 @@ fn rugg_aop() {
 #[test]
 fn rugg_aop_decr() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let sma = earth.equatorial_radius() + 900.0;
+    let sma = eme2k.equatorial_radius() + 900.0;
 
     // Note that AOP computation requires the orbit to not be equatorial or circular, hence the non-zero ECC and INC.
-    let orbit = State::keplerian(sma, 5e-5, 5e-3, 0.0, 183.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(sma, 5e-5, 5e-3, 0.0, 183.0, 0.0, start_time, eme2k);
 
     let prop_time = 2650.0;
 
@@ -438,13 +438,13 @@ fn rugg_aop_decr() {
 #[test]
 fn rugg_raan() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2017, 1, 1);
 
-    let sma = earth.equatorial_radius() + 798.0;
+    let sma = eme2k.equatorial_radius() + 798.0;
 
-    let orbit = State::keplerian(sma, 0.00125, 98.57, 0.0, 1.0, 0.0, start_time, earth);
+    let orbit = State::keplerian(sma, 0.00125, 98.57, 0.0, 1.0, 0.0, start_time, eme2k);
 
     let prop_time = 49.0 * SECONDS_PER_DAY;
 

@@ -18,18 +18,18 @@ use nyx::utils::rss_state_errors;
 fn srp_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth];
+    let shadow_bodies = vec![eme2k];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
 
@@ -66,18 +66,18 @@ fn srp_earth() {
 fn drag_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth];
+    let shadow_bodies = vec![eme2k];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
     let drag = ExpEarthDrag {

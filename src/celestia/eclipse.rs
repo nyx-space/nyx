@@ -344,22 +344,22 @@ mod tests {
     #[test]
     fn los_earth_eclipse() {
         let cosm = Cosm::from_xb("./de438s");
-        let earth = cosm.frame("EME2000");
+        let eme2k = cosm.frame("EME2000");
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-        let sma = earth.equatorial_radius() + 300.0;
+        let sma = eme2k.equatorial_radius() + 300.0;
 
-        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc2 = State::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, earth);
-        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, earth);
+        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
+        let sc2 = State::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
+        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, eme2k);
 
         // Out of phase by pi.
-        assert_eq!(line_of_sight(&sc1, &sc3, earth, &cosm), EclipseState::Umbra);
+        assert_eq!(line_of_sight(&sc1, &sc3, eme2k, &cosm), EclipseState::Umbra);
 
         // Nearly identical orbits in the same phasing
         assert_eq!(
-            line_of_sight(&sc1, &sc2, earth, &cosm),
+            line_of_sight(&sc1, &sc2, eme2k, &cosm),
             EclipseState::Visibilis
         );
     }
@@ -368,27 +368,27 @@ mod tests {
     fn eclipse_sun_eclipse() {
         let cosm = Cosm::from_xb("./de438s");
         let sun = cosm.frame("Sun J2000");
-        let earth = cosm.frame("EME2000");
+        let eme2k = cosm.frame("EME2000");
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-        let sma = earth.equatorial_radius() + 300.0;
+        let sma = eme2k.equatorial_radius() + 300.0;
 
-        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, earth);
-        let sc2 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, earth);
-        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, earth);
+        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, eme2k);
+        let sc2 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, eme2k);
+        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, eme2k);
 
         let correction = LTCorr::None;
 
         assert_eq!(
-            eclipse_state(&sc1, sun, earth, &cosm, correction),
+            eclipse_state(&sc1, sun, eme2k, &cosm, correction),
             EclipseState::Visibilis
         );
         assert_eq!(
-            eclipse_state(&sc2, sun, earth, &cosm, correction),
+            eclipse_state(&sc2, sun, eme2k, &cosm, correction),
             EclipseState::Umbra
         );
-        match eclipse_state(&sc3, sun, earth, &cosm, correction) {
+        match eclipse_state(&sc3, sun, eme2k, &cosm, correction) {
             EclipseState::Penumbra(val) => assert!(val > 0.9),
             _ => panic!("should be in penumbra"),
         };

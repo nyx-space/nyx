@@ -13,18 +13,11 @@ use nyx::propagators::{PropOpts, Propagator};
 #[test]
 fn stop_cond_3rd_apo() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = State::cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let period = state.period();
@@ -60,7 +53,7 @@ fn stop_cond_3rd_apo() {
 #[test]
 fn nrho_apo() {
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
     let luna = cosm.frame("Luna");
 
     let dt = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
@@ -72,7 +65,7 @@ fn nrho_apo() {
         0.436_775_046_841_900_9,
         -0.082_211_021_250_348_95,
         dt,
-        earth,
+        eme2k,
     );
 
     // Note that this expected state was generated using SRP and a lunar gravity field
@@ -85,7 +78,7 @@ fn nrho_apo() {
         0.588_200_782_187_968,
         0.202_695_184_897_909,
         dt + 118_753.007_910_251,
-        earth,
+        eme2k,
     );
 
     let state_luna = cosm.frame_chg(&state, luna);
@@ -107,7 +100,7 @@ fn nrho_apo() {
     // Check how many times we have found that event
     let orbit = rslt.expect("condition should have been found");
     println!("Luna: {:o}", orbit);
-    let rslt_eme = cosm.frame_chg(&orbit, earth);
+    let rslt_eme = cosm.frame_chg(&orbit, eme2k);
     println!("EME2k: {}", rslt_eme);
     assert!((rslt_eme - expect).rmag() < 1.0);
     assert!((rslt_eme - expect).vmag() < 1e-5);

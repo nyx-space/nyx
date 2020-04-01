@@ -26,12 +26,12 @@ fn transfer_schedule_no_depl() {
     cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
     cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
     cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
     let orbit = State::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
     );
 
     let prop_time = 3000.0;
@@ -46,7 +46,7 @@ fn transfer_schedule_no_depl() {
         5.540_316_900_333_103,
         -2.207_082_771_390_863,
         end_time,
-        earth,
+        eme2k,
     );
 
     // Define the dynamics
@@ -124,12 +124,12 @@ fn transfer_schedule_depl() {
     cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
     cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
     cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
 
     let orbit = State::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, earth,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
     );
 
     let prop_time = 3000.0;
@@ -144,7 +144,7 @@ fn transfer_schedule_depl() {
         5.540_321_146_839_762,
         -2.207_146_819_283_441,
         end_time,
-        earth,
+        eme2k,
     );
 
     // Define the dynamics

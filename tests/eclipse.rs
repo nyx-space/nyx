@@ -17,11 +17,11 @@ fn leo_sun_earth_eclipses() {
     let prop_time = 2.0 * SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::keplerian(6778.0, 0.1, 60.0, 0.0, 0.0, 0.0, start_time, earth);
+    let leo = State::keplerian(6778.0, 0.1, 60.0, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
 
@@ -38,7 +38,7 @@ fn leo_sun_earth_eclipses() {
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
         light_source: cosm.frame("Sun J2000"),
-        shadow_bodies: vec![earth],
+        shadow_bodies: vec![eme2k],
         cosm: &cosm,
         correction: LTCorr::None,
     };
@@ -67,12 +67,12 @@ fn geo_sun_earth_eclipses() {
     let prop_time = 2.0 * SECONDS_PER_DAY;
 
     let cosm = Cosm::from_xb("./de438s");
-    let earth = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
 
-    let leo = State::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, earth);
+    let leo = State::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
 
@@ -89,7 +89,7 @@ fn geo_sun_earth_eclipses() {
     // Initialize the EclipseLocator
     let e_loc = EclipseLocator {
         light_source: cosm.frame("Sun J2000"),
-        shadow_bodies: vec![earth],
+        shadow_bodies: vec![eme2k],
         cosm: &cosm,
         correction: LTCorr::None,
     };

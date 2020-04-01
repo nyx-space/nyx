@@ -15,11 +15,11 @@ fn nil_measurement() {
     let height = 0.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.frame("EME2000");
+    let eme2k = cosm.frame("EME2000");
 
     let station = GroundStation::from_noise_values("nil", 0.0, lat, long, height, 0.0, 0.0);
 
-    let at_station = State::from_geodesic(lat, long, height, dt, earth_geoid);
+    let at_station = State::from_geodesic(lat, long, height, dt, eme2k);
 
     let meas = station.measure(&at_station).unwrap();
 
