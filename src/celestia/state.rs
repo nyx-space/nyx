@@ -184,151 +184,7 @@ impl State {
     pub fn v_hat(&self) -> Vector3<f64> {
         perpv(&self.velocity(), &self.r_hat()) / self.rmag()
     }
-}
 
-impl PartialEq for State {
-    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    fn eq(&self, other: &State) -> bool {
-        let distance_tol = 1e-5; // centimeter
-        let velocity_tol = 1e-5; // centimeter per second
-        self.dt == other.dt
-            && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol
-            && (self.vz - other.vz).abs() < velocity_tol
-            && self.frame == other.frame
-    }
-}
-
-impl Add for State {
-    type Output = State;
-
-    /// Add one state from another. Frame must be manually changed if needed.
-    fn add(self, other: State) -> State {
-        State {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            vx: self.vx + other.vx,
-            vy: self.vy + other.vy,
-            vz: self.vz + other.vz,
-            dt: self.dt,
-            frame: self.frame,
-        }
-    }
-}
-
-impl Sub for State {
-    type Output = State;
-
-    /// Subtract one state from another
-    fn sub(self, other: State) -> State {
-        State {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            vx: self.vx - other.vx,
-            vy: self.vy - other.vy,
-            vz: self.vz - other.vz,
-            dt: self.dt,
-            frame: self.frame,
-        }
-    }
-}
-
-impl Neg for State {
-    type Output = State;
-
-    /// Subtract one state from another
-    fn neg(self) -> Self::Output {
-        State {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-            vx: -self.vx,
-            vy: -self.vy,
-            vz: -self.vz,
-            dt: self.dt,
-            frame: self.frame,
-        }
-    }
-}
-
-impl Add for &State {
-    type Output = State;
-
-    /// Add one state from another. Frame must be manually changed if needed.
-    fn add(self, other: &State) -> State {
-        State {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            vx: self.vx + other.vx,
-            vy: self.vy + other.vy,
-            vz: self.vz + other.vz,
-            dt: self.dt,
-            frame: self.frame,
-        }
-    }
-}
-
-impl Sub for &State {
-    type Output = State;
-
-    /// Subtract one state from another
-    fn sub(self, other: &State) -> State {
-        State {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            vx: self.vx - other.vx,
-            vy: self.vy - other.vy,
-            vz: self.vz - other.vz,
-            dt: self.dt,
-            frame: self.frame,
-        }
-    }
-}
-
-impl Neg for &State {
-    type Output = State;
-
-    /// Subtract one state from another
-    fn neg(self) -> Self::Output {
-        State {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-            vx: -self.vx,
-            vy: -self.vy,
-            vz: -self.vz,
-            dt: self.dt,
-            frame: self.frame,
-        }
-    }
-}
-
-impl Serialize for State {
-    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("State", 7)?;
-        state.serialize_field("dt", &self.dt.as_jde_et_days())?;
-        state.serialize_field("x", &self.x)?;
-        state.serialize_field("y", &self.y)?;
-        state.serialize_field("z", &self.z)?;
-        state.serialize_field("vx", &self.vx)?;
-        state.serialize_field("vy", &self.vy)?;
-        state.serialize_field("vz", &self.vz)?;
-        state.end()
-    }
-}
-
-impl State {
     /// Creates a new State around the provided Celestial or Geoid frame from the Keplerian orbital elements.
     ///
     /// **Units:** km, none, degrees, degrees, degrees, degrees
@@ -892,6 +748,162 @@ impl State {
             }
             _ => panic!("did not provide a local frame"),
         }
+    }
+
+    /// Rotate this state provided a direct cosine matrix
+    pub fn apply_dcm(&mut self, dcm: Matrix3<f64>) {
+        let new_r = dcm * self.radius();
+        let new_v = dcm * self.velocity();
+
+        self.x = new_r[0];
+        self.y = new_r[1];
+        self.z = new_r[2];
+
+        self.vx = new_v[0];
+        self.vy = new_v[1];
+        self.vz = new_v[2];
+    }
+}
+
+impl PartialEq for State {
+    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
+    fn eq(&self, other: &State) -> bool {
+        let distance_tol = 1e-5; // centimeter
+        let velocity_tol = 1e-5; // centimeter per second
+        self.dt == other.dt
+            && (self.x - other.x).abs() < distance_tol
+            && (self.y - other.y).abs() < distance_tol
+            && (self.z - other.z).abs() < distance_tol
+            && (self.vx - other.vx).abs() < velocity_tol
+            && (self.vy - other.vy).abs() < velocity_tol
+            && (self.vz - other.vz).abs() < velocity_tol
+            && self.frame == other.frame
+    }
+}
+
+impl Add for State {
+    type Output = State;
+
+    /// Add one state from another. Frame must be manually changed if needed.
+    fn add(self, other: State) -> State {
+        State {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+            vx: self.vx + other.vx,
+            vy: self.vy + other.vy,
+            vz: self.vz + other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl Sub for State {
+    type Output = State;
+
+    /// Subtract one state from another
+    fn sub(self, other: State) -> State {
+        State {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+            vx: self.vx - other.vx,
+            vy: self.vy - other.vy,
+            vz: self.vz - other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl Neg for State {
+    type Output = State;
+
+    /// Subtract one state from another
+    fn neg(self) -> Self::Output {
+        State {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            vx: -self.vx,
+            vy: -self.vy,
+            vz: -self.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl Add for &State {
+    type Output = State;
+
+    /// Add one state from another. Frame must be manually changed if needed.
+    fn add(self, other: &State) -> State {
+        State {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+            vx: self.vx + other.vx,
+            vy: self.vy + other.vy,
+            vz: self.vz + other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl Sub for &State {
+    type Output = State;
+
+    /// Subtract one state from another
+    fn sub(self, other: &State) -> State {
+        State {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+            vx: self.vx - other.vx,
+            vy: self.vy - other.vy,
+            vz: self.vz - other.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl Neg for &State {
+    type Output = State;
+
+    /// Subtract one state from another
+    fn neg(self) -> Self::Output {
+        State {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            vx: -self.vx,
+            vy: -self.vy,
+            vz: -self.vz,
+            dt: self.dt,
+            frame: self.frame,
+        }
+    }
+}
+
+impl Serialize for State {
+    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("State", 7)?;
+        state.serialize_field("dt", &self.dt.as_jde_et_days())?;
+        state.serialize_field("x", &self.x)?;
+        state.serialize_field("y", &self.y)?;
+        state.serialize_field("z", &self.z)?;
+        state.serialize_field("vx", &self.vx)?;
+        state.serialize_field("vy", &self.vy)?;
+        state.serialize_field("vz", &self.vz)?;
+        state.end()
     }
 }
 

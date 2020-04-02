@@ -12,6 +12,7 @@ use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, EphemerisContainer};
 use super::SPEED_OF_LIGHT_KMS;
 use crate::hifitime::{Epoch, SECONDS_PER_DAY};
+use crate::na::Matrix3;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -44,7 +45,9 @@ pub struct Cosm {
     frames: HashMap<String, Frame>,
     axb_names: HashMap<String, i32>,
     exb_map: Graph<i32, u8, Undirected>,
-    axb_map: Graph<i32, Box<dyn ParentRotation>, Directed>,
+    axb_map: Graph<i32, u8, Undirected>,
+    // Stores the rotations, cannot be in the map because Box<dyn T> si not clonable, and therefore cannot be used for A*
+    axb_rotations: HashMap<i32, Box<dyn ParentRotation>>,
     j2k_nidx: NodeIndex<u32>,
 }
 
@@ -87,7 +90,7 @@ impl Cosm {
 
     /// Attempts to build a Cosm from the *XB files.
     pub fn try_from_xb(filename: &str) -> Result<Cosm, IoError> {
-        let mut axb_map: Graph<i32, Box<dyn ParentRotation>, Directed> = Graph::new();
+        let mut axb_map: Graph<i32, u8, Undirected> = Graph::new_undirected();
         let j2k_nidx = axb_map.add_node(0);
 
         let mut cosm = Cosm {
@@ -97,6 +100,7 @@ impl Cosm {
             axb_names: HashMap::new(),
             exb_map: Graph::new_undirected(),
             axb_map,
+            axb_rotations: HashMap::new(),
             j2k_nidx,
         };
 
@@ -252,14 +256,12 @@ impl Cosm {
                                         semi_major_radius: 696_342.0,
                                     };
 
-                                    let sun_iau_node = self.axb_map.add_node(10);
+                                    let sun_iau_id = 10;
+                                    let sun_iau_node = self.axb_map.add_node(sun_iau_id);
                                     self.axb_names.insert("iau sun".to_owned(), 0);
                                     // And create the edge between the IAU SUN and J2k
-                                    self.axb_map.add_edge(
-                                        sun_iau_node,
-                                        self.j2k_nidx,
-                                        Box::new(sun2ssb_rot),
-                                    );
+                                    self.axb_map.add_edge(sun_iau_node, self.j2k_nidx, 1);
+                                    self.axb_rotations.insert(sun_iau_id, Box::new(sun2ssb_rot));
                                     self.frames.insert("iau sun".to_owned(), sun_iau);
                                 }
                                 _ => {
@@ -315,7 +317,12 @@ impl Cosm {
         }
     }
 
-    pub fn try_frame_by_id(&self, id: i32) -> Result<Frame, CosmError> {
+    /// Returns the geoid from the loaded XB, if it is in there, else panics!
+    pub fn frame(&self, name: &str) -> Frame {
+        self.try_frame(name).unwrap()
+    }
+
+    pub fn try_frame_by_exb_id(&self, id: i32) -> Result<Frame, CosmError> {
         if id == 0 {
             // Requesting the SSB in J2k
             return Ok(self.frames["solar system barycenter j2000"]);
@@ -339,13 +346,27 @@ impl Cosm {
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame(&self, name: &str) -> Frame {
-        self.try_frame(name).unwrap()
+    pub fn frame_by_exb_id(&self, id: i32) -> Frame {
+        self.try_frame_by_exb_id(id).unwrap()
+    }
+
+    pub fn try_frame_by_axb_id(&self, id: i32) -> Result<Frame, CosmError> {
+        if id == 0 {
+            // Requesting the J2k orientation
+            return Ok(self.frames["solar system barycenter j2000"]);
+        }
+        for (_, frame) in &self.frames {
+            if frame.axb_id() == id {
+                return Ok(*frame);
+            }
+        }
+
+        Err(CosmError::ObjectIDNotFound(id))
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame_by_id(&self, id: i32) -> Frame {
-        self.try_frame_by_id(id).unwrap()
+    pub fn frame_by_axb_id(&self, id: i32) -> Frame {
+        self.try_frame_by_axb_id(id).unwrap()
     }
 
     /// Returns the list of loaded geoids
@@ -457,7 +478,7 @@ impl Cosm {
         // Get the Geoid associated with the ephemeris frame
         let ref_frame_id = ephem.ref_frame.as_ref().unwrap().number;
         let ref_frame_exb_id = ref_frame_id % 100_000;
-        let storage_geoid = self.frame_by_id(ref_frame_exb_id);
+        let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
         let dt = Epoch::from_jde_tai(jde);
         Ok(State::cartesian(
             x,
@@ -485,13 +506,13 @@ impl Cosm {
     ) -> Result<State, CosmError> {
         match correction {
             LTCorr::None => {
-                let target_frame = self.try_frame_by_id(target_exb_id)?;
+                let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
                 let state = State::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
             LTCorr::LightTime | LTCorr::Abberation => {
                 // Get the geometric states as seen from SSB
-                let ssb2k = self.frame_by_id(0);
+                let ssb2k = self.frame_by_exb_id(0);
                 let obs =
                     self.try_celestial_state(frame.exb_id(), datetime, ssb2k, LTCorr::None)?;
                 let mut tgt =
@@ -572,8 +593,8 @@ impl Cosm {
         if state.frame == new_frame {
             return Ok(*state);
         }
-        // Let's get the path between both both states.
-        let path = if state.rmag() > 0.0 {
+        // Let's get the translation path between both both states.
+        let tr_path = if state.rmag() > 0.0 {
             // This is a state transformation, not a celestial position, so let's iterate backward
             // Not entirely sure why, but this works.
             self.translation_path(&new_frame, &state.frame)?
@@ -590,7 +611,7 @@ impl Cosm {
         new_state.frame = new_frame;
         let mut prev_frame_exb_id = new_state.frame.exb_id();
         let mut neg_needed = false;
-        for body in path {
+        for body in tr_path {
             if body.exb_id() == 0 {
                 neg_needed = !neg_needed;
                 continue;
@@ -610,6 +631,31 @@ impl Cosm {
         if state.frame.exb_id() == 0 {
             new_state = -new_state;
         }
+
+        // And now let's compute the rotation path
+        let rot_path = self.rotation_path(&new_frame, &state.frame)?;
+        let mut prev_axb = state.frame.axb_id();
+        if !rot_path.is_empty() {
+            let mut dcm = Matrix3::<f64>::identity();
+            for axb_id in rot_path {
+                // Get the frame and see in which direction we're moving
+                let next_frame = self.frame_by_axb_id(axb_id);
+                if let Some(parent) = next_frame.parent_axb_id() {
+                    // There might not be a rotation at this time.
+                    if let Some(next_dcm) = self.axb_rotations[&axb_id].dcm_to_parent(state.dt) {
+                        if parent == prev_axb {
+                            dcm *= next_dcm;
+                        } else {
+                            dcm *= next_dcm.transpose();
+                        }
+                    }
+                }
+                prev_axb = axb_id;
+            }
+            println!("{}", dcm);
+            new_state.apply_dcm(dcm);
+        }
+
         Ok(new_state)
     }
 
@@ -620,14 +666,12 @@ impl Cosm {
 
     /// Return the provided state in the provided frame, or panics
     pub fn frame_chg_by_id(&self, state: &State, new_frame: i32) -> State {
-        let frame = self.frame_by_id(new_frame);
+        let frame = self.frame_by_exb_id(new_frame);
         self.try_frame_chg(state, frame).unwrap()
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
     fn translation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<Frame>, CosmError> {
-        // TODO: Add orientation computation
-
         if from == to {
             // Same frames, nothing to do
             return Ok(Vec::new());
@@ -655,16 +699,55 @@ impl Cosm {
                         common_denom = exb_id;
                         denom_idx = i;
                     }
-                    let this_frame = self.frame_by_id(exb_id);
-
-                    // Ignore going through SSB since it isn't a geoid
-                    f_path.push(this_frame);
+                    f_path.push(self.frame_by_exb_id(exb_id));
                 }
                 // Remove the common denominator
                 f_path.remove(denom_idx);
                 Ok(f_path)
             }
             None => Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
+        }
+    }
+
+    /// Returns the rotation path of AXB IDs from the target `from` as seen from `to`.
+    fn rotation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<i32>, CosmError> {
+        if from == to {
+            // Same frames, nothing to do
+            return Ok(Vec::new());
+        }
+
+        let start_axb_idx = self.axbid_to_map_idx(to.axb_id()).unwrap();
+        let end_axb_idx = self.axbid_to_map_idx(from.axb_id()).unwrap();
+
+        match astar(
+            &self.axb_map,
+            start_axb_idx,
+            |finish| finish == end_axb_idx,
+            |e| *e.weight(),
+            |_| 0,
+        ) {
+            Some((_, path)) => {
+                // Build the path with the frames
+                let mut f_path = Vec::new();
+                // Arbitrarily high number
+                let mut common_denom = 1_000_000_000;
+                let mut denom_idx = 0;
+                for (i, idx) in path.iter().enumerate() {
+                    let axb_id = self.axb_map[*idx];
+                    if axb_id < common_denom {
+                        common_denom = axb_id;
+                        denom_idx = i;
+                    }
+                    f_path.push(axb_id);
+                }
+                // Remove the common denominator
+                f_path.remove(denom_idx);
+                Ok(f_path)
+            }
+            None => Err(CosmError::DisjointFrameOrientations(
+                from.axb_id(),
+                to.axb_id(),
+            )),
         }
     }
 }
@@ -722,7 +805,18 @@ mod tests {
             .unwrap()
             .len(),
             0,
-            "Conversions within Earth does not require any transformation"
+            "Conversions within Earth does not require any translation"
+        );
+
+        assert_eq!(
+            cosm.rotation_path(
+                &cosm.frame("Earth Barycenter J2000"),
+                &cosm.frame("Earth Barycenter J2000"),
+            )
+            .unwrap()
+            .len(),
+            0,
+            "Conversions within Earth does not require any rotation"
         );
 
         let jde = Epoch::from_jde_et(2_452_312.5);
@@ -800,6 +894,39 @@ mod tests {
             ven2ear.len(),
             3,
             "Venus -> (SSB) -> Earth Barycenter -> Earth Moon"
+        );
+
+        assert_eq!(
+            cosm.rotation_path(
+                &cosm.frame("Venus Barycenter J2000"),
+                &cosm.frame("EME2000"),
+            )
+            .unwrap()
+            .len(),
+            0,
+            "Conversion does not require any rotation"
+        );
+
+        assert_eq!(
+            cosm.rotation_path(
+                &cosm.frame("Venus Barycenter J2000"),
+                &cosm.frame("IAU Sun"),
+            )
+            .unwrap()
+            .len(),
+            1,
+            "Conversion to Sun IAU from Venus J2k requires one rotation"
+        );
+
+        assert_eq!(
+            cosm.rotation_path(
+                &cosm.frame("IAU Sun"),
+                &cosm.frame("Venus Barycenter J2000"),
+            )
+            .unwrap()
+            .len(),
+            1,
+            "Conversion from Sun IAU to Venus J2k requires one rotation"
         );
 
         let c = LTCorr::None;
@@ -901,6 +1028,15 @@ mod tests {
         let state_sum = ear2sun_state + sun2ear_state;
         assert!(state_sum.rmag() < EPSILON);
         assert!(state_sum.vmag() < EPSILON);
+
+        // Check converse of rotations
+        let sun_iau = cosm.frame("IAU Sun");
+        let ear_sun_2k = cosm.celestial_state(bodies::EARTH, jde, sun2k, c);
+        let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
+        let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
+
+        println!("{}", ear_sun_2k - ear_sun_iau);
+        println!("{}", ear_sun_2k_prime - ear_sun_iau);
     }
 
     #[test]

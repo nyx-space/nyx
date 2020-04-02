@@ -26,7 +26,7 @@ impl<'a> CelestialDynamics<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
     pub fn new(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         for exb_id in &bodies {
-            cosm.try_frame_by_id(*exb_id)
+            cosm.try_frame_by_exb_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
         }
         Self {
@@ -102,7 +102,7 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
         // Get all of the position vectors between the center body and the third bodies
         let jde = Epoch::from_tai_seconds(self.init_tai_secs + t);
         for exb_id in &self.bodies {
-            let third_body = self.cosm.unwrap().frame_by_id(*exb_id);
+            let third_body = self.cosm.unwrap().frame_by_exb_id(*exb_id);
             // State of j-th body as seen from primary body
             let st_ij =
                 self.cosm
@@ -143,7 +143,7 @@ impl<'a> CelestialDynamicsStm<'a> {
     pub fn new(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         // Check that these bodies are present in the EXB.
         for exb_id in &bodies {
-            cosm.try_frame_by_id(*exb_id)
+            cosm.try_frame_by_exb_id(*exb_id)
                 .expect("unknown EXB ID in list of third bodies");
         }
         Self {
@@ -248,7 +248,7 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
         // Get all of the position vectors between the center body and the third bodies
         let jde = Epoch::from_tai_seconds(self.init_tai_secs + t);
         for exb_id in &self.bodies {
-            let third_body = self.cosm.unwrap().frame_by_id(*exb_id);
+            let third_body = self.cosm.unwrap().frame_by_exb_id(*exb_id);
             let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
 
             // State of j-th body as seen from primary body
