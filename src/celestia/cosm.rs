@@ -355,7 +355,7 @@ impl Cosm {
             // Requesting the J2k orientation
             return Ok(self.frames["solar system barycenter j2000"]);
         }
-        for (_, frame) in &self.frames {
+        for frame in self.frames.values() {
             if frame.axb_id() == id {
                 return Ok(*frame);
             }
@@ -1028,15 +1028,27 @@ mod tests {
         let state_sum = ear2sun_state + sun2ear_state;
         assert!(state_sum.rmag() < EPSILON);
         assert!(state_sum.vmag() < EPSILON);
+    }
 
-        // Check converse of rotations
+    #[test]
+    fn test_rotation_coherent() {
+        let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
+        let cosm = Cosm::from_xb("./de438s");
+
+        let sun2k = cosm.frame("Sun J2000");
         let sun_iau = cosm.frame("IAU Sun");
-        let ear_sun_2k = cosm.celestial_state(bodies::EARTH, jde, sun2k, c);
+        let ear_sun_2k = cosm.celestial_state(bodies::EARTH, jde, sun2k, LTCorr::None);
         let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
         let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
 
-        println!("{}", ear_sun_2k - ear_sun_iau);
-        println!("{}", ear_sun_2k_prime - ear_sun_iau);
+        assert!(
+            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= std::f64::EPSILON,
+            "a single rotation changes rmag"
+        );
+        assert!(
+            dbg!((ear_sun_2k_prime - ear_sun_2k).rmag()) <= 1e-6,
+            "reverse rotation does not match initial state"
+        );
     }
 
     #[test]
