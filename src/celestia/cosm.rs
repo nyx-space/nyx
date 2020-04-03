@@ -118,14 +118,16 @@ impl Cosm {
         cosm.frames
             .insert("solar system barycenter j2000".to_owned(), ssb2k);
 
-        match cosm.append_xb(filename) {
-            None => Ok(cosm),
-            Some(err) => Err(err),
+        if let Some(err) = cosm.append_xb(filename) {
+            return Err(err);
         }
 
         // Now, let's append the IAU frames as defined in
         // Celest Mech Dyn Astr (2018) 130:22
         // https://doi.org/10.1007/s10569-017-9805-5
+        cosm.add_iau_frames();
+
+        Ok(cosm)
     }
 
     pub fn append_xb(&mut self, filename: &str) -> Option<IoError> {
@@ -228,41 +230,6 @@ impl Cosm {
                                         format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
                                         sun2k,
                                     );
-                                    // And now in IAU body fixed
-
-                                    // Define the IAU_SUN frame
-                                    let sun2ssb_ctx = HashMap::new();
-                                    let right_asc: meval::Expr = "289.13".parse().unwrap();
-                                    let declin: meval::Expr = "63.87".parse().unwrap();
-                                    let w_expr: meval::Expr =
-                                        "84.176 + 14.18440000*d".parse().unwrap();
-                                    let sun2ssb_rot = Euler3AxisDt::from_ra_dec_w(
-                                        right_asc,
-                                        declin,
-                                        w_expr,
-                                        &sun2ssb_ctx,
-                                        AngleUnit::Degrees,
-                                    );
-                                    // Executively state that the IAU_SUN frame has the ID 10
-                                    let sun_iau = Frame::Geoid {
-                                        axb_id: 10,
-                                        exb_id: id.number,
-                                        gm: SUN_GM,
-                                        parent_axb_id: Some(0),
-                                        parent_exb_id: Some(exb_id),
-                                        flattening: 0.0,
-                                        // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
-                                        equatorial_radius: 696_342.0,
-                                        semi_major_radius: 696_342.0,
-                                    };
-
-                                    let sun_iau_id = 10;
-                                    let sun_iau_node = self.axb_map.add_node(sun_iau_id);
-                                    self.axb_names.insert("iau sun".to_owned(), 0);
-                                    // And create the edge between the IAU SUN and J2k
-                                    self.axb_map.add_edge(sun_iau_node, self.j2k_nidx, 1);
-                                    self.axb_rotations.insert(sun_iau_id, Box::new(sun2ssb_rot));
-                                    self.frames.insert("iau sun".to_owned(), sun_iau);
                                 }
                                 _ => {
                                     info!(
@@ -278,6 +245,114 @@ impl Cosm {
                 None
             }
         }
+    }
+
+    fn add_iau_frames(&mut self) {
+        let no_ctx = HashMap::new();
+        // IAU_SUN
+        let right_asc: meval::Expr = "289.13".parse().unwrap();
+        let declin: meval::Expr = "63.87".parse().unwrap();
+        let w_expr: meval::Expr = "84.176 + 14.18440000*d".parse().unwrap();
+        let sun2ssb_rot =
+            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        // Executively state that the IAU_SUN frame has the ID 10
+        let sun_iau = Frame::Geoid {
+            axb_id: 10,
+            exb_id: 10,
+            gm: SUN_GM,
+            parent_axb_id: Some(0),
+            parent_exb_id: Some(0),
+            flattening: 0.0,
+            // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+            equatorial_radius: 696_342.0,
+            semi_major_radius: 696_342.0,
+        };
+
+        let sun_iau_node = self.axb_map.add_node(sun_iau.axb_id());
+        self.axb_names.insert("iau sun".to_owned(), 0);
+        // And create the edge between the IAU SUN and J2k
+        self.axb_map.add_edge(sun_iau_node, self.j2k_nidx, 1);
+        self.axb_rotations
+            .insert(sun_iau.axb_id(), Box::new(sun2ssb_rot));
+        self.frames.insert("iau sun".to_owned(), sun_iau);
+
+        // IAU_VENUS
+        let right_asc: meval::Expr = "272.76".parse().unwrap();
+        let declin: meval::Expr = "67.16".parse().unwrap();
+        let w_expr: meval::Expr = "160.20 - 1.4813688*d".parse().unwrap();
+        let venus_rot =
+            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let venus_j2k = self.frame("Venus barycenter");
+        let venus_iau = Frame::Geoid {
+            axb_id: 200,
+            exb_id: venus_j2k.exb_id(),
+            gm: venus_j2k.gm(),
+            parent_axb_id: Some(0),
+            parent_exb_id: Some(0),
+            flattening: 0.0,
+            equatorial_radius: venus_j2k.equatorial_radius(),
+            semi_major_radius: venus_j2k.semi_major_radius(),
+        };
+
+        let iau_node = self.axb_map.add_node(venus_iau.axb_id());
+        self.axb_names.insert("iau venus".to_owned(), 0);
+        // And create the edge between the IAU SUN and J2k
+        self.axb_map.add_edge(iau_node, self.j2k_nidx, 1);
+        self.axb_rotations
+            .insert(venus_iau.axb_id(), Box::new(venus_rot));
+        self.frames.insert("iau venus".to_owned(), venus_iau);
+
+        // IAU_SATURN
+        let right_asc: meval::Expr = "40.589 - 0.036*T".parse().unwrap();
+        let declin: meval::Expr = "83.537 - 0.004*T".parse().unwrap();
+        let w_expr: meval::Expr = "38.90 - 810.7939024*d".parse().unwrap();
+        let saturn_rot =
+            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let saturn_j2k = self.frame("Saturn barycenter");
+        let saturn_iau = Frame::Geoid {
+            axb_id: 200,
+            exb_id: saturn_j2k.exb_id(),
+            gm: saturn_j2k.gm(),
+            parent_axb_id: Some(0),
+            parent_exb_id: Some(0),
+            flattening: 0.0,
+            equatorial_radius: saturn_j2k.equatorial_radius(),
+            semi_major_radius: saturn_j2k.semi_major_radius(),
+        };
+
+        let iau_id = 600;
+        let iau_node = self.axb_map.add_node(iau_id);
+        self.axb_names.insert("iau saturn".to_owned(), 0);
+        // And create the edge between the IAU SUN and J2k
+        self.axb_map.add_edge(iau_node, self.j2k_nidx, 1);
+        self.axb_rotations.insert(iau_id, Box::new(saturn_rot));
+        self.frames.insert("iau saturn".to_owned(), saturn_iau);
+
+        // IAU_URANUS
+        let right_asc: meval::Expr = "40.589 - 0.036*T".parse().unwrap();
+        let declin: meval::Expr = "83.537 - 0.004*T".parse().unwrap();
+        let w_expr: meval::Expr = "38.90 - 810.7939024*d".parse().unwrap();
+        let uranus_rot =
+            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let uranus_j2k = self.frame("Uranus barycenter");
+        let uranus_iau = Frame::Geoid {
+            axb_id: 700,
+            exb_id: uranus_j2k.exb_id(),
+            gm: uranus_j2k.gm(),
+            parent_axb_id: Some(0),
+            parent_exb_id: Some(0),
+            flattening: 0.0,
+            equatorial_radius: uranus_j2k.equatorial_radius(),
+            semi_major_radius: uranus_j2k.semi_major_radius(),
+        };
+
+        let iau_node = self.axb_map.add_node(uranus_iau.axb_id());
+        self.axb_names.insert("iau uranus".to_owned(), 0);
+        // And create the edge between the IAU SUN and J2k
+        self.axb_map.add_edge(iau_node, self.j2k_nidx, 1);
+        self.axb_rotations
+            .insert(uranus_iau.axb_id(), Box::new(uranus_rot));
+        self.frames.insert("iau uranus".to_owned(), uranus_iau);
     }
 
     fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
@@ -299,14 +374,15 @@ impl Cosm {
     }
 
     fn frame_idx_name(name: &str) -> String {
-        if name.to_owned().to_lowercase() == "eme2000" {
+        let name = name.replace("_", " ");
+        if name.to_lowercase() == "eme2000" {
             String::from("earth j2000")
-        } else if name.to_owned().to_lowercase() == "luna" {
+        } else if name.to_lowercase() == "luna" {
             String::from("moon j2000")
-        } else if name.to_owned().to_lowercase() == "ssb" {
+        } else if name.to_lowercase() == "ssb" {
             String::from("solar system barycenter j2000")
         } else {
-            name.to_owned().to_lowercase()
+            name.to_lowercase()
         }
     }
 
