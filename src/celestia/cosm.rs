@@ -248,6 +248,7 @@ impl Cosm {
     }
 
     fn add_iau_frames(&mut self) {
+        println!("{:?}", self.get_frame_names());
         let no_ctx = HashMap::new();
         // IAU_SUN
         let right_asc: meval::Expr = "289.13".parse().unwrap();
@@ -282,7 +283,7 @@ impl Cosm {
         let w_expr: meval::Expr = "160.20 - 1.4813688*d".parse().unwrap();
         let venus_rot =
             Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
-        let venus_j2k = self.frame("Venus barycenter");
+        let venus_j2k = self.frame("Venus barycenter j2000");
         let venus_iau = Frame::Geoid {
             axb_id: 200,
             exb_id: venus_j2k.exb_id(),
@@ -308,7 +309,7 @@ impl Cosm {
         let w_expr: meval::Expr = "38.90 - 810.7939024*d".parse().unwrap();
         let saturn_rot =
             Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
-        let saturn_j2k = self.frame("Saturn barycenter");
+        let saturn_j2k = self.frame("Saturn barycenter j2000");
         let saturn_iau = Frame::Geoid {
             axb_id: 200,
             exb_id: saturn_j2k.exb_id(),
@@ -334,7 +335,7 @@ impl Cosm {
         let w_expr: meval::Expr = "38.90 - 810.7939024*d".parse().unwrap();
         let uranus_rot =
             Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
-        let uranus_j2k = self.frame("Uranus barycenter");
+        let uranus_j2k = self.frame("Uranus barycenter j2000");
         let uranus_iau = Frame::Geoid {
             axb_id: 700,
             exb_id: uranus_j2k.exb_id(),
@@ -424,6 +425,16 @@ impl Cosm {
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
     pub fn frame_by_exb_id(&self, id: i32) -> Frame {
         self.try_frame_by_exb_id(id).unwrap()
+    }
+
+    /// Return the names of all the frames
+    pub fn get_frame_names(&self) -> Vec<String> {
+        self.frames.keys().cloned().collect::<Vec<String>>()
+    }
+
+    /// Returns all the frames themselves
+    pub fn get_frames(&self) -> Vec<Frame> {
+        self.frames.values().cloned().collect::<Vec<Frame>>()
     }
 
     pub fn try_frame_by_axb_id(&self, id: i32) -> Result<Frame, CosmError> {
@@ -728,7 +739,6 @@ impl Cosm {
                 }
                 prev_axb = axb_id;
             }
-            println!("{}", dcm);
             new_state.apply_dcm(dcm);
         }
 
@@ -1122,7 +1132,7 @@ mod tests {
             "a single rotation changes rmag"
         );
         assert!(
-            dbg!((ear_sun_2k_prime - ear_sun_2k).rmag()) <= 1e-6,
+            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-6,
             "reverse rotation does not match initial state"
         );
     }
