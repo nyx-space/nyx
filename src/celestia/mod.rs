@@ -60,10 +60,12 @@ pub use self::state::*;
 mod frames;
 pub use self::frames::*;
 
+mod rotations;
+pub use self::rotations::*;
+
 mod cosm;
 mod xb;
 pub use self::cosm::*;
-mod hermite;
 
 /// The eclipse module allows finding eclipses and (conversely) visibility between a state and another one (e.g. a planet or the Sun).
 pub mod eclipse;

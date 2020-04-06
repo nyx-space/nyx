@@ -1,36 +1,57 @@
+extern crate approx;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 use std::f64;
 
+use approx::{abs_diff_eq, relative_eq};
+use hifitime::{Epoch, J2000_OFFSET};
+use na::Vector6;
+use nyx::celestia::{Cosm, State};
+use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::propagators::error_ctrl::RSSStatePV;
+use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
+
+macro_rules! assert_eq_or_abs {
+    ($left:expr, $right:expr, $msg:expr) => {
+        if !(*$left == *$right) && !abs_diff_eq!($left, $right, epsilon = 1e-8) {
+            panic!(
+                r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`: {}"#,
+                &*$left, &*$right, $msg
+            )
+        }
+    };
+}
+
+macro_rules! assert_eq_or_rel {
+    ($left:expr, $right:expr, $msg:expr) => {
+        if !(*$left == *$right) && !relative_eq!($left, $right, max_relative = 1e-7) {
+            panic!(
+                r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`: {}"#,
+                &*$left, &*$right, $msg
+            )
+        }
+    };
+}
 
 #[test]
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
-    use hifitime::{Epoch, J2000_OFFSET};
-    use na::Vector6;
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
-    use nyx::propagators::*;
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(399);
+    let eme2k = cosm.frame("EME2000");
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+    let init = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let all_rslts = vec![
@@ -82,7 +103,7 @@ fn regress_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
+        assert_eq_or_abs!(prop.state_vector(), all_rslts[1], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -100,7 +121,7 @@ fn regress_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[2], "two body prop failed");
+        assert_eq_or_rel!(prop.state_vector(), all_rslts[2], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -117,31 +138,17 @@ fn gmat_val_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    use self::na::Vector6;
-    use hifitime::{Epoch, J2000_OFFSET};
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::error_ctrl::RSSStatePV;
-    use nyx::propagators::*;
-
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(399);
-    earth_geoid.gm = 398_600.441_5; // Using GMAT's value
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let prop_time = 24.0 * 3_600.0;
     let accuracy = 1e-12;
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+    let init = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let all_rslts = vec![
@@ -186,7 +193,7 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[0], "two body prop failed");
+        assert_eq_or_abs!(prop.state_vector(), all_rslts[0], "two body prop failed");
         assert!(
             (prop.dynamics.state.dt.as_tai_seconds() - init.dt.as_tai_seconds() - prop_time).abs()
                 < f64::EPSILON
@@ -200,7 +207,7 @@ fn gmat_val_leo_day_adaptive() {
                 prev_details
             );
         }
-        assert_eq!(
+        assert_eq_or_abs!(
             prop.state_vector(),
             all_rslts[0],
             "first forward two body prop failed"
@@ -227,7 +234,7 @@ fn gmat_val_leo_day_adaptive() {
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
+        assert_eq_or_abs!(prop.state_vector(), all_rslts[1], "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert!(
@@ -277,27 +284,14 @@ fn gmat_val_leo_day_adaptive() {
 
 #[test]
 fn gmat_val_leo_day_fixed() {
-    use crate::na::Vector6;
-    use hifitime::{Epoch, J2000_OFFSET};
-    use nyx::celestia::{Cosm, Geoid, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
-    use nyx::propagators::*;
-
-    let cosm = Cosm::from_xb("./de438s");
-    let mut earth_geoid = cosm.geoid_from_id(399);
-    earth_geoid.gm = 398_600.441_5; // Using GMAT's value
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let prop_time = 3_600.0 * 24.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::<Geoid>::from_cartesian(
-        -2436.45,
-        -2436.45,
-        6891.037,
-        5.088_611,
-        -5.088_611,
-        0.0,
-        dt,
-        earth_geoid,
+    let init = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
     let all_rslts = vec![
@@ -371,7 +365,7 @@ fn gmat_val_leo_day_fixed() {
         let mut dynamics = CelestialDynamics::two_body(init);
         let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time);
-        assert_eq!(prop.state_vector(), all_rslts[1], "two body prop failed");
+        assert_eq_or_rel!(prop.state_vector(), all_rslts[1], "two body prop failed");
     }
 
     {

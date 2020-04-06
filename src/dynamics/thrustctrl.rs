@@ -1,6 +1,6 @@
 use super::hifitime::Epoch;
 use super::na::Vector3;
-use celestia::{Geoid, LocalFrame, State};
+use celestia::{Frame, State};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
 /// The `ThrustControl` trait handles control laws, optimizations, and other such methods for
@@ -11,26 +11,26 @@ where
     Self: Clone + Sized,
 {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, state: &State<Geoid>) -> Vector3<f64>;
+    fn direction(&self, state: &State) -> Vector3<f64>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, state: &State<Geoid>) -> f64;
+    fn throttle(&self, state: &State) -> f64;
 
     /// Prepares the controller for the next maneuver (called from set_state of the dynamics).
-    fn next(&mut self, state: &State<Geoid>);
+    fn next(&mut self, state: &State);
 }
 
 #[derive(Clone)]
 pub struct NoThrustControl {}
 impl ThrustControl for NoThrustControl {
-    fn direction(&self, _: &State<Geoid>) -> Vector3<f64> {
+    fn direction(&self, _: &State) -> Vector3<f64> {
         unimplemented!();
     }
-    fn throttle(&self, _: &State<Geoid>) -> f64 {
+    fn throttle(&self, _: &State) -> f64 {
         unimplemented!();
     }
-    fn next(&mut self, _: &State<Geoid>) {
+    fn next(&mut self, _: &State) {
         unimplemented!();
     }
 }
@@ -46,7 +46,7 @@ pub enum Achieve {
 }
 
 impl Achieve {
-    pub fn achieved(&self, state: &State<Geoid>) -> bool {
+    pub fn achieved(&self, state: &State) -> bool {
         match *self {
             Achieve::Sma { target, tol } => (state.sma() - target).abs() < tol,
             Achieve::Ecc { target, tol } => (state.ecc() - target).abs() < tol,
@@ -90,14 +90,14 @@ impl Mnvr {
 pub struct Ruggiero {
     /// Stores the objectives
     objectives: Vec<Achieve>,
-    init_state: State<Geoid>,
+    init_state: State,
     achieved: bool,
 }
 
-/// The QLaw is an optimal control of a state for specific osculating elements.
+/// The Ruggiero is a locally optimal control of a state for specific osculating elements.
 /// WARNING: Objectives must be in degrees!
 impl Ruggiero {
-    pub fn new(objectives: Vec<Achieve>, initial: State<Geoid>) -> Self {
+    pub fn new(objectives: Vec<Achieve>, initial: State) -> Self {
         Self {
             objectives,
             init_state: initial,
@@ -122,7 +122,7 @@ impl Ruggiero {
     }
 
     /// Returns whether the control law has achieved all goals
-    pub fn achieved(&self, state: &State<Geoid>) -> bool {
+    pub fn achieved(&self, state: &State) -> bool {
         for obj in &self.objectives {
             if !obj.achieved(state) {
                 return false;
@@ -133,7 +133,7 @@ impl Ruggiero {
 }
 
 impl ThrustControl for Ruggiero {
-    fn direction(&self, osc: &State<Geoid>) -> Vector3<f64> {
+    fn direction(&self, osc: &State) -> Vector3<f64> {
         if self.achieved {
             Vector3::zeros()
         } else {
@@ -219,12 +219,12 @@ impl ThrustControl for Ruggiero {
                 ctrl
             };
             // Convert to inertial
-            osc.dcm_to_inertial(LocalFrame::RCN) * ctrl
+            osc.dcm_to_inertial(Frame::RCN) * ctrl
         }
     }
 
     // Either thrust full power or not at all
-    fn throttle(&self, osc: &State<Geoid>) -> f64 {
+    fn throttle(&self, osc: &State) -> f64 {
         if self.achieved {
             0.0
         } else {
@@ -268,7 +268,7 @@ impl ThrustControl for Ruggiero {
     }
 
     /// Update the state for the next iteration
-    fn next(&mut self, osc: &State<Geoid>) {
+    fn next(&mut self, osc: &State) {
         if self.throttle(osc) > 0.0 {
             if self.achieved {
                 info!("enabling control: {:o}", osc);
@@ -289,22 +289,17 @@ pub struct FiniteBurns {
     /// Maneuvers should be provided in chronological order, first maneuver first in the list
     pub mnvrs: Vec<Mnvr>,
     pub mnvr_no: usize,
-    geoid: Geoid,
 }
 
 impl FiniteBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
-    pub fn from_mnvrs(mnvrs: Vec<Mnvr>, geoid: Geoid) -> Self {
-        Self {
-            mnvrs,
-            mnvr_no: 0,
-            geoid,
-        }
+    pub fn from_mnvrs(mnvrs: Vec<Mnvr>) -> Self {
+        Self { mnvrs, mnvr_no: 0 }
     }
 }
 
 impl ThrustControl for FiniteBurns {
-    fn direction(&self, osc: &State<Geoid>) -> Vector3<f64> {
+    fn direction(&self, osc: &State) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
         if self.mnvr_no >= self.mnvrs.len() {
@@ -312,14 +307,14 @@ impl ThrustControl for FiniteBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= osc.dt {
-                osc.dcm_to_inertial(LocalFrame::VNC) * next_mnvr.vector
+                osc.dcm_to_inertial(Frame::VNC) * next_mnvr.vector
             } else {
                 Vector3::zeros()
             }
         }
     }
 
-    fn throttle(&self, osc: &State<Geoid>) -> f64 {
+    fn throttle(&self, osc: &State) -> f64 {
         if self.mnvr_no >= self.mnvrs.len() {
             0.0
         } else {
@@ -332,7 +327,7 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn next(&mut self, osc: &State<Geoid>) {
+    fn next(&mut self, osc: &State) {
         if self.mnvr_no < self.mnvrs.len() {
             let cur_mnvr = self.mnvrs[self.mnvr_no];
             if osc.dt >= cur_mnvr.end {
@@ -353,15 +348,14 @@ fn unit_vector_from_angles(alpha: f64, beta: f64) -> Vector3<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use celestia::{bodies, Cosm};
+    use celestia::Cosm;
     #[test]
     fn ruggiero_weight() {
         let mut cosm = Cosm::from_xb("./de438s");
-        cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.433);
-        let earth = cosm.geoid_from_id(bodies::EARTH);
+        cosm.mut_gm_for_frame("EME2000", 398_600.433);
+        let eme2k = cosm.frame("EME2000");
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-        let orbit =
-            State::<Geoid>::from_keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, earth);
+        let orbit = State::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
         // Define the objectives
         let objectives = vec![
@@ -377,7 +371,7 @@ mod tests {
 
         let ruggiero = Ruggiero::new(objectives, orbit);
         // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
-        let osc = State::<Geoid>::from_cartesian(
+        let osc = State::cartesian(
             7_303.253_461_441_64f64,
             127.478_714_816_381_75,
             0.111_246_193_227_445_4,
@@ -385,7 +379,7 @@ mod tests {
             7.422_889_151_816_439,
             0.006_477_694_429_837_2,
             start_time,
-            earth,
+            eme2k,
         );
         let expected = Vector3::new(
             -0.017_279_636_133_108_3,

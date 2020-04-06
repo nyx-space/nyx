@@ -1,5 +1,6 @@
 /// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
+pub use self::error_ctrl::*;
 
 pub mod events;
 

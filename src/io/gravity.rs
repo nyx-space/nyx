@@ -153,7 +153,7 @@ impl MemoryBackend {
             .split('\n')
             .enumerate()
         {
-            if line.is_empty() || line.chars().nth(0).unwrap() != 'R' {
+            if line.is_empty() || line.chars().next().unwrap() != 'R' {
                 continue; // This is either a comment, a header or "END"
             }
             // These variables need to be declared as mutable because rustc does not know
@@ -198,7 +198,7 @@ impl MemoryBackend {
                             // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
                             // is a positive number, otherwise, they are continuous (what a great format).
                             if (item.matches('-').count() == 3
-                                && item.chars().nth(0).unwrap() != '-')
+                                && item.chars().next().unwrap() != '-')
                                 || item.matches('-').count() == 4
                             {
                                 // Now we have two items concatenated into one... great

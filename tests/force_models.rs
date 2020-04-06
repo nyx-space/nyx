@@ -4,32 +4,32 @@ extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use na::Vector6;
-use nyx::celestia::{bodies, Cosm, Geoid, State};
+use nyx::celestia::{Cosm, State};
 use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::dynamics::drag::ExpEarthDrag;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
 use nyx::dynamics::thrustctrl::NoThrustControl;
 use nyx::dynamics::Dynamics;
-use nyx::propagators::{PropOpts, Propagator, RK89};
+use nyx::propagators::{PropOpts, Propagator};
 use nyx::utils::rss_state_errors;
 
 #[test]
 fn srp_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
-    let earth = cosm.geoid_from_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::<Geoid>::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth];
+    let shadow_bodies = vec![eme2k];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
 
@@ -38,7 +38,7 @@ fn srp_earth() {
     let mut sc = Spacecraft::<NoThrustControl>::with_srp(dynamics, srp, dry_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.state();
@@ -65,19 +65,19 @@ fn srp_earth() {
 #[test]
 fn drag_earth() {
     let mut cosm = Cosm::from_xb("./de438s");
-    cosm.mut_gm_for_geoid_id(bodies::EARTH, 398_600.441_5);
-    let earth = cosm.geoid_from_id(bodies::EARTH);
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::<Geoid>::from_keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, earth);
+    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
     let dynamics = CelestialDynamics::two_body(orbit);
 
-    let shadow_bodies = vec![earth];
+    let shadow_bodies = vec![eme2k];
 
     let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
     let drag = ExpEarthDrag {
@@ -93,7 +93,7 @@ fn drag_earth() {
     sc.exp_drag = Some(drag);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.state();

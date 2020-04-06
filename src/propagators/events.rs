@@ -1,4 +1,4 @@
-use crate::celestia::{Cosm, Geoid, State};
+use crate::celestia::{Cosm, Frame, State};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;
@@ -88,11 +88,20 @@ impl<S: Copy> fmt::Display for EventTrackers<S> {
             if event_no > 0 {
                 writeln!(f)?;
             }
-            write!(
-                f,
-                "For {:?}, found times: {:?}",
-                self.events[event_no], self.found_bounds[event_no]
-            )?;
+            if !self.found_bounds[event_no].is_empty() {
+                let last_e = self.found_bounds[event_no][self.found_bounds[event_no].len() - 1];
+                write!(
+                    f,
+                    "[ OK  ] Event {:?} converged on ({}, {})",
+                    self.events[event_no], last_e.0, last_e.1,
+                )?;
+            } else {
+                write!(
+                    f,
+                    "[ERROR] Event {:?} did NOT converge",
+                    self.events[event_no]
+                )?;
+            }
         }
         Ok(())
     }
@@ -123,7 +132,7 @@ impl fmt::Display for EventKind {
 #[derive(Debug)]
 pub struct OrbitalEvent<'a> {
     pub kind: EventKind,
-    pub tgt: Option<Geoid>,
+    pub tgt: Option<Frame>,
     pub cosm: Option<&'a Cosm>,
 }
 
@@ -135,7 +144,7 @@ impl<'a> OrbitalEvent<'a> {
             cosm: None,
         })
     }
-    pub fn in_frame(kind: EventKind, tgt: Geoid, cosm: &'a Cosm) -> Box<Self> {
+    pub fn in_frame(kind: EventKind, tgt: Frame, cosm: &'a Cosm) -> Box<Self> {
         Box::new(OrbitalEvent {
             kind,
             tgt: Some(tgt),
@@ -145,7 +154,7 @@ impl<'a> OrbitalEvent<'a> {
 }
 
 impl<'a> Event for OrbitalEvent<'a> {
-    type StateType = State<Geoid>;
+    type StateType = State;
 
     fn eval(&self, state: &Self::StateType) -> f64 {
         let state = match self.tgt {

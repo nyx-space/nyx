@@ -5,7 +5,7 @@ use super::propulsion::Propulsion;
 use super::solarpressure::SolarPressure;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
-use celestia::{Geoid, State};
+use celestia::State;
 use std::fmt;
 use std::marker::PhantomData;
 
@@ -161,7 +161,7 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct SpacecraftState {
-    pub orbit: State<Geoid>,
+    pub orbit: State,
     pub dry_mass: f64,
     pub fuel_mass: f64,
 }

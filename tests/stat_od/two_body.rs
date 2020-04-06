@@ -5,8 +5,8 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6};
-use self::nyx::celestia::{bodies, Cosm, Geoid, State};
+use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U3};
+use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
@@ -38,15 +38,14 @@ fn ekf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state =
-        State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -158,15 +157,14 @@ fn ckf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state =
-        State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -347,15 +345,14 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state =
-        State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -453,5 +450,84 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
 
         wtr.serialize(est.clone())
             .expect("could not write to stdout");
+    }
+}
+
+#[test]
+fn ckf_map_covar() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    // Define the ground stations.
+    let elevation_mask = 0.0;
+    let range_noise = 0.0;
+    let range_rate_noise = 0.0;
+    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the propagator information.
+    let prop_time = 2.0 * SECONDS_PER_DAY;
+    let step_size = 10.0;
+    let opts_est = PropOpts::with_fixed_step(step_size);
+
+    // Define state information.
+    let cosm = Cosm::from_xb("./de438s");
+    let eme2k = cosm.frame("EME2000");
+    let dt = Epoch::from_mjd_tai(21545.0);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
+    // the measurements, and the same time step.
+    let mut tb_estimator = CelestialDynamicsStm::two_body(initial_state);
+
+    let (pest_tx, pest_rx): (
+        Sender<(State, Matrix6<f64>)>,
+        Receiver<(State, Matrix6<f64>)>,
+    ) = mpsc::channel();
+
+    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    prop_est.tx_chan = Some(&pest_tx);
+    let covar_radius = 1.0e-3;
+    let covar_velocity = 1.0e-6;
+    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+        covar_radius,
+        covar_radius,
+        covar_radius,
+        covar_velocity,
+        covar_velocity,
+        covar_velocity,
+    ));
+
+    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+    let mut ckf = KF::<_, U3, _>::no_snc(initial_estimate, measurement_noise);
+
+    let mut odp = ODProcess::default_ckf(&mut prop_est, &mut ckf, &all_stations);
+
+    let filter_return = odp.map_covar(&pest_rx, dt + prop_time);
+    assert!(filter_return.is_none(), "covar mapping failed");
+
+    // Check that the covariance inflated
+    let estimates = odp.estimates;
+    let est = &estimates[estimates.len() - 1];
+    for i in 0..6 {
+        if i < 3 {
+            assert!(
+                est.covar[(i, i)].abs() > covar_radius,
+                "covar radius did not increase"
+            );
+        } else {
+            assert!(
+                est.covar[(i, i)].abs() > covar_velocity,
+                "covar velocity did not increase"
+            );
+        }
     }
 }

@@ -1,6 +1,6 @@
 use super::na::Vector3;
 use super::ForceModel;
-use celestia::{bodies, Cosm, Geoid, State};
+use celestia::{Cosm, State};
 
 /// `ConstantDrag` implements a constant drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
 ///
@@ -16,14 +16,14 @@ pub struct ConstantDrag<'a> {
     /// atmospheric density in kg/m^3
     pub rho: f64,
     /// Geoid causing the drag
-    pub drag_geoid: Geoid,
+    pub drag_frame_id: i32,
     /// a Cosm reference is needed to convert to the state around the correct planet
     pub cosm: &'a Cosm,
 }
 
-impl<'a> ForceModel<Geoid> for ConstantDrag<'a> {
-    fn eom(&self, osc: &State<Geoid>) -> Vector3<f64> {
-        let osc = self.cosm.frame_chg(&osc, self.drag_geoid);
+impl<'a> ForceModel for ConstantDrag<'a> {
+    fn eom(&self, osc: &State) -> Vector3<f64> {
+        let osc = self.cosm.frame_chg_by_id(&osc, self.drag_frame_id);
         let velocity = osc.velocity();
         -0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity
     }
@@ -44,16 +44,16 @@ pub struct ExpEarthDrag<'a> {
     pub cosm: &'a Cosm,
 }
 
-impl<'a> ForceModel<Geoid> for ExpEarthDrag<'a> {
-    fn eom(&self, osc: &State<Geoid>) -> Vector3<f64> {
-        let earth = self.cosm.geoid_from_id(bodies::EARTH);
+impl<'a> ForceModel for ExpEarthDrag<'a> {
+    fn eom(&self, osc: &State) -> Vector3<f64> {
+        let eme2k = self.cosm.frame("EME2000");
         // Compute the density
         let rho0 = 3.614e-13; // # kg/m^3
-        let r0 = 700_000.0 + earth.equatorial_radius;
+        let r0 = 700_000.0 + eme2k.equatorial_radius();
         let h = 88_667.0; // m
         let rho = rho0 * (-(osc.rmag() - r0) / h).exp(); // # Exponential decay model for density
 
-        let osc = self.cosm.frame_chg(&osc, earth);
+        let osc = self.cosm.frame_chg(&osc, eme2k);
 
         // Incorrectly transform to some ECEF frame
         let earth_rot = 7.292_115_855_3e-5;

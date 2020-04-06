@@ -6,7 +6,7 @@ extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{bodies, Cosm, Geoid, State};
+use self::nyx::celestia::{bodies, Cosm, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
@@ -37,15 +37,14 @@ fn multi_body_ckf_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state =
-        State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -177,15 +176,14 @@ fn multi_body_ckf_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State<Geoid>>, Receiver<State<Geoid>>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let cosm = Cosm::from_xb("./de438s");
-    let earth_geoid = cosm.geoid_from_id(bodies::EARTH);
+    let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state =
-        State::from_keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, earth_geoid);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -216,8 +214,8 @@ fn multi_body_ckf_covar_map() {
     let mut estimator = CelestialDynamicsStm::new(initial_state, bodies, &cosm);
 
     let (pest_tx, pest_rx): (
-        Sender<(State<Geoid>, Matrix6<f64>)>,
-        Receiver<(State<Geoid>, Matrix6<f64>)>,
+        Sender<(State, Matrix6<f64>)>,
+        Receiver<(State, Matrix6<f64>)>,
     ) = mpsc::channel();
 
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
