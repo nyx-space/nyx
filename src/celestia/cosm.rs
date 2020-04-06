@@ -248,7 +248,6 @@ impl Cosm {
     }
 
     fn add_iau_frames(&mut self) {
-        println!("{:?}", self.get_frame_names());
         let no_ctx = HashMap::new();
         // IAU_SUN
         let right_asc: meval::Expr = "289.13".parse().unwrap();
@@ -270,7 +269,8 @@ impl Cosm {
         };
 
         let sun_iau_node = self.axb_map.add_node(sun_iau.axb_id());
-        self.axb_names.insert("iau sun".to_owned(), 0);
+        self.axb_names
+            .insert("iau sun".to_owned(), sun_iau.axb_id());
         // And create the edge between the IAU SUN and J2k
         self.axb_map.add_edge(sun_iau_node, self.j2k_nidx, 1);
         self.axb_rotations
@@ -289,19 +289,47 @@ impl Cosm {
             exb_id: venus_j2k.exb_id(),
             gm: venus_j2k.gm(),
             parent_axb_id: Some(0),
-            parent_exb_id: Some(0),
-            flattening: 0.0,
+            parent_exb_id: Some(venus_j2k.exb_id()),
+            flattening: venus_j2k.flattening(),
             equatorial_radius: venus_j2k.equatorial_radius(),
             semi_major_radius: venus_j2k.semi_major_radius(),
         };
 
         let iau_node = self.axb_map.add_node(venus_iau.axb_id());
-        self.axb_names.insert("iau venus".to_owned(), 0);
+        self.axb_names
+            .insert("iau venus".to_owned(), venus_iau.axb_id());
         // And create the edge between the IAU SUN and J2k
         self.axb_map.add_edge(iau_node, self.j2k_nidx, 1);
         self.axb_rotations
             .insert(venus_iau.axb_id(), Box::new(venus_rot));
         self.frames.insert("iau venus".to_owned(), venus_iau);
+
+        // IAU_EARTH 2006 model
+        let right_asc: meval::Expr = "-0.641*T".parse().unwrap();
+        let declin: meval::Expr = "90.0 - 0.557*T".parse().unwrap();
+        let w_expr: meval::Expr = "190.147 + 360.9856235*d".parse().unwrap();
+        let earth_rot =
+            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let earth_j2k = self.frame("eme2000");
+        let earth_iau = Frame::Geoid {
+            axb_id: 300,
+            exb_id: earth_j2k.exb_id(),
+            gm: earth_j2k.gm(),
+            parent_axb_id: Some(0),
+            parent_exb_id: Some(earth_j2k.exb_id()),
+            flattening: earth_j2k.flattening(),
+            equatorial_radius: earth_j2k.equatorial_radius(),
+            semi_major_radius: earth_j2k.semi_major_radius(),
+        };
+
+        let iau_node = self.axb_map.add_node(earth_iau.axb_id());
+        self.axb_names
+            .insert("iau earth".to_owned(), earth_iau.axb_id());
+        // And create the edge between the IAU SUN and J2k
+        self.axb_map.add_edge(iau_node, self.j2k_nidx, 1);
+        self.axb_rotations
+            .insert(earth_iau.axb_id(), Box::new(earth_rot));
+        self.frames.insert("iau earth".to_owned(), earth_iau);
 
         // IAU_SATURN
         let right_asc: meval::Expr = "40.589 - 0.036*T".parse().unwrap();
@@ -315,15 +343,16 @@ impl Cosm {
             exb_id: saturn_j2k.exb_id(),
             gm: saturn_j2k.gm(),
             parent_axb_id: Some(0),
-            parent_exb_id: Some(0),
-            flattening: 0.0,
+            parent_exb_id: Some(saturn_j2k.exb_id()),
+            flattening: saturn_j2k.flattening(),
             equatorial_radius: saturn_j2k.equatorial_radius(),
             semi_major_radius: saturn_j2k.semi_major_radius(),
         };
 
         let iau_id = 600;
         let iau_node = self.axb_map.add_node(iau_id);
-        self.axb_names.insert("iau saturn".to_owned(), 0);
+        self.axb_names
+            .insert("iau saturn".to_owned(), saturn_iau.axb_id());
         // And create the edge between the IAU SUN and J2k
         self.axb_map.add_edge(iau_node, self.j2k_nidx, 1);
         self.axb_rotations.insert(iau_id, Box::new(saturn_rot));
@@ -348,7 +377,8 @@ impl Cosm {
         };
 
         let iau_node = self.axb_map.add_node(uranus_iau.axb_id());
-        self.axb_names.insert("iau uranus".to_owned(), 0);
+        self.axb_names
+            .insert("iau uranus".to_owned(), uranus_iau.axb_id());
         // And create the edge between the IAU SUN and J2k
         self.axb_map.add_edge(iau_node, self.j2k_nidx, 1);
         self.axb_rotations
@@ -1121,6 +1151,8 @@ mod tests {
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
         let cosm = Cosm::from_xb("./de438s");
 
+        println!("Available frames: {:?}", cosm.get_frame_names());
+
         let sun2k = cosm.frame("Sun J2000");
         let sun_iau = cosm.frame("IAU Sun");
         let ear_sun_2k = cosm.celestial_state(bodies::EARTH, jde, sun2k, LTCorr::None);
@@ -1128,13 +1160,45 @@ mod tests {
         let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
 
         assert!(
-            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= std::f64::EPSILON,
+            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 1e-6,
             "a single rotation changes rmag"
         );
         assert!(
             (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-6,
             "reverse rotation does not match initial state"
         );
+
+        // Test an EME2k to Earth IAU rotation
+
+        let eme2k = cosm.frame("EME2000");
+        let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
+        let state_eme2k = State::keplerian(
+            eme2k.equatorial_radius() + 36_000.0,
+            1e-6,
+            1e-6,
+            90.0,
+            90.0,
+            90.0,
+            dt,
+            eme2k,
+        );
+
+        let state_eme2k1 = State::keplerian(
+            eme2k.equatorial_radius() + 36_000.0,
+            1e-6,
+            1e-6,
+            90.0,
+            90.0,
+            90.0,
+            dt + state_eme2k.period(),
+            eme2k,
+        );
+
+        let earth_iau = cosm.frame("IAU Earth"); // 2006 Model!!
+        let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
+        let state_ecef1 = cosm.frame_chg(&state_eme2k1, earth_iau);
+
+        println!("{}\n{}", state_ecef, state_ecef1);
     }
 
     #[test]
