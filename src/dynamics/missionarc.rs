@@ -1,10 +1,9 @@
 use super::celestial::CelestialDynamics;
 use super::deltavctrl::DeltaVctrl;
-use super::na::{VectorN, U6};
 use super::Dynamics;
+use crate::dimensions::{VectorN, U6};
 use celestia::State;
 
-#[derive(Clone)]
 pub struct MissionArc<'a, D: DeltaVctrl> {
     pub celestial: CelestialDynamics<'a>,
     pub ctrl: D,

@@ -1,7 +1,5 @@
-extern crate nalgebra as na;
-
-use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, DimName};
 
 pub use super::estimate::*;
 pub use super::kalman::*;

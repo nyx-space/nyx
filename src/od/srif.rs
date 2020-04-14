@@ -1,9 +1,9 @@
 extern crate nalgebra as na;
 
-use self::na::allocator::Allocator;
-use self::na::dimension::{DimMin, DimMinimum, DimNameAdd, DimNameSum};
 use self::na::linalg::QR;
-use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::dimension::{DimMin, DimMinimum, DimNameAdd, DimNameSum};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
 use crate::hifitime::Epoch;
 
 pub use super::estimate::{Estimate, IfEstimate};

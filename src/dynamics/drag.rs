@@ -1,5 +1,5 @@
-use super::na::Vector3;
 use super::ForceModel;
+use crate::dimensions::Vector3;
 use celestia::{Cosm, State};
 
 /// `ConstantDrag` implements a constant drag model as defined in Vallado, 4th ed., page 551, with an important caveat.

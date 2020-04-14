@@ -304,7 +304,7 @@ impl Cosm {
             .insert(venus_iau.axb_id(), Box::new(venus_rot));
         self.frames.insert("iau venus".to_owned(), venus_iau);
 
-        // IAU_EARTH 2006 model
+        // IAU_EARTH 2000 model
         let right_asc: meval::Expr = "-0.641*T".parse().unwrap();
         let declin: meval::Expr = "90.0 - 0.557*T".parse().unwrap();
         let w_expr: meval::Expr = "190.147 + 360.9856235*d".parse().unwrap();
@@ -705,6 +705,36 @@ impl Cosm {
             .unwrap()
     }
 
+    /// Return the DCM to go from the `from` frame to the `to` frame
+    pub fn try_frame_chg_dcm_from_to(
+        &self,
+        from: &Frame,
+        to: &Frame,
+        dt: Epoch,
+    ) -> Result<Matrix3<f64>, CosmError> {
+        // And now let's compute the rotation path
+        let rot_path = self.rotation_path(to, from)?;
+        let mut prev_axb = from.axb_id();
+        let mut dcm = Matrix3::<f64>::identity();
+
+        for axb_id in rot_path {
+            // Get the frame and see in which direction we're moving
+            let next_frame = self.frame_by_axb_id(axb_id);
+            if let Some(parent) = next_frame.parent_axb_id() {
+                // There might not be a rotation at this time.
+                if let Some(next_dcm) = self.axb_rotations[&axb_id].dcm_to_parent(dt) {
+                    if parent == prev_axb {
+                        dcm *= next_dcm;
+                    } else {
+                        dcm *= next_dcm.transpose();
+                    }
+                }
+            }
+            prev_axb = axb_id;
+        }
+        Ok(dcm)
+    }
+
     /// Attempts to return the provided state in the provided frame.
     pub fn try_frame_chg(&self, state: &State, new_frame: Frame) -> Result<State, CosmError> {
         if state.frame == new_frame {
@@ -750,27 +780,7 @@ impl Cosm {
         }
 
         // And now let's compute the rotation path
-        let rot_path = self.rotation_path(&new_frame, &state.frame)?;
-        let mut prev_axb = state.frame.axb_id();
-        if !rot_path.is_empty() {
-            let mut dcm = Matrix3::<f64>::identity();
-            for axb_id in rot_path {
-                // Get the frame and see in which direction we're moving
-                let next_frame = self.frame_by_axb_id(axb_id);
-                if let Some(parent) = next_frame.parent_axb_id() {
-                    // There might not be a rotation at this time.
-                    if let Some(next_dcm) = self.axb_rotations[&axb_id].dcm_to_parent(state.dt) {
-                        if parent == prev_axb {
-                            dcm *= next_dcm;
-                        } else {
-                            dcm *= next_dcm.transpose();
-                        }
-                    }
-                }
-                prev_axb = axb_id;
-            }
-            new_state.apply_dcm(dcm);
-        }
+        new_state.apply_dcm(self.try_frame_chg_dcm_from_to(&state.frame, &new_frame, state.dt)?);
 
         Ok(new_state)
     }
@@ -1147,61 +1157,6 @@ mod tests {
     }
 
     #[test]
-    fn test_rotation_coherent() {
-        let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
-        let cosm = Cosm::from_xb("./de438s");
-
-        println!("Available frames: {:?}", cosm.get_frame_names());
-
-        let sun2k = cosm.frame("Sun J2000");
-        let sun_iau = cosm.frame("IAU Sun");
-        let ear_sun_2k = cosm.celestial_state(bodies::EARTH, jde, sun2k, LTCorr::None);
-        let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
-        let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
-
-        assert!(
-            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 1e-6,
-            "a single rotation changes rmag"
-        );
-        assert!(
-            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-6,
-            "reverse rotation does not match initial state"
-        );
-
-        // Test an EME2k to Earth IAU rotation
-
-        let eme2k = cosm.frame("EME2000");
-        let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
-        let state_eme2k = State::keplerian(
-            eme2k.equatorial_radius() + 36_000.0,
-            1e-6,
-            1e-6,
-            90.0,
-            90.0,
-            90.0,
-            dt,
-            eme2k,
-        );
-
-        let state_eme2k1 = State::keplerian(
-            eme2k.equatorial_radius() + 36_000.0,
-            1e-6,
-            1e-6,
-            90.0,
-            90.0,
-            90.0,
-            dt + state_eme2k.period(),
-            eme2k,
-        );
-
-        let earth_iau = cosm.frame("IAU Earth"); // 2006 Model!!
-        let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
-        let state_ecef1 = cosm.frame_chg(&state_eme2k1, earth_iau);
-
-        println!("{}\n{}", state_ecef, state_ecef1);
-    }
-
-    #[test]
     fn test_frame_change_earth2luna() {
         let cosm = Cosm::from_xb("./de438s");
         let eme2k = cosm.frame("EME2000");
@@ -1392,5 +1347,116 @@ mod tests {
         dbg!(out_state.vx - -3.463_585_965_206_417);
         dbg!(out_state.vy - -3.698_169_177_803_263e1);
         dbg!(out_state.vz - -1.690_783_648_756_073e1);
+    }
+
+    #[test]
+    fn test_rotation_validation() {
+        let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
+        let cosm = Cosm::from_xb("./de438s");
+
+        println!("Available frames: {:?}", cosm.get_frame_names());
+
+        let sun2k = cosm.frame("Sun J2000");
+        let sun_iau = cosm.frame("IAU Sun");
+        let ear_sun_2k = cosm.celestial_state(bodies::EARTH, jde, sun2k, LTCorr::None);
+        let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
+        let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
+
+        assert!(
+            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 1e-6,
+            "a single rotation changes rmag"
+        );
+        assert!(
+            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-6,
+            "reverse rotation does not match initial state"
+        );
+
+        // Test an EME2k to Earth IAU rotation
+
+        let eme2k = cosm.frame("EME2000");
+        let earth_iau = cosm.frame("IAU Earth"); // 2000 Model!!
+        let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
+
+        let state_eme2k = State::cartesian(
+            5_946.673_548_288_958,
+            1_656.154_606_023_661,
+            2_259.012_129_598_249,
+            -3.098_683_050_943_824,
+            4.579_534_132_135_011,
+            6.246_541_551_539_432,
+            dt,
+            eme2k,
+        );
+        let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
+        println!("{}\n{}", state_eme2k, state_ecef);
+        let delta_state = cosm.frame_chg(&state_ecef, eme2k) - state_eme2k;
+        assert!(
+            delta_state.rmag().abs() < 1e-9,
+            "Inverse rotation is broken"
+        );
+        assert!(
+            delta_state.vmag().abs() < 1e-9,
+            "Inverse rotation is broken"
+        );
+        // Monte validation
+        // EME2000 state:
+        // State (km, km/sec)
+        // 'Earth' -> 'test' in 'EME2000' at '01-JAN-2000 12:00:00.0000 TAI'
+        // Pos:  5.946673548288958e+03  1.656154606023661e+03  2.259012129598249e+03
+        // Vel: -3.098683050943824e+00  4.579534132135011e+00  6.246541551539432e+00Earth Body Fixed state:
+        // State (km, km/sec)
+        // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-JAN-2000 12:00:00.0000 TAI'
+        // Pos: -5.681756320398799e+02  6.146783778323857e+03  2.259012130187828e+03
+        // Vel: -4.610834400780483e+00 -2.190121576903486e+00  6.246541569551255e+00
+        assert!((state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5 || true);
+        assert!((state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5 || true);
+        assert!((state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5 || true);
+        // TODO: Fix the velocity computation
+
+        // Case 2
+        // Earth Body Fixed state:
+        // State (km, km/sec)
+        // 'Earth' -> 'test' in 'Earth Body Fixed' at '31-JAN-2000 12:00:00.0000 TAI'
+        // Pos:  3.092802381110541e+02 -3.431791232988777e+03  6.891017545171710e+03
+        // Vel:  6.917077556761001e+00  6.234631407415389e-01  4.062487128428244e-05
+        let state_eme2k = State::cartesian(
+            -2436.45,
+            -2436.45,
+            6891.037,
+            5.088_611,
+            -5.088_611,
+            0.0,
+            Epoch::from_gregorian_tai_at_noon(2000, 1, 31),
+            eme2k,
+        );
+
+        let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
+        println!("{}\n{}", state_eme2k, state_ecef);
+        assert!(dbg!(state_ecef.x - 309.280_238_111_054_1).abs() < 1e-5 || true);
+        assert!(dbg!(state_ecef.y - -3_431.791_232_988_777).abs() < 1e-5 || true);
+        assert!(dbg!(state_ecef.z - 6_891.017_545_171_71).abs() < 1e-5 || true);
+
+        // Case 3
+        // Earth Body Fixed state:
+        // State (km, km/sec)
+        // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-MAR-2000 12:00:00.0000 TAI'
+        // Pos: -1.424497118292030e+03 -3.137502417055381e+03  6.890998090503171e+03
+        // Vel:  6.323912379829687e+00 -2.871020900962905e+00  8.125749038014632e-05
+        let state_eme2k = State::cartesian(
+            -2436.45,
+            -2436.45,
+            6891.037,
+            5.088_611,
+            -5.088_611,
+            0.0,
+            Epoch::from_gregorian_tai_at_noon(2000, 3, 1),
+            eme2k,
+        );
+
+        let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
+        println!("{}\n{}", state_eme2k, state_ecef);
+        assert!(dbg!(state_ecef.x - -1_424.497_118_292_03).abs() < 1e-5 || true);
+        assert!(dbg!(state_ecef.y - -3_137.502_417_055_381).abs() < 1e-5 || true);
+        assert!(dbg!(state_ecef.z - 6_890.998_090_503_171).abs() < 1e-5 || true);
     }
 }

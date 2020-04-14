@@ -1,5 +1,5 @@
-use super::na::allocator::Allocator;
-use super::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
 
 pub use super::estimate::{Estimate, KfEstimate};

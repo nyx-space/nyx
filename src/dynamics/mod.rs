@@ -1,9 +1,6 @@
-extern crate hifitime;
-extern crate nalgebra as na;
-
-use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, Vector3, VectorN};
 use crate::celestia::State;
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, DimName, Vector3, VectorN};
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -45,6 +42,9 @@ pub mod solarpressure;
 /// Define drag models
 pub mod drag;
 
+/// Define the spherical harmonic models.
+pub mod sph_harmonics;
+
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
 /// Its design is such that several of the provided dynamics can be combined fairly easily. However,
@@ -53,7 +53,7 @@ pub mod drag;
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
 pub trait Dynamics
 where
-    Self: Clone + Sized,
+    Self: Sized,
 {
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
     type StateSize: DimName;
@@ -81,14 +81,18 @@ where
     fn state(&self) -> Self::StateType;
 }
 
-/// The `ForceModel` trait handles immutable dynamics, i.e. forces which do not need to save the current state, only act on it.
+/// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
-/// Examples include Solar Radiation Pressure, drag, spherical harmonics, etc.
-pub trait ForceModel
-where
-    Self: Sized,
-{
+/// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
+pub trait ForceModel {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    /// TODO: Expand to all frames (useful for attitude)
+    fn eom(&self, osc: &State) -> Vector3<f64>;
+}
+
+/// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
+///
+/// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
+pub trait AccelModel {
+    /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
     fn eom(&self, osc: &State) -> Vector3<f64>;
 }

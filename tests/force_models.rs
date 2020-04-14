@@ -35,7 +35,9 @@ fn srp_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::<NoThrustControl>::with_srp(dynamics, srp, dry_mass);
+    let mut sc = Spacecraft::<NoThrustControl>::new(dynamics, dry_mass);
+    // Add the SRP model to the spacecraft
+    sc.add_model(Box::new(srp));
     println!("{:o}", orbit);
 
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
@@ -88,9 +90,11 @@ fn drag_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::<NoThrustControl>::with_srp(dynamics, srp, dry_mass);
+    let mut sc = Spacecraft::<NoThrustControl>::new(dynamics, dry_mass);
+    // Add the SRP model to the spacecraft
+    sc.add_model(Box::new(srp));
     // Add the drag model to the spacecraft
-    sc.exp_drag = Some(drag);
+    sc.add_model(Box::new(drag));
     println!("{:o}", orbit);
 
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
