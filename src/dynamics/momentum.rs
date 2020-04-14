@@ -1,5 +1,5 @@
-use super::na::{Matrix3, Vector3, VectorN, U3};
 use super::Dynamics;
+use crate::dimensions::{Matrix3, Vector3, VectorN, U3};
 use std::f64;
 use utils::is_diagonal;
 // use alga::general::operator::Inverse;

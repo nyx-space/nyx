@@ -1,18 +1,18 @@
-extern crate hifitime;
 extern crate hyperdual;
-extern crate nalgebra as na;
 extern crate rand;
 extern crate rand_distr;
 
-use self::hifitime::Epoch;
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual};
-use self::na::{DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7};
 use self::rand::thread_rng;
 use self::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice};
+use crate::dimensions::{
+    DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7,
+};
+use crate::time::Epoch;
 use celestia::{Frame, State};
 use utils::{r2, r3};
 

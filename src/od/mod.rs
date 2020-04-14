@@ -1,10 +1,9 @@
 extern crate hyperdual;
-extern crate nalgebra as na;
 extern crate serde;
 
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
-use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
 use dynamics::Dynamics;
 use std::fmt;
@@ -207,8 +206,6 @@ where
 }
 
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-///
-/// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
 pub trait AutoDiffDynamics: Dynamics
 where
     Self: Sized,

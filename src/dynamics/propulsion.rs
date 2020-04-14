@@ -1,5 +1,5 @@
-use super::na::Vector3;
 use super::thrustctrl::ThrustControl;
+use crate::dimensions::Vector3;
 use celestia::State;
 
 // TODO: Change to a trait to enable variable thrust and isp

@@ -133,7 +133,7 @@ fn multi_body_ckf_perfect_stations() {
 
         let res = &odp.residuals[no];
         assert!(
-            res.postfit.norm() < 1e-12,
+            res.postfit.norm() < 1e-9,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );
@@ -282,7 +282,7 @@ fn multi_body_ckf_covar_map() {
     // Note that we check the residuals separately from the estimates because we have many predicted estimates which do not have any associated residuals.
     for res in odp.residuals.iter() {
         assert!(
-            res.postfit.norm() < 1e-12,
+            res.postfit.norm() < 1e-10,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );

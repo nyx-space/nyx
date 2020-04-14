@@ -721,3 +721,128 @@ fn multi_body_dynamics_dual() {
     assert!(radius_err.norm() < 1e-3);
     assert!(velocity_err.norm() < 1e-3);
 }
+
+#[test]
+fn earth_sph_harmonics_j2() {
+    use nyx::dynamics::sph_harmonics::Harmonics;
+    use nyx::dynamics::Dynamics;
+    use nyx::io::gravity::*;
+
+    let monte_earth_gm = 3.986_004_328_969_392e5;
+    let monte_earth_j2 = -0.000_484_169_325_971;
+
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame("EME2000", monte_earth_gm);
+    cosm.mut_gm_for_frame("IAU Earth", monte_earth_gm);
+    let eme2k = cosm.frame("EME2000");
+    let iau_earth = cosm.frame("IAU Earth");
+
+    let earth_sph_harm = HarmonicsMem::from_j2(monte_earth_j2);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+    // GMAT validation case
+    // -5751.473991327555          4721.214035135832           2045.947768608806           -0.7977402618596746          -3.656451983636495           6.139637921620765
+    // NOTE: GMAT and Monte are within about 0.1 meters of difference in position.
+    /*
+    let rslt_gmat = Vector6::new(
+        -5_751.473_991_327_555,
+        4721.214035135832,
+        2045.947768608806,
+        -0.7977402618596746,
+        -3.656451983636495,
+        6.139637921620765,
+    );*/
+
+    // Monte validation case
+    // State (km, km/sec)
+    // 'Earth' -> 'test' in 'EME2000' at '02-JAN-2000 12:00:00.0000 TAI'
+    // Pos: -5.751472565170783e+03  4.721183256208691e+03  2.046020865167045e+03
+    // Vel: -7.976895830677169e-01 -3.656498994998706e+00  6.139616747276084e+00
+    let rslt_monte = Vector6::new(
+        -5.751_472_565_170_783e3,
+        4.721_183_256_208_691e3,
+        2.046_020_865_167_045e3,
+        -7.976_895_830_677_169e-1,
+        -3.656_498_994_998_706,
+        6.139_616_747_276_084,
+    );
+
+    let mut dynamics = CelestialDynamics::two_body(state);
+    dynamics.add_model(Box::new(harmonics));
+
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
+    prop.until_time_elapsed(SECONDS_PER_DAY);
+
+    println!("{}", prop.dynamics.state());
+    println!("Error: {:3.12}", prop.state_vector() - rslt_monte);
+
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_monte);
+
+    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
+    assert!(
+        err_r < 1e-1,
+        format!("J2 failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-4,
+        format!("J2 failed in velocity: {:.5e}", err_v)
+    );
+}
+
+#[test]
+fn earth_sph_harmonics_12x12() {
+    extern crate pretty_env_logger;
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+    use nyx::dynamics::sph_harmonics::Harmonics;
+    use nyx::io::gravity::*;
+
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
+    let iau_earth = cosm.frame("IAU Earth");
+
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 17, 17, true);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    // GMAT validation case
+    let rslt_gmat = Vector6::new(
+        -5_751.935_197_673_059,
+        4_719.330_857_046_409,
+        2_048.776_230_999_391,
+        -0.795_315_465_634_082_6,
+        -3.658_346_256_468_031,
+        6.138_852_391_455_04,
+    );
+
+    let mut dynamics = CelestialDynamics::two_body(state);
+    dynamics.add_model(Box::new(harmonics));
+
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
+    prop.until_time_elapsed(SECONDS_PER_DAY);
+
+    println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
+
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_gmat);
+
+    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
+    assert!(
+        err_r < 0.2,
+        format!("12x12 failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        err_v < 1e-3,
+        format!("12x12 failed in velocity: {:.5e}", err_v)
+    );
+}

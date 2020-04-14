@@ -2,5 +2,5 @@ stable:
   image: rust:1-slim
   script:
     - rustup component add rustfmt
-    - cargo test --release
+    - RUST_BACKTRACE=full cargo test --release
     - cargo fmt -- --check

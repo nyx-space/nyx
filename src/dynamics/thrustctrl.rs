@@ -1,5 +1,5 @@
-use super::hifitime::Epoch;
-use super::na::Vector3;
+use crate::dimensions::Vector3;
+use crate::time::Epoch;
 use celestia::{Frame, State};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 

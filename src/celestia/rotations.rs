@@ -128,15 +128,15 @@ impl<'a> Euler3AxisDt<'a> {
     /// R3(-(alpha-90 deg)) * R1(delta - 90 deg) * R3(-W)
     /// Where alpha is the right ascension and delta the declination
     pub fn from_ra_dec_w(
-        right_asc: Expr,
-        declin: Expr,
+        alpha_right_asc: Expr,
+        delta_declin: Expr,
         w: Expr,
         context: &HashMap<String, f64>,
         unit: AngleUnit,
     ) -> Self {
         Self::new(
-            (EulerRotation::R3(0.0), right_asc),
-            (EulerRotation::R1(0.0), declin),
+            (EulerRotation::R3(0.0), alpha_right_asc),
+            (EulerRotation::R1(0.0), delta_declin),
             (EulerRotation::R3(0.0), w),
             context,
             unit,
@@ -164,16 +164,24 @@ impl<'a> ParentRotation for Euler3AxisDt<'a> {
         ctx.var("d", days_d);
         ctx.var("T", centuries_t);
         let mut dcm = Matrix3::identity();
-        for (rot, expr) in &self.rot_order {
+        for (angle_no, (rot, expr)) in self.rot_order.iter().enumerate() {
             // Compute the correct angle
             match expr.eval_with_context(&ctx) {
                 Ok(eval_angle) => {
                     // Convert the angle to radians if needed
-                    let angle = if self.unit == AngleUnit::Degrees {
+                    let mut angle = if self.unit == AngleUnit::Degrees {
                         eval_angle.to_radians()
                     } else {
                         eval_angle
                     };
+                    // Apply the angle transformation if needed
+                    if self.is_ra_dec_w {
+                        if angle_no == 1 {
+                            angle -= std::f64::consts::FRAC_PI_2;
+                        } else if angle_no == 0 {
+                            angle = std::f64::consts::FRAC_PI_2 - angle;
+                        }
+                    }
                     let rot_with_angl = match rot {
                         EulerRotation::R1(_) => EulerRotation::R1(angle),
                         EulerRotation::R2(_) => EulerRotation::R2(angle),

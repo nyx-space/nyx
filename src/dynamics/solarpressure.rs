@@ -1,5 +1,5 @@
-use super::na::Vector3;
 use super::ForceModel;
+use crate::dimensions::Vector3;
 use celestia::eclipse::{EclipseLocator, EclipseState};
 use celestia::{Cosm, Frame, LTCorr, State, AU, SPEED_OF_LIGHT};
 

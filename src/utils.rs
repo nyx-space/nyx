@@ -1,5 +1,7 @@
-extern crate nalgebra as na;
-use self::na::{Matrix3, Vector3, Vector6, U3};
+extern crate num;
+
+use self::num::traits::real::Real;
+use crate::dimensions::{Matrix3, Vector3, Vector6, U3};
 use std::f64;
 
 /// Returns the tilde matrix from the provided Vector3.
@@ -65,11 +67,12 @@ pub fn factorial(num: f64) -> f64 {
     }
 }
 
-pub fn kronecker(a: f64, b: f64) -> f64 {
-    if (a - b).abs() <= f64::EPSILON {
-        1.0
+/// The Kronecker delta function
+pub fn kronecker<T: Real>(a: T, b: T) -> T {
+    if (a - b).abs() <= T::epsilon() {
+        T::one()
     } else {
-        0.0
+        T::zero()
     }
 }
 

@@ -1,10 +1,8 @@
-extern crate nalgebra as na;
-
-use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, VectorN};
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
 use super::events::{ConvergenceError, EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, VectorN};
 use dynamics::Dynamics;
 use std::f64;
 use std::f64::EPSILON;
@@ -107,6 +105,7 @@ where
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
+                debug!("@{:>.9}s: {:?}", t, self.details);
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
                 self.event_trackers
@@ -124,6 +123,7 @@ where
                 return self.dynamics.state();
             } else {
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
+                debug!("@{:>.9}s: {:?}", t, self.details);
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
@@ -424,7 +424,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
 impl PropOpts<RSSStepPV> {
     /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
     ///  step size.
-    pub fn with_fixed_step(step: f64) -> PropOpts<RSSStepPV> {
+    pub fn with_fixed_step(step: f64) -> Self {
         PropOpts {
             init_step: step,
             min_step: step,
@@ -434,6 +434,13 @@ impl PropOpts<RSSStepPV> {
             attempts: 0,
             errctrl: RSSStepPV {},
         }
+    }
+
+    /// Returns the default options with a specific tolerance.
+    pub fn with_tolerance(tolerance: f64) -> Self {
+        let mut opts = Self::default();
+        opts.tolerance = tolerance;
+        opts
     }
 }
 

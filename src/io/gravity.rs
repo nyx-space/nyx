@@ -1,5 +1,5 @@
 use super::flate2::read::GzDecoder;
-use std::collections::HashMap;
+use crate::dimensions::DMatrix;
 use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;
@@ -12,85 +12,77 @@ where
     Self: Sized,
 {
     /// Returns the maximum degree of this gravity potential storage (Jn=J2,J3...)
-    fn max_degree(&self) -> u16;
+    fn max_degree_n(&self) -> usize;
     /// Returns the maximum order of this gravity potential storage (Jnm=Jn2,Jn3...)
-    fn max_order(&self) -> u16;
+    fn max_order_m(&self) -> usize;
     /// Returns the C_nm and S_nm for the provided order and degree.
     ///
     /// WARNING: It's up to the caller to ensure that no degree or order greater than stored
     /// in this `GravityPotentialStor` is requested. Depending on the implementor, this call might `panic!`.
-    fn cs_nm(&self, degree: u16, order: u16) -> (f64, f64);
+    fn cs_nm(&self, degree: usize, order: usize) -> (f64, f64);
 }
 
-/// `MemoryBackend` loads the requested gravity potential files and stores them in memory (in a HashMap).
+/// `HarmonicsMem` loads the requested gravity potential files and stores them in memory (in a HashMap).
 ///
 /// WARNING: This memory backend may require a lot of RAM (e.g. EMG2008 2190x2190 requires nearly 400 MB of RAM).
 #[derive(Clone)]
-pub struct MemoryBackend {
-    degree: u16,
-    order: u16,
-    // data is (degree, order) -> (C_nm, S_nm)
-    data: HashMap<(u16, u16), (f64, f64)>,
+pub struct HarmonicsMem {
+    degree: usize,
+    order: usize,
+    c_nm: DMatrix<f64>,
+    s_nm: DMatrix<f64>,
 }
 
-impl MemoryBackend {
-    /// Initialize `MemoryBackend` as an EARTH J<sub>2</sub> only using the JGM3 model (available in GMAT)
+impl HarmonicsMem {
+    /// Initialize `HarmonicsMem` with a custom J2 value
+    pub fn from_j2(j2: f64) -> HarmonicsMem {
+        let mut c_nm = DMatrix::from_element(3, 3, 0.0);
+        c_nm[(2, 0)] = j2;
+
+        HarmonicsMem {
+            degree: 2 + 1,
+            order: 0,
+            c_nm,
+            s_nm: DMatrix::from_element(3, 3, 0.0),
+        }
+    }
+
+    /// Initialize `HarmonicsMem` as an EARTH J<sub>2</sub> only using the JGM3 model (available in GMAT)
     ///
     /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_jgm3() -> MemoryBackend {
-        let mut data = HashMap::new();
-        data.insert((0, 0), (0.0, 0.0));
-        data.insert((1, 0), (0.0, 0.0));
-        data.insert((1, 1), (0.0, 0.0));
-        data.insert((2, 0), (-4.841_653_748_864_70e-04, 0.0));
-        data.insert((2, 1), (0.0, 0.0));
-        data.insert((2, 2), (0.0, 0.0));
-
-        MemoryBackend {
-            degree: 2,
-            order: 0,
-            data,
-        }
+    pub fn j2_jgm3() -> HarmonicsMem {
+        Self::from_j2(-4.841_653_748_864_70e-04)
     }
 
-    /// Initialize `MemoryBackend` as an EARTH J<sub>2</sub> only using the JGM2 model (available in GMAT)
+    /// Initialize `HarmonicsMem` as an EARTH J<sub>2</sub> only using the JGM2 model (available in GMAT)
     ///
     /// Use the embedded Earth parameter. If others are needed, load from `from_shadr` or `from_egm`.
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_jgm2() -> MemoryBackend {
-        let mut data = HashMap::new();
-        data.insert((1, 0), (0.0, 0.0));
-        data.insert((2, 0), (-4.841_653_9e-04, 0.0));
-        MemoryBackend {
-            degree: 2,
-            order: 0,
-            data,
-        }
+    pub fn j2_jgm2() -> HarmonicsMem {
+        Self::from_j2(-4.841_653_9e-04)
     }
 
-    /// Initialize `MemoryBackend` as J<sub>2</sub> only using the EGM2008 model (from the GRACE mission, best model as of 2018)
+    /// Initialize `HarmonicsMem` as J<sub>2</sub> only using the EGM2008 model (from the GRACE mission, best model as of 2018)
     ///
     /// *WARNING:* This is an EARTH gravity model, and _should not_ be used around any other body.
-    pub fn j2_egm2008() -> MemoryBackend {
-        let mut data = HashMap::new();
-        data.insert((1, 0), (0.0, 0.0));
-        data.insert((2, 0), (-0.484_165_143_790_815e-03, 0.0));
-        MemoryBackend {
-            degree: 2,
-            order: 0,
-            data,
-        }
+    pub fn j2_egm2008() -> HarmonicsMem {
+        Self::from_j2(-0.484_165_143_790_815e-03)
     }
 
-    /// Initialize `MemoryBackend` from the file path (must be a gunzipped file)
+    /// Initialize `HarmonicsMem` from the file path (must be a gunzipped file)
     ///
     /// Gravity models provided by `nyx`: TODO: add github links and examples
     /// + EMG2008 to 2190 for Earth (tide free)
     /// + Moon to 1500 (from SHADR file)
     /// + Mars to 120 (from SHADR file)
     /// + Venus to 150 (from SHADR file)
-    pub fn from_shadr(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+    pub fn from_shadr(
+        filepath: &str,
+        degree: usize,
+        order: usize,
+        gunzipped: bool,
+    ) -> HarmonicsMem {
         let mut f = File::open(filepath).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -109,7 +101,7 @@ impl MemoryBackend {
         )
     }
 
-    pub fn from_egm(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+    pub fn from_egm(filepath: &str, degree: usize, order: usize, gunzipped: bool) -> HarmonicsMem {
         let mut f = File::open(filepath).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -128,7 +120,7 @@ impl MemoryBackend {
         )
     }
 
-    pub fn from_cof(filepath: &str, degree: u16, order: u16, gunzipped: bool) -> MemoryBackend {
+    pub fn from_cof(filepath: &str, degree: usize, order: usize, gunzipped: bool) -> HarmonicsMem {
         let mut f = File::open(filepath).expect("could not open file");
         let mut buffer = vec![0; 0];
         if gunzipped {
@@ -141,38 +133,35 @@ impl MemoryBackend {
 
         // Since the COF files are so specific, we just code everything up in here.
 
-        let mut data: HashMap<(u16, u16), (f64, f64)>;
-        data = HashMap::new();
-        // Immediately add data which will be requested but may not exist (will be overwritten if it does)
-        data.insert((1, 0), (0.0, 0.0));
-        data.insert((1, 1), (0.0, 0.0));
-        let mut max_order: u16 = 0;
-        let mut max_degree: u16 = 0;
+        let mut c_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
+        let mut s_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
+        let mut max_order: usize = 0;
+        let mut max_degree: usize = 0;
         for (lno, line) in String::from_utf8(buffer)
             .expect("error decoding utf8")
             .split('\n')
             .enumerate()
         {
-            if line.is_empty() || line.chars().next().unwrap() != 'R' {
+            if line.is_empty() || !line.starts_with('R') {
                 continue; // This is either a comment, a header or "END"
             }
             // These variables need to be declared as mutable because rustc does not know
             // we nwon't match each ino more than once.
-            let mut cur_degree: u16 = 0;
-            let mut cur_order: u16 = 0;
+            let mut cur_degree: usize = 0;
+            let mut cur_order: usize = 0;
             let mut c_nm: f64 = 0.0;
             let mut s_nm: f64 = 0.0;
             for (ino, item) in line.split_whitespace().enumerate() {
                 match ino {
                     0 => continue, // We need this so we don't break at every first item
-                    1 => match u16::from_str(item) {
+                    1 => match usize::from_str(item) {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
                             println!("could not parse degree on line {} -- ignoring line", lno);
                             break;
                         }
                     },
-                    2 => match u16::from_str(item) {
+                    2 => match usize::from_str(item) {
                         Ok(val) => cur_order = val,
                         Err(_) => {
                             println!("could not parse order on line {} -- ignoring line", lno);
@@ -197,8 +186,7 @@ impl MemoryBackend {
                         } else {
                             // There is a space as a delimiting character between the C_nm and S_nm only if the S_nm
                             // is a positive number, otherwise, they are continuous (what a great format).
-                            if (item.matches('-').count() == 3
-                                && item.chars().next().unwrap() != '-')
+                            if (item.matches('-').count() == 3 && !item.starts_with('-'))
                                 || item.matches('-').count() == 4
                             {
                                 // Now we have two items concatenated into one... great
@@ -277,17 +265,9 @@ impl MemoryBackend {
 
             // Only insert this data into the hashmap if it's within the required order as well
             if cur_order <= order {
-                data.insert((cur_degree, cur_order), (c_nm, s_nm));
+                c_nm_mat[(cur_degree, cur_order)] = c_nm;
+                s_nm_mat[(cur_degree, cur_order)] = s_nm;
             }
-            if max_degree == 0 {
-                // Let's populate with zeros.
-                for n in 0..degree {
-                    for m in 0..order {
-                        data.insert((n, m), (0.0, 0.0));
-                    }
-                }
-            }
-
             // This serves as a warning.
             max_order = if cur_order > max_order {
                 cur_order
@@ -311,48 +291,47 @@ impl MemoryBackend {
                 filepath, degree, order
             );
         }
-        MemoryBackend {
+        HarmonicsMem {
             degree: max_degree,
             order: max_order,
-            data,
+            c_nm: c_nm_mat,
+            s_nm: s_nm_mat,
         }
     }
 
     /// `load` handles the actual loading in memory.
     fn load(
         skip_first_line: bool,
-        degree: u16,
-        order: u16,
+        degree: usize,
+        order: usize,
         data_as_str: String,
         filepath: &str,
-    ) -> MemoryBackend {
-        let mut data: HashMap<(u16, u16), (f64, f64)>;
-        data = HashMap::new();
-        // Immediately add data which will be requested but may not exist (will be overwritten if it does)
-        data.insert((1, 0), (0.0, 0.0));
-        data.insert((1, 1), (0.0, 0.0));
-        let mut max_degree: u16 = 0;
-        let mut max_order: u16 = 0;
+    ) -> HarmonicsMem {
+        let mut c_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
+        let mut s_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
+
+        let mut max_degree: usize = 0;
+        let mut max_order: usize = 0;
         for (lno, line) in data_as_str.split('\n').enumerate() {
             if lno == 0 && skip_first_line {
                 continue;
             }
             // These variables need to be declared as mutable because rustc does not know
             // we won't match each ino more than once.
-            let mut cur_order: u16 = 0;
-            let mut cur_degree: u16 = 0;
+            let mut cur_order: usize = 0;
+            let mut cur_degree: usize = 0;
             let mut c_nm: f64 = 0.0;
             let mut s_nm: f64 = 0.0;
             for (ino, item) in line.split_whitespace().enumerate() {
                 match ino {
-                    0 => match u16::from_str(item) {
+                    0 => match usize::from_str(item) {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
                             println!("could not parse degree on line {} -- ignoring line", lno);
                             break;
                         }
                     },
-                    1 => match u16::from_str(item) {
+                    1 => match usize::from_str(item) {
                         Ok(val) => cur_order = val,
                         Err(_) => {
                             println!("could not parse order on line {} -- ignoring line", lno);
@@ -388,7 +367,8 @@ impl MemoryBackend {
 
             // Only insert this data into the hashmap if it's within the required order as well
             if cur_order <= order {
-                data.insert((cur_degree, cur_order), (c_nm, s_nm));
+                c_nm_mat[(cur_degree, cur_order)] = c_nm;
+                s_nm_mat[(cur_degree, cur_order)] = s_nm;
             }
             // This serves as a warning.
             max_order = if cur_order > max_order {
@@ -413,25 +393,25 @@ impl MemoryBackend {
                 filepath, degree, order
             );
         }
-        MemoryBackend {
+        HarmonicsMem {
             order: max_order,
             degree: max_degree,
-            data,
+            c_nm: c_nm_mat,
+            s_nm: s_nm_mat,
         }
     }
 }
 
-impl GravityPotentialStor for MemoryBackend {
-    fn max_order(&self) -> u16 {
+impl GravityPotentialStor for HarmonicsMem {
+    fn max_order_m(&self) -> usize {
         self.order
     }
 
-    fn max_degree(&self) -> u16 {
+    fn max_degree_n(&self) -> usize {
         self.degree
     }
 
-    fn cs_nm(&self, degree: u16, order: u16) -> (f64, f64) {
-        let &(c, s) = &self.data[&(degree, order)];
-        (c, s)
+    fn cs_nm(&self, degree: usize, order: usize) -> (f64, f64) {
+        (self.c_nm[(degree, order)], self.s_nm[(degree, order)])
     }
 }

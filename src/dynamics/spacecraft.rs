@@ -1,21 +1,16 @@
 use super::celestial::CelestialDynamics;
-use super::drag::{ConstantDrag, ExpEarthDrag};
-use super::na::{Vector1, VectorN, U6, U7};
 use super::propulsion::Propulsion;
-use super::solarpressure::SolarPressure;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
+use crate::dimensions::{Vector1, VectorN, U6, U7};
 use celestia::State;
 use std::fmt;
 use std::marker::PhantomData;
 
-#[derive(Clone)]
 pub struct Spacecraft<'a, T: ThrustControl> {
     pub celestial: CelestialDynamics<'a>,
+    pub force_models: Vec<Box<dyn ForceModel + 'a>>,
     pub prop: Option<Propulsion<T>>,
-    pub srp: Option<SolarPressure<'a>>,
-    pub cst_drag: Option<ConstantDrag<'a>>,
-    pub exp_drag: Option<ExpEarthDrag<'a>>,
     /// in kg
     pub dry_mass: f64,
     /// in kg
@@ -34,9 +29,7 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
         Self {
             celestial,
             prop: Some(prop),
-            srp: None,
-            cst_drag: None,
-            exp_drag: None,
+            force_models: Vec::new(),
             dry_mass,
             fuel_mass,
             _marker: PhantomData,
@@ -44,22 +37,20 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
     }
 
     /// Initialize a Spacecraft with a set of celestial dynamics and with SRP enabled.
-    pub fn with_srp(
-        celestial: CelestialDynamics<'a>,
-        srp: SolarPressure<'a>,
-        dry_mass: f64,
-    ) -> Self {
+    pub fn new(celestial: CelestialDynamics<'a>, dry_mass: f64) -> Self {
         // Set the dry mass of the propulsion system
         Self {
             celestial,
             prop: None,
-            srp: Some(srp),
-            cst_drag: None,
-            exp_drag: None,
+            force_models: Vec::new(),
             dry_mass,
             fuel_mass: 0.0,
             _marker: PhantomData,
         }
+    }
+
+    pub fn add_model(&mut self, force_model: Box<dyn ForceModel + 'a>) {
+        self.force_models.push(force_model);
     }
 }
 
@@ -132,29 +123,14 @@ impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
             d_x[6] += fuel_usage;
         }
 
-        // Now compute the SRP if applicable
-        if let Some(srp) = &self.srp {
-            let srp_force = srp.eom(&celestial_state) / total_mass;
+        // Compute additional force models as needed
+        for model in &self.force_models {
+            let model_frc = model.eom(&celestial_state) / total_mass;
             for i in 0..3 {
-                d_x[i + 3] += srp_force[i];
+                d_x[i + 3] += model_frc[i];
             }
         }
 
-        // Now compute the constant drag if applicable
-        if let Some(drag) = &self.cst_drag {
-            let drag_force = drag.eom(&celestial_state) / total_mass;
-            for i in 0..3 {
-                d_x[i + 3] += drag_force[i];
-            }
-        }
-
-        // Now compute the constant drag if applicable
-        if let Some(drag) = &self.exp_drag {
-            let drag_force = drag.eom(&celestial_state) / total_mass;
-            for i in 0..3 {
-                d_x[i + 3] += drag_force[i];
-            }
-        }
         d_x
     }
 }

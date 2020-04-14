@@ -1,10 +1,8 @@
-extern crate nalgebra as na;
-
-use self::na::allocator::Allocator;
-use self::na::{DefaultAllocator, DimName, VectorN};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::EpochFormat;
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::hifitime::Epoch;
 use std::fmt;
 

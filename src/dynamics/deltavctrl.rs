@@ -1,4 +1,4 @@
-use super::na::Vector3;
+use crate::dimensions::Vector3;
 use celestia::{Frame, State};
 
 pub use super::thrustctrl::Mnvr;
