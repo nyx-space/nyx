@@ -2,8 +2,10 @@ extern crate hyperdual;
 
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
-use super::{AccelModel, AutoDiffDynamics, Differentiable, Dynamics};
-use crate::dimensions::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
+use super::{AccelModel, AutoDiff, Differentiable, Dynamics};
+use crate::dimensions::{
+    DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
+};
 use crate::time::Epoch;
 use celestia::{Cosm, Frame, LTCorr, State};
 use od::Estimable;
@@ -104,93 +106,27 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
     }
 }
 
-pub struct PointMasses<'a> {
-    /// The propagation frame
-    pub frame: Frame,
-    pub bodies: Vec<i32>,
-    /// Optional point to a Cosm, needed if extra point masses are needed
-    pub cosm: &'a Cosm,
-    /// Light-time correction computation if extra point masses are needed
-    pub correction: LTCorr,
-}
-
-impl<'a> PointMasses<'a> {
-    pub fn new(propagation_frame: Frame, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
-        Self::with_correction(propagation_frame, bodies, cosm, LTCorr::None)
-    }
-
-    pub fn with_correction(
-        propagation_frame: Frame,
-        bodies: Vec<i32>,
-        cosm: &'a Cosm,
-        correction: LTCorr,
-    ) -> Self {
-        // Check that these celestial bodies exist
-        for exb_id in &bodies {
-            cosm.try_frame_by_exb_id(*exb_id)
-                .expect("unknown EXB ID in list of third bodies");
-        }
-
-        Self {
-            frame: propagation_frame,
-            bodies,
-            cosm,
-            correction,
-        }
-    }
-}
-
-impl<'a> AccelModel for PointMasses<'a> {
-    fn eom(&self, osc: &State) -> Vector3<f64> {
-        let mut d_x = Vector3::zeros();
-        // Get all of the position vectors between the center body and the third bodies
-        for exb_id in &self.bodies {
-            let third_body = self.cosm.frame_by_exb_id(*exb_id);
-            // State of j-th body as seen from primary body
-            let st_ij = self
-                .cosm
-                .celestial_state(*exb_id, osc.dt, self.frame, self.correction);
-
-            let r_ij = st_ij.radius();
-            let r_ij3 = st_ij.rmag().powi(3);
-            let r_j = osc.radius() - r_ij; // sc as seen from 3rd body
-            let r_j3 = r_j.norm().powi(3);
-            d_x += -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
-        }
-        d_x
-    }
-}
-
 /// `CelestialDynamicsStm` provides the equations of motion for any celestial dynamic, **with** state transition matrix computation.
-#[derive(Clone)]
 pub struct CelestialDynamicsStm<'a> {
     pub state: State,
-    pub bodies: Vec<i32>,
     pub stm: Matrix6<f64>,
     // Loss in precision is avoided by using a relative time parameter initialized to zero
     relative_time: f64,
     // Allows us to rebuilt the true epoch
     init_tai_secs: f64,
-    pub cosm: Option<&'a Cosm>,
-    pub correction: LTCorr,
+    pub accel_models: Vec<Box<dyn AutoDiff<STMSize = U3, HyperStateSize = U7> + 'a>>,
 }
 
 impl<'a> CelestialDynamicsStm<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
     pub fn new(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
-        // Check that these bodies are present in the EXB.
-        for exb_id in &bodies {
-            cosm.try_frame_by_exb_id(*exb_id)
-                .expect("unknown EXB ID in list of third bodies");
-        }
+        let pts = PointMasses::new(state.frame, bodies, cosm);
         Self {
             state,
-            bodies,
             stm: Matrix6::identity(),
             relative_time: 0.0,
             init_tai_secs: state.dt.as_tai_seconds(),
-            cosm: Some(cosm),
-            correction: LTCorr::None,
+            accel_models: vec![Box::new(pts)],
         }
     }
 
@@ -198,12 +134,10 @@ impl<'a> CelestialDynamicsStm<'a> {
     pub fn two_body(state: State) -> Self {
         Self {
             state,
-            bodies: Vec::new(),
             stm: Matrix6::identity(),
             relative_time: 0.0,
             init_tai_secs: state.dt.as_tai_seconds(),
-            cosm: None,
-            correction: LTCorr::None,
+            accel_models: vec![],
         }
     }
 
@@ -248,28 +182,21 @@ impl<'a> CelestialDynamicsStm<'a> {
 
 impl<'a> Differentiable for CelestialDynamicsStm<'a> {
     type STMSize = U6;
-
-    /// Computes both the state and the gradient of the dynamics. These may be accessed by the
-    /// related getters.
-    fn compute(
-        &self,
-        t: f64,
-        state: &VectorN<f64, Self::STMSize>,
-    ) -> (VectorN<f64, Self::STMSize>, Matrix6<f64>) {
+    fn eom_grad(&self, epoch: Epoch, state: &Vector6<f64>) -> (Vector6<f64>, Matrix6<f64>) {
         let hyperstate = hyperspace_from_vector(&state);
 
-        let (state, grad) = self.dual_eom(t, &hyperstate);
+        let (state, grad) = self.dual_eom(epoch, &hyperstate);
 
         (state, grad)
     }
 }
 
-impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
+impl<'a> AutoDiff for CelestialDynamicsStm<'a> {
     type HyperStateSize = U7;
 
     fn dual_eom(
         &self,
-        t: f64,
+        epoch: Epoch,
         state: &VectorN<Hyperdual<f64, U7>, U6>,
     ) -> (Vector6<f64>, Matrix6<f64>) {
         // Extract data from hyperspace
@@ -299,33 +226,13 @@ impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
             }
         }
 
-        // Get all of the position vectors between the center body and the third bodies
-        let jde = Epoch::from_tai_seconds(self.init_tai_secs + t);
-        for exb_id in &self.bodies {
-            let third_body = self.cosm.unwrap().frame_by_exb_id(*exb_id);
-            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
-
-            // State of j-th body as seen from primary body
-            let st_ij =
-                self.cosm
-                    .unwrap()
-                    .celestial_state(*exb_id, jde, self.state.frame, self.correction);
-
-            let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
-            let r_ij3 = norm(&r_ij).powi(3) / gm_d;
-            // The difference leads to the dual parts nulling themselves out, so let's fix that.
-            let mut r_j = radius - r_ij; // sc as seen from 3rd body
-            r_j[0][1] = 1.0;
-            r_j[1][2] = 1.0;
-            r_j[2][3] = 1.0;
-
-            let r_j3 = norm(&r_j).powi(3) / gm_d;
-            let third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
-
+        // Apply the acceleration models
+        for model in &self.accel_models {
+            let (model_acc, model_grad) = model.dual_eom(epoch, &radius);
             for i in 0..U3::dim() {
-                fx[i + 3] += third_body_acc_d[i][0];
-                for j in 1..U7::dim() {
-                    grad[(i + 3, j - 1)] += third_body_acc_d[i][j];
+                fx[i + 3] += model_acc[i];
+                for j in 1..U4::dim() {
+                    grad[(i + 3, j - 1)] += model_grad[(i, j - 1)];
                 }
             }
         }
@@ -394,7 +301,8 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
-        let (state, grad) = self.compute(t, &pos_vel);
+        let epoch = Epoch::from_tai_seconds(self.init_tai_secs + t);
+        let (state, grad) = self.eom_grad(epoch, &pos_vel);
         let stm_dt = self.stm * grad;
         // Rebuild the STM as a vector.
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
@@ -437,5 +345,122 @@ impl<'a> Estimable<State> for CelestialDynamicsStm<'a> {
         self.state.vx = new_state[3];
         self.state.vy = new_state[4];
         self.state.vz = new_state[5];
+    }
+}
+
+/// PointMasses model
+pub struct PointMasses<'a> {
+    /// The propagation frame
+    pub frame: Frame,
+    pub bodies: Vec<i32>,
+    /// Optional point to a Cosm, needed if extra point masses are needed
+    pub cosm: &'a Cosm,
+    /// Light-time correction computation if extra point masses are needed
+    pub correction: LTCorr,
+}
+
+impl<'a> PointMasses<'a> {
+    pub fn new(propagation_frame: Frame, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+        Self::with_correction(propagation_frame, bodies, cosm, LTCorr::None)
+    }
+
+    pub fn with_correction(
+        propagation_frame: Frame,
+        bodies: Vec<i32>,
+        cosm: &'a Cosm,
+        correction: LTCorr,
+    ) -> Self {
+        // Check that these celestial bodies exist
+        for exb_id in &bodies {
+            cosm.try_frame_by_exb_id(*exb_id)
+                .expect("unknown EXB ID in list of third bodies");
+        }
+
+        Self {
+            frame: propagation_frame,
+            bodies,
+            cosm,
+            correction,
+        }
+    }
+}
+
+impl<'a> AccelModel for PointMasses<'a> {
+    fn eom(&self, osc: &State) -> Vector3<f64> {
+        let mut d_x = Vector3::zeros();
+        // Get all of the position vectors between the center body and the third bodies
+        for exb_id in &self.bodies {
+            let third_body = self.cosm.frame_by_exb_id(*exb_id);
+            // State of j-th body as seen from primary body
+            let st_ij = self
+                .cosm
+                .celestial_state(*exb_id, osc.dt, self.frame, self.correction);
+
+            let r_ij = st_ij.radius();
+            let r_ij3 = st_ij.rmag().powi(3);
+            let r_j = osc.radius() - r_ij; // sc as seen from 3rd body
+            let r_j3 = r_j.norm().powi(3);
+            d_x += -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
+        }
+        d_x
+    }
+}
+
+impl<'a> Differentiable for PointMasses<'a> {
+    type STMSize = U3;
+    fn eom_grad(&self, epoch: Epoch, state: &Vector3<f64>) -> (Vector3<f64>, Matrix3<f64>) {
+        let hyperstate = hyperspace_from_vector(&state);
+
+        let (state, grad) = self.dual_eom(epoch, &hyperstate);
+
+        (state, grad)
+    }
+}
+
+impl<'a> AutoDiff for PointMasses<'a> {
+    type HyperStateSize = U7;
+
+    fn dual_eom(
+        &self,
+        epoch: Epoch,
+        state: &VectorN<Hyperdual<f64, U7>, U3>,
+    ) -> (Vector3<f64>, Matrix3<f64>) {
+        // Extract data from hyperspace
+        let radius = state.fixed_rows::<U3>(0).into_owned();
+        // Extract result into Vector6 and Matrix6
+        let mut fx = Vector3::zeros();
+        let mut grad = Matrix3::zeros();
+
+        // Get all of the position vectors between the center body and the third bodies
+        for exb_id in &self.bodies {
+            let third_body = self.cosm.frame_by_exb_id(*exb_id);
+            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
+
+            // State of j-th body as seen from primary body
+            let st_ij = self
+                .cosm
+                .celestial_state(*exb_id, epoch, self.frame, self.correction);
+
+            let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
+            let r_ij3 = norm(&r_ij).powi(3) / gm_d;
+            // The difference leads to the dual parts nulling themselves out, so let's fix that.
+            let mut r_j = radius - r_ij; // sc as seen from 3rd body
+            r_j[0][1] = 1.0;
+            r_j[1][2] = 1.0;
+            r_j[2][3] = 1.0;
+
+            let r_j3 = norm(&r_j).powi(3) / gm_d;
+            let third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
+
+            for i in 0..U3::dim() {
+                fx[i] += third_body_acc_d[i][0];
+                // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
+                for j in 1..U4::dim() {
+                    grad[(i, j - 1)] += third_body_acc_d[i][j];
+                }
+            }
+        }
+
+        (fx, grad)
     }
 }

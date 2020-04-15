@@ -1,9 +1,10 @@
 extern crate hyperdual;
 
-use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
+use self::hyperdual::{Hyperdual, Owned};
 use crate::celestia::State;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN};
+use crate::time::Epoch;
 
 /// The celestial module handles all Cartesian based dynamics.
 ///
@@ -84,6 +85,45 @@ where
     fn state(&self) -> Self::StateType;
 }
 
+/// A trait to specify that some equations of motion are differentiable.
+pub trait Differentiable {
+    type STMSize: DimName;
+    /// Computes both the state and the gradient of the dynamics.
+    fn eom_grad(
+        &self,
+        epoch: Epoch,
+        state: &VectorN<f64, Self::STMSize>,
+    ) -> (
+        VectorN<f64, Self::STMSize>,
+        MatrixMN<f64, Self::STMSize, Self::STMSize>,
+    )
+    where
+        DefaultAllocator:
+            Allocator<f64, Self::STMSize> + Allocator<f64, Self::STMSize, Self::STMSize>;
+}
+
+/// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
+pub trait AutoDiff: Differentiable {
+    /// Defines the state size of the estimated state
+    type HyperStateSize: DimName;
+
+    /// Defines the equations of motion for Dual numbers for these dynamics.
+    fn dual_eom(
+        &self,
+        epoch: Epoch,
+        state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+    ) -> (
+        VectorN<f64, Self::STMSize>,
+        MatrixMN<f64, Self::STMSize, Self::STMSize>,
+    )
+    where
+        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
+            + Allocator<f64, Self::STMSize>
+            + Allocator<f64, Self::STMSize, Self::STMSize>
+            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+        Owned<f64, Self::HyperStateSize>: Copy;
+}
+
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
@@ -98,49 +138,4 @@ pub trait ForceModel {
 pub trait AccelModel {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
     fn eom(&self, osc: &State) -> Vector3<f64>;
-}
-
-pub trait Differentiable: Dynamics
-where
-    Self: Sized,
-{
-    type STMSize: DimName;
-    /// Computes both the state and the gradient of the dynamics. These may be accessed by the
-    /// related getters.
-    fn compute(
-        &self,
-        t: f64,
-        state: &VectorN<f64, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
-    where
-        DefaultAllocator:
-            Allocator<f64, Self::STMSize> + Allocator<f64, Self::STMSize, Self::STMSize>;
-}
-
-/// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-pub trait AutoDiffDynamics: Differentiable
-where
-    Self: Sized,
-{
-    /// Defines the state size of the estimated state
-    type HyperStateSize: DimName;
-
-    /// Defines the equations of motion for Dual numbers for these dynamics.
-    fn dual_eom(
-        &self,
-        t: f64,
-        state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
-    where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::STMSize>
-            + Allocator<f64, Self::STMSize, Self::STMSize>
-            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-        Owned<f64, Self::HyperStateSize>: Copy;
 }

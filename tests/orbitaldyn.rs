@@ -630,7 +630,7 @@ fn two_body_dual() {
     );
 
     let mut dynamics = CelestialDynamicsStm::two_body(init);
-    let (fx, grad) = dynamics.compute(0.0, &init.to_cartesian_vec());
+    let (fx, grad) = dynamics.eom_grad(Epoch::from_tai_seconds(0.0), &init.to_cartesian_vec());
 
     assert!(
         (fx - expected_fx).norm() < 1e-16,
