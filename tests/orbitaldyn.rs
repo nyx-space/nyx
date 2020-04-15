@@ -9,7 +9,7 @@ use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 use na::{Matrix6, Vector6, U3};
 use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
-use nyx::od::AutoDiffDynamics;
+use nyx::dynamics::Differentiable;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
 use nyx::utils::rss_state_errors;

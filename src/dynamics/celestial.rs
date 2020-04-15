@@ -2,11 +2,11 @@ extern crate hyperdual;
 
 use self::hyperdual::linalg::norm;
 use self::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
-use super::{AccelModel, Dynamics};
+use super::{AccelModel, AutoDiffDynamics, Differentiable, Dynamics};
 use crate::dimensions::{DimName, Matrix6, Vector3, Vector6, VectorN, U3, U36, U42, U6, U7};
 use crate::time::Epoch;
 use celestia::{Cosm, Frame, LTCorr, State};
-use od::{AutoDiffDynamics, Estimable};
+use od::Estimable;
 use std::f64;
 
 /// `CelestialDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
@@ -246,9 +246,26 @@ impl<'a> CelestialDynamicsStm<'a> {
     }
 }
 
+impl<'a> Differentiable for CelestialDynamicsStm<'a> {
+    type STMSize = U6;
+
+    /// Computes both the state and the gradient of the dynamics. These may be accessed by the
+    /// related getters.
+    fn compute(
+        &self,
+        t: f64,
+        state: &VectorN<f64, Self::STMSize>,
+    ) -> (VectorN<f64, Self::STMSize>, Matrix6<f64>) {
+        let hyperstate = hyperspace_from_vector(&state);
+
+        let (state, grad) = self.dual_eom(t, &hyperstate);
+
+        (state, grad)
+    }
+}
+
 impl<'a> AutoDiffDynamics for CelestialDynamicsStm<'a> {
     type HyperStateSize = U7;
-    type STMSize = U6;
 
     fn dual_eom(
         &self,

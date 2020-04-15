@@ -1,7 +1,5 @@
-extern crate hyperdual;
 extern crate serde;
 
-use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
@@ -203,56 +201,6 @@ where
     type MeasurementInput;
     /// Returns the measurement if the device and generate one, else returns None
     fn measure(&self, state: &Self::MeasurementInput) -> Option<N>;
-}
-
-/// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-pub trait AutoDiffDynamics: Dynamics
-where
-    Self: Sized,
-{
-    /// Defines the state size of the estimated state
-    type HyperStateSize: DimName;
-    type STMSize: DimName;
-
-    /// Defines the equations of motion for Dual numbers for these dynamics.
-    fn dual_eom(
-        &self,
-        t: f64,
-        state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
-    where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::STMSize>
-            + Allocator<f64, Self::STMSize, Self::STMSize>
-            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-        Owned<f64, Self::HyperStateSize>: Copy;
-
-    /// Computes both the state and the gradient of the dynamics. These may be accessed by the
-    /// related getters.
-    fn compute(
-        &self,
-        t: f64,
-        state: &VectorN<f64, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
-    where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::STMSize>
-            + Allocator<f64, Self::STMSize, Self::STMSize>
-            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-        Owned<f64, Self::HyperStateSize>: Copy,
-    {
-        let hyperstate = hyperspace_from_vector(&state);
-
-        let (state, grad) = self.dual_eom(t, &hyperstate);
-
-        (state, grad)
-    }
 }
 
 /// Specifies the format of the Epoch during serialization
