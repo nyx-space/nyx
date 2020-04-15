@@ -121,6 +121,18 @@ impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
             }
         }
 
+        // Generate r_m and i_m
+        let mut r_m = Vec::with_capacity(min(max_degree, max_order) + 1);
+        let mut i_m = Vec::with_capacity(min(max_degree, max_order) + 1);
+
+        r_m.push(1.0);
+        i_m.push(0.0);
+
+        for m in 1..=min(max_degree, max_order) {
+            r_m.push(s_ * r_m[m - 1] - t_ * i_m[m - 1]);
+            i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
+        }
+
         let rho = self.compute_frame.equatorial_radius() / r_;
         let mut a1 = 0.0;
         let mut a2 = 0.0;
@@ -135,16 +147,16 @@ impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
 
             for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n, m);
-                let d_ = c_val * r_m(m as u16, s_, t_) + s_val * i_m(m as u16, s_, t_);
+                let d_ = c_val * r_m[m] + s_val * i_m[m];
                 let e_ = if m == 0 {
                     0.0
                 } else {
-                    c_val * r_m(m as u16 - 1, s_, t_) + s_val * i_m(m as u16 - 1, s_, t_)
+                    c_val * r_m[m - 1] + s_val * i_m[m - 1]
                 };
                 let f_ = if m == 0 {
                     0.0
                 } else {
-                    s_val * r_m(m as u16 - 1, s_, t_) - c_val * i_m(m as u16 - 1, s_, t_)
+                    s_val * r_m[m - 1] - c_val * i_m[m - 1]
                 };
 
                 sum1 += (m as f64) * a_nm[(n, m)] * e_;
@@ -166,21 +178,5 @@ impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
         let accel = Vector3::new(a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_);
         // Convert back to integration frame
         dcm.transpose() * accel
-    }
-}
-
-fn r_m(m: u16, s: f64, t: f64) -> f64 {
-    if m == 0 {
-        1.0
-    } else {
-        s * r_m(m - 1, s, t) - t * i_m(m - 1, s, t)
-    }
-}
-
-fn i_m(m: u16, s: f64, t: f64) -> f64 {
-    if m == 0 {
-        0.0
-    } else {
-        s * i_m(m - 1, s, t) + t * r_m(m - 1, s, t)
     }
 }
