@@ -1,7 +1,5 @@
-extern crate hyperdual;
-
-use self::hyperdual::linalg::norm;
-use self::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
+use super::hyperdual::linalg::norm;
+use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, AutoDiff, Differentiable, Dynamics};
 use crate::dimensions::{
     DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
@@ -141,6 +139,14 @@ impl<'a> CelestialDynamicsStm<'a> {
         }
     }
 
+    /// Add a model to these celestial dynamics (must be differentiable by automatic differentiation)
+    pub fn add_model(
+        &mut self,
+        accel_model: Box<dyn AutoDiff<STMSize = U3, HyperStateSize = U7> + 'a>,
+    ) {
+        self.accel_models.push(accel_model);
+    }
+
     /// Provides a copy to the state.
     pub fn as_state(&self) -> State {
         self.state
@@ -182,10 +188,15 @@ impl<'a> CelestialDynamicsStm<'a> {
 
 impl<'a> Differentiable for CelestialDynamicsStm<'a> {
     type STMSize = U6;
-    fn eom_grad(&self, epoch: Epoch, state: &Vector6<f64>) -> (Vector6<f64>, Matrix6<f64>) {
+    fn eom_grad(
+        &self,
+        epoch: Epoch,
+        integr_frame: Frame,
+        state: &Vector6<f64>,
+    ) -> (Vector6<f64>, Matrix6<f64>) {
         let hyperstate = hyperspace_from_vector(&state);
 
-        let (state, grad) = self.dual_eom(epoch, &hyperstate);
+        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
 
         (state, grad)
     }
@@ -197,6 +208,7 @@ impl<'a> AutoDiff for CelestialDynamicsStm<'a> {
     fn dual_eom(
         &self,
         epoch: Epoch,
+        integr_frame: Frame,
         state: &VectorN<Hyperdual<f64, U7>, U6>,
     ) -> (Vector6<f64>, Matrix6<f64>) {
         // Extract data from hyperspace
@@ -228,7 +240,7 @@ impl<'a> AutoDiff for CelestialDynamicsStm<'a> {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.dual_eom(epoch, &radius);
+            let (model_acc, model_grad) = model.dual_eom(epoch, integr_frame, &radius);
             for i in 0..U3::dim() {
                 fx[i + 3] += model_acc[i];
                 for j in 1..U4::dim() {
@@ -302,7 +314,7 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {
         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
         let epoch = Epoch::from_tai_seconds(self.init_tai_secs + t);
-        let (state, grad) = self.eom_grad(epoch, &pos_vel);
+        let (state, grad) = self.eom_grad(epoch, self.state.frame, &pos_vel);
         let stm_dt = self.stm * grad;
         // Rebuild the STM as a vector.
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
@@ -408,10 +420,15 @@ impl<'a> AccelModel for PointMasses<'a> {
 
 impl<'a> Differentiable for PointMasses<'a> {
     type STMSize = U3;
-    fn eom_grad(&self, epoch: Epoch, state: &Vector3<f64>) -> (Vector3<f64>, Matrix3<f64>) {
+    fn eom_grad(
+        &self,
+        epoch: Epoch,
+        integr_frame: Frame,
+        state: &Vector3<f64>,
+    ) -> (Vector3<f64>, Matrix3<f64>) {
         let hyperstate = hyperspace_from_vector(&state);
 
-        let (state, grad) = self.dual_eom(epoch, &hyperstate);
+        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
 
         (state, grad)
     }
@@ -423,6 +440,7 @@ impl<'a> AutoDiff for PointMasses<'a> {
     fn dual_eom(
         &self,
         epoch: Epoch,
+        _integr_frame: Frame,
         state: &VectorN<Hyperdual<f64, U7>, U3>,
     ) -> (Vector3<f64>, Matrix3<f64>) {
         // Extract data from hyperspace

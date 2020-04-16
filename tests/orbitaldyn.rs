@@ -630,7 +630,11 @@ fn two_body_dual() {
     );
 
     let mut dynamics = CelestialDynamicsStm::two_body(init);
-    let (fx, grad) = dynamics.eom_grad(Epoch::from_tai_seconds(0.0), &init.to_cartesian_vec());
+    let (fx, grad) = dynamics.eom_grad(
+        Epoch::from_tai_seconds(0.0),
+        eme2k,
+        &init.to_cartesian_vec(),
+    );
 
     assert!(
         (fx - expected_fx).norm() < 1e-16,
@@ -889,6 +893,64 @@ fn earth_sph_harmonics_70x70() {
     println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
 
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_gmat);
+
+    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
+    assert!(
+        dbg!(err_r) < 0.2,
+        format!("12x12 failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        dbg!(err_v) < 1e-3,
+        format!("12x12 failed in velocity: {:.5e}", err_v)
+    );
+}
+
+#[test]
+fn earth_sph_harmonics_70x70_partials() {
+    extern crate pretty_env_logger;
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+    use nyx::dynamics::sph_harmonics::HarmonicsDiff;
+    use nyx::dynamics::Dynamics;
+    use nyx::io::gravity::*;
+
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
+    let iau_earth = cosm.frame("IAU Earth");
+
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    // GMAT validation case
+    let rslt_gmat = Vector6::new(
+        -5_751.924_618_076_704,
+        4_719.386_612_440_923,
+        2_048.696_011_823_441,
+        -0.795_383_404_365_819_8,
+        -3.658_301_183_319_466,
+        6.138_865_498_487_843,
+    );
+
+    let mut dynamics = CelestialDynamicsStm::two_body(state);
+    dynamics.add_model(Box::new(harmonics));
+
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    prop.until_time_elapsed(SECONDS_PER_DAY);
+
+    println!(
+        "Error: {:3.12}",
+        prop.dynamics.state().0.to_cartesian_vec() - rslt_gmat
+    );
+
+    let (err_r, err_v) = rss_state_errors(&prop.dynamics.state().0.to_cartesian_vec(), &rslt_gmat);
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(

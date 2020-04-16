@@ -1,7 +1,7 @@
 extern crate hyperdual;
 
 use self::hyperdual::{Hyperdual, Owned};
-use crate::celestia::State;
+use crate::celestia::{Frame, State};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN};
 use crate::time::Epoch;
@@ -92,6 +92,7 @@ pub trait Differentiable {
     fn eom_grad(
         &self,
         epoch: Epoch,
+        integr_frame: Frame,
         state: &VectorN<f64, Self::STMSize>,
     ) -> (
         VectorN<f64, Self::STMSize>,
@@ -111,6 +112,7 @@ pub trait AutoDiff: Differentiable {
     fn dual_eom(
         &self,
         epoch: Epoch,
+        integr_frame: Frame,
         state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
     ) -> (
         VectorN<f64, Self::STMSize>,
