@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, J2000_OFFSET};
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
@@ -26,7 +26,7 @@ fn stop_cond_3rd_apo() {
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
     let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-6);
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
 
     let mut prop = Propagator::default(
         &mut dynamics,
@@ -88,7 +88,8 @@ fn nrho_apo() {
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
     let condition = StopCondition::new(apo_event, 2.0 * 86_400.0, 1e-1);
 
-    let mut dynamics = CelestialDynamics::new(state_luna, vec![bodies::EARTH, bodies::SUN], &cosm);
+    let mut dynamics =
+        OrbitalDynamics::point_masses(state_luna, vec![bodies::EARTH, bodies::SUN], &cosm);
 
     let mut prop = Propagator::default(
         &mut dynamics,

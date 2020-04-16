@@ -6,13 +6,13 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN};
 use crate::time::Epoch;
 
-/// The celestial module handles all Cartesian based dynamics.
+/// The orbital module handles all Cartesian based orbital dynamics.
 ///
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
 /// from this module match, or perform the appropriate coordinate transformations.
-pub mod celestial;
+pub mod orbital;
 
-/// The gravity module handles spherical harmonics only. It _must_ be combined with a CelestialDynamics dynamics
+/// The gravity module handles spherical harmonics only. It _must_ be combined with a OrbitalDynamics dynamics
 ///
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
 // pub mod gravity;

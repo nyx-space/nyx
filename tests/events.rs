@@ -7,7 +7,7 @@ extern crate nyx_space as nyx;
 fn event_tracker_true_anomaly() {
     use hifitime::{Epoch, J2000_OFFSET};
     use nyx::celestia::{Cosm, State};
-    use nyx::dynamics::celestial::CelestialDynamics;
+    use nyx::dynamics::orbital::OrbitalDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent};
     use nyx::propagators::*;
@@ -30,7 +30,7 @@ fn event_tracker_true_anomaly() {
 
     let tracker = EventTrackers::from_events(vec![peri_event, apo_event, ta_event0, ta_event1]);
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
 
     let mut prop = Propagator::default(
         &mut dynamics,

@@ -6,7 +6,7 @@ extern crate nyx_space as nyx;
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
 use nyx::celestia::{bodies, Cosm, LTCorr, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -29,7 +29,7 @@ fn leo_sun_earth_eclipses() {
 
     thread::spawn(move || {
         let cosm = Cosm::from_xb("./de438s");
-        let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+        let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
         let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
@@ -80,7 +80,7 @@ fn geo_sun_earth_eclipses() {
 
     thread::spawn(move || {
         let cosm = Cosm::from_xb("./de438s");
-        let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+        let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
         let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);

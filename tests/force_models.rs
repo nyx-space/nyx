@@ -5,8 +5,8 @@ extern crate nyx_space as nyx;
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use na::Vector6;
 use nyx::celestia::{Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
 use nyx::dynamics::drag::ExpEarthDrag;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
 use nyx::dynamics::thrustctrl::NoThrustControl;
@@ -27,7 +27,7 @@ fn srp_earth() {
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     let shadow_bodies = vec![eme2k];
 
@@ -77,7 +77,7 @@ fn drag_earth() {
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     let shadow_bodies = vec![eme2k];
 

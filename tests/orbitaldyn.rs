@@ -8,7 +8,7 @@ use approx::abs_diff_eq;
 use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 use na::{Matrix6, Vector6, U3};
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
+use nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use nyx::dynamics::Differentiable;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
@@ -36,7 +36,7 @@ fn two_body_dynamics() {
         5.848_947_462_472_877,
     );
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
@@ -113,7 +113,7 @@ fn halo_earth_moon_dynamics() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -178,7 +178,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -244,7 +244,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = CelestialDynamics::new(llo_xmtr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -312,7 +312,7 @@ fn halo_multi_body_dynamics() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -382,7 +382,7 @@ fn halo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -451,7 +451,7 @@ fn llo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(llo_xmtr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -513,7 +513,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -574,7 +574,7 @@ fn leo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -629,7 +629,7 @@ fn two_body_dual() {
         -0.000_270_059_537_150_490_5,
     );
 
-    let mut dynamics = CelestialDynamicsStm::two_body(init);
+    let mut dynamics = OrbitalDynamicsStm::two_body(init);
     let (fx, grad) = dynamics.eom_grad(
         Epoch::from_tai_seconds(0.0),
         eme2k,
@@ -706,7 +706,7 @@ fn multi_body_dynamics_dual() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamicsStm::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamicsStm::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -775,7 +775,7 @@ fn earth_sph_harmonics_j2() {
         6.139_616_747_276_084,
     );
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
@@ -830,7 +830,7 @@ fn earth_sph_harmonics_12x12() {
         6.138_852_391_455_04,
     );
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
@@ -884,7 +884,7 @@ fn earth_sph_harmonics_70x70() {
         6.138_865_498_487_843,
     );
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
@@ -939,7 +939,7 @@ fn earth_sph_harmonics_70x70_partials() {
         6.138_865_498_487_843,
     );
 
-    let mut dynamics = CelestialDynamicsStm::two_body(state);
+    let mut dynamics = OrbitalDynamicsStm::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());

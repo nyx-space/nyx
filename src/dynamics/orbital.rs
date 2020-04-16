@@ -9,8 +9,10 @@ use celestia::{Cosm, Frame, LTCorr, State};
 use od::Estimable;
 use std::f64;
 
-/// `CelestialDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
-pub struct CelestialDynamics<'a> {
+pub use super::sph_harmonics::{Harmonics, HarmonicsDiff};
+
+/// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
+pub struct OrbitalDynamics<'a> {
     /// Current state of these dynamics
     pub state: State,
     /// Loss in precision is avoided by using a relative time parameter initialized to zero
@@ -20,9 +22,9 @@ pub struct CelestialDynamics<'a> {
     pub accel_models: Vec<Box<dyn AccelModel + 'a>>,
 }
 
-impl<'a> CelestialDynamics<'a> {
-    /// Initialize third body dynamics given the EXB IDs and a Cosm
-    pub fn new(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+impl<'a> OrbitalDynamics<'a> {
+    /// Initialize point mass dynamics given the EXB IDs and a Cosm
+    pub fn point_masses(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         // Create the point masses
         let pts = PointMasses::new(state.frame, bodies, cosm);
         Self {
@@ -33,13 +35,23 @@ impl<'a> CelestialDynamics<'a> {
         }
     }
 
-    /// Initializes a CelestialDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
+    /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
     pub fn two_body(state: State) -> Self {
         Self {
             state,
             relative_time: 0.0,
             init_tai_secs: state.dt.as_tai_seconds(),
             accel_models: Vec::new(),
+        }
+    }
+
+    /// Initialize orbital dynamics with a list of acceleration models
+    pub fn new(state: State, accel_models: Vec<Box<dyn AccelModel + 'a>>) -> Self {
+        Self {
+            state,
+            relative_time: 0.0,
+            init_tai_secs: state.dt.as_tai_seconds(),
+            accel_models,
         }
     }
 
@@ -61,7 +73,7 @@ impl<'a> CelestialDynamics<'a> {
     }
 }
 
-impl<'a> Dynamics for CelestialDynamics<'a> {
+impl<'a> Dynamics for OrbitalDynamics<'a> {
     type StateSize = U6;
     type StateType = State;
     /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
@@ -104,8 +116,8 @@ impl<'a> Dynamics for CelestialDynamics<'a> {
     }
 }
 
-/// `CelestialDynamicsStm` provides the equations of motion for any celestial dynamic, **with** state transition matrix computation.
-pub struct CelestialDynamicsStm<'a> {
+/// `OrbitalDynamicsStm` provides the equations of motion for any celestial dynamic, **with** state transition matrix computation.
+pub struct OrbitalDynamicsStm<'a> {
     pub state: State,
     pub stm: Matrix6<f64>,
     // Loss in precision is avoided by using a relative time parameter initialized to zero
@@ -115,9 +127,9 @@ pub struct CelestialDynamicsStm<'a> {
     pub accel_models: Vec<Box<dyn AutoDiff<STMSize = U3, HyperStateSize = U7> + 'a>>,
 }
 
-impl<'a> CelestialDynamicsStm<'a> {
+impl<'a> OrbitalDynamicsStm<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
-    pub fn new(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+    pub fn point_masses(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
         let pts = PointMasses::new(state.frame, bodies, cosm);
         Self {
             state,
@@ -128,7 +140,7 @@ impl<'a> CelestialDynamicsStm<'a> {
         }
     }
 
-    /// Initializes a CelestialDynamicsStm which does not simulate the gravity pull of other celestial objects but the primary one.
+    /// Initializes a OrbitalDynamicsStm which does not simulate the gravity pull of other celestial objects but the primary one.
     pub fn two_body(state: State) -> Self {
         Self {
             state,
@@ -186,7 +198,7 @@ impl<'a> CelestialDynamicsStm<'a> {
     }
 }
 
-impl<'a> Differentiable for CelestialDynamicsStm<'a> {
+impl<'a> Differentiable for OrbitalDynamicsStm<'a> {
     type STMSize = U6;
     fn eom_grad(
         &self,
@@ -202,7 +214,7 @@ impl<'a> Differentiable for CelestialDynamicsStm<'a> {
     }
 }
 
-impl<'a> AutoDiff for CelestialDynamicsStm<'a> {
+impl<'a> AutoDiff for OrbitalDynamicsStm<'a> {
     type HyperStateSize = U7;
 
     fn dual_eom(
@@ -253,7 +265,7 @@ impl<'a> AutoDiff for CelestialDynamicsStm<'a> {
     }
 }
 
-impl<'a> Dynamics for CelestialDynamicsStm<'a> {
+impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
     type StateSize = U42;
     type StateType = (State, Matrix6<f64>);
     /// Returns the relative time to the propagator. Use prop.dynamics.state.dt for absolute time
@@ -331,7 +343,7 @@ impl<'a> Dynamics for CelestialDynamicsStm<'a> {
     }
 }
 
-impl<'a> Estimable<State> for CelestialDynamicsStm<'a> {
+impl<'a> Estimable<State> for OrbitalDynamicsStm<'a> {
     type LinStateSize = U6;
 
     fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, State) {

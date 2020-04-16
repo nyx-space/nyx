@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 use self::hifitime::Epoch;
 use self::na::Vector3;
 use self::nyx::celestia::{bodies, Cosm, State};
-use self::nyx::dynamics::celestial::CelestialDynamics;
+use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
@@ -51,7 +51,7 @@ fn transfer_schedule_no_depl() {
 
     // Define the dynamics
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(orbit, bodies, &cosm);
 
     // Define the thruster
     let biprop = vec![Thruster {
@@ -149,7 +149,7 @@ fn transfer_schedule_depl() {
 
     // Define the dynamics
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(orbit, bodies, &cosm);
 
     // Define the thruster
     let biprop = vec![Thruster {
