@@ -8,6 +8,8 @@ use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U3};
 use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
+use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
+use self::nyx::io::gravity::*;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::sync::mpsc;
@@ -529,5 +531,130 @@ fn ckf_map_covar() {
                 "covar velocity did not increase"
             );
         }
+    }
+}
+
+#[test]
+fn ckf_fixed_step_perfect_stations_harmonics() {
+    // Tests state noise compensation with covariance mapping
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    // Define the ground stations.
+    let elevation_mask = 0.0;
+    let range_noise = 0.0;
+    let range_rate_noise = 0.0;
+    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the propagator information.
+    let prop_time = SECONDS_PER_DAY;
+    let step_size = 10.0;
+    let opts = PropOpts::with_fixed_step(step_size);
+
+    // Define the storages (channels for the states and a map for the measurements).
+    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
+
+    // Define state information.
+    let cosm = Cosm::from_xb("./de438s");
+    let eme2k = cosm.frame("EME2000");
+    let iau_earth = cosm.frame("IAU Earth");
+    let dt = Epoch::from_mjd_tai(21545.0);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+
+    // Generate the truth data on one thread.
+    let mut dynamics = CelestialDynamics::two_body(initial_state);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    dynamics.add_model(Box::new(harmonics));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+    prop.tx_chan = Some(&truth_tx);
+    prop.until_time_elapsed(prop_time);
+
+    // Receive the states on the main thread, and populate the measurement channel.
+    while let Ok(rx_state) = truth_rx.try_recv() {
+        // Convert the state to ECI.
+        for station in all_stations.iter() {
+            let meas = station.measure(&rx_state).unwrap();
+            if meas.visible() {
+                measurements.push((rx_state.dt, meas));
+                break; // We know that only one station is in visibility at each time.
+            }
+        }
+    }
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
+    // the measurements, and the same time step.
+    let opts_est = PropOpts::with_fixed_step(step_size);
+    let mut estimator = CelestialDynamicsStm::two_body(initial_state);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
+    estimator.add_model(Box::new(harmonics));
+    let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
+    // Create the channels for covariance mapping
+    let (prop_tx, prop_rx) = mpsc::channel();
+    prop_est.tx_chan = Some(&prop_tx);
+
+    // Set up the filter
+    let covar_radius = 1.0e-3;
+    let covar_velocity = 1.0e-6;
+    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+        covar_radius,
+        covar_radius,
+        covar_radius,
+        covar_velocity,
+        covar_velocity,
+        covar_velocity,
+    ));
+
+    // Define the initial estimate
+    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+
+    let process_noise = Matrix3::zeros();
+    let process_noise_dt = None;
+
+    let mut ckf = KF::initialize(
+        initial_estimate,
+        process_noise,
+        measurement_noise,
+        process_noise_dt,
+    );
+
+    let mut odp = ODProcess::ckf(
+        &mut prop_est,
+        &mut ckf,
+        &all_stations,
+        false,
+        measurements.len(),
+    );
+
+    let rtn = odp.process_measurements_covar(&prop_rx, &measurements);
+    assert!(rtn.is_none(), "kf failed");
+
+    let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
+
+    // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
+    for (no, est) in odp.estimates.iter().enumerate() {
+        if no == 1 {
+            println!("{}", est);
+        }
+        assert!(
+            est.state.norm() < 1e-12,
+            "estimate error should be zero (perfect dynamics) ({:e})",
+            est.state.norm()
+        );
+
+        wtr.serialize(est.clone())
+            .expect("could not write to stdout");
     }
 }
