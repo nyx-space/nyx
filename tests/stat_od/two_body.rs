@@ -541,6 +541,8 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
         println!("could not init env_logger");
     }
 
+    use std::thread;
+
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
@@ -569,16 +571,19 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
-    let mut dynamics = CelestialDynamics::two_body(initial_state);
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
-    dynamics.add_model(Box::new(harmonics));
-    let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-    prop.tx_chan = Some(&truth_tx);
-    prop.until_time_elapsed(prop_time);
+    thread::spawn(move || {
+        let cosm = Cosm::from_xb("./de438s");
+        let mut dynamics = CelestialDynamics::two_body(initial_state);
+        let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+        let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+        dynamics.add_model(Box::new(harmonics));
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        prop.tx_chan = Some(&truth_tx);
+        prop.until_time_elapsed(prop_time);
+    });
 
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    while let Ok(rx_state) = truth_rx.recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
