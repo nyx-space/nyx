@@ -1,14 +1,18 @@
-use crate::celestia::State;
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, Vector3, VectorN};
+extern crate hyperdual;
 
-/// The celestial module handles all Cartesian based dynamics.
+use self::hyperdual::{Hyperdual, Owned};
+use crate::celestia::{Frame, State};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN};
+use crate::time::Epoch;
+
+/// The orbital module handles all Cartesian based orbital dynamics.
 ///
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
 /// from this module match, or perform the appropriate coordinate transformations.
-pub mod celestial;
+pub mod orbital;
 
-/// The gravity module handles spherical harmonics only. It _must_ be combined with a CelestialDynamics dynamics
+/// The gravity module handles spherical harmonics only. It _must_ be combined with a OrbitalDynamics dynamics
 ///
 /// This module allows loading gravity models from [PDS](http://pds-geosciences.wustl.edu/), [EGM2008](http://earth-info.nga.mil/GandG/wgs84/gravitymod/egm2008/) and GMAT's own COF files.
 // pub mod gravity;
@@ -79,6 +83,47 @@ where
 
     /// Returns the state of the dynamics
     fn state(&self) -> Self::StateType;
+}
+
+/// A trait to specify that some equations of motion are differentiable.
+pub trait Differentiable {
+    type STMSize: DimName;
+    /// Computes both the state and the gradient of the dynamics.
+    fn eom_grad(
+        &self,
+        epoch: Epoch,
+        integr_frame: Frame,
+        state: &VectorN<f64, Self::STMSize>,
+    ) -> (
+        VectorN<f64, Self::STMSize>,
+        MatrixMN<f64, Self::STMSize, Self::STMSize>,
+    )
+    where
+        DefaultAllocator:
+            Allocator<f64, Self::STMSize> + Allocator<f64, Self::STMSize, Self::STMSize>;
+}
+
+/// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
+pub trait AutoDiff: Differentiable {
+    /// Defines the state size of the estimated state
+    type HyperStateSize: DimName;
+
+    /// Defines the equations of motion for Dual numbers for these dynamics.
+    fn dual_eom(
+        &self,
+        epoch: Epoch,
+        integr_frame: Frame,
+        state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+    ) -> (
+        VectorN<f64, Self::STMSize>,
+        MatrixMN<f64, Self::STMSize, Self::STMSize>,
+    )
+    where
+        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
+            + Allocator<f64, Self::STMSize>
+            + Allocator<f64, Self::STMSize, Self::STMSize>
+            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+        Owned<f64, Self::HyperStateSize>: Copy;
 }
 
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).

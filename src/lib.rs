@@ -62,7 +62,7 @@ pub mod propagators;
 /// extern crate nyx_space as nyx;
 /// use hifitime::{Epoch, SECONDS_PER_DAY};
 /// use nyx::celestia::{bodies, Cosm, State};
-/// use nyx::dynamics::celestial::CelestialDynamics;
+/// use nyx::dynamics::orbital::OrbitalDynamics;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
 /// use nyx::propagators::{PropOpts, Propagator};
@@ -91,7 +91,7 @@ pub mod propagators;
 ///         eme2k,
 /// );
 ///
-/// let mut dynamics = CelestialDynamics::two_body(initial_state);
+/// let mut dynamics = OrbitalDynamics::two_body(initial_state);
 /// let mut prop = Propagator::default(
 ///     &mut dynamics,
 ///     &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
@@ -114,7 +114,7 @@ pub mod propagators;
 /// use hifitime::Epoch;
 /// use na::Vector6;
 /// use nyx::celestia::{bodies, Cosm, State};
-/// use nyx::dynamics::celestial::CelestialDynamics;
+/// use nyx::dynamics::orbital::OrbitalDynamics;
 /// use nyx::propagators::*;
 /// use nyx::utils::rss_state_errors;
 ///
@@ -147,7 +147,7 @@ pub mod propagators;
 /// );
 ///
 /// let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-/// let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+/// let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 ///
 /// let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
 /// prop.until_time_elapsed(prop_time);

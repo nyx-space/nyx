@@ -7,7 +7,7 @@ extern crate pretty_env_logger;
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{bodies, Cosm, State};
-use self::nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
+use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::sync::mpsc;
@@ -50,7 +50,7 @@ fn multi_body_ckf_perfect_stations() {
     thread::spawn(move || {
         let cosm = Cosm::from_xb("./de438s");
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = CelestialDynamics::new(initial_state, bodies, &cosm);
+        let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
@@ -72,7 +72,7 @@ fn multi_body_ckf_perfect_stations() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut estimator = CelestialDynamicsStm::new(initial_state, bodies, &cosm);
+    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
@@ -189,7 +189,7 @@ fn multi_body_ckf_covar_map() {
     thread::spawn(move || {
         let cosm = Cosm::from_xb("./de438s");
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = CelestialDynamics::new(initial_state, bodies, &cosm);
+        let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(&truth_tx);
         prop.until_time_elapsed(prop_time);
@@ -211,7 +211,7 @@ fn multi_body_ckf_covar_map() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut estimator = CelestialDynamicsStm::new(initial_state, bodies, &cosm);
+    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
 
     let (pest_tx, pest_rx): (
         Sender<(State, Matrix6<f64>)>,

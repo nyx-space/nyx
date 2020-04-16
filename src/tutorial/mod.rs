@@ -31,7 +31,6 @@ Note that nyx is still going through rapid iteration, and every feedback on how 
 **Known problems:**
 
 + The TAI time printed is incorrect, cf. [hifitime#67](https://github.com/ChristopherRabotin/hifitime/issues/67)
-+ Frame transformations do not account for orientation of the frame, cf. [nyx#93](https://gitlab.com/chrisrabotin/nyx/-/issues/93)
 
 # Table of contents
 0. [Setup](#setup)
@@ -48,6 +47,7 @@ Note that nyx is still going through rapid iteration, and every feedback on how 
     - [Eclipse locator](#eclipse-locators)
 3. [Dynamical models](#dynamical-models)
     - [Multibody dynamics](#multibody-dynamics)
+    - [Spherical harmonics](#spherical-harmonics)
     - [Basic attitude dynamics](#basic-attitude-dynamics)
     - [Finite burns with fuel depletion](#finite-burns-with-fuel-depletion)
     - [Sub-Optimal Control of continuous thrust](#sub-optimal-control-of-continuous-thrust)
@@ -80,7 +80,7 @@ $ cd nyxtutorial
 ```
 
 Once inside `nyxtutorial`, open `Cargo.toml` in your favorite text editor and add
-`nyx_space = "0.0.20-alpha.1"` to your `[dependencies]` section.
+`nyx_space = "0.0.20"` to your `[dependencies]` section.
 All high fidelity time management is handled by the hifitime library, and is accessible via `nyx::time`.
 The documentation for hifitime is available on [docs.rs](https://docs.rs/hifitime).
 Mainly, you'll be using the `Epoch` structure of this library, whose documentation is [here](https://docs.rs/hifitime/1.0.10/hifitime/struct.Epoch.html).
@@ -95,7 +95,7 @@ version = "0.1.0"
 authors = ["Your Name"]
 
 [dependencies]
-nyx-space = "0.0.20-alpha.2"
+nyx-space = "0.0.20"
 ```
 
 Next, let's build your project. Since you added the `nyx_space` crate as a
@@ -187,11 +187,10 @@ println!("{:e}", cart - kep);
 ```
 
 ## Planetary state computation
-**IMPORTANT: Update this section after attitude frame transformations have been implemented**
 
 All of the ephemeris computation happens through the `Cosm` structure, whose documentation is [here](../celestia/struct.Cosm.html).
 
-Let's start by getting the position and velocity of the Earth with respect to the Sun at a given time. As of 0.0.20-alpha.1, these are all in J2000 equatorial.
+Let's start by getting the position and velocity of the Earth with respect to the Sun at a given time.
 
 ```
 extern crate nyx_space as nyx;
@@ -327,10 +326,10 @@ let state = State::cartesian(
 
 // Let's initialize two body celestial dynamics.
 // (the use statement is here for clarity, but should be moved to the top of the file).
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 // Note that we're defining this variable as `mut`.
 // This means the variable is mutable, i.e. can be changed or modified.
-let mut dynamics = CelestialDynamics::two_body(state);
+let mut dynamics = OrbitalDynamics::two_body(state);
 
 // Let's setup the propagator options.
 // The default is to use the same configuration as NASA GMAT:
@@ -389,7 +388,7 @@ The default propagator works fine for most cases, but sometimes you will want so
 ```
 extern crate nyx_space as nyx;
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
@@ -405,7 +404,7 @@ let state = State::cartesian(
 );
 
 // Let's initialize two body celestial dynamics.
-let mut dynamics = CelestialDynamics::two_body(state);
+let mut dynamics = OrbitalDynamics::two_body(state);
 
 // Let's setup the propagator options.
 // We's setting it to be a with_fixed_step.
@@ -442,7 +441,7 @@ The condition stopper uses a Brent root solver. Documentation on StopCondition i
 ```
 extern crate nyx_space as nyx;
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
@@ -470,7 +469,7 @@ let apo_event = OrbitalEvent::new(EventKind::Apoapse);
 // And set it up as a condition.
 let condition = StopCondition::new(apo_event, max_prop_time, 1e-6);
 
-let mut dynamics = CelestialDynamics::two_body(state);
+let mut dynamics = OrbitalDynamics::two_body(state);
 
 // Note that the precision of the condition is matched only as good as the
 // minimum step of the propagator options.
@@ -503,7 +502,7 @@ Let's now allow for the apoapse event to happen several times and stop on the th
 ```
 extern crate nyx_space as nyx;
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
@@ -528,7 +527,7 @@ let apo_event = OrbitalEvent::new(EventKind::Apoapse);
 // And now let's stop the propagation after three apoapsis crossings.
 let condition = StopCondition::after_hits(apo_event, 3, max_prop_time, 1e-6);
 
-let mut dynamics = CelestialDynamics::two_body(state);
+let mut dynamics = OrbitalDynamics::two_body(state);
 
 let opts = PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {});
 
@@ -579,7 +578,7 @@ extern crate nyx_space as nyx;
 extern crate csv;
 // ^^^ Allows us to the CSV crate
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
@@ -597,7 +596,7 @@ let state = State::cartesian(
 // Let's initialize celestial dynamics with the point masses of the Moon and the Sun
 // in addition to the those of the Earth, which are included by default because the
 // initial state is defined around the Earth.
-let mut dynamics = CelestialDynamics::new(state, vec![bodies::EARTH_MOON, bodies::SUN], &cosm);
+let mut dynamics = OrbitalDynamics::point_masses(state, vec![bodies::EARTH_MOON, bodies::SUN], &cosm);
 
 let opts = PropOpts::default();
 println!("propagator options: {}", opts.info());
@@ -605,7 +604,7 @@ println!("propagator options: {}", opts.info());
 // Now let's setup the propagator.
 let mut prop = Propagator::default(&mut dynamics, &opts);
 // Now, let's define the channels so that the propagator can send and receive the
-// output states from the CelestialDynamics.
+// output states from the OrbitalDynamics.
 use std::sync::mpsc;
 // ^^^ We're using the standard library (std), so we can just `use` something without
 // having to `extern crate` it.
@@ -655,7 +654,7 @@ In Penumbra, the closer the reported value is, the more light is received by the
 ```
 extern crate nyx_space as nyx;
 use nyx::celestia::{bodies, Cosm, LTCorr, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 use std::sync::mpsc;
@@ -676,7 +675,7 @@ let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
 // Let's move the propagation to another thread.
 thread::spawn(move || {
     let cosm = Cosm::from_xb("./de438s");
-    let mut dynamics = CelestialDynamics::new(geo_bird, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(geo_bird, bodies, &cosm);
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
     prop.tx_chan = Some(&truth_tx);
     prop.until_time_elapsed(2.0 * SECONDS_PER_DAY);
@@ -795,7 +794,7 @@ Setting up a celestial dynamics with multibody point masses is quite straightfor
 ```
 extern crate nyx_space as nyx;
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, SECONDS_PER_DAY};
 
@@ -816,7 +815,7 @@ let pt_masses = vec![bodies::EARTH_MOON, bodies::SUN];
 // Let's initialize celestial dynamics with the extra point masses
 // in addition to the those of the Earth, which are included by default because the
 // initial state is defined around the Earth.
-let mut dynamics = CelestialDynamics::new(state, pt_masses, &cosm);
+let mut dynamics = OrbitalDynamics::point_masses(state, pt_masses, &cosm);
 
 let opts = PropOpts::default();
 println!("propagator options: {}", opts.info());
@@ -827,6 +826,70 @@ let mut prop = Propagator::default(&mut dynamics, &opts);
 let last_state = prop.until_time_elapsed(SECONDS_PER_DAY);
 println!("{}", last_state);
 ```
+
+## Spherical harmonics
+Nyx supports propagation with spherical harmonics. Those can be defined around any celestial object.
+
+They must be initialized from a `cof`, `shadr` or `EGM` file, which may or may not be gunzipped. One must also specify the body fixed frame in which these harmonics need to be computed in.
+
+```
+extern crate nyx_space as nyx;
+use nyx::celestia::{bodies, Cosm, State};
+use nyx::dynamics::orbital::{Harmonics, OrbitalDynamics, PointMasses};
+use nyx::dynamics::Dynamics;
+use nyx::io::gravity::HarmonicsMem;
+use nyx::propagators::{PropOpts, Propagator};
+use nyx::time::Epoch;
+
+let cosm = Cosm::from_xb("./de438s");
+// Get the EME2000 frame
+let eme2k = cosm.frame("EME2000");
+// Get the IAU Earth frame, frame in which the spherical harmonics are computed
+let iau_earth = cosm.frame("IAU Earth");
+
+let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
+
+let prop_time = orbit.period();
+
+// Initialize the spherical harmonics
+let degree = 50;
+let order = 50;
+let is_gunzipped = true;
+// Load the file into memory in a specifi HarmonicsMem structure.
+// This might sound like an overkill, but it allows you to define any
+// backend you wish to store harmonics, even something over gRPCs for example.
+let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", degree, order, is_gunzipped);
+let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+
+// Initialize the point masses (this method added in v0.0.20).
+let pts_mass = PointMasses::new(orbit.frame, vec![bodies::SUN, bodies::EARTH_MOON], &cosm);
+
+// Define the dynamics
+let mut dynamics = OrbitalDynamics::two_body(orbit);
+// Add the harmonics
+dynamics.add_model(Box::new(harmonics));
+dynamics.add_model(Box::new(pts_mass));
+
+let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
+prop.until_time_elapsed(prop_time);
+
+println!("Initial state: {:o}", orbit);
+println!("Final   state: {:o}", prop.dynamics.state());
+```
+
+I recommend running this in release mode is a good idea given the computations needed for the spherical harmonics. On my machine, it takes 12.4 seconds in debug mode, but only 0.3 seconds in release mode.
+```text
+$ cargo run --release
+   Compiling nyx-space v0.0.20 (/home/chris/Workspace/rust/nyx)
+   Compiling nyxtutorial v0.1.0 (/home/chris/Workspace/rust/nyxtutorial)
+    Finished release [optimized] target(s) in 4.73s
+     Running `target/release/nyxtutorial`
+Initial state: [399 (0)] 2019-12-31T23:59:23 TAI        sma = 7000.000000 km    ecc = 0.010000  inc = 0.050000 deg      raan = 0.000000 deg     aop = 360.000000 deg    ta = 1.000000 deg
+Final   state: [399 (0)] 2020-01-01T01:36:31 TAI        sma = 6999.984394 km    ecc = 0.010016  inc = 0.050008 deg      raan = 358.930647 deg   aop = 1.703888 deg      ta = 1.361272 deg
+```
+
 
 ## Basic attitude dynamics
 Currently the attitude model is extremely limited. If you need high fidelity attitude
@@ -900,7 +963,7 @@ all of the subsystems of the spacecraft prior to be able to run the propagator.
 extern crate nyx_space as nyx;
 use nyx::celestia::{bodies, Cosm, State};
 use nyx::dimensions::Vector3;
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::propulsion::{Propulsion, Thruster};
 use nyx::dynamics::spacecraft::Spacecraft;
 use nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
@@ -955,7 +1018,7 @@ let prop_subsys = Propulsion::new(schedule, biprop, fuel_depl);
 
 // Define the celestial dynamics
 let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-let dynamics = CelestialDynamics::new(orbit, bodies, &cosm);
+let dynamics = OrbitalDynamics::point_masses(orbit, bodies, &cosm);
 
 // And finally, we can define the spacecraft, with the celestial dynamics, the
 // propulsion subsystem, and the masses.
@@ -983,7 +1046,7 @@ based on the osculating orbital state, and therefore do a local optimization of 
 ```
 extern crate nyx_space as nyx;
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::propulsion::{Propulsion, Thruster};
 use nyx::dynamics::spacecraft::Spacecraft;
 use nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
@@ -1003,7 +1066,7 @@ let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2
 let prop_time = 39.91 * SECONDS_PER_DAY;
 
 // Define the dynamics
-let dynamics = CelestialDynamics::two_body(orbit);
+let dynamics = OrbitalDynamics::two_body(orbit);
 
 // Define the thruster
 let lowt = vec![Thruster {
@@ -1065,7 +1128,7 @@ be executed in `release` mode, which will optimize the binary.
 
 ```test
 $ cargo run --release
-   Compiling nyx-space v0.0.20-alpha.1 (/home/chris/Workspace/rust/nyx)
+   Compiling nyx-space v0.0.20 (/home/chris/Workspace/rust/nyx)
 (...)
    Compiling nyxtutorial v0.1.0 (/home/chris/Workspace/rust/nyxtutorial)
     Finished release [optimized] target(s) in 8.89s

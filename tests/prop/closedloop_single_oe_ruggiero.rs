@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::nyx::celestia::{Cosm, State};
-use self::nyx::dynamics::celestial::CelestialDynamics;
+use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
@@ -24,7 +24,7 @@ fn rugg_sma() {
     let prop_time = 45.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -75,7 +75,7 @@ fn rugg_sma_decr() {
     let prop_time = 45.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -128,7 +128,7 @@ fn rugg_inc() {
     let prop_time = 55.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -181,7 +181,7 @@ fn rugg_inc_decr() {
     let prop_time = 55.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -234,7 +234,7 @@ fn rugg_ecc() {
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -287,7 +287,7 @@ fn rugg_ecc_decr() {
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -342,7 +342,7 @@ fn rugg_aop() {
     let prop_time = 2650.0;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -396,7 +396,7 @@ fn rugg_aop_decr() {
     let prop_time = 2650.0;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {
@@ -449,7 +449,7 @@ fn rugg_raan() {
     let prop_time = 49.0 * SECONDS_PER_DAY;
 
     // Define the dynamics
-    let dynamics = CelestialDynamics::two_body(orbit);
+    let dynamics = OrbitalDynamics::two_body(orbit);
 
     // Define the thruster
     let lowt = vec![Thruster {

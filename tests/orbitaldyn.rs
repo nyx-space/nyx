@@ -8,8 +8,8 @@ use approx::abs_diff_eq;
 use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 use na::{Matrix6, Vector6, U3};
 use nyx::celestia::{bodies, Cosm, State};
-use nyx::dynamics::celestial::{CelestialDynamics, CelestialDynamicsStm};
-use nyx::od::AutoDiffDynamics;
+use nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
+use nyx::dynamics::Differentiable;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
@@ -36,7 +36,7 @@ fn two_body_dynamics() {
         5.848_947_462_472_877,
     );
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time);
@@ -113,7 +113,7 @@ fn halo_earth_moon_dynamics() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -178,7 +178,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -244,7 +244,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = CelestialDynamics::new(llo_xmtr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -312,7 +312,7 @@ fn halo_multi_body_dynamics() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -382,7 +382,7 @@ fn halo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -451,7 +451,7 @@ fn llo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(llo_xmtr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -513,7 +513,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -574,7 +574,7 @@ fn leo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamics::new(leo, bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
@@ -629,8 +629,12 @@ fn two_body_dual() {
         -0.000_270_059_537_150_490_5,
     );
 
-    let mut dynamics = CelestialDynamicsStm::two_body(init);
-    let (fx, grad) = dynamics.compute(0.0, &init.to_cartesian_vec());
+    let mut dynamics = OrbitalDynamicsStm::two_body(init);
+    let (fx, grad) = dynamics.eom_grad(
+        Epoch::from_tai_seconds(0.0),
+        eme2k,
+        &init.to_cartesian_vec(),
+    );
 
     assert!(
         (fx - expected_fx).norm() < 1e-16,
@@ -702,7 +706,7 @@ fn multi_body_dynamics_dual() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = CelestialDynamicsStm::new(halo_rcvr, bodies, &cosm);
+    let mut dynamics = OrbitalDynamicsStm::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
@@ -771,7 +775,7 @@ fn earth_sph_harmonics_j2() {
         6.139_616_747_276_084,
     );
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
@@ -808,7 +812,7 @@ fn earth_sph_harmonics_12x12() {
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 17, 17, true);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 12, 12, true);
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -826,7 +830,7 @@ fn earth_sph_harmonics_12x12() {
         6.138_852_391_455_04,
     );
 
-    let mut dynamics = CelestialDynamics::two_body(state);
+    let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
@@ -838,11 +842,123 @@ fn earth_sph_harmonics_12x12() {
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
-        err_r < 0.2,
+        dbg!(err_r) < 1e-1,
         format!("12x12 failed in position: {:.5e}", err_r)
     );
     assert!(
-        err_v < 1e-3,
+        dbg!(err_v) < 1e-4,
+        format!("12x12 failed in velocity: {:.5e}", err_v)
+    );
+}
+
+#[test]
+fn earth_sph_harmonics_70x70() {
+    extern crate pretty_env_logger;
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+    use nyx::dynamics::sph_harmonics::Harmonics;
+    use nyx::io::gravity::*;
+
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
+    let iau_earth = cosm.frame("IAU Earth");
+
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    // GMAT validation case
+    let rslt_gmat = Vector6::new(
+        -5_751.924_618_076_704,
+        4_719.386_612_440_923,
+        2_048.696_011_823_441,
+        -0.795_383_404_365_819_8,
+        -3.658_301_183_319_466,
+        6.138_865_498_487_843,
+    );
+
+    let mut dynamics = OrbitalDynamics::two_body(state);
+    dynamics.add_model(Box::new(harmonics));
+
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    prop.until_time_elapsed(SECONDS_PER_DAY);
+
+    println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
+
+    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_gmat);
+
+    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
+    assert!(
+        dbg!(err_r) < 0.2,
+        format!("12x12 failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        dbg!(err_v) < 1e-3,
+        format!("12x12 failed in velocity: {:.5e}", err_v)
+    );
+}
+
+#[test]
+fn earth_sph_harmonics_70x70_partials() {
+    extern crate pretty_env_logger;
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+    use nyx::dynamics::sph_harmonics::HarmonicsDiff;
+    use nyx::dynamics::Dynamics;
+    use nyx::io::gravity::*;
+
+    let mut cosm = Cosm::from_xb("./de438s");
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
+    let iau_earth = cosm.frame("IAU Earth");
+
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    // GMAT validation case
+    let rslt_gmat = Vector6::new(
+        -5_751.924_618_076_704,
+        4_719.386_612_440_923,
+        2_048.696_011_823_441,
+        -0.795_383_404_365_819_8,
+        -3.658_301_183_319_466,
+        6.138_865_498_487_843,
+    );
+
+    let mut dynamics = OrbitalDynamicsStm::two_body(state);
+    dynamics.add_model(Box::new(harmonics));
+
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    prop.until_time_elapsed(SECONDS_PER_DAY);
+
+    println!(
+        "Error: {:3.12}",
+        prop.dynamics.state().0.to_cartesian_vec() - rslt_gmat
+    );
+
+    let (err_r, err_v) = rss_state_errors(&prop.dynamics.state().0.to_cartesian_vec(), &rslt_gmat);
+
+    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
+    assert!(
+        dbg!(err_r) < 0.2,
+        format!("12x12 failed in position: {:.5e}", err_r)
+    );
+    assert!(
+        dbg!(err_v) < 1e-3,
         format!("12x12 failed in velocity: {:.5e}", err_v)
     );
 }

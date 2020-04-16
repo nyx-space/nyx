@@ -29,7 +29,7 @@ Unless specified otherwise in the documentation of specific functions, all vecto
 - [x] Sub-Optimal Control of continuous thrust (e.g. Ruggerio, Petropoulos/Q-law) (cf. [tests/prop/closedloop_multi_oe_ruggiero.rs](tests/prop/closedloop_multi_oe_ruggiero.rs))
 - [x] Solar radiation pressure modeling (cf. [tests/srp.rs](tests/srp.rs))
 - [x] Basic drag models (cannonball)
-- [ ] Spherical harmonics ([#28](https://gitlab.com/chrisrabotin/nyx/issues/28), [#93](https://gitlab.com/chrisrabotin/nyx/issues/93))
+- [x] Spherical harmonics ([#28](https://gitlab.com/chrisrabotin/nyx/issues/28))
 - [ ] Spacecraft attitude control and some useful optimal control algorithms
 ## Orbit determination
 - [x] Statistical Orbit Determination: Classical and Extended Kalman Filter (cf. [tests/stat_od/two_body.rs](tests/stat_od/two_body.rs))
@@ -37,6 +37,7 @@ Unless specified otherwise in the documentation of specific functions, all vecto
 - [x] Smoothing and iterations of CKFs ([#105](https://gitlab.com/chrisrabotin/nyx/issues/105))
 - [x] Square Root Information Filer (SRIF) ([#91](https://gitlab.com/chrisrabotin/nyx/issues/91))
 - [x] An easy-to-use OD user interface ([#109](https://gitlab.com/chrisrabotin/nyx/issues/109))
+- [x] Estimation with spherical harmonics enabled ([#123](https://gitlab.com/chrisrabotin/nyx/issues/123))
 - [ ] Solar radiation pressure (SRP) parameter estimation ([#98](https://gitlab.com/chrisrabotin/nyx/issues/98))
 - [ ] Covariance mapping and estimate frame transformations ([#106](https://gitlab.com/chrisrabotin/nyx/issues/106), [#112](https://gitlab.com/chrisrabotin/nyx/issues/112))
 - [x] State noise compensation (SNC) ([#85](https://gitlab.com/chrisrabotin/nyx/issues/85))
@@ -45,10 +46,11 @@ Unless specified otherwise in the documentation of specific functions, all vecto
 ## Celestial computations
 - [x] Orbital state manipulation (from GMAT source code and validated in GMAT) (cf. [tests/state.rs](tests/state.rs))
 - [x] Planetary and Solar eclipse and visibility computation (cf. [tests/eclipse.rs](tests/eclipse.rs))
-- [x] Light-time corrections and abberations
+- [x] Light-time corrections and abberations ([#88](https://gitlab.com/chrisrabotin/nyx/issues/88))
+- [x] Frame rotations [#93](https://gitlab.com/chrisrabotin/nyx/issues/93)
 
 # Who am I?
-An astrodynamics engineer with a heavy background in software. Nyx relies on the fallbacks of
+An astrodynamics engineer with a heavy background in software. Nyx relies on the drawbacks of
 [smd](https://github.com/ChristopherRabotin/smd), a library I wrote in Go while researching at the University
 of Colorado at Boulder. I work for Advanced Space ([we do really cool stuff](http://advanced-space.com/)).
 

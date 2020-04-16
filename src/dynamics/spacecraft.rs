@@ -1,4 +1,4 @@
-use super::celestial::CelestialDynamics;
+use super::orbital::OrbitalDynamics;
 use super::propulsion::Propulsion;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
@@ -7,8 +7,10 @@ use celestia::State;
 use std::fmt;
 use std::marker::PhantomData;
 
+pub use super::solarpressure::SolarPressure;
+
 pub struct Spacecraft<'a, T: ThrustControl> {
-    pub celestial: CelestialDynamics<'a>,
+    pub celestial: OrbitalDynamics<'a>,
     pub force_models: Vec<Box<dyn ForceModel + 'a>>,
     pub prop: Option<Propulsion<T>>,
     /// in kg
@@ -21,7 +23,7 @@ pub struct Spacecraft<'a, T: ThrustControl> {
 impl<'a, T: ThrustControl> Spacecraft<'a, T> {
     /// Initialize a Spacecraft with a set of celestial dynamics and a propulsion subsystem.
     pub fn with_prop(
-        celestial: CelestialDynamics<'a>,
+        celestial: OrbitalDynamics<'a>,
         prop: Propulsion<T>,
         dry_mass: f64,
         fuel_mass: f64,
@@ -37,7 +39,7 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
     }
 
     /// Initialize a Spacecraft with a set of celestial dynamics and with SRP enabled.
-    pub fn new(celestial: CelestialDynamics<'a>, dry_mass: f64) -> Self {
+    pub fn new(celestial: OrbitalDynamics<'a>, dry_mass: f64) -> Self {
         // Set the dry mass of the propulsion system
         Self {
             celestial,

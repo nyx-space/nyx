@@ -1,16 +1,16 @@
-use super::celestial::CelestialDynamics;
 use super::deltavctrl::DeltaVctrl;
+use super::orbital::OrbitalDynamics;
 use super::Dynamics;
 use crate::dimensions::{VectorN, U6};
 use celestia::State;
 
 pub struct MissionArc<'a, D: DeltaVctrl> {
-    pub celestial: CelestialDynamics<'a>,
+    pub celestial: OrbitalDynamics<'a>,
     pub ctrl: D,
 }
 
 impl<'a, D: DeltaVctrl> MissionArc<'a, D> {
-    pub fn new(celestial: CelestialDynamics<'a>, ctrl: D) -> Self {
+    pub fn new(celestial: OrbitalDynamics<'a>, ctrl: D) -> Self {
         Self { celestial, ctrl }
     }
 }

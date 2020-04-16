@@ -5,9 +5,9 @@ extern crate nyx_space as nyx;
 use self::hifitime::Epoch;
 use self::na::Vector3;
 use self::nyx::celestia::{Cosm, State};
-use self::nyx::dynamics::celestial::CelestialDynamics;
 use self::nyx::dynamics::deltavctrl::{InstantBurns, Mnvr};
 use self::nyx::dynamics::missionarc::MissionArc;
+use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::Dynamics;
 use self::nyx::propagators::{PropOpts, Propagator};
 
@@ -31,7 +31,7 @@ fn arc_example() {
     end_time.mut_add_secs(prop_time);
 
     // Define the dynamics
-    let celestial = CelestialDynamics::two_body(orbit);
+    let celestial = OrbitalDynamics::two_body(orbit);
 
     let mnvr0 = Mnvr::instantaneous(start_time, Vector3::new(2.42, 0.0, 0.0));
     let mnvr1 = Mnvr::instantaneous(mnvr1_dt, Vector3::new(-1.46, 0.0, 0.0));

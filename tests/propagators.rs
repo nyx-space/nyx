@@ -8,7 +8,7 @@ use approx::{abs_diff_eq, relative_eq};
 use hifitime::{Epoch, J2000_OFFSET};
 use na::Vector6;
 use nyx::celestia::{Cosm, State};
-use nyx::dynamics::celestial::CelestialDynamics;
+use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStatePV;
 use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
@@ -82,7 +82,7 @@ fn regress_leo_day_adaptive() {
     ];
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<RK2Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state_vector(), all_rslts[0], "two body prop failed");
@@ -97,7 +97,7 @@ fn regress_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<CashKarp45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -115,7 +115,7 @@ fn regress_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Fehlberg45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -187,7 +187,7 @@ fn gmat_val_leo_day_adaptive() {
     ];
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand45>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -228,7 +228,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Verner56>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -246,7 +246,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand78>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -264,7 +264,7 @@ fn gmat_val_leo_day_adaptive() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<RK89>(
             &mut dynamics,
             &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
@@ -338,7 +338,7 @@ fn gmat_val_leo_day_fixed() {
     ];
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0));
         prop.until_time_elapsed(prop_time);
         assert_eq!(
@@ -362,14 +362,14 @@ fn gmat_val_leo_day_fixed() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time);
         assert_eq_or_rel!(prop.state_vector(), all_rslts[1], "two body prop failed");
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop =
             Propagator::new::<Dormand45>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time);
@@ -377,7 +377,7 @@ fn gmat_val_leo_day_fixed() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop =
             Propagator::new::<Dormand78>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time);
@@ -385,7 +385,7 @@ fn gmat_val_leo_day_fixed() {
     }
 
     {
-        let mut dynamics = CelestialDynamics::two_body(init);
+        let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time);
         assert_eq!(prop.state_vector(), all_rslts[4], "two body prop failed");
