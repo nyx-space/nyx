@@ -102,7 +102,7 @@ where
         let mut seq = serializer.serialize_seq(Some(2 * M::dim() + 1))?;
         match self.epoch_fmt {
             EpochFormat::GregorianUtc => seq.serialize_element(&self.dt.as_gregorian_utc_str())?,
-            EpochFormat::GregorianTai => seq.serialize_element(&self.dt.as_gregorian_utc_tai())?,
+            EpochFormat::GregorianTai => seq.serialize_element(&self.dt.as_gregorian_tai_str())?,
             EpochFormat::MjdTai => seq.serialize_element(&self.dt.as_mjd_tai_days())?,
             EpochFormat::MjdTt => seq.serialize_element(&self.dt.as_mjd_tt_days())?,
             EpochFormat::MjdUtc => seq.serialize_element(&self.dt.as_mjd_utc_days())?,

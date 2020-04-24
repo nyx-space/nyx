@@ -765,7 +765,7 @@ impl Cosm {
             }
             // This means the target or the origin is exactly this path.
             let mut next_state =
-                self.raw_celestial_state(body.exb_id(), state.dt.as_jde_et_days())?;
+                self.raw_celestial_state(body.exb_id(), state.dt.as_jde_tdb_days())?;
             if prev_frame_exb_id == next_state.frame.exb_id() || neg_needed {
                 // Let's negate the next state prior to adding it.
                 next_state = -next_state;

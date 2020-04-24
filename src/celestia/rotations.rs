@@ -2,7 +2,7 @@ extern crate meval;
 use self::meval::{Context, Expr};
 use crate::log::error;
 use crate::na::Matrix3;
-use crate::time::{Epoch, J2000_OFFSET, MJD_OFFSET};
+use crate::time::{Epoch, DAYS_PER_CENTURY, J2000_OFFSET, MJD_OFFSET};
 use crate::utils::{r1, r2, r3};
 pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
@@ -157,8 +157,8 @@ impl<'a> fmt::Debug for Euler3AxisDt<'a> {
 
 impl<'a> ParentRotation for Euler3AxisDt<'a> {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-        let days_d = datetime.as_jde_et_days() - MJD_OFFSET - J2000_OFFSET;
-        let centuries_t = days_d / 36_525.0;
+        let days_d = datetime.as_jde_tdb_days() - MJD_OFFSET - J2000_OFFSET;
+        let centuries_t = days_d / DAYS_PER_CENTURY;
         // Now let's clone the context, and add the time variables.
         let mut ctx = self.base_context.clone();
         ctx.var("d", days_d);

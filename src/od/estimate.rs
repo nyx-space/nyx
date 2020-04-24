@@ -223,7 +223,7 @@ where
                 seq.serialize_element(&self.dt.as_gregorian_utc_str().replace("T", " "))?
             }
             EpochFormat::GregorianTai => {
-                seq.serialize_element(&self.dt.as_gregorian_utc_tai().replace("T", " "))?
+                seq.serialize_element(&self.dt.as_gregorian_tai_str().replace("T", " "))?
             }
             EpochFormat::MjdTai => seq.serialize_element(&self.dt.as_mjd_tai_days())?,
             EpochFormat::MjdTt => seq.serialize_element(&self.dt.as_mjd_tt_days())?,
@@ -431,7 +431,7 @@ where
                 seq.serialize_element(&self.dt.as_gregorian_utc_str().replace("T", " "))?
             }
             EpochFormat::GregorianTai => {
-                seq.serialize_element(&self.dt.as_gregorian_utc_tai().replace("T", " "))?
+                seq.serialize_element(&self.dt.as_gregorian_tai_str().replace("T", " "))?
             }
             EpochFormat::MjdTai => seq.serialize_element(&self.dt.as_mjd_tai_days())?,
             EpochFormat::MjdTt => seq.serialize_element(&self.dt.as_mjd_tt_days())?,
