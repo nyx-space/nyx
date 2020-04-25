@@ -1,9 +1,13 @@
 extern crate bytes;
 extern crate petgraph;
 extern crate prost;
+extern crate rust_embed;
+extern crate toml;
+
 use self::bytes::IntoBuf;
 use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
+use self::rust_embed::RustEmbed;
 use super::cosm::prost::Message;
 use super::frames::*;
 use super::rotations::*;
@@ -12,15 +16,20 @@ use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, EphemerisContainer};
 use super::SPEED_OF_LIGHT_KMS;
 use crate::hifitime::{Epoch, SECONDS_PER_DAY};
+use crate::io::frame_toml;
 use crate::na::Matrix3;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
-pub use std::io::Error as IoError;
 use std::io::Read;
+pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::time::Instant;
 use utils::rotv;
+
+#[derive(RustEmbed)]
+#[folder = "data/embed/"]
+struct EmbeddedAsset;
 
 /// Mass of the solar system from https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
 pub const SS_MASS: f64 = 1.0014;
@@ -247,14 +256,58 @@ impl Cosm {
         }
     }
 
+    /// Append Cosm with the contents of this TOML (must _not_ be the filename)
+    pub fn append_frames(&mut self, toml_content: &str) -> Option<IoError> {
+        let maybe_frames: Result<frame_toml::FramesToml, _> = toml::from_str(toml_content);
+        match maybe_frames {
+            Ok(frames) => {
+                for (ref name, ref mut definition) in frames.frames {
+                    if self.try_frame(name.as_str()).is_ok() {
+                        warn!("overwriting frame `{}`", name);
+                    }
+                    if let Some(src_frame_name) = &definition.clonefrom {
+                        match self.try_frame(src_frame_name.as_str()) {
+                            Ok(src_frame) => {
+                                definition.update_from(&src_frame);
+                            }
+                            Err(_) => panic!(
+                                "frame `{}` is derived from unknown frame `{}`",
+                                name, src_frame_name
+                            ),
+                        }
+                    }
+                    let rot = definition.rotation.clone();
+                    let frame_rot = rot.to_euler3_axis_dt().clone();
+                    // Let's now create the Frame
+                    let new_frame = definition.as_frame();
+                    // Let's now insert the frame.
+                    let node = self.axb_map.add_node(new_frame.axb_id());
+                    self.axb_names.insert(name.clone(), new_frame.axb_id());
+                    // And create the edge between the IAU SUN and J2k
+                    self.axb_map.add_edge(node, self.j2k_nidx, 1);
+                    self.axb_rotations
+                        .insert(new_frame.axb_id(), Box::new(frame_rot));
+                    self.frames.insert(name.to_string(), new_frame);
+                }
+                None
+            }
+            Err(e) => Some(IoError::new(IoErrorKind::InvalidData, e)),
+        }
+    }
+
     fn add_iau_frames(&mut self) {
         let no_ctx = HashMap::new();
         // IAU_SUN
         let right_asc: meval::Expr = "289.13".parse().unwrap();
         let declin: meval::Expr = "63.87".parse().unwrap();
         let w_expr: meval::Expr = "84.176 + 14.18440000*d".parse().unwrap();
-        let sun2ssb_rot =
-            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let sun2ssb_rot = Euler3AxisDt::from_ra_dec_w(
+            right_asc,
+            declin,
+            w_expr,
+            no_ctx.clone(),
+            AngleUnit::Degrees,
+        );
         // Executively state that the IAU_SUN frame has the ID 10
         let sun_iau = Frame::Geoid {
             axb_id: 10,
@@ -281,8 +334,13 @@ impl Cosm {
         let right_asc: meval::Expr = "272.76".parse().unwrap();
         let declin: meval::Expr = "67.16".parse().unwrap();
         let w_expr: meval::Expr = "160.20 - 1.4813688*d".parse().unwrap();
-        let venus_rot =
-            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let venus_rot = Euler3AxisDt::from_ra_dec_w(
+            right_asc,
+            declin,
+            w_expr,
+            no_ctx.clone(),
+            AngleUnit::Degrees,
+        );
         let venus_j2k = self.frame("Venus barycenter j2000");
         let venus_iau = Frame::Geoid {
             axb_id: 200,
@@ -308,8 +366,13 @@ impl Cosm {
         let right_asc: meval::Expr = "-0.641*T".parse().unwrap();
         let declin: meval::Expr = "90.0 - 0.557*T".parse().unwrap();
         let w_expr: meval::Expr = "190.147 + 360.9856235*d".parse().unwrap();
-        let earth_rot =
-            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let earth_rot = Euler3AxisDt::from_ra_dec_w(
+            right_asc,
+            declin,
+            w_expr,
+            no_ctx.clone(),
+            AngleUnit::Degrees,
+        );
         let earth_j2k = self.frame("eme2000");
         let earth_iau = Frame::Geoid {
             axb_id: 300,
@@ -335,8 +398,13 @@ impl Cosm {
         let right_asc: meval::Expr = "40.589 - 0.036*T".parse().unwrap();
         let declin: meval::Expr = "83.537 - 0.004*T".parse().unwrap();
         let w_expr: meval::Expr = "38.90 - 810.7939024*d".parse().unwrap();
-        let saturn_rot =
-            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let saturn_rot = Euler3AxisDt::from_ra_dec_w(
+            right_asc,
+            declin,
+            w_expr,
+            no_ctx.clone(),
+            AngleUnit::Degrees,
+        );
         let saturn_j2k = self.frame("Saturn barycenter j2000");
         let saturn_iau = Frame::Geoid {
             axb_id: 200,
@@ -362,8 +430,13 @@ impl Cosm {
         let right_asc: meval::Expr = "40.589 - 0.036*T".parse().unwrap();
         let declin: meval::Expr = "83.537 - 0.004*T".parse().unwrap();
         let w_expr: meval::Expr = "38.90 - 810.7939024*d".parse().unwrap();
-        let uranus_rot =
-            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &no_ctx, AngleUnit::Degrees);
+        let uranus_rot = Euler3AxisDt::from_ra_dec_w(
+            right_asc,
+            declin,
+            w_expr,
+            no_ctx.clone(),
+            AngleUnit::Degrees,
+        );
         let uranus_j2k = self.frame("Uranus barycenter j2000");
         let uranus_iau = Frame::Geoid {
             axb_id: 700,

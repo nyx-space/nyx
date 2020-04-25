@@ -8,6 +8,8 @@ pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
+use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::str::FromStr;
 
 pub trait ParentRotation: fmt::Debug {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>>;
@@ -78,7 +80,24 @@ pub enum AngleUnit {
     Radians,
 }
 
+impl FromStr for AngleUnit {
+    type Err = IoError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.to_lowercase().starts_with("deg") {
+            Ok(AngleUnit::Degrees)
+        } else if s.to_lowercase().starts_with("ran") {
+            Ok(AngleUnit::Radians)
+        } else {
+            Err(IoError::new(
+                IoErrorKind::InvalidData,
+                format!("unknown angles `{}`", s),
+            ))
+        }
+    }
+}
+
 /// A time varying three-axis Euler rotation
+#[derive(Clone)]
 pub struct Euler3AxisDt<'a> {
     pub base_context: Context<'a>,
     pub rot_order: [(EulerRotation, Expr); 3],
@@ -94,13 +113,13 @@ impl<'a> Euler3AxisDt<'a> {
         first_rot: (EulerRotation, Expr),
         second_rot: (EulerRotation, Expr),
         third_rot: (EulerRotation, Expr),
-        context: &HashMap<String, f64>,
+        context: HashMap<String, f64>,
         unit: AngleUnit,
         is_ra_dec_w: bool,
     ) -> Self {
         let mut ctx = Context::default();
         for (var, value) in context {
-            ctx.var(var, *value);
+            ctx.var(var, value);
         }
         let rot_order = [first_rot, second_rot, third_rot];
         Self {
@@ -117,7 +136,7 @@ impl<'a> Euler3AxisDt<'a> {
         first_rot: (EulerRotation, Expr),
         second_rot: (EulerRotation, Expr),
         third_rot: (EulerRotation, Expr),
-        context: &HashMap<String, f64>,
+        context: HashMap<String, f64>,
         unit: AngleUnit,
     ) -> Self {
         Self::new(first_rot, second_rot, third_rot, context, unit, false)
@@ -131,7 +150,7 @@ impl<'a> Euler3AxisDt<'a> {
         alpha_right_asc: Expr,
         delta_declin: Expr,
         w: Expr,
-        context: &HashMap<String, f64>,
+        context: HashMap<String, f64>,
         unit: AngleUnit,
     ) -> Self {
         Self::new(

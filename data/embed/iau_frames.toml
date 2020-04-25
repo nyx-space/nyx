@@ -1,0 +1,17 @@
+[frames.iau_sun]
+axb = 10
+exb = 10
+clonefrom = "Sun J2000"
+gm = -1
+parent_axb = -1
+parent_exb = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_sun.rotation]
+right_asc = "289.13"
+declin = "63.87"
+w = "84.176 + 14.18440000*d"
+angle_unit = "degrees"
+[frames.iau_sun.rotation.context]
+t_prime = 1.0  # For example
