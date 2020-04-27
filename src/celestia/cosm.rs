@@ -1,10 +1,12 @@
 extern crate bytes;
+extern crate meval;
 extern crate petgraph;
 extern crate prost;
 extern crate rust_embed;
 extern crate toml;
 
 use self::bytes::IntoBuf;
+use self::meval::Expr;
 use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
 use self::rust_embed::RustEmbed;
@@ -24,6 +26,7 @@ use std::fmt;
 use std::fs::File;
 use std::io::Read;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::str::FromStr;
 use std::time::Instant;
 use utils::rotv;
 
@@ -134,7 +137,16 @@ impl Cosm {
         // Now, let's append the IAU frames as defined in
         // Celest Mech Dyn Astr (2018) 130:22
         // https://doi.org/10.1007/s10569-017-9805-5
-        cosm.add_iau_frames();
+        // cosm.add_iau_frames();
+        // Load the IAU frames from the embedded TOML
+        let iau_toml_str =
+            EmbeddedAsset::get("iau_frames.toml").expect("Could not find iau_frames.toml as asset");
+        if let Some(err) = cosm.append_frames(
+            std::str::from_utf8(&iau_toml_str)
+                .expect("Could not deserialize iau_frames.toml as string"),
+        ) {
+            error!("Could not load IAU frames: {}", err);
+        }
 
         Ok(cosm)
     }
@@ -260,38 +272,58 @@ impl Cosm {
     pub fn append_frames(&mut self, toml_content: &str) -> Option<IoError> {
         let maybe_frames: Result<frame_toml::FramesToml, _> = toml::from_str(toml_content);
         match maybe_frames {
-            Ok(frames) => {
-                for (ref name, ref mut definition) in frames.frames {
+            Ok(mut frames) => {
+                for (ref name, ref mut definition) in frames.frames.drain() {
                     if self.try_frame(name.as_str()).is_ok() {
                         warn!("overwriting frame `{}`", name);
                     }
-                    if let Some(src_frame_name) = &definition.clonefrom {
+                    if let Some(src_frame_name) = &definition.base {
                         match self.try_frame(src_frame_name.as_str()) {
                             Ok(src_frame) => {
                                 definition.update_from(&src_frame);
                             }
-                            Err(_) => panic!(
-                                "frame `{}` is derived from unknown frame `{}`",
+                            Err(_) => println!(
+                                "frame `{}` is derived from unknown frame `{}`, skipping!",
                                 name, src_frame_name
                             ),
                         }
                     }
-                    let rot = definition.rotation.clone();
-                    let frame_rot = rot.to_euler3_axis_dt().clone();
+                    let rot = &definition.rotation;
+                    let right_asc: Expr = rot.right_asc.parse().unwrap();
+                    let declin: Expr = rot.declin.parse().unwrap();
+                    let w_expr: Expr = rot.w.parse().unwrap();
+                    let frame_rot = Euler3AxisDt::from_ra_dec_w(
+                        right_asc,
+                        declin,
+                        w_expr,
+                        match &rot.context {
+                            Some(ctx) => ctx.clone(),
+                            None => HashMap::new(),
+                        },
+                        match &rot.angle_unit {
+                            Some(val) => AngleUnit::from_str(val.as_str()).unwrap(),
+                            None => AngleUnit::Degrees,
+                        },
+                    );
+                    let frame_name = name.replace("_", " ");
                     // Let's now create the Frame
                     let new_frame = definition.as_frame();
                     // Let's now insert the frame.
                     let node = self.axb_map.add_node(new_frame.axb_id());
-                    self.axb_names.insert(name.clone(), new_frame.axb_id());
+                    self.axb_names
+                        .insert(frame_name.clone(), new_frame.axb_id());
                     // And create the edge between the IAU SUN and J2k
                     self.axb_map.add_edge(node, self.j2k_nidx, 1);
                     self.axb_rotations
                         .insert(new_frame.axb_id(), Box::new(frame_rot));
-                    self.frames.insert(name.to_string(), new_frame);
+                    self.frames.insert(dbg!(frame_name.to_string()), new_frame);
                 }
                 None
             }
-            Err(e) => Some(IoError::new(IoErrorKind::InvalidData, e)),
+            Err(e) => {
+                println!("{}", e);
+                Some(IoError::new(IoErrorKind::InvalidData, e))
+            }
         }
     }
 
@@ -430,13 +462,8 @@ impl Cosm {
         let right_asc: meval::Expr = "40.589 - 0.036*T".parse().unwrap();
         let declin: meval::Expr = "83.537 - 0.004*T".parse().unwrap();
         let w_expr: meval::Expr = "38.90 - 810.7939024*d".parse().unwrap();
-        let uranus_rot = Euler3AxisDt::from_ra_dec_w(
-            right_asc,
-            declin,
-            w_expr,
-            no_ctx.clone(),
-            AngleUnit::Degrees,
-        );
+        let uranus_rot =
+            Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, no_ctx, AngleUnit::Degrees);
         let uranus_j2k = self.frame("Uranus barycenter j2000");
         let uranus_iau = Frame::Geoid {
             axb_id: 700,
@@ -1531,5 +1558,24 @@ mod tests {
         assert!(dbg!(state_ecef.x - -1_424.497_118_292_03).abs() < 1e-5 || true);
         assert!(dbg!(state_ecef.y - -3_137.502_417_055_381).abs() < 1e-5 || true);
         assert!(dbg!(state_ecef.z - 6_890.998_090_503_171).abs() < 1e-5 || true);
+    }
+
+    #[test]
+    fn test_cosm_frame_context() {
+        let cosm = Cosm::from_xb("./de438s");
+
+        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
+
+        // Neptune has a context for its frame computation, so
+        // let's check that it works.
+        let neptune_iau = cosm.frame("iau_neptune");
+
+        let out_state = cosm.celestial_state(
+            bodies::EARTH_BARYCENTER,
+            jde,
+            neptune_iau,
+            LTCorr::Abberation,
+        );
+        println!("{}", out_state);
     }
 }

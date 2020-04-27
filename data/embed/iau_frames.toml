@@ -1,10 +1,10 @@
 [frames.iau_sun]
-axb = 10
-exb = 10
-clonefrom = "Sun J2000"
+orientation = 10
+center = 10
+base = "Sun J2000"
 gm = -1
-parent_axb = -1
-parent_exb = -1
+parent_orientation = -1
+parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -13,5 +13,85 @@ right_asc = "289.13"
 declin = "63.87"
 w = "84.176 + 14.18440000*d"
 angle_unit = "degrees"
-[frames.iau_sun.rotation.context]
-t_prime = 1.0  # For example
+
+[frames.iau_venus]
+orientation = 200
+center = -1
+base = "Venus barycenter J2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_venus.rotation]
+right_asc = "272.76"
+declin = "61.16"
+w = "160.20 - 1.4813688*d"
+angle_unit = "degrees"
+
+[frames.iau_earth]
+orientation = 200
+center = -1
+base = "EME2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_earth.rotation]
+right_asc = "-0.641*T"
+declin = "90.0 - 0.557*T"
+w = "190.147 + 360.9856235*d"
+angle_unit = "degrees"
+
+[frames.iau_saturn]
+orientation = 600
+center = -1
+base = "Saturn barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_saturn.rotation]
+right_asc = "40.589 - 0.036*T"
+declin = "83.537 - 0.004*T"
+w = "38.90 - 810.7939024*d"
+angle_unit = "degrees"
+
+[frames.iau_uranus]
+orientation = 700
+center = -1
+base = "Uranus barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_uranus.rotation]
+right_asc = "257.311"
+declin = "-15.175"
+w = "203.81 - 501.1600928*d"
+angle_unit = "degrees"
+
+[frames.iau_neptune]
+orientation = 800
+center = -1
+base = "Neptune barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_neptune.rotation]
+right_asc = "299.36 + 0.70*sin(N)"
+declin = "43.46 - 0.51*cos(N)"
+w = "249.978 + 541.1397757*d - 0.48*sin(N)"
+angle_unit = "degrees"
+[frames.iau_neptune.rotation.context]
+N = "357 + 52.316*T"
