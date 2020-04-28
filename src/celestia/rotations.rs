@@ -85,7 +85,7 @@ impl FromStr for AngleUnit {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.to_lowercase().starts_with("deg") {
             Ok(AngleUnit::Degrees)
-        } else if s.to_lowercase().starts_with("ran") {
+        } else if s.to_lowercase().starts_with("rad") {
             Ok(AngleUnit::Radians)
         } else {
             Err(IoError::new(
@@ -222,4 +222,12 @@ impl ParentRotation for Euler3AxisDt {
         }
         Some(dcm)
     }
+}
+
+#[test]
+fn test_angle_unit_deser() {
+    use std::str::FromStr;
+    assert_eq!(AngleUnit::from_str("DeGrEes").unwrap(), AngleUnit::Degrees);
+    assert_eq!(AngleUnit::from_str("RaDiaNs").unwrap(), AngleUnit::Radians);
+    assert!(AngleUnit::from_str("Gradian").is_err());
 }
