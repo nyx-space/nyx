@@ -108,7 +108,7 @@ fn test_deser_frame_toml() {
         w = "84.176 + 14.18440000*d"
         angle_unit = "degrees"
         [frames.iau_sun.rotation.context]
-        t_prime = 1.0  # For example
+        t_prime = "1.0"  # Must be encasted in quote even if just a floating point value
 
         [frames.iau_sun2]
         orientation = 10
@@ -125,8 +125,6 @@ fn test_deser_frame_toml() {
         declin = "63.87"
         w = "84.176 + 14.18440000*d"
         angle_unit = "degrees"
-        [frames.iau_sun2.rotation.context]
-        t_prime = 1.0  # For example
     "#,
     )
     .unwrap();
