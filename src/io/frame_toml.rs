@@ -10,16 +10,19 @@ pub struct FramesToml {
     pub frames: HashMap<String, FrameToml>,
 }
 
-// TODO: Support copying info from the J2000 frames somehow by specifying the name, e.g. "Venus barycenter J2000"
-
+/// A structure specifying the format of a frame defined in TOML, or some other serialization.
 #[derive(Clone, Deserialize)]
 pub struct FrameToml {
+    /// Refers to, or create, a unique identifier of the orientation defined by this frame.
     orientation: i32,
+    /// Refers to, or create, a unique identifier of the center object defined by this frame.
     center: i32,
     // Set this in the TOML to clone the negative values of this frame from another frame
     pub base: Option<String>,
     gm: f64,
+    /// Refers to the a unique identifier of the parent orientation of this frame (e.g. J2000 Ecliptic)
     parent_orientation: Option<i32>,
+    /// Refers to the a unique identifier of the parent center object of this frame (e.g. Solar System Barycenter)
     parent_center: Option<i32>,
     flattening: f64,
     equatorial_radius: f64,

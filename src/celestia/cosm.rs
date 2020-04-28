@@ -501,6 +501,7 @@ impl Cosm {
         let start_mod_julian = ephem.start_epoch.as_ref().unwrap().value;
         let coefficient_count: usize = interp.position_degree as usize;
         if coefficient_count <= 2 {
+            // Cf. https://gitlab.com/chrisrabotin/nyx/-/issues/131
             return Err(CosmError::InvalidInterpolationData(format!(
                 "position_degree is less than 3 for EXB ID {}",
                 exb_id
