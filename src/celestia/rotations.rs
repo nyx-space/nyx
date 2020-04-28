@@ -8,6 +8,8 @@ pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
+use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::str::FromStr;
 
 pub trait ParentRotation: fmt::Debug {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>>;
@@ -78,15 +80,32 @@ pub enum AngleUnit {
     Radians,
 }
 
+impl FromStr for AngleUnit {
+    type Err = IoError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.to_lowercase().starts_with("deg") {
+            Ok(AngleUnit::Degrees)
+        } else if s.to_lowercase().starts_with("rad") {
+            Ok(AngleUnit::Radians)
+        } else {
+            Err(IoError::new(
+                IoErrorKind::InvalidData,
+                format!("unknown angles `{}`", s),
+            ))
+        }
+    }
+}
+
 /// A time varying three-axis Euler rotation
-pub struct Euler3AxisDt<'a> {
-    pub base_context: Context<'a>,
+#[derive(Clone)]
+pub struct Euler3AxisDt {
+    pub base_context: HashMap<String, String>,
     pub rot_order: [(EulerRotation, Expr); 3],
     pub unit: AngleUnit,
     pub is_ra_dec_w: bool,
 }
 
-impl<'a> Euler3AxisDt<'a> {
+impl Euler3AxisDt {
     /// Initialize a new time varying transformation.
     /// Reserved keywords in the context are "T" for centuries past 2000 Jan 1 12h TBD
     /// epoch (JDE 2451545.0), and "d" for days since that epoch.
@@ -94,17 +113,13 @@ impl<'a> Euler3AxisDt<'a> {
         first_rot: (EulerRotation, Expr),
         second_rot: (EulerRotation, Expr),
         third_rot: (EulerRotation, Expr),
-        context: &HashMap<String, f64>,
+        context: HashMap<String, String>,
         unit: AngleUnit,
         is_ra_dec_w: bool,
     ) -> Self {
-        let mut ctx = Context::default();
-        for (var, value) in context {
-            ctx.var(var, *value);
-        }
         let rot_order = [first_rot, second_rot, third_rot];
         Self {
-            base_context: ctx,
+            base_context: context,
             rot_order,
             unit,
             is_ra_dec_w,
@@ -117,7 +132,7 @@ impl<'a> Euler3AxisDt<'a> {
         first_rot: (EulerRotation, Expr),
         second_rot: (EulerRotation, Expr),
         third_rot: (EulerRotation, Expr),
-        context: &HashMap<String, f64>,
+        context: HashMap<String, String>,
         unit: AngleUnit,
     ) -> Self {
         Self::new(first_rot, second_rot, third_rot, context, unit, false)
@@ -131,7 +146,7 @@ impl<'a> Euler3AxisDt<'a> {
         alpha_right_asc: Expr,
         delta_declin: Expr,
         w: Expr,
-        context: &HashMap<String, f64>,
+        context: HashMap<String, String>,
         unit: AngleUnit,
     ) -> Self {
         Self::new(
@@ -145,7 +160,7 @@ impl<'a> Euler3AxisDt<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Euler3AxisDt<'a> {
+impl fmt::Debug for Euler3AxisDt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -155,14 +170,23 @@ impl<'a> fmt::Debug for Euler3AxisDt<'a> {
     }
 }
 
-impl<'a> ParentRotation for Euler3AxisDt<'a> {
+impl ParentRotation for Euler3AxisDt {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
         let days_d = datetime.as_jde_tdb_days() - MJD_OFFSET - J2000_OFFSET;
         let centuries_t = days_d / DAYS_PER_CENTURY;
-        // Now let's clone the context, and add the time variables.
-        let mut ctx = self.base_context.clone();
+        // Let's create a new context, add the time variables, and compute the rotation's context
+        let mut ctx = Context::default();
         ctx.var("d", days_d);
         ctx.var("T", centuries_t);
+        for (var, expr_str) in &self.base_context {
+            let as_expr: Expr = expr_str.parse().unwrap();
+            ctx.var(
+                var.to_owned(),
+                as_expr.eval_with_context(&ctx).unwrap_or_else(|_| {
+                    panic!("Could not evaluate variable `{}` as `{}`", var, expr_str)
+                }),
+            );
+        }
         let mut dcm = Matrix3::identity();
         for (angle_no, (rot, expr)) in self.rot_order.iter().enumerate() {
             // Compute the correct angle
@@ -198,4 +222,12 @@ impl<'a> ParentRotation for Euler3AxisDt<'a> {
         }
         Some(dcm)
     }
+}
+
+#[test]
+fn test_angle_unit_deser() {
+    use std::str::FromStr;
+    assert_eq!(AngleUnit::from_str("DeGrEes").unwrap(), AngleUnit::Degrees);
+    assert_eq!(AngleUnit::from_str("RaDiaNs").unwrap(), AngleUnit::Radians);
+    assert!(AngleUnit::from_str("Gradian").is_err());
 }
