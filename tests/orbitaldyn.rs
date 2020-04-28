@@ -919,6 +919,7 @@ fn earth_sph_harmonics_70x70_partials() {
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
     cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
+    dbg!(eme2k.exb_id());
     let iau_earth = cosm.frame("IAU Earth");
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
