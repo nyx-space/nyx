@@ -1,7 +1,6 @@
-extern crate serde_derive;
 extern crate toml;
 
-use self::serde_derive::Deserialize;
+use super::serde_derive::Deserialize;
 use crate::celestia::Frame;
 use std::collections::HashMap;
 
@@ -9,8 +8,6 @@ use std::collections::HashMap;
 pub struct FramesToml {
     pub frames: HashMap<String, FrameToml>,
 }
-
-// TODO: Support copying info from the J2000 frames somehow by specifying the name, e.g. "Venus barycenter J2000"
 
 #[derive(Clone, Deserialize)]
 pub struct FrameToml {
