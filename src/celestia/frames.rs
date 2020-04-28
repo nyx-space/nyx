@@ -129,56 +129,9 @@ impl fmt::Display for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Frame::Celestial { axb_id, exb_id, .. } | Frame::Geoid { axb_id, exb_id, .. } => {
-                write!(f, "{} ({})", exb_id, axb_id)
+                write!(f, "{:3} ({:3})", exb_id, axb_id)
             }
             othframe => write!(f, "{:?}", othframe),
         }
     }
-}
-
-#[test]
-fn frame_def() {
-    /*
-    let ssb = Frame {
-        id: XbId {
-            number: 0,
-            name: "Solar System Barycenter".to_owned(),
-        },
-        exb_id: None,
-        info: Frame::Celestial {
-            gm: 1.0014 * 132_712_440_041.939_38,
-        },
-        parent: None,
-    };
-
-    let sun2ssb_ctx = HashMap::new();
-    let right_asc: meval::Expr = "289.13".parse().unwrap();
-    let declin: meval::Expr = "63.87".parse().unwrap();
-    let w_expr: meval::Expr = "84.176 + 14.18440000*d".parse().unwrap();
-    let sun2ssb_rot =
-        Euler3AxisDt::from_ra_dec_w(right_asc, declin, w_expr, &sun2ssb_ctx, AngleUnit::Degrees);
-
-    let sun_fixed = Frame {
-        id: XbId {
-            number: 10,
-            name: "Sun body fixed".to_owned(),
-        },
-        exb_id: None,
-        info: Frame::Celestial { gm: 1.0 },
-        parent: Some((&ssb, Box::new(sun2ssb_rot))),
-    };
-
-    let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
-    println!("{}", sun_fixed.dcm_to_parent(dt));
-    println!("{}", sun_fixed.dcm_to_parent(dt + 1.0));
-    println!(
-        "{}",
-        sun_fixed.dcm_to_parent(dt) * sun_fixed.dcm_from_parent(dt)
-    );
-
-    let mut map: HashMap<i32, Frame> = HashMap::new();
-    map.insert(ssb.id.number, ssb);
-
-    println!("{:?}", map);
-    */
 }
