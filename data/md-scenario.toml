@@ -1,0 +1,82 @@
+[state.state_name]
+x = -2436.45
+y = -2436.45
+z = 6891.037
+vx = 5.088611
+vy = -5.088611
+vz = 0.0
+frame = "EME2000"
+epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
+
+[state.state_name.units]
+position = "km"  # Default value if unspecified
+velocity = "km/s"  # Default value if unspecified
+
+[state.another_state]
+x = -3436.45
+y = -3436.45
+z = 6891.037
+vx = 5.088611
+vy = -5.088611
+vz = 0.0
+frame = "EME2000"
+epoch = "MJD 51540.5 TAI"
+
+[orbital_dynamics.conf_name]
+stm = false
+integration_frame = "EME2000"
+initial_state = "state_name"
+point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
+accel_models = ["jgm3_70x70"]
+
+[harmonics.jgm3_70x70]
+frame = "EME2000"
+degree = 70
+order = 70
+cof_file = "data/JGM3.cof.gz"
+gzip = true
+
+[srp.srp_name]
+area = 1.0  # m^2 by default
+cr = 1.8 
+phi = 1367.0
+
+[exp_drag.drag_mdl_name]
+area = 0.95
+cd = 2.2
+
+[spacecraft_dynamics.sc1]
+orbital_dynamics = "conf_name"  # Reference the name of the orbital_dynamics
+dry_mass = 100.0  # kg by default
+fuel_mass = 25.0
+force_models = ["drag_mdl_name", "srp_name"]
+
+[spacecraft_dynamics.sc1.units]
+mass = "kg"
+
+[propagator.prop_name]
+flavor = "rk89"  # If unspecified, the default propagator is used
+dynamics = "sc1"  # Use "sc1" spacecraft dynamics
+stop_cond = "one_day_prop"
+output = "my_output"
+
+[stop_cond.one_day_prop]
+kind = "time"
+time = 1.0
+unit = "day"
+
+[stop_cond.some_event]
+kind = "orbital"
+event = "apoapse"
+count = 3  # Condition triggered at third apoapse passage
+max_time = 1.0
+unit = "day"
+
+[csv_output.my_output]
+filename = "some/path/results.csv"
+epoch_format = "GregorianUtc"  # Must be one of https://docs.rs/nyx-space/0.0.20/nyx_space/od/enum.EpochFormat.html
+unit_position = "km"
+unit_velocity = "km/s"
+
+[mission_sequence]
+propagate = "prop_name"
