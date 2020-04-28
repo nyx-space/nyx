@@ -1,0 +1,136 @@
+# From Archinal et al. 2015, Reports of the IAU Working Group on Cartographic Coordinates and Rotational Elements
+[frames.iau_sun]
+orientation = 10
+center = 10
+base = "Sun J2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_sun.rotation]
+right_asc = "289.13"
+declin = "63.87"
+w = "84.176 + 14.18440000*d"
+angle_unit = "degrees"
+
+[frames.iau_venus]
+orientation = 200
+center = 2
+base = "Venus barycenter J2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_venus.rotation]
+right_asc = "272.76"
+declin = "61.16"
+w = "160.20 - 1.4813688*d"
+angle_unit = "degrees"
+
+[frames.iau_earth]
+orientation = 300
+center = 399
+base = "EME2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_earth.rotation]
+right_asc = "-0.641*T"
+declin = "90.0 - 0.557*T"
+w = "190.147 + 360.9856235*d"
+angle_unit = "degrees"
+
+[frames.iau_mars]
+orientation = 400
+center = 4
+base = "Mars barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_mars.rotation]
+right_asc = "317.269202 - 0.10927547*T + 0.000068 * sin(198.991226 + 19139.4819985*T) + 0.000238 * sin(226.292679 + 38280.8511281 * T) + 0.000052 * sin(249.663391 + 57420.7251593*T ) + 0.000009 * sin(266.183510 + 76560.6367950*T) + 0.419057 * sin(79.398797 + 0.5042615*T)"
+declin = "54.432516 - 0.05827105*T + 0.000051 * cos(122.433576 + 19139.9407476*T) + 0.000141 * cos(43.058401 + 38280.8753272*T) + 0.000031 * cos(57.663379 + 57420.7517205*T) + 0.000005 * cos(79.476401 + 76560.6495004*T) + 1.591274 * cos(166.325722 + 0.5042615*T)"
+w = "176.049863 + 350.891982443297*d + 0.000145 * sin(129.071773 + 19140.0328244*T) + 0.000157 * sin(36.352167 + 38281.0473591*T) + 0.000040 * sin(56.668646 + 57420.9295360*T) + 0.000001 * sin(67.364003 + 76560.2552215*T) + 0.000001 * sin(104.792680 + 95700.4387578*T) + 0.584542 * sin(95.391654 + 0.5042615*T)"
+angle_unit = "degrees"
+
+[frames.iau_jupiter]
+orientation = 500
+center = 5
+base = "Jupiter barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_jupiter.rotation]
+right_asc = "268.056595 - 0.006499*T + 0.000117 * sin(Ja) + 0.000938 * sin(Jb)+ 0.001432 * sin(Jc) + 0.000030 * sin(Jd) + 0.002150 * sin(Je)"
+declin = "64.495303 + 0.002413*T + 0.000050 * cos (Ja) + 0.000404 * cos (Jb) + 0.000617 * cos (Jc) - 0.000013 * cos (Jd) + 0.000926 * cos (Je)"
+w = "284.95 + 870.536*d"
+angle_unit = "degrees"
+[frames.iau_jupiter.rotation.context]
+Ja = "99360714 + 4850.4046T"
+Jb = "175.895369 + 1191.9605*T"
+Jc = "300.323162 + 262.5475*T"
+Jd = "114.012305 + 6070.2476*T"
+Je = "49.511251 + 64.3000*T"
+
+[frames.iau_saturn]
+orientation = 600
+center = 6
+base = "Saturn barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_saturn.rotation]
+right_asc = "40.589 - 0.036*T"
+declin = "83.537 - 0.004*T"
+w = "38.90 - 810.7939024*d"
+angle_unit = "degrees"
+
+[frames.iau_uranus]
+orientation = 700
+center = 7
+base = "Uranus barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_uranus.rotation]
+right_asc = "257.311"
+declin = "-15.175"
+w = "203.81 - 501.1600928*d"
+angle_unit = "degrees"
+
+[frames.iau_neptune]
+orientation = 800
+center = 8
+base = "Neptune barycenter j2000"
+gm = -1
+parent_orientation = -1
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_neptune.rotation]
+right_asc = "299.36 + 0.70*sin(N)"
+declin = "43.46 - 0.51*cos(N)"
+w = "249.978 + 541.1397757*d - 0.48*sin(N)"
+angle_unit = "degrees"
+[frames.iau_neptune.rotation.context]
+N = "357 + 52.316*T"
