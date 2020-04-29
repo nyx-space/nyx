@@ -220,8 +220,9 @@ where
             )
         };
 
-        // Compute the covariance (Jacobi formulation)
-        let covar = (MatrixMN::<f64, S, S>::identity() - gain * &self.h_tilde) * covar_bar;
+        // Compute covariance (Joseph update)
+        let first_term = MatrixMN::<f64, S, S>::identity() - &gain * &self.h_tilde;
+        let covar = &first_term * covar_bar * &first_term.transpose() + &gain * &self.measurement_noise * &gain.transpose();
 
         // And wrap up
         let estimate = KfEstimate {
