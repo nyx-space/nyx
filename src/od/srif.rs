@@ -142,7 +142,7 @@ where
             .try_inverse()
             .expect("state transition matrix singular");
 
-        let r_bar = &self.prev_estimate.info_mat * &stm_inv;
+        let r_bar = (&self.prev_estimate.info_mat * &stm_inv).abs();
 
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
@@ -189,7 +189,7 @@ where
             .try_inverse()
             .expect("state transition matrix singular");
 
-        let mut r_bar = &self.prev_estimate.info_mat * &stm_inv;
+        let mut r_bar = (&self.prev_estimate.info_mat * &stm_inv).abs();
         if let Some(pcr_dt) = self.process_noise_dt {
             let delta_t = dt - self.prev_estimate.dt;
 

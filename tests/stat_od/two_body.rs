@@ -121,14 +121,19 @@ fn ekf_fixed_step_perfect_stations() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}", est.state);
     for i in 0..6 {
+        for j in 0..6 {
+            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
+        }
+    }
+    for i in 0..6 {
         if i < 3 {
             assert!(
-                est.covar[(i, i)].abs() < covar_radius,
+                est.covar[(i, i)] < covar_radius,
                 "covar radius did not decrease"
             );
         } else {
             assert!(
-                est.covar[(i, i)].abs() < covar_velocity,
+                est.covar[(i, i)] < covar_velocity,
                 "covar velocity did not decrease"
             );
         }
@@ -267,14 +272,19 @@ fn ckf_fixed_step_perfect_stations() {
     let estimates = odp.estimates.clone();
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
+        for j in 0..6 {
+            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
+        }
+    }
+    for i in 0..6 {
         if i < 3 {
             assert!(
-                est.covar[(i, i)].abs() < covar_radius,
+                est.covar[(i, i)] < covar_radius,
                 "covar radius did not decrease"
             );
         } else {
             assert!(
-                est.covar[(i, i)].abs() < covar_velocity,
+                est.covar[(i, i)] < covar_velocity,
                 "covar velocity did not decrease"
             );
         }
@@ -442,8 +452,14 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
         );
 
         for i in 0..6 {
+            for j in 0..6 {
+                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
+            }
+        }
+
+        for i in 0..6 {
             assert!(
-                est.covar[(i, i)].abs() >= sigma_q,
+                est.covar[(i, i)] >= sigma_q,
                 "covar diagonal less than SNC value @ {} = {:.3e}",
                 no,
                 est.covar[(i, i)]
@@ -520,14 +536,19 @@ fn ckf_map_covar() {
     let estimates = odp.estimates;
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
+        for j in 0..6 {
+            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
+        }
+    }
+    for i in 0..6 {
         if i < 3 {
             assert!(
-                est.covar[(i, i)].abs() > covar_radius,
+                est.covar[(i, i)] > covar_radius,
                 "covar radius did not increase"
             );
         } else {
             assert!(
-                est.covar[(i, i)].abs() > covar_velocity,
+                est.covar[(i, i)] > covar_velocity,
                 "covar velocity did not increase"
             );
         }
@@ -652,6 +673,11 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 1 {
             println!("{}", est);
+        }
+        for i in 0..6 {
+            for j in 0..6 {
+                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
+            }
         }
         assert!(
             est.state.norm() < 1e-12,
