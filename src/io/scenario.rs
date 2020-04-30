@@ -27,6 +27,12 @@ pub struct OrbitalDynamicsSerde {
     pub stm: Option<bool>,
 }
 
+impl OrbitalDynamicsSerde {
+    pub fn with_stm(&self) -> bool {
+        self.stm.is_some() && self.stm.unwrap()
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PropagatorKind {
@@ -52,10 +58,35 @@ pub struct PropagatorSerde {
 
 #[derive(Deserialize)]
 pub struct Scenario {
+    sequence: Vec<String>,
     propagator: HashMap<String, PropagatorSerde>,
     state: HashMap<String, StateSerde>,
     orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
     distr: Option<HashMap<String, Distribution>>,
+}
+
+impl Scenario {
+    pub fn validate(&self) {
+        for seq_name in &self.sequence {
+            match self.propagator.get(seq_name) {
+                None => panic!("sequence refers to undefined propagator `{}` ", seq_name),
+                Some(prop) => match self.orbital_dynamics.get(&prop.dynamics) {
+                    None => panic!(
+                        "propagator `{}` refers to undefined dynamics `{}`",
+                        seq_name, prop.dynamics
+                    ),
+                    Some(dynamics) => {
+                        if self.state.get(&dynamics.initial_state).is_none() {
+                            panic!(
+                                "dynamics `{}` refers to unknown state `{}`",
+                                prop.dynamics, dynamics.initial_state
+                            );
+                        }
+                    }
+                },
+            }
+        }
+    }
 }
 
 #[test]
@@ -64,6 +95,8 @@ fn test_deser_scenario() {
 
     let scen: Scenario = toml::from_str(
         r#"
+        sequence = ["prop_name"]
+
         [state.state_name]
         x = -2436.45
         y = -2436.45
@@ -112,4 +145,5 @@ fn test_deser_scenario() {
     assert_eq!(scen.state.len(), 2);
     assert_eq!(scen.orbital_dynamics.len(), 2);
     assert_eq!(scen.propagator.len(), 2);
+    assert_eq!(scen.sequence.len(), 1);
 }

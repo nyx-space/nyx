@@ -1,3 +1,5 @@
+sequence = ["prop_name"]
+
 [state.state_name]
 x = -2436.45
 y = -2436.45
@@ -75,6 +77,3 @@ filename = "some/path/results.csv"
 epoch_format = "GregorianUtc"  # Must be one of https://docs.rs/nyx-space/0.0.20/nyx_space/od/enum.EpochFormat.html
 unit_position = "km"
 unit_velocity = "km/s"
-
-[scenario_sequence]
-propagate = "prop_name"

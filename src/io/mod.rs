@@ -1,4 +1,5 @@
 extern crate flate2;
+extern crate serde;
 extern crate serde_derive;
 
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
