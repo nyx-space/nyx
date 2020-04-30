@@ -7,10 +7,8 @@ vy = -5.088611
 vz = 0.0
 frame = "EME2000"
 epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
-
-[state.state_name.units]
-position = "km"  # Default value if unspecified
-velocity = "km/s"  # Default value if unspecified
+unit_position = "km"  # Default value if unspecified
+unit_velocity = "km/s"  # Default value if unspecified
 
 [state.another_state]
 x = -3436.45
@@ -78,5 +76,5 @@ epoch_format = "GregorianUtc"  # Must be one of https://docs.rs/nyx-space/0.0.20
 unit_position = "km"
 unit_velocity = "km/s"
 
-[mission_sequence]
+[scenario_sequence]
 propagate = "prop_name"

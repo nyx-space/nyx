@@ -7,8 +7,8 @@ pub mod gravity;
 /// Handles writing to an XYZV file
 pub mod cosmo;
 
-/// Handles reading from frames defined in TOML files
-pub mod frame_toml;
+/// Handles reading from frames defined in input files
+pub mod frame_serde;
 
 /// Handles reading random variables
 pub mod rv;

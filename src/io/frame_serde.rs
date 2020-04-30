@@ -5,13 +5,13 @@ use crate::celestia::Frame;
 use std::collections::HashMap;
 
 #[derive(Clone, Deserialize)]
-pub struct FramesToml {
-    pub frames: HashMap<String, FrameToml>,
+pub struct FramesSerde {
+    pub frames: HashMap<String, FrameSerde>,
 }
 
 /// A structure specifying the format of a frame defined in TOML, or some other serialization.
 #[derive(Clone, Deserialize)]
-pub struct FrameToml {
+pub struct FrameSerde {
     /// Refers to, or create, a unique identifier of the orientation defined by this frame.
     orientation: i32,
     /// Refers to, or create, a unique identifier of the center object defined by this frame.
@@ -29,7 +29,7 @@ pub struct FrameToml {
     pub rotation: RotationToml,
 }
 
-impl FrameToml {
+impl FrameSerde {
     pub fn to_frame(&self) -> Frame {
         Frame::Geoid {
             axb_id: self.orientation,
@@ -93,7 +93,7 @@ pub struct RotationToml {
 
 #[test]
 fn test_deser_frame_toml() {
-    let frames: FramesToml = toml::from_str(
+    let frames: FramesSerde = toml::from_str(
         r#"
         [frames.iau_sun]
         orientation = 10
