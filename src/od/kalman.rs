@@ -194,8 +194,9 @@ where
                     gamma[(i + A::dim(), i)] = delta_t;
                 }
                 // Let's add the process noise
-                covar_bar += delta_t.powi(2)
-                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose());
+                covar_bar += (delta_t.powi(2)
+                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose()))
+                    .abs();
             }
         }
 
@@ -224,8 +225,9 @@ where
 
         // Compute covariance (Joseph update)
         let first_term = MatrixMN::<f64, S, S>::identity() - &gain * &self.h_tilde;
-        let covar = &first_term * covar_bar * &first_term.transpose()
-            + &gain * &self.measurement_noise * &gain.transpose();
+        let covar = (&first_term * covar_bar * &first_term.transpose()
+            + &gain * &self.measurement_noise * &gain.transpose())
+            .abs();
 
         // And wrap up
         let estimate = KfEstimate {
