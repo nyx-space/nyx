@@ -27,12 +27,15 @@ stm = false
 integration_frame = "EME2000"
 initial_state = "state_name"
 point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
-accel_models = ["jgm3_70x70"]
-
-[orbital_dynamics.two_body]
-initial_state = "state_name"
+accel_models = ["my_models"]
 
 [propagator.prop_name]
-dynamics = "two_body"
+dynamics = "conf_name"
 stop_cond = "3.5 days"
 output = "my_output"
+
+[accel_models.my_models.harmonics.jgm3_70x70]
+frame = "EME2000"
+degree = 70
+order = 70
+file = "data/JGM3.cof.gz"

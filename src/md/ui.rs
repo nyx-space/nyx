@@ -5,6 +5,7 @@ pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::OrbitalDynamics;
+use crate::dynamics::sph_harmonics::Harmonics;
 use crate::io::scenario::ScenarioSerde;
 use crate::propagators::{PropOpts, Propagator};
 use crate::time::Epoch;
@@ -40,7 +41,7 @@ where
         }
     }
 
-    pub fn try_from_scenario(scen: ScenarioSerde, cosm: &Cosm) -> Result<Vec<Self>, MDError> {
+    pub fn try_from_scenario(scen: ScenarioSerde, cosm: &'a Cosm) -> Result<Vec<Self>, MDError> {
         let mut seq = Vec::with_capacity(10);
         for seq_name in &scen.sequence {
             match scen.propagator.get(seq_name) {
@@ -52,7 +53,7 @@ where
                 }
                 Some(prop) => {
                     // let mut spacecraft_dynamics;
-                    let orbital_dynamics;
+                    let mut orbital_dynamics;
                     let mut init_state;
                     // Validate the orbital dynamics
                     match scen.orbital_dynamics.get(&prop.dynamics) {
@@ -78,7 +79,69 @@ where
                                     init_state = cosm.frame_chg(&init_state, integ_frame);
                                 }
                                 // Create the dynamics
-                                orbital_dynamics = OrbitalDynamics::two_body(init_state);
+                                if let Some(pts_masses) = &dynamics.point_masses {
+                                    // Get the object IDs from name
+                                    let mut bodies = Vec::with_capacity(10);
+                                    for obj in pts_masses {
+                                        match cosm.try_frame(obj) {
+                                            Ok(frame) => bodies.push(frame.exb_id()),
+                                            Err(_) => {
+                                                // Let's try with "j2000" appended
+                                                match cosm
+                                                    .try_frame(format!("{} j2000", obj).as_str())
+                                                {
+                                                    Ok(frame) => bodies.push(frame.exb_id()),
+                                                    Err(_) => {
+                                                        bodies.push(
+                                                            cosm.frame(
+                                                                format!("{} barycenter j2000", obj)
+                                                                    .as_str(),
+                                                            )
+                                                            .exb_id(),
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // Remove bodies which are part of the state
+                                    if let Some(pos) =
+                                        bodies.iter().position(|x| *x == state_frame.exb_id())
+                                    {
+                                        bodies.remove(pos);
+                                    }
+                                    orbital_dynamics =
+                                        OrbitalDynamics::point_masses(init_state, bodies, cosm);
+                                } else {
+                                    orbital_dynamics = OrbitalDynamics::two_body(init_state);
+                                }
+
+                                // Add the acceleration models if applicable
+                                if let Some(accel_models) = &dynamics.accel_models {
+                                    for mdl in accel_models {
+                                        match scen.accel_models.get(mdl) {
+                                            None => {
+                                                return Err(MDError::ParsingError(format!(
+                                                    "dynamics `{}` refers to unknown state `{}`",
+                                                    prop.dynamics, dynamics.initial_state
+                                                )))
+                                            }
+                                            Some(amdl) => {
+                                                for hmdl in amdl.harmonics.values() {
+                                                    let in_mem = hmdl.load();
+                                                    let compute_frame =
+                                                        cosm.frame(hmdl.frame.as_str());
+                                                    let hh = Harmonics::from_stor(
+                                                        compute_frame,
+                                                        in_mem,
+                                                        &cosm,
+                                                    );
+                                                    orbital_dynamics.add_model(Box::new(hh));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                     }
