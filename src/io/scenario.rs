@@ -103,11 +103,6 @@ pub struct ScenarioSerde {
     pub distr: Option<HashMap<String, Distribution>>,
 }
 
-impl ScenarioSerde {
-    /// Runs this scenario, if valid, and in sequence
-    pub fn validate(&self) {}
-}
-
 #[test]
 fn test_deser_scenario() {
     extern crate toml;

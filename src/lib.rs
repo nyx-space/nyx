@@ -225,6 +225,9 @@ pub mod od;
 /// Provides all methods for running a scenario
 pub mod executor;
 
+/// Provides all of the mission design tools
+pub mod md;
+
 pub mod tutorial;
 
 #[macro_use]

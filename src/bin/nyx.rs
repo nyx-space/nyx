@@ -5,8 +5,8 @@ extern crate pretty_env_logger;
 use clap::{App, Arg};
 use config::{Config, File};
 use nyx::celestia::Cosm;
-use nyx::executor::run;
 use nyx::io::scenario::*;
+use nyx::md::ui::MDProcess;
 
 fn main() {
     let app = App::new("nyx")
@@ -42,7 +42,6 @@ fn main() {
         Ok(s) => scenario = s,
         Err(e) => panic!("{:?}", e),
     };
-    scenario.validate();
 
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
@@ -51,5 +50,12 @@ fn main() {
     // Load cosm
     let cosm = Cosm::from_xb("./de438s");
 
-    run(scenario, &cosm);
+    match MDProcess::try_from_scenario(scenario, &cosm) {
+        Ok(sequence) => {
+            for mut item in sequence {
+                item.execute();
+            }
+        }
+        Err(e) => println!("ERROR\n{:?}", e),
+    };
 }

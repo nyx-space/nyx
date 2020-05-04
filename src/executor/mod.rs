@@ -1,10 +1,10 @@
 extern crate regex;
+
 use self::regex::Regex;
 use crate::celestia::*;
 use crate::dynamics::*;
 use crate::io::scenario::{PropagatorKind, ScenarioSerde};
 use crate::log::warn;
-use crate::od::ui::*;
 use crate::propagators::*;
 use crate::time::Epoch;
 use std::str::FromStr;
