@@ -4,3 +4,4 @@ stable:
     - rustup component add rustfmt
     - RUST_BACKTRACE=full cargo test --release
     - cargo fmt -- --check
+    - cargo run -- data/tb-scenario.toml

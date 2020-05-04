@@ -13,8 +13,11 @@ epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
 [orbital_dynamics.example]
 initial_state = "init"
 
+[orbital_dynamics.unused]
+initial_state = "initdd"
+
 [propagator.prop]
-dynamics = "example"  # Use "sc1" spacecraft dynamics
+dynamics = "example"
 stop_cond = "one_day_prop"
 output = "my_output"
 

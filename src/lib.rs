@@ -222,6 +222,9 @@ pub mod io;
 /// Provides all the orbital determination tools.
 pub mod od;
 
+/// Provides all methods for running a scenario
+pub mod executor;
+
 pub mod tutorial;
 
 #[macro_use]

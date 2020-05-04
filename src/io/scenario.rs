@@ -1,6 +1,9 @@
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
+use crate::celestia::{Frame, State};
+use crate::time::Epoch;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 #[derive(Deserialize)]
 pub struct StateSerde {
@@ -14,6 +17,41 @@ pub struct StateSerde {
     pub epoch: String,
     pub unit_position: Option<String>,
     pub unit_velocity: Option<String>,
+}
+
+impl StateSerde {
+    pub fn as_state(&self, frame: Frame) -> State {
+        let pos_mul = match &self.unit_position {
+            Some(unit) => match unit.to_lowercase().as_str() {
+                "km" => 1.0,
+                "m" => 1_000.0,
+                "cm" => 100_000.0,
+                _ => panic!("unknown unit `{}`", unit),
+            },
+            None => 1.0,
+        };
+
+        let vel_mul = match &self.unit_velocity {
+            Some(unit) => match unit.to_lowercase().as_str() {
+                "km/s" => 1.0,
+                "m/s" => 1_000.0,
+                "cm/s" => 100_000.0,
+                _ => panic!("unknown unit `{}`", unit),
+            },
+            None => 1.0,
+        };
+
+        State::cartesian(
+            self.x * pos_mul,
+            self.y * pos_mul,
+            self.z * pos_mul,
+            self.vx * vel_mul,
+            self.vy * vel_mul,
+            self.vz * vel_mul,
+            Epoch::from_str(&self.epoch).unwrap(),
+            frame,
+        )
+    }
 }
 
 #[derive(Deserialize)]
@@ -57,43 +95,24 @@ pub struct PropagatorSerde {
 }
 
 #[derive(Deserialize)]
-pub struct Scenario {
-    sequence: Vec<String>,
-    propagator: HashMap<String, PropagatorSerde>,
-    state: HashMap<String, StateSerde>,
-    orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
-    distr: Option<HashMap<String, Distribution>>,
+pub struct ScenarioSerde {
+    pub sequence: Vec<String>,
+    pub propagator: HashMap<String, PropagatorSerde>,
+    pub state: HashMap<String, StateSerde>,
+    pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
+    pub distr: Option<HashMap<String, Distribution>>,
 }
 
-impl Scenario {
-    pub fn validate(&self) {
-        for seq_name in &self.sequence {
-            match self.propagator.get(seq_name) {
-                None => panic!("sequence refers to undefined propagator `{}` ", seq_name),
-                Some(prop) => match self.orbital_dynamics.get(&prop.dynamics) {
-                    None => panic!(
-                        "propagator `{}` refers to undefined dynamics `{}`",
-                        seq_name, prop.dynamics
-                    ),
-                    Some(dynamics) => {
-                        if self.state.get(&dynamics.initial_state).is_none() {
-                            panic!(
-                                "dynamics `{}` refers to unknown state `{}`",
-                                prop.dynamics, dynamics.initial_state
-                            );
-                        }
-                    }
-                },
-            }
-        }
-    }
+impl ScenarioSerde {
+    /// Runs this scenario, if valid, and in sequence
+    pub fn validate(&self) {}
 }
 
 #[test]
 fn test_deser_scenario() {
     extern crate toml;
 
-    let scen: Scenario = toml::from_str(
+    let scen: ScenarioSerde = toml::from_str(
         r#"
         sequence = ["prop_name"]
 
@@ -132,12 +151,12 @@ fn test_deser_scenario() {
         [propagator.prop_name]
         flavor = "rk89"  # If unspecified, the default propagator is used
         dynamics = "two_body"  # Use "sc1" spacecraft dynamics
-        stop_cond = "one_day_prop"
+        stop_cond = "MJD 51540.5 TAI"
         output = "my_output"
 
         [propagator.simple]
         dynamics = "two_body"  # Use "sc1" spacecraft dynamics
-        stop_cond = "one_day_prop"
+        stop_cond = "1 * day"
         "#,
     )
     .unwrap();

@@ -1,8 +1,11 @@
 extern crate clap;
 extern crate config;
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger;
 use clap::{App, Arg};
 use config::{Config, File};
+use nyx::celestia::Cosm;
+use nyx::executor::run;
 use nyx::io::scenario::*;
 
 fn main() {
@@ -34,11 +37,19 @@ fn main() {
         .expect("Could not load scenario from file or directory");
 
     // Try to deserialize the scenario
-    let scenario: Scenario;
+    let scenario: ScenarioSerde;
     match s.try_into() {
         Ok(s) => scenario = s,
         Err(e) => panic!("{:?}", e),
     };
     scenario.validate();
-    println!("Scenario is valid")
+
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    // Load cosm
+    let cosm = Cosm::from_xb("./de438s");
+
+    run(scenario, &cosm);
 }

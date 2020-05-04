@@ -14,29 +14,45 @@ fn test_deser_distr() {
     extern crate toml;
 
     let _std_norm: Distribution = toml::from_str(
-        r#"[distribution.normal]
+        r#"[normal]
         mean = 0.0
         std_dev = 1.0"#,
     )
     .unwrap();
 
     let _cauchy: Distribution = toml::from_str(
-        r#"[distribution.cauchy]
+        r#"[cauchy]
         median = 0.0
         scale = 1.0"#,
     )
     .unwrap();
 
     let _my_exp: Distribution = toml::from_str(
-        r#"[distribution.exponential]
+        r#"[exponential]
         lambda = 0.5"#,
     )
     .unwrap();
 
     let _fish: Distribution = toml::from_str(
-        r#"[distribution.poisson]
+        r#"[poisson]
         lambda = 10.0
     "#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_deser_distr_multi() {
+    use std::collections::HashMap;
+    extern crate toml;
+
+    #[derive(Deserialize)]
+    struct MapRv {
+        rvs: HashMap<String, Distribution>,
+    }
+
+    let _as_map: MapRv = toml::from_str(
+        r#"rvs = { one = { normal = { mean = 0.0, std_dev = 0.2 } }, two = { poisson = { lambda = 10.0 } } }"#,
     )
     .unwrap();
 }
