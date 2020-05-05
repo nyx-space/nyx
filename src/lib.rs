@@ -222,9 +222,6 @@ pub mod io;
 /// Provides all the orbital determination tools.
 pub mod od;
 
-/// Provides all methods for running a scenario
-pub mod executor;
-
 /// Provides all of the mission design tools
 pub mod md;
 

@@ -14,6 +14,7 @@ use crate::propagators::{PropOpts, Propagator};
 use crate::time::Epoch;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
+use std::time::Instant;
 
 pub struct MDProcess<'a>
 where
@@ -205,6 +206,7 @@ where
                     csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
                 wtr.serialize(&fmtr.headers)
                     .expect("could not write headers");
+                info!("Saving output to {}", fmtr.filename);
                 Some(wtr)
             }
             None => None,
@@ -215,7 +217,13 @@ where
         let (tx, rx) = channel();
         prop.tx_chan = Some(&tx);
         // Run
+        info!("Propagating for {} seconds", self.prop_time_s.unwrap());
+        let start = Instant::now();
         prop.until_time_elapsed(self.prop_time_s.unwrap());
+        info!(
+            "Done in {:.3} seconds",
+            (Instant::now() - start).as_secs_f64()
+        );
 
         while let Ok(prop_state) = rx.try_recv() {
             self.output.push(prop_state);
