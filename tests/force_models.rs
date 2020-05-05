@@ -9,7 +9,6 @@ use nyx::dynamics::drag::ExpEarthDrag;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
-use nyx::dynamics::thrustctrl::NoThrustControl;
 use nyx::dynamics::Dynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::utils::rss_state_errors;
@@ -35,7 +34,7 @@ fn srp_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::<NoThrustControl>::new(dynamics, dry_mass);
+    let mut sc = Spacecraft::new(dynamics, dry_mass);
     // Add the SRP model to the spacecraft
     sc.add_model(Box::new(srp));
     println!("{:o}", orbit);
@@ -90,7 +89,7 @@ fn drag_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::<NoThrustControl>::new(dynamics, dry_mass);
+    let mut sc = Spacecraft::new(dynamics, dry_mass);
     // Add the SRP model to the spacecraft
     sc.add_model(Box::new(srp));
     // Add the drag model to the spacecraft
