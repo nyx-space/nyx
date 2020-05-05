@@ -183,7 +183,11 @@ fn test_deser_scenario() {
         flavor = "rk89"  # If unspecified, the default propagator is used
         dynamics = "two_body"  # Use "sc1" spacecraft dynamics
         stop_cond = "MJD 51540.5 TAI"
-        output = "my_output"
+        output = "my_csv"
+        
+        [output.my_csv]
+        filename = "./data/scenario-run.csv"
+        headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 
         [propagator.simple]
         dynamics = "two_body"  # Use "sc1" spacecraft dynamics
