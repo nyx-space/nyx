@@ -1,4 +1,5 @@
 use super::gravity::HarmonicsMem;
+use super::output::OutputSerde;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use crate::celestia::{Frame, State};
@@ -134,6 +135,7 @@ pub struct ScenarioSerde {
     pub state: HashMap<String, StateSerde>,
     pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
     pub accel_models: HashMap<String, AccelModel>,
+    pub output: HashMap<String, OutputSerde>,
     pub distr: Option<HashMap<String, Distribution>>,
 }
 

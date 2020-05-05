@@ -6,6 +6,8 @@ use crate::hifitime::Epoch;
 use dynamics::Dynamics;
 use std::fmt;
 
+use crate::io::{CovarFormat, EpochFormat};
+
 /// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.
 pub mod kalman;
 
@@ -201,65 +203,4 @@ where
     type MeasurementInput;
     /// Returns the measurement if the device and generate one, else returns None
     fn measure(&self, state: &Self::MeasurementInput) -> Option<N>;
-}
-
-/// Specifies the format of the Epoch during serialization
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum EpochFormat {
-    /// Default is GregorianUtc, as defined in [hifitime](https://docs.rs/hifitime/).
-    GregorianUtc,
-    GregorianTai,
-    MjdTai,
-    MjdTt,
-    MjdUtc,
-    JdeEt,
-    JdeTai,
-    JdeTt,
-    JdeUtc,
-    /// Seconds past a provided TAI Epoch
-    TaiSecs(f64),
-    /// Days past a provided TAI Epoch
-    TaiDays(f64),
-}
-
-impl fmt::Display for EpochFormat {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            EpochFormat::GregorianUtc => write!(f, "Gregorian UTC"),
-            EpochFormat::GregorianTai => write!(f, "Gregorian TAI"),
-            EpochFormat::MjdTai => write!(f, "MJD TAI"),
-            EpochFormat::MjdTt => write!(f, "MJD TT"),
-            EpochFormat::MjdUtc => write!(f, "MJD UTC"),
-            EpochFormat::JdeEt => write!(f, "JDE ET"),
-            EpochFormat::JdeTai => write!(f, "JDE TAI"),
-            EpochFormat::JdeTt => write!(f, "JDE TT"),
-            EpochFormat::JdeUtc => write!(f, "JDE UTC"),
-            EpochFormat::TaiSecs(_) => write!(f, "TAI+ s"),
-            EpochFormat::TaiDays(_) => write!(f, "TAI+ days"),
-        }
-    }
-}
-
-/// Specifies the format of the covariance during serialization
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum CovarFormat {
-    /// Default: allows plotting the variance of the elements instead of the covariance
-    Sqrt,
-    /// Keeps the covariance as computed, i.e. one sigma (~68%), causes e.g. positional elements in km^2.
-    Sigma1,
-    /// Three sigma covers about 99.7% of the distribution
-    Sigma3,
-    /// Allows specifying a custom multiplication factor of each element of the covariance.
-    MulSigma(f64),
-}
-
-impl fmt::Display for CovarFormat {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            CovarFormat::Sqrt => write!(f, "exptd_val_"),
-            CovarFormat::Sigma1 => write!(f, "covar_"),
-            CovarFormat::Sigma3 => write!(f, "3sig_covar"),
-            CovarFormat::MulSigma(x) => write!(f, "{}sig_covar", x),
-        }
-    }
 }

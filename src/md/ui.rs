@@ -1,3 +1,4 @@
+extern crate csv;
 extern crate regex;
 
 use self::regex::Regex;
@@ -6,25 +7,20 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::OrbitalDynamics;
 use crate::dynamics::sph_harmonics::Harmonics;
+use crate::io::output::*;
 use crate::io::scenario::ScenarioSerde;
+use crate::io::ParsingError;
 use crate::propagators::{PropOpts, Propagator};
 use crate::time::Epoch;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 
-#[derive(Debug)]
-pub enum MDError {
-    ParsingError(String),
-}
-
 pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    /// Propagator used for the mission design
-    // prop: &'a mut Propagator<'a, OrbitalDynamics<'a>, RSSStepPV>,
     orbit_dyn: OrbitalDynamics<'a>,
-    /// Vector of estimates available after a pass
+    formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
 }
@@ -33,20 +29,15 @@ impl<'a> MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    pub fn new(orbit_dyn: OrbitalDynamics<'a>) -> Self {
-        Self {
-            orbit_dyn,
-            output: Vec::with_capacity(65_535),
-            prop_time_s: None,
-        }
-    }
-
-    pub fn try_from_scenario(scen: ScenarioSerde, cosm: &'a Cosm) -> Result<Vec<Self>, MDError> {
+    pub fn try_from_scenario(
+        scen: ScenarioSerde,
+        cosm: &'a Cosm,
+    ) -> Result<Vec<Self>, ParsingError> {
         let mut seq = Vec::with_capacity(10);
         for seq_name in &scen.sequence {
             match scen.propagator.get(seq_name) {
                 None => {
-                    return Err(MDError::ParsingError(format!(
+                    return Err(ParsingError::MD(format!(
                         "sequence refers to undefined propagator `{}` ",
                         seq_name,
                     )))
@@ -55,17 +46,31 @@ where
                     // let mut spacecraft_dynamics;
                     let mut orbital_dynamics;
                     let mut init_state;
+                    // Validate the output
+                    let formatter = if let Some(output) = &prop.output {
+                        match scen.output.get(output) {
+                            None => {
+                                return Err(ParsingError::MD(format!(
+                                    "propagator `{}` refers to undefined output `{}`",
+                                    seq_name, output
+                                )))
+                            }
+                            Some(out) => Some(out.to_state_formatter(cosm)),
+                        }
+                    } else {
+                        None
+                    };
                     // Validate the orbital dynamics
                     match scen.orbital_dynamics.get(&prop.dynamics) {
                         None => {
-                            return Err(MDError::ParsingError(format!(
+                            return Err(ParsingError::MD(format!(
                                 "propagator `{}` refers to undefined dynamics `{}`",
                                 seq_name, prop.dynamics
                             )))
                         }
                         Some(dynamics) => match scen.state.get(&dynamics.initial_state) {
                             None => {
-                                return Err(MDError::ParsingError(format!(
+                                return Err(ParsingError::MD(format!(
                                     "dynamics `{}` refers to unknown state `{}`",
                                     prop.dynamics, dynamics.initial_state
                                 )))
@@ -121,7 +126,7 @@ where
                                     for mdl in accel_models {
                                         match scen.accel_models.get(mdl) {
                                             None => {
-                                                return Err(MDError::ParsingError(format!(
+                                                return Err(ParsingError::MD(format!(
                                                     "dynamics `{}` refers to unknown state `{}`",
                                                     prop.dynamics, dynamics.initial_state
                                                 )))
@@ -156,7 +161,7 @@ where
                                 "hours" | "hour" => prop_time_s *= 3_600.0,
                                 "min" | "mins" | "minute" | "minutes" => prop_time_s *= 60.0,
                                 _ => {
-                                    return Err(MDError::ParsingError(format!(
+                                    return Err(ParsingError::MD(format!(
                                         "unknown duration unit in `{}`",
                                         prop.stop_cond
                                     )))
@@ -168,7 +173,7 @@ where
                             // Check to see if it's an Epoch
                             match Epoch::from_str(prop.stop_cond.as_str()) {
                                 Err(_) => {
-                                    return Err(MDError::ParsingError(format!(
+                                    return Err(ParsingError::MD(format!(
                                         "Could not parse stopping condition: `{}`",
                                         prop.stop_cond
                                     )))
@@ -177,8 +182,14 @@ where
                             }
                         }
                     };
-                    let mut me = Self::new(orbital_dynamics);
-                    me.prop_time_s = Some(prop_time_s);
+
+                    let me = Self {
+                        orbit_dyn: orbital_dynamics,
+                        formatter,
+                        output: Vec::with_capacity(65_535),
+                        prop_time_s: Some(prop_time_s),
+                    };
+
                     seq.push(me);
                 }
             }
@@ -187,6 +198,17 @@ where
     }
 
     pub fn execute(&mut self) {
+        // Create the output file
+        let mut maybe_wtr = match &self.formatter {
+            Some(fmtr) => {
+                let mut wtr =
+                    csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+                wtr.serialize(&fmtr.headers)
+                    .expect("could not write headers");
+                Some(wtr)
+            }
+            None => None,
+        };
         // Build the propagator
         let mut prop = Propagator::default(&mut self.orbit_dyn, &PropOpts::default());
         // Set up the channels
@@ -197,6 +219,10 @@ where
 
         while let Ok(prop_state) = rx.try_recv() {
             self.output.push(prop_state);
+            if let Some(wtr) = &mut maybe_wtr {
+                wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state))
+                    .expect("could not format state");
+            }
         }
     }
 }
