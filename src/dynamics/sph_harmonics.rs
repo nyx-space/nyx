@@ -7,6 +7,7 @@ use crate::io::gravity::GravityPotentialStor;
 use crate::time::Epoch;
 use std::cmp::min;
 
+#[derive(Clone)]
 pub struct Harmonics<'a, S>
 where
     S: GravityPotentialStor,
