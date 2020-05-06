@@ -5,8 +5,9 @@ use self::regex::Regex;
 pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
-pub use crate::dynamics::orbital::OrbitalDynamics;
+pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use crate::dynamics::sph_harmonics::Harmonics;
+pub use crate::dynamics::Dynamics;
 use crate::io::output::*;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::ParsingError;
@@ -20,7 +21,7 @@ pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    orbit_dyn: OrbitalDynamics<'a>,
+    orbital_dyn: OrbitalDynamics<'a>,
     formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
@@ -45,7 +46,7 @@ where
                 }
                 Some(prop) => {
                     // let mut spacecraft_dynamics;
-                    let mut orbital_dynamics;
+                    let mut orbital_dyn;
                     let mut init_state;
                     // Validate the output
                     let formatter = if let Some(output) = &prop.output {
@@ -84,6 +85,10 @@ where
                                     let integ_frame = cosm.frame(integ_frame_name);
                                     init_state = cosm.frame_chg(&init_state, integ_frame);
                                 }
+                                if dynamics.with_stm() {
+                                    // If this calls for an STM, we should be decoding as an ODProcess
+                                    return Err(ParsingError::UseOdInstead);
+                                }
                                 // Create the dynamics
                                 if let Some(pts_masses) = &dynamics.point_masses {
                                     // Get the object IDs from name
@@ -116,10 +121,11 @@ where
                                     {
                                         bodies.remove(pos);
                                     }
-                                    orbital_dynamics =
+
+                                    orbital_dyn =
                                         OrbitalDynamics::point_masses(init_state, bodies, cosm);
                                 } else {
-                                    orbital_dynamics = OrbitalDynamics::two_body(init_state);
+                                    orbital_dyn = OrbitalDynamics::two_body(init_state);
                                 }
 
                                 // Add the acceleration models if applicable
@@ -137,12 +143,13 @@ where
                                                     let in_mem = hmdl.load();
                                                     let compute_frame =
                                                         cosm.frame(hmdl.frame.as_str());
+
                                                     let hh = Harmonics::from_stor(
                                                         compute_frame,
                                                         in_mem,
                                                         &cosm,
                                                     );
-                                                    orbital_dynamics.add_model(Box::new(hh));
+                                                    orbital_dyn.add_model(Box::new(hh));
                                                 }
                                             }
                                         }
@@ -185,7 +192,7 @@ where
                     };
 
                     let me = Self {
-                        orbit_dyn: orbital_dynamics,
+                        orbital_dyn,
                         formatter,
                         output: Vec::with_capacity(65_535),
                         prop_time_s: Some(prop_time_s),
@@ -212,7 +219,7 @@ where
             None => None,
         };
         // Build the propagator
-        let mut prop = Propagator::default(&mut self.orbit_dyn, &PropOpts::default());
+        let mut prop = Propagator::default(&mut self.orbital_dyn, &PropOpts::default());
         // Set up the channels
         let (tx, rx) = channel();
         prop.tx_chan = Some(&tx);

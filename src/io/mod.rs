@@ -25,6 +25,7 @@ pub mod output;
 #[derive(Debug)]
 pub enum ParsingError {
     MD(String),
+    UseOdInstead,
     EpochFormat,
     CovarFormat,
 }

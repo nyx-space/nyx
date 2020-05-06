@@ -55,10 +55,7 @@ pub mod sph_harmonics;
 /// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
 ///  parameters), it is up to the implementor to handle time and state organization correctly.
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
-pub trait Dynamics
-where
-    Self: Sized,
-{
+pub trait Dynamics {
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
     type StateSize: DimName;
     /// Defines the type which will be published on the propagator channel
