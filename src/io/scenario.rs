@@ -1,3 +1,5 @@
+use super::gravity::HarmonicsMem;
+use super::output::OutputSerde;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use crate::celestia::{Frame, State};
@@ -72,6 +74,38 @@ impl OrbitalDynamicsSerde {
 }
 
 #[derive(Deserialize)]
+pub struct Harmonics {
+    pub frame: String,
+    pub degree: usize,
+    pub order: Option<usize>,
+    pub file: String,
+}
+
+impl Harmonics {
+    pub fn load(&self) -> HarmonicsMem {
+        let gunzipped = self.file.contains("gz");
+        let order = match self.order {
+            Some(order) => order,
+            None => 0,
+        };
+        if self.file.contains("cof") {
+            HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped)
+        } else if self.file.contains("sha") {
+            HarmonicsMem::from_shadr(self.file.as_str(), self.degree, order, gunzipped)
+        } else if self.file.contains("EGM") {
+            HarmonicsMem::from_egm(self.file.as_str(), self.degree, order, gunzipped)
+        } else {
+            panic!("could not guess file format from name");
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct AccelModel {
+    pub harmonics: HashMap<String, Harmonics>,
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PropagatorKind {
     Dormand45,
@@ -100,12 +134,9 @@ pub struct ScenarioSerde {
     pub propagator: HashMap<String, PropagatorSerde>,
     pub state: HashMap<String, StateSerde>,
     pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
+    pub accel_models: HashMap<String, AccelModel>,
+    pub output: HashMap<String, OutputSerde>,
     pub distr: Option<HashMap<String, Distribution>>,
-}
-
-impl ScenarioSerde {
-    /// Runs this scenario, if valid, and in sequence
-    pub fn validate(&self) {}
 }
 
 #[test]
@@ -152,11 +183,21 @@ fn test_deser_scenario() {
         flavor = "rk89"  # If unspecified, the default propagator is used
         dynamics = "two_body"  # Use "sc1" spacecraft dynamics
         stop_cond = "MJD 51540.5 TAI"
-        output = "my_output"
+        output = "my_csv"
+        
+        [output.my_csv]
+        filename = "./data/scenario-run.csv"
+        headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 
         [propagator.simple]
         dynamics = "two_body"  # Use "sc1" spacecraft dynamics
         stop_cond = "1 * day"
+
+        [accel_models.my_models.harmonics.jgm3_70x70]
+        frame = "EME2000"
+        degree = 70
+        order = 70
+        file = "data/JGM3.cof.gz"
         "#,
     )
     .unwrap();
@@ -164,5 +205,7 @@ fn test_deser_scenario() {
     assert_eq!(scen.state.len(), 2);
     assert_eq!(scen.orbital_dynamics.len(), 2);
     assert_eq!(scen.propagator.len(), 2);
+    assert_eq!(scen.accel_models.len(), 1);
+    assert_eq!(scen.accel_models["my_models"].harmonics.len(), 1);
     assert_eq!(scen.sequence.len(), 1);
 }

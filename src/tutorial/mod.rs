@@ -1014,7 +1014,7 @@ let fuel_depl = true;
 // It requires something which implement `ThrustControl` (the schedule),
 // the list of thruster (`biprop`), and whether or not we want to
 // compute the fuel depletion.
-let prop_subsys = Propulsion::new(schedule, biprop, fuel_depl);
+let prop_subsys = Propulsion::new(Box::new(schedule), biprop, fuel_depl);
 
 // Define the celestial dynamics
 let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
@@ -1100,7 +1100,7 @@ let fuel_mass = 299.0;
 
 // Define the propulsion subsystem where the control is Ruggiero and the propulsion
 // is the 1 Newton EP thruster defined above.
-let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
 let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 println!("{:o}", orbit);
@@ -1115,10 +1115,10 @@ let fuel_usage = fuel_mass - sc.fuel_mass;
 println!("{:o}", final_state);
 println!("fuel usage: {:.3} kg", fuel_usage);
 
-assert!(
-    sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-    "objective not achieved"
-);
+match sc.prop.unwrap().ctrl.achieved(&final_state) {
+    Ok(val) => assert!(val, "objective not achieved"),
+    Err(e) => panic!("{:?}", e),
+};
 
 assert!((fuel_usage - 93.449).abs() < 1.0);
 ```

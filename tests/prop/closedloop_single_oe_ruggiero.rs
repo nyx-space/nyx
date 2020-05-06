@@ -43,7 +43,7 @@ fn rugg_sma() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -56,10 +56,10 @@ fn rugg_sma() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 21.0).abs() < 1.0);
 }
 
@@ -94,7 +94,7 @@ fn rugg_sma_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -107,10 +107,10 @@ fn rugg_sma_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 21.0).abs() < 1.0);
 }
 
@@ -147,7 +147,7 @@ fn rugg_inc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -160,10 +160,10 @@ fn rugg_inc() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 25.0).abs() < 1.0);
 }
 
@@ -200,7 +200,7 @@ fn rugg_inc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -213,10 +213,10 @@ fn rugg_inc_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 25.0).abs() < 1.0);
 }
 
@@ -253,7 +253,7 @@ fn rugg_ecc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -266,10 +266,10 @@ fn rugg_ecc() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
@@ -306,7 +306,7 @@ fn rugg_ecc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -319,10 +319,10 @@ fn rugg_ecc_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 10.37).abs() < 1.0);
 }
 
@@ -361,7 +361,7 @@ fn rugg_aop() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -374,10 +374,10 @@ fn rugg_aop() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 0.014).abs() < 1.0);
 }
 
@@ -415,7 +415,7 @@ fn rugg_aop_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -428,10 +428,10 @@ fn rugg_aop_decr() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 0.014).abs() < 1.0);
 }
 
@@ -471,7 +471,7 @@ fn rugg_raan() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -487,9 +487,9 @@ fn rugg_raan() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
     assert!((fuel_usage - 22.189).abs() < 1.0);
 }
