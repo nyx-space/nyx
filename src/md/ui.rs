@@ -6,7 +6,7 @@ pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
-use crate::dynamics::sph_harmonics::Harmonics;
+use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
 use crate::io::output::*;
 use crate::io::scenario::ScenarioSerde;
@@ -21,7 +21,8 @@ pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    orbital_dyn: OrbitalDynamics<'a>,
+    orbital_dyn: Option<OrbitalDynamics<'a>>,
+    orbital_dyn_stm: Option<OrbitalDynamicsStm<'a>>,
     formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
@@ -46,7 +47,8 @@ where
                 }
                 Some(prop) => {
                     // let mut spacecraft_dynamics;
-                    let mut orbital_dyn;
+                    let mut orbital_dyn = None;
+                    let mut orbital_dyn_stm = None;
                     let mut init_state;
                     // Validate the output
                     let formatter = if let Some(output) = &prop.output {
@@ -85,10 +87,6 @@ where
                                     let integ_frame = cosm.frame(integ_frame_name);
                                     init_state = cosm.frame_chg(&init_state, integ_frame);
                                 }
-                                if dynamics.with_stm() {
-                                    // If this calls for an STM, we should be decoding as an ODProcess
-                                    return Err(ParsingError::UseOdInstead);
-                                }
                                 // Create the dynamics
                                 if let Some(pts_masses) = &dynamics.point_masses {
                                     // Get the object IDs from name
@@ -121,11 +119,20 @@ where
                                     {
                                         bodies.remove(pos);
                                     }
-
-                                    orbital_dyn =
-                                        OrbitalDynamics::point_masses(init_state, bodies, cosm);
+                                    if dynamics.with_stm() {
+                                        orbital_dyn_stm = Some(OrbitalDynamicsStm::point_masses(
+                                            init_state, bodies, cosm,
+                                        ));
+                                    } else {
+                                        orbital_dyn = Some(OrbitalDynamics::point_masses(
+                                            init_state, bodies, cosm,
+                                        ));
+                                    }
+                                } else if dynamics.with_stm() {
+                                    orbital_dyn_stm =
+                                        Some(OrbitalDynamicsStm::two_body(init_state));
                                 } else {
-                                    orbital_dyn = OrbitalDynamics::two_body(init_state);
+                                    orbital_dyn = Some(OrbitalDynamics::two_body(init_state));
                                 }
 
                                 // Add the acceleration models if applicable
@@ -143,13 +150,27 @@ where
                                                     let in_mem = hmdl.load();
                                                     let compute_frame =
                                                         cosm.frame(hmdl.frame.as_str());
-
-                                                    let hh = Harmonics::from_stor(
-                                                        compute_frame,
-                                                        in_mem,
-                                                        &cosm,
-                                                    );
-                                                    orbital_dyn.add_model(Box::new(hh));
+                                                    if dynamics.with_stm() {
+                                                        let hh = Harmonics::from_stor(
+                                                            compute_frame,
+                                                            in_mem,
+                                                            &cosm,
+                                                        );
+                                                        let mut new_orbital_dyn =
+                                                            orbital_dyn.take().unwrap();
+                                                        new_orbital_dyn.add_model(Box::new(hh));
+                                                        orbital_dyn = Some(new_orbital_dyn);
+                                                    } else {
+                                                        let hh = HarmonicsDiff::from_stor(
+                                                            compute_frame,
+                                                            in_mem,
+                                                            &cosm,
+                                                        );
+                                                        let mut new_orbital_dyn_stm =
+                                                            orbital_dyn_stm.take().unwrap();
+                                                        new_orbital_dyn_stm.add_model(Box::new(hh));
+                                                        orbital_dyn_stm = Some(new_orbital_dyn_stm);
+                                                    }
                                                 }
                                             }
                                         }
@@ -193,6 +214,7 @@ where
 
                     let me = Self {
                         orbital_dyn,
+                        orbital_dyn_stm,
                         formatter,
                         output: Vec::with_capacity(65_535),
                         prop_time_s: Some(prop_time_s),
@@ -218,25 +240,49 @@ where
             }
             None => None,
         };
-        // Build the propagator
-        let mut prop = Propagator::default(&mut self.orbital_dyn, &PropOpts::default());
-        // Set up the channels
-        let (tx, rx) = channel();
-        prop.tx_chan = Some(&tx);
-        // Run
-        info!("Propagating for {} seconds", self.prop_time_s.unwrap());
-        let start = Instant::now();
-        prop.until_time_elapsed(self.prop_time_s.unwrap());
-        info!(
-            "Done in {:.3} seconds",
-            (Instant::now() - start).as_secs_f64()
-        );
 
-        while let Ok(prop_state) = rx.try_recv() {
-            self.output.push(prop_state);
-            if let Some(wtr) = &mut maybe_wtr {
-                wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state))
-                    .expect("could not format state");
+        // Build the propagator
+        if let Some(mut orbital_dyn) = self.orbital_dyn.take() {
+            let mut prop = Propagator::default(&mut orbital_dyn, &PropOpts::default());
+            // Set up the channels
+            let (tx, rx) = channel();
+            prop.tx_chan = Some(&tx);
+            // Run
+            info!("Propagating for {} seconds", self.prop_time_s.unwrap());
+            let start = Instant::now();
+            prop.until_time_elapsed(self.prop_time_s.unwrap());
+            info!(
+                "Done in {:.3} seconds",
+                (Instant::now() - start).as_secs_f64()
+            );
+
+            while let Ok(prop_state) = rx.try_recv() {
+                self.output.push(prop_state);
+                if let Some(wtr) = &mut maybe_wtr {
+                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state))
+                        .expect("could not format state");
+                }
+            }
+        } else if let Some(mut orbital_dyn_stm) = self.orbital_dyn_stm.take() {
+            let mut prop = Propagator::default(&mut orbital_dyn_stm, &PropOpts::default());
+            // Set up the channels
+            let (tx, rx) = channel();
+            prop.tx_chan = Some(&tx);
+            // Run
+            info!("Propagating for {} seconds", self.prop_time_s.unwrap());
+            let start = Instant::now();
+            prop.until_time_elapsed(self.prop_time_s.unwrap());
+            info!(
+                "Done in {:.3} seconds",
+                (Instant::now() - start).as_secs_f64()
+            );
+
+            while let Ok(prop_state) = rx.try_recv() {
+                self.output.push(prop_state.0);
+                if let Some(wtr) = &mut maybe_wtr {
+                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state.0))
+                        .expect("could not format state");
+                }
             }
         }
     }
