@@ -125,6 +125,11 @@ fn multi_body_ckf_perfect_stations() {
             "estimate {} should not be a prediction",
             no
         );
+        for i in 0..6 {
+            for j in 0..6 {
+                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
+            }
+        }
         assert!(
             est.state.norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
@@ -275,6 +280,11 @@ fn multi_body_ckf_covar_map() {
                 "estimate error should be zero (perfect dynamics) ({:e})",
                 est.state.norm()
             );
+        }
+        for i in 0..6 {
+            for j in 0..6 {
+                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
+            }
         }
         last_est = Some(est);
     }
