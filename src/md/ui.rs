@@ -12,7 +12,7 @@ use crate::io::output::*;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::ParsingError;
 use crate::propagators::{PropOpts, Propagator};
-use crate::time::Epoch;
+use crate::time::{Epoch, SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE};
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -151,16 +151,6 @@ where
                                                     let compute_frame =
                                                         cosm.frame(hmdl.frame.as_str());
                                                     if dynamics.with_stm() {
-                                                        let hh = Harmonics::from_stor(
-                                                            compute_frame,
-                                                            in_mem,
-                                                            &cosm,
-                                                        );
-                                                        let mut new_orbital_dyn =
-                                                            orbital_dyn.take().unwrap();
-                                                        new_orbital_dyn.add_model(Box::new(hh));
-                                                        orbital_dyn = Some(new_orbital_dyn);
-                                                    } else {
                                                         let hh = HarmonicsDiff::from_stor(
                                                             compute_frame,
                                                             in_mem,
@@ -170,6 +160,16 @@ where
                                                             orbital_dyn_stm.take().unwrap();
                                                         new_orbital_dyn_stm.add_model(Box::new(hh));
                                                         orbital_dyn_stm = Some(new_orbital_dyn_stm);
+                                                    } else {
+                                                        let hh = Harmonics::from_stor(
+                                                            compute_frame,
+                                                            in_mem,
+                                                            &cosm,
+                                                        );
+                                                        let mut new_orbital_dyn =
+                                                            orbital_dyn.take().unwrap();
+                                                        new_orbital_dyn.add_model(Box::new(hh));
+                                                        orbital_dyn = Some(new_orbital_dyn);
                                                     }
                                                 }
                                             }
@@ -186,9 +186,11 @@ where
                         Some(cap) => {
                             let mut prop_time_s = cap[1].to_owned().parse::<f64>().unwrap();
                             match cap[2].to_owned().to_lowercase().as_str() {
-                                "days" | "day" => prop_time_s *= 84_600.0,
-                                "hours" | "hour" => prop_time_s *= 3_600.0,
-                                "min" | "mins" | "minute" | "minutes" => prop_time_s *= 60.0,
+                                "days" | "day" => prop_time_s *= SECONDS_PER_DAY,
+                                "hours" | "hour" => prop_time_s *= SECONDS_PER_HOUR,
+                                "min" | "mins" | "minute" | "minutes" => {
+                                    prop_time_s *= SECONDS_PER_MINUTE
+                                }
                                 _ => {
                                     return Err(ParsingError::MD(format!(
                                         "unknown duration unit in `{}`",
@@ -248,9 +250,14 @@ where
             let (tx, rx) = channel();
             prop.tx_chan = Some(&tx);
             // Run
-            info!("Propagating for {} seconds", self.prop_time_s.unwrap());
+            let prop_time = self.prop_time_s.unwrap();
+            info!(
+                "Propagating for {} seconds (~ {:.3} days)",
+                prop_time,
+                prop_time / SECONDS_PER_DAY
+            );
             let start = Instant::now();
-            prop.until_time_elapsed(self.prop_time_s.unwrap());
+            prop.until_time_elapsed(prop_time);
             info!(
                 "Done in {:.3} seconds",
                 (Instant::now() - start).as_secs_f64()
@@ -269,9 +276,14 @@ where
             let (tx, rx) = channel();
             prop.tx_chan = Some(&tx);
             // Run
-            info!("Propagating for {} seconds", self.prop_time_s.unwrap());
+            let prop_time = self.prop_time_s.unwrap();
+            info!(
+                "Propagating for {} seconds (~ {:.3} days)",
+                prop_time,
+                prop_time / SECONDS_PER_DAY
+            );
             let start = Instant::now();
-            prop.until_time_elapsed(self.prop_time_s.unwrap());
+            prop.until_time_elapsed(prop_time);
             info!(
                 "Done in {:.3} seconds",
                 (Instant::now() - start).as_secs_f64()
