@@ -729,7 +729,6 @@ fn multi_body_dynamics_dual() {
 #[test]
 fn earth_sph_harmonics_j2() {
     use nyx::dynamics::sph_harmonics::Harmonics;
-    use nyx::dynamics::Dynamics;
     use nyx::io::gravity::*;
 
     let monte_earth_gm = 3.986_004_328_969_392e5;
@@ -781,7 +780,7 @@ fn earth_sph_harmonics_j2() {
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(SECONDS_PER_DAY);
 
-    println!("{}", prop.dynamics.state());
+    println!("{}", prop.state());
     println!("Error: {:3.12}", prop.state_vector() - rslt_monte);
 
     let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_monte);
@@ -912,7 +911,6 @@ fn earth_sph_harmonics_70x70_partials() {
         println!("could not init env_logger");
     }
     use nyx::dynamics::sph_harmonics::HarmonicsDiff;
-    use nyx::dynamics::Dynamics;
     use nyx::io::gravity::*;
 
     let mut cosm = Cosm::from_xb("./de438s");
@@ -947,10 +945,10 @@ fn earth_sph_harmonics_70x70_partials() {
 
     println!(
         "Error: {:3.12}",
-        prop.dynamics.state().0.to_cartesian_vec() - rslt_gmat
+        prop.state().0.to_cartesian_vec() - rslt_gmat
     );
 
-    let (err_r, err_v) = rss_state_errors(&prop.dynamics.state().0.to_cartesian_vec(), &rslt_gmat);
+    let (err_r, err_v) = rss_state_errors(&prop.state().0.to_cartesian_vec(), &rslt_gmat);
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(

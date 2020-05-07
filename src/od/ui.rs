@@ -156,10 +156,7 @@ where
             self.prop.until_time_elapsed(delta_time);
             // Update the STM of the KF
             self.kf.update_stm(self.prop.dynamics.stm());
-            let (dt, meas_input) = self
-                .prop
-                .dynamics
-                .to_measurement(&self.prop.dynamics.state());
+            let (dt, meas_input) = self.prop.dynamics.to_measurement(&self.prop.state());
             // Get the computed observations
             for device in self.devices.iter() {
                 if let Some(computed_meas) = device.measure(&meas_input) {

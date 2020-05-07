@@ -9,7 +9,6 @@ use nyx::dynamics::drag::ExpEarthDrag;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
-use nyx::dynamics::Dynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::utils::rss_state_errors;
 
@@ -42,7 +41,7 @@ fn srp_earth() {
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.state();
+    let final_state = prop.state();
     println!("{}", final_state);
 
     // GMAT result
@@ -99,7 +98,7 @@ fn drag_earth() {
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.state();
+    let final_state = prop.state();
     println!("{}", final_state);
     println!("{}", final_state.orbit);
 }
