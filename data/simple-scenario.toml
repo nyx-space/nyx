@@ -1,4 +1,4 @@
-sequence = ["prop_name"]
+sequence = ["prop_km", "prop_m", "prop_cm"]
 
 [state.state_name]
 x = -2436.45
@@ -12,15 +12,29 @@ epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
 unit_position = "km"  # Default value if unspecified
 unit_velocity = "km/s"  # Default value if unspecified
 
-[state.another_state]
-x = -3436.45
-y = -3436.45
-z = 6891.037
-vx = 5.088611
-vy = -5.088611
+[state.state_m]
+x = -2436450.0
+y = -2436450.0
+z = 6891037.0
+vx = 5088.611
+vy = -5088.611
 vz = 0.0
 frame = "EME2000"
-epoch = "MJD 51540.5 TAI"
+epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
+unit_position = "m"  # Default value if unspecified
+unit_velocity = "m/s"  # Default value if unspecified
+
+[state.state_cm]
+x = -243645000.0
+y = -243645000.0
+z = 689103700.0
+vx = 508861.1
+vy = -508861.1
+vz = 0.0
+frame = "EME2000"
+epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
+unit_position = "cm"  # Default value if unspecified
+unit_velocity = "cm/s"  # Default value if unspecified
 
 [orbital_dynamics.conf_name]
 stm = false
@@ -29,7 +43,21 @@ initial_state = "state_name"
 point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
 accel_models = ["my_models"]
 
-[propagator.prop_name]
+[orbital_dynamics.conf_m]
+stm = false
+integration_frame = "EME2000"
+initial_state = "state_m"
+point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
+accel_models = ["my_models"]
+
+[orbital_dynamics.conf_cm]
+stm = false
+integration_frame = "EME2000"
+initial_state = "state_m"
+point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
+accel_models = ["my_models"]
+
+[propagator.prop_km]
 dynamics = "conf_name"
 stop_cond = "3.5 days"
 output = "my_csv"
@@ -42,4 +70,22 @@ file = "data/JGM3.cof.gz"
 
 [output.my_csv]
 filename = "./data/scenario-run.csv"
+headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
+
+[propagator.prop_m]
+dynamics = "conf_m"
+stop_cond = "3.5 days"
+output = "my_csv_m"
+
+[propagator.prop_cm]
+dynamics = "conf_cm"
+stop_cond = "3.5 days"
+output = "my_csv_cm"
+
+[output.my_csv_m]
+filename = "./data/scenario-run-m.csv"
+headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
+
+[output.my_csv_cm]
+filename = "./data/scenario-run-cm.csv"
 headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]

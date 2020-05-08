@@ -26,8 +26,8 @@ impl StateSerde {
         let pos_mul = match &self.unit_position {
             Some(unit) => match unit.to_lowercase().as_str() {
                 "km" => 1.0,
-                "m" => 1_000.0,
-                "cm" => 100_000.0,
+                "m" => 1e-3,
+                "cm" => 1e-5,
                 _ => panic!("unknown unit `{}`", unit),
             },
             None => 1.0,
@@ -36,8 +36,8 @@ impl StateSerde {
         let vel_mul = match &self.unit_velocity {
             Some(unit) => match unit.to_lowercase().as_str() {
                 "km/s" => 1.0,
-                "m/s" => 1_000.0,
-                "cm/s" => 100_000.0,
+                "m/s" => 1e-3,
+                "cm/s" => 1e-5,
                 _ => panic!("unknown unit `{}`", unit),
             },
             None => 1.0,

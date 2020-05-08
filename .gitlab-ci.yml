@@ -5,3 +5,6 @@ stable:
     - RUST_BACKTRACE=full cargo test --release
     - cargo fmt -- --check
     - cargo run -- data/simple-scenario.toml
+    # Check that when we do a unit conversion it's correct
+    # NOTE: We don't do that with km output because the unit conversion leads to some rounding issues
+    - diff ./data/scenario-run-cm.csv ./data/scenario-run-m.csv
