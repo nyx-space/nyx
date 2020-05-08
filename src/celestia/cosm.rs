@@ -163,8 +163,6 @@ impl Cosm {
                     self.ephemerides.insert(id.number, ephem.clone());
                     self.ephemerides_names.insert(id.name.clone(), id.number);
 
-                    // TODO: Clone all of the frames and add their IAU fixed definitions
-
                     // Compute the exb_id.
                     let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
 

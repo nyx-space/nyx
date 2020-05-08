@@ -17,7 +17,8 @@ fn nil_measurement() {
     let cosm = Cosm::from_xb("./de438s");
     let eme2k = cosm.frame("EME2000");
 
-    let station = GroundStation::from_noise_values("nil", 0.0, lat, long, height, 0.0, 0.0);
+    let station =
+        GroundStation::from_noise_values("nil", 0.0, lat, long, height, 0.0, 0.0, eme2k, &cosm);
 
     let at_station = State::from_geodesic(lat, long, height, dt, eme2k);
 
