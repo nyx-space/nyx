@@ -605,7 +605,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     thread::spawn(move || {
         let cosm = Cosm::de438();
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+        let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
         let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
         dynamics.add_model(Box::new(harmonics));
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
@@ -630,7 +630,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let mut estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
     estimator.add_model(Box::new(harmonics));
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);

@@ -89,11 +89,11 @@ impl Harmonics {
             None => 0,
         };
         if self.file.contains("cof") {
-            HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped)
+            HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped).unwrap()
         } else if self.file.contains("sha") {
-            HarmonicsMem::from_shadr(self.file.as_str(), self.degree, order, gunzipped)
+            HarmonicsMem::from_shadr(self.file.as_str(), self.degree, order, gunzipped).unwrap()
         } else if self.file.contains("EGM") {
-            HarmonicsMem::from_egm(self.file.as_str(), self.degree, order, gunzipped)
+            HarmonicsMem::from_egm(self.file.as_str(), self.degree, order, gunzipped).unwrap()
         } else {
             panic!("could not guess file format from name");
         }
