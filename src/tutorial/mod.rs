@@ -860,7 +860,7 @@ let is_gunzipped = true;
 // Load the file into memory in a specifi HarmonicsMem structure.
 // This might sound like an overkill, but it allows you to define any
 // backend you wish to store harmonics, even something over gRPCs for example.
-let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", degree, order, is_gunzipped);
+let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", degree, order, is_gunzipped).unwrap();
 let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
 // Initialize the point masses (this method added in v0.0.20).
