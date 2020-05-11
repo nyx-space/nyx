@@ -123,14 +123,9 @@ impl<'a> MeasurementDevice<StdMeasurement> for GroundStation<'a> {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &State) -> Option<StdMeasurement> {
         match rx.frame {
-            Frame::Geoid { exb_id, .. } => {
+            Frame::Geoid { .. } => {
                 use std::f64::consts::PI;
-                // TODO: Get the frame from cosm instead of using the one from Rx!
-                // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
-                if exb_id != 399 {
-                    unimplemented!("the receiver is not around the Earth");
-                }
-                // Convert the station to "ECEF"
+                // Convert the station to the state's frame
                 let dt = rx.dt;
                 let station_state = State::from_geodesic(
                     self.latitude,
