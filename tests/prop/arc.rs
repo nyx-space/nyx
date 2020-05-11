@@ -15,7 +15,7 @@ use self::nyx::propagators::{PropOpts, Propagator};
 fn arc_example() {
     // This is an example of two delta Vs happening one after another. Other implementations of
     // a DeltaVctrl would be much more useful than this schedule of maneuvers.
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);

@@ -52,7 +52,7 @@ fn main() {
     }
 
     // Load cosm
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     match MDProcess::try_from_scenario(scenario, &cosm) {
         Ok(sequence) => {

@@ -14,7 +14,7 @@ fn nil_measurement() {
     let long = 345.5975;
     let height = 0.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let station =

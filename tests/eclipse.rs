@@ -16,7 +16,7 @@ use std::thread;
 fn leo_sun_earth_eclipses() {
     let prop_time = 2.0 * SECONDS_PER_DAY;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -28,7 +28,7 @@ fn leo_sun_earth_eclipses() {
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
 
     thread::spawn(move || {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
         let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(&truth_tx);
@@ -66,7 +66,7 @@ fn leo_sun_earth_eclipses() {
 fn geo_sun_earth_eclipses() {
     let prop_time = 2.0 * SECONDS_PER_DAY;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     // GEO are in shadow or near shadow during the equinoxes.
@@ -79,7 +79,7 @@ fn geo_sun_earth_eclipses() {
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
 
     thread::spawn(move || {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
         let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(&truth_tx);

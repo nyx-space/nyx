@@ -22,7 +22,7 @@ fn ekf_fixed_step_perfect_stations() {
     }
     use std::thread;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let num_meas_for_ekf = 15;
@@ -149,7 +149,7 @@ fn ckf_fixed_step_perfect_stations() {
     }
     use std::{io, thread};
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -344,7 +344,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     }
     use std::thread;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -483,7 +483,7 @@ fn ckf_map_covar() {
         println!("could not init env_logger");
     }
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -572,7 +572,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
 
     use std::thread;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -603,7 +603,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
         let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);

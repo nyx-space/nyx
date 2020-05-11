@@ -42,7 +42,7 @@ macro_rules! assert_eq_or_rel {
 #[test]
 fn regress_leo_day_adaptive() {
     // Regression test for propagators not available in GMAT.
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let prop_time = 24.0 * 3_600.0;
@@ -138,7 +138,7 @@ fn gmat_val_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    let mut cosm = Cosm::from_xb("./de438s");
+    let mut cosm = Cosm::de438();
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
@@ -284,7 +284,7 @@ fn gmat_val_leo_day_adaptive() {
 
 #[test]
 fn gmat_val_leo_day_fixed() {
-    let mut cosm = Cosm::from_xb("./de438s");
+    let mut cosm = Cosm::de438();
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 

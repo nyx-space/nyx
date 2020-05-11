@@ -14,7 +14,7 @@ use nyx::utils::rss_state_errors;
 
 #[test]
 fn srp_earth() {
-    let mut cosm = Cosm::from_xb("./de438s");
+    let mut cosm = Cosm::de438();
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
@@ -64,7 +64,7 @@ fn srp_earth() {
 
 #[test]
 fn drag_earth() {
-    let mut cosm = Cosm::from_xb("./de438s");
+    let mut cosm = Cosm::de438();
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 

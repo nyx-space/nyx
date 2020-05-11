@@ -20,7 +20,7 @@ fn multi_body_ckf_perfect_stations() {
     }
     use std::{io, thread};
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -50,7 +50,7 @@ fn multi_body_ckf_perfect_stations() {
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
@@ -169,7 +169,7 @@ fn multi_body_ckf_covar_map() {
     }
     use std::{io, thread};
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -195,7 +195,7 @@ fn multi_body_ckf_covar_map() {
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);

@@ -12,7 +12,7 @@ fn event_tracker_true_anomaly() {
     use nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent};
     use nyx::propagators::*;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);

@@ -20,7 +20,7 @@ fn srif_fixed_step_perfect_stations() {
     }
     use std::{io, thread};
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;
@@ -170,7 +170,7 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
     }
     use std::thread;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
 
     // Define the ground stations.
     let elevation_mask = 0.0;

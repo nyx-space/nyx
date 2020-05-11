@@ -19,7 +19,7 @@ use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 fn qlaw_as_ruggiero_case_a() {
     // Source: AAS-2004-5089
 
-    let mut cosm = Cosm::from_xb("./de438s");
+    let mut cosm = Cosm::de438();
     cosm.mut_gm_for_frame("EME2000", 398_600.433);
     let eme2k = cosm.frame("EME2000");
 
@@ -86,7 +86,7 @@ fn qlaw_as_ruggiero_case_a() {
 #[test]
 fn qlaw_as_ruggiero_case_b() {
     // Source: AAS-2004-5089
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -149,7 +149,7 @@ fn qlaw_as_ruggiero_case_b() {
 #[test]
 fn qlaw_as_ruggiero_case_c() {
     // Source: AAS-2004-5089
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -210,7 +210,7 @@ fn qlaw_as_ruggiero_case_c() {
 fn qlaw_as_ruggiero_case_d() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -279,7 +279,7 @@ fn qlaw_as_ruggiero_case_d() {
 fn qlaw_as_ruggiero_case_e() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -361,7 +361,7 @@ fn qlaw_as_ruggiero_case_f() {
     use std::sync::mpsc::{Receiver, Sender};
     use std::thread;
 
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -427,7 +427,7 @@ fn qlaw_as_ruggiero_case_f() {
 #[test]
 fn ruggiero_iepc_2011_102() {
     // Source: IEPC 2011 102
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);

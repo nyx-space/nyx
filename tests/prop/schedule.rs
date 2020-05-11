@@ -20,7 +20,7 @@ fn transfer_schedule_no_depl() {
         components of a spacecraft before defining the spacecraft itself.
     */
 
-    let mut cosm = Cosm::from_xb("./de438s");
+    let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
     cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
@@ -118,7 +118,7 @@ fn transfer_schedule_depl() {
         components of a spacecraft before defining the spacecraft itself.
     */
 
-    let mut cosm = Cosm::from_xb("./de438s");
+    let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
     cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
