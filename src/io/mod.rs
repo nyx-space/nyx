@@ -28,6 +28,10 @@ pub enum ParsingError {
     UseOdInstead,
     EpochFormat,
     CovarFormat,
+    FileNotFound(String),
+    FileNotUTF8(String),
+    FileUnreadable(String),
+    HarmonicsFile(String),
 }
 
 /// Specifies the format of the Epoch during serialization

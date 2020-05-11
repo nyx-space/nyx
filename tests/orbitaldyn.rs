@@ -811,7 +811,7 @@ fn earth_sph_harmonics_12x12() {
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 12, 12, true);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 12, 12, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -865,7 +865,7 @@ fn earth_sph_harmonics_70x70() {
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
@@ -919,7 +919,7 @@ fn earth_sph_harmonics_70x70_partials() {
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);

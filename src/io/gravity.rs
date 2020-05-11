@@ -1,4 +1,5 @@
 use super::flate2::read::GzDecoder;
+use super::ParsingError;
 use crate::dimensions::DMatrix;
 use std::fs::File;
 use std::io::prelude::*;
@@ -82,54 +83,51 @@ impl HarmonicsMem {
         degree: usize,
         order: usize,
         gunzipped: bool,
-    ) -> HarmonicsMem {
-        let mut f = File::open(filepath).expect("could not open file");
-        let mut buffer = vec![0; 0];
-        if gunzipped {
-            let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer)
-                .expect("could not read the full file");
-        } else {
-            f.read_to_end(&mut buffer).expect("to end");
-        }
-        Self::load(
-            true, //SHADR has a header which we ignore
-            degree,
-            order,
-            String::from_utf8(buffer).expect("could not decode file contents as utf8"),
-            filepath,
-        )
+    ) -> Result<HarmonicsMem, ParsingError> {
+        Ok(Self::load(
+            gunzipped, true, //SHADR has a header which we ignore
+            degree, order, filepath,
+        )?)
     }
 
-    pub fn from_egm(filepath: &str, degree: usize, order: usize, gunzipped: bool) -> HarmonicsMem {
-        let mut f = File::open(filepath).expect("could not open file");
-        let mut buffer = vec![0; 0];
-        if gunzipped {
-            let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer)
-                .expect("could not read the full file");
-        } else {
-            f.read_to_end(&mut buffer).expect("to end");
-        }
-        Self::load(
-            false,
-            degree,
-            order,
-            String::from_utf8(buffer).expect("could not decode file contents as utf8"),
-            filepath,
-        )
+    pub fn from_egm(
+        filepath: &str,
+        degree: usize,
+        order: usize,
+        gunzipped: bool,
+    ) -> Result<HarmonicsMem, ParsingError> {
+        Ok(Self::load(gunzipped, false, degree, order, filepath)?)
     }
 
-    pub fn from_cof(filepath: &str, degree: usize, order: usize, gunzipped: bool) -> HarmonicsMem {
-        let mut f = File::open(filepath).expect("could not open file");
+    pub fn from_cof(
+        filepath: &str,
+        degree: usize,
+        order: usize,
+        gunzipped: bool,
+    ) -> Result<HarmonicsMem, ParsingError> {
+        let mut f = File::open(filepath)
+            .or_else(|_| Err(ParsingError::FileNotFound(filepath.to_string())))?;
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer)
-                .expect("could not read the full file");
+            d.read_to_end(&mut buffer).or_else(|_| {
+                Err(ParsingError::FileUnreadable(
+                    "could not read file as gunzip".to_string(),
+                ))
+            })?;
         } else {
-            f.read_to_end(&mut buffer).expect("to end");
+            f.read_to_end(&mut buffer).or_else(|_| {
+                Err(ParsingError::FileUnreadable(
+                    "could not read file to end".to_string(),
+                ))
+            })?;
         }
+
+        let data_as_str = String::from_utf8(buffer).or_else(|_| {
+            Err(ParsingError::FileUnreadable(
+                "could not decode file contents as utf8".to_string(),
+            ))
+        })?;
 
         // Since the COF files are so specific, we just code everything up in here.
 
@@ -137,11 +135,7 @@ impl HarmonicsMem {
         let mut s_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
         let mut max_order: usize = 0;
         let mut max_degree: usize = 0;
-        for (lno, line) in String::from_utf8(buffer)
-            .expect("error decoding utf8")
-            .split('\n')
-            .enumerate()
-        {
+        for (lno, line) in data_as_str.split('\n').enumerate() {
             if line.is_empty() || !line.starts_with('R') {
                 continue; // This is either a comment, a header or "END"
             }
@@ -157,15 +151,19 @@ impl HarmonicsMem {
                     1 => match usize::from_str(item) {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
-                            println!("could not parse degree on line {} -- ignoring line", lno);
-                            break;
+                            return Err(ParsingError::HarmonicsFile(format!(
+                                "could not parse degree `{}` on line {}",
+                                item, lno
+                            )));
                         }
                     },
                     2 => match usize::from_str(item) {
                         Ok(val) => cur_order = val,
                         Err(_) => {
-                            println!("could not parse order on line {} -- ignoring line", lno);
-                            break;
+                            return Err(ParsingError::HarmonicsFile(format!(
+                                "could not parse order `{}` on line {}",
+                                item, lno
+                            )));
                         }
                     },
                     3 => {
@@ -176,11 +174,10 @@ impl HarmonicsMem {
                             match f64::from_str(item) {
                                 Ok(val) => c_nm = val,
                                 Err(_) => {
-                                    println!(
-                                        "could not parse C_nm `{}` on line {} -- ignoring line",
+                                    return Err(ParsingError::HarmonicsFile(format!(
+                                        "could not parse C_nm `{}` on line {}",
                                         item, lno
-                                    );
-                                    break;
+                                    )));
                                 }
                             }
                         } else {
@@ -197,8 +194,10 @@ impl HarmonicsMem {
                                     match f64::from_str(&c_nm_str) {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
-                                            println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
-                                            break;
+                                            return Err(ParsingError::HarmonicsFile(format!(
+                                                "could not parse C_nm `{}` on line {}",
+                                                item, lno
+                                            )));
                                         }
                                     }
                                     // That mean we have five minus signs, so both the C and S are negative.
@@ -206,8 +205,10 @@ impl HarmonicsMem {
                                     match f64::from_str(&s_nm_str) {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
-                                            println!("could not parse S_nm `{}` on line {} -- ignoring line", item, lno);
-                                            break;
+                                            return Err(ParsingError::HarmonicsFile(format!(
+                                                "could not parse S_nm `{}` on line {}",
+                                                item, lno
+                                            )));
                                         }
                                     }
                                 } else {
@@ -216,8 +217,10 @@ impl HarmonicsMem {
                                     match f64::from_str(&c_nm_str) {
                                         Ok(val) => c_nm = val,
                                         Err(_) => {
-                                            println!("could not parse C_nm `{}` on line {} -- ignoring line", item, lno);
-                                            break;
+                                            return Err(ParsingError::HarmonicsFile(format!(
+                                                "could not parse C_nm `{}` on line {}",
+                                                item, lno
+                                            )));
                                         }
                                     }
                                     // That mean we have five minus signs, so both the C and S are negative.
@@ -225,8 +228,10 @@ impl HarmonicsMem {
                                     match f64::from_str(&s_nm_str) {
                                         Ok(val) => s_nm = val,
                                         Err(_) => {
-                                            println!("could not parse S_nm `{}` on line {} -- ignoring line", item, lno);
-                                            break;
+                                            return Err(ParsingError::HarmonicsFile(format!(
+                                                "could not parse S_nm `{}` on line {}",
+                                                item, lno
+                                            )));
                                         }
                                     }
                                 }
@@ -235,11 +240,10 @@ impl HarmonicsMem {
                                 match f64::from_str(item) {
                                     Ok(val) => c_nm = val,
                                     Err(_) => {
-                                        println!(
-                                            "could not parse C_nm `{}` on line {} -- ignoring line",
+                                        return Err(ParsingError::HarmonicsFile(format!(
+                                            "could not parse C_nm `{}` on line {}",
                                             item, lno
-                                        );
-                                        break;
+                                        )));
                                     }
                                 }
                             }
@@ -249,8 +253,10 @@ impl HarmonicsMem {
                         // If this exists, then the S_nm is positive.
                         Ok(val) => s_nm = val,
                         Err(_) => {
-                            println!("could not parse S_nm on line {} -- ignoring line", lno);
-                            break;
+                            return Err(ParsingError::HarmonicsFile(format!(
+                                "could not parse S_nm `{}` on line {}",
+                                item, lno
+                            )));
                         }
                     },
                     _ => break, // We aren't storing the covariance of these harmonics
@@ -291,22 +297,46 @@ impl HarmonicsMem {
                 filepath, degree, order
             );
         }
-        HarmonicsMem {
+        Ok(HarmonicsMem {
             degree: max_degree,
             order: max_order,
             c_nm: c_nm_mat,
             s_nm: s_nm_mat,
-        }
+        })
     }
 
     /// `load` handles the actual loading in memory.
     fn load(
+        gunzipped: bool,
         skip_first_line: bool,
         degree: usize,
         order: usize,
-        data_as_str: String,
         filepath: &str,
-    ) -> HarmonicsMem {
+    ) -> Result<HarmonicsMem, ParsingError> {
+        let mut f = File::open(filepath)
+            .or_else(|_| Err(ParsingError::FileNotFound(filepath.to_string())))?;
+        let mut buffer = vec![0; 0];
+        if gunzipped {
+            let mut d = GzDecoder::new(f);
+            d.read_to_end(&mut buffer).or_else(|_| {
+                Err(ParsingError::FileUnreadable(
+                    "could not read file as gunzip".to_string(),
+                ))
+            })?;
+        } else {
+            f.read_to_end(&mut buffer).or_else(|_| {
+                Err(ParsingError::FileUnreadable(
+                    "could not read file to end".to_string(),
+                ))
+            })?;
+        }
+
+        let data_as_str = String::from_utf8(buffer).or_else(|_| {
+            Err(ParsingError::FileUnreadable(
+                "could not decode file contents as utf8".to_string(),
+            ))
+        })?;
+
         let mut c_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
         let mut s_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
 
@@ -322,37 +352,42 @@ impl HarmonicsMem {
             let mut cur_degree: usize = 0;
             let mut c_nm: f64 = 0.0;
             let mut s_nm: f64 = 0.0;
-            for (ino, item) in line.split_whitespace().enumerate() {
+            for (ino, item) in line.replace(",", " ").split_whitespace().enumerate() {
                 match ino {
                     0 => match usize::from_str(item) {
                         Ok(val) => cur_degree = val,
                         Err(_) => {
-                            println!("could not parse degree on line {} -- ignoring line", lno);
-                            break;
+                            return Err(ParsingError::HarmonicsFile(format!(
+                                "could not parse degree on line {} (`{}`)",
+                                lno, item
+                            )));
                         }
                     },
                     1 => match usize::from_str(item) {
                         Ok(val) => cur_order = val,
                         Err(_) => {
-                            println!("could not parse order on line {} -- ignoring line", lno);
-                            break;
+                            return Err(ParsingError::HarmonicsFile(format!(
+                                "could not parse order on line {} (`{}`)",
+                                lno, item
+                            )));
                         }
                     },
                     2 => match f64::from_str(&item.replace("D", "E")) {
                         Ok(val) => c_nm = val,
                         Err(_) => {
-                            println!(
-                                "could not parse C_nm `{}` on line {} -- ignoring line",
+                            return Err(ParsingError::HarmonicsFile(format!(
+                                "could not parse C_nm `{}` on line {}",
                                 item, lno
-                            );
-                            break;
+                            )));
                         }
                     },
                     3 => match f64::from_str(&item.replace("D", "E")) {
                         Ok(val) => s_nm = val,
                         Err(_) => {
-                            println!("could not parse S_nm on line {} -- ignoring line", lno);
-                            break;
+                            return Err(ParsingError::HarmonicsFile(format!(
+                                "could not parse S_nm `{}` on line {}",
+                                item, lno
+                            )));
                         }
                     },
                     _ => break, // We aren't storing the covariance of these harmonics
@@ -393,12 +428,12 @@ impl HarmonicsMem {
                 filepath, degree, order
             );
         }
-        HarmonicsMem {
+        Ok(HarmonicsMem {
             order: max_order,
             degree: max_degree,
             c_nm: c_nm_mat,
             s_nm: s_nm_mat,
-        }
+        })
     }
 }
 
@@ -414,4 +449,15 @@ impl GravityPotentialStor for HarmonicsMem {
     fn cs_nm(&self, degree: usize, order: usize) -> (f64, f64) {
         (self.c_nm[(degree, order)], self.s_nm[(degree, order)])
     }
+}
+
+#[test]
+fn test_load_harmonic_files() {
+    HarmonicsMem::from_cof("data/JGM3.cof.gz", 50, 50, true).expect("could not load JGM3");
+
+    HarmonicsMem::from_egm("data/EGM2008_to2190_TideFree.gz", 120, 120, true)
+        .expect("could not load EGM2008");
+
+    HarmonicsMem::from_shadr("data/Luna_jggrx_1500e_sha.tab.gz", 1500, 1500, true)
+        .expect("could not load jggrx");
 }

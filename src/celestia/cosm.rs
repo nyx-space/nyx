@@ -301,7 +301,7 @@ impl Cosm {
                         Err(e) => {
                             let msg = format!("[frame.{}] - could not parse right_asc `{}` - are there any special characters? {}",
                             &name, &rot.right_asc, e);
-                            println!("{}", msg);
+                            error!("{}", msg);
                             return Some(IoError::new(IoErrorKind::InvalidData, msg));
                         }
                     };
@@ -310,7 +310,7 @@ impl Cosm {
                         Err(e) => {
                             let msg = format!("[frame.{}] - could not parse declin `{}` - are there any special characters? {}",
                             &name, &rot.declin, e);
-                            println!("{}", msg);
+                            error!("{}", msg);
                             return Some(IoError::new(IoErrorKind::InvalidData, msg));
                         }
                     };
@@ -319,7 +319,7 @@ impl Cosm {
                         Err(e) => {
                             let msg = format!("[frame.{}] - could not parse w `{}` - are there any special characters? {}",
                             &name, &rot.w, e);
-                            println!("{}", msg);
+                            error!("{}", msg);
                             return Some(IoError::new(IoErrorKind::InvalidData, msg));
                         }
                     };
@@ -354,7 +354,7 @@ impl Cosm {
                 None
             }
             Err(e) => {
-                println!("{}", e);
+                error!("{}", e);
                 Some(IoError::new(IoErrorKind::InvalidData, e))
             }
         }
@@ -1467,7 +1467,7 @@ mod tests {
             print!("{}: ", frame);
             println!(
                 "{}",
-                cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, *frame, LTCorr::Abberation,)
+                cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, *frame, LTCorr::Abberation)
             );
         }
     }

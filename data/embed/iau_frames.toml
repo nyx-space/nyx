@@ -134,3 +134,35 @@ w = "249.978 + 541.1397757*d - 0.48*sin(N)"
 angle_unit = "degrees"
 [frames.iau_neptune.rotation.context]
 N = "357 + 52.316*T"
+
+[frames.iau_moon]
+# Uses the Mean Earth rotation axis convention (like Monte)
+orientation = 301
+center = 301
+base = "Luna"
+gm = -1
+parent_orientation = 0
+parent_center = -1
+flattening = -1
+equatorial_radius = -1
+semi_major_radius = -1
+[frames.iau_moon.rotation]
+right_asc = "269.9949 + 0.0031*T - 3.8787*sin(E1) - 0.1204*sin(E2) + 0.0700*sin(E3) - 0.0172*sin(E4) + 0.0072*sin(E6) - 0.0052*sin(E10) + 0.0043*sin(E13)"
+declin = "66.5392 + 0.0130*T + 1.5419*cos(E1) + 0.0239*cos(E2) - 0.0278*cos(E3) + 0.0068*cos(E4) - 0.0029*cos(E6) + 0.0009*cos(E7) + 0.0008*cos(E10) - 0.0009*cos(E13)"
+w = "WP + 3.5610*sin(E1) + 0.1208*sin(E2) - 0.0642*sin(E3) + 0.0158*sin(E4) + 0.0252*sin(E5) - 0.0066*sin(E6) - 0.0047*sin(E7) - 0.0046*sin(E8) + 0.0028*sin(E9) + 0.0052*sin(E10) + 0.0040*sin(E11) + 0.0019*sin(E12) - 0.0044*sin(E13)"
+angle_unit = "degrees"
+[frames.iau_moon.rotation.context]
+WP = "38.3213 + 13.17635815*d - 1.4e-12*d*d"
+E1 = "125.045 - 0.0529921*d"
+E8 = "276.617 + 0.3287146*d"
+E2 = "250.089 - 0.1059842*d"
+E9 = "34.226 + 1.7484877*d"
+E3 = "260.008 + 13.0120009*d"
+E10 = "15.134 - 0.1589763*d"
+E4 = "176.625 + 13.3407154*d"
+E11 = "119.743 + 0.0036096*d"
+E5 = "357.529 + 0.9856003*d"
+E12 = "239.961 + 0.1643573*d"
+E6 = "311.589 + 26.4057084*d"
+E13 = "25.053 + 12.9590088*d"
+E7 = "134.963 + 13.0649930*d"
