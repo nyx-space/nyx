@@ -14,10 +14,11 @@ fn nil_measurement() {
     let long = 345.5975;
     let height = 0.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let station = GroundStation::from_noise_values("nil", 0.0, lat, long, height, 0.0, 0.0);
+    let station =
+        GroundStation::from_noise_values("nil", 0.0, lat, long, height, 0.0, 0.0, eme2k, &cosm);
 
     let at_station = State::from_geodesic(lat, long, height, dt, eme2k);
 

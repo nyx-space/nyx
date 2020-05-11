@@ -20,15 +20,18 @@ fn srif_fixed_step_perfect_stations() {
     }
     use std::{io, thread};
 
+    let cosm = Cosm::de438();
+
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -41,7 +44,6 @@ fn srif_fixed_step_perfect_stations() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
-    let cosm = Cosm::from_xb("./de438s");
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
@@ -168,15 +170,18 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
     }
     use std::thread;
 
+    let cosm = Cosm::de438();
+
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -189,7 +194,6 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
-    let cosm = Cosm::from_xb("./de438s");
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);

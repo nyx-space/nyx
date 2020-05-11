@@ -20,15 +20,18 @@ fn multi_body_ckf_perfect_stations() {
     }
     use std::{io, thread};
 
+    let cosm = Cosm::de438();
+
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
-    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise);
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -41,14 +44,13 @@ fn multi_body_ckf_perfect_stations() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
-    let cosm = Cosm::from_xb("./de438s");
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
@@ -167,12 +169,14 @@ fn multi_body_ckf_covar_map() {
     }
     use std::{io, thread};
 
+    let cosm = Cosm::de438();
+
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
     let all_stations = vec![dss13_goldstone];
 
     // Define the propagator information.
@@ -185,14 +189,13 @@ fn multi_body_ckf_covar_map() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
-    let cosm = Cosm::from_xb("./de438s");
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);

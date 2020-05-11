@@ -14,7 +14,7 @@ use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 
 #[test]
 fn rugg_sma() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -65,7 +65,7 @@ fn rugg_sma() {
 
 #[test]
 fn rugg_sma_decr() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -116,7 +116,7 @@ fn rugg_sma_decr() {
 
 #[test]
 fn rugg_inc() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -169,7 +169,7 @@ fn rugg_inc() {
 
 #[test]
 fn rugg_inc_decr() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -222,7 +222,7 @@ fn rugg_inc_decr() {
 
 #[test]
 fn rugg_ecc() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -275,7 +275,7 @@ fn rugg_ecc() {
 
 #[test]
 fn rugg_ecc_decr() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -328,7 +328,7 @@ fn rugg_ecc_decr() {
 
 #[test]
 fn rugg_aop() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -383,7 +383,7 @@ fn rugg_aop() {
 
 #[test]
 fn rugg_aop_decr() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -437,7 +437,7 @@ fn rugg_aop_decr() {
 
 #[test]
 fn rugg_raan() {
-    let cosm = Cosm::from_xb("./de438s");
+    let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2017, 1, 1);

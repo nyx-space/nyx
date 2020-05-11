@@ -13,22 +13,29 @@ use crate::dimensions::{
     DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7,
 };
 use crate::time::Epoch;
-use celestia::{Frame, State};
+use celestia::{Cosm, Frame, State};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
 #[derive(Debug, Copy, Clone)]
-pub struct GroundStation {
-    pub name: &'static str,
+pub struct GroundStation<'a> {
+    pub name: &'a str,
+    /// in degrees
     pub elevation_mask: f64,
+    /// in degrees
     pub latitude: f64,
+    /// in degrees
     pub longitude: f64,
+    /// in km
     pub height: f64,
+    /// Frame in which this station is defined
+    pub frame: Frame,
+    pub cosm: &'a Cosm,
     range_noise: Normal<f64>,
     range_rate_noise: Normal<f64>,
 }
 
-impl GroundStation {
+impl<'a> GroundStation<'a> {
     /// Initializes a new Two Way ranging equipment from the noise values.
     pub fn from_noise_values(
         name: &'static str,
@@ -38,13 +45,17 @@ impl GroundStation {
         height: f64,
         range_noise: f64,
         range_rate_noise: f64,
-    ) -> GroundStation {
-        GroundStation {
+        frame: Frame,
+        cosm: &'a Cosm,
+    ) -> Self {
+        Self {
             name,
             elevation_mask,
             latitude,
             longitude,
             height,
+            frame,
+            cosm,
             range_noise: Normal::new(0.0, range_noise).unwrap(),
             range_rate_noise: Normal::new(0.0, range_rate_noise).unwrap(),
         }
@@ -54,8 +65,9 @@ impl GroundStation {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-    ) -> GroundStation {
-        GroundStation::from_noise_values(
+        cosm: &'a Cosm,
+    ) -> Self {
+        Self::from_noise_values(
             "Madrid",
             elevation_mask,
             40.427_222,
@@ -63,6 +75,8 @@ impl GroundStation {
             0.834_939,
             range_noise,
             range_rate_noise,
+            cosm.frame("IAU Earth"),
+            cosm,
         )
     }
 
@@ -70,8 +84,9 @@ impl GroundStation {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-    ) -> GroundStation {
-        GroundStation::from_noise_values(
+        cosm: &'a Cosm,
+    ) -> Self {
+        Self::from_noise_values(
             "Canberra",
             elevation_mask,
             -35.398_333,
@@ -79,6 +94,8 @@ impl GroundStation {
             0.691_750,
             range_noise,
             range_rate_noise,
+            cosm.frame("IAU Earth"),
+            cosm,
         )
     }
 
@@ -86,8 +103,9 @@ impl GroundStation {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-    ) -> GroundStation {
-        GroundStation::from_noise_values(
+        cosm: &'a Cosm,
+    ) -> Self {
+        Self::from_noise_values(
             "Goldstone",
             elevation_mask,
             35.247_164,
@@ -95,36 +113,28 @@ impl GroundStation {
             1.071_149_04,
             range_noise,
             range_rate_noise,
+            cosm.frame("IAU Earth"),
+            cosm,
         )
     }
 }
-impl MeasurementDevice<StdMeasurement> for GroundStation {
+impl<'a> MeasurementDevice<StdMeasurement> for GroundStation<'a> {
     type MeasurementInput = State;
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &State) -> Option<StdMeasurement> {
         match rx.frame {
-            Frame::Geoid { exb_id, .. } => {
+            Frame::Geoid { .. } => {
                 use std::f64::consts::PI;
-                // TODO: Get the frame from cosm instead of using the one from Rx!
-                // TODO: Also change the frame number based on the axes, right now, ECI frame == ECEF!
-                if exb_id != 399 {
-                    unimplemented!("the receiver is not around the Earth");
-                }
+                // Convert the station to the state's frame
                 let dt = rx.dt;
-                let tx =
-                    State::from_geodesic(self.latitude, self.longitude, self.height, dt, rx.frame);
-                /*
-                // Convert the station to "ECEF"
-                let theta = gast(dt);
-                let tx_ecef_r = r3(-theta) * tx.radius();
-                let tx_ecef_v = r3(-theta) * tx.velocity(); // XXX: Shouldn't we be using the transport theorem?
-                                                            // HACK: change after Cosm supports rotations
-                let tx_ecef = State::cartesian_vec(
-                    &Vector6::from_iterator(tx_ecef_r.iter().chain(tx_ecef_v.iter()).cloned()),
-                    mjd_dt,
-                    rx.frame,
+                let station_state = State::from_geodesic(
+                    self.latitude,
+                    self.longitude,
+                    self.height,
+                    dt,
+                    self.frame,
                 );
-                */
+                let tx = self.cosm.frame_chg(&station_state, rx.frame);
                 // Let's start by computing the range and range rate
                 let rho_ecef = rx.radius() - tx.radius();
 

@@ -96,13 +96,30 @@ impl Error for CosmError {
 
 impl Cosm {
     /// Builds a Cosm from the *XB files. Path should _not_ contain file extension. Panics if the files could not be loaded.
-    pub fn from_xb(filename: &str) -> Cosm {
-        Self::try_from_xb(filename)
+    pub fn from_xb(filename: &str) -> Self {
+        Self::try_from_xb(load_ephemeris(filename).unwrap())
             .unwrap_or_else(|_| panic!("could not open EXB file {}", filename))
     }
 
-    /// Attempts to build a Cosm from the *XB files.
-    pub fn try_from_xb(filename: &str) -> Result<Cosm, IoError> {
+    pub fn try_from_xb_file(filename: &str) -> Result<Self, IoError> {
+        Ok(Self::try_from_xb(load_ephemeris(filename)?)?)
+    }
+
+    /// Tries to load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn try_de438() -> Result<Self, IoError> {
+        let de438_buf: Vec<u8> = EmbeddedAsset::get("de438s-00-50.exb")
+            .expect("Could not find de438s-00-550.exb as asset")
+            .to_vec();
+        Ok(Self::try_from_xb(load_ephemeris_from_buf(de438_buf)?)?)
+    }
+
+    /// Load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn de438() -> Self {
+        Self::try_de438().expect("could not load embedded de438s EXB file")
+    }
+
+    /// Attempts to build a Cosm from the *XB files and the embedded IAU frames
+    pub fn try_from_xb(ephemerides: Vec<Ephemeris>) -> Result<Self, IoError> {
         let mut axb_map: Graph<i32, u8, Undirected> = Graph::new_undirected();
         let j2k_nidx = axb_map.add_node(0);
 
@@ -131,142 +148,131 @@ impl Cosm {
         cosm.frames
             .insert("solar system barycenter j2000".to_owned(), ssb2k);
 
-        if let Some(err) = cosm.append_xb(filename) {
+        if let Some(err) = cosm.append_xb(ephemerides) {
             return Err(err);
         }
 
-        // Now, let's append the IAU frames as defined in
-        // Celest Mech Dyn Astr (2018) 130:22
-        // https://doi.org/10.1007/s10569-017-9805-5
-        // cosm.add_iau_frames();
+        cosm.load_iau_frames();
+
+        Ok(cosm)
+    }
+
+    /// Load the IAU Frames as defined in Celest Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
+    pub fn load_iau_frames(&mut self) {
         // Load the IAU frames from the embedded TOML
         let iau_toml_str =
             EmbeddedAsset::get("iau_frames.toml").expect("Could not find iau_frames.toml as asset");
-        if let Some(err) = cosm.append_frames(
+        if let Some(err) = self.append_frames(
             std::str::from_utf8(&iau_toml_str)
                 .expect("Could not deserialize iau_frames.toml as string"),
         ) {
             error!("Could not load IAU frames: {}", err);
         }
-
-        Ok(cosm)
     }
 
-    pub fn append_xb(&mut self, filename: &str) -> Option<IoError> {
+    pub fn append_xb(&mut self, ephemerides: Vec<Ephemeris>) -> Option<IoError> {
         let j2k_str = "j2000";
-        match load_ephemeris(&(filename.to_string() + ".exb")) {
-            Err(e) => Some(e),
-            Ok(ephemerides) => {
-                for ephem in &ephemerides {
-                    let id = ephem.id.as_ref().unwrap();
+        for ephem in &ephemerides {
+            let id = ephem.id.as_ref().unwrap();
 
-                    self.ephemerides.insert(id.number, ephem.clone());
-                    self.ephemerides_names.insert(id.name.clone(), id.number);
+            self.ephemerides.insert(id.number, ephem.clone());
+            self.ephemerides_names.insert(id.name.clone(), id.number);
 
-                    // TODO: Clone all of the frames and add their IAU fixed definitions
+            // Compute the exb_id.
+            let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
 
-                    // Compute the exb_id.
-                    let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
+            // Add this EXB to the map, and link it to its parent
+            let this_node = self.exb_map.add_node(id.number);
+            let parent_node = match self.exbid_to_map_idx(exb_id) {
+                Ok(p) => p,
+                Err(e) => panic!(e),
+            };
+            // All edges are of value 1
+            self.exb_map.add_edge(parent_node, this_node, 1);
 
-                    // Add this EXB to the map, and link it to its parent
-                    let this_node = self.exb_map.add_node(id.number);
-                    let parent_node = match self.exbid_to_map_idx(exb_id) {
-                        Ok(p) => p,
-                        Err(e) => panic!(e),
+            // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
+
+            // Ephemeris exists
+            match ephem.parameters.get("GM") {
+                Some(gm) => {
+                    // It's a geoid, and we assume everything else is there
+                    let flattening = match ephem.parameters.get("Flattening") {
+                        Some(param) => param.value,
+                        None => {
+                            if id.name == "Moon" {
+                                0.0012
+                            } else {
+                                0.0
+                            }
+                        }
                     };
-                    // All edges are of value 1
-                    self.exb_map.add_edge(parent_node, this_node, 1);
+                    let equatorial_radius = match ephem.parameters.get("Equatorial radius") {
+                        Some(param) => param.value,
+                        None => {
+                            if id.name == "Moon" {
+                                1738.1
+                            } else {
+                                0.0
+                            }
+                        }
+                    };
+                    let semi_major_radius = match ephem.parameters.get("Equatorial radius") {
+                        Some(param) => {
+                            if id.name == "Earth Barycenter" {
+                                6378.1370
+                            } else {
+                                param.value
+                            }
+                        }
+                        None => equatorial_radius, // assume spherical if unspecified
+                    };
 
-                    // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
-
-                    // Ephemeris exists
-                    match ephem.parameters.get("GM") {
-                        Some(gm) => {
-                            // It's a geoid, and we assume everything else is there
-                            let flattening = match ephem.parameters.get("Flattening") {
-                                Some(param) => param.value,
-                                None => {
-                                    if id.name == "Moon" {
-                                        0.0012
-                                    } else {
-                                        0.0
-                                    }
-                                }
-                            };
-                            let equatorial_radius = match ephem.parameters.get("Equatorial radius")
-                            {
-                                Some(param) => param.value,
-                                None => {
-                                    if id.name == "Moon" {
-                                        1738.1
-                                    } else {
-                                        0.0
-                                    }
-                                }
-                            };
-                            let semi_major_radius = match ephem.parameters.get("Equatorial radius")
-                            {
-                                Some(param) => {
-                                    if id.name == "Earth Barycenter" {
-                                        6378.1370
-                                    } else {
-                                        param.value
-                                    }
-                                }
-                                None => equatorial_radius, // assume spherical if unspecified
-                            };
-
-                            // Let's now build the J2000 version of this body
-                            let obj = Frame::Geoid {
-                                axb_id: 0, // TODO: Get this from the EXB
+                    // Let's now build the J2000 version of this body
+                    let obj = Frame::Geoid {
+                        axb_id: 0, // TODO: Get this from the EXB
+                        exb_id: id.number,
+                        gm: gm.value,
+                        parent_axb_id: None,
+                        parent_exb_id: Some(exb_id),
+                        flattening,
+                        equatorial_radius,
+                        semi_major_radius,
+                    };
+                    self.frames.insert(
+                        format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
+                        obj,
+                    );
+                }
+                None => {
+                    match id.number {
+                        10 => {
+                            // Build the Sun frame in J2000
+                            let sun2k = Frame::Geoid {
+                                axb_id: 0,
                                 exb_id: id.number,
-                                gm: gm.value,
+                                gm: SUN_GM,
                                 parent_axb_id: None,
                                 parent_exb_id: Some(exb_id),
-                                flattening,
-                                equatorial_radius,
-                                semi_major_radius,
+                                flattening: 0.0,
+                                // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+                                equatorial_radius: 696_342.0,
+                                semi_major_radius: 696_342.0,
                             };
+
                             self.frames.insert(
                                 format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
-                                obj,
+                                sun2k,
                             );
                         }
-                        None => {
-                            match id.number {
-                                10 => {
-                                    // Build the Sun frame in J2000
-                                    let sun2k = Frame::Geoid {
-                                        axb_id: 0,
-                                        exb_id: id.number,
-                                        gm: SUN_GM,
-                                        parent_axb_id: None,
-                                        parent_exb_id: Some(exb_id),
-                                        flattening: 0.0,
-                                        // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
-                                        equatorial_radius: 696_342.0,
-                                        semi_major_radius: 696_342.0,
-                                    };
-
-                                    self.frames.insert(
-                                        format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
-                                        sun2k,
-                                    );
-                                }
-                                _ => {
-                                    info!(
-                                        "no GM value for EXB ID {} (exb ID: {})",
-                                        id.number, exb_id
-                                    );
-                                }
-                            }
+                        _ => {
+                            info!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
                         }
                     }
                 }
-
-                None
             }
         }
+
+        None
     }
 
     /// Append Cosm with the contents of this TOML (must _not_ be the filename)
@@ -859,7 +865,11 @@ impl Cosm {
 pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
     let mut input_exb_buf = Vec::new();
 
-    let mut f = File::open(input_filename)?;
+    let mut f = File::open(if !input_filename.ends_with(".exb") {
+        format!("{}.exb", input_filename)
+    } else {
+        input_filename.to_string()
+    })?;
     f.read_to_end(&mut input_exb_buf)
         .expect("something went wrong reading the file");
 
@@ -867,6 +877,13 @@ pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
         panic!("EXB file {} is empty (zero bytes read)", input_filename);
     }
 
+    load_ephemeris_from_buf(input_exb_buf)
+}
+
+/// Loads the provided input_filename as an EXB
+///
+/// This function may panic!
+pub fn load_ephemeris_from_buf(input_exb_buf: Vec<u8>) -> Result<Vec<Ephemeris>, IoError> {
     let decode_start = Instant::now();
 
     let ephcnt =
@@ -896,7 +913,7 @@ mod tests {
     #[test]
     fn test_cosm_direct() {
         use std::f64::EPSILON;
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
 
         assert_eq!(
             cosm.translation_path(
@@ -986,7 +1003,7 @@ mod tests {
 
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
 
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
 
         let ven2ear = cosm
             .translation_path(&cosm.frame("VENUS BARYCENTER J2000"), &cosm.frame("Luna"))
@@ -1133,7 +1150,7 @@ mod tests {
 
     #[test]
     fn test_frame_change_earth2luna() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let eme2k = cosm.frame("EME2000");
         let luna = cosm.frame("Luna");
 
@@ -1176,7 +1193,7 @@ mod tests {
 
     #[test]
     fn test_frame_change_ven2luna() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let luna = cosm.frame("Luna");
         let venus = cosm.frame("Venus Barycenter J2000");
 
@@ -1219,7 +1236,7 @@ mod tests {
 
     #[test]
     fn test_frame_change_ssb2luna() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
         let luna = cosm.frame("Luna");
         let ssb = cosm.frame("SSB");
 
@@ -1262,7 +1279,7 @@ mod tests {
 
     #[test]
     fn test_cosm_lt_corr() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
 
@@ -1284,7 +1301,7 @@ mod tests {
 
     #[test]
     fn test_cosm_aberration_corr() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
 
@@ -1304,9 +1321,10 @@ mod tests {
 
     #[test]
     fn test_cosm_append() {
-        let mut cosm = Cosm::from_xb("./de438s");
+        let mut cosm = Cosm::de438();
+        let ephem_buf = load_ephemeris("./de438s").unwrap();
         // Let's load the same XB again to demonstrate idempotency.
-        cosm.append_xb("./de438s");
+        cosm.append_xb(ephem_buf);
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
 
@@ -1327,7 +1345,7 @@ mod tests {
     #[test]
     fn test_rotation_validation() {
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
 
         println!("Available frames: {:?}", cosm.get_frame_names());
 
@@ -1437,7 +1455,7 @@ mod tests {
 
     #[test]
     fn test_cosm_frame_context() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::de438();
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
 
