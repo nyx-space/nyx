@@ -1,30 +1,27 @@
 use super::orbital::OrbitalDynamics;
 use super::propulsion::Propulsion;
-use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
 use crate::dimensions::{Vector1, VectorN, U6, U7};
 use celestia::State;
 use std::fmt;
-use std::marker::PhantomData;
 
 pub use super::solarpressure::SolarPressure;
 
-pub struct Spacecraft<'a, T: ThrustControl> {
+pub struct Spacecraft<'a> {
     pub celestial: OrbitalDynamics<'a>,
     pub force_models: Vec<Box<dyn ForceModel + 'a>>,
-    pub prop: Option<Propulsion<T>>,
+    pub prop: Option<Propulsion>,
     /// in kg
     pub dry_mass: f64,
     /// in kg
     pub fuel_mass: f64,
-    _marker: PhantomData<T>,
 }
 
-impl<'a, T: ThrustControl> Spacecraft<'a, T> {
+impl<'a> Spacecraft<'a> {
     /// Initialize a Spacecraft with a set of celestial dynamics and a propulsion subsystem.
     pub fn with_prop(
         celestial: OrbitalDynamics<'a>,
-        prop: Propulsion<T>,
+        prop: Propulsion,
         dry_mass: f64,
         fuel_mass: f64,
     ) -> Self {
@@ -34,7 +31,6 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
             force_models: Vec::new(),
             dry_mass,
             fuel_mass,
-            _marker: PhantomData,
         }
     }
 
@@ -47,7 +43,6 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
             force_models: Vec::new(),
             dry_mass,
             fuel_mass: 0.0,
-            _marker: PhantomData,
         }
     }
 
@@ -56,7 +51,7 @@ impl<'a, T: ThrustControl> Spacecraft<'a, T> {
     }
 }
 
-impl<'a, T: ThrustControl> Dynamics for Spacecraft<'a, T> {
+impl<'a> Dynamics for Spacecraft<'a> {
     type StateSize = U7;
     type StateType = SpacecraftState;
 

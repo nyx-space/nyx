@@ -61,7 +61,7 @@ fn qlaw_as_ruggiero_case_a() {
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -75,10 +75,10 @@ fn qlaw_as_ruggiero_case_a() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
 
     assert!((fuel_usage - 93.449).abs() < 1.0);
 }
@@ -125,7 +125,7 @@ fn qlaw_as_ruggiero_case_b() {
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -138,10 +138,10 @@ fn qlaw_as_ruggiero_case_b() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
 
     assert!((fuel_usage - 223.515).abs() < 1.0);
 }
@@ -184,7 +184,7 @@ fn qlaw_as_ruggiero_case_c() {
     let fuel_mass = 299.9;
     let dry_mass = 0.1;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -197,10 +197,10 @@ fn qlaw_as_ruggiero_case_c() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
 
     assert!((fuel_usage - 41.742).abs() < 1.0);
 }
@@ -253,7 +253,7 @@ fn qlaw_as_ruggiero_case_d() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -266,10 +266,10 @@ fn qlaw_as_ruggiero_case_d() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
 
     assert!((fuel_usage - 23.0).abs() < 1.0);
 }
@@ -326,7 +326,7 @@ fn qlaw_as_ruggiero_case_e() {
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -339,10 +339,10 @@ fn qlaw_as_ruggiero_case_e() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
 
     assert!((fuel_usage - 23.0).abs() < 1.0);
 }
@@ -390,7 +390,7 @@ fn qlaw_as_ruggiero_case_f() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -416,10 +416,10 @@ fn qlaw_as_ruggiero_case_f() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
 
     assert!((fuel_usage - 10.378).abs() < 1.0);
 }
@@ -466,7 +466,7 @@ fn ruggiero_iepc_2011_102() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
@@ -479,10 +479,10 @@ fn ruggiero_iepc_2011_102() {
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
 
-    assert!(
-        sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-        "objective not achieved"
-    );
+    match sc.prop.unwrap().ctrl.achieved(&final_state) {
+        Ok(val) => assert!(val, "objective not achieved"),
+        Err(e) => panic!("{:?}", e),
+    };
 
     // WARNING: Paper claims this can be done with only 49kg of fuel.
     assert!((fuel_usage - 49.0).abs() < 1.0);

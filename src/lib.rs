@@ -222,6 +222,9 @@ pub mod io;
 /// Provides all the orbital determination tools.
 pub mod od;
 
+/// Provides all of the mission design tools
+pub mod md;
+
 pub mod tutorial;
 
 #[macro_use]

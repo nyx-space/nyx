@@ -9,8 +9,6 @@ use nyx::dynamics::drag::ExpEarthDrag;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
-use nyx::dynamics::thrustctrl::NoThrustControl;
-use nyx::dynamics::Dynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::utils::rss_state_errors;
 
@@ -35,7 +33,7 @@ fn srp_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::<NoThrustControl>::new(dynamics, dry_mass);
+    let mut sc = Spacecraft::new(dynamics, dry_mass);
     // Add the SRP model to the spacecraft
     sc.add_model(Box::new(srp));
     println!("{:o}", orbit);
@@ -43,7 +41,7 @@ fn srp_earth() {
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.state();
+    let final_state = prop.state();
     println!("{}", final_state);
 
     // GMAT result
@@ -90,7 +88,7 @@ fn drag_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::<NoThrustControl>::new(dynamics, dry_mass);
+    let mut sc = Spacecraft::new(dynamics, dry_mass);
     // Add the SRP model to the spacecraft
     sc.add_model(Box::new(srp));
     // Add the drag model to the spacecraft
@@ -100,7 +98,7 @@ fn drag_earth() {
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.state();
+    let final_state = prop.state();
     println!("{}", final_state);
     println!("{}", final_state.orbit);
 }

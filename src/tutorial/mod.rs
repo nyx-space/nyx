@@ -354,7 +354,7 @@ let last_state_0 = prop.until_time_elapsed(prop_time);
 // Note that in order to call state(), we need to tell Rust that we're using
 // the `dynamics` variable as a Dynamics, so we need to `use` dynamics::Dynamics.
 use nyx::dynamics::Dynamics;
-let last_state_1 = prop.dynamics.state();
+let last_state_1 = prop.state();
 println!("{}\n{}", last_state_0, last_state_1);
 
 // We can check that the propagator works well by doing a back propagation
@@ -876,7 +876,7 @@ let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9
 prop.until_time_elapsed(prop_time);
 
 println!("Initial state: {:o}", orbit);
-println!("Final   state: {:o}", prop.dynamics.state());
+println!("Final   state: {:o}", prop.state());
 ```
 
 I recommend running this in release mode is a good idea given the computations needed for the spherical harmonics. On my machine, it takes 12.4 seconds in debug mode, but only 0.3 seconds in release mode.
@@ -1014,7 +1014,7 @@ let fuel_depl = true;
 // It requires something which implement `ThrustControl` (the schedule),
 // the list of thruster (`biprop`), and whether or not we want to
 // compute the fuel depletion.
-let prop_subsys = Propulsion::new(schedule, biprop, fuel_depl);
+let prop_subsys = Propulsion::new(Box::new(schedule), biprop, fuel_depl);
 
 // Define the celestial dynamics
 let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
@@ -1028,7 +1028,7 @@ let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 let mut prop = Propagator::default(&mut sc, &PropOpts::with_fixed_step(10.0));
 prop.until_time_elapsed(prop_time);
 
-println!("{}", prop.dynamics.state());
+println!("{}", prop.state());
 ```
 
 The output should be:
@@ -1100,7 +1100,7 @@ let fuel_mass = 299.0;
 
 // Define the propulsion subsystem where the control is Ruggiero and the propulsion
 // is the 1 Newton EP thruster defined above.
-let prop_subsys = Propulsion::new(ruggiero, lowt, true);
+let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
 
 let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 println!("{:o}", orbit);
@@ -1115,10 +1115,10 @@ let fuel_usage = fuel_mass - sc.fuel_mass;
 println!("{:o}", final_state);
 println!("fuel usage: {:.3} kg", fuel_usage);
 
-assert!(
-    sc.prop.as_ref().unwrap().ctrl.achieved(&final_state),
-    "objective not achieved"
-);
+match sc.prop.unwrap().ctrl.achieved(&final_state) {
+    Ok(val) => assert!(val, "objective not achieved"),
+    Err(e) => panic!("{:?}", e),
+};
 
 assert!((fuel_usage - 93.449).abs() < 1.0);
 ```

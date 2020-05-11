@@ -12,14 +12,14 @@ use std::sync::mpsc::Sender;
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
 /// details of the previous step, and the set of coefficients used for the monomorphic instance.
 #[derive(Debug)]
-pub struct Propagator<'a, M: Dynamics, E: ErrorCtrl>
+pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
 where
-    DefaultAllocator: Allocator<f64, M::StateSize>,
+    DefaultAllocator: Allocator<f64, D::StateSize>,
 {
-    pub dynamics: &'a mut M, // Stores the dynamics used. *Must* use this to get the latest values
+    pub dynamics: &'a mut D, // Stores the dynamics used. *Must* use this to get the latest values
     // An output channel for all of the states computed by this propagator
-    pub tx_chan: Option<&'a Sender<M::StateType>>,
-    pub event_trackers: EventTrackers<M::StateType>,
+    pub tx_chan: Option<&'a Sender<D::StateType>>,
+    pub event_trackers: EventTrackers<D::StateType>,
     opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
     step_size: f64,    // Stores the adapted step for the _next_ call
@@ -31,12 +31,12 @@ where
 }
 
 /// The `Propagator` trait defines the functions of a propagator and of an event tracker.
-impl<'a, M: Dynamics, E: ErrorCtrl> Propagator<'a, M, E>
+impl<'a, D: Dynamics, E: ErrorCtrl> Propagator<'a, D, E>
 where
-    DefaultAllocator: Allocator<f64, M::StateSize>,
+    DefaultAllocator: Allocator<f64, D::StateSize>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: &'a mut M, opts: &PropOpts<E>) -> Self {
+    pub fn new<T: RK>(dynamics: &'a mut D, opts: &PropOpts<E>) -> Self {
         Self {
             tx_chan: None,
             dynamics,
@@ -57,7 +57,7 @@ where
     }
 
     /// Default propagator is an RK89.
-    pub fn default(dynamics: &'a mut M, opts: &PropOpts<E>) -> Self {
+    pub fn default(dynamics: &'a mut D, opts: &PropOpts<E>) -> Self {
         Self::new::<RK89>(dynamics, opts)
     }
 
@@ -76,15 +76,20 @@ where
     /// Returns the state of the propagation
     ///
     /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
-    pub fn state_vector(&self) -> VectorN<f64, M::StateSize> {
+    pub fn state_vector(&self) -> VectorN<f64, D::StateSize> {
         self.dynamics.state_vector()
+    }
+
+    /// A shortcut to dynamics.state()
+    pub fn state(&self) -> D::StateType {
+        self.dynamics.state()
     }
 
     /// This method propagates the provided Dynamics `dyn` for `elapsed_time` seconds. WARNING: This function has many caveats (please read detailed docs).
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `self.dynamics.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> M::StateType {
+    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> D::StateType {
         let backprop = elapsed_time < 0.0;
         if backprop {
             self.step_size *= -1.0; // Invert the step size
@@ -140,8 +145,8 @@ where
 
     pub fn until_event(
         &mut self,
-        condition: StopCondition<M::StateType>,
-    ) -> Result<M::StateType, ConvergenceError> {
+        condition: StopCondition<D::StateType>,
+    ) -> Result<D::StateType, ConvergenceError> {
         // Store the initial time and state
         let init_time = self.dynamics.time();
         let init_state_vec = self.dynamics.state_vector();
@@ -234,26 +239,24 @@ where
                 // Propagate until time xa
                 self.until_time_elapsed(xa - self.dynamics.time());
                 let ya_p = self.event_trackers.events[0].eval(&self.dynamics.state());
-                match arrange(xa, ya_p, s, ys) {
-                    (_a, _ya, _b, _yb) => {
-                        xa = _a;
-                        ya = _ya;
-                        xb = _b;
-                        yb = _yb;
-                    }
+                let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
+                {
+                    xa = _a;
+                    ya = _ya;
+                    xb = _b;
+                    yb = _yb;
                 }
             } else {
                 // Root bracketed between s and b
                 // Propagate until time xb
                 self.until_time_elapsed(xb - self.dynamics.time());
                 let yb_p = self.event_trackers.events[0].eval(&self.dynamics.state());
-                match arrange(s, ys, xb, yb_p) {
-                    (_a, _ya, _b, _yb) => {
-                        xa = _a;
-                        ya = _ya;
-                        xb = _b;
-                        yb = _yb;
-                    }
+                let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
+                {
+                    xa = _a;
+                    ya = _ya;
+                    xb = _b;
+                    yb = _yb;
                 }
             }
             iter += 1;
@@ -281,8 +284,8 @@ where
     pub fn derive(
         &mut self,
         t: f64,
-        state: &VectorN<f64, M::StateSize>,
-    ) -> (f64, VectorN<f64, M::StateSize>) {
+        state: &VectorN<f64, D::StateSize>,
+    ) -> (f64, VectorN<f64, D::StateSize>) {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         loop {
@@ -295,7 +298,7 @@ where
                 // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
                 // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
-                let mut wi = VectorN::<f64, M::StateSize>::from_element(0.0);
+                let mut wi = VectorN::<f64, D::StateSize>::from_element(0.0);
                 for kj in &k {
                     let a_ij = self.a_coeffs[a_idx];
                     ci += a_ij;
@@ -312,7 +315,7 @@ where
             let mut next_state = state.clone();
             // State error estimation from https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Adaptive_Runge%E2%80%93Kutta_methods
             // This is consistent with GMAT https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L537
-            let mut error_est = VectorN::<f64, M::StateSize>::from_element(0.0);
+            let mut error_est = VectorN::<f64, D::StateSize>::from_element(0.0);
             for (i, ki) in k.iter().enumerate() {
                 let b_i = self.b_coeffs[i];
                 if !self.fixed_step {

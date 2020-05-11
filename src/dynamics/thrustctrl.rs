@@ -3,13 +3,15 @@ use crate::time::Epoch;
 use celestia::{Frame, State};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
+#[derive(Debug)]
+pub enum ThrustingError {
+    NoObjectiveDefined,
+}
+
 /// The `ThrustControl` trait handles control laws, optimizations, and other such methods for
 /// controlling the overall thrust direction when tied to a `Spacecraft`. For delta V control,
 /// tie the DeltaVctrl to a MissionArc.
-pub trait ThrustControl
-where
-    Self: Clone + Sized,
-{
+pub trait ThrustControl {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
     fn direction(&self, state: &State) -> Vector3<f64>;
 
@@ -19,19 +21,10 @@ where
 
     /// Prepares the controller for the next maneuver (called from set_state of the dynamics).
     fn next(&mut self, state: &State);
-}
 
-#[derive(Clone)]
-pub struct NoThrustControl {}
-impl ThrustControl for NoThrustControl {
-    fn direction(&self, _: &State) -> Vector3<f64> {
-        unimplemented!();
-    }
-    fn throttle(&self, _: &State) -> f64 {
-        unimplemented!();
-    }
-    fn next(&mut self, _: &State) {
-        unimplemented!();
+    /// Returns whether this thrust control has been achieve, if it has an objective
+    fn achieved(&self, _state: &State) -> Result<bool, ThrustingError> {
+        Err(ThrustingError::NoObjectiveDefined)
     }
 }
 
@@ -120,19 +113,19 @@ impl Ruggiero {
                 .abs()
         }
     }
-
-    /// Returns whether the control law has achieved all goals
-    pub fn achieved(&self, state: &State) -> bool {
-        for obj in &self.objectives {
-            if !obj.achieved(state) {
-                return false;
-            }
-        }
-        true
-    }
 }
 
 impl ThrustControl for Ruggiero {
+    /// Returns whether the control law has achieved all goals
+    fn achieved(&self, state: &State) -> Result<bool, ThrustingError> {
+        for obj in &self.objectives {
+            if !obj.achieved(state) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     fn direction(&self, osc: &State) -> Vector3<f64> {
         if self.achieved {
             Vector3::zeros()

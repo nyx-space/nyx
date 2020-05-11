@@ -18,7 +18,7 @@ use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, EphemerisContainer};
 use super::SPEED_OF_LIGHT_KMS;
 use crate::hifitime::{Epoch, SECONDS_PER_DAY};
-use crate::io::frame_toml;
+use crate::io::frame_serde;
 use crate::na::Matrix3;
 use std::collections::HashMap;
 use std::error::Error;
@@ -271,7 +271,7 @@ impl Cosm {
 
     /// Append Cosm with the contents of this TOML (must _not_ be the filename)
     pub fn append_frames(&mut self, toml_content: &str) -> Option<IoError> {
-        let maybe_frames: Result<frame_toml::FramesToml, _> = toml::from_str(toml_content);
+        let maybe_frames: Result<frame_serde::FramesSerde, _> = toml::from_str(toml_content);
         match maybe_frames {
             Ok(mut frames) => {
                 for (ref name, ref mut definition) in frames.frames.drain() {

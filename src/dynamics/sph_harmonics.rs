@@ -7,6 +7,7 @@ use crate::io::gravity::GravityPotentialStor;
 use crate::time::Epoch;
 use std::cmp::min;
 
+#[derive(Clone)]
 pub struct Harmonics<'a, S>
 where
     S: GravityPotentialStor,
@@ -186,6 +187,7 @@ impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
 
 /// HarmonicsDiff is the hyperdual number based implementation for spherical harmonics.
 /// It provides the EOMs and partial derivatives of the harmonics.
+#[derive(Clone)]
 pub struct HarmonicsDiff<'a, S>
 where
     S: GravityPotentialStor,
