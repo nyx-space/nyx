@@ -70,7 +70,7 @@ fn qlaw_as_ruggiero_case_a() {
     prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time);
     println!("{}", prop.event_trackers);
-    let final_state = prop.dynamics.celestial.state();
+    let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
@@ -133,7 +133,7 @@ fn qlaw_as_ruggiero_case_b() {
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.celestial.state();
+    let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
@@ -192,7 +192,7 @@ fn qlaw_as_ruggiero_case_c() {
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.celestial.state();
+    let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
@@ -261,7 +261,7 @@ fn qlaw_as_ruggiero_case_d() {
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.celestial.state();
+    let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
@@ -334,7 +334,7 @@ fn qlaw_as_ruggiero_case_e() {
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.celestial.state();
+    let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
@@ -411,7 +411,7 @@ fn qlaw_as_ruggiero_case_f() {
     prop.tx_chan = Some(&tx);
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.celestial.state();
+    let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);
@@ -474,7 +474,7 @@ fn ruggiero_iepc_2011_102() {
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
 
-    let final_state = prop.dynamics.celestial.state();
+    let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
     println!("{:o}", final_state);
     println!("fuel usage: {:.3} kg", fuel_usage);

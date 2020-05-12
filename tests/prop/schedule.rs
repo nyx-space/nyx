@@ -80,11 +80,11 @@ fn transfer_schedule_no_depl() {
 
     // Compute the errors
     let (err_r, err_v) = rss_state_errors(
-        &prop.dynamics.celestial.state_vector(),
+        &prop.dynamics.orbital_dyn.state_vector(),
         &rslt.to_cartesian_vec(),
     );
     println!("Absolute errors");
-    let delta = prop.dynamics.celestial.state_vector() - rslt.to_cartesian_vec();
+    let delta = prop.dynamics.orbital_dyn.state_vector() - rslt.to_cartesian_vec();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -178,11 +178,11 @@ fn transfer_schedule_depl() {
 
     // Compute the errors
     let (err_r, err_v) = rss_state_errors(
-        &prop.dynamics.celestial.state_vector(),
+        &prop.dynamics.orbital_dyn.state_vector(),
         &rslt.to_cartesian_vec(),
     );
     println!("Absolute errors");
-    let delta = prop.dynamics.celestial.state_vector() - rslt.to_cartesian_vec();
+    let delta = prop.dynamics.orbital_dyn.state_vector() - rslt.to_cartesian_vec();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
