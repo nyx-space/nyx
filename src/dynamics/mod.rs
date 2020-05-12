@@ -3,7 +3,7 @@ extern crate hyperdual;
 use self::hyperdual::{Hyperdual, Owned};
 use crate::celestia::{Frame, State};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U1};
 use crate::time::Epoch;
 
 /// The orbital module handles all Cartesian based orbital dynamics.

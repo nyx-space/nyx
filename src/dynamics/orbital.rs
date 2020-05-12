@@ -2,7 +2,8 @@ use super::hyperdual::linalg::norm;
 use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, AutoDiff, Differentiable, Dynamics};
 use crate::dimensions::{
-    DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN,
+    U3, U36, U4, U42, U6, U7,
 };
 use crate::time::Epoch;
 use celestia::{Cosm, Frame, LTCorr, State};
@@ -10,6 +11,14 @@ use od::Estimable;
 use std::f64;
 
 pub use super::sph_harmonics::{Harmonics, HarmonicsDiff};
+
+pub trait OrbitalDynamicsT: Dynamics {
+    fn orbital_state(&self) -> State;
+
+    fn orbital_state_ctor(&self, rel_time: f64, state_vec: &VectorN<f64, Self::StateSize>) -> State
+    where
+        DefaultAllocator: Allocator<f64, Self::StateSize>;
+}
 
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 pub struct OrbitalDynamics<'a> {
@@ -20,6 +29,20 @@ pub struct OrbitalDynamics<'a> {
     /// Allows us to rebuilt the true epoch
     init_tai_secs: f64,
     pub accel_models: Vec<Box<dyn AccelModel + 'a>>,
+}
+
+impl<'a> OrbitalDynamicsT for OrbitalDynamics<'a> {
+    fn orbital_state(&self) -> State {
+        self.state
+    }
+
+    fn orbital_state_ctor(
+        &self,
+        rel_time: f64,
+        state_vec: &VectorN<f64, Self::StateSize>,
+    ) -> State {
+        self.state_ctor(rel_time, state_vec)
+    }
 }
 
 impl<'a> OrbitalDynamics<'a> {
@@ -125,6 +148,20 @@ pub struct OrbitalDynamicsStm<'a> {
     // Allows us to rebuilt the true epoch
     init_tai_secs: f64,
     pub accel_models: Vec<Box<dyn AutoDiff<STMSize = U3, HyperStateSize = U7> + 'a>>,
+}
+
+impl<'a> OrbitalDynamicsT for OrbitalDynamicsStm<'a> {
+    fn orbital_state(&self) -> State {
+        self.state
+    }
+
+    fn orbital_state_ctor(
+        &self,
+        rel_time: f64,
+        state_vec: &VectorN<f64, Self::StateSize>,
+    ) -> State {
+        self.state_ctor(rel_time, state_vec).0
+    }
 }
 
 impl<'a> OrbitalDynamicsStm<'a> {
