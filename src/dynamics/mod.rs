@@ -3,7 +3,7 @@ extern crate hyperdual;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use crate::celestia::{Frame, State};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U3, U7};
 use crate::time::Epoch;
 
 /// The orbital module handles all Cartesian based orbital dynamics.
@@ -134,7 +134,7 @@ pub trait AutoDiff {
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel {
+pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> {
     /// Defines the equations of motion for this force model from the provided osculating state.
     fn eom(&self, osc: &State) -> Vector3<f64>;
 }
