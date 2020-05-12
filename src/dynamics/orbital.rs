@@ -1,6 +1,6 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
-use super::{AccelModel, AutoDiff, Differentiable, Dynamics};
+use super::{AccelModel, AutoDiff, Dynamics};
 use crate::dimensions::{
     allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN,
     U3, U36, U4, U42, U6, U7,
@@ -235,23 +235,8 @@ impl<'a> OrbitalDynamicsStm<'a> {
     }
 }
 
-impl<'a> Differentiable for OrbitalDynamicsStm<'a> {
-    type STMSize = U6;
-    fn eom_grad(
-        &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &Vector6<f64>,
-    ) -> (Vector6<f64>, Matrix6<f64>) {
-        let hyperstate = hyperspace_from_vector(&state);
-
-        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
-
-        (state, grad)
-    }
-}
-
 impl<'a> AutoDiff for OrbitalDynamicsStm<'a> {
+    type STMSize = U6;
     type HyperStateSize = U7;
 
     fn dual_eom(
@@ -467,24 +452,9 @@ impl<'a> AccelModel for PointMasses<'a> {
     }
 }
 
-impl<'a> Differentiable for PointMasses<'a> {
-    type STMSize = U3;
-    fn eom_grad(
-        &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &Vector3<f64>,
-    ) -> (Vector3<f64>, Matrix3<f64>) {
-        let hyperstate = hyperspace_from_vector(&state);
-
-        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
-
-        (state, grad)
-    }
-}
-
 impl<'a> AutoDiff for PointMasses<'a> {
     type HyperStateSize = U7;
+    type STMSize = U3;
 
     fn dual_eom(
         &self,

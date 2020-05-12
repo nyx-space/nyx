@@ -1,9 +1,9 @@
 extern crate hyperdual;
 
-use self::hyperdual::{Hyperdual, Owned};
+use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use crate::celestia::{Frame, State};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U1};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN};
 use crate::time::Epoch;
 
 /// The orbital module handles all Cartesian based orbital dynamics.
@@ -82,9 +82,12 @@ pub trait Dynamics {
     fn state(&self) -> Self::StateType;
 }
 
-/// A trait to specify that some equations of motion are differentiable.
-pub trait Differentiable {
+/// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
+pub trait AutoDiff {
+    /// Defines the state size of the estimated state
+    type HyperStateSize: DimName;
     type STMSize: DimName;
+
     /// Computes both the state and the gradient of the dynamics.
     fn eom_grad(
         &self,
@@ -96,14 +99,19 @@ pub trait Differentiable {
         MatrixMN<f64, Self::STMSize, Self::STMSize>,
     )
     where
-        DefaultAllocator:
-            Allocator<f64, Self::STMSize> + Allocator<f64, Self::STMSize, Self::STMSize>;
-}
+        DefaultAllocator: Allocator<f64, Self::STMSize>
+            + Allocator<f64, Self::STMSize, Self::STMSize>
+            + Allocator<f64, Self::HyperStateSize>
+            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
+        Owned<f64, Self::HyperStateSize>: Copy,
+    {
+        let hyperstate: VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize> =
+            hyperspace_from_vector(&state);
 
-/// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-pub trait AutoDiff: Differentiable {
-    /// Defines the state size of the estimated state
-    type HyperStateSize: DimName;
+        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
+
+        (state, grad)
+    }
 
     /// Defines the equations of motion for Dual numbers for these dynamics.
     fn dual_eom(

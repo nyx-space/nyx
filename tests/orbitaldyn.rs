@@ -9,7 +9,6 @@ use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 use na::{Matrix6, Vector6, U3};
 use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
-use nyx::dynamics::Differentiable;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
@@ -604,6 +603,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
 #[test]
 fn two_body_dual() {
+    use self::nyx::dynamics::AutoDiff;
     // This is a duplicate of the differentials test in hyperdual.
 
     let cosm = Cosm::de438();

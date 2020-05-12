@@ -1,8 +1,8 @@
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
+use super::hyperdual::{Float, Hyperdual};
 use crate::celestia::{Cosm, Frame, State};
 use crate::dimensions::{DMatrix, Matrix3, Vector3, U3, U7};
-use crate::dynamics::{AccelModel, AutoDiff, Differentiable};
+use crate::dynamics::{AccelModel, AutoDiff};
 use crate::io::gravity::GravityPotentialStor;
 use crate::time::Epoch;
 use std::cmp::min;
@@ -274,23 +274,8 @@ where
     }
 }
 
-impl<'a, S: GravityPotentialStor> Differentiable for HarmonicsDiff<'a, S> {
-    type STMSize = U3;
-    fn eom_grad(
-        &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        radius: &Vector3<f64>,
-    ) -> (Vector3<f64>, Matrix3<f64>) {
-        let hyperstate = hyperspace_from_vector(&radius);
-
-        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
-
-        (state, grad)
-    }
-}
-
 impl<'a, S: GravityPotentialStor> AutoDiff for HarmonicsDiff<'a, S> {
+    type STMSize = U3;
     type HyperStateSize = U7;
 
     fn dual_eom(
