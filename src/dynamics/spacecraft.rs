@@ -133,13 +133,13 @@ where
 
         // Now compute the other dynamics as needed.
         if let Some(prop) = &self.prop {
-            let (thrust_force, fuel_usage) = prop.eom(&orbital_dyn_state);
+            let (thrust_force, fuel_rate) = prop.eom(&orbital_dyn_state);
             // Add the fuel mass to the total mass, minus the change in fuel
-            total_mass += self.fuel_mass + fuel_usage;
+            total_mass += self.fuel_mass + fuel_rate;
             for i in 0..3 {
                 d_x[i + 3] += thrust_force[i] / (self.dry_mass + state[Self::StateSize::dim() - 1]);
             }
-            d_x[Self::StateSize::dim() - 1] += fuel_usage;
+            d_x[Self::StateSize::dim() - 1] += fuel_rate;
         }
 
         // Compute additional force models as needed
