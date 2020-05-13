@@ -15,6 +15,8 @@ pub use super::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub trait OrbitalDynamicsT: Dynamics {
     fn orbital_state(&self) -> State;
 
+    fn stm(&self) -> Option<Matrix6<f64>>;
+
     fn orbital_state_ctor(&self, rel_time: f64, state_vec: &VectorN<f64, Self::StateSize>) -> State
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
@@ -34,6 +36,10 @@ pub struct OrbitalDynamics<'a> {
 impl<'a> OrbitalDynamicsT for OrbitalDynamics<'a> {
     fn orbital_state(&self) -> State {
         self.state
+    }
+
+    fn stm(&self) -> Option<Matrix6<f64>> {
+        None
     }
 
     fn orbital_state_ctor(
@@ -153,6 +159,10 @@ pub struct OrbitalDynamicsStm<'a> {
 impl<'a> OrbitalDynamicsT for OrbitalDynamicsStm<'a> {
     fn orbital_state(&self) -> State {
         self.state
+    }
+
+    fn stm(&self) -> Option<Matrix6<f64>> {
+        Some(self.stm)
     }
 
     fn orbital_state_ctor(

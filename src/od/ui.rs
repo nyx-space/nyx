@@ -16,21 +16,22 @@ use std::sync::mpsc::Receiver;
 
 pub struct ODProcess<
     'a,
-    D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
+    D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
     E: ErrorCtrl,
-    M: Measurement,
-    N: MeasurementDevice<M>,
+    Msr: Measurement,
+    N: MeasurementDevice<Msr, MsrIn>,
     T: EkfTrigger,
     A: DimName,
-    K: Filter<D::LinStateSize, A, M::MeasurementSize>,
+    K: Filter<D::LinStateSize, A, Msr::MeasurementSize>,
+    MsrIn,
 > where
     DefaultAllocator: Allocator<f64, D::StateSize>
-        + Allocator<f64, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, M::StateSize>
+        + Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, D::LinStateSize>
-        + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, D::LinStateSize>
-        + Allocator<f64, D::LinStateSize, M::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
+        + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
@@ -47,29 +48,30 @@ pub struct ODProcess<
     /// Vector of estimates available after a pass
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
-    pub residuals: Vec<Residual<M::MeasurementSize>>,
+    pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
     _marker: PhantomData<A>,
 }
 
 impl<
         'a,
-        D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
+        D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
         E: ErrorCtrl,
-        M: Measurement,
-        N: MeasurementDevice<M>,
+        Msr: Measurement,
+        N: MeasurementDevice<Msr, MsrIn>,
         T: EkfTrigger,
         A: DimName,
-        K: Filter<D::LinStateSize, A, M::MeasurementSize>,
-    > ODProcess<'a, D, E, M, N, T, A, K>
+        K: Filter<D::LinStateSize, A, Msr::MeasurementSize>,
+        MsrIn,
+    > ODProcess<'a, D, E, Msr, N, T, A, K, MsrIn>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
-        + Allocator<f64, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, M::StateSize>
+        + Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, D::LinStateSize>
-        + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, D::LinStateSize>
-        + Allocator<f64, D::LinStateSize, M::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
+        + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
@@ -142,7 +144,7 @@ where
     }
 
     /// Allows processing all measurements without covariance mapping.
-    pub fn process_measurements(&mut self, measurements: &[(Epoch, M)]) -> Option<FilterError> {
+    pub fn process_measurements(&mut self, measurements: &[(Epoch, Msr)]) -> Option<FilterError> {
         info!("Processing {} measurements", measurements.len());
 
         let mut prev_dt = self.kf.previous_estimate().dt();
@@ -218,7 +220,7 @@ where
     pub fn process_measurements_covar(
         &mut self,
         prop_rx: &Receiver<D::StateType>,
-        measurements: &[(Epoch, M)],
+        measurements: &[(Epoch, Msr)],
     ) -> Option<FilterError> {
         assert!(
             !measurements.is_empty(),
@@ -406,13 +408,14 @@ where
 
 impl<
         'a,
-        D: Estimable<N::MeasurementInput, LinStateSize = M::StateSize>,
+        D: Estimable<MsrIn, LinStateSize = M::StateSize>,
         E: ErrorCtrl,
         M: Measurement,
-        N: MeasurementDevice<M>,
+        N: MeasurementDevice<M, MsrIn>,
         A: DimName,
         K: Filter<D::LinStateSize, A, M::MeasurementSize>,
-    > ODProcess<'a, D, E, M, N, CkfTrigger, A, K>
+        MsrIn,
+    > ODProcess<'a, D, E, M, N, CkfTrigger, A, K, MsrIn>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>

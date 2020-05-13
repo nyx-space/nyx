@@ -191,16 +191,15 @@ where
 }
 
 /// A trait to generalize measurement devices such as a ground station
-pub trait MeasurementDevice<N>
+pub trait MeasurementDevice<Msr, MsrIn>
 where
     Self: Sized,
-    N: Measurement,
-    DefaultAllocator: Allocator<f64, N::StateSize>
-        + Allocator<f64, N::StateSize, N::MeasurementSize>
-        + Allocator<f64, N::MeasurementSize>
-        + Allocator<f64, N::MeasurementSize, N::StateSize>,
+    Msr: Measurement,
+    DefaultAllocator: Allocator<f64, Msr::StateSize>
+        + Allocator<f64, Msr::StateSize, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>,
 {
-    type MeasurementInput;
     /// Returns the measurement if the device and generate one, else returns None
-    fn measure(&self, state: &Self::MeasurementInput) -> Option<N>;
+    fn measure(&self, input: &MsrIn) -> Option<Msr>;
 }

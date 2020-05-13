@@ -3,7 +3,9 @@ use super::propulsion::Propulsion;
 use super::{Dynamics, ForceModel};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::dimension::{DimNameAdd, DimNameSum};
-use crate::dimensions::{DefaultAllocator, DimName, Vector1, VectorN, U1};
+use crate::dimensions::{DefaultAllocator, DimName, Matrix6, Vector1, VectorN, U1, U6};
+use crate::od::Estimable;
+use crate::time::Epoch;
 use celestia::State;
 use std::fmt;
 
@@ -74,6 +76,7 @@ where
             orbit: self.orbital_dyn.orbital_state(),
             dry_mass: self.dry_mass,
             fuel_mass: self.fuel_mass,
+            stm: self.orbital_dyn.stm(),
         }
     }
 
@@ -169,11 +172,41 @@ impl<'a> Spacecraft<'a, OrbitalDynamicsStm<'a>> {
     }
 }
 
+impl<'a> Estimable<SpacecraftState> for Spacecraft<'a, OrbitalDynamicsStm<'a>> {
+    type LinStateSize = U6;
+
+    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, SpacecraftState) {
+        (prop_state.orbit.dt, *prop_state)
+    }
+
+    fn extract_stm(&self, prop_state: &Self::StateType) -> Matrix6<f64> {
+        prop_state.stm.unwrap()
+    }
+
+    fn extract_estimated_state(
+        &self,
+        prop_state: &Self::StateType,
+    ) -> VectorN<f64, Self::LinStateSize> {
+        prop_state.orbit.to_cartesian_vec()
+    }
+
+    /// Returns the estimated state
+    fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>) {
+        self.orbital_dyn.state.x = new_state[0];
+        self.orbital_dyn.state.y = new_state[1];
+        self.orbital_dyn.state.z = new_state[2];
+        self.orbital_dyn.state.vx = new_state[3];
+        self.orbital_dyn.state.vy = new_state[4];
+        self.orbital_dyn.state.vz = new_state[5];
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct SpacecraftState {
     pub orbit: State,
     pub dry_mass: f64,
     pub fuel_mass: f64,
+    pub stm: Option<Matrix6<f64>>,
 }
 
 impl fmt::Display for SpacecraftState {
