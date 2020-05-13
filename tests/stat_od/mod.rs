@@ -4,10 +4,11 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::hifitime::Epoch;
-use self::nyx::od::ui::*;
+use self::nyx::od::ui::{Estimate, Filter, FilterError, KfEstimate, KF};
 
 mod measurements;
 mod multi_body;
+mod spacecraft;
 mod srif;
 mod two_body;
 

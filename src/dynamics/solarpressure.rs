@@ -1,5 +1,8 @@
+use super::hyperdual::{hyperspace_from_vector, linalg::norm, vector_from_hyperspace, Hyperdual};
+use super::AutoDiff;
 use super::ForceModel;
-use crate::dimensions::Vector3;
+use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
+use crate::time::Epoch;
 use celestia::eclipse::{EclipseLocator, EclipseState};
 use celestia::{Cosm, Frame, LTCorr, State, AU, SPEED_OF_LIGHT};
 
@@ -56,5 +59,75 @@ impl<'a> ForceModel for SolarPressure<'a> {
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         -1e-3 * self.cr * self.sc_area * flux_pressure * r_sun_unit
+    }
+}
+
+impl<'a> AutoDiff for SolarPressure<'a> {
+    type HyperStateSize = U7;
+    type STMSize = U3;
+
+    fn dual_eom(
+        &self,
+        dt: Epoch,
+        integr_frame: Frame,
+        radius: &Vector3<Hyperdual<f64, U7>>,
+    ) -> (Vector3<f64>, Matrix3<f64>) {
+        // Extract data from hyperspace
+        let cart_r = vector_from_hyperspace(&radius.fixed_rows::<U3>(0).into_owned());
+        // Recreate the osculating state
+        let osc = State::cartesian(
+            cart_r[0],
+            cart_r[1],
+            cart_r[2],
+            0.0,
+            0.0,
+            0.0,
+            dt,
+            integr_frame,
+        );
+
+        // Compute the position of the Sun as seen from the spacecraft
+        let r_sun = self
+            .e_loc
+            .cosm
+            .frame_chg(&osc, self.e_loc.light_source)
+            .radius();
+
+        let r_sun_d: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&r_sun);
+        let r_sun_unit = r_sun_d / norm(&r_sun_d);
+
+        // Compute the shaddowing factor.
+        let k = match self.e_loc.compute(&osc) {
+            EclipseState::Umbra => 0.0,
+            EclipseState::Visibilis => 1.0,
+            EclipseState::Penumbra(val) => val,
+        };
+
+        let inv_r_sun_au = Hyperdual::<f64, U7>::from_real(1.0) / (norm(&r_sun_d) / AU);
+        let inv_r_sun_au_p2 = inv_r_sun_au * inv_r_sun_au;
+        // in N/(m^2)
+        let flux_pressure =
+            Hyperdual::<f64, U7>::from_real(k * self.phi / SPEED_OF_LIGHT) * inv_r_sun_au_p2;
+
+        // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
+        let dual_force_scalar =
+            Hyperdual::<f64, U7>::from_real(-1e-3 * self.cr * self.sc_area) * flux_pressure;
+        let mut dual_force: Vector3<Hyperdual<f64, U7>> = Vector3::zeros();
+        dual_force[0] = dual_force_scalar * r_sun_unit[0];
+        dual_force[1] = dual_force_scalar * r_sun_unit[1];
+        dual_force[2] = dual_force_scalar * r_sun_unit[2];
+
+        // Extract result into Vector6 and Matrix6
+        let mut fx = Vector3::zeros();
+        let mut grad = Matrix3::zeros();
+        for i in 0..U3::dim() {
+            fx[i] += dual_force[i][0];
+            // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
+            for j in 0..U3::dim() {
+                grad[(i, j)] += dual_force[i][j + 1];
+            }
+        }
+
+        (fx, grad)
     }
 }

@@ -1,6 +1,7 @@
-use super::ForceModel;
-use crate::dimensions::Vector3;
-use celestia::{Cosm, State};
+use super::hyperdual::Hyperdual;
+use super::{AutoDiff, Epoch, ForceModel};
+use crate::dimensions::{Matrix3, Vector3, U3, U7};
+use celestia::{Cosm, Frame, State};
 
 /// `ConstantDrag` implements a constant drag model as defined in Vallado, 4th ed., page 551, with an important caveat.
 ///
@@ -26,6 +27,20 @@ impl<'a> ForceModel for ConstantDrag<'a> {
         let osc = self.cosm.frame_chg_by_id(&osc, self.drag_frame_id);
         let velocity = osc.velocity();
         -0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity
+    }
+}
+
+impl<'a> AutoDiff for ConstantDrag<'a> {
+    type HyperStateSize = U7;
+    type STMSize = U3;
+
+    fn dual_eom(
+        &self,
+        _: Epoch,
+        _: Frame,
+        _: &Vector3<Hyperdual<f64, U7>>,
+    ) -> (Vector3<f64>, Matrix3<f64>) {
+        unimplemented!("drag models not differentiable yet");
     }
 }
 
@@ -60,5 +75,19 @@ impl<'a> ForceModel for ExpEarthDrag<'a> {
 
         let velocity = osc.velocity() - Vector3::new(earth_rot * osc.y, -earth_rot * osc.x, 0.0);
         -0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity
+    }
+}
+
+impl<'a> AutoDiff for ExpEarthDrag<'a> {
+    type HyperStateSize = U7;
+    type STMSize = U3;
+
+    fn dual_eom(
+        &self,
+        _: Epoch,
+        _: Frame,
+        _: &Vector3<Hyperdual<f64, U7>>,
+    ) -> (Vector3<f64>, Matrix3<f64>) {
+        unimplemented!("drag models not differentiable yet");
     }
 }

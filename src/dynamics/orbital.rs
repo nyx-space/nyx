@@ -1,8 +1,9 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
-use super::{AccelModel, AutoDiff, Differentiable, Dynamics};
+use super::{AccelModel, AutoDiff, Dynamics};
 use crate::dimensions::{
-    DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN,
+    U3, U36, U4, U42, U6, U7,
 };
 use crate::time::Epoch;
 use celestia::{Cosm, Frame, LTCorr, State};
@@ -10,6 +11,16 @@ use od::Estimable;
 use std::f64;
 
 pub use super::sph_harmonics::{Harmonics, HarmonicsDiff};
+
+pub trait OrbitalDynamicsT: Dynamics {
+    fn orbital_state(&self) -> State;
+
+    fn stm(&self) -> Option<Matrix6<f64>>;
+
+    fn orbital_state_ctor(&self, rel_time: f64, state_vec: &VectorN<f64, Self::StateSize>) -> State
+    where
+        DefaultAllocator: Allocator<f64, Self::StateSize>;
+}
 
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 pub struct OrbitalDynamics<'a> {
@@ -20,6 +31,24 @@ pub struct OrbitalDynamics<'a> {
     /// Allows us to rebuilt the true epoch
     init_tai_secs: f64,
     pub accel_models: Vec<Box<dyn AccelModel + 'a>>,
+}
+
+impl<'a> OrbitalDynamicsT for OrbitalDynamics<'a> {
+    fn orbital_state(&self) -> State {
+        self.state
+    }
+
+    fn stm(&self) -> Option<Matrix6<f64>> {
+        None
+    }
+
+    fn orbital_state_ctor(
+        &self,
+        rel_time: f64,
+        state_vec: &VectorN<f64, Self::StateSize>,
+    ) -> State {
+        self.state_ctor(rel_time, state_vec)
+    }
 }
 
 impl<'a> OrbitalDynamics<'a> {
@@ -127,6 +156,24 @@ pub struct OrbitalDynamicsStm<'a> {
     pub accel_models: Vec<Box<dyn AutoDiff<STMSize = U3, HyperStateSize = U7> + 'a>>,
 }
 
+impl<'a> OrbitalDynamicsT for OrbitalDynamicsStm<'a> {
+    fn orbital_state(&self) -> State {
+        self.state
+    }
+
+    fn stm(&self) -> Option<Matrix6<f64>> {
+        Some(self.stm)
+    }
+
+    fn orbital_state_ctor(
+        &self,
+        rel_time: f64,
+        state_vec: &VectorN<f64, Self::StateSize>,
+    ) -> State {
+        self.state_ctor(rel_time, state_vec).0
+    }
+}
+
 impl<'a> OrbitalDynamicsStm<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
     pub fn point_masses(state: State, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
@@ -198,23 +245,8 @@ impl<'a> OrbitalDynamicsStm<'a> {
     }
 }
 
-impl<'a> Differentiable for OrbitalDynamicsStm<'a> {
-    type STMSize = U6;
-    fn eom_grad(
-        &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &Vector6<f64>,
-    ) -> (Vector6<f64>, Matrix6<f64>) {
-        let hyperstate = hyperspace_from_vector(&state);
-
-        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
-
-        (state, grad)
-    }
-}
-
 impl<'a> AutoDiff for OrbitalDynamicsStm<'a> {
+    type STMSize = U6;
     type HyperStateSize = U7;
 
     fn dual_eom(
@@ -430,24 +462,9 @@ impl<'a> AccelModel for PointMasses<'a> {
     }
 }
 
-impl<'a> Differentiable for PointMasses<'a> {
-    type STMSize = U3;
-    fn eom_grad(
-        &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &Vector3<f64>,
-    ) -> (Vector3<f64>, Matrix3<f64>) {
-        let hyperstate = hyperspace_from_vector(&state);
-
-        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
-
-        (state, grad)
-    }
-}
-
 impl<'a> AutoDiff for PointMasses<'a> {
     type HyperStateSize = U7;
+    type STMSize = U3;
 
     fn dual_eom(
         &self,

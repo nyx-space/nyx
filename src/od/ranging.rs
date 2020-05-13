@@ -12,6 +12,7 @@ use super::{Measurement, MeasurementDevice};
 use crate::dimensions::{
     DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7,
 };
+use crate::dynamics::spacecraft::SpacecraftState;
 use crate::time::Epoch;
 use celestia::{Cosm, Frame, State};
 use utils::{r2, r3};
@@ -118,10 +119,38 @@ impl<'a> GroundStation<'a> {
         )
     }
 }
-impl<'a> MeasurementDevice<StdMeasurement> for GroundStation<'a> {
-    type MeasurementInput = State;
+impl<'a> MeasurementDevice<StdMeasurement, State> for GroundStation<'a> {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &State) -> Option<StdMeasurement> {
+        use std::f64::consts::PI;
+        // Convert the station to the state's frame
+        let dt = rx.dt;
+        let station_state =
+            State::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
+        let tx = self.cosm.frame_chg(&station_state, rx.frame);
+        // Let's start by computing the range and range rate
+        let rho_ecef = rx.radius() - tx.radius();
+
+        // Convert to SEZ to compute elevation
+        let rho_sez =
+            r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
+        let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
+
+        Some(StdMeasurement::new(
+            dt,
+            tx,
+            *rx,
+            elevation >= self.elevation_mask,
+            &self.range_noise,
+            &self.range_rate_noise,
+        ))
+    }
+}
+
+impl<'a> MeasurementDevice<StdMeasurement, SpacecraftState> for GroundStation<'a> {
+    /// Perform a measurement from the ground station to the receiver (rx).
+    fn measure(&self, sc_rx: &SpacecraftState) -> Option<StdMeasurement> {
+        let rx = &sc_rx.orbit;
         match rx.frame {
             Frame::Geoid { .. } => {
                 use std::f64::consts::PI;
@@ -160,6 +189,7 @@ impl<'a> MeasurementDevice<StdMeasurement> for GroundStation<'a> {
         }
     }
 }
+
 /*
 /// Computes the (approximate) Greenwich Apparent Sideral Time as per IAU2000.
 ///

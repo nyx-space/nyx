@@ -1110,7 +1110,7 @@ prop.event_trackers = tracker;
 prop.until_time_elapsed(prop_time);
 
 println!("{}", prop.event_trackers);
-let final_state = prop.dynamics.celestial.state();
+let final_state = prop.dynamics.orbital_dyn.state();
 let fuel_usage = fuel_mass - sc.fuel_mass;
 println!("{:o}", final_state);
 println!("fuel usage: {:.3} kg", fuel_usage);
