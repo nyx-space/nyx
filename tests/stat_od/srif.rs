@@ -124,9 +124,9 @@ fn srif_fixed_step_perfect_stations() {
             no
         );
         assert!(
-            est.state().norm() < 1e-6,
+            est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
-            est.state().norm()
+            est.state_deviation().norm()
         );
 
         let res = &odp.residuals[no];
@@ -278,9 +278,9 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
             println!("{}", est);
         }
         assert!(
-            est.state().norm() < 1e-6,
+            est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
-            est.state().norm()
+            est.state_deviation().norm()
         );
 
         // for i in 0..6 {

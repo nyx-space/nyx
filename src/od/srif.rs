@@ -4,19 +4,19 @@ use self::na::linalg::QR;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::dimension::{DimMin, DimMinimum, DimNameAdd, DimNameSum};
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
-use crate::hifitime::Epoch;
 
 pub use super::estimate::{Estimate, IfEstimate};
 pub use super::residual::Residual;
-use super::{CovarFormat, EpochFormat, Filter, FilterError};
+use super::{CovarFormat, EpochFormat, EstimableState, Filter, FilterError};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
-pub struct SRIF<S, A, M>
+pub struct SRIF<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
+    T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -24,7 +24,7 @@ where
         + Allocator<f64, A, A>,
 {
     /// The previous estimate used in the KF computations.
-    pub prev_estimate: IfEstimate<S>,
+    pub prev_estimate: IfEstimate<S, T>,
     /// Sets the Measurement noise (usually noted R)
     pub inv_measurement_noise: MatrixMN<f64, M, M>,
     /// Sets the process noise (usually noted Q) in the frame of the estimated state
@@ -42,11 +42,12 @@ where
     covar_fmt: CovarFormat, // Idem
 }
 
-impl<S, A, M> SRIF<S, A, M>
+impl<S, A, M, T> SRIF<S, A, M, T>
 where
     S: DimName + DimNameAdd<M> + DimMin<M>,
     A: DimName,
     M: DimName + DimNameAdd<S>,
+    T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -56,7 +57,7 @@ where
 {
     /// Initializes this KF with an initial estimate and measurement noise.
     pub fn initialize(
-        initial_estimate: IfEstimate<S>,
+        initial_estimate: IfEstimate<S, T>,
         process_noise: MatrixMN<f64, A, A>,
         measurement_noise: MatrixMN<f64, M, M>,
         process_noise_dt: Option<f64>,
@@ -84,12 +85,13 @@ where
     }
 }
 
-impl<S, A, M> Filter<S, A, M> for SRIF<S, A, M>
+impl<S, A, M, T> Filter<S, A, M, T> for SRIF<S, A, M, T>
 where
     S: DimName + DimNameAdd<M> + DimNameAdd<S> + DimNameAdd<U1> + DimMin<U1>,
     A: DimName,
     M: DimName + DimNameAdd<S> + DimNameAdd<M> + DimNameAdd<U1>,
     DimNameSum<S, M>: DimMin<DimNameSum<S, U1>>,
+    T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -107,7 +109,7 @@ where
         + Allocator<f64, A, S>
         + Allocator<f64, S, U1>,
 {
-    type Estimate = IfEstimate<S>;
+    type Estimate = IfEstimate<S, T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {
@@ -131,7 +133,7 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    fn time_update(&mut self, dt: Epoch) -> Result<Self::Estimate, FilterError> {
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
@@ -147,13 +149,13 @@ where
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
         } else {
-            &self.stm * &self.prev_estimate.state()
+            &self.stm * &self.prev_estimate.state_deviation()
         };
 
         let b_bar = &r_bar * &state_bar;
 
         let estimate = IfEstimate {
-            dt,
+            nominal_state,
             info_state: b_bar,
             info_mat: r_bar,
             stm: self.stm.clone(),
@@ -172,7 +174,7 @@ where
     /// May return a FilterError if the STM or sensitivity matrices were not updated.
     fn measurement_update(
         &mut self,
-        dt: Epoch,
+        nominal_state: T,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
     ) -> Result<(Self::Estimate, Residual<M>), FilterError> {
@@ -191,7 +193,7 @@ where
 
         let mut r_bar = (&self.prev_estimate.info_mat * &stm_inv).abs();
         if let Some(pcr_dt) = self.process_noise_dt {
-            let delta_t = dt - self.prev_estimate.dt;
+            let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
 
             if delta_t <= pcr_dt {
                 // Let's compute the Gamma matrix, an approximation of the time integral
@@ -214,7 +216,7 @@ where
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
         } else {
-            &self.stm * &self.prev_estimate.state()
+            &self.stm * &self.prev_estimate.state_deviation()
         };
 
         let b_bar = &r_bar * &state_bar;
@@ -258,8 +260,9 @@ where
         let postfit = &prefit - (&self.h_tilde * &state_bar);
 
         // And wrap up
+        let res = Residual::new(nominal_state.epoch(), prefit, postfit);
         let estimate = IfEstimate {
-            dt,
+            nominal_state,
             info_state,
             info_mat: rk,
             stm: self.stm.clone(),
@@ -267,7 +270,6 @@ where
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
-        let res = Residual::new(dt, prefit, postfit);
         self.stm_updated = false;
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();

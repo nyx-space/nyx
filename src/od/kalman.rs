@@ -1,18 +1,18 @@
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
-use crate::hifitime::Epoch;
 
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
-use super::{CovarFormat, EpochFormat, Filter, FilterError};
+use super::{CovarFormat, EpochFormat, EstimableState, Filter, FilterError};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
-pub struct KF<S, A, M>
+pub struct KF<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
+    T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -23,7 +23,7 @@ where
         + Allocator<f64, A, S>,
 {
     /// The previous estimate used in the KF computations.
-    pub prev_estimate: KfEstimate<S>,
+    pub prev_estimate: KfEstimate<S, T>,
     /// Sets the Measurement noise (usually noted R)
     pub measurement_noise: MatrixMN<f64, M, M>,
     /// Sets the process noise (usually noted Q) in the frame of the estimated state
@@ -41,11 +41,12 @@ where
     covar_fmt: CovarFormat, // Idem
 }
 
-impl<S, A, M> KF<S, A, M>
+impl<S, A, M, T> KF<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
+    T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -58,7 +59,7 @@ where
 {
     /// Initializes this KF with an initial estimate and measurement noise.
     pub fn initialize(
-        initial_estimate: KfEstimate<S>,
+        initial_estimate: KfEstimate<S, T>,
         process_noise: MatrixMN<f64, A, A>,
         measurement_noise: MatrixMN<f64, M, M>,
         process_noise_dt: Option<f64>,
@@ -81,7 +82,10 @@ where
     }
 
     /// Initializes this KF without SNC
-    pub fn no_snc(initial_estimate: KfEstimate<S>, measurement_noise: MatrixMN<f64, M, M>) -> Self {
+    pub fn no_snc(
+        initial_estimate: KfEstimate<S, T>,
+        measurement_noise: MatrixMN<f64, M, M>,
+    ) -> Self {
         let epoch_fmt = initial_estimate.epoch_fmt;
         let covar_fmt = initial_estimate.covar_fmt;
         Self {
@@ -100,11 +104,12 @@ where
     }
 }
 
-impl<S, A, M> Filter<S, A, M> for KF<S, A, M>
+impl<S, A, M, T> Filter<S, A, M, T> for KF<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
+    T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -115,7 +120,7 @@ where
         + Allocator<f64, S, A>
         + Allocator<f64, A, S>,
 {
-    type Estimate = KfEstimate<S>;
+    type Estimate = KfEstimate<S, T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {
@@ -139,7 +144,7 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    fn time_update(&mut self, dt: Epoch) -> Result<Self::Estimate, FilterError> {
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, FilterError> {
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
@@ -149,11 +154,11 @@ where
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
         } else {
-            &self.stm * &self.prev_estimate.state
+            &self.stm * &self.prev_estimate.state_deviation
         };
         let estimate = KfEstimate {
-            dt,
-            state: state_bar,
+            nominal_state,
+            state_deviation: state_bar,
             covar: covar_bar,
             stm: self.stm.clone(),
             predicted: true,
@@ -170,7 +175,7 @@ where
     /// May return a FilterError if the STM or sensitivity matrices were not updated.
     fn measurement_update(
         &mut self,
-        dt: Epoch,
+        nominal_state: T,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
     ) -> Result<(Self::Estimate, Residual<M>), FilterError> {
@@ -183,7 +188,7 @@ where
         // Compute Kalman gain (note the `abs()` is to prevent rounding issues with small numbers)
         let mut covar_bar = (&self.stm * &self.prev_estimate.covar * &self.stm.transpose()).abs();
         if let Some(pcr_dt) = self.process_noise_dt {
-            let delta_t = dt - self.prev_estimate.dt;
+            let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
 
             if delta_t <= pcr_dt {
                 // Let's compute the Gamma matrix, an approximation of the time integral
@@ -215,11 +220,11 @@ where
             (&gain * prefit, Residual::zeros())
         } else {
             // Must do a time update first
-            let state_bar = &self.stm * &self.prev_estimate.state;
+            let state_bar = &self.stm * &self.prev_estimate.state_deviation;
             let postfit = &prefit - (&self.h_tilde * &state_bar);
             (
                 state_bar + &gain * &postfit,
-                Residual::new(dt, prefit, postfit),
+                Residual::new(nominal_state.epoch(), prefit, postfit),
             )
         };
 
@@ -231,8 +236,8 @@ where
 
         // And wrap up
         let estimate = KfEstimate {
-            dt,
-            state: state_hat,
+            nominal_state,
+            state_deviation: state_hat,
             covar,
             stm: self.stm.clone(),
             predicted: false,

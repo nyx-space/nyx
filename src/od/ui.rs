@@ -22,13 +22,14 @@ pub struct ODProcess<
     N: MeasurementDevice<Msr, MsrIn>,
     T: EkfTrigger,
     A: DimName,
-    K: Filter<D::LinStateSize, A, Msr::MeasurementSize>,
+    K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
     MsrIn,
 > where
+    D::StateType: EstimableState<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, D::LinStateSize>
+        + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
@@ -61,14 +62,15 @@ impl<
         N: MeasurementDevice<Msr, MsrIn>,
         T: EkfTrigger,
         A: DimName,
-        K: Filter<D::LinStateSize, A, Msr::MeasurementSize>,
+        K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
         MsrIn,
     > ODProcess<'a, D, E, Msr, N, T, A, K, MsrIn>
 where
+    D::StateType: EstimableState<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, D::LinStateSize>
+        + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
@@ -131,7 +133,7 @@ where
                 return Some(FilterError::StateTransitionMatrixSingular);
             }
             sm_est.set_covar(&stm_inv * estimate.covar() * &stm_inv.transpose());
-            sm_est.set_state(&stm_inv * estimate.state());
+            sm_est.set_state(&stm_inv * estimate.state_deviation());
             smoothed.push(sm_est);
         }
 
@@ -147,7 +149,7 @@ where
     pub fn process_measurements(&mut self, measurements: &[(Epoch, Msr)]) -> Option<FilterError> {
         info!("Processing {} measurements", measurements.len());
 
-        let mut prev_dt = self.kf.previous_estimate().dt();
+        let mut prev_dt = self.kf.previous_estimate().epoch();
         let mut reported = vec![false; 11];
         let num_msrs = measurements.len();
 
@@ -158,14 +160,15 @@ where
             self.prop.until_time_elapsed(delta_time);
             // Update the STM of the KF
             self.kf.update_stm(self.prop.dynamics.stm());
-            let (dt, meas_input) = self.prop.dynamics.to_measurement(&self.prop.state());
+            let nominal_state = self.prop.state();
+            let (_, meas_input) = self.prop.dynamics.to_measurement(&nominal_state);
             // Get the computed observations
             for device in self.devices.iter() {
                 if let Some(computed_meas) = device.measure(&meas_input) {
                     if computed_meas.visible() {
                         self.kf.update_h_tilde(computed_meas.sensitivity());
                         match self.kf.measurement_update(
-                            dt,
+                            nominal_state,
                             real_meas.observation(),
                             computed_meas.observation(),
                         ) {
@@ -177,7 +180,8 @@ where
                                 }
                                 if self.kf.is_extended() {
                                     self.prop.dynamics.set_estimated_state(
-                                        self.prop.dynamics.estimated_state() + est.state(),
+                                        self.prop.dynamics.estimated_state()
+                                            + est.state_deviation(),
                                     );
                                 }
                                 self.estimates.push(est);
@@ -228,7 +232,7 @@ where
         );
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
-        let prop_time = measurements[num_msrs - 1].0 - self.kf.previous_estimate().dt();
+        let prop_time = measurements[num_msrs - 1].0 - self.kf.previous_estimate().epoch();
         info!(
             "Propagating for {} seconds (~ {:.3} days)",
             prop_time,
@@ -265,11 +269,12 @@ where
                         // No measurement can be used here, let's just do a time update (unless we have already done a time update)
                         if num_msr_processed == 0 {
                             debug!("time update {:?}", dt);
-                            match self.kf.time_update(dt) {
+                            match self.kf.time_update(prop_state) {
                                 Ok(est) => {
                                     if self.kf.is_extended() {
                                         self.prop.dynamics.set_estimated_state(
-                                            self.prop.dynamics.estimated_state() + est.state(),
+                                            self.prop.dynamics.estimated_state()
+                                                + est.state_deviation(),
                                         );
                                     }
                                     self.estimates.push(est);
@@ -286,7 +291,7 @@ where
                                 if computed_meas.visible() {
                                     self.kf.update_h_tilde(computed_meas.sensitivity());
                                     match self.kf.measurement_update(
-                                        dt,
+                                        prop_state,
                                         real_meas.observation(),
                                         computed_meas.observation(),
                                     ) {
@@ -308,7 +313,7 @@ where
                                                     self.prop
                                                         .dynamics
                                                         .extract_estimated_state(&prop_state)
-                                                        + est.state(),
+                                                        + est.state_deviation(),
                                                 );
                                             }
                                             self.estimates.push(est);
@@ -338,12 +343,12 @@ where
                 } else {
                     // No more measurements, we can only do a time update
                     debug!("final time update {:?}", dt);
-                    match self.kf.time_update(dt) {
+                    match self.kf.time_update(prop_state) {
                         Ok(est) => {
                             if self.kf.is_extended() {
                                 self.prop.dynamics.set_estimated_state(
                                     self.prop.dynamics.extract_estimated_state(&prop_state)
-                                        + est.state(),
+                                        + est.state_deviation(),
                                 );
                             }
                             self.estimates.push(est);
@@ -374,24 +379,21 @@ where
         end_epoch: Epoch,
     ) -> Option<FilterError> {
         // Start by propagating the estimator (on the same thread).
-        let prop_time = end_epoch - self.kf.previous_estimate().dt();
+        let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Propagating for {} seconds", prop_time);
 
         self.prop.until_time_elapsed(prop_time);
         info!("Mapping covariance");
 
         while let Ok(prop_state) = prop_rx.try_recv() {
-            // Get the datetime
-            let (dt, _) = self.prop.dynamics.to_measurement(&prop_state);
-
             // Update the STM of the KF (needed between each measurement or time update)
             let stm = self.prop.dynamics.extract_stm(&prop_state);
             self.kf.update_stm(stm);
-            info!("final time update {:?}", dt);
-            match self.kf.time_update(dt) {
+            info!("final time update {:?}", prop_state.epoch());
+            match self.kf.time_update(prop_state) {
                 Ok(est) => {
                     if self.kf.is_extended() {
-                        let est_state = est.state().clone();
+                        let est_state = est.state_deviation().clone();
                         self.prop.dynamics.set_estimated_state(
                             self.prop.dynamics.extract_estimated_state(&prop_state) + est_state,
                         );
@@ -413,14 +415,15 @@ impl<
         M: Measurement,
         N: MeasurementDevice<M, MsrIn>,
         A: DimName,
-        K: Filter<D::LinStateSize, A, M::MeasurementSize>,
+        K: Filter<D::LinStateSize, A, M::MeasurementSize, D::StateType>,
         MsrIn,
     > ODProcess<'a, D, E, M, N, CkfTrigger, A, K, MsrIn>
 where
+    D::StateType: EstimableState<M::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, M::MeasurementSize>
         + Allocator<f64, M::MeasurementSize, M::StateSize>
-        + Allocator<f64, D::LinStateSize>
+        + Allocator<f64, M::StateSize>
         + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
         + Allocator<f64, M::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, M::MeasurementSize>
@@ -467,10 +470,10 @@ where
 }
 /// A trait detailing when to switch to from a CKF to an EKF
 pub trait EkfTrigger {
-    fn enable_ekf<S, E>(&mut self, est: &E) -> bool
+    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, est: &E) -> bool
     where
         S: DimName,
-        E: Estimate<S>,
+        E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
 }
 
@@ -478,10 +481,10 @@ pub trait EkfTrigger {
 pub struct CkfTrigger;
 
 impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<S, E>(&mut self, _est: &E) -> bool
+    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, _est: &E) -> bool
     where
         S: DimName,
-        E: Estimate<S>,
+        E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
         false
@@ -504,10 +507,10 @@ impl NumMsrEkfTrigger {
 }
 
 impl EkfTrigger for NumMsrEkfTrigger {
-    fn enable_ekf<S, E>(&mut self, _est: &E) -> bool
+    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, _est: &E) -> bool
     where
         S: DimName,
-        E: Estimate<S>,
+        E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
         self.cur_msrs += 1;
