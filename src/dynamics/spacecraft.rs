@@ -3,11 +3,14 @@ use super::propulsion::Propulsion;
 use super::{Dynamics, ForceModel};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::dimension::{DimNameAdd, DimNameSum};
-use crate::dimensions::{DefaultAllocator, DimName, Matrix6, Vector1, VectorN, U1, U6};
+use crate::dimensions::{DefaultAllocator, DimName, Matrix6, Vector1, Vector6, VectorN, U1, U6};
 use crate::od::Estimable;
 use crate::time::Epoch;
-use celestia::State;
+use celestia::{State, TimeTagged};
+use od::EstimableState;
+use std::cmp::PartialEq;
 use std::fmt;
+use std::ops::Add;
 
 pub use super::solarpressure::SolarPressure;
 
@@ -209,8 +212,62 @@ pub struct SpacecraftState {
     pub stm: Option<Matrix6<f64>>,
 }
 
+impl SpacecraftState {
+    pub fn zeros() -> Self {
+        Self {
+            orbit: State::zeros(),
+            dry_mass: 0.0,
+            fuel_mass: 0.0,
+            stm: None,
+        }
+    }
+}
+
+impl PartialEq for SpacecraftState {
+    fn eq(&self, other: &SpacecraftState) -> bool {
+        let mass_tol = 1e-6; // milligram
+        self.orbit == other.orbit
+            && (self.dry_mass - other.dry_mass).abs() < mass_tol
+            && (self.fuel_mass - other.fuel_mass).abs() < mass_tol
+    }
+}
+
 impl fmt::Display for SpacecraftState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:o}\t{} kg", self.orbit, self.dry_mass + self.fuel_mass)
+    }
+}
+
+impl fmt::LowerExp for SpacecraftState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:o}\t{:e} kg",
+            self.orbit,
+            self.dry_mass + self.fuel_mass
+        )
+    }
+}
+
+impl TimeTagged for SpacecraftState {
+    fn epoch(&self) -> Epoch {
+        self.orbit.dt
+    }
+
+    fn set_epoch(&mut self, epoch: Epoch) {
+        self.orbit.dt = epoch
+    }
+}
+
+impl EstimableState<U6> for SpacecraftState {}
+
+impl Add<Vector6<f64>> for SpacecraftState {
+    type Output = SpacecraftState;
+
+    fn add(self, other: Vector6<f64>) -> Self::Output {
+        let mut me = self;
+        me.orbit = me.orbit + other;
+
+        me
     }
 }

@@ -85,6 +85,49 @@ where
     }
 }
 
+impl<S, M, T> SRIF<S, U1, M, T>
+where
+    S: DimName,
+    M: DimName,
+    T: EstimableState<S>,
+    DefaultAllocator: Allocator<f64, M>
+        + Allocator<f64, S>
+        + Allocator<f64, M, M>
+        + Allocator<f64, M, S>
+        + Allocator<f64, S, M>
+        + Allocator<f64, S, S>
+        + Allocator<f64, U1, U1>
+        + Allocator<f64, S, U1>
+        + Allocator<f64, U1, S>,
+{
+    /// Initializes this KF without SNC
+    pub fn no_snc(
+        initial_estimate: IfEstimate<S, T>,
+        measurement_noise: MatrixMN<f64, M, M>,
+    ) -> Self {
+        let inv_measurement_noise = measurement_noise
+            .try_inverse()
+            .expect("measurement noise singular");
+
+        let epoch_fmt = initial_estimate.epoch_fmt;
+        let covar_fmt = initial_estimate.covar_fmt;
+
+        Self {
+            prev_estimate: initial_estimate,
+            inv_measurement_noise,
+            process_noise: None,
+            process_noise_dt: None,
+            ekf: false,
+            h_tilde: MatrixMN::<f64, M, S>::zeros(),
+            stm: MatrixMN::<f64, S, S>::identity(),
+            stm_updated: false,
+            h_tilde_updated: false,
+            epoch_fmt,
+            covar_fmt,
+        }
+    }
+}
+
 impl<S, A, M, T> Filter<S, A, M, T> for SRIF<S, A, M, T>
 where
     S: DimName + DimNameAdd<M> + DimNameAdd<S> + DimNameAdd<U1> + DimMin<U1>,

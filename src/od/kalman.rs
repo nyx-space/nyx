@@ -1,5 +1,5 @@
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
 
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
@@ -80,7 +80,23 @@ where
             covar_fmt,
         }
     }
+}
 
+impl<S, M, T> KF<S, U1, M, T>
+where
+    S: DimName,
+    M: DimName,
+    T: EstimableState<S>,
+    DefaultAllocator: Allocator<f64, M>
+        + Allocator<f64, S>
+        + Allocator<f64, M, M>
+        + Allocator<f64, M, S>
+        + Allocator<f64, S, M>
+        + Allocator<f64, S, S>
+        + Allocator<f64, U1, U1>
+        + Allocator<f64, S, U1>
+        + Allocator<f64, U1, S>,
+{
     /// Initializes this KF without SNC
     pub fn no_snc(
         initial_estimate: KfEstimate<S, T>,

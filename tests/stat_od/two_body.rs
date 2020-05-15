@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U3};
+use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6};
 use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
@@ -89,7 +89,7 @@ fn ekf_fixed_step_perfect_stations() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -100,12 +100,7 @@ fn ekf_fixed_step_perfect_stations() {
     // But we disable the state noise compensation / process noise by setting the delta time to None
     let process_noise_dt = None;
 
-    let mut kf = KF::initialize(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        process_noise_dt,
-    );
+    let mut kf = KF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::ekf(
         &mut prop_est,
@@ -215,23 +210,12 @@ fn ckf_fixed_step_perfect_stations() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    // Define the process noise in order to define how many variables of the EOMs are accelerations
-    // (this is required due to the many compile-time matrix size verifications)
-    let process_noise = Matrix3::zeros();
-    // But we disable the state noise compensation / process noise by setting the delta time to None
-    let process_noise_dt = None;
-
-    let mut ckf = KF::initialize(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        process_noise_dt,
-    );
+    let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::ckf(
         &mut prop_est,
@@ -313,12 +297,7 @@ fn ckf_fixed_step_perfect_stations() {
     // Get the propagator to catch up to the first estimate
     prop_est.until_time_elapsed(init_smoothed.dt - initial_state.dt);
 
-    let mut ckf = KF::initialize(
-        init_smoothed,
-        process_noise,
-        measurement_noise,
-        process_noise_dt,
-    );
+    let mut ckf = KF::no_snc(init_smoothed, measurement_noise);
 
     let mut odp2 = ODProcess::ckf(
         &mut prop_est,
@@ -415,7 +394,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -452,7 +431,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
             println!("{}", est);
         }
         assert!(
-            est.state.norm() < 1e-6,
+            est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state.norm()
         );
@@ -530,10 +509,10 @@ fn ckf_map_covar() {
         covar_velocity,
     ));
 
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-    let mut ckf = KF::<_, U3, _>::no_snc(initial_estimate, measurement_noise);
+    let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::default_ckf(&mut prop_est, &mut ckf, &all_stations);
 
@@ -651,20 +630,12 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    let process_noise = Matrix3::zeros();
-    let process_noise_dt = None;
-
-    let mut ckf = KF::initialize(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        process_noise_dt,
-    );
+    let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::ckf(
         &mut prop_est,

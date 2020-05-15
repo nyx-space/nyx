@@ -88,7 +88,7 @@ fn multi_body_ckf_perfect_stations() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -133,7 +133,7 @@ fn multi_body_ckf_perfect_stations() {
             }
         }
         assert!(
-            est.state.norm() < 1e-6,
+            est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state.norm()
         );
@@ -157,7 +157,7 @@ fn multi_body_ckf_perfect_stations() {
     // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
     // The filter in multibody dynamics has been validated against JPL tools using a proprietary scenario.
     let est = last_est.unwrap();
-    assert!(est.state.norm() < 1e-8);
+    assert!(est.state_deviation().norm() < 1e-8);
     assert!(est.covar.norm() < 1e-5);
 }
 
@@ -240,7 +240,7 @@ fn multi_body_ckf_covar_map() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -279,7 +279,7 @@ fn multi_body_ckf_covar_map() {
         } else {
             // Only check that the covariance is low IF this isn't a predicted estimate
             assert!(
-                est.state.norm() < 1e-6,
+                est.state_deviation().norm() < 1e-6,
                 "estimate error should be zero (perfect dynamics) ({:e})",
                 est.state.norm()
             );
@@ -311,6 +311,6 @@ fn multi_body_ckf_covar_map() {
     wtr.serialize(est.clone())
         .expect("could not write to stdout");
 
-    assert!(est.state.norm() < 1e-8);
+    assert!(est.state_deviation().norm() < 1e-8);
     assert!(est.covar.norm() < 1e-4);
 }
