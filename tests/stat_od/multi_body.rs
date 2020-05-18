@@ -128,7 +128,12 @@ fn multi_body_ckf_perfect_stations() {
             no
         );
         for i in 0..6 {
-            assert!(est.covar[(i, i)] >= 0.0, "covar diagonal element negative @ [{}, {}]", i, i);
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
         }
         assert!(
             est.state.norm() < 1e-6,
@@ -283,7 +288,12 @@ fn multi_body_ckf_covar_map() {
             );
         }
         for i in 0..6 {
-            assert!(est.covar[(i, i)] >= 0.0, "covar diagonal element negative @ [{}, {}]", i, i);
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
         }
         last_est = Some(est);
     }

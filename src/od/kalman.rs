@@ -143,8 +143,8 @@ where
         if !self.stm_updated {
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
-        // Note the `abs()` is to prevent rounding issues with small numbers
-        let covar_bar = (&self.stm * &self.prev_estimate.covar * &self.stm.transpose());//.abs();
+
+        let covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
 
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
@@ -180,7 +180,7 @@ where
         if !self.h_tilde_updated {
             return Err(FilterError::SensitivityNotUpdated);
         }
-        // Compute Kalman gain (note the `abs()` is to prevent rounding issues with small numbers)
+
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         if let Some(pcr_dt) = self.process_noise_dt {
             let delta_t = dt - self.prev_estimate.dt;
