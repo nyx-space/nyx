@@ -9,6 +9,7 @@ use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 use na::{Matrix6, Vector6, U3};
 use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
+use nyx::od::Estimable;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
 use nyx::utils::rss_state_errors;
@@ -672,7 +673,7 @@ fn two_body_dual() {
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_state = prop.dynamics.state.to_cartesian_vec();
-    let final_stm = prop.dynamics.stm;
+    let final_stm = prop.dynamics.stm();
     let final_step = prop.latest_details().step;
     prop.until_time_elapsed(-final_step);
 
@@ -713,7 +714,7 @@ fn multi_body_dynamics_dual() {
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_state = prop.dynamics.state.to_cartesian_vec();
-    let final_stm = prop.dynamics.stm;
+    let final_stm = prop.dynamics.state.stm();
     let final_step = prop.latest_details().step;
     prop.until_time_elapsed(-final_step);
 
@@ -945,10 +946,10 @@ fn earth_sph_harmonics_70x70_partials() {
 
     println!(
         "Error: {:3.12}",
-        prop.state().0.to_cartesian_vec() - rslt_gmat
+        prop.state().to_cartesian_vec() - rslt_gmat
     );
 
-    let (err_r, err_v) = rss_state_errors(&prop.state().0.to_cartesian_vec(), &rslt_gmat);
+    let (err_r, err_v) = rss_state_errors(&prop.state().to_cartesian_vec(), &rslt_gmat);
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(

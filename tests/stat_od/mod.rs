@@ -51,7 +51,6 @@ fn filter_errors() {
     let computed_obs = Vector2::zeros();
     let sensitivity = Matrix2x6::zeros();
     let stm = Matrix6::zeros();
-    let dt = Epoch::from_tai_seconds(0.0);
 
     let mut ckf = KF::initialize(initial_estimate, process_noise, measurement_noise, None);
     match ckf.time_update(State::zeros()) {

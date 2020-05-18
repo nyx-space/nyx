@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector6};
+use self::na::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::od::ui::*;
@@ -90,12 +90,6 @@ fn srif_fixed_step_perfect_stations() {
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
-
-    // Define the process noise in order to define how many variables of the EOMs are accelerations
-    // (this is required due to the many compile-time matrix size verifications)
-    let process_noise = Matrix3::zeros();
-    // But we disable the state noise compensation / process noise by setting the delta time to None
-    let process_noise_dt = None;
 
     let mut ckf = SRIF::no_snc(initial_estimate, measurement_noise);
 
@@ -242,7 +236,7 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
-    let sigma_q = 1e-8_f64.powi(2);
+    // let sigma_q = 1e-8_f64.powi(2);
     /*
     TODO: Reenable SNC here in issue 120
 

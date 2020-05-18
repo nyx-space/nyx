@@ -4,7 +4,7 @@ extern crate serde;
 use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
-use super::na::{Matrix3, Vector3, Vector6, U6};
+use super::na::{Matrix3, Matrix6, Vector3, Vector6, U6};
 use super::{Frame, TimeTagged};
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
@@ -45,6 +45,8 @@ pub struct State {
     pub dt: Epoch,
     /// Frame contains everything we need to compute state information
     pub frame: Frame,
+    /// Optionally stores an STM
+    pub stm: Option<Matrix6<f64>>,
 }
 
 impl State {
@@ -70,6 +72,7 @@ impl State {
             vz,
             dt,
             frame,
+            stm: None,
         }
     }
 
@@ -86,6 +89,7 @@ impl State {
             vz: 0.0,
             dt,
             frame,
+            stm: None,
         }
     }
 
@@ -103,6 +107,7 @@ impl State {
             vz: state[(5, 0)],
             dt,
             frame,
+            stm: None,
         }
     }
 
@@ -290,6 +295,7 @@ impl State {
                     vz,
                     dt,
                     frame,
+                    stm: None,
                 }
             }
             _ => panic!("Frame is not Celestial or Geoid in kind"),
@@ -758,7 +764,7 @@ impl State {
         self.vz = new_v[2];
     }
 
-    /// Returns a state whose position, velocity and frame are zero
+    /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
     pub fn zeros() -> Self {
         let frame = Frame::Celestial {
             axb_id: 0,
@@ -768,16 +774,27 @@ impl State {
             parent_exb_id: None,
         };
 
-        State::cartesian(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            Epoch::from_tai_seconds(0.0),
+        Self {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            vx: 0.0,
+            vy: 0.0,
+            vz: 0.0,
+            dt: Epoch::from_tai_seconds(0.0),
             frame,
-        )
+            stm: Some(Matrix6::identity()),
+        }
+    }
+
+    /// Sets the STM of this state of identity
+    pub fn stm_identity(&mut self) {
+        self.stm = Some(Matrix6::identity());
+    }
+
+    /// Unwraps this STM, or panics if unset.
+    pub fn stm(&self) -> Matrix6<f64> {
+        self.stm.unwrap()
     }
 }
 
@@ -828,7 +845,7 @@ impl PartialEq for State {
 impl Add for State {
     type Output = State;
 
-    /// Add one state from another. Frame must be manually changed if needed.
+    /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
     fn add(self, other: State) -> State {
         State {
             x: self.x + other.x,
@@ -839,6 +856,7 @@ impl Add for State {
             vz: self.vz + other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -846,7 +864,7 @@ impl Add for State {
 impl Sub for State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied from &self.
     fn sub(self, other: State) -> State {
         State {
             x: self.x - other.x,
@@ -857,6 +875,7 @@ impl Sub for State {
             vz: self.vz - other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -864,7 +883,7 @@ impl Sub for State {
 impl Neg for State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied from &self.
     fn neg(self) -> Self::Output {
         State {
             x: -self.x,
@@ -875,6 +894,7 @@ impl Neg for State {
             vz: -self.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -882,7 +902,7 @@ impl Neg for State {
 impl Add for &State {
     type Output = State;
 
-    /// Add one state from another. Frame must be manually changed if needed.
+    /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
     fn add(self, other: &State) -> State {
         State {
             x: self.x + other.x,
@@ -893,6 +913,7 @@ impl Add for &State {
             vz: self.vz + other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -900,7 +921,7 @@ impl Add for &State {
 impl Sub for &State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied from &self.
     fn sub(self, other: &State) -> State {
         State {
             x: self.x - other.x,
@@ -911,6 +932,7 @@ impl Sub for &State {
             vz: self.vz - other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -918,7 +940,7 @@ impl Sub for &State {
 impl Neg for &State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied form &self.
     fn neg(self) -> Self::Output {
         State {
             x: -self.x,
@@ -929,6 +951,7 @@ impl Neg for &State {
             vz: -self.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }

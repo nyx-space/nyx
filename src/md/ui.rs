@@ -290,9 +290,9 @@ where
             );
 
             while let Ok(prop_state) = rx.try_recv() {
-                self.output.push(prop_state.0);
+                self.output.push(prop_state);
                 if let Some(wtr) = &mut maybe_wtr {
-                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state.0))
+                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state))
                         .expect("could not format state");
                 }
             }

@@ -135,7 +135,7 @@ fn multi_body_ckf_perfect_stations() {
         assert!(
             est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
-            est.state.norm()
+            est.state_deviation().norm()
         );
 
         let res = &odp.residuals[no];
@@ -221,10 +221,7 @@ fn multi_body_ckf_covar_map() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
 
-    let (pest_tx, pest_rx): (
-        Sender<(State, Matrix6<f64>)>,
-        Receiver<(State, Matrix6<f64>)>,
-    ) = mpsc::channel();
+    let (pest_tx, pest_rx) = mpsc::channel();
 
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     prop_est.tx_chan = Some(&pest_tx);
@@ -281,7 +278,7 @@ fn multi_body_ckf_covar_map() {
             assert!(
                 est.state_deviation().norm() < 1e-6,
                 "estimate error should be zero (perfect dynamics) ({:e})",
-                est.state.norm()
+                est.state_deviation().norm()
             );
         }
         for i in 0..6 {
