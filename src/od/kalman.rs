@@ -144,7 +144,7 @@ where
             return Err(FilterError::StateTransitionMatrixNotUpdated);
         }
         // Note the `abs()` is to prevent rounding issues with small numbers
-        let covar_bar = (&self.stm * &self.prev_estimate.covar * &self.stm.transpose()).abs();
+        let covar_bar = (&self.stm * &self.prev_estimate.covar * &self.stm.transpose());//.abs();
 
         let state_bar = if self.ekf {
             VectorN::<f64, S>::zeros()
@@ -181,7 +181,7 @@ where
             return Err(FilterError::SensitivityNotUpdated);
         }
         // Compute Kalman gain (note the `abs()` is to prevent rounding issues with small numbers)
-        let mut covar_bar = (&self.stm * &self.prev_estimate.covar * &self.stm.transpose()).abs();
+        let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         if let Some(pcr_dt) = self.process_noise_dt {
             let delta_t = dt - self.prev_estimate.dt;
 
@@ -194,9 +194,8 @@ where
                     gamma[(i + A::dim(), i)] = delta_t;
                 }
                 // Let's add the process noise
-                covar_bar += (delta_t.powi(2)
-                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose()))
-                    .abs();
+                covar_bar += delta_t.powi(2)
+                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose());
             }
         }
 
@@ -225,9 +224,8 @@ where
 
         // Compute covariance (Joseph update)
         let first_term = MatrixMN::<f64, S, S>::identity() - &gain * &self.h_tilde;
-        let covar = (&first_term * covar_bar * &first_term.transpose()
-            + &gain * &self.measurement_noise * &gain.transpose())
-            .abs();
+        let covar = &first_term * covar_bar * &first_term.transpose()
+            + &gain * &self.measurement_noise * &gain.transpose();
 
         // And wrap up
         let estimate = KfEstimate {
