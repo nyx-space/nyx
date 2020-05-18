@@ -123,9 +123,12 @@ fn ekf_fixed_step_perfect_stations() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}", est.state);
     for i in 0..6 {
-        for j in 0..6 {
-            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-        }
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
     }
     for i in 0..6 {
         if i < 3 {
@@ -276,9 +279,12 @@ fn ckf_fixed_step_perfect_stations() {
     let estimates = odp.estimates.clone();
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
-        for j in 0..6 {
-            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-        }
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
     }
     for i in 0..6 {
         if i < 3 {
@@ -458,9 +464,12 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
         );
 
         for i in 0..6 {
-            for j in 0..6 {
-                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-            }
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
         }
 
         for i in 0..6 {
@@ -544,9 +553,12 @@ fn ckf_map_covar() {
     let estimates = odp.estimates;
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
-        for j in 0..6 {
-            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-        }
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
     }
     for i in 0..6 {
         if i < 3 {
@@ -685,9 +697,12 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
             println!("{}", est);
         }
         for i in 0..6 {
-            for j in 0..6 {
-                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-            }
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
         }
         assert!(
             est.state.norm() < 1e-12,
