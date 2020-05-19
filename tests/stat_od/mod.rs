@@ -3,7 +3,6 @@ extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::hifitime::Epoch;
 use self::nyx::celestia::State;
 use self::nyx::od::ui::{Estimate, Filter, FilterError, KfEstimate, KF};
 

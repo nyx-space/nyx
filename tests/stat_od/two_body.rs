@@ -359,7 +359,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
-                measurements.push((rx_state.dt, meas));
+                measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -589,7 +589,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
-                measurements.push((rx_state.dt, meas));
+                measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }

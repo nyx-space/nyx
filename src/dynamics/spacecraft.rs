@@ -178,8 +178,8 @@ impl<'a> Spacecraft<'a, OrbitalDynamicsStm<'a>> {
 impl<'a> Estimable<SpacecraftState> for Spacecraft<'a, OrbitalDynamicsStm<'a>> {
     type LinStateSize = U6;
 
-    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, SpacecraftState) {
-        (prop_state.orbit.dt, *prop_state)
+    fn to_measurement(&self, prop_state: &Self::StateType) -> SpacecraftState {
+        *prop_state
     }
 
     fn extract_stm(&self, prop_state: &Self::StateType) -> Matrix6<f64> {

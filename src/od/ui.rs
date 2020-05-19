@@ -161,7 +161,7 @@ where
             // Update the STM of the KF
             self.kf.update_stm(self.prop.dynamics.stm());
             let nominal_state = self.prop.state();
-            let (_, meas_input) = self.prop.dynamics.to_measurement(&nominal_state);
+            let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
             // Get the computed observations
             for device in self.devices.iter() {
                 if let Some(computed_meas) = device.measure(&meas_input) {
@@ -223,8 +223,8 @@ where
     /// + the measurements have be to mapped to a fixed time corresponding to the step of the propagator
     pub fn process_measurements_covar(
         &mut self,
-        prop_rx: &Receiver<D::StateType>,
-        measurements: &[(Epoch, Msr)],
+        rx: &Receiver<D::StateType>,
+        measurements: &[Msr],
     ) -> Option<FilterError> {
         assert!(
             !measurements.is_empty(),
@@ -232,7 +232,7 @@ where
         );
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
-        let prop_time = measurements[num_msrs - 1].0 - self.kf.previous_estimate().epoch();
+        let prop_time = measurements[num_msrs - 1].epoch() - self.kf.previous_estimate().epoch();
         info!(
             "Propagating for {} seconds (~ {:.3} days)",
             prop_time,
@@ -248,28 +248,31 @@ where
         let mut msr_cnt = 0_usize;
         let mut reported = vec![false; 11];
 
-        while let Ok(prop_state) = prop_rx.try_recv() {
+        while let Ok(nominal_state) = rx.try_recv() {
             // Get the datetime and info needed to compute the theoretical measurement according to the model
-            let (dt, meas_input) = self.prop.dynamics.to_measurement(&prop_state);
+            let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
+
+            let dt = nominal_state.epoch();
 
             let mut num_msr_processed = 0_u32;
             loop {
                 // Update the STM of the KF (needed between each measurement or time update)
-                let stm = self.prop.dynamics.extract_stm(&prop_state);
+                let stm = self.prop.dynamics.extract_stm(&nominal_state);
                 self.kf.update_stm(stm);
                 if msr_cnt < num_msrs {
                     // Get the next measurement
-                    let (next_epoch, real_meas) = &measurements[msr_cnt];
-                    if *next_epoch < dt {
+                    let real_meas = &measurements[msr_cnt];
+                    let next_epoch = real_meas.epoch();
+                    if next_epoch < dt {
                         // We missed a measurement! Let's try to catch up.
-                        error!("Skipped measurement #{} -- measurement timestamps not in sync with propagator!\n{:?}\n{:?}", msr_cnt, *next_epoch, dt);
+                        error!("Skipped measurement #{} -- measurement timestamps not in sync with propagator!\n{:?}\n{:?}", msr_cnt, next_epoch, dt);
                         msr_cnt += 1;
                         continue;
-                    } else if *next_epoch > dt {
+                    } else if next_epoch > dt {
                         // No measurement can be used here, let's just do a time update (unless we have already done a time update)
                         if num_msr_processed == 0 {
                             debug!("time update {:?}", dt);
-                            match self.kf.time_update(prop_state) {
+                            match self.kf.time_update(nominal_state) {
                                 Ok(est) => {
                                     if self.kf.is_extended() {
                                         self.prop.dynamics.set_estimated_state(
@@ -291,7 +294,7 @@ where
                                 if computed_meas.visible() {
                                     self.kf.update_h_tilde(computed_meas.sensitivity());
                                     match self.kf.measurement_update(
-                                        prop_state,
+                                        nominal_state,
                                         real_meas.observation(),
                                         computed_meas.observation(),
                                     ) {
@@ -312,7 +315,7 @@ where
                                                 self.prop.dynamics.set_estimated_state(
                                                     self.prop
                                                         .dynamics
-                                                        .extract_estimated_state(&prop_state)
+                                                        .extract_estimated_state(&nominal_state)
                                                         + est.state_deviation(),
                                                 );
                                             }
@@ -343,11 +346,11 @@ where
                 } else {
                     // No more measurements, we can only do a time update
                     debug!("final time update {:?}", dt);
-                    match self.kf.time_update(prop_state) {
+                    match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             if self.kf.is_extended() {
                                 self.prop.dynamics.set_estimated_state(
-                                    self.prop.dynamics.extract_estimated_state(&prop_state)
+                                    self.prop.dynamics.extract_estimated_state(&nominal_state)
                                         + est.state_deviation(),
                                 );
                             }
@@ -385,17 +388,17 @@ where
         self.prop.until_time_elapsed(prop_time);
         info!("Mapping covariance");
 
-        while let Ok(prop_state) = prop_rx.try_recv() {
+        while let Ok(nominal_state) = prop_rx.try_recv() {
             // Update the STM of the KF (needed between each measurement or time update)
-            let stm = self.prop.dynamics.extract_stm(&prop_state);
+            let stm = self.prop.dynamics.extract_stm(&nominal_state);
             self.kf.update_stm(stm);
-            info!("final time update {:?}", prop_state.epoch());
-            match self.kf.time_update(prop_state) {
+            info!("final time update {:?}", nominal_state.epoch());
+            match self.kf.time_update(nominal_state) {
                 Ok(est) => {
                     if self.kf.is_extended() {
                         let est_state = est.state_deviation().clone();
                         self.prop.dynamics.set_estimated_state(
-                            self.prop.dynamics.extract_estimated_state(&prop_state) + est_state,
+                            self.prop.dynamics.extract_estimated_state(&nominal_state) + est_state,
                         );
                     }
                     self.estimates.push(est);

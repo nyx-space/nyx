@@ -68,7 +68,7 @@ where
     }
 
     /// Converts the Dynamics' state type to a measurement to be ingested in a filter
-    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, N);
+    fn to_measurement(&self, prop_state: &Self::StateType) -> N;
 
     /// Extracts the STM from the dynamics state
     fn extract_stm(
@@ -165,7 +165,7 @@ impl fmt::Display for FilterError {
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
-pub trait Measurement
+pub trait Measurement: TimeTagged
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
@@ -188,9 +188,6 @@ where
 
     /// Returns whether the transmitter and receiver where in line of sight.
     fn visible(&self) -> bool;
-
-    /// Returns the time at which the measurement was performed.
-    fn at(&self) -> Epoch;
 }
 
 /// A trait to generalize measurement devices such as a ground station

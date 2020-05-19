@@ -248,7 +248,7 @@ where
         }
         // Serialize the state
         for i in 0..S::dim() {
-            seq.serialize_element(&self.state_deviation[(i, 0)])?;
+            seq.serialize_element(&self.state_deviation[i])?;
         }
         // Serialize the covariance
         for i in 0..S::dim() {

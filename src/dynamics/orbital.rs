@@ -161,7 +161,7 @@ impl<'a> OrbitalDynamicsT for OrbitalDynamicsStm<'a> {
     }
 
     fn stm(&self) -> Option<Matrix6<f64>> {
-        Some(self.state.stm.unwrap())
+        self.state.stm
     }
 
     fn orbital_state_ctor(
@@ -236,7 +236,7 @@ impl<'a> OrbitalDynamicsStm<'a> {
         state.vy = in_state[4];
         state.vz = in_state[5];
 
-        let mut stm = state.stm.unwrap();
+        let mut stm = state.stm();
         for i in 0..6 {
             for j in 0..6 {
                 stm[(i, j)] = in_state[i * 6 + j + 6];
@@ -310,7 +310,7 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
     fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
         let mut stm_idx = 0;
-        let stm = self.state.stm.unwrap();
+        let stm = self.state.stm();
         for i in 0..6 {
             for j in 0..6 {
                 stm_as_vec[(stm_idx, 0)] = stm[(i, j)];
@@ -350,7 +350,7 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
             }
         }
 
-        let mut stm_prev = self.state.stm.unwrap();
+        let mut stm_prev = self.state.stm();
         if !stm_prev.try_inverse_mut() {
             panic!("STM not invertible: {}", stm_prev);
         }
@@ -361,7 +361,7 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
         let epoch = Epoch::from_tai_seconds(self.init_tai_secs + t);
         let (state, grad) = self.eom_grad(epoch, self.state.frame, &pos_vel);
-        let stm_dt = self.state.stm.unwrap() * grad;
+        let stm_dt = self.state.stm() * grad;
         // Rebuild the STM as a vector.
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
         let mut stm_idx = 0;
@@ -380,12 +380,12 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
 impl<'a> Estimable<State> for OrbitalDynamicsStm<'a> {
     type LinStateSize = U6;
 
-    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, State) {
-        (prop_state.dt, *prop_state)
+    fn to_measurement(&self, prop_state: &Self::StateType) -> State {
+        *prop_state
     }
 
     fn extract_stm(&self, prop_state: &Self::StateType) -> Matrix6<f64> {
-        prop_state.stm.unwrap()
+        prop_state.stm()
     }
 
     fn extract_estimated_state(
