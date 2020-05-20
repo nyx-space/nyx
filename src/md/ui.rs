@@ -8,7 +8,7 @@ use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
-use crate::io::output::*;
+use crate::io::formatter::*;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::ParsingError;
 use crate::propagators::{PropOpts, Propagator};

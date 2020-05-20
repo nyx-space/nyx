@@ -2,8 +2,9 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::EstimableState;
 use super::{CovarFormat, EpochFormat};
+use crate::celestia::State;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U6};
 use crate::hifitime::Epoch;
 use std::cmp::PartialEq;
 use std::f64::INFINITY;
@@ -489,3 +490,6 @@ where
         seq.end()
     }
 }
+
+/// A trait to store a navigation solution, can be used in conjunction with KfEstimate or IfEstimate
+pub trait NavSolution: Estimate<U6, State> {}
