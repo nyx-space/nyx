@@ -1,8 +1,12 @@
+use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::serde_derive::Deserialize;
 use super::EpochFormat;
 use crate::celestia::{Cosm, Frame, State};
+use crate::dimensions::U6;
 use crate::od::estimate::NavSolution;
+use crate::od::EstimableState;
+use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -25,7 +29,7 @@ impl OutputSerde {
 /// Allowed headers, with an optional frame.
 /// TODO: Support units
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StateHeader {
     /// Argument of Periapse (deg)
     AoL { frame: Option<String> },
@@ -152,7 +156,7 @@ impl Serialize for StateHeader {
 /// Allowed headers, with an optional frame.
 /// TODO: Support units
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NavSolutionHeader {
     /// The epoch in the specified format
     Epoch(EpochFormat),
@@ -214,6 +218,61 @@ pub enum NavSolutionHeader {
     Cz_dot_y_dot,
     /// Covariance matrix [6,6]
     Cz_dot_z_dot,
+}
+
+impl Serialize for NavSolutionHeader {
+    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            NavSolutionHeader::Epoch(efmt) => {
+                serializer.serialize_str(format!("Epoch:{:?}", efmt).as_str())
+            }
+            NavSolutionHeader::EstimatedState(hdr) => {
+                let mut seq = serializer.serialize_seq(Some(hdr.len()))?;
+                for element in hdr {
+                    seq.serialize_element(element)?;
+                }
+                seq.end()
+            }
+            NavSolutionHeader::NominalState(hdr) => {
+                let mut seq = serializer.serialize_seq(Some(hdr.len()))?;
+                for element in hdr {
+                    seq.serialize_element(element)?;
+                }
+                seq.end()
+            }
+            NavSolutionHeader::Delta_x => serializer.serialize_str("delta_x"),
+            NavSolutionHeader::Delta_y => serializer.serialize_str("delta_y"),
+            NavSolutionHeader::Delta_z => serializer.serialize_str("delta_z"),
+            NavSolutionHeader::Delta_vx => serializer.serialize_str("delta_vx"),
+            NavSolutionHeader::Delta_vy => serializer.serialize_str("delta_vy"),
+            NavSolutionHeader::Delta_vz => serializer.serialize_str("delta_vz"),
+            NavSolutionHeader::Cx_x => serializer.serialize_str("cx_x"),
+            NavSolutionHeader::Cy_x => serializer.serialize_str("cy_x"),
+            NavSolutionHeader::Cy_y => serializer.serialize_str("cy_y"),
+            NavSolutionHeader::Cz_x => serializer.serialize_str("cz_x"),
+            NavSolutionHeader::Cz_y => serializer.serialize_str("cz_y"),
+            NavSolutionHeader::Cz_z => serializer.serialize_str("cz_z"),
+            NavSolutionHeader::Cx_dot_x => serializer.serialize_str("cx_dot_x"),
+            NavSolutionHeader::Cx_dot_y => serializer.serialize_str("cx_dot_y"),
+            NavSolutionHeader::Cx_dot_z => serializer.serialize_str("cx_dot_z"),
+            NavSolutionHeader::Cx_dot_x_dot => serializer.serialize_str("cx_dot_x_dot"),
+            NavSolutionHeader::Cy_dot_x => serializer.serialize_str("cy_dot_x"),
+            NavSolutionHeader::Cy_dot_y => serializer.serialize_str("cy_dot_y"),
+            NavSolutionHeader::Cy_dot_z => serializer.serialize_str("cy_dot_z"),
+            NavSolutionHeader::Cy_dot_x_dot => serializer.serialize_str("cy_dot_x_dot"),
+            NavSolutionHeader::Cy_dot_y_dot => serializer.serialize_str("cy_dot_y_dot"),
+            NavSolutionHeader::Cz_dot_x => serializer.serialize_str("cz_dot_x"),
+            NavSolutionHeader::Cz_dot_y => serializer.serialize_str("cz_dot_y"),
+            NavSolutionHeader::Cz_dot_z => serializer.serialize_str("cz_dot_z"),
+            NavSolutionHeader::Cz_dot_x_dot => serializer.serialize_str("cz_dot_x_dot"),
+            NavSolutionHeader::Cz_dot_y_dot => serializer.serialize_str("cz_dot_y_dot"),
+            NavSolutionHeader::Cz_dot_z_dot => serializer.serialize_str("cz_dot_z_dot"),
+        }
+    }
 }
 
 /// A formatter for states
@@ -323,7 +382,7 @@ impl<'a> StateFormatter<'a> {
         }
     }
 
-    pub fn format(&self, state: &State) -> Vec<String> {
+    pub fn fmt(&self, state: &State) -> Vec<String> {
         // Start by computing the state in all of the frames needed
         let mut mapped = HashMap::new();
         for (name, frame) in &self.frames {
@@ -376,68 +435,68 @@ impl<'a> StateFormatter<'a> {
                     };
 
                     formatted.push(match hdr {
-                        StateHeader::AoL { .. } => format!("{:.9}", out_state.aol()),
-                        StateHeader::AoP { .. } => format!("{:.9}", out_state.aop()),
-                        StateHeader::apoapsis { .. } => format!("{:.9}", out_state.apoapsis()),
-                        StateHeader::EA { .. } => format!("{:.9}", out_state.ea()),
-                        StateHeader::ECC { .. } => format!("{:.9}", out_state.ecc()),
-                        StateHeader::energy { .. } => format!("{:.9}", out_state.energy()),
+                        StateHeader::AoL { .. } => format!("{:.16e}", out_state.aol()),
+                        StateHeader::AoP { .. } => format!("{:.16e}", out_state.aop()),
+                        StateHeader::apoapsis { .. } => format!("{:.16e}", out_state.apoapsis()),
+                        StateHeader::EA { .. } => format!("{:.16e}", out_state.ea()),
+                        StateHeader::ECC { .. } => format!("{:.16e}", out_state.ecc()),
+                        StateHeader::energy { .. } => format!("{:.16e}", out_state.energy()),
                         StateHeader::evec { .. } => format!(
-                            "[{:.9},{:.9},{:.9}]",
+                            "[{:.16e},{:.16e},{:.16e}]",
                             out_state.evec()[0],
                             out_state.evec()[1],
                             out_state.evec()[2]
                         ),
                         StateHeader::geodetic_height { .. } => {
-                            format!("{:.9}", out_state.geodetic_height())
+                            format!("{:.16e}", out_state.geodetic_height())
                         }
                         StateHeader::geodetic_latitude { .. } => {
-                            format!("{:.9}", out_state.geodetic_latitude())
+                            format!("{:.16e}", out_state.geodetic_latitude())
                         }
                         StateHeader::geodetic_longitude { .. } => {
-                            format!("{:.9}", out_state.geodetic_longitude())
+                            format!("{:.16e}", out_state.geodetic_longitude())
                         }
-                        StateHeader::hmag { .. } => format!("{:.9}", out_state.hmag()),
+                        StateHeader::hmag { .. } => format!("{:.16e}", out_state.hmag()),
                         StateHeader::hvec { .. } => format!(
-                            "[{:.9},{:.9},{:.9}]",
+                            "[{:.16e},{:.16e},{:.16e}]",
                             out_state.hvec()[0],
                             out_state.hvec()[1],
                             out_state.hvec()[2]
                         ),
-                        StateHeader::HX { .. } => format!("{:.9}", out_state.hx()),
-                        StateHeader::HY { .. } => format!("{:.9}", out_state.hy()),
-                        StateHeader::HZ { .. } => format!("{:.9}", out_state.hz()),
-                        StateHeader::INC { .. } => format!("{:.9}", out_state.inc()),
-                        StateHeader::MA { .. } => format!("{:.9}", out_state.ma()),
-                        StateHeader::periapsis { .. } => format!("{:.9}", out_state.periapsis()),
-                        StateHeader::period { .. } => format!("{:.9}", out_state.period()),
-                        StateHeader::RAAN { .. } => format!("{:.9}", out_state.raan()),
+                        StateHeader::HX { .. } => format!("{:.16e}", out_state.hx()),
+                        StateHeader::HY { .. } => format!("{:.16e}", out_state.hy()),
+                        StateHeader::HZ { .. } => format!("{:.16e}", out_state.hz()),
+                        StateHeader::INC { .. } => format!("{:.16e}", out_state.inc()),
+                        StateHeader::MA { .. } => format!("{:.16e}", out_state.ma()),
+                        StateHeader::periapsis { .. } => format!("{:.16e}", out_state.periapsis()),
+                        StateHeader::period { .. } => format!("{:.16e}", out_state.period()),
+                        StateHeader::RAAN { .. } => format!("{:.16e}", out_state.raan()),
                         StateHeader::radius { .. } => format!(
-                            "[{:.9},{:.9},{:.9}]",
+                            "[{:.16e},{:.16e},{:.16e}]",
                             out_state.radius()[0],
                             out_state.radius()[1],
                             out_state.radius()[2]
                         ),
-                        StateHeader::rmag { .. } => format!("{:.9}", out_state.rmag()),
+                        StateHeader::rmag { .. } => format!("{:.16e}", out_state.rmag()),
                         StateHeader::semi_parameter { .. } => {
-                            format!("{:.9}", out_state.semi_parameter())
+                            format!("{:.16e}", out_state.semi_parameter())
                         }
-                        StateHeader::SMA { .. } => format!("{:.9}", out_state.sma()),
-                        StateHeader::TA { .. } => format!("{:.9}", out_state.ta()),
-                        StateHeader::TLong { .. } => format!("{:.9}", out_state.tlong()),
+                        StateHeader::SMA { .. } => format!("{:.16e}", out_state.sma()),
+                        StateHeader::TA { .. } => format!("{:.16e}", out_state.ta()),
+                        StateHeader::TLong { .. } => format!("{:.16e}", out_state.tlong()),
                         StateHeader::velocity { .. } => format!(
-                            "[{:.9},{:.9},{:.9}]",
+                            "[{:.16e},{:.16e},{:.16e}]",
                             out_state.velocity()[0],
                             out_state.velocity()[1],
                             out_state.velocity()[2]
                         ),
-                        StateHeader::vmag { .. } => format!("{:.9}", out_state.vmag()),
-                        StateHeader::X { .. } => format!("{:.9}", out_state.x),
-                        StateHeader::Y { .. } => format!("{:.9}", out_state.y),
-                        StateHeader::Z { .. } => format!("{:.9}", out_state.z),
-                        StateHeader::VX { .. } => format!("{:.9}", out_state.vx),
-                        StateHeader::VY { .. } => format!("{:.9}", out_state.vy),
-                        StateHeader::VZ { .. } => format!("{:.9}", out_state.vz),
+                        StateHeader::vmag { .. } => format!("{:.16e}", out_state.vmag()),
+                        StateHeader::X { .. } => format!("{:.16e}", out_state.x),
+                        StateHeader::Y { .. } => format!("{:.16e}", out_state.y),
+                        StateHeader::Z { .. } => format!("{:.16e}", out_state.z),
+                        StateHeader::VX { .. } => format!("{:.16e}", out_state.vx),
+                        StateHeader::VY { .. } => format!("{:.16e}", out_state.vy),
+                        StateHeader::VZ { .. } => format!("{:.16e}", out_state.vz),
                         _ => panic!("unsupported header `{:?}`", hdr),
                     });
                 }
@@ -631,92 +690,92 @@ impl<'a> NavSolutionFormatter<'a> {
         }
     }
 
-    pub fn format<S: NavSolution>(&self, sol: &S) -> Vec<String> {
+    pub fn fmt<T: EstimableState<U6>, S: NavSolution<T>>(&self, sol: &S) -> Vec<String> {
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {
             match hdr {
                 NavSolutionHeader::EstimatedState(_) => {
                     // The formatter is already initialized
-                    for fmtval in self.estimated_headers.format(&sol.state()) {
+                    for fmtval in self.estimated_headers.fmt(&sol.orbital_state()) {
                         formatted.push(fmtval);
                     }
                 }
                 NavSolutionHeader::NominalState(_) => {
                     // The formatter is already initialized
-                    for fmtval in self.nominal_headers.format(&sol.state()) {
+                    for fmtval in self.nominal_headers.fmt(&sol.orbital_state()) {
                         formatted.push(fmtval);
                     }
                 }
                 NavSolutionHeader::Epoch(efmt) => formatted.push(efmt.format(sol.epoch())),
                 NavSolutionHeader::Delta_x => {
-                    formatted.push(format!("{:.9}", sol.state_deviation()[0]))
+                    formatted.push(format!("{:.16e}", sol.state_deviation()[0]))
                 }
                 NavSolutionHeader::Delta_y => {
-                    formatted.push(format!("{:.9}", sol.state_deviation()[1]))
+                    formatted.push(format!("{:.16e}", sol.state_deviation()[1]))
                 }
                 NavSolutionHeader::Delta_z => {
-                    formatted.push(format!("{:.9}", sol.state_deviation()[2]))
+                    formatted.push(format!("{:.16e}", sol.state_deviation()[2]))
                 }
                 NavSolutionHeader::Delta_vx => {
-                    formatted.push(format!("{:.9}", sol.state_deviation()[3]))
+                    formatted.push(format!("{:.16e}", sol.state_deviation()[3]))
                 }
                 NavSolutionHeader::Delta_vy => {
-                    formatted.push(format!("{:.9}", sol.state_deviation()[4]))
+                    formatted.push(format!("{:.16e}", sol.state_deviation()[4]))
                 }
                 NavSolutionHeader::Delta_vz => {
-                    formatted.push(format!("{:.9}", sol.state_deviation()[5]))
+                    formatted.push(format!("{:.16e}", sol.state_deviation()[5]))
                 }
-                NavSolutionHeader::Cx_x => formatted.push(format!("{:.9}", sol.covar()[(0, 0)])),
-                NavSolutionHeader::Cy_x => formatted.push(format!("{:.9}", sol.covar()[(1, 0)])),
-                NavSolutionHeader::Cy_y => formatted.push(format!("{:.9}", sol.covar()[(1, 1)])),
-                NavSolutionHeader::Cz_x => formatted.push(format!("{:.9}", sol.covar()[(2, 0)])),
-                NavSolutionHeader::Cz_y => formatted.push(format!("{:.9}", sol.covar()[(2, 1)])),
-                NavSolutionHeader::Cz_z => formatted.push(format!("{:.9}", sol.covar()[(2, 2)])),
+                NavSolutionHeader::Cx_x => formatted.push(format!("{:.16e}", sol.covar()[(0, 0)])),
+                NavSolutionHeader::Cy_x => formatted.push(format!("{:.16e}", sol.covar()[(1, 0)])),
+                NavSolutionHeader::Cy_y => formatted.push(format!("{:.16e}", sol.covar()[(1, 1)])),
+                NavSolutionHeader::Cz_x => formatted.push(format!("{:.16e}", sol.covar()[(2, 0)])),
+                NavSolutionHeader::Cz_y => formatted.push(format!("{:.16e}", sol.covar()[(2, 1)])),
+                NavSolutionHeader::Cz_z => formatted.push(format!("{:.16e}", sol.covar()[(2, 2)])),
                 NavSolutionHeader::Cx_dot_x => {
-                    formatted.push(format!("{:.9}", sol.covar()[(3, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(3, 0)]))
                 }
                 NavSolutionHeader::Cx_dot_y => {
-                    formatted.push(format!("{:.9}", sol.covar()[(3, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(3, 1)]))
                 }
                 NavSolutionHeader::Cx_dot_z => {
-                    formatted.push(format!("{:.9}", sol.covar()[(3, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(3, 2)]))
                 }
                 NavSolutionHeader::Cx_dot_x_dot => {
-                    formatted.push(format!("{:.9}", sol.covar()[(3, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(3, 3)]))
                 }
                 NavSolutionHeader::Cy_dot_x => {
-                    formatted.push(format!("{:.9}", sol.covar()[(4, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(4, 0)]))
                 }
                 NavSolutionHeader::Cy_dot_y => {
-                    formatted.push(format!("{:.9}", sol.covar()[(4, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(4, 1)]))
                 }
                 NavSolutionHeader::Cy_dot_z => {
-                    formatted.push(format!("{:.9}", sol.covar()[(4, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(4, 2)]))
                 }
                 NavSolutionHeader::Cy_dot_x_dot => {
-                    formatted.push(format!("{:.9}", sol.covar()[(4, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(4, 3)]))
                 }
                 NavSolutionHeader::Cy_dot_y_dot => {
-                    formatted.push(format!("{:.9}", sol.covar()[(4, 4)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(4, 4)]))
                 }
                 NavSolutionHeader::Cz_dot_x => {
-                    formatted.push(format!("{:.9}", sol.covar()[(5, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(5, 0)]))
                 }
                 NavSolutionHeader::Cz_dot_y => {
-                    formatted.push(format!("{:.9}", sol.covar()[(5, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(5, 1)]))
                 }
                 NavSolutionHeader::Cz_dot_z => {
-                    formatted.push(format!("{:.9}", sol.covar()[(5, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(5, 2)]))
                 }
                 NavSolutionHeader::Cz_dot_x_dot => {
-                    formatted.push(format!("{:.9}", sol.covar()[(5, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(5, 3)]))
                 }
                 NavSolutionHeader::Cz_dot_y_dot => {
-                    formatted.push(format!("{:.9}", sol.covar()[(5, 4)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(5, 4)]))
                 }
                 NavSolutionHeader::Cz_dot_z_dot => {
-                    formatted.push(format!("{:.9}", sol.covar()[(5, 5)]))
+                    formatted.push(format!("{:.16e}", sol.covar()[(5, 5)]))
                 }
             };
         }

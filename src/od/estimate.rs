@@ -5,6 +5,7 @@ use super::{CovarFormat, EpochFormat};
 use crate::celestia::State;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U6};
+use crate::dynamics::spacecraft::SpacecraftState;
 use crate::hifitime::Epoch;
 use std::cmp::PartialEq;
 use std::f64::INFINITY;
@@ -492,4 +493,33 @@ where
 }
 
 /// A trait to store a navigation solution, can be used in conjunction with KfEstimate or IfEstimate
-pub trait NavSolution: Estimate<U6, State> {}
+pub trait NavSolution<T>: Estimate<U6, T>
+where
+    T: EstimableState<U6>,
+{
+    fn orbital_state(&self) -> State;
+}
+
+impl NavSolution<State> for KfEstimate<U6, State> {
+    fn orbital_state(&self) -> State {
+        self.state()
+    }
+}
+
+impl NavSolution<State> for IfEstimate<U6, State> {
+    fn orbital_state(&self) -> State {
+        self.state()
+    }
+}
+
+impl NavSolution<SpacecraftState> for KfEstimate<U6, SpacecraftState> {
+    fn orbital_state(&self) -> State {
+        self.state().orbit
+    }
+}
+
+impl NavSolution<SpacecraftState> for IfEstimate<U6, SpacecraftState> {
+    fn orbital_state(&self) -> State {
+        self.state().orbit
+    }
+}

@@ -10,6 +10,7 @@ use self::nyx::celestia::{bodies, Cosm, State};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::dynamics::spacecraft::{SolarPressure, Spacecraft};
 use self::nyx::dynamics::Dynamics;
+use self::nyx::io::formatter::NavSolutionFormatter;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::sync::mpsc;
@@ -136,7 +137,12 @@ fn sc_ckf_perfect_stations() {
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
 
+    // Initialize the formatter
+    let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), &cosm);
+
     let mut wtr = csv::Writer::from_writer(io::stdout());
+    wtr.serialize(&estimate_fmtr.headers)
+        .expect("could not write to stdout");
     let mut printed = false;
     let mut last_est = None;
     for (no, est) in odp.estimates.iter().enumerate() {
@@ -164,7 +170,8 @@ fn sc_ckf_perfect_stations() {
         );
 
         if !printed {
-            wtr.serialize(est.clone())
+            // Format the estimate
+            wtr.serialize(estimate_fmtr.fmt(est))
                 .expect("could not write to stdout");
             printed = true;
         }

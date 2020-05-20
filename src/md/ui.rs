@@ -266,7 +266,7 @@ where
             while let Ok(prop_state) = rx.try_recv() {
                 self.output.push(prop_state);
                 if let Some(wtr) = &mut maybe_wtr {
-                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state))
+                    wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state))
                         .expect("could not format state");
                 }
             }
@@ -292,7 +292,7 @@ where
             while let Ok(prop_state) = rx.try_recv() {
                 self.output.push(prop_state);
                 if let Some(wtr) = &mut maybe_wtr {
-                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state))
+                    wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state))
                         .expect("could not format state");
                 }
             }
