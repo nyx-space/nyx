@@ -4,12 +4,13 @@ extern crate serde;
 use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
-use super::na::{Matrix3, Vector3, Vector6};
-use super::Frame;
+use super::na::{Matrix3, Matrix6, Vector3, Vector6, U6};
+use super::{Frame, TimeTagged};
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
 use celestia::xb::Vector as XBVector;
 use celestia::xb::{TimeRepr, TimeSystem, Unit};
+use od::EstimableState;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
@@ -20,7 +21,7 @@ use utils::{between_0_360, between_pm_180, perpv, r1, r3};
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
 
-/// State defines an orbital state parameterized  by a `CelestialBody`.
+/// State defines an orbital state
 ///
 /// Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/StateConversionUtil.cpp).
 /// Regardless of the constructor used, this struct stores all the state information in Cartesian coordinates
@@ -44,6 +45,8 @@ pub struct State {
     pub dt: Epoch,
     /// Frame contains everything we need to compute state information
     pub frame: Frame,
+    /// Optionally stores an STM
+    pub stm: Option<Matrix6<f64>>,
 }
 
 impl State {
@@ -69,6 +72,7 @@ impl State {
             vz,
             dt,
             frame,
+            stm: None,
         }
     }
 
@@ -85,6 +89,7 @@ impl State {
             vz: 0.0,
             dt,
             frame,
+            stm: None,
         }
     }
 
@@ -102,6 +107,7 @@ impl State {
             vz: state[(5, 0)],
             dt,
             frame,
+            stm: None,
         }
     }
 
@@ -289,27 +295,21 @@ impl State {
                     vz,
                     dt,
                     frame,
+                    stm: None,
                 }
             }
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }
 
-    /// Creates a new State around the provided CelestialBody from the borrowed state vector
+    /// Creates a new State around the provided frame from the borrowed state vector
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
     pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
         match frame {
             Frame::Geoid { .. } | Frame::Celestial { .. } => Self::keplerian(
-                state[(0, 0)],
-                state[(1, 0)],
-                state[(2, 0)],
-                state[(3, 0)],
-                state[(4, 0)],
-                state[(5, 0)],
-                dt,
-                frame,
+                state[0], state[1], state[2], state[3], state[4], state[5], dt, frame,
             ),
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
@@ -346,12 +346,12 @@ impl State {
                 let radius = Vector3::new(ri, rj, rk);
                 let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
                 State::cartesian(
-                    radius[(0, 0)],
-                    radius[(1, 0)],
-                    radius[(2, 0)],
-                    velocity[(0, 0)],
-                    velocity[(1, 0)],
-                    velocity[(2, 0)],
+                    radius[0],
+                    radius[1],
+                    radius[2],
+                    velocity[0],
+                    velocity[1],
+                    velocity[2],
                     dt,
                     frame,
                 )
@@ -381,17 +381,17 @@ impl State {
 
     /// Returns the orbital momentum value on the X axis
     pub fn hx(&self) -> f64 {
-        self.hvec()[(0, 0)]
+        self.hvec()[0]
     }
 
     /// Returns the orbital momentum value on the Y axis
     pub fn hy(&self) -> f64 {
-        self.hvec()[(1, 0)]
+        self.hvec()[1]
     }
 
     /// Returns the orbital momentum value on the Z axis
     pub fn hz(&self) -> f64 {
-        self.hvec()[(2, 0)]
+        self.hvec()[2]
     }
 
     /// Returns the norm of the orbital momentum
@@ -763,6 +763,67 @@ impl State {
         self.vy = new_v[1];
         self.vz = new_v[2];
     }
+
+    /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
+    pub fn zeros() -> Self {
+        let frame = Frame::Celestial {
+            axb_id: 0,
+            exb_id: 0,
+            gm: 159.0,
+            parent_axb_id: None,
+            parent_exb_id: None,
+        };
+
+        Self {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            vx: 0.0,
+            vy: 0.0,
+            vz: 0.0,
+            dt: Epoch::from_tai_seconds(0.0),
+            frame,
+            stm: Some(Matrix6::identity()),
+        }
+    }
+
+    /// Sets the STM of this state of identity
+    pub fn stm_identity(&mut self) {
+        self.stm = Some(Matrix6::identity());
+    }
+
+    /// Unwraps this STM, or panics if unset.
+    pub fn stm(&self) -> Matrix6<f64> {
+        self.stm.unwrap()
+    }
+}
+
+impl TimeTagged for State {
+    fn epoch(&self) -> Epoch {
+        self.dt
+    }
+
+    fn set_epoch(&mut self, epoch: Epoch) {
+        self.dt = epoch
+    }
+}
+
+impl EstimableState<U6> for State {}
+
+impl Add<Vector6<f64>> for State {
+    type Output = State;
+
+    fn add(self, other: Vector6<f64>) -> State {
+        let mut me = self;
+        me.x += other[0];
+        me.y += other[1];
+        me.z += other[2];
+        me.vx += other[3];
+        me.vy += other[4];
+        me.vz += other[5];
+
+        me
+    }
 }
 
 impl PartialEq for State {
@@ -784,7 +845,7 @@ impl PartialEq for State {
 impl Add for State {
     type Output = State;
 
-    /// Add one state from another. Frame must be manually changed if needed.
+    /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
     fn add(self, other: State) -> State {
         State {
             x: self.x + other.x,
@@ -795,6 +856,7 @@ impl Add for State {
             vz: self.vz + other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -802,7 +864,7 @@ impl Add for State {
 impl Sub for State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied from &self.
     fn sub(self, other: State) -> State {
         State {
             x: self.x - other.x,
@@ -813,6 +875,7 @@ impl Sub for State {
             vz: self.vz - other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -820,7 +883,7 @@ impl Sub for State {
 impl Neg for State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied from &self.
     fn neg(self) -> Self::Output {
         State {
             x: -self.x,
@@ -831,6 +894,7 @@ impl Neg for State {
             vz: -self.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -838,7 +902,7 @@ impl Neg for State {
 impl Add for &State {
     type Output = State;
 
-    /// Add one state from another. Frame must be manually changed if needed.
+    /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
     fn add(self, other: &State) -> State {
         State {
             x: self.x + other.x,
@@ -849,6 +913,7 @@ impl Add for &State {
             vz: self.vz + other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -856,7 +921,7 @@ impl Add for &State {
 impl Sub for &State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied from &self.
     fn sub(self, other: &State) -> State {
         State {
             x: self.x - other.x,
@@ -867,6 +932,7 @@ impl Sub for &State {
             vz: self.vz - other.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }
@@ -874,7 +940,7 @@ impl Sub for &State {
 impl Neg for &State {
     type Output = State;
 
-    /// Subtract one state from another
+    /// Subtract one state from another. STM will be copied form &self.
     fn neg(self) -> Self::Output {
         State {
             x: -self.x,
@@ -885,6 +951,7 @@ impl Neg for &State {
             vz: -self.vz,
             dt: self.dt,
             frame: self.frame,
+            stm: self.stm,
         }
     }
 }

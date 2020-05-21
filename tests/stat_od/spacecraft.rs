@@ -9,6 +9,8 @@ use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{bodies, Cosm, State};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::dynamics::spacecraft::{SolarPressure, Spacecraft};
+use self::nyx::dynamics::Dynamics;
+use self::nyx::io::formatter::NavSolutionFormatter;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use std::sync::mpsc;
@@ -86,6 +88,7 @@ fn sc_ckf_perfect_stations() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let orbital_dyn = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
     let mut estimator = Spacecraft::with_stm(orbital_dyn, sc_dry_mass);
+    let init_sc_state = estimator.state();
     estimator.add_model(Box::new(SolarPressure::default(
         sc_area,
         vec![cosm.frame("EME2000")],
@@ -104,7 +107,7 @@ fn sc_ckf_perfect_stations() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(init_sc_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -134,7 +137,12 @@ fn sc_ckf_perfect_stations() {
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
 
+    // Initialize the formatter
+    let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), &cosm);
+
     let mut wtr = csv::Writer::from_writer(io::stdout());
+    wtr.serialize(&estimate_fmtr.headers)
+        .expect("could not write to stdout");
     let mut printed = false;
     let mut last_est = None;
     for (no, est) in odp.estimates.iter().enumerate() {
@@ -152,9 +160,9 @@ fn sc_ckf_perfect_stations() {
             );
         }
         assert!(
-            est.state.norm() < 1e-6,
+            est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
-            est.state.norm()
+            est.state_deviation().norm()
         );
 
         let res = &odp.residuals[no];
@@ -165,7 +173,8 @@ fn sc_ckf_perfect_stations() {
         );
 
         if !printed {
-            wtr.serialize(est.clone())
+            // Format the estimate
+            wtr.serialize(estimate_fmtr.fmt(est))
                 .expect("could not write to stdout");
             printed = true;
         }
@@ -176,6 +185,6 @@ fn sc_ckf_perfect_stations() {
     // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
     // The filter in multibody dynamics has been validated against JPL tools using a proprietary scenario.
     let est = last_est.unwrap();
-    assert!(est.state.norm() < 1e-8);
+    assert!(est.state_deviation().norm() < 1e-8);
     assert!(est.covar.norm() < 1e-5);
 }

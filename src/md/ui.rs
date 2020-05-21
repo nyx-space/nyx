@@ -8,7 +8,7 @@ use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
-use crate::io::output::*;
+use crate::io::formatter::*;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::ParsingError;
 use crate::propagators::{PropOpts, Propagator};
@@ -266,7 +266,7 @@ where
             while let Ok(prop_state) = rx.try_recv() {
                 self.output.push(prop_state);
                 if let Some(wtr) = &mut maybe_wtr {
-                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state))
+                    wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state))
                         .expect("could not format state");
                 }
             }
@@ -290,9 +290,9 @@ where
             );
 
             while let Ok(prop_state) = rx.try_recv() {
-                self.output.push(prop_state.0);
+                self.output.push(prop_state);
                 if let Some(wtr) = &mut maybe_wtr {
-                    wtr.serialize(self.formatter.as_ref().unwrap().format(&prop_state.0))
+                    wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state))
                         .expect("could not format state");
                 }
             }

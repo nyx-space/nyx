@@ -20,7 +20,7 @@ pub mod rv;
 
 pub mod scenario;
 
-pub mod output;
+pub mod formatter;
 
 #[derive(Debug)]
 pub enum ParsingError {

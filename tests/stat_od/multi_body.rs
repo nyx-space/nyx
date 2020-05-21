@@ -88,7 +88,7 @@ fn multi_body_ckf_perfect_stations() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -136,9 +136,9 @@ fn multi_body_ckf_perfect_stations() {
             );
         }
         assert!(
-            est.state.norm() < 1e-6,
+            est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
-            est.state.norm()
+            est.state_deviation().norm()
         );
 
         let res = &odp.residuals[no];
@@ -160,7 +160,7 @@ fn multi_body_ckf_perfect_stations() {
     // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
     // The filter in multibody dynamics has been validated against JPL tools using a proprietary scenario.
     let est = last_est.unwrap();
-    assert!(est.state.norm() < 1e-8);
+    assert!(est.state_deviation().norm() < 1e-8);
     assert!(est.covar.norm() < 1e-5);
 }
 
@@ -211,7 +211,7 @@ fn multi_body_ckf_covar_map() {
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
-                measurements.push((rx_state.dt, meas));
+                measurements.push(meas);
                 break;
             }
         }
@@ -224,10 +224,7 @@ fn multi_body_ckf_covar_map() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
 
-    let (pest_tx, pest_rx): (
-        Sender<(State, Matrix6<f64>)>,
-        Receiver<(State, Matrix6<f64>)>,
-    ) = mpsc::channel();
+    let (pest_tx, pest_rx) = mpsc::channel();
 
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     prop_est.tx_chan = Some(&pest_tx);
@@ -243,7 +240,7 @@ fn multi_body_ckf_covar_map() {
     ));
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(dt, init_covar);
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise =
@@ -282,9 +279,9 @@ fn multi_body_ckf_covar_map() {
         } else {
             // Only check that the covariance is low IF this isn't a predicted estimate
             assert!(
-                est.state.norm() < 1e-6,
+                est.state_deviation().norm() < 1e-6,
                 "estimate error should be zero (perfect dynamics) ({:e})",
-                est.state.norm()
+                est.state_deviation().norm()
             );
         }
         for i in 0..6 {
@@ -317,6 +314,6 @@ fn multi_body_ckf_covar_map() {
     wtr.serialize(est.clone())
         .expect("could not write to stdout");
 
-    assert!(est.state.norm() < 1e-8);
+    assert!(est.state_deviation().norm() < 1e-8);
     assert!(est.covar.norm() < 1e-4);
 }

@@ -8,7 +8,7 @@ use self::rand::thread_rng;
 use self::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
-use super::{Measurement, MeasurementDevice};
+use super::{Measurement, MeasurementDevice, TimeTagged};
 use crate::dimensions::{
     DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7,
 };
@@ -326,9 +326,15 @@ impl Measurement for StdMeasurement {
     fn visible(&self) -> bool {
         self.visible
     }
+}
 
-    fn at(&self) -> Epoch {
+impl TimeTagged for StdMeasurement {
+    fn epoch(&self) -> Epoch {
         self.dt
+    }
+
+    fn set_epoch(&mut self, dt: Epoch) {
+        self.dt = dt
     }
 }
 
@@ -416,9 +422,15 @@ impl Measurement for RangeMsr {
     fn visible(&self) -> bool {
         self.visible
     }
+}
 
-    fn at(&self) -> Epoch {
+impl TimeTagged for RangeMsr {
+    fn epoch(&self) -> Epoch {
         self.dt
+    }
+
+    fn set_epoch(&mut self, dt: Epoch) {
+        self.dt = dt
     }
 }
 
@@ -506,9 +518,15 @@ impl Measurement for DopplerMsr {
     fn visible(&self) -> bool {
         self.visible
     }
+}
 
-    fn at(&self) -> Epoch {
+impl TimeTagged for DopplerMsr {
+    fn epoch(&self) -> Epoch {
         self.dt
+    }
+
+    fn set_epoch(&mut self, dt: Epoch) {
+        self.dt = dt
     }
 }
 

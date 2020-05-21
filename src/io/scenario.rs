@@ -1,5 +1,5 @@
+use super::formatter::OutputSerde;
 use super::gravity::HarmonicsMem;
-use super::output::OutputSerde;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use crate::celestia::{Frame, State};

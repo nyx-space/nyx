@@ -1,10 +1,12 @@
 extern crate serde;
 
+use crate::celestia::TimeTagged;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
-use crate::hifitime::Epoch;
+use crate::time::Epoch;
 use dynamics::Dynamics;
 use std::fmt;
+use std::ops::Add;
 
 use crate::io::{CovarFormat, EpochFormat};
 
@@ -66,7 +68,7 @@ where
     }
 
     /// Converts the Dynamics' state type to a measurement to be ingested in a filter
-    fn to_measurement(&self, prop_state: &Self::StateType) -> (Epoch, N);
+    fn to_measurement(&self, prop_state: &Self::StateType) -> N;
 
     /// Extracts the STM from the dynamics state
     fn extract_stm(
@@ -79,11 +81,12 @@ where
 }
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
-pub trait Filter<S, A, M>
+pub trait Filter<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
+    T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -93,7 +96,7 @@ where
         + Allocator<f64, S, A>
         + Allocator<f64, A, S>,
 {
-    type Estimate: estimate::Estimate<S>;
+    type Estimate: estimate::Estimate<S, T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate;
@@ -106,17 +109,17 @@ where
     /// call to `measurement_update`.
     fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>);
 
-    /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
+    /// Computes a time update/prediction at the provided nominal state (i.e. advances the filter estimate with the updated STM).
     ///
     /// Returns a FilterError if the STM was not updated.
-    fn time_update(&mut self, dt: Epoch) -> Result<Self::Estimate, FilterError>;
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, FilterError>;
 
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
     ///Returns a FilterError if the STM or sensitivity matrices were not updated.
     fn measurement_update(
         &mut self,
-        dt: Epoch,
+        nominal_state: T,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
     ) -> Result<(Self::Estimate, residual::Residual<M>), FilterError>;
@@ -162,7 +165,7 @@ impl fmt::Display for FilterError {
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
-pub trait Measurement
+pub trait Measurement: TimeTagged
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
@@ -185,9 +188,6 @@ where
 
     /// Returns whether the transmitter and receiver where in line of sight.
     fn visible(&self) -> bool;
-
-    /// Returns the time at which the measurement was performed.
-    fn at(&self) -> Epoch;
 }
 
 /// A trait to generalize measurement devices such as a ground station
@@ -202,4 +202,12 @@ where
 {
     /// Returns the measurement if the device and generate one, else returns None
     fn measure(&self, input: &MsrIn) -> Option<Msr>;
+}
+
+pub trait EstimableState<S: DimName>:
+    TimeTagged + Add<VectorN<f64, S>, Output = Self> + Clone + PartialEq + fmt::Display + fmt::LowerExp
+where
+    Self: Sized,
+    DefaultAllocator: Allocator<f64, S>,
+{
 }
