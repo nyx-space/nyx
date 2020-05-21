@@ -37,28 +37,30 @@ unit_position = "cm"  # Default value if unspecified
 unit_velocity = "cm/s"  # Default value if unspecified
 
 [orbital_dynamics.conf_name]
-stm = false
 integration_frame = "EME2000"
 initial_state = "state_name"
 point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
 accel_models = ["my_models"]
 
 [orbital_dynamics.conf_m]
-stm = false
 integration_frame = "EME2000"
 initial_state = "state_m"
 point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
 accel_models = ["my_models"]
 
 [orbital_dynamics.conf_cm]
-stm = false
 integration_frame = "EME2000"
 initial_state = "state_m"
 point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
 accel_models = ["my_models"]
 
+[spacecraft.sc1]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "conf_name"
+
 [propagator.prop_km]
-dynamics = "conf_name"
+dynamics = "sc1"
 stop_cond = "3.5 days"
 output = "my_csv"
 
@@ -72,13 +74,23 @@ file = "data/JGM3.cof.gz"
 filename = "./data/scenario-run.csv"
 headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 
+[spacecraft.sc1_m]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "conf_m"
+
+[spacecraft.sc1_cm]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "conf_cm"
+
 [propagator.prop_m]
-dynamics = "conf_m"
+dynamics = "sc1_m"
 stop_cond = "3.5 days"
 output = "my_csv_m"
 
 [propagator.prop_cm]
-dynamics = "conf_cm"
+dynamics = "sc1_cm"
 stop_cond = "3.5 days"
 output = "my_csv_cm"
 

@@ -74,6 +74,30 @@ impl OrbitalDynamicsSerde {
 }
 
 #[derive(Deserialize)]
+pub struct SpacecraftSerde {
+    pub dry_mass: f64,
+    pub fuel_mass: Option<f64>,
+    pub orbital_dynamics: String,
+    pub force_models: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+pub struct SolarPressureSerde {
+    pub sc_area: f64,
+    #[serde(default = "default_cr")]
+    pub cr: f64,
+    #[serde(default = "default_phi")]
+    pub phi: f64,
+}
+
+fn default_cr() -> f64 {
+    1.8
+}
+fn default_phi() -> f64 {
+    1367.0
+}
+
+#[derive(Deserialize)]
 pub struct Harmonics {
     pub frame: String,
     pub degree: usize,
@@ -134,6 +158,7 @@ pub struct ScenarioSerde {
     pub propagator: HashMap<String, PropagatorSerde>,
     pub state: HashMap<String, StateSerde>,
     pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
+    pub spacecraft: HashMap<String, SpacecraftSerde>,
     pub accel_models: HashMap<String, AccelModel>,
     pub output: HashMap<String, OutputSerde>,
     pub distr: Option<HashMap<String, Distribution>>,
@@ -170,18 +195,22 @@ fn test_deser_scenario() {
         epoch = "MJD 51540.5 TAI"
 
         [orbital_dynamics.conf_name]
-        stm = false
         integration_frame = "EME2000"
         initial_state = "state_name"
         point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
         accel_models = ["jgm3_70x70"]
 
-        [orbital_dynamics.two_body]
+        [orbital_dynamics.two_body_dyn]
         initial_state = "state_name"
+
+        [spacecraft.sc1]
+        dry_mass = 100.0
+        fuel_mass = 20.0
+        orbital_dynamics = "conf_name"
 
         [propagator.prop_name]
         flavor = "rk89"  # If unspecified, the default propagator is used
-        dynamics = "two_body"  # Use "sc1" spacecraft dynamics
+        dynamics = "sc1"  # Use "sc1" spacecraft dynamics
         stop_cond = "MJD 51540.5 TAI"
         output = "my_csv"
         
