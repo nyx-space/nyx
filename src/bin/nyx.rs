@@ -1,19 +1,21 @@
 extern crate clap;
 extern crate config;
+extern crate dialoguer;
 extern crate log;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 use clap::{App, Arg};
 use config::{Config, File};
-use log::info;
+use dialoguer::{theme::ColorfulTheme, Select};
+use log::{error, info};
 use nyx::celestia::Cosm;
-use nyx::io::scenario::*;
+use nyx::io::{scenario::*, ParsingError};
 use nyx::md::ui::MDProcess;
 use std::env::{set_var, var};
 
 const LOG_VAR: &str = "NYX_LOG";
 
-fn main() {
+fn main() -> Result<(), ParsingError> {
     let app = App::new("nyx")
         .version("0.0.20")
         .author(
@@ -25,6 +27,19 @@ fn main() {
                 .help("Sets the scenario file or path to use")
                 .required(true)
                 .index(1),
+        ).arg(
+            Arg::with_name("sequence")
+                .short("s")
+                .long("seq")
+                .takes_value(true)
+                .value_name("sequence name")
+                .help("Specify which sequence to run, program will fail if sequence is not found")
+        ).arg(
+            Arg::with_name("all")
+                .short("a")
+                .long("all")
+                .takes_value(false)
+                .help("Execute all sequences in order")
         );
 
     let matches = app.get_matches();
@@ -36,6 +51,7 @@ fn main() {
     s.merge(File::with_name(scenario_path))
         .expect("Could not load scenario from file or directory");
 
+    let exec_all = matches.is_present("all");
     // Try to deserialize the scenario
     let scenario: ScenarioSerde;
     match s.try_into() {
@@ -54,13 +70,52 @@ fn main() {
     // Load cosm
     let cosm = Cosm::de438();
 
-    match MDProcess::try_from_scenario(scenario, &cosm) {
+    let rtn = match MDProcess::try_from_scenario(scenario, &cosm) {
         Ok(sequence) => {
             info!("Loaded scenario `{}`", scenario_path);
-            for mut item in sequence {
-                item.execute();
+            if exec_all {
+                for mut item in sequence {
+                    item.execute();
+                }
+                Ok(())
+            } else {
+                let seq_name = if let Some(seq_name) = matches.value_of("sequence") {
+                    seq_name.to_string()
+                } else {
+                    // Build the list of sequences
+                    let sequences: Vec<String> = sequence.iter().map(|x| x.name.clone()).collect();
+
+                    let selection = Select::with_theme(&ColorfulTheme::default())
+                        .with_prompt("\n\nSelect the sequence to execute")
+                        .default(0)
+                        .items(&sequences[..])
+                        .interact()
+                        .unwrap();
+                    sequences[selection].clone()
+                };
+
+                let mut found = false;
+                for mut item in sequence {
+                    if item.name == seq_name {
+                        found = true;
+                        item.execute();
+                        break;
+                    }
+                }
+                if !found {
+                    Err(ParsingError::SequenceNotFound(seq_name))
+                } else {
+                    Ok(())
+                }
             }
         }
-        Err(e) => println!("ERROR\n{:?}", e), // Here is where we try to load this as an ODP
+        Err(e) => match e {
+            ParsingError::UseOdInstead => unimplemented!(),
+            _ => Err(e),
+        },
     };
+    if rtn.is_err() {
+        error!("{:?}", rtn);
+    }
+    rtn
 }

@@ -32,6 +32,7 @@ pub enum ParsingError {
     FileNotUTF8(String),
     FileUnreadable(String),
     HarmonicsFile(String),
+    SequenceNotFound(String),
 }
 
 /// Specifies the format of the Epoch during serialization

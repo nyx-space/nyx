@@ -27,6 +27,7 @@ where
     formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
+    pub name: String,
 }
 
 impl<'a> MDProcess<'a>
@@ -240,6 +241,7 @@ where
                         formatter,
                         output: Vec::with_capacity(65_535),
                         prop_time_s: Some(prop_time_s),
+                        name: seq_name.clone(),
                     };
 
                     seq.push(me);

@@ -841,8 +841,6 @@ pub struct NavSolutionFormatter<'a> {
     pub headers: Vec<NavSolutionHeader>,
     pub estimated_headers: StateFormatter<'a>,
     pub nominal_headers: StateFormatter<'a>,
-    frames: HashMap<String, Frame>,
-    cosm: &'a Cosm,
 }
 
 impl<'a> NavSolutionFormatter<'a> {
@@ -975,8 +973,6 @@ impl<'a> NavSolutionFormatter<'a> {
                 frames: frames.clone(),
                 cosm: &cosm,
             },
-            frames,
-            cosm,
         }
     }
 
@@ -1020,8 +1016,6 @@ impl<'a> NavSolutionFormatter<'a> {
                 frames: HashMap::new(),
                 cosm: &cosm,
             },
-            frames: HashMap::new(),
-            cosm,
         }
     }
 
