@@ -38,8 +38,8 @@ where
     fn nominal_state(&self) -> T;
     /// The Covariance of this estimate
     fn covar(&self) -> MatrixMN<f64, S, S>;
-    /// Sets the estimated state, or state deviation (check filter docs).
-    fn set_state(&mut self, new_state: VectorN<f64, S>);
+    /// Sets the state deviation.
+    fn set_state_deviation(&mut self, new_state: VectorN<f64, S>);
     /// Sets the Covariance of this estimate
     fn set_covar(&mut self, new_covar: MatrixMN<f64, S, S>);
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
@@ -170,7 +170,7 @@ where
     fn covar_fmt(&self) -> CovarFormat {
         self.covar_fmt
     }
-    fn set_state(&mut self, new_state: VectorN<f64, S>) {
+    fn set_state_deviation(&mut self, new_state: VectorN<f64, S>) {
         self.state_deviation = new_state;
     }
     fn set_covar(&mut self, new_covar: MatrixMN<f64, S, S>) {
@@ -190,14 +190,18 @@ where
         } else {
             "Estimate"
         };
+        let mut fmt_cov = Vec::with_capacity(S::dim());
+        for i in 0..S::dim() {
+            fmt_cov.push(format!("{:e}", &self.covar[(i, i)]));
+        }
         write!(
             f,
-            "=== {} @ {} UTC -- within 3 sigma: {} ===\nEstState {} Covariance {}\n=====================",
+            "=== {} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
             word,
             &self.epoch().as_gregorian_utc_str(),
             self.within_3sigma(),
-            &self.state_deviation,
-            &self.covar
+            &self.state(),
+            fmt_cov.join(",")
         )
     }
 }
@@ -375,7 +379,7 @@ where
         self.covar_fmt
     }
     /// WARNING: This sets the information state, not the filter state
-    fn set_state(&mut self, new_info_state: VectorN<f64, S>) {
+    fn set_state_deviation(&mut self, new_info_state: VectorN<f64, S>) {
         self.info_state = new_info_state;
     }
     /// WARNING: This sets the information matrix
@@ -392,14 +396,25 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.try_covar() {
-            Some(covar) => write!(
+            Some(covar) => {
+                let mut fmt_cov = Vec::with_capacity(S::dim());
+                for i in 0..S::dim() {
+                    fmt_cov.push(format!("{:e}", covar[(i, i)]));
+                }
+                write!(
+                    f,
+                    "=== ESTIMATE @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
+                    &self.epoch().as_gregorian_utc_str(),
+                    self.within_3sigma(),
+                    &self.state(),
+                    fmt_cov.join(",")
+                )
+            }
+            None => write!(
                 f,
-                "=== PREDICTED: {} ===\nEstState {} Covariance {}\n=====================",
-                &self.predicted,
-                self.state_deviation(),
-                covar
+                "=== PREDICTION @ {} === Not invertible",
+                &self.epoch().as_gregorian_utc_str(),
             ),
-            None => write!(f, "=== PREDICTED: {} === Not invertible", &self.predicted),
         }
     }
 }

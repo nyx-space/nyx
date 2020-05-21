@@ -90,6 +90,7 @@ fn ekf_fixed_step_perfect_stations() {
 
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    println!("initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
