@@ -133,7 +133,7 @@ where
                 return Some(FilterError::StateTransitionMatrixSingular);
             }
             sm_est.set_covar(&stm_inv * estimate.covar() * &stm_inv.transpose());
-            sm_est.set_state(&stm_inv * estimate.state_deviation());
+            sm_est.set_state_deviation(&stm_inv * estimate.state_deviation());
             smoothed.push(sm_est);
         }
 

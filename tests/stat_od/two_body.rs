@@ -90,6 +90,7 @@ fn ekf_fixed_step_perfect_stations() {
 
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    println!("initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -112,9 +113,12 @@ fn ekf_fixed_step_perfect_stations() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("{}", est.state());
     for i in 0..6 {
-        for j in 0..6 {
-            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-        }
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
     }
     for i in 0..6 {
         if i < 3 {
@@ -254,9 +258,12 @@ fn ckf_fixed_step_perfect_stations() {
     let estimates = odp.estimates.clone();
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
-        for j in 0..6 {
-            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-        }
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
     }
     for i in 0..6 {
         if i < 3 {
@@ -431,9 +438,12 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
         );
 
         for i in 0..6 {
-            for j in 0..6 {
-                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-            }
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
         }
 
         for i in 0..6 {
@@ -514,9 +524,12 @@ fn ckf_map_covar() {
     let estimates = odp.estimates;
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
-        for j in 0..6 {
-            assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-        }
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
     }
     for i in 0..6 {
         if i < 3 {
@@ -647,9 +660,12 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
             println!("{}", est);
         }
         for i in 0..6 {
-            for j in 0..6 {
-                assert!(est.covar[(i, j)] >= 0.0, "covar negative @ [{}, {}]", i, j);
-            }
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
         }
         assert!(
             est.state_deviation().norm() < 1e-12,
