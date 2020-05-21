@@ -110,42 +110,244 @@ impl Serialize for StateHeader {
         S: Serializer,
     {
         match self {
-            StateHeader::AoL { .. } => serializer.serialize_str("AoL"),
-            StateHeader::AoP { .. } => serializer.serialize_str("AoP"),
-            StateHeader::apoapsis { .. } => serializer.serialize_str("apoapsis"),
-            StateHeader::EA { .. } => serializer.serialize_str("EA"),
-            StateHeader::ECC { .. } => serializer.serialize_str("ECC"),
-            StateHeader::energy { .. } => serializer.serialize_str("energy"),
-            StateHeader::evec { .. } => serializer.serialize_str("evec"),
-            StateHeader::geodetic_height { .. } => serializer.serialize_str("geodetic_height"),
-            StateHeader::geodetic_latitude { .. } => serializer.serialize_str("geodetic_latitude"),
-            StateHeader::geodetic_longitude { .. } => {
-                serializer.serialize_str("geodetic_longitude")
+            StateHeader::AoL { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("AoL:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("AoL")
+                }
             }
-            StateHeader::hmag { .. } => serializer.serialize_str("hmag"),
-            StateHeader::hvec { .. } => serializer.serialize_str("hvec"),
-            StateHeader::HX { .. } => serializer.serialize_str("HX"),
-            StateHeader::HY { .. } => serializer.serialize_str("HY"),
-            StateHeader::HZ { .. } => serializer.serialize_str("HZ"),
-            StateHeader::INC { .. } => serializer.serialize_str("INC"),
-            StateHeader::MA { .. } => serializer.serialize_str("MA"),
-            StateHeader::periapsis { .. } => serializer.serialize_str("periapsis"),
-            StateHeader::period { .. } => serializer.serialize_str("period"),
-            StateHeader::RAAN { .. } => serializer.serialize_str("RAAN"),
-            StateHeader::radius { .. } => serializer.serialize_str("radius"),
-            StateHeader::rmag { .. } => serializer.serialize_str("rmag"),
-            StateHeader::semi_parameter { .. } => serializer.serialize_str("semi_parameter"),
-            StateHeader::SMA { .. } => serializer.serialize_str("SMA"),
-            StateHeader::TA { .. } => serializer.serialize_str("TA"),
-            StateHeader::TLong { .. } => serializer.serialize_str("TLong"),
-            StateHeader::velocity { .. } => serializer.serialize_str("velocity"),
-            StateHeader::vmag { .. } => serializer.serialize_str("vmag"),
-            StateHeader::X { .. } => serializer.serialize_str("X"),
-            StateHeader::Y { .. } => serializer.serialize_str("Y"),
-            StateHeader::Z { .. } => serializer.serialize_str("Z"),
-            StateHeader::VX { .. } => serializer.serialize_str("VX"),
-            StateHeader::VY { .. } => serializer.serialize_str("VY"),
-            StateHeader::VZ { .. } => serializer.serialize_str("VZ"),
+            StateHeader::AoP { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("AoP:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("AoP")
+                }
+            }
+            StateHeader::apoapsis { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("apoapsis:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("apoapsis")
+                }
+            }
+            StateHeader::EA { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("EA:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("EA")
+                }
+            }
+            StateHeader::ECC { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("ECC:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("ECC")
+                }
+            }
+            StateHeader::energy { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("energy:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("energy")
+                }
+            }
+            StateHeader::evec { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("evec:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("evec")
+                }
+            }
+            StateHeader::geodetic_height { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("geodetic_height:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("geodetic_height")
+                }
+            }
+            StateHeader::geodetic_latitude { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("geodetic_latitude:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("geodetic_latitude")
+                }
+            }
+            StateHeader::geodetic_longitude { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("geodetic_longitude:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("geodetic_longitude")
+                }
+            }
+            StateHeader::hmag { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("hmag:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("hmag")
+                }
+            }
+            StateHeader::hvec { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("hvec:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("hvec")
+                }
+            }
+            StateHeader::HX { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("HX:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("HX")
+                }
+            }
+            StateHeader::HY { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("HY:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("HY")
+                }
+            }
+            StateHeader::HZ { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("HZ:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("HZ")
+                }
+            }
+            StateHeader::INC { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("INC:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("INC")
+                }
+            }
+            StateHeader::MA { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("MA:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("MA")
+                }
+            }
+            StateHeader::periapsis { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("periapsis:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("periapsis")
+                }
+            }
+            StateHeader::period { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("period:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("period")
+                }
+            }
+            StateHeader::RAAN { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("RAAN:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("RAAN")
+                }
+            }
+            StateHeader::radius { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("radius:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("radius")
+                }
+            }
+            StateHeader::rmag { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("rmag:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("rmag")
+                }
+            }
+            StateHeader::semi_parameter { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("semi_parameter:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("semi_parameter")
+                }
+            }
+            StateHeader::SMA { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("SMA:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("SMA")
+                }
+            }
+            StateHeader::TA { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("TA:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("TA")
+                }
+            }
+            StateHeader::TLong { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("TLong:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("TLong")
+                }
+            }
+            StateHeader::velocity { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("velocity:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("velocity")
+                }
+            }
+            StateHeader::vmag { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("vmag:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("vmag")
+                }
+            }
+            StateHeader::X { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("X:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("X")
+                }
+            }
+            StateHeader::Y { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("Y:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("Y")
+                }
+            }
+            StateHeader::Z { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("Z:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("Z")
+                }
+            }
+            StateHeader::VX { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("VX:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("VX")
+                }
+            }
+            StateHeader::VY { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("VY:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("VY")
+                }
+            }
+            StateHeader::VZ { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("VZ:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("VZ")
+                }
+            }
             StateHeader::Epoch(efmt) => {
                 serializer.serialize_str(format!("Epoch:{:?}", efmt).as_str())
             }
@@ -177,47 +379,47 @@ pub enum NavSolutionHeader {
     /// State deviation VZ (km/s)
     Delta_vz,
     /// Covariance matrix [1,1]
-    Cx_x,
+    Cx_x { frame: Option<String> },
     /// Covariance matrix [2,1]
-    Cy_x,
+    Cy_x { frame: Option<String> },
     /// Covariance matrix [2,2]
-    Cy_y,
+    Cy_y { frame: Option<String> },
     /// Covariance matrix [3,1]
-    Cz_x,
+    Cz_x { frame: Option<String> },
     /// Covariance matrix [3,2]
-    Cz_y,
+    Cz_y { frame: Option<String> },
     /// Covariance matrix [3,3]
-    Cz_z,
+    Cz_z { frame: Option<String> },
     /// Covariance matrix [4,1]
-    Cx_dot_x,
+    Cx_dot_x { frame: Option<String> },
     /// Covariance matrix [4,2]
-    Cx_dot_y,
+    Cx_dot_y { frame: Option<String> },
     /// Covariance matrix [4,3]
-    Cx_dot_z,
+    Cx_dot_z { frame: Option<String> },
     /// Covariance matrix [4,4]
-    Cx_dot_x_dot,
+    Cx_dot_x_dot { frame: Option<String> },
     /// Covariance matrix [5,1]
-    Cy_dot_x,
+    Cy_dot_x { frame: Option<String> },
     /// Covariance matrix [5,2]
-    Cy_dot_y,
+    Cy_dot_y { frame: Option<String> },
     /// Covariance matrix [5,3]
-    Cy_dot_z,
+    Cy_dot_z { frame: Option<String> },
     /// Covariance matrix [5,4]
-    Cy_dot_x_dot,
+    Cy_dot_x_dot { frame: Option<String> },
     /// Covariance matrix [5,5]
-    Cy_dot_y_dot,
+    Cy_dot_y_dot { frame: Option<String> },
     /// Covariance matrix [6,1]
-    Cz_dot_x,
+    Cz_dot_x { frame: Option<String> },
     /// Covariance matrix [6,2]
-    Cz_dot_y,
+    Cz_dot_y { frame: Option<String> },
     /// Covariance matrix [6,3]
-    Cz_dot_z,
+    Cz_dot_z { frame: Option<String> },
     /// Covariance matrix [6,4]
-    Cz_dot_x_dot,
+    Cz_dot_x_dot { frame: Option<String> },
     /// Covariance matrix [6,5]
-    Cz_dot_y_dot,
+    Cz_dot_y_dot { frame: Option<String> },
     /// Covariance matrix [6,6]
-    Cz_dot_z_dot,
+    Cz_dot_z_dot { frame: Option<String> },
 }
 
 impl Serialize for NavSolutionHeader {
@@ -250,27 +452,153 @@ impl Serialize for NavSolutionHeader {
             NavSolutionHeader::Delta_vx => serializer.serialize_str("delta_vx"),
             NavSolutionHeader::Delta_vy => serializer.serialize_str("delta_vy"),
             NavSolutionHeader::Delta_vz => serializer.serialize_str("delta_vz"),
-            NavSolutionHeader::Cx_x => serializer.serialize_str("cx_x"),
-            NavSolutionHeader::Cy_x => serializer.serialize_str("cy_x"),
-            NavSolutionHeader::Cy_y => serializer.serialize_str("cy_y"),
-            NavSolutionHeader::Cz_x => serializer.serialize_str("cz_x"),
-            NavSolutionHeader::Cz_y => serializer.serialize_str("cz_y"),
-            NavSolutionHeader::Cz_z => serializer.serialize_str("cz_z"),
-            NavSolutionHeader::Cx_dot_x => serializer.serialize_str("cx_dot_x"),
-            NavSolutionHeader::Cx_dot_y => serializer.serialize_str("cx_dot_y"),
-            NavSolutionHeader::Cx_dot_z => serializer.serialize_str("cx_dot_z"),
-            NavSolutionHeader::Cx_dot_x_dot => serializer.serialize_str("cx_dot_x_dot"),
-            NavSolutionHeader::Cy_dot_x => serializer.serialize_str("cy_dot_x"),
-            NavSolutionHeader::Cy_dot_y => serializer.serialize_str("cy_dot_y"),
-            NavSolutionHeader::Cy_dot_z => serializer.serialize_str("cy_dot_z"),
-            NavSolutionHeader::Cy_dot_x_dot => serializer.serialize_str("cy_dot_x_dot"),
-            NavSolutionHeader::Cy_dot_y_dot => serializer.serialize_str("cy_dot_y_dot"),
-            NavSolutionHeader::Cz_dot_x => serializer.serialize_str("cz_dot_x"),
-            NavSolutionHeader::Cz_dot_y => serializer.serialize_str("cz_dot_y"),
-            NavSolutionHeader::Cz_dot_z => serializer.serialize_str("cz_dot_z"),
-            NavSolutionHeader::Cz_dot_x_dot => serializer.serialize_str("cz_dot_x_dot"),
-            NavSolutionHeader::Cz_dot_y_dot => serializer.serialize_str("cz_dot_y_dot"),
-            NavSolutionHeader::Cz_dot_z_dot => serializer.serialize_str("cz_dot_z_dot"),
+            NavSolutionHeader::Cx_x { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cx_x:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cx_x")
+                }
+            }
+            NavSolutionHeader::Cy_x { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cy_x:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cy_x")
+                }
+            }
+            NavSolutionHeader::Cy_y { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cy_y:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cy_y")
+                }
+            }
+            NavSolutionHeader::Cz_x { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_x:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_x")
+                }
+            }
+            NavSolutionHeader::Cz_y { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_y:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_y")
+                }
+            }
+            NavSolutionHeader::Cz_z { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_z:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_z")
+                }
+            }
+            NavSolutionHeader::Cx_dot_x { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cx_dot_x:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cx_dot_x")
+                }
+            }
+            NavSolutionHeader::Cx_dot_y { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cx_dot_y:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cx_dot_y")
+                }
+            }
+            NavSolutionHeader::Cx_dot_z { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cx_dot_z:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cx_dot_z")
+                }
+            }
+            NavSolutionHeader::Cx_dot_x_dot { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cx_dot_x_dot:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cx_dot_x_dot")
+                }
+            }
+            NavSolutionHeader::Cy_dot_x { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cy_dot_x:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cy_dot_x")
+                }
+            }
+            NavSolutionHeader::Cy_dot_y { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cy_dot_y:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cy_dot_y")
+                }
+            }
+            NavSolutionHeader::Cy_dot_z { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cy_dot_z:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cy_dot_z")
+                }
+            }
+            NavSolutionHeader::Cy_dot_x_dot { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cy_dot_x_dot:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cy_dot_x_dot")
+                }
+            }
+            NavSolutionHeader::Cy_dot_y_dot { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cy_dot_y_dot:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cy_dot_y_dot")
+                }
+            }
+            NavSolutionHeader::Cz_dot_x { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_dot_x:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_dot_x")
+                }
+            }
+            NavSolutionHeader::Cz_dot_y { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_dot_y:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_dot_y")
+                }
+            }
+            NavSolutionHeader::Cz_dot_z { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_dot_z:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_dot_z")
+                }
+            }
+            NavSolutionHeader::Cz_dot_x_dot { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_dot_x_dot:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_dot_x_dot")
+                }
+            }
+            NavSolutionHeader::Cz_dot_y_dot { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_dot_y_dot:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_dot_y_dot")
+                }
+            }
+            NavSolutionHeader::Cz_dot_z_dot { frame } => {
+                if let Some(f) = frame {
+                    serializer.serialize_str(format!("cz_dot_z_dot:{}", f).as_str())
+                } else {
+                    serializer.serialize_str("cz_dot_z_dot")
+                }
+            }
         }
     }
 }
@@ -513,6 +841,8 @@ pub struct NavSolutionFormatter<'a> {
     pub headers: Vec<NavSolutionHeader>,
     pub estimated_headers: StateFormatter<'a>,
     pub nominal_headers: StateFormatter<'a>,
+    frames: HashMap<String, Frame>,
+    cosm: &'a Cosm,
 }
 
 impl<'a> NavSolutionFormatter<'a> {
@@ -525,6 +855,12 @@ impl<'a> NavSolutionFormatter<'a> {
         for hdr in &headers {
             let lowered = hdr.to_lowercase();
             let splt: Vec<&str> = lowered.split(':').collect();
+
+            let frame_name = if splt.len() == 3 {
+                Some(splt[2].to_owned())
+            } else {
+                None
+            };
 
             match splt[0] {
                 "epoch" => {
@@ -540,33 +876,28 @@ impl<'a> NavSolutionFormatter<'a> {
                 "delta_vx" => hdrs.push(NavSolutionHeader::Delta_vx),
                 "delta_vy" => hdrs.push(NavSolutionHeader::Delta_vy),
                 "delta_vz" => hdrs.push(NavSolutionHeader::Delta_vz),
-                "cx_x" => hdrs.push(NavSolutionHeader::Cx_x),
-                "cy_x" => hdrs.push(NavSolutionHeader::Cy_x),
-                "cy_y" => hdrs.push(NavSolutionHeader::Cy_y),
-                "cz_x" => hdrs.push(NavSolutionHeader::Cz_x),
-                "cz_y" => hdrs.push(NavSolutionHeader::Cz_y),
-                "cz_z" => hdrs.push(NavSolutionHeader::Cz_z),
-                "cx_dot_x" => hdrs.push(NavSolutionHeader::Cx_dot_x),
-                "cx_dot_y" => hdrs.push(NavSolutionHeader::Cx_dot_y),
-                "cx_dot_z" => hdrs.push(NavSolutionHeader::Cx_dot_z),
-                "cx_dot_x_dot" => hdrs.push(NavSolutionHeader::Cx_dot_x_dot),
-                "cy_dot_x" => hdrs.push(NavSolutionHeader::Cy_dot_x),
-                "cy_dot_y" => hdrs.push(NavSolutionHeader::Cy_dot_y),
-                "cy_dot_z" => hdrs.push(NavSolutionHeader::Cy_dot_z),
-                "cy_dot_x_dot" => hdrs.push(NavSolutionHeader::Cy_dot_x_dot),
-                "cy_dot_y_dot" => hdrs.push(NavSolutionHeader::Cy_dot_y_dot),
-                "cz_dot_x" => hdrs.push(NavSolutionHeader::Cz_dot_x),
-                "cz_dot_y" => hdrs.push(NavSolutionHeader::Cz_dot_y),
-                "cz_dot_z" => hdrs.push(NavSolutionHeader::Cz_dot_z),
-                "cz_dot_x_dot" => hdrs.push(NavSolutionHeader::Cz_dot_x_dot),
-                "cz_dot_y_dot" => hdrs.push(NavSolutionHeader::Cz_dot_y_dot),
-                "cz_dot_z_dot" => hdrs.push(NavSolutionHeader::Cz_dot_z_dot),
+                "cx_x" => hdrs.push(NavSolutionHeader::Cx_x { frame: frame_name }),
+                "cy_x" => hdrs.push(NavSolutionHeader::Cy_x { frame: frame_name }),
+                "cy_y" => hdrs.push(NavSolutionHeader::Cy_y { frame: frame_name }),
+                "cz_x" => hdrs.push(NavSolutionHeader::Cz_x { frame: frame_name }),
+                "cz_y" => hdrs.push(NavSolutionHeader::Cz_y { frame: frame_name }),
+                "cz_z" => hdrs.push(NavSolutionHeader::Cz_z { frame: frame_name }),
+                "cx_dot_x" => hdrs.push(NavSolutionHeader::Cx_dot_x { frame: frame_name }),
+                "cx_dot_y" => hdrs.push(NavSolutionHeader::Cx_dot_y { frame: frame_name }),
+                "cx_dot_z" => hdrs.push(NavSolutionHeader::Cx_dot_z { frame: frame_name }),
+                "cx_dot_x_dot" => hdrs.push(NavSolutionHeader::Cx_dot_x_dot { frame: frame_name }),
+                "cy_dot_x" => hdrs.push(NavSolutionHeader::Cy_dot_x { frame: frame_name }),
+                "cy_dot_y" => hdrs.push(NavSolutionHeader::Cy_dot_y { frame: frame_name }),
+                "cy_dot_z" => hdrs.push(NavSolutionHeader::Cy_dot_z { frame: frame_name }),
+                "cy_dot_x_dot" => hdrs.push(NavSolutionHeader::Cy_dot_x_dot { frame: frame_name }),
+                "cy_dot_y_dot" => hdrs.push(NavSolutionHeader::Cy_dot_y_dot { frame: frame_name }),
+                "cz_dot_x" => hdrs.push(NavSolutionHeader::Cz_dot_x { frame: frame_name }),
+                "cz_dot_y" => hdrs.push(NavSolutionHeader::Cz_dot_y { frame: frame_name }),
+                "cz_dot_z" => hdrs.push(NavSolutionHeader::Cz_dot_z { frame: frame_name }),
+                "cz_dot_x_dot" => hdrs.push(NavSolutionHeader::Cz_dot_x_dot { frame: frame_name }),
+                "cz_dot_y_dot" => hdrs.push(NavSolutionHeader::Cz_dot_y_dot { frame: frame_name }),
+                "cz_dot_z_dot" => hdrs.push(NavSolutionHeader::Cz_dot_z_dot { frame: frame_name }),
                 "estimate" | "nominal" => {
-                    let frame_name = if splt.len() == 3 {
-                        Some(splt[2].to_owned())
-                    } else {
-                        None
-                    };
                     let state_hdr = match splt[1] {
                         "aol" => StateHeader::AoL { frame: frame_name },
                         "aop" => StateHeader::AoP { frame: frame_name },
@@ -635,15 +966,17 @@ impl<'a> NavSolutionFormatter<'a> {
             nominal_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: nom_hdrs,
-                frames: HashMap::new(),
+                frames: frames.clone(),
                 cosm: &cosm,
             },
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
-                frames: HashMap::new(),
+                frames: frames.clone(),
                 cosm: &cosm,
             },
+            frames,
+            cosm,
         }
     }
 
@@ -667,12 +1000,12 @@ impl<'a> NavSolutionFormatter<'a> {
                 NavSolutionHeader::Delta_vx,
                 NavSolutionHeader::Delta_vy,
                 NavSolutionHeader::Delta_vz,
-                NavSolutionHeader::Cx_x,
-                NavSolutionHeader::Cy_y,
-                NavSolutionHeader::Cz_z,
-                NavSolutionHeader::Cx_dot_x_dot,
-                NavSolutionHeader::Cy_dot_y_dot,
-                NavSolutionHeader::Cz_dot_z_dot,
+                NavSolutionHeader::Cx_x { frame: None },
+                NavSolutionHeader::Cy_y { frame: None },
+                NavSolutionHeader::Cz_z { frame: None },
+                NavSolutionHeader::Cx_dot_x_dot { frame: None },
+                NavSolutionHeader::Cy_dot_y_dot { frame: None },
+                NavSolutionHeader::Cz_dot_z_dot { frame: None },
                 NavSolutionHeader::EstimatedState(est_hdrs.clone()),
             ],
             nominal_headers: StateFormatter {
@@ -687,6 +1020,8 @@ impl<'a> NavSolutionFormatter<'a> {
                 frames: HashMap::new(),
                 cosm: &cosm,
             },
+            frames: HashMap::new(),
+            cosm,
         }
     }
 
@@ -726,55 +1061,67 @@ impl<'a> NavSolutionFormatter<'a> {
                 NavSolutionHeader::Delta_vz => {
                     formatted.push(format!("{:.16e}", sol.state_deviation()[5]))
                 }
-                NavSolutionHeader::Cx_x => formatted.push(format!("{:.16e}", sol.covar()[(0, 0)])),
-                NavSolutionHeader::Cy_x => formatted.push(format!("{:.16e}", sol.covar()[(1, 0)])),
-                NavSolutionHeader::Cy_y => formatted.push(format!("{:.16e}", sol.covar()[(1, 1)])),
-                NavSolutionHeader::Cz_x => formatted.push(format!("{:.16e}", sol.covar()[(2, 0)])),
-                NavSolutionHeader::Cz_y => formatted.push(format!("{:.16e}", sol.covar()[(2, 1)])),
-                NavSolutionHeader::Cz_z => formatted.push(format!("{:.16e}", sol.covar()[(2, 2)])),
-                NavSolutionHeader::Cx_dot_x => {
+                NavSolutionHeader::Cx_x { .. } => {
+                    formatted.push(format!("{:.16e}", sol.covar()[(0, 0)]))
+                }
+                NavSolutionHeader::Cy_x { .. } => {
+                    formatted.push(format!("{:.16e}", sol.covar()[(1, 0)]))
+                }
+                NavSolutionHeader::Cy_y { .. } => {
+                    formatted.push(format!("{:.16e}", sol.covar()[(1, 1)]))
+                }
+                NavSolutionHeader::Cz_x { .. } => {
+                    formatted.push(format!("{:.16e}", sol.covar()[(2, 0)]))
+                }
+                NavSolutionHeader::Cz_y { .. } => {
+                    formatted.push(format!("{:.16e}", sol.covar()[(2, 1)]))
+                }
+                NavSolutionHeader::Cz_z { .. } => {
+                    formatted.push(format!("{:.16e}", sol.covar()[(2, 2)]))
+                }
+                NavSolutionHeader::Cx_dot_x { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(3, 0)]))
                 }
-                NavSolutionHeader::Cx_dot_y => {
+                NavSolutionHeader::Cx_dot_y { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(3, 1)]))
                 }
-                NavSolutionHeader::Cx_dot_z => {
+                NavSolutionHeader::Cx_dot_z { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(3, 2)]))
                 }
-                NavSolutionHeader::Cx_dot_x_dot => {
+                NavSolutionHeader::Cx_dot_x_dot { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(3, 3)]))
                 }
-                NavSolutionHeader::Cy_dot_x => {
+                NavSolutionHeader::Cy_dot_x { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(4, 0)]))
                 }
-                NavSolutionHeader::Cy_dot_y => {
+                NavSolutionHeader::Cy_dot_y { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(4, 1)]))
                 }
-                NavSolutionHeader::Cy_dot_z => {
+                NavSolutionHeader::Cy_dot_z { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(4, 2)]))
                 }
-                NavSolutionHeader::Cy_dot_x_dot => {
+                NavSolutionHeader::Cy_dot_x_dot { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(4, 3)]))
                 }
-                NavSolutionHeader::Cy_dot_y_dot => {
+                NavSolutionHeader::Cy_dot_y_dot { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(4, 4)]))
                 }
-                NavSolutionHeader::Cz_dot_x => {
+                NavSolutionHeader::Cz_dot_x { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(5, 0)]))
                 }
-                NavSolutionHeader::Cz_dot_y => {
+                NavSolutionHeader::Cz_dot_y { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(5, 1)]))
                 }
-                NavSolutionHeader::Cz_dot_z => {
+                NavSolutionHeader::Cz_dot_z { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(5, 2)]))
                 }
-                NavSolutionHeader::Cz_dot_x_dot => {
+                NavSolutionHeader::Cz_dot_x_dot { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(5, 3)]))
                 }
-                NavSolutionHeader::Cz_dot_y_dot => {
+                NavSolutionHeader::Cz_dot_y_dot { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(5, 4)]))
                 }
-                NavSolutionHeader::Cz_dot_z_dot => {
+                NavSolutionHeader::Cz_dot_z_dot { .. } => {
                     formatted.push(format!("{:.16e}", sol.covar()[(5, 5)]))
                 }
             };
