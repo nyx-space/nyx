@@ -56,7 +56,7 @@ fn main() -> Result<(), ParsingError> {
     let scenario: ScenarioSerde;
     match s.try_into() {
         Ok(s) => scenario = s,
-        Err(e) => panic!("{:?}", e),
+        Err(e) => return Err(ParsingError::LoadingError(e.to_string())),
     };
 
     if var(LOG_VAR).is_err() {
@@ -67,46 +67,48 @@ fn main() -> Result<(), ParsingError> {
         println!("could not init logger");
     }
 
+    // Select the sequence to run (or run all)
+    let seq_name = if exec_all {
+        None
+    } else if let Some(seq_name) = matches.value_of("sequence") {
+        Some(seq_name.to_string())
+    } else {
+        // Build the list of sequences
+        let sequences = &scenario.sequence;
+
+        let selection = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("\n\nSelect the sequence to execute")
+            .default(0)
+            .items(&sequences[..])
+            .interact()
+            .unwrap();
+        Some(sequences[selection].clone())
+    };
+
     // Load cosm
     let cosm = Cosm::de438();
 
     let rtn = match MDProcess::try_from_scenario(scenario, &cosm) {
         Ok(sequence) => {
             info!("Loaded scenario `{}`", scenario_path);
-            if exec_all {
-                for mut item in sequence {
-                    item.execute();
-                }
-                Ok(())
-            } else {
-                let seq_name = if let Some(seq_name) = matches.value_of("sequence") {
-                    seq_name.to_string()
-                } else {
-                    // Build the list of sequences
-                    let sequences: Vec<String> = sequence.iter().map(|x| x.name.clone()).collect();
 
-                    let selection = Select::with_theme(&ColorfulTheme::default())
-                        .with_prompt("\n\nSelect the sequence to execute")
-                        .default(0)
-                        .items(&sequences[..])
-                        .interact()
-                        .unwrap();
-                    sequences[selection].clone()
-                };
-
-                let mut found = false;
-                for mut item in sequence {
-                    if item.name == seq_name {
+            let mut found = false;
+            for mut item in sequence {
+                if let Some(seq_name) = &seq_name {
+                    if &item.name == seq_name {
                         found = true;
                         item.execute();
                         break;
                     }
-                }
-                if !found {
-                    Err(ParsingError::SequenceNotFound(seq_name))
                 } else {
-                    Ok(())
+                    found = true;
+                    item.execute();
                 }
+            }
+            if !found {
+                Err(ParsingError::SequenceNotFound(seq_name.unwrap()))
+            } else {
+                Ok(())
             }
         }
         Err(e) => match e {
