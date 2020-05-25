@@ -48,7 +48,7 @@ fn test_deser_distr_multi() {
 
     #[derive(Deserialize)]
     struct MapRv {
-        rvs: HashMap<String, Distribution>,
+        pub rvs: HashMap<String, Distribution>,
     }
 
     let _as_map: MapRv = toml::from_str(

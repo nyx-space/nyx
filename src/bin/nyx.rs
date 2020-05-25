@@ -67,6 +67,8 @@ fn main() -> Result<(), ParsingError> {
         println!("could not init logger");
     }
 
+    info!("Loaded scenario `{}`", scenario_path);
+
     // Select the sequence to run (or run all)
     let seq_name = if exec_all {
         None
@@ -76,48 +78,54 @@ fn main() -> Result<(), ParsingError> {
         // Build the list of sequences
         let sequences = &scenario.sequence;
 
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("\n\nSelect the sequence to execute")
-            .default(0)
-            .items(&sequences[..])
-            .interact()
-            .unwrap();
-        Some(sequences[selection].clone())
+        if sequences.len() == 1 {
+            // Always execute the only sequence available
+            Some(sequences[0].clone())
+        } else {
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("\n\nSelect the sequence to execute")
+                .default(0)
+                .items(&sequences[..])
+                .interact()
+                .unwrap();
+            Some(sequences[selection].clone())
+        }
     };
 
     // Load cosm
     let cosm = Cosm::de438();
 
-    let rtn = match MDProcess::try_from_scenario(scenario, &cosm) {
-        Ok(sequence) => {
-            info!("Loaded scenario `{}`", scenario_path);
-
-            let mut found = false;
-            for mut item in sequence {
-                if let Some(seq_name) = &seq_name {
-                    if &item.name == seq_name {
-                        found = true;
-                        item.execute();
+    for scen_seq_name in &scenario.sequence {
+        if let Some(seq_name) = &seq_name {
+            if scen_seq_name == seq_name {
+                // Build the MDP
+                match MDProcess::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
+                    Ok(mut md) => {
+                        info!("Executing sequence `{}`", seq_name);
+                        md.execute();
                         break;
                     }
-                } else {
-                    found = true;
-                    item.execute();
+                    Err(e) => {
+                        error!("{:?}", e);
+                        return Err(e);
+                    }
+                };
+            }
+        } else {
+            // Build the MDP
+            match MDProcess::try_from_scenario(&scenario, scen_seq_name.to_string(), &cosm) {
+                Ok(mut md) => {
+                    info!("Executing sequence `{}`", scen_seq_name);
+                    md.execute();
+                    break;
                 }
-            }
-            if !found {
-                Err(ParsingError::SequenceNotFound(seq_name.unwrap()))
-            } else {
-                Ok(())
-            }
+                Err(e) => {
+                    error!("{:?}", e);
+                    return Err(e);
+                }
+            };
         }
-        Err(e) => match e {
-            ParsingError::UseOdInstead => unimplemented!(),
-            _ => Err(e),
-        },
-    };
-    if rtn.is_err() {
-        error!("{:?}", rtn);
     }
-    rtn
+
+    Ok(())
 }

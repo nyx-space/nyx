@@ -8,6 +8,7 @@ pub use super::residual::*;
 pub use super::srif::*;
 pub use super::*;
 
+use crate::io::scenario::ScenarioSerde;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
 

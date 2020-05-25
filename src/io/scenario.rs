@@ -153,6 +153,55 @@ pub struct PropagatorSerde {
 }
 
 #[derive(Deserialize)]
+pub struct OdpSerde {
+    /// The kind of filter to use
+    pub kind: String,
+    /// Name of the navigation propagator
+    pub navigation_prop: String,
+    /// Name of the measurement generator/reader
+    pub measurements: String,
+    /// Name of the initial estimate name
+    pub initial_estimate: String,
+    /// Optional SNC
+    pub snc: Option<Vec<f64>>,
+    /// Optional SNC turn-off time
+    pub snc_disable: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct EstimateSerde {
+    /// The initial state estimate, must be a reference to a state
+    pub state: String,
+    /// The full covariance matrix, must be 6x6
+    pub covar_mat: Option<Vec<Vec<f64>>>,
+    /// The diagonal of the covariance matrix (a single vector of 6 values)
+    pub covar_diag: Option<Vec<f64>>,
+}
+
+#[derive(Deserialize)]
+pub struct MeasurementSerde {
+    /// Name of the truth propagator, if unspecified then the output must be specified
+    pub propagator: Option<String>,
+    /// Names of the measurement devices to use
+    pub msr_device: Vec<String>,
+    /// Name of the output file to store the measurements
+    pub output: String,
+    /// Optionally specify whether to use the file if it exists
+    pub use_file_if_available: Option<bool>,
+}
+
+#[derive(Deserialize)]
+pub struct StationSerde {
+    pub elevation: f64,
+    pub range_noise: f64,
+    pub range_rate_noise: f64,
+    pub latitude: Option<f64>,
+    pub longitutde: Option<f64>,
+    pub height: Option<f64>,
+    pub from: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct ScenarioSerde {
     pub sequence: Vec<String>,
     pub propagator: HashMap<String, PropagatorSerde>,
@@ -162,10 +211,14 @@ pub struct ScenarioSerde {
     pub accel_models: HashMap<String, AccelModel>,
     pub output: HashMap<String, OutputSerde>,
     pub distr: Option<HashMap<String, Distribution>>,
+    pub odp: Option<HashMap<String, OdpSerde>>,
+    pub estimate: Option<HashMap<String, EstimateSerde>>,
+    pub measurements: Option<HashMap<String, MeasurementSerde>>,
+    pub stations: Option<HashMap<String, StationSerde>>,
 }
 
 #[test]
-fn test_deser_scenario() {
+fn test_md_scenario() {
     extern crate toml;
 
     let scen: ScenarioSerde = toml::from_str(
@@ -237,4 +290,103 @@ fn test_deser_scenario() {
     assert_eq!(scen.accel_models.len(), 1);
     assert_eq!(scen.accel_models["my_models"].harmonics.len(), 1);
     assert_eq!(scen.sequence.len(), 1);
+}
+
+#[test]
+fn test_od_scenario() {
+    extern crate toml;
+
+    let scen: ScenarioSerde = toml::from_str(
+        r#"
+        sequence = ["my_flt"]
+
+        [state.state_name]
+        x = -2436.45
+        y = -2436.45
+        z = 6891.037
+        vx = 5.088611
+        vy = -5.088611
+        vz = 0.0
+        frame = "EME2000"
+        epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
+        unit_position = "km"  # Default value if unspecified
+        unit_velocity = "km/s"  # Default value if unspecified
+
+        [orbital_dynamics.conf_name]
+        integration_frame = "EME2000"
+        initial_state = "state_name"
+        point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
+        accel_models = ["my_models"]
+
+        [spacecraft.sc1]
+        dry_mass = 100.0
+        fuel_mass = 20.0
+        orbital_dynamics = "conf_name"
+
+        [propagator.nav_prop]
+        dynamics = "sc1"
+        stop_cond = "3.5 days"
+        output = "my_csv"
+
+        [propagator.truth_propagator]
+        dynamics = "sc1"
+        stop_cond = "3.5 days"
+        output = "my_csv"
+
+        [accel_models.my_models.harmonics.jgm3_70x70]
+        frame = "EME2000"
+        degree = 70
+        order = 70
+        file = "data/JGM3.cof.gz"
+
+        [output.my_csv]
+        filename = "./data/scenario-run.csv"
+        headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
+
+        [odp.my_flt]
+        kind = "cfk"  # Could be ekf or srif
+        navigation_prop = "nav_prop"
+        initial_estimate = "my_estimate"
+        snc = [1e-8, 1e-8, 1e-8]
+        snc_disable = "120 * sec"
+        measurements = "msr_sim"  # Or provide a file name
+
+        [measurements.msr_sim]
+        propagator = "truth_propagator"
+        msr_device = ["dss13", "dss65", "dss34"]
+        output = "msr_sim.csv"
+        use_file_if_available = true
+
+        [stations.dss13]
+        elevation = 10.0
+        latitude = 40.427_222
+        longitude = 4.250_556
+        height = 0.834_939
+        range_noise = 0.1
+        range_rate_noise = 0.01
+
+        [stations.dss65]
+        from = "dss65" # Name of the station, built-in
+        elevation = 10.0
+        range_noise = 0.1
+        range_rate_noise = 0.01
+
+        [estimate.my_estimate]
+        state = "state_name"
+        #covar_mat = [[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1]]
+        covar_diag = [1e1, 1e1, 1e1, 1e-2, 1e-2, 1e-2]
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(scen.state.len(), 1);
+    assert_eq!(scen.orbital_dynamics.len(), 1);
+    assert_eq!(scen.propagator.len(), 2);
+    assert_eq!(scen.accel_models.len(), 1);
+    assert_eq!(scen.accel_models["my_models"].harmonics.len(), 1);
+    assert_eq!(scen.sequence.len(), 1);
+    assert_eq!(scen.odp.unwrap().len(), 1);
+    assert_eq!(scen.measurements.unwrap().len(), 1);
+    assert_eq!(scen.stations.unwrap().len(), 2);
+    assert_eq!(scen.estimate.unwrap().len(), 1);
 }
