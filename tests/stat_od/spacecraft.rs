@@ -75,7 +75,7 @@ fn sc_ckf_perfect_stations() {
             let rx_state = rx_sc_state.orbit;
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
-                measurements.push((rx_state.dt, meas));
+                measurements.push(meas);
                 break;
             }
         }

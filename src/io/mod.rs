@@ -20,12 +20,16 @@ pub mod rv;
 
 pub mod scenario;
 
+pub mod odp;
+
 pub mod formatter;
 
 #[derive(Debug)]
 pub enum ParsingError {
     MD(String),
+    OD(String),
     UseOdInstead,
+    UseMdInstead,
     EpochFormat,
     CovarFormat,
     FileNotFound(String),

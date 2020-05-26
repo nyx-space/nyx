@@ -63,7 +63,7 @@ fn multi_body_ckf_perfect_stations() {
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
-                measurements.push((rx_state.dt, meas));
+                measurements.push(meas);
                 break;
             }
         }

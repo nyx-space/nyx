@@ -12,6 +12,7 @@ pub use crate::dynamics::Dynamics;
 use crate::io::formatter::*;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::ParsingError;
+use crate::propagators::error_ctrl::RSSStepPV;
 use crate::propagators::{PropOpts, Propagator};
 use crate::time::{Epoch, SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE};
 use std::str::FromStr;
@@ -40,9 +41,7 @@ where
         cosm: &'a Cosm,
     ) -> Result<Self, ParsingError> {
         match scen.propagator.get(&prop_name) {
-            None => {
-                return Err(ParsingError::PropagatorNotFound(prop_name));
-            }
+            None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
                 // let mut spacecraft_dynamics;
                 let mut sc_dyn;
@@ -237,6 +236,10 @@ where
         }
     }
 
+    pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
+        Propagator::default(&mut self.sc_dyn, &PropOpts::default())
+    }
+
     pub fn execute(&mut self) {
         // Create the output file
         let mut maybe_wtr = match &self.formatter {
@@ -251,13 +254,16 @@ where
             None => None,
         };
 
+        // Get the prop time before the mutable ref
+        let prop_time = self.prop_time_s.unwrap();
+
         // Build the propagator
-        let mut prop = Propagator::default(&mut self.sc_dyn, &PropOpts::default());
+        // let mut prop = Propagator::default(&mut self.sc_dyn, &PropOpts::default());
+        let mut prop = self.propagator();
         // Set up the channels
         let (tx, rx) = channel();
         prop.tx_chan = Some(&tx);
         // Run
-        let prop_time = self.prop_time_s.unwrap();
         info!(
             "Propagating for {} seconds (~ {:.3} days)",
             prop_time,

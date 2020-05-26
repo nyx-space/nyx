@@ -147,17 +147,18 @@ where
     }
 
     /// Allows processing all measurements without covariance mapping.
-    pub fn process_measurements(&mut self, measurements: &[(Epoch, Msr)]) -> Option<FilterError> {
+    pub fn process_measurements(&mut self, measurements: &[Msr]) -> Option<FilterError> {
         info!("Processing {} measurements", measurements.len());
 
         let mut prev_dt = self.kf.previous_estimate().epoch();
         let mut reported = vec![false; 11];
         let num_msrs = measurements.len();
 
-        for (msr_cnt, (next_epoch, real_meas)) in measurements.iter().enumerate() {
+        for (msr_cnt, real_meas) in measurements.iter().enumerate() {
+            let next_epoch = real_meas.epoch();
             // Propagate the dynamics to the measurement, and then start the filter.
-            let delta_time = *next_epoch - prev_dt;
-            prev_dt = *next_epoch; // Update the epoch for the next computation
+            let delta_time = next_epoch - prev_dt;
+            prev_dt = next_epoch; // Update the epoch for the next computation
             self.prop.until_time_elapsed(delta_time);
             // Update the STM of the KF
             self.kf.update_stm(self.prop.dynamics.stm());

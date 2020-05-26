@@ -196,7 +196,7 @@ pub struct StationSerde {
     pub range_noise: f64,
     pub range_rate_noise: f64,
     pub latitude: Option<f64>,
-    pub longitutde: Option<f64>,
+    pub longitude: Option<f64>,
     pub height: Option<f64>,
     pub from: Option<String>,
 }

@@ -9,7 +9,7 @@ use config::{Config, File};
 use dialoguer::{theme::ColorfulTheme, Select};
 use log::{error, info};
 use nyx::celestia::Cosm;
-use nyx::io::{scenario::*, ParsingError};
+use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
 use nyx::md::ui::MDProcess;
 use std::env::{set_var, var};
 
@@ -70,7 +70,7 @@ fn main() -> Result<(), ParsingError> {
     info!("Loaded scenario `{}`", scenario_path);
 
     // Select the sequence to run (or run all)
-    let seq_name = if exec_all {
+    let req_seq_name = if exec_all {
         None
     } else if let Some(seq_name) = matches.value_of("sequence") {
         Some(seq_name.to_string())
@@ -95,35 +95,38 @@ fn main() -> Result<(), ParsingError> {
     // Load cosm
     let cosm = Cosm::de438();
 
-    for scen_seq_name in &scenario.sequence {
-        if let Some(seq_name) = &seq_name {
-            if scen_seq_name == seq_name {
-                // Build the MDP
-                match MDProcess::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
-                    Ok(mut md) => {
-                        info!("Executing sequence `{}`", seq_name);
-                        md.execute();
-                        break;
+    // If there is an ODP setup, let's try to decode that
+
+    for seq_name in &scenario.sequence {
+        let should_exec = if let Some(req_seq_name) = &req_seq_name {
+            seq_name == req_seq_name
+        } else {
+            true
+        };
+        if should_exec {
+            match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
+                Ok(odp) => unimplemented!(),
+                Err(e) => match e {
+                    ParsingError::UseMdInstead => {
+                        // Build the MDP
+                        match MDProcess::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
+                            Ok(mut md) => {
+                                info!("Executing sequence `{}`", seq_name);
+                                md.execute();
+                                break;
+                            }
+                            Err(e) => {
+                                error!("{:?}", e);
+                                return Err(e);
+                            }
+                        };
                     }
-                    Err(e) => {
+                    _ => {
                         error!("{:?}", e);
                         return Err(e);
                     }
-                };
+                },
             }
-        } else {
-            // Build the MDP
-            match MDProcess::try_from_scenario(&scenario, scen_seq_name.to_string(), &cosm) {
-                Ok(mut md) => {
-                    info!("Executing sequence `{}`", scen_seq_name);
-                    md.execute();
-                    break;
-                }
-                Err(e) => {
-                    error!("{:?}", e);
-                    return Err(e);
-                }
-            };
         }
     }
 
