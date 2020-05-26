@@ -5,9 +5,9 @@ use self::regex::Regex;
 pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
-pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
+pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
 use crate::dynamics::spacecraft::Spacecraft;
-use crate::dynamics::sph_harmonics::Harmonics;
+use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
 use crate::io::formatter::*;
 use crate::io::scenario::ScenarioSerde;
@@ -19,12 +19,30 @@ use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
+pub enum StmState<N, M> {
+    Without(N),
+    With(M),
+    Unknown,
+}
+
+impl<N, M> StmState<N, M> {
+    pub fn with(&self) -> bool {
+        match self {
+            StmState::With(_) => true,
+            _ => false,
+        }
+    }
+}
+
+pub type StmStateFlag = StmState<(), ()>;
+
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics
 pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    sc_dyn: Spacecraft<'a, OrbitalDynamics<'a>>,
+    // sc_dyn: Spacecraft<'a, OrbitalDynamics<'a>>,
+    sc_dyn: StmState<Spacecraft<'a, OrbitalDynamics<'a>>, Spacecraft<'a, OrbitalDynamicsStm<'a>>>,
     formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
@@ -38,13 +56,14 @@ where
     pub fn try_from_scenario(
         scen: &ScenarioSerde,
         prop_name: String,
+        stm_flag: StmStateFlag,
         cosm: &'a Cosm,
     ) -> Result<Self, ParsingError> {
         match scen.propagator.get(&prop_name) {
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
-                // let mut spacecraft_dynamics;
-                let mut sc_dyn;
+                #[allow(unused_assignments)]
+                let mut sc_dyn_flagged = StmState::Unknown;
                 let mut init_state;
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
@@ -127,13 +146,20 @@ where
                                         {
                                             bodies.remove(pos);
                                         }
-                                        if dynamics.with_stm() {
-                                            return Err(ParsingError::MD(format!(
-                                                    "dynamics `{}` require STM, but this is a mission design scenario",
-                                                    prop.dynamics
-                                                )));
+                                        if stm_flag.with() {
+                                            let mut sc_dyn_stm = Spacecraft::with_stm(
+                                                OrbitalDynamicsStm::point_masses(
+                                                    init_state, bodies, cosm,
+                                                ),
+                                                spacecraft.dry_mass,
+                                            );
+                                            if let Some(fuel_mass) = spacecraft.fuel_mass {
+                                                sc_dyn_stm.fuel_mass = fuel_mass;
+                                            }
+
+                                            sc_dyn_flagged = StmState::With(sc_dyn_stm);
                                         } else {
-                                            sc_dyn = Spacecraft::new(
+                                            let mut sc_dyn = Spacecraft::new(
                                                 OrbitalDynamics::point_masses(
                                                     init_state, bodies, cosm,
                                                 ),
@@ -142,20 +168,29 @@ where
                                             if let Some(fuel_mass) = spacecraft.fuel_mass {
                                                 sc_dyn.fuel_mass = fuel_mass;
                                             }
+
+                                            sc_dyn_flagged = StmState::Without(sc_dyn);
                                         }
-                                    } else if dynamics.with_stm() {
-                                        return Err(ParsingError::MD(format!(
-                                                "dynamics `{}` require STM, but this is a mission design scenario",
-                                                prop.dynamics
-                                            )));
+                                    } else if stm_flag.with() {
+                                        let mut sc_dyn_stm = Spacecraft::with_stm(
+                                            OrbitalDynamicsStm::two_body(init_state),
+                                            spacecraft.dry_mass,
+                                        );
+                                        if let Some(fuel_mass) = spacecraft.fuel_mass {
+                                            sc_dyn_stm.fuel_mass = fuel_mass;
+                                        }
+
+                                        sc_dyn_flagged = StmState::With(sc_dyn_stm);
                                     } else {
-                                        sc_dyn = Spacecraft::new(
+                                        let mut sc_dyn = Spacecraft::new(
                                             OrbitalDynamics::two_body(init_state),
                                             spacecraft.dry_mass,
                                         );
                                         if let Some(fuel_mass) = spacecraft.fuel_mass {
                                             sc_dyn.fuel_mass = fuel_mass;
                                         }
+
+                                        sc_dyn_flagged = StmState::Without(sc_dyn);
                                     }
 
                                     // Add the acceleration models if applicable
@@ -174,12 +209,39 @@ where
                                                         let compute_frame =
                                                             cosm.frame(hmdl.frame.as_str());
 
-                                                        let hh = Harmonics::from_stor(
-                                                            compute_frame,
-                                                            in_mem,
-                                                            &cosm,
-                                                        );
-                                                        sc_dyn.orbital_dyn.add_model(Box::new(hh));
+                                                        if stm_flag.with() {
+                                                            let hh = HarmonicsDiff::from_stor(
+                                                                compute_frame,
+                                                                in_mem,
+                                                                &cosm,
+                                                            );
+                                                            match sc_dyn_flagged {
+                                                                StmState::With(
+                                                                    ref mut sc_dyn_stm,
+                                                                ) => {
+                                                                    sc_dyn_stm
+                                                                        .orbital_dyn
+                                                                        .add_model(Box::new(hh));
+                                                                }
+                                                                _ => panic!("should not happen"),
+                                                            };
+                                                        } else {
+                                                            let hh = Harmonics::from_stor(
+                                                                compute_frame,
+                                                                in_mem,
+                                                                &cosm,
+                                                            );
+                                                            match sc_dyn_flagged {
+                                                                StmState::Without(
+                                                                    ref mut sc_dyn,
+                                                                ) => {
+                                                                    sc_dyn
+                                                                        .orbital_dyn
+                                                                        .add_model(Box::new(hh));
+                                                                }
+                                                                _ => panic!("should not happen"),
+                                                            };
+                                                        }
                                                     }
                                                 }
                                             }
@@ -226,7 +288,7 @@ where
                 };
 
                 Ok(Self {
-                    sc_dyn,
+                    sc_dyn: sc_dyn_flagged,
                     formatter,
                     output: Vec::with_capacity(65_535),
                     prop_time_s: Some(prop_time_s),
@@ -237,7 +299,10 @@ where
     }
 
     pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
-        Propagator::default(&mut self.sc_dyn, &PropOpts::default())
+        match self.sc_dyn {
+            StmState::Without(ref mut sc_dyn) => Propagator::default(sc_dyn, &PropOpts::default()),
+            _ => unimplemented!(),
+        }
     }
 
     pub fn execute(&mut self) {

@@ -63,14 +63,6 @@ pub struct OrbitalDynamicsSerde {
     pub integration_frame: Option<String>,
     pub point_masses: Option<Vec<String>>,
     pub accel_models: Option<Vec<String>>,
-    /// If unspecified, the STM will not be computed
-    pub stm: Option<bool>,
-}
-
-impl OrbitalDynamicsSerde {
-    pub fn with_stm(&self) -> bool {
-        self.stm.is_some() && self.stm.unwrap()
-    }
 }
 
 #[derive(Deserialize)]

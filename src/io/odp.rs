@@ -1,7 +1,7 @@
 pub use crate::celestia::*;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::ParsingError;
-use crate::md::ui::MDProcess;
+use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
 use crate::od::{Measurement, MeasurementDevice};
 use crate::time::SECONDS_PER_DAY;
@@ -101,10 +101,10 @@ impl<'a> OdpScenario<'a> {
                         }
                     }
                     // Generate the measurements.
-
                     let mut md = MDProcess::try_from_scenario(
                         scenario,
                         msr.propagator.as_ref().unwrap().to_string(),
+                        StmStateFlag::Without(()),
                         cosm,
                     )?;
 

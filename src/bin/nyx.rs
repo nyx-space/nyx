@@ -10,7 +10,7 @@ use dialoguer::{theme::ColorfulTheme, Select};
 use log::{error, info};
 use nyx::celestia::Cosm;
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
-use nyx::md::ui::MDProcess;
+use nyx::md::ui::{MDProcess, StmStateFlag};
 use std::env::{set_var, var};
 
 const LOG_VAR: &str = "NYX_LOG";
@@ -109,7 +109,12 @@ fn main() -> Result<(), ParsingError> {
                 Err(e) => match e {
                     ParsingError::UseMdInstead => {
                         // Build the MDP
-                        match MDProcess::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
+                        match MDProcess::try_from_scenario(
+                            &scenario,
+                            seq_name.to_string(),
+                            StmStateFlag::Without(()),
+                            &cosm,
+                        ) {
                             Ok(mut md) => {
                                 info!("Executing sequence `{}`", seq_name);
                                 md.execute();
