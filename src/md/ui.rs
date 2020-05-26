@@ -1,20 +1,18 @@
 extern crate csv;
-extern crate regex;
 
-use self::regex::Regex;
 pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
-use crate::dynamics::spacecraft::Spacecraft;
+use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
 use crate::io::formatter::*;
 use crate::io::scenario::ScenarioSerde;
-use crate::io::ParsingError;
+use crate::io::{parse_duration, ParsingError};
 use crate::propagators::error_ctrl::RSSStepPV;
 use crate::propagators::{PropOpts, Propagator};
-use crate::time::{Epoch, SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE};
+use crate::time::{Epoch, SECONDS_PER_DAY};
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -41,7 +39,6 @@ pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    // sc_dyn: Spacecraft<'a, OrbitalDynamics<'a>>,
     sc_dyn: StmState<Spacecraft<'a, OrbitalDynamics<'a>>, Spacecraft<'a, OrbitalDynamicsStm<'a>>>,
     formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
@@ -254,34 +251,12 @@ where
                 }
                 // Validate the stopping condition
                 // Let's see if it's a relative time
-                let reg = Regex::new(r"^(\d+\.?\d*)\W*(\w+)$").unwrap();
-                let prop_time_s = match reg.captures(prop.stop_cond.as_str()) {
-                    Some(cap) => {
-                        let mut prop_time_s = cap[1].to_owned().parse::<f64>().unwrap();
-                        match cap[2].to_owned().to_lowercase().as_str() {
-                            "days" | "day" => prop_time_s *= SECONDS_PER_DAY,
-                            "hours" | "hour" => prop_time_s *= SECONDS_PER_HOUR,
-                            "min" | "mins" | "minute" | "minutes" => {
-                                prop_time_s *= SECONDS_PER_MINUTE
-                            }
-                            _ => {
-                                return Err(ParsingError::MD(format!(
-                                    "unknown duration unit in `{}`",
-                                    prop.stop_cond
-                                )))
-                            }
-                        }
-                        prop_time_s
-                    }
-                    None => {
+                let prop_time_s = match parse_duration(prop.stop_cond.as_str()) {
+                    Ok(duration) => duration,
+                    Err(e) => {
                         // Check to see if it's an Epoch
                         match Epoch::from_str(prop.stop_cond.as_str()) {
-                            Err(_) => {
-                                return Err(ParsingError::MD(format!(
-                                    "Could not parse stopping condition: `{}`",
-                                    prop.stop_cond
-                                )))
-                            }
+                            Err(_) => return Err(e),
                             Ok(epoch) => epoch - init_state.dt,
                         }
                     }
@@ -301,7 +276,24 @@ where
     pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
         match self.sc_dyn {
             StmState::Without(ref mut sc_dyn) => Propagator::default(sc_dyn, &PropOpts::default()),
-            _ => unimplemented!(),
+            _ => panic!("these dynamics are defined with stm. Use stm_propagator instead"),
+        }
+    }
+
+    pub fn stm_propagator(
+        &mut self,
+    ) -> Propagator<Spacecraft<'a, OrbitalDynamicsStm<'a>>, RSSStepPV> {
+        match self.sc_dyn {
+            StmState::With(ref mut sc_dyn) => Propagator::default(sc_dyn, &PropOpts::default()),
+            _ => panic!("these dynamics are defined without stm. Use propagator instead"),
+        }
+    }
+
+    pub fn state(&self) -> SpacecraftState {
+        match &self.sc_dyn {
+            StmState::With(sc_dyn) => sc_dyn.state(),
+            StmState::Without(sc_dyn) => sc_dyn.state(),
+            _ => panic!("only call state() on an initialized MDProcess"),
         }
     }
 

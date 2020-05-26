@@ -47,6 +47,7 @@ headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 kind = "cfk"  # Could be ekf or srif
 navigation_prop = "nav_prop"
 initial_estimate = "my_estimate"
+msr_noise = [1e-6, 1e-3]
 snc = [1e-8, 1e-8, 1e-8]
 snc_disable = "120 * sec"
 measurements = "msr_sim"  # Or provide a file name

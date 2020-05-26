@@ -1,5 +1,5 @@
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3};
 
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
@@ -58,7 +58,7 @@ where
         + Allocator<f64, A, S>,
 {
     /// Initializes this KF with an initial estimate and measurement noise.
-    pub fn initialize(
+    pub fn new(
         initial_estimate: KfEstimate<S, T>,
         process_noise: MatrixMN<f64, A, A>,
         measurement_noise: MatrixMN<f64, M, M>,
@@ -82,7 +82,7 @@ where
     }
 }
 
-impl<S, M, T> KF<S, U1, M, T>
+impl<S, M, T> KF<S, U3, M, T>
 where
     S: DimName,
     M: DimName,
@@ -93,9 +93,9 @@ where
         + Allocator<f64, M, S>
         + Allocator<f64, S, M>
         + Allocator<f64, S, S>
-        + Allocator<f64, U1, U1>
-        + Allocator<f64, S, U1>
-        + Allocator<f64, U1, S>,
+        + Allocator<f64, U3, U3>
+        + Allocator<f64, S, U3>
+        + Allocator<f64, U3, S>,
 {
     /// Initializes this KF without SNC
     pub fn no_snc(

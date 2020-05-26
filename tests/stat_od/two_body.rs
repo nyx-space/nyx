@@ -405,7 +405,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Disable SNC if there is more than 120 seconds between two measurements
     let process_noise_dt = Some(120.0);
 
-    let mut ckf = KF::initialize(
+    let mut ckf = KF::new(
         initial_estimate,
         process_noise,
         measurement_noise,

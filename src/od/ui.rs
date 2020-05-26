@@ -8,13 +8,13 @@ pub use super::residual::*;
 pub use super::srif::*;
 pub use super::*;
 
-use crate::io::scenario::ScenarioSerde;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
 
 use std::marker::PhantomData;
 use std::sync::mpsc::Receiver;
 
+/// An orbit determination process. Note that everything passed to this structure is moved.
 pub struct ODProcess<
     'a,
     D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,

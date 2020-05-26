@@ -1,15 +1,31 @@
 pub use crate::celestia::*;
+use crate::dimensions::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U2, U3, U6};
+use crate::dynamics::orbital::OrbitalDynamicsStm;
+use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use crate::io::scenario::ScenarioSerde;
-use crate::io::ParsingError;
+use crate::io::{parse_duration, ParsingError};
 use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
+use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
+use crate::propagators::error_ctrl::RSSStepPV;
 use crate::time::SECONDS_PER_DAY;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
 pub struct OdpScenario<'a> {
-    cosm: &'a Cosm,
+    truth: MDProcess<'a>,
+    odp: ODProcess<
+        'a,
+        Spacecraft<'a, OrbitalDynamicsStm<'a>>,
+        RSSStepPV,
+        StdMeasurement,
+        GroundStation<'a>,
+        NumMsrEkfTrigger,
+        U3,
+        KF<U6, U3, U2, SpacecraftState>,
+        SpacecraftState,
+    >,
 }
 
 impl<'a> OdpScenario<'a> {
@@ -100,48 +116,174 @@ impl<'a> OdpScenario<'a> {
                             }
                         }
                     }
-                    // Generate the measurements.
-                    let mut md = MDProcess::try_from_scenario(
+                    // Build the truth MD
+                    let md = MDProcess::try_from_scenario(
                         scenario,
                         msr.propagator.as_ref().unwrap().to_string(),
                         StmStateFlag::Without(()),
                         cosm,
                     )?;
 
-                    let prop_time = md.prop_time_s.unwrap();
-                    let mut prop = md.propagator();
+                    // Build the initial estimate
+                    if all_estimates.get(&odp_seq.initial_estimate).is_none() {
+                        return Err(ParsingError::OD(format!(
+                            "estimate `{}` not found",
+                            &odp_seq.initial_estimate
+                        )));
+                    }
 
-                    // Set up the channels
-                    let (tx, rx) = channel();
-                    prop.tx_chan = Some(&tx);
+                    let est_serde = &all_estimates[&odp_seq.initial_estimate];
+                    if scenario.state.get(&est_serde.state).is_none() {
+                        return Err(ParsingError::OD(format!(
+                            "state `{}` not found",
+                            &est_serde.state
+                        )));
+                    }
 
-                    // Run
-                    info!(
-                        "Generating measurements over {} seconds (~ {:.3} days)",
-                        prop_time,
-                        prop_time / SECONDS_PER_DAY
-                    );
-                    let start = Instant::now();
-                    prop.until_time_elapsed(prop_time);
-                    info!(
-                        "Done in {:.3} seconds",
-                        (Instant::now() - start).as_secs_f64()
-                    );
+                    let est_init_state_serde = &scenario.state[&est_serde.state];
+                    let state_frame = cosm.frame(est_init_state_serde.frame.as_str());
+                    let est_init_state = est_init_state_serde.as_state(state_frame);
 
-                    let mut sim_measurements = Vec::with_capacity(10000);
-                    while let Ok(rx_state) = rx.try_recv() {
-                        for station in stations.iter() {
-                            let meas = station.measure(&rx_state).unwrap();
-                            if meas.visible() {
-                                sim_measurements.push(meas);
-                                break; // We know that only one station is in visibility at each time.
+                    // Build the covariance
+                    let mut cov;
+                    if let Some(covar_mat) = &est_serde.covar_mat {
+                        cov = Matrix6::from_element(0.0);
+                        let max_i = covar_mat.len();
+                        let mut max_j = 0;
+                        for (i, row) in covar_mat.iter().enumerate() {
+                            for (j, item) in row.iter().enumerate() {
+                                cov[(i, j)] = *item;
+                                if j > max_j {
+                                    max_j = j;
+                                }
                             }
                         }
+                        if max_i != 6 || max_j != 6 {
+                            return Err(ParsingError::OD(format!(
+                                "initial covariance `{}` does not have 36 items",
+                                &odp_seq.initial_estimate
+                            )));
+                        }
+                    } else if let Some(covar_diag) = &est_serde.covar_diag {
+                        let mut as_v = Vector6::zeros();
+                        for (i, item) in covar_diag.iter().enumerate() {
+                            as_v[i] = *item;
+                        }
+                        cov = Matrix6::from_diagonal(&as_v);
+                    } else {
+                        return Err(ParsingError::OD(format!(
+                            "initial covariance not specified in `{}`",
+                            &odp_seq.initial_estimate
+                        )));
                     }
+                    let init_sc_state = md.state();
+                    let initial_estimate = KfEstimate::from_covar(init_sc_state, cov);
+                    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(
+                        odp_seq.msr_noise[0],
+                        odp_seq.msr_noise[1],
+                    ));
+
+                    // Build the filter
+                    let mut kf = match &odp_seq.snc {
+                        None => KF::no_snc(initial_estimate, measurement_noise),
+                        Some(snc) => {
+                            if snc.len() != 3 {
+                                return Err(ParsingError::OD(
+                                    "SNC must have three components".to_string(),
+                                ));
+                            }
+                            let process_noise =
+                                Matrix3::from_diagonal(&Vector3::new(snc[0], snc[1], snc[2]));
+                            // Disable SNC if there is more than 120 seconds between two measurements
+                            let process_noise_dt = match &odp_seq.snc_disable {
+                                None => {
+                                    warn!("No SNC disable time specified, assuming 120 seconds");
+                                    Some(120.0)
+                                }
+                                Some(snd_disable_dt) => Some(parse_duration(snd_disable_dt)?),
+                            };
+
+                            // And build the filter
+                            KF::new(
+                                initial_estimate,
+                                process_noise,
+                                measurement_noise,
+                                process_noise_dt,
+                            )
+                        }
+                    };
+
+                    // Build the estimation propagator
+                    let mut estimator = MDProcess::try_from_scenario(
+                        scenario,
+                        odp_seq.navigation_prop.to_string(),
+                        StmStateFlag::With(()),
+                        cosm,
+                    )?;
+
+                    // Build the OD Process
+                    let odp = ODProcess::ekf(
+                        estimator.stm_propagator(),
+                        kf,
+                        stations,
+                        false,
+                        100_000,
+                        NumMsrEkfTrigger::init(match &odp_seq.ekf_msr_trigger {
+                            Some(val) => *val,
+                            None => 100_000,
+                        }),
+                    );
+
+                    return Ok(Self { truth: md, odp });
                 }
             }
         }
 
-        Ok(Self { cosm })
+        Err(ParsingError::OD("sequence not found".to_string()))
+    }
+
+    /// Will generate the measurements and run the filter.
+    pub fn execute(&mut self) {
+        // Generate the measurements.
+        // let mut md = MDProcess::try_from_scenario(
+        //     scenario,
+        //     msr.propagator.as_ref().unwrap().to_string(),
+        //     StmStateFlag::Without(()),
+        //     cosm,
+        // )?;
+
+        let prop_time = self.truth.prop_time_s.unwrap();
+        let mut prop = self.truth.propagator();
+
+        // Set up the channels
+        let (tx, rx) = channel();
+        prop.tx_chan = Some(&tx);
+
+        // Generate the measurements
+        info!(
+            "Generating measurements over {} seconds (~ {:.3} days)",
+            prop_time,
+            prop_time / SECONDS_PER_DAY
+        );
+
+        let start = Instant::now();
+        prop.until_time_elapsed(prop_time);
+
+        let mut sim_measurements = Vec::with_capacity(10000);
+        while let Ok(rx_state) = rx.try_recv() {
+            for station in self.odp.devices.iter() {
+                let meas = station.measure(&rx_state).unwrap();
+                if meas.visible() {
+                    sim_measurements.push(meas);
+                    break; // We know that only one station is in visibility at each time.
+                }
+            }
+        }
+
+        info!(
+            "Generated {} measurements in {:.3} seconds",
+            sim_measurements.len(),
+            (Instant::now() - start).as_secs_f64()
+        );
     }
 }

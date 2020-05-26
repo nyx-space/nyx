@@ -51,7 +51,7 @@ fn filter_errors() {
     let sensitivity = Matrix2x6::zeros();
     let stm = Matrix6::zeros();
 
-    let mut ckf = KF::initialize(initial_estimate, process_noise, measurement_noise, None);
+    let mut ckf = KF::new(initial_estimate, process_noise, measurement_noise, None);
     match ckf.time_update(State::zeros()) {
         Ok(_) => panic!("expected the time update to fail"),
         Err(e) => {

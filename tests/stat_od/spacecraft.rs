@@ -119,7 +119,7 @@ fn sc_ckf_perfect_stations() {
     // But we disable the state noise compensation / process noise by setting the delta time to None
     let process_noise_dt = None;
 
-    let mut ckf = KF::initialize(
+    let mut ckf = KF::new(
         initial_estimate,
         process_noise,
         measurement_noise,

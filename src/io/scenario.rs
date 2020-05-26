@@ -154,10 +154,14 @@ pub struct OdpSerde {
     pub measurements: String,
     /// Name of the initial estimate name
     pub initial_estimate: String,
+    /// Measurement noise
+    pub msr_noise: Vec<f64>,
     /// Optional SNC
     pub snc: Option<Vec<f64>>,
     /// Optional SNC turn-off time
     pub snc_disable: Option<String>,
+    /// Set the number of measurements to switch to an EKF
+    pub ekf_msr_trigger: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -332,16 +336,23 @@ fn test_od_scenario() {
         file = "data/JGM3.cof.gz"
 
         [output.my_csv]
-        filename = "./data/scenario-run.csv"
+        filename = "./data/truth.csv"
         headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 
         [odp.my_flt]
         kind = "cfk"  # Could be ekf or srif
         navigation_prop = "nav_prop"
         initial_estimate = "my_estimate"
+        msr_noise = [1e-6, 1e-3]
         snc = [1e-8, 1e-8, 1e-8]
         snc_disable = "120 * sec"
         measurements = "msr_sim"  # Or provide a file name
+        ekf_msr_trigger = 30
+        output = "estimate_csv"
+
+        [output.estimate_csv]
+        filename = "./data/estimates.csv"
+        headers = ["epoch:GregorianUtc", "delta_x", "delta_y", "delta_z", "delta_vx", "delta_vy", "delta_vz"]  # If unset, default will be used
 
         [measurements.msr_sim]
         propagator = "truth_propagator"

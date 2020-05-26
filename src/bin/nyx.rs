@@ -105,7 +105,9 @@ fn main() -> Result<(), ParsingError> {
         };
         if should_exec {
             match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
-                Ok(odp) => unimplemented!(),
+                Ok(mut odp) => {
+                    odp.execute();
+                }
                 Err(e) => match e {
                     ParsingError::UseMdInstead => {
                         // Build the MDP

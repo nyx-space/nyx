@@ -970,7 +970,7 @@ impl<'a> NavSolutionFormatter<'a> {
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
-                frames: frames.clone(),
+                frames,
                 cosm: &cosm,
             },
         }
