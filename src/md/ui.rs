@@ -319,7 +319,7 @@ where
         let mut prop = self.propagator();
         // Set up the channels
         let (tx, rx) = channel();
-        prop.tx_chan = Some(&tx);
+        prop.tx_chan = Some(tx);
         // Run
         info!(
             "Propagating for {} seconds (~ {:.3} days)",

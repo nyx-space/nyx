@@ -1,31 +1,22 @@
 pub use crate::celestia::*;
 use crate::dimensions::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U2, U3, U6};
-use crate::dynamics::orbital::OrbitalDynamicsStm;
-use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
+use crate::dynamics::spacecraft::SpacecraftState;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::{parse_duration, ParsingError};
 use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
-use crate::propagators::error_ctrl::RSSStepPV;
 use crate::time::SECONDS_PER_DAY;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
 pub struct OdpScenario<'a> {
     truth: MDProcess<'a>,
-    odp: ODProcess<
-        'a,
-        Spacecraft<'a, OrbitalDynamicsStm<'a>>,
-        RSSStepPV,
-        StdMeasurement,
-        GroundStation<'a>,
-        NumMsrEkfTrigger,
-        U3,
-        KF<U6, U3, U2, SpacecraftState>,
-        SpacecraftState,
-    >,
+    nav: MDProcess<'a>,
+    ekf_msr_trigger: usize,
+    kf: KF<U6, U3, U2, SpacecraftState>,
+    stations: Vec<GroundStation<'a>>,
 }
 
 impl<'a> OdpScenario<'a> {
@@ -176,7 +167,8 @@ impl<'a> OdpScenario<'a> {
                             &odp_seq.initial_estimate
                         )));
                     }
-                    let init_sc_state = md.state();
+                    let mut init_sc_state = md.state();
+                    init_sc_state.orbit = est_init_state;
                     let initial_estimate = KfEstimate::from_covar(init_sc_state, cov);
                     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(
                         odp_seq.msr_noise[0],
@@ -184,7 +176,7 @@ impl<'a> OdpScenario<'a> {
                     ));
 
                     // Build the filter
-                    let mut kf = match &odp_seq.snc {
+                    let kf = match &odp_seq.snc {
                         None => KF::no_snc(initial_estimate, measurement_noise),
                         Some(snc) => {
                             if snc.len() != 3 {
@@ -214,7 +206,7 @@ impl<'a> OdpScenario<'a> {
                     };
 
                     // Build the estimation propagator
-                    let mut estimator = MDProcess::try_from_scenario(
+                    let estimator = MDProcess::try_from_scenario(
                         scenario,
                         odp_seq.navigation_prop.to_string(),
                         StmStateFlag::With(()),
@@ -222,8 +214,9 @@ impl<'a> OdpScenario<'a> {
                     )?;
 
                     // Build the OD Process
+                    /*let prop_est = estimator.stm_propagator();
                     let odp = ODProcess::ekf(
-                        estimator.stm_propagator(),
+                        prop_est,
                         kf,
                         stations,
                         false,
@@ -232,9 +225,17 @@ impl<'a> OdpScenario<'a> {
                             Some(val) => *val,
                             None => 100_000,
                         }),
-                    );
-
-                    return Ok(Self { truth: md, odp });
+                    );*/
+                    return Ok(Self {
+                        truth: md,
+                        nav: estimator,
+                        kf,
+                        ekf_msr_trigger: match &odp_seq.ekf_msr_trigger {
+                            Some(val) => *val,
+                            None => 100_000,
+                        },
+                        stations,
+                    });
                 }
             }
         }
@@ -243,21 +244,14 @@ impl<'a> OdpScenario<'a> {
     }
 
     /// Will generate the measurements and run the filter.
-    pub fn execute(&mut self) {
+    pub fn execute(mut self) {
         // Generate the measurements.
-        // let mut md = MDProcess::try_from_scenario(
-        //     scenario,
-        //     msr.propagator.as_ref().unwrap().to_string(),
-        //     StmStateFlag::Without(()),
-        //     cosm,
-        // )?;
-
         let prop_time = self.truth.prop_time_s.unwrap();
         let mut prop = self.truth.propagator();
 
         // Set up the channels
         let (tx, rx) = channel();
-        prop.tx_chan = Some(&tx);
+        prop.tx_chan = Some(tx);
 
         // Generate the measurements
         info!(
@@ -271,7 +265,7 @@ impl<'a> OdpScenario<'a> {
 
         let mut sim_measurements = Vec::with_capacity(10000);
         while let Ok(rx_state) = rx.try_recv() {
-            for station in self.odp.devices.iter() {
+            for station in self.stations.iter() {
                 let meas = station.measure(&rx_state).unwrap();
                 if meas.visible() {
                     sim_measurements.push(meas);
@@ -285,5 +279,19 @@ impl<'a> OdpScenario<'a> {
             sim_measurements.len(),
             (Instant::now() - start).as_secs_f64()
         );
+
+        // Build the ODP
+        let nav = self.nav.stm_propagator();
+        let kf = self.kf;
+        let mut odp = ODProcess::ekf(
+            nav,
+            kf,
+            self.stations.clone(),
+            false,
+            100_000,
+            NumMsrEkfTrigger::init(self.ekf_msr_trigger),
+        );
+
+        odp.process_measurements_covar(&sim_measurements);
     }
 }

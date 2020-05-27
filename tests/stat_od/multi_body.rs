@@ -54,7 +54,7 @@ fn multi_body_ckf_perfect_stations() {
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -75,7 +75,7 @@ fn multi_body_ckf_perfect_stations() {
     let opts_est = PropOpts::with_fixed_step(step_size);
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -107,13 +107,7 @@ fn multi_body_ckf_perfect_stations() {
         process_noise_dt,
     );
 
-    let mut odp = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
@@ -202,7 +196,7 @@ fn multi_body_ckf_covar_map() {
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -224,10 +218,7 @@ fn multi_body_ckf_covar_map() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
 
-    let (pest_tx, pest_rx) = mpsc::channel();
-
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
-    prop_est.tx_chan = Some(&pest_tx);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -259,15 +250,9 @@ fn multi_body_ckf_covar_map() {
         process_noise_dt,
     );
 
-    let mut odp = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements_covar(&pest_rx, &measurements);
+    let rtn = odp.process_measurements_covar(&measurements);
 
     assert!(rtn.is_none(), "kf failed");
 

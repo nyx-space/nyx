@@ -55,7 +55,7 @@ fn ekf_fixed_step_perfect_stations() {
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -97,9 +97,9 @@ fn ekf_fixed_step_perfect_stations() {
     let mut kf = KF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::ekf(
-        &mut prop_est,
-        &mut kf,
-        &all_stations,
+        prop_est,
+        kf,
+        all_stations,
         false,
         measurements.len(),
         NumMsrEkfTrigger::init(num_meas_for_ekf),
@@ -173,7 +173,7 @@ fn ckf_fixed_step_perfect_stations() {
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -214,13 +214,7 @@ fn ckf_fixed_step_perfect_stations() {
 
     let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
@@ -299,13 +293,7 @@ fn ckf_fixed_step_perfect_stations() {
 
     let mut ckf = KF::no_snc(init_smoothed, measurement_noise);
 
-    let mut odp2 = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp2 = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     odp2.process_measurements(&measurements);
 
@@ -355,7 +343,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -376,10 +364,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
-    // Create the channels for covariance mapping
-    let (prop_tx, prop_rx) = mpsc::channel();
-    prop_est.tx_chan = Some(&prop_tx);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -412,15 +397,9 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
         process_noise_dt,
     );
 
-    let mut odp = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements_covar(&prop_rx, &measurements);
+    let rtn = odp.process_measurements_covar(&measurements);
     assert!(rtn.is_none(), "kf failed");
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -494,10 +473,7 @@ fn ckf_map_covar() {
     // the measurements, and the same time step.
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
 
-    let (pest_tx, pest_rx) = mpsc::channel();
-
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
-    prop_est.tx_chan = Some(&pest_tx);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -514,9 +490,9 @@ fn ckf_map_covar() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::default_ckf(&mut prop_est, &mut ckf, &all_stations);
+    let mut odp = ODProcess::default_ckf(prop_est, ckf, all_stations);
 
-    let filter_return = odp.map_covar(&pest_rx, dt + prop_time);
+    let filter_return = odp.map_covar(dt + prop_time);
     assert!(filter_return.is_none(), "covar mapping failed");
 
     // Check that the covariance inflated
@@ -591,7 +567,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
         let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
         dynamics.add_model(Box::new(harmonics));
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -618,7 +594,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     // Create the channels for covariance mapping
     let (prop_tx, prop_rx) = mpsc::channel();
-    prop_est.tx_chan = Some(&prop_tx);
+    prop_est.tx_chan = Some(prop_tx);
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -640,15 +616,9 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
 
     let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements_covar(&prop_rx, &measurements);
+    let rtn = odp.process_measurements_covar(&measurements);
     assert!(rtn.is_none(), "kf failed");
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();

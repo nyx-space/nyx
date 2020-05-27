@@ -12,7 +12,7 @@ use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
 
 use std::marker::PhantomData;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::channel;
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 pub struct ODProcess<
@@ -40,11 +40,11 @@ pub struct ODProcess<
         + Allocator<f64, A, D::LinStateSize>,
 {
     /// Propagator used for the estimation
-    pub prop: &'a mut Propagator<'a, D, E>,
+    pub prop: Propagator<'a, D, E>,
     /// Kalman filter itself
-    pub kf: &'a mut K,
+    pub kf: K,
     /// List of measurement devices used
-    pub devices: &'a [N],
+    pub devices: Vec<N>,
     /// Whether or not these devices can make simultaneous measurements of the spacecraft
     pub simultaneous_msr: bool,
     /// Vector of estimates available after a pass
@@ -81,9 +81,9 @@ where
         + Allocator<f64, A, D::LinStateSize>,
 {
     pub fn ekf(
-        prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut K,
-        devices: &'a [N],
+        prop: Propagator<'a, D, E>,
+        kf: K,
+        devices: Vec<N>,
         simultaneous_msr: bool,
         num_expected_msr: usize,
         trigger: T,
@@ -91,7 +91,7 @@ where
         Self {
             prop,
             kf,
-            devices: &devices,
+            devices,
             simultaneous_msr,
             estimates: Vec::with_capacity(num_expected_msr),
             residuals: Vec::with_capacity(num_expected_msr),
@@ -100,16 +100,11 @@ where
         }
     }
 
-    pub fn default_ekf(
-        prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut K,
-        devices: &'a [N],
-        trigger: T,
-    ) -> Self {
+    pub fn default_ekf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
         Self {
             prop,
             kf,
-            devices: &devices,
+            devices,
             simultaneous_msr: false,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),
@@ -223,25 +218,28 @@ where
     ///
     /// Important notes:
     /// + the measurements have be to mapped to a fixed time corresponding to the step of the propagator
-    pub fn process_measurements_covar(
-        &mut self,
-        rx: &Receiver<D::StateType>,
-        measurements: &[Msr],
-    ) -> Option<FilterError> {
+    pub fn process_measurements_covar(&mut self, measurements: &[Msr]) -> Option<FilterError> {
+        let (tx, rx) = channel();
+        self.prop.tx_chan = Some(tx);
         assert!(
             !measurements.is_empty(),
-            "must have at least one measurement (for propagation time)"
+            "must have at least one measurement"
         );
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
+
         let prop_time = measurements[num_msrs - 1].epoch() - self.kf.previous_estimate().epoch();
         info!(
-            "Propagating for {} seconds (~ {:.3} days)",
+            "Navigation propagating for a total of {} seconds (~ {:.3} days)",
             prop_time,
             prop_time / 86_400.0
         );
-
-        self.prop.until_time_elapsed(prop_time);
+        let mut prev_dt = self.kf.previous_estimate().epoch();
+        for msr in measurements {
+            let delta_t = msr.epoch() - prev_dt;
+            self.prop.until_time_elapsed(delta_t);
+            prev_dt = msr.epoch();
+        }
         info!(
             "Processing {} measurements with covariance mapping",
             num_msrs
@@ -267,13 +265,18 @@ where
                     let next_epoch = real_meas.epoch();
                     if next_epoch < dt {
                         // We missed a measurement! Let's try to catch up.
-                        error!("Skipped measurement #{} -- measurement timestamps not in sync with propagator!\n{:?}\n{:?}", msr_cnt, next_epoch, dt);
+                        error!(
+                            "Skipping msr #{}: nav and msr not in sync: msr.dt = {} \t nav.dt = {}",
+                            msr_cnt,
+                            next_epoch.as_gregorian_tai_str(),
+                            dt.as_gregorian_tai_str()
+                        );
                         msr_cnt += 1;
                         continue;
                     } else if next_epoch > dt {
                         // No measurement can be used here, let's just do a time update (unless we have already done a time update)
                         if num_msr_processed == 0 {
-                            debug!("time update {:?}", dt);
+                            debug!("time update {}", dt.as_gregorian_tai_str());
                             match self.kf.time_update(nominal_state) {
                                 Ok(est) => {
                                     if self.kf.is_extended() {
@@ -304,7 +307,7 @@ where
                                             debug!(
                                                 "msr update msr #{} {}",
                                                 msr_cnt,
-                                                dt.as_gregorian_utc_str()
+                                                dt.as_gregorian_tai_str()
                                             );
                                             // Switch to EKF if necessary, and update the dynamics and such
                                             if !self.kf.is_extended()
@@ -347,7 +350,7 @@ where
                     }
                 } else {
                     // No more measurements, we can only do a time update
-                    debug!("final time update {:?}", dt);
+                    debug!("final time update {:?}", dt.as_gregorian_tai_str());
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             if self.kf.is_extended() {
@@ -378,11 +381,9 @@ where
     }
 
     /// Allows for covariance mapping without processing measurements
-    pub fn map_covar(
-        &mut self,
-        prop_rx: &Receiver<D::StateType>,
-        end_epoch: Epoch,
-    ) -> Option<FilterError> {
+    pub fn map_covar(&mut self, end_epoch: Epoch) -> Option<FilterError> {
+        let (tx, rx) = channel();
+        self.prop.tx_chan = Some(tx);
         // Start by propagating the estimator (on the same thread).
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Propagating for {} seconds", prop_time);
@@ -390,7 +391,7 @@ where
         self.prop.until_time_elapsed(prop_time);
         info!("Mapping covariance");
 
-        while let Ok(nominal_state) = prop_rx.try_recv() {
+        while let Ok(nominal_state) = rx.try_recv() {
             // Update the STM of the KF (needed between each measurement or time update)
             let stm = self.prop.dynamics.extract_stm(&nominal_state);
             self.kf.update_stm(stm);
@@ -438,16 +439,16 @@ where
         + Allocator<f64, A, D::LinStateSize>,
 {
     pub fn ckf(
-        prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut K,
-        devices: &'a [N],
+        prop: Propagator<'a, D, E>,
+        kf: K,
+        devices: Vec<N>,
         simultaneous_msr: bool,
         num_expected_msr: usize,
     ) -> Self {
         Self {
             prop,
             kf,
-            devices: &devices,
+            devices,
             simultaneous_msr,
             estimates: Vec::with_capacity(num_expected_msr),
             residuals: Vec::with_capacity(num_expected_msr),
@@ -456,15 +457,11 @@ where
         }
     }
 
-    pub fn default_ckf(
-        prop: &'a mut Propagator<'a, D, E>,
-        kf: &'a mut K,
-        devices: &'a [N],
-    ) -> Self {
+    pub fn default_ckf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
         Self {
             prop,
             kf,
-            devices: &devices,
+            devices,
             simultaneous_msr: false,
             estimates: Vec::with_capacity(10_000),
             residuals: Vec::with_capacity(10_000),

@@ -105,7 +105,7 @@ fn main() -> Result<(), ParsingError> {
         };
         if should_exec {
             match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
-                Ok(mut odp) => {
+                Ok(odp) => {
                     odp.execute();
                 }
                 Err(e) => match e {

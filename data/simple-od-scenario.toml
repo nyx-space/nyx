@@ -53,7 +53,7 @@ snc_disable = "120 * sec"
 measurements = "msr_sim"  # Or provide a file name
 
 [measurements.msr_sim]
-propagator = "truth_propagator"
+propagator = "nav_prop"
 msr_device = ["dss13", "dss65", "dss34"]
 output = "msr_sim.csv"
 use_file_if_available = true

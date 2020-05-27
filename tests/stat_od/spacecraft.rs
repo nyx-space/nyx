@@ -65,7 +65,7 @@ fn sc_ckf_perfect_stations() {
             &cosm,
         )));
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -126,13 +126,7 @@ fn sc_ckf_perfect_stations() {
         process_noise_dt,
     );
 
-    let mut odp = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
