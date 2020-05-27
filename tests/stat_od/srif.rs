@@ -73,7 +73,7 @@ fn srif_fixed_step_perfect_stations() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -91,7 +91,7 @@ fn srif_fixed_step_perfect_stations() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    let mut ckf = SRIF::no_snc(initial_estimate, measurement_noise);
+    let ckf = SRIF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
@@ -236,7 +236,7 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
     let process_noise_dt = None;
     */
 
-    let mut ckf = SRIF::no_snc(initial_estimate, measurement_noise);
+    let ckf = SRIF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 

@@ -94,7 +94,7 @@ fn sc_ckf_perfect_stations() {
         vec![cosm.frame("EME2000")],
         &cosm,
     )));
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -119,7 +119,7 @@ fn sc_ckf_perfect_stations() {
     // But we disable the state noise compensation / process noise by setting the delta time to None
     let process_noise_dt = None;
 
-    let mut ckf = KF::new(
+    let ckf = KF::new(
         initial_estimate,
         process_noise,
         measurement_noise,

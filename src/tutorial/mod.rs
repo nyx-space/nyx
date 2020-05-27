@@ -613,7 +613,7 @@ let (tx, rx) = mpsc::channel();
 // They know of each other's existance, we don't need to do anything else to link them.
 
 // Now, let's attach the sending channel to the propagator
-prop.tx_chan = Some(&tx);
+prop.tx_chan = Some(tx);
 
 // And let's prepare the receive the state on another thread.
 use std::thread;
@@ -677,7 +677,7 @@ thread::spawn(move || {
     let cosm = Cosm::from_xb("./de438s");
     let mut dynamics = OrbitalDynamics::point_masses(geo_bird, bodies, &cosm);
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
-    prop.tx_chan = Some(&truth_tx);
+    prop.tx_chan = Some(truth_tx);
     prop.until_time_elapsed(2.0 * SECONDS_PER_DAY);
 });
 

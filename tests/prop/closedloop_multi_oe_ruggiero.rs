@@ -408,7 +408,7 @@ fn qlaw_as_ruggiero_case_f() {
     });
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
-    prop.tx_chan = Some(&tx);
+    prop.tx_chan = Some(tx);
     prop.until_time_elapsed(prop_time);
 
     let final_state = prop.dynamics.orbital_dyn.state();
