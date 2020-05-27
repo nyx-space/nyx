@@ -221,15 +221,6 @@ impl SpacecraftState {
             stm: None,
         }
     }
-
-    pub fn identity(state: &State) -> Self {
-        Self {
-            orbit: *state,
-            dry_mass: 0.0,
-            fuel_mass: 0.0,
-            stm: Some(Matrix6::identity()),
-        }
-    }
 }
 
 impl PartialEq for SpacecraftState {

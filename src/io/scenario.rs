@@ -146,8 +146,6 @@ pub struct PropagatorSerde {
 
 #[derive(Deserialize)]
 pub struct OdpSerde {
-    /// The kind of filter to use
-    pub kind: String,
     /// Name of the navigation propagator
     pub navigation_prop: String,
     /// Name of the measurement generator/reader
@@ -342,7 +340,6 @@ fn test_od_scenario() {
         headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 
         [odp.my_flt]
-        kind = "cfk"  # Could be ekf or srif
         navigation_prop = "nav_prop"
         initial_estimate = "my_estimate"
         msr_noise = [1e-6, 1e-3]
