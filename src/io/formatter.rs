@@ -24,6 +24,15 @@ impl OutputSerde {
             None => StateFormatter::default(self.filename.clone(), cosm),
         }
     }
+
+    pub fn to_nav_sol_formatter<'a>(&self, cosm: &'a Cosm) -> NavSolutionFormatter<'a> {
+        match &self.headers {
+            Some(hdr) => {
+                NavSolutionFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm)
+            }
+            None => NavSolutionFormatter::default(self.filename.clone(), cosm),
+        }
+    }
 }
 
 /// Allowed headers, with an optional frame.
@@ -841,8 +850,6 @@ pub struct NavSolutionFormatter<'a> {
     pub headers: Vec<NavSolutionHeader>,
     pub estimated_headers: StateFormatter<'a>,
     pub nominal_headers: StateFormatter<'a>,
-    frames: HashMap<String, Frame>,
-    cosm: &'a Cosm,
 }
 
 impl<'a> NavSolutionFormatter<'a> {
@@ -972,11 +979,9 @@ impl<'a> NavSolutionFormatter<'a> {
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
-                frames: frames.clone(),
+                frames,
                 cosm: &cosm,
             },
-            frames,
-            cosm,
         }
     }
 
@@ -1020,8 +1025,6 @@ impl<'a> NavSolutionFormatter<'a> {
                 frames: HashMap::new(),
                 cosm: &cosm,
             },
-            frames: HashMap::new(),
-            cosm,
         }
     }
 

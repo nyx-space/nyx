@@ -39,6 +39,7 @@ clap = "2"
 config = "0.9"
 regex = "1.1"
 pretty_env_logger = "0.3"
+dialoguer = "0.6"
 
 [dev-dependencies]
 approx = "0.3.2"

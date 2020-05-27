@@ -18,9 +18,9 @@ use celestia::{Cosm, Frame, State};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct GroundStation<'a> {
-    pub name: &'a str,
+    pub name: String,
     /// in degrees
     pub elevation_mask: f64,
     /// in degrees
@@ -39,7 +39,7 @@ pub struct GroundStation<'a> {
 impl<'a> GroundStation<'a> {
     /// Initializes a new Two Way ranging equipment from the noise values.
     pub fn from_noise_values(
-        name: &'static str,
+        name: String,
         elevation_mask: f64,
         latitude: f64,
         longitude: f64,
@@ -69,7 +69,7 @@ impl<'a> GroundStation<'a> {
         cosm: &'a Cosm,
     ) -> Self {
         Self::from_noise_values(
-            "Madrid",
+            "Madrid".to_string(),
             elevation_mask,
             40.427_222,
             4.250_556,
@@ -88,7 +88,7 @@ impl<'a> GroundStation<'a> {
         cosm: &'a Cosm,
     ) -> Self {
         Self::from_noise_values(
-            "Canberra",
+            "Canberra".to_string(),
             elevation_mask,
             -35.398_333,
             148.981_944,
@@ -107,7 +107,7 @@ impl<'a> GroundStation<'a> {
         cosm: &'a Cosm,
     ) -> Self {
         Self::from_noise_values(
-            "Goldstone",
+            "Goldstone".to_string(),
             elevation_mask,
             35.247_164,
             243.205,

@@ -65,7 +65,7 @@ fn sc_ckf_perfect_stations() {
             &cosm,
         )));
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(&truth_tx);
+        prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time);
     });
 
@@ -75,7 +75,7 @@ fn sc_ckf_perfect_stations() {
             let rx_state = rx_sc_state.orbit;
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
-                measurements.push((rx_state.dt, meas));
+                measurements.push(meas);
                 break;
             }
         }
@@ -94,7 +94,7 @@ fn sc_ckf_perfect_stations() {
         vec![cosm.frame("EME2000")],
         &cosm,
     )));
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -119,20 +119,14 @@ fn sc_ckf_perfect_stations() {
     // But we disable the state noise compensation / process noise by setting the delta time to None
     let process_noise_dt = None;
 
-    let mut ckf = KF::initialize(
+    let ckf = KF::new(
         initial_estimate,
         process_noise,
         measurement_noise,
         process_noise_dt,
     );
 
-    let mut odp = ODProcess::ckf(
-        &mut prop_est,
-        &mut ckf,
-        &all_stations,
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");

@@ -18,7 +18,7 @@ where
 {
     pub dynamics: &'a mut D, // Stores the dynamics used. *Must* use this to get the latest values
     // An output channel for all of the states computed by this propagator
-    pub tx_chan: Option<&'a Sender<D::StateType>>,
+    pub tx_chan: Option<Sender<D::StateType>>,
     pub event_trackers: EventTrackers<D::StateType>,
     opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
@@ -110,7 +110,7 @@ where
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                debug!("@{:>.9}s: {:?}", t, self.details);
+                trace!("@{:>.9}s: {:?}", t, self.details);
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
                 self.event_trackers
@@ -128,7 +128,7 @@ where
                 return self.dynamics.state();
             } else {
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                debug!("@{:>.9}s: {:?}", t, self.details);
+                trace!("@{:>.9}s: {:?}", t, self.details);
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
