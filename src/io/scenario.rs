@@ -162,6 +162,8 @@ pub struct OdpSerde {
     pub snc_disable: Option<String>,
     /// Set the number of measurements to switch to an EKF
     pub ekf_msr_trigger: Option<usize>,
+    /// An optional output of a NavSolution
+    pub output: Option<String>,
 }
 
 #[derive(Deserialize)]

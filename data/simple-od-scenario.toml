@@ -40,7 +40,7 @@ order = 70
 file = "data/JGM3.cof.gz"
 
 [output.my_csv]
-filename = "./data/scenario-run.csv"
+filename = "./data/truth.csv"
 headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 
 [odp.my_flt]
@@ -51,9 +51,15 @@ msr_noise = [1e-6, 1e-3]
 snc = [1e-8, 1e-8, 1e-8]
 snc_disable = "120 * sec"
 measurements = "msr_sim"  # Or provide a file name
+ekf_msr_trigger = 30
+output = "estimate_csv"
+
+[output.estimate_csv]
+filename = "./data/estimates.csv"
+headers = ["epoch:GregorianUtc", "delta_x", "delta_y", "delta_z", "delta_vx", "delta_vy", "delta_vz"]  # If unset, default will be used
 
 [measurements.msr_sim]
-propagator = "nav_prop"
+propagator = "truth_propagator"
 msr_device = ["dss13", "dss65", "dss34"]
 output = "msr_sim.csv"
 use_file_if_available = true

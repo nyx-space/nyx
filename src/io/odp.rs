@@ -1,6 +1,9 @@
+extern crate csv;
+
 pub use crate::celestia::*;
 use crate::dimensions::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U2, U3, U6};
 use crate::dynamics::spacecraft::SpacecraftState;
+use crate::io::formatter::NavSolutionFormatter;
 use crate::io::scenario::ScenarioSerde;
 use crate::io::{parse_duration, ParsingError};
 use crate::md::ui::{MDProcess, StmStateFlag};
@@ -17,6 +20,7 @@ pub struct OdpScenario<'a> {
     ekf_msr_trigger: usize,
     kf: KF<U6, U3, U2, SpacecraftState>,
     stations: Vec<GroundStation<'a>>,
+    formatter: Option<NavSolutionFormatter<'a>>,
 }
 
 impl<'a> OdpScenario<'a> {
@@ -213,19 +217,20 @@ impl<'a> OdpScenario<'a> {
                         cosm,
                     )?;
 
-                    // Build the OD Process
-                    /*let prop_est = estimator.stm_propagator();
-                    let odp = ODProcess::ekf(
-                        prop_est,
-                        kf,
-                        stations,
-                        false,
-                        100_000,
-                        NumMsrEkfTrigger::init(match &odp_seq.ekf_msr_trigger {
-                            Some(val) => *val,
-                            None => 100_000,
-                        }),
-                    );*/
+                    // Get the formatter
+                    let formatter = match &odp_seq.output {
+                        Some(output) => match &scenario.output.get(output) {
+                            None => {
+                                return Err(ParsingError::OD(format!(
+                                    "output `{}` not found",
+                                    output
+                                )))
+                            }
+                            Some(output) => Some(output.to_nav_sol_formatter(&cosm)),
+                        },
+                        None => None,
+                    };
+
                     return Ok(Self {
                         truth: md,
                         nav: estimator,
@@ -235,6 +240,7 @@ impl<'a> OdpScenario<'a> {
                             None => 100_000,
                         },
                         stations,
+                        formatter,
                     });
                 }
             }
@@ -293,5 +299,19 @@ impl<'a> OdpScenario<'a> {
         );
 
         odp.process_measurements_covar(&sim_measurements);
+
+        // Save to output file if requested
+        // Create the output file
+        if let Some(fmtr) = &self.formatter {
+            let mut wtr =
+                csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+            wtr.serialize(&fmtr.headers)
+                .expect("could not write headers");
+            info!("Saving output to {}", fmtr.filename);
+            for est in &odp.estimates {
+                wtr.serialize(fmtr.fmt(est))
+                    .expect("could not format state");
+            }
+        };
     }
 }

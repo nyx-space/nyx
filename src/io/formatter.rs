@@ -24,6 +24,15 @@ impl OutputSerde {
             None => StateFormatter::default(self.filename.clone(), cosm),
         }
     }
+
+    pub fn to_nav_sol_formatter<'a>(&self, cosm: &'a Cosm) -> NavSolutionFormatter<'a> {
+        match &self.headers {
+            Some(hdr) => {
+                NavSolutionFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm)
+            }
+            None => NavSolutionFormatter::default(self.filename.clone(), cosm),
+        }
+    }
 }
 
 /// Allowed headers, with an optional frame.
