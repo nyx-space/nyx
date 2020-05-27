@@ -120,7 +120,6 @@ fn main() -> Result<(), ParsingError> {
                             Ok(mut md) => {
                                 info!("Executing sequence `{}`", seq_name);
                                 md.execute();
-                                break;
                             }
                             Err(e) => {
                                 error!("{:?}", e);
