@@ -10,6 +10,7 @@ use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
+use crate::propagators::PropOpts;
 use crate::time::SECONDS_PER_DAY;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -254,6 +255,7 @@ impl<'a> OdpScenario<'a> {
         // Generate the measurements.
         let prop_time = self.truth.prop_time_s.unwrap();
         let mut prop = self.truth.propagator();
+        prop.set_step(60.0, true);
 
         // Set up the channels
         let (tx, rx) = channel();

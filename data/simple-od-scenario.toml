@@ -46,16 +46,16 @@ headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
 [odp.my_flt]
 navigation_prop = "nav_prop"
 initial_estimate = "my_estimate"
-msr_noise = [1e-6, 1e-3]
-snc = [1e-8, 1e-8, 1e-8]
+msr_noise = [1e-1, 1e-2]
+# snc = [1e-12, 1e-12, 1e-12]
 snc_disable = "120 * sec"
 measurements = "msr_sim"  # Or provide a file name
-ekf_msr_trigger = 30
+# ekf_msr_trigger = 30
 output = "estimate_csv"
 
 [output.estimate_csv]
 filename = "./data/estimates.csv"
-headers = ["epoch:GregorianUtc", "delta_x", "delta_y", "delta_z", "delta_vx", "delta_vy", "delta_vz"]  # If unset, default will be used
+# headers = ["epoch:GregorianUtc", "delta_x", "delta_y", "delta_z", "delta_vx", "delta_vy", "delta_vz"]  # If unset, default will be used
 
 [measurements.msr_sim]
 propagator = "truth_propagator"
@@ -64,26 +64,26 @@ output = "msr_sim.csv"
 use_file_if_available = true
 
 [stations.dss13]
-elevation = 10.0
+elevation = 0.0
 latitude = 40.427_222
 longitude = 4.250_556
 height = 0.834_939
-range_noise = 0.1
-range_rate_noise = 0.01
+range_noise = 0.001
+range_rate_noise = 0.0001
 
 [stations.dss65]
 from = "dss65" # Name of the station, built-in
-elevation = 10.0
-range_noise = 0.1
-range_rate_noise = 0.01
+elevation = 0.0
+range_noise = 0.001
+range_rate_noise = 0.0001
 
 [stations.dss34]
 from = "dss34" # Name of the station, built-in
-elevation = 10.0
-range_noise = 0.1
-range_rate_noise = 0.01
+elevation = 0.0
+range_noise = 0.001
+range_rate_noise = 0.0001
 
 [estimate.my_estimate]
 state = "state_name"
 #covar_mat = [[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1]]
-covar_diag = [1e1, 1e1, 1e1, 1e-2, 1e-2, 1e-2]
+covar_diag = [1e3, 1e3, 1e3, 1e1, 1e1, 1e1]
