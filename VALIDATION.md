@@ -247,3 +247,10 @@ LEO | 20x20 | 10x10  | 0.005
 #### Realistic
 ![State deviation & covariance](./data/od_plots/lro-fig1.png "State deviation & covariance (perfect)")
 ![Error with truth](./data/od_plots/lro-fig2.png "Error with truth (perfect)")
+
+### LEO
+**Note:** I think the spikes in covariance correspond to ground station switching.
+
+#### Perfect
+![State deviation & covariance](./data/od_plots/leo-perfect-fig1.png "State deviation & covariance (perfect)")
+![Error with truth](./data/od_plots/leo-perfect-fig2.png "Error with truth (perfect)")
