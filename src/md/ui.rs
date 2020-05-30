@@ -40,7 +40,7 @@ where
     DefaultAllocator: Allocator<f64, U6>,
 {
     sc_dyn: StmState<Spacecraft<'a, OrbitalDynamics<'a>>, Spacecraft<'a, OrbitalDynamicsStm<'a>>>,
-    formatter: Option<StateFormatter<'a>>,
+    pub formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
     pub name: String,
@@ -315,7 +315,6 @@ where
         let prop_time = self.prop_time_s.unwrap();
 
         // Build the propagator
-        // let mut prop = Propagator::default(&mut self.sc_dyn, &PropOpts::default());
         let mut prop = self.propagator();
         // Set up the channels
         let (tx, rx) = channel();
@@ -326,10 +325,12 @@ where
             prop_time,
             prop_time / SECONDS_PER_DAY
         );
+        info!("Initial state: {}", prop.state());
         let start = Instant::now();
         prop.until_time_elapsed(prop_time);
         info!(
-            "Done in {:.3} seconds",
+            "Final state:   {} (computed in {:.3} seconds)",
+            prop.state(),
             (Instant::now() - start).as_secs_f64()
         );
 

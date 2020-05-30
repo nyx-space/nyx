@@ -10,7 +10,6 @@ use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
-use crate::propagators::PropOpts;
 use crate::time::SECONDS_PER_DAY;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -254,12 +253,26 @@ impl<'a> OdpScenario<'a> {
     pub fn execute(mut self) {
         // Generate the measurements.
         let prop_time = self.truth.prop_time_s.unwrap();
-        let mut prop = self.truth.propagator();
-        prop.set_step(60.0, true);
+
+        // Create the output file for the truth
+        let mut maybe_wtr = match &self.truth.formatter {
+            Some(fmtr) => {
+                let mut wtr =
+                    csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+                wtr.serialize(&fmtr.headers)
+                    .expect("could not write headers");
+                info!("Saving truth to {}", fmtr.filename);
+                Some(wtr)
+            }
+            None => None,
+        };
+
+        let mut truth_prop = self.truth.propagator();
+        truth_prop.set_step(10.0, true);
 
         // Set up the channels
         let (tx, rx) = channel();
-        prop.tx_chan = Some(tx);
+        truth_prop.tx_chan = Some(tx);
 
         // Generate the measurements
         info!(
@@ -269,10 +282,21 @@ impl<'a> OdpScenario<'a> {
         );
 
         let start = Instant::now();
-        prop.until_time_elapsed(prop_time);
+        info!("Initial state: {}", truth_prop.state());
+        truth_prop.until_time_elapsed(prop_time);
+        info!(
+            "Final state:   {} (computed in {:.3} seconds)",
+            truth_prop.state(),
+            (Instant::now() - start).as_secs_f64()
+        );
 
         let mut sim_measurements = Vec::with_capacity(10000);
+        let start = Instant::now();
         while let Ok(rx_state) = rx.try_recv() {
+            if let Some(wtr) = &mut maybe_wtr {
+                wtr.serialize(self.truth.formatter.as_ref().unwrap().fmt(&rx_state.orbit))
+                    .expect("could not format state");
+            }
             for station in self.stations.iter() {
                 let meas = station.measure(&rx_state).unwrap();
                 if meas.visible() {
@@ -289,7 +313,8 @@ impl<'a> OdpScenario<'a> {
         );
 
         // Build the ODP
-        let nav = self.nav.stm_propagator();
+        let mut nav = self.nav.stm_propagator();
+        nav.set_step(10.0, true);
         let kf = self.kf;
         let mut odp = ODProcess::ekf(
             nav,
