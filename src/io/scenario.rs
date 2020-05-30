@@ -181,7 +181,7 @@ pub struct MeasurementSerde {
     /// Names of the measurement devices to use
     pub msr_device: Vec<String>,
     /// Name of the output file to store the measurements
-    pub output: String,
+    pub output: Option<String>,
     /// Optionally specify whether to use the file if it exists
     pub use_file_if_available: Option<bool>,
 }

@@ -34,13 +34,13 @@ epoch = "2020-01-12T04:42:54.776 TAI"
 
 [orbital_dynamics.truth]
 integration_frame = "EME2000"
-initial_state = "lro"
+initial_state = "nrho"
 point_masses = ["Sun", "Earth", "Luna"]
 accel_models = ["my_models"]
 
 [orbital_dynamics.nav]
 integration_frame = "EME2000"
-initial_state = "lro"
+initial_state = "nrho"
 point_masses = ["Sun", "Earth", "Luna"]
 accel_models = ["my_models"]
 
@@ -82,7 +82,7 @@ filename = "./data/truth.csv"
 navigation_prop = "nav_prop"
 initial_estimate = "my_estimate"
 msr_noise = [1e-1, 1e-2]
-snc = [1e-12, 1e-12, 1e-12]
+# snc = [1e-12, 1e-12, 1e-12]
 snc_disable = "120 * sec"
 measurements = "msr_sim"  # Or provide a file name
 # ekf_msr_trigger = 30
@@ -118,6 +118,6 @@ range_noise = 0.00
 range_rate_noise = 0.000
 
 [estimate.my_estimate]
-state = "lro"
+state = "nrho"
 #covar_mat = [[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1]]
 covar_diag = [1e3, 1e3, 1e3, 1e1, 1e1, 1e1]

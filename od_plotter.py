@@ -5,28 +5,31 @@ import pandas as pd
 from astropy.time import Time
 from astropy.visualization import time_support
 from sys import argv
+from os import environ
 
 
 def add_to_plot(hdlr, epochs, dev, cov, idx, name, label):
     color = ["#648FFF", "#DC267F", "#FFB000"][idx % 3]
     max_len = min(epochs.shape[0], dev[idx, :].shape[0])
-    hdlr.scatter(epochs[:max_len], dev[idx, :][:max_len].flatten(
-    ), marker='.', c=color, label="{} deviation".format(name))
+
+    epochs = epochs[:max_len]
+    y = dev[idx, :][:max_len].flatten()
+
+    hdlr.plot(epochs, y, c=color,
+              label="{} deviation".format(name), linewidth=1)
     if cov is not None:
-        hdlr.plot(epochs[:max_len], cov[:, idx][:max_len].flatten(
-        ), linestyle='--', c=color, label="{} 1-sigma".format(name))
-        hdlr.plot(epochs[:max_len], -cov[:, idx][:max_len].flatten(),
+        covs = cov[:, idx][:max_len].flatten()
+
+        hdlr.plot(epochs, covs, linestyle='--', c=color, linewidth=1,
+                  label="{} 1-sigma".format(name))
+        hdlr.plot(epochs, -covs, linewidth=1,
                   linestyle='--', c=color, label="_nolegend_")
 
-        ylim_x = 1.2 * \
-            max(max(dev[idx, :][:max_len].flatten()),
-                max(cov[:, idx][:max_len].flatten()))
-        # hdlr.set_yscale('log')
+        ylim_x = 1.2 * max(max(y), max(covs))
     else:
-        ylim_x = 1.2 * \
-            max(dev[idx, :].flatten())
+        ylim_x = 1.2 * max(abs(y))
 
-        hdlr.set_ylim([-ylim_x, ylim_x])
+    hdlr.set_ylim([-ylim_x, ylim_x])
     hdlr.set_ylabel(label)
     hdlr.grid()
     hdlr.legend()
@@ -50,10 +53,17 @@ def main(estimates, truth):
     delta = est_state[:, :max_len] - truth_state[:, :max_len]
     epochs = epochs[:max_len]
 
-    err_avr = [sum(compo) / len(compo) for compo in delta[:, :-1]]
-    print("Delta avr. ", err_avr)
+    err_avr = ', '.join(['{:1.1e}'.format(sum(compo) / len(compo))
+                         for compo in delta[:, :-1]])
+    title = "Delta avr. " + err_avr
+    print(title)
 
-    node_name = "Spacecraft"
+    node_name = environ.get("PLOT")
+    if node_name is None:
+        node_name = ""
+
+    node_name += "\n"
+    node_name += title
 
     fig = plt.figure(figsize=(15, 10))
     fig.suptitle(node_name)

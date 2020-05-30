@@ -1,0 +1,11 @@
+[measurements.msr_sim_nrho]
+propagator = "nrho_truth"
+msr_device = ["dss13", "dss65", "dss34"]
+
+[measurements.msr_sim_lro]
+propagator = "lro_truth"
+msr_device = ["dss13", "dss65", "dss34"]
+
+[measurements.msr_sim_leo]
+propagator = "leo_truth"
+msr_device = ["dss13", "dss65", "dss34"]

@@ -1,0 +1,70 @@
+# sequence = ["nrho_perfect", "nrho", "lro_perfect", "lro", "leo_perfect", "leo"]
+[estimate.nrho_perfect]
+state = "nrho"
+covar_diag = [1e3, 1e3, 1e3, 1e1, 1e1, 1e1]
+
+[estimate.nrho_nav]
+state = "nrho_nav"
+covar_diag = [1e3, 1e3, 1e3, 1e1, 1e1, 1e1]
+
+[estimate.lro_perfect]
+state = "lro"
+covar_diag = [1e1, 1e1, 1e1, 1e-1, 1e-1, 1e-1]
+
+[estimate.lro_nav]
+state = "lro_nav"
+covar_diag = [1e1, 1e1, 1e1, 1e-1, 1e-1, 1e-1]
+
+[estimate.leo_perfect]
+state = "leo"
+covar_diag = [1e1, 1e1, 1e1, 1e-1, 1e-1, 1e-1]
+
+[estimate.leo_nav]
+state = "leo_nav"
+covar_diag = [1e1, 1e1, 1e1, 1e-1, 1e-1, 1e-1]
+
+[odp.nrho_perfect]
+navigation_prop = "nrho_truth"
+initial_estimate = "nrho_perfect"
+msr_noise = [1e-1, 1e-2]
+measurements = "msr_sim_nrho"
+output = "estimates"
+
+[odp.nrho]
+navigation_prop = "nrho_nav"
+initial_estimate = "nrho_nav"
+msr_noise = [1e-1, 1e-2]
+snc = [1e-14, 1e-14, 1e-14]
+snc_disable = "120 * sec"
+measurements = "msr_sim_nrho"
+output = "estimates"
+
+[odp.lro_perfect]
+navigation_prop = "lro_truth"
+initial_estimate = "lro_perfect"
+msr_noise = [1e-1, 1e-2]
+measurements = "msr_sim_lro"
+output = "estimates"
+
+[odp.lro]
+navigation_prop = "lro_nav"
+initial_estimate = "lro_nav"
+msr_noise = [1e-1, 1e-2]
+snc = [1e-14, 1e-14, 1e-14]
+measurements = "msr_sim_lro"
+output = "estimates"
+
+[odp.leo_perfect]
+navigation_prop = "leo_truth"
+initial_estimate = "leo_perfect"
+msr_noise = [1e-1, 1e-2]
+measurements = "msr_sim_leo"
+output = "estimates"
+
+[odp.leo]
+navigation_prop = "leo_nav"
+initial_estimate = "leo_nav"
+msr_noise = [1e-1, 1e-2]
+# snc = [1e-16, 1e-16, 1e-16]
+measurements = "msr_sim_leo"
+output = "estimates"

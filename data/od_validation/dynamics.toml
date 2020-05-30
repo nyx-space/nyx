@@ -1,0 +1,93 @@
+# Define the harmonics
+[accel_models.truth_models.harmonics.earth_sph]
+frame = "EME2000"
+degree = 20
+order = 20
+file = "data/JGM3.cof.gz"
+
+[accel_models.truth_models.harmonics.moon]
+frame = "Iau Moon"
+degree = 20
+order = 20
+file = "data/Luna_jggrx_1500e_sha.tab.gz"
+
+[accel_models.nav_models.harmonics.earth_sph]
+frame = "EME2000"
+degree = 10
+order = 10
+file = "data/JGM3.cof.gz"
+
+[accel_models.nav_models.harmonics.moon]
+frame = "Iau Moon"
+degree = 10
+order = 10
+file = "data/Luna_jggrx_1500e_sha.tab.gz"
+
+# NRHO cases
+[orbital_dynamics.nrho_truth]
+integration_frame = "EME2000"
+initial_state = "nrho"
+point_masses = ["Sun", "Earth", "Luna"]
+accel_models = ["truth_models"]
+
+[orbital_dynamics.nrho_nav]
+integration_frame = "EME2000"
+initial_state = "nrho_nav"
+point_masses = ["Sun", "Earth", "Luna"]
+accel_models = ["nav_models"]
+
+[spacecraft.sc_nrho]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "nrho_truth"
+
+[spacecraft.sc_nrho_nav]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "nrho_nav"
+
+# LRO cases
+[orbital_dynamics.lro_truth]
+integration_frame = "EME2000"
+initial_state = "lro"
+point_masses = ["Sun", "Earth", "Luna"]
+accel_models = ["truth_models"]
+
+[orbital_dynamics.lro_nav]
+integration_frame = "EME2000"
+initial_state = "lro_nav"
+point_masses = ["Sun", "Earth", "Luna"]
+accel_models = ["nav_models"]
+
+[spacecraft.sc_lro]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "lro_truth"
+
+[spacecraft.sc_lro_nav]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "lro_nav"
+
+# LEO cases
+[orbital_dynamics.leo_truth]
+integration_frame = "EME2000"
+initial_state = "leo"
+point_masses = ["Sun", "Earth", "Luna"]
+accel_models = ["truth_models"]
+
+[orbital_dynamics.leo_nav]
+integration_frame = "EME2000"
+initial_state = "leo_nav"
+point_masses = ["Sun", "Earth", "Luna"]
+accel_models = ["nav_models"]
+
+[spacecraft.sc_leo]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "leo_truth"
+
+[spacecraft.sc_leo_nav]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "leo_nav"

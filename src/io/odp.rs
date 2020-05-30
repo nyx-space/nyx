@@ -51,7 +51,7 @@ impl<'a> OdpScenario<'a> {
         if let Some(odp_seq) = odp.get(&seq_name) {
             // Get the measurement generation
             match all_measurements.get(&odp_seq.measurements) {
-                None => unimplemented!(),
+                None => unimplemented!("{}", &odp_seq.measurements),
                 Some(ref msr) => {
                     // Get the IAU Earth frame
                     let iau_earth = cosm.frame("IAU Earth");

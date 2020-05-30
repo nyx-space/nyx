@@ -1,0 +1,5 @@
+[output.truth]
+filename = "./data/truth.csv"
+
+[output.estimates]
+filename = "./data/estimates.csv"
