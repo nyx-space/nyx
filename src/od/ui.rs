@@ -234,7 +234,11 @@ where
             prop_time,
             prop_time / 86_400.0
         );
-        let mut prev_dt = self.kf.previous_estimate().epoch();
+
+        // Push the initial estimate
+        let prev = self.kf.previous_estimate().clone();
+        let mut prev_dt = prev.epoch();
+        self.estimates.push(prev);
         for msr in measurements {
             let delta_t = msr.epoch() - prev_dt;
             self.prop.until_time_elapsed(delta_t);

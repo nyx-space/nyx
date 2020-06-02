@@ -86,6 +86,16 @@ where
     fn default_header() -> Vec<String> {
         Self::header(EpochFormat::GregorianUtc, CovarFormat::Sqrt)
     }
+
+    /// Returns the covariance element at position (i, j) formatted with this estimate's covariance formatter
+    fn covar_ij(&self, i: usize, j: usize) -> f64 {
+        match self.covar_fmt() {
+            CovarFormat::Sqrt => self.covar()[(i, j)].sqrt(),
+            CovarFormat::Sigma1 => self.covar()[(i, j)],
+            CovarFormat::Sigma3 => self.covar()[(i, j)] * 3.0,
+            CovarFormat::MulSigma(x) => self.covar()[(i, j)] * x,
+        }
+    }
 }
 
 /// Kalman filter Estimate

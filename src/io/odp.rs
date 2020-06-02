@@ -274,6 +274,8 @@ impl<'a> OdpScenario<'a> {
         let (tx, rx) = channel();
         truth_prop.tx_chan = Some(tx);
 
+        let mut initial_state = Some(truth_prop.state());
+
         // Generate the measurements
         info!(
             "Generating measurements over {} seconds (~ {:.3} days)",
@@ -283,7 +285,11 @@ impl<'a> OdpScenario<'a> {
 
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state());
-        truth_prop.until_time_elapsed(prop_time);
+        let integration_time = 60.0; // TODO: Read integration time from TOML
+        while truth_prop.time() < prop_time {
+            truth_prop.until_time_elapsed(integration_time);
+        }
+
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
             truth_prop.state(),
@@ -294,6 +300,17 @@ impl<'a> OdpScenario<'a> {
         let start = Instant::now();
         while let Ok(rx_state) = rx.try_recv() {
             if let Some(wtr) = &mut maybe_wtr {
+                if let Some(first_state) = initial_state {
+                    wtr.serialize(
+                        self.truth
+                            .formatter
+                            .as_ref()
+                            .unwrap()
+                            .fmt(&first_state.orbit),
+                    )
+                    .expect("could not format state");
+                    initial_state = None;
+                }
                 wtr.serialize(self.truth.formatter.as_ref().unwrap().fmt(&rx_state.orbit))
                     .expect("could not format state");
             }
@@ -315,6 +332,7 @@ impl<'a> OdpScenario<'a> {
         // Build the ODP
         let mut nav = self.nav.stm_propagator();
         nav.set_step(10.0, true);
+
         let kf = self.kf;
         let mut odp = ODProcess::ekf(
             nav,

@@ -1065,67 +1065,67 @@ impl<'a> NavSolutionFormatter<'a> {
                     formatted.push(format!("{:.16e}", sol.state_deviation()[5]))
                 }
                 NavSolutionHeader::Cx_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(0, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(0, 0)))
                 }
                 NavSolutionHeader::Cy_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(1, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(1, 0)))
                 }
                 NavSolutionHeader::Cy_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(1, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(1, 1)))
                 }
                 NavSolutionHeader::Cz_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(2, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 0)))
                 }
                 NavSolutionHeader::Cz_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(2, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 1)))
                 }
                 NavSolutionHeader::Cz_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(2, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 2)))
                 }
                 NavSolutionHeader::Cx_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 0)))
                 }
                 NavSolutionHeader::Cx_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 1)))
                 }
                 NavSolutionHeader::Cx_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 2)))
                 }
                 NavSolutionHeader::Cx_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 3)))
                 }
                 NavSolutionHeader::Cy_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 0)))
                 }
                 NavSolutionHeader::Cy_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 1)))
                 }
                 NavSolutionHeader::Cy_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 2)))
                 }
                 NavSolutionHeader::Cy_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 3)))
                 }
                 NavSolutionHeader::Cy_dot_y_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 4)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 4)))
                 }
                 NavSolutionHeader::Cz_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 0)))
                 }
                 NavSolutionHeader::Cz_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 1)))
                 }
                 NavSolutionHeader::Cz_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 2)))
                 }
                 NavSolutionHeader::Cz_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 3)))
                 }
                 NavSolutionHeader::Cz_dot_y_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 4)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 4)))
                 }
                 NavSolutionHeader::Cz_dot_z_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 5)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 5)))
                 }
             };
         }

@@ -43,6 +43,7 @@ where
     pub formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
+    pub prop_tol: f64,
     pub name: String,
 }
 
@@ -262,11 +263,18 @@ where
                     }
                 };
 
+                // Let's see if it's a relative time
+                let prop_tol = match prop.tolerance {
+                    Some(tol) => tol,
+                    None => 1e-12,
+                };
+
                 Ok(Self {
                     sc_dyn: sc_dyn_flagged,
                     formatter,
                     output: Vec::with_capacity(65_535),
                     prop_time_s: Some(prop_time_s),
+                    prop_tol,
                     name: prop_name.clone(),
                 })
             }
@@ -275,7 +283,11 @@ where
 
     pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
         match self.sc_dyn {
-            StmState::Without(ref mut sc_dyn) => Propagator::default(sc_dyn, &PropOpts::default()),
+            StmState::Without(ref mut sc_dyn) => {
+                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
+                p.set_tolerance(self.prop_tol);
+                p
+            }
             _ => panic!("these dynamics are defined with stm. Use stm_propagator instead"),
         }
     }
@@ -284,7 +296,11 @@ where
         &mut self,
     ) -> Propagator<Spacecraft<'a, OrbitalDynamicsStm<'a>>, RSSStepPV> {
         match self.sc_dyn {
-            StmState::With(ref mut sc_dyn) => Propagator::default(sc_dyn, &PropOpts::default()),
+            StmState::With(ref mut sc_dyn) => {
+                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
+                p.set_tolerance(self.prop_tol);
+                p
+            }
             _ => panic!("these dynamics are defined without stm. Use propagator instead"),
         }
     }
@@ -319,6 +335,9 @@ where
         // Set up the channels
         let (tx, rx) = channel();
         prop.tx_chan = Some(tx);
+
+        let mut initial_state = Some(prop.state());
+
         // Run
         info!(
             "Propagating for {} seconds (~ {:.3} days)",
@@ -337,6 +356,11 @@ where
         while let Ok(prop_state) = rx.try_recv() {
             self.output.push(prop_state.orbit);
             if let Some(wtr) = &mut maybe_wtr {
+                if let Some(first_state) = initial_state {
+                    wtr.serialize(self.formatter.as_ref().unwrap().fmt(&first_state.orbit))
+                        .expect("could not format state");
+                    initial_state = None;
+                }
                 wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state.orbit))
                     .expect("could not format state");
             }

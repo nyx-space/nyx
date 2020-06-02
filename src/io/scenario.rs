@@ -139,6 +139,8 @@ pub struct PropagatorSerde {
     pub dynamics: String,
     /// Name of the stoping condition used
     pub stop_cond: String,
+    /// The tolerance of the propagator (default to 1e-12)
+    pub tolerance: Option<f64>,
     pub output: Option<String>,
     /// If no kind is specified, an RK89 will be used
     pub kind: Option<PropagatorKind>,
@@ -323,6 +325,7 @@ fn test_od_scenario() {
         dynamics = "sc1"
         stop_cond = "3.5 days"
         output = "my_csv"
+        tolerance = 1e-9
 
         [propagator.truth_propagator]
         dynamics = "sc1"

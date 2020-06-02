@@ -11,10 +11,12 @@ stop_cond = "8 hours"
 dynamics = "sc_lro"
 stop_cond = "8 hours"
 output = "truth"
+tolerance = 1e-9
 
 [propagator.lro_nav]
 dynamics = "sc_lro_nav"
 stop_cond = "8 hours"
+tolerance = 1e-9
 
 [propagator.leo_truth]
 dynamics = "sc_leo"

@@ -61,9 +61,15 @@ where
         Self::new::<RK89>(dynamics, opts)
     }
 
+    /// Allows setting the step size of the propagator
     pub fn set_step(&mut self, step_size: f64, fixed: bool) {
         self.step_size = step_size;
         self.fixed_step = fixed;
+    }
+
+    /// Set the tolerance for the propagator
+    pub fn set_tolerance(&mut self, tol: f64) {
+        self.opts.tolerance = tol;
     }
 
     /// Returns the time of the propagation
