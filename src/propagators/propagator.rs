@@ -72,6 +72,11 @@ where
         self.opts.tolerance = tol;
     }
 
+    /// Set the maximum step size for the propagator
+    pub fn set_max_step(&mut self, step: f64) {
+        self.opts.max_step = step;
+    }
+
     /// Returns the time of the propagation
     ///
     /// WARNING: Do not use the dynamics to get the time, it will be the initial value!
@@ -116,7 +121,7 @@ where
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                trace!("@{:>.9}s: {:?}", t, self.details);
+                trace!("@{:>.9}s: {}", t, self.details);
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
                 self.event_trackers
@@ -134,7 +139,7 @@ where
                 return self.dynamics.state();
             } else {
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                trace!("@{:>.9}s: {:?}", t, self.details);
+                trace!("@{:>.9}s: {}", t, self.details);
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers

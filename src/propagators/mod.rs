@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
 pub use self::error_ctrl::*;
@@ -47,4 +49,14 @@ pub struct IntegrationDetails {
     pub error: f64,
     /// number of attempts needed by an adaptive step size to be within the tolerance
     pub attempts: u8,
+}
+
+impl fmt::Display for IntegrationDetails {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "IntegrationDetails {{step: {}, error: {:.3e}, attempts: {}}}",
+            self.step, self.error, self.attempts
+        )
+    }
 }
