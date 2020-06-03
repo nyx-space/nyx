@@ -20,7 +20,7 @@ pub struct ODProcess<
     D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
     E: ErrorCtrl,
     Msr: Measurement,
-    N: MeasurementDevice<Msr, MsrIn>,
+    N: MeasurementDevice<MsrIn, Msr>,
     T: EkfTrigger,
     A: DimName,
     K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
@@ -60,7 +60,7 @@ impl<
         D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
         E: ErrorCtrl,
         Msr: Measurement,
-        N: MeasurementDevice<Msr, MsrIn>,
+        N: MeasurementDevice<MsrIn, Msr>,
         T: EkfTrigger,
         A: DimName,
         K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
@@ -420,23 +420,23 @@ where
 
 impl<
         'a,
-        D: Estimable<MsrIn, LinStateSize = M::StateSize>,
+        D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
         E: ErrorCtrl,
-        M: Measurement,
-        N: MeasurementDevice<M, MsrIn>,
+        Msr: Measurement,
+        N: MeasurementDevice<MsrIn, Msr>,
         A: DimName,
-        K: Filter<D::LinStateSize, A, M::MeasurementSize, D::StateType>,
+        K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
         MsrIn,
-    > ODProcess<'a, D, E, M, N, CkfTrigger, A, K, MsrIn>
+    > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K, MsrIn>
 where
-    D::StateType: EstimableState<M::StateSize>,
+    D::StateType: EstimableState<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
-        + Allocator<f64, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, M::StateSize>
-        + Allocator<f64, M::StateSize>
-        + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, D::LinStateSize>
-        + Allocator<f64, D::LinStateSize, M::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
+        + Allocator<f64, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
+        + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>

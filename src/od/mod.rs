@@ -191,7 +191,7 @@ where
 }
 
 /// A trait to generalize measurement devices such as a ground station
-pub trait MeasurementDevice<Msr, MsrIn>
+pub trait MeasurementDevice<MsrIn, Msr>
 where
     Self: Sized,
     Msr: Measurement,

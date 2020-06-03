@@ -119,7 +119,7 @@ impl<'a> GroundStation<'a> {
         )
     }
 }
-impl<'a> MeasurementDevice<StdMeasurement, State> for GroundStation<'a> {
+impl<'a> MeasurementDevice<State, StdMeasurement> for GroundStation<'a> {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &State) -> Option<StdMeasurement> {
         use std::f64::consts::PI;
@@ -147,7 +147,7 @@ impl<'a> MeasurementDevice<StdMeasurement, State> for GroundStation<'a> {
     }
 }
 
-impl<'a> MeasurementDevice<StdMeasurement, SpacecraftState> for GroundStation<'a> {
+impl<'a> MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation<'a> {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, sc_rx: &SpacecraftState) -> Option<StdMeasurement> {
         let rx = &sc_rx.orbit;
