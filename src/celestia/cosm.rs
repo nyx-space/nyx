@@ -791,7 +791,7 @@ impl Cosm {
             &self.exb_map,
             start_exb_idx,
             |finish| finish == end_exb_idx,
-            |e| *e.weight(),
+            |_| 1,
             |_| 0,
         ) {
             Some((_, path)) => {
