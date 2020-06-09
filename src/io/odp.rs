@@ -48,9 +48,9 @@ impl<'a> OdpScenario<'a> {
         let all_estimates = scenario.estimate.as_ref().unwrap();
         let all_stations = scenario.stations.as_ref().unwrap();
 
-        if let Some(odp_seq) = odp.get(&seq_name) {
+        if let Some(odp_seq) = odp.get(&seq_name.to_lowercase()) {
             // Get the measurement generation
-            match all_measurements.get(&odp_seq.measurements) {
+            match all_measurements.get(&odp_seq.measurements.to_lowercase()) {
                 None => unimplemented!("{}", &odp_seq.measurements),
                 Some(ref msr) => {
                     // Get the IAU Earth frame
@@ -58,7 +58,7 @@ impl<'a> OdpScenario<'a> {
                     // Build the stations
                     let mut stations = Vec::with_capacity(5);
                     for device in &msr.msr_device {
-                        match all_stations.get(device) {
+                        match all_stations.get(&device.to_lowercase()) {
                             None => {
                                 return Err(ParsingError::OD(format!(
                                     "station `{}` in sequence `{}` not found",
@@ -120,7 +120,10 @@ impl<'a> OdpScenario<'a> {
                     )?;
 
                     // Build the initial estimate
-                    if all_estimates.get(&odp_seq.initial_estimate).is_none() {
+                    if all_estimates
+                        .get(&odp_seq.initial_estimate.to_lowercase())
+                        .is_none()
+                    {
                         return Err(ParsingError::OD(format!(
                             "estimate `{}` not found",
                             &odp_seq.initial_estimate
@@ -128,7 +131,11 @@ impl<'a> OdpScenario<'a> {
                     }
 
                     let est_serde = &all_estimates[&odp_seq.initial_estimate];
-                    if scenario.state.get(&est_serde.state).is_none() {
+                    if scenario
+                        .state
+                        .get(&est_serde.state.to_lowercase())
+                        .is_none()
+                    {
                         return Err(ParsingError::OD(format!(
                             "state `{}` not found",
                             &est_serde.state
@@ -219,7 +226,7 @@ impl<'a> OdpScenario<'a> {
 
                     // Get the formatter
                     let formatter = match &odp_seq.output {
-                        Some(output) => match &scenario.output.get(output) {
+                        Some(output) => match &scenario.output.get(&output.to_lowercase()) {
                             None => {
                                 return Err(ParsingError::OD(format!(
                                     "output `{}` not found",

@@ -12,7 +12,8 @@ epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
 unit_position = "km"  # Default value if unspecified
 unit_velocity = "km/s"  # Default value if unspecified
 
-[state.nrho]
+[state.NrHO]
+# Note: state names are case insensitive
 x = -247_356.243_556_962_3
 y = 288_461.416_024_030_9
 z = 69_541.142_921_074_58
@@ -32,9 +33,9 @@ vz = 1.268_665_304_666_975
 frame = "EME2000"
 epoch = "2020-01-12T04:42:54.776 TAI"
 
-[orbital_dynamics.truth]
+[orbital_dynamics.trUtH]
 integration_frame = "EME2000"
-initial_state = "nrho"
+initial_state = "NrHo"
 point_masses = ["Sun", "Earth", "Luna"]
 accel_models = ["my_models"]
 
@@ -42,24 +43,24 @@ accel_models = ["my_models"]
 integration_frame = "EME2000"
 initial_state = "nrho"
 point_masses = ["Sun", "Earth", "Luna"]
-accel_models = ["my_models"]
+accel_models = ["my_modEls"]
 
-[spacecraft.sc1_truth]
+[spacecraft.sC1_truth]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "truth"
 
-[spacecraft.sc1_nav]
+[spacecraft.sc1_nAv]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "nav"
 
 [propagator.nav_prop]
-dynamics = "sc1_nav"
+dynamics = "sc1_naV"
 stop_cond = "8 hours"
 
 [propagator.truth_propagator]
-dynamics = "sc1_truth"
+dynamics = "sc1_Truth"
 stop_cond = "8 hours"
 output = "my_csv"
 
@@ -75,7 +76,7 @@ degree = 20
 order = 20
 file = "data/Luna_jggrx_1500e_sha.tab.gz"
 
-[output.my_csv]
+[output.my_cSv]
 filename = "./data/truth.csv"
 
 [odp.my_flt]

@@ -223,7 +223,7 @@ fn test_md_scenario() {
         r#"
         sequence = ["prop_name"]
 
-        [state.state_name]
+        [state.STATE_NAME]
         x = -2436.45
         y = -2436.45
         z = 6891.037

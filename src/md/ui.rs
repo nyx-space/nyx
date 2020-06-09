@@ -57,7 +57,7 @@ where
         stm_flag: StmStateFlag,
         cosm: &'a Cosm,
     ) -> Result<Self, ParsingError> {
-        match scen.propagator.get(&prop_name) {
+        match scen.propagator.get(&prop_name.to_lowercase()) {
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
                 #[allow(unused_assignments)]
@@ -65,7 +65,7 @@ where
                 let mut init_state;
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
-                    match scen.output.get(output) {
+                    match scen.output.get(&output.to_lowercase()) {
                         None => {
                             return Err(ParsingError::MD(format!(
                                 "propagator `{}` refers to undefined output `{}`",
@@ -77,7 +77,7 @@ where
                 } else {
                     None
                 };
-                match scen.spacecraft.get(&prop.dynamics) {
+                match scen.spacecraft.get(&prop.dynamics.to_lowercase()) {
                     None => {
                         return Err(ParsingError::MD(format!(
                             "propagator `{}` refers to undefined spacecraft `{}`",
@@ -87,14 +87,20 @@ where
                     Some(spacecraft) =>
                     // Validate the orbital dynamics
                     {
-                        match scen.orbital_dynamics.get(&spacecraft.orbital_dynamics) {
+                        match scen
+                            .orbital_dynamics
+                            .get(&spacecraft.orbital_dynamics.to_lowercase())
+                        {
                             None => {
                                 return Err(ParsingError::MD(format!(
                                     "spacecraft `{}` refers to undefined dynamics `{}`",
                                     &prop.dynamics, spacecraft.orbital_dynamics
                                 )))
                             }
-                            Some(dynamics) => match scen.state.get(&dynamics.initial_state) {
+                            Some(dynamics) => match scen
+                                .state
+                                .get(&dynamics.initial_state.to_lowercase())
+                            {
                                 None => {
                                     return Err(ParsingError::MD(format!(
                                         "dynamics `{}` refers to unknown state `{}`",
@@ -194,7 +200,7 @@ where
                                     // Add the acceleration models if applicable
                                     if let Some(accel_models) = &dynamics.accel_models {
                                         for mdl in accel_models {
-                                            match scen.accel_models.get(mdl) {
+                                            match scen.accel_models.get(&mdl.to_lowercase()) {
                                                 None => {
                                                     return Err(ParsingError::MD(format!(
                                                     "dynamics `{}` refers to unknown state `{}`",
