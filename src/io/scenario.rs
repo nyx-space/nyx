@@ -211,8 +211,8 @@ pub struct ScenarioSerde {
     pub state: HashMap<String, StateSerde>,
     pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
     pub spacecraft: HashMap<String, SpacecraftSerde>,
-    pub accel_models: HashMap<String, AccelModel>,
-    pub force_models: HashMap<String, ForceModel>,
+    pub accel_models: Option<HashMap<String, AccelModel>>,
+    pub force_models: Option<HashMap<String, ForceModel>>,
     pub output: HashMap<String, OutputSerde>,
     pub distr: Option<HashMap<String, Distribution>>,
     pub odp: Option<HashMap<String, OdpSerde>>,
@@ -297,8 +297,13 @@ fn test_md_scenario() {
     assert_eq!(scen.state.len(), 2);
     assert_eq!(scen.orbital_dynamics.len(), 2);
     assert_eq!(scen.propagator.len(), 2);
-    assert_eq!(scen.accel_models.len(), 1);
-    assert_eq!(scen.accel_models["my_models"].harmonics.len(), 1);
+    assert_eq!(scen.accel_models.as_ref().unwrap().len(), 1);
+    assert_eq!(
+        scen.accel_models.as_ref().unwrap()["my_models"]
+            .harmonics
+            .len(),
+        1
+    );
     assert_eq!(scen.sequence.len(), 1);
 }
 
@@ -332,7 +337,7 @@ fn test_od_scenario() {
         dry_mass = 100.0
         fuel_mass = 20.0
         orbital_dynamics = "conf_name"
-        force_models = "my_srp"
+        force_models = ["my_srp"]
 
         [propagator.nav_prop]
         dynamics = "sc1"
@@ -400,8 +405,13 @@ fn test_od_scenario() {
     assert_eq!(scen.state.len(), 1);
     assert_eq!(scen.orbital_dynamics.len(), 1);
     assert_eq!(scen.propagator.len(), 2);
-    assert_eq!(scen.accel_models.len(), 1);
-    assert_eq!(scen.accel_models["my_models"].harmonics.len(), 1);
+    assert_eq!(scen.accel_models.as_ref().unwrap().len(), 1);
+    assert_eq!(
+        scen.accel_models.as_ref().unwrap()["my_models"]
+            .harmonics
+            .len(),
+        1
+    );
     assert_eq!(scen.sequence.len(), 1);
     assert_eq!(scen.odp.unwrap().len(), 1);
     assert_eq!(scen.measurements.unwrap().len(), 1);

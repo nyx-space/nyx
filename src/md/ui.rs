@@ -4,8 +4,8 @@ pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
-use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use crate::dynamics::solarpressure::SolarPressure;
+use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
 use crate::io::formatter::*;
@@ -196,8 +196,11 @@ where
                                         }
                                         // Add the force models
                                         if let Some(force_models) = &spacecraft.force_models {
+                                            if scen.force_models.as_ref().is_none() {
+                                                return Err(ParsingError::MD(format!("spacecraft `{}` refers to force models but none are defined", prop.dynamics)));
+                                            }
                                             for mdl in force_models {
-                                                match scen.force_models.get(&mdl.to_lowercase()) {
+                                                match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
                                                     None => {
                                                         return Err(ParsingError::MD(format!(
                                                         "spacecraft `{}` refers to unknown force model `{}`",
@@ -223,7 +226,7 @@ where
                                                                     .add_model(Box::new(srp));
                                                                 }
                                                                 _ => panic!("should not happen"),
-                                                            };   
+                                                            };
                                                         }
                                                     }
                                                 }
@@ -236,7 +239,12 @@ where
                                     // Add the acceleration models if applicable
                                     if let Some(accel_models) = &dynamics.accel_models {
                                         for mdl in accel_models {
-                                            match scen.accel_models.get(&mdl.to_lowercase()) {
+                                            match scen
+                                                .accel_models
+                                                .as_ref()
+                                                .unwrap()
+                                                .get(&mdl.to_lowercase())
+                                            {
                                                 None => {
                                                     return Err(ParsingError::MD(format!(
                                                     "dynamics `{}` refers to unknown state `{}`",
