@@ -122,6 +122,11 @@ pub struct AccelModel {
 }
 
 #[derive(Deserialize)]
+pub struct ForceModel {
+    pub srp: HashMap<String, SolarPressureSerde>,
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PropagatorKind {
     Dormand45,
@@ -207,6 +212,7 @@ pub struct ScenarioSerde {
     pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
     pub spacecraft: HashMap<String, SpacecraftSerde>,
     pub accel_models: HashMap<String, AccelModel>,
+    pub force_models: HashMap<String, ForceModel>,
     pub output: HashMap<String, OutputSerde>,
     pub distr: Option<HashMap<String, Distribution>>,
     pub odp: Option<HashMap<String, OdpSerde>>,
@@ -258,6 +264,7 @@ fn test_md_scenario() {
         dry_mass = 100.0
         fuel_mass = 20.0
         orbital_dynamics = "conf_name"
+        force_models = ["my_frc"]
 
         [propagator.prop_name]
         flavor = "rk89"  # If unspecified, the default propagator is used
@@ -278,6 +285,11 @@ fn test_md_scenario() {
         degree = 70
         order = 70
         file = "data/JGM3.cof.gz"
+
+        [force_models.my_frc.srp.my_srp]
+        sc_area = 1.0 # in meters squared
+        cr = 1.5 # Defaults to 1.8
+
         "#,
     )
     .unwrap();
@@ -320,6 +332,7 @@ fn test_od_scenario() {
         dry_mass = 100.0
         fuel_mass = 20.0
         orbital_dynamics = "conf_name"
+        force_models = "my_srp"
 
         [propagator.nav_prop]
         dynamics = "sc1"

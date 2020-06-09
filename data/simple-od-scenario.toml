@@ -49,11 +49,13 @@ accel_models = ["my_modEls"]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "truth"
+force_models = ["my_srp"]
 
 [spacecraft.sc1_nAv]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "nav"
+force_models = ["my_srp"]
 
 [propagator.nav_prop]
 dynamics = "sc1_naV"
@@ -122,3 +124,7 @@ range_rate_noise = 0.000
 state = "nrho"
 #covar_mat = [[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1]]
 covar_diag = [1e3, 1e3, 1e3, 1e1, 1e1, 1e1]
+
+[force_models.my_frc.srp.my_srp]
+sc_area = 1.0 # in meters squared
+cr = 1.5 # Defaults to 1.8

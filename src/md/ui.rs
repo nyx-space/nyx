@@ -5,6 +5,7 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
 use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
+use crate::dynamics::solarpressure::SolarPressure;
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
 use crate::io::formatter::*;
@@ -192,6 +193,41 @@ where
                                         );
                                         if let Some(fuel_mass) = spacecraft.fuel_mass {
                                             sc_dyn.fuel_mass = fuel_mass;
+                                        }
+                                        // Add the force models
+                                        if let Some(force_models) = &spacecraft.force_models {
+                                            for mdl in force_models {
+                                                match scen.force_models.get(&mdl.to_lowercase()) {
+                                                    None => {
+                                                        return Err(ParsingError::MD(format!(
+                                                        "spacecraft `{}` refers to unknown force model `{}`",
+                                                        prop.dynamics, mdl
+                                                    )))
+                                                    }
+                                                    Some(amdl) => {
+                                                        for smdl in amdl.srp.values() {
+                                                            let mut srp = SolarPressure::default(smdl.sc_area, vec![cosm.frame("EME2000"), cosm.frame("Luna")], &cosm);
+                                                            srp.phi = smdl.phi;
+                                                            srp.cr = smdl.cr;
+                                                            match sc_dyn_flagged {
+                                                                StmState::With(
+                                                                    ref mut sc_dyn_stm,
+                                                                ) => {
+                                                                    sc_dyn_stm
+                                                                        .add_model(Box::new(srp));
+                                                                },
+                                                                StmState::Without(
+                                                                    ref mut sc_dyn,
+                                                                ) => {
+                                                                    sc_dyn
+                                                                    .add_model(Box::new(srp));
+                                                                }
+                                                                _ => panic!("should not happen"),
+                                                            };   
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         sc_dyn_flagged = StmState::Without(sc_dyn);
