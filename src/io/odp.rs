@@ -285,10 +285,8 @@ impl<'a> OdpScenario<'a> {
 
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state());
-        let integration_time = 60.0; // TODO: Read integration time from TOML
-        while truth_prop.time() < prop_time {
-            truth_prop.until_time_elapsed(integration_time);
-        }
+
+        truth_prop.until_time_elapsed(prop_time);
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
