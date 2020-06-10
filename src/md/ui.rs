@@ -1,5 +1,6 @@
 extern crate csv;
 
+use super::MdHdlr;
 pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
@@ -363,7 +364,12 @@ where
         }
     }
 
-    pub fn execute(&mut self) {
+    pub fn execute(mut self) {
+        self.execute_with(vec![])
+    }
+
+    /// Execute the MD with the provided handlers. Note that you must initialize your own CSV output if that's desired.
+    pub fn execute_with(&mut self, mut hdlrs: Vec<&mut dyn MdHdlr<SpacecraftState>>) {
         // Create the output file
         let mut maybe_wtr = match &self.formatter {
             Some(fmtr) => {
@@ -394,6 +400,7 @@ where
             prop_time,
             prop_time / SECONDS_PER_DAY
         );
+
         info!("Initial state: {}", prop.state());
         let start = Instant::now();
         prop.until_time_elapsed(prop_time);
@@ -404,15 +411,26 @@ where
         );
 
         while let Ok(prop_state) = rx.try_recv() {
+            // Provide to the handler
+            for hdlr in &mut hdlrs {
+                if let Some(first_state) = initial_state {
+                    hdlr.handle(&first_state);
+                }
+                hdlr.handle(&prop_state);
+            }
             self.output.push(prop_state.orbit);
             if let Some(wtr) = &mut maybe_wtr {
                 if let Some(first_state) = initial_state {
                     wtr.serialize(self.formatter.as_ref().unwrap().fmt(&first_state.orbit))
                         .expect("could not format state");
-                    initial_state = None;
                 }
                 wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state.orbit))
                     .expect("could not format state");
+            }
+
+            // We've used the initial state (if it was there)
+            if initial_state.is_some() {
+                initial_state = None;
             }
         }
     }

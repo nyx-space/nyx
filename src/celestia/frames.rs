@@ -129,7 +129,41 @@ impl fmt::Display for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Frame::Celestial { axb_id, exb_id, .. } | Frame::Geoid { axb_id, exb_id, .. } => {
-                write!(f, "{:3} ({:3})", exb_id, axb_id)
+                write!(
+                    f,
+                    "{} {}",
+                    match exb_id {
+                        0 => "SSB".to_string(),
+                        10 => "Sun".to_string(),
+                        100 => "Mercury".to_string(),
+                        200 => "Venus".to_string(),
+                        300 => "Earth-Moon barycenter".to_string(),
+                        399 => "Earth".to_string(),
+                        400 => "Mars barycenter".to_string(),
+                        500 => "Jupiter barycenter".to_string(),
+                        600 => "Saturn barycenter".to_string(),
+                        700 => "Uranus barycenter".to_string(),
+                        800 => "Neptune barycenter".to_string(),
+                        _ => format!("{:3}", exb_id),
+                    },
+                    if axb_id == exb_id || exb_id - axb_id == 99 {
+                        "IAU Fixed".to_string()
+                    } else {
+                        match axb_id / 100 {
+                            0 => "J2000".to_string(),
+                            10 => "IAU Sun".to_string(),
+                            1 => "Mercury IAU Fixed".to_string(),
+                            2 => "Venus IAU Fixed".to_string(),
+                            3 => "Earth IAU Fixed".to_string(),
+                            4 => "Mars IAU Fixed".to_string(),
+                            5 => "Jupiter IAU Fixed".to_string(),
+                            6 => "Saturn IAU Fixed".to_string(),
+                            7 => "Uranus IAU Fixed".to_string(),
+                            8 => "Neptune IAU Fixed".to_string(),
+                            _ => format!("{:3}", axb_id),
+                        }
+                    }
+                )
             }
             othframe => write!(f, "{:?}", othframe),
         }
