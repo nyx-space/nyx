@@ -1,4 +1,5 @@
 # Imports
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -37,6 +38,8 @@ def add_to_plot(hdlr, epochs, dev, cov, idx, name, label):
 
 def main(estimates, truth):
     time_support()
+
+    matplotlib.use('Qt5Agg')
 
     data = pd.read_csv(estimates).to_numpy()
     truth_data = pd.read_csv(truth).to_numpy()
