@@ -164,6 +164,17 @@ where
                 if let Some(computed_meas) = device.measure(&meas_input) {
                     if computed_meas.visible() {
                         self.kf.update_h_tilde(computed_meas.sensitivity());
+
+                        // Switch back from extended if necessary
+                        if self.kf.is_extended() && self.ekf_trigger.disable_ekf(real_meas.epoch())
+                        {
+                            self.kf.set_extended(false);
+                            info!(
+                                "EKF disabled @ {}",
+                                real_meas.epoch().as_gregorian_tai_str()
+                            );
+                        }
+
                         match self.kf.measurement_update(
                             nominal_state,
                             real_meas.observation(),
@@ -173,7 +184,10 @@ where
                                 // Switch to extended if necessary, and update the dynamics and such
                                 if !self.kf.is_extended() && self.ekf_trigger.enable_ekf(&est) {
                                     self.kf.set_extended(true);
-                                    info!("EKF now enabled");
+                                    info!(
+                                        "EKF enabled @ {}",
+                                        real_meas.epoch().as_gregorian_tai_str()
+                                    );
                                 }
                                 if self.kf.is_extended() {
                                     self.prop.dynamics.set_estimated_state(
@@ -196,7 +210,7 @@ where
             let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
             if !reported[msr_prct] {
                 info!(
-                    "[ODProcess] {:>3}% done ({:.0} measurements processed)",
+                    "{:>3}% done ({:.0} measurements processed)",
                     10 * msr_prct,
                     msr_cnt
                 );
@@ -205,10 +219,7 @@ where
         }
         // Always report the 100% mark
         if !reported[10] {
-            info!(
-                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
-                100, num_msrs
-            );
+            info!("{:>3}% done ({:.0} measurements processed)", 100, num_msrs);
         }
 
         None
@@ -302,6 +313,18 @@ where
                             if let Some(computed_meas) = device.measure(&meas_input) {
                                 if computed_meas.visible() {
                                     self.kf.update_h_tilde(computed_meas.sensitivity());
+
+                                    // Switch back from extended if necessary
+                                    if self.kf.is_extended()
+                                        && self.ekf_trigger.disable_ekf(real_meas.epoch())
+                                    {
+                                        self.kf.set_extended(false);
+                                        info!(
+                                            "EKF disabled @ {}",
+                                            real_meas.epoch().as_gregorian_tai_str()
+                                        );
+                                    }
+
                                     match self.kf.measurement_update(
                                         nominal_state,
                                         real_meas.observation(),
@@ -318,7 +341,10 @@ where
                                                 && self.ekf_trigger.enable_ekf(&est)
                                             {
                                                 self.kf.set_extended(true);
-                                                info!("EKF now enabled");
+                                                info!(
+                                                    "EKF enabled @ {}",
+                                                    real_meas.epoch().as_gregorian_tai_str()
+                                                );
                                             }
                                             if self.kf.is_extended() {
                                                 self.prop.dynamics.set_estimated_state(
@@ -345,7 +371,7 @@ where
                         let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
                         if !reported[msr_prct] {
                             info!(
-                                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
+                                "{:>3}% done ({:.0} measurements processed)",
                                 10 * msr_prct,
                                 msr_cnt
                             );
@@ -375,10 +401,7 @@ where
 
         // Always report the 100% mark
         if !reported[10] {
-            info!(
-                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
-                100, num_msrs
-            );
+            info!("{:>3}% done ({:.0} measurements processed)", 100, num_msrs);
         }
 
         None
@@ -481,6 +504,13 @@ pub trait EkfTrigger {
         S: DimName,
         E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
+
+    /// Return true if the filter should not longer be as extended.
+    /// By default, this returns false, i.e. when a filter has been switched to an EKF, it will
+    /// remain as such.
+    fn disable_ekf(&mut self, _epoch: Epoch) -> bool {
+        false
+    }
 }
 
 /// CkfTrigger will never switch a KF to an EKF
@@ -497,29 +527,53 @@ impl EkfTrigger for CkfTrigger {
     }
 }
 
-/// An EkfTrigger on the number of measurements processed
-pub struct NumMsrEkfTrigger {
+/// An EkfTrigger on the number of measurements processed and a time between measurements.
+pub struct StdEkfTrigger {
     pub num_msrs: usize,
+    /// In seconds!
+    pub disable_time: f64,
+    prev_msr_dt: Option<Epoch>,
     cur_msrs: usize,
 }
 
-impl NumMsrEkfTrigger {
-    pub fn init(num_msrs: usize) -> Self {
+impl StdEkfTrigger {
+    pub fn new(num_msrs: usize, disable_time: f64) -> Self {
         Self {
             num_msrs,
+            disable_time,
+            prev_msr_dt: None,
             cur_msrs: 0,
         }
     }
 }
 
-impl EkfTrigger for NumMsrEkfTrigger {
-    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, _est: &E) -> bool
+impl EkfTrigger for StdEkfTrigger {
+    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, est: &E) -> bool
     where
         S: DimName,
         E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
+        if !est.predicted() {
+            // If this isn't a prediction, let's update the previous measurement time
+            self.prev_msr_dt = Some(est.epoch());
+        }
         self.cur_msrs += 1;
         self.cur_msrs >= self.num_msrs
+    }
+
+    fn disable_ekf(&mut self, epoch: Epoch) -> bool {
+        // Return true if there is a prev msr dt, and the next measurement time is more than the disable time seconds away
+        match self.prev_msr_dt {
+            Some(prev_dt) => {
+                if (epoch - prev_dt).abs() > self.disable_time {
+                    self.cur_msrs = 0;
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
+        }
     }
 }

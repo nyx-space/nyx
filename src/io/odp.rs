@@ -18,6 +18,7 @@ pub struct OdpScenario<'a> {
     truth: MDProcess<'a>,
     nav: MDProcess<'a>,
     ekf_msr_trigger: usize,
+    ekf_disable_time: f64,
     kf: KF<U6, U3, U2, SpacecraftState>,
     stations: Vec<GroundStation<'a>>,
     formatter: Option<NavSolutionFormatter<'a>>,
@@ -246,6 +247,10 @@ impl<'a> OdpScenario<'a> {
                             Some(val) => *val,
                             None => 100_000,
                         },
+                        ekf_disable_time: match &odp_seq.ekf_disable_time {
+                            Some(val) => *val,
+                            None => 3600.0, // defaults to one hour
+                        },
                         stations,
                         formatter,
                     });
@@ -345,7 +350,7 @@ impl<'a> OdpScenario<'a> {
             self.stations.clone(),
             false,
             100_000,
-            NumMsrEkfTrigger::init(self.ekf_msr_trigger),
+            StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time),
         );
 
         odp.process_measurements_covar(&sim_measurements);

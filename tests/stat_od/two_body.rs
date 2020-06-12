@@ -25,7 +25,9 @@ fn ekf_fixed_step_perfect_stations() {
     let cosm = Cosm::de438();
 
     // Define the ground stations.
-    let num_meas_for_ekf = 15;
+    let ekf_num_meas = 15;
+    // Set the disable time to be very low to test enable/disable sequence
+    let ekf_disable_time = 30.0;
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
@@ -102,7 +104,7 @@ fn ekf_fixed_step_perfect_stations() {
         all_stations,
         false,
         measurements.len(),
-        NumMsrEkfTrigger::init(num_meas_for_ekf),
+        StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
     let rtn = odp.process_measurements(&measurements);

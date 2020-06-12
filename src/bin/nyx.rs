@@ -130,7 +130,7 @@ fn main() -> Result<(), ParsingError> {
                             StmStateFlag::Without(()),
                             &cosm,
                         ) {
-                            Ok(mut md) => {
+                            Ok(md) => {
                                 info!("Executing sequence `{}`", seq_name);
                                 md.execute();
                             }
