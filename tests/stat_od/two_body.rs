@@ -25,9 +25,9 @@ fn ekf_fixed_step_perfect_stations() {
     let cosm = Cosm::de438();
 
     // Define the ground stations.
-    let ekf_num_meas = 15;
+    let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 30.0;
+    let ekf_disable_time = 5.0;
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;

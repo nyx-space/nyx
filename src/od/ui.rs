@@ -182,7 +182,10 @@ where
                         ) {
                             Ok((est, res)) => {
                                 // Switch to extended if necessary, and update the dynamics and such
-                                if !self.kf.is_extended() && self.ekf_trigger.enable_ekf(&est) {
+                                // Note: we call enable_ekf first to ensure that the trigger gets
+                                // called in case it needs to save some information (e.g. the
+                                // StdEkfTrigger needs to store the time of the previous measurement).
+                                if self.ekf_trigger.enable_ekf(&est) && !self.kf.is_extended() {
                                     self.kf.set_extended(true);
                                     info!(
                                         "EKF enabled @ {}",
@@ -337,8 +340,11 @@ where
                                                 dt.as_gregorian_tai_str()
                                             );
                                             // Switch to EKF if necessary, and update the dynamics and such
-                                            if !self.kf.is_extended()
-                                                && self.ekf_trigger.enable_ekf(&est)
+                                            // Note: we call enable_ekf first to ensure that the trigger gets
+                                            // called in case it needs to save some information (e.g. the
+                                            // StdEkfTrigger needs to store the time of the previous measurement).
+                                            if self.ekf_trigger.enable_ekf(&est)
+                                                && !self.kf.is_extended()
                                             {
                                                 self.kf.set_extended(true);
                                                 info!(
