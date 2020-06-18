@@ -233,7 +233,7 @@ where
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
             let state_hat = &gain * &prefit;
-            let postfit = real_obs - (&self.h_tilde * &state_hat);
+            let postfit = &prefit - (&self.h_tilde * &state_hat);
             (
                 state_hat,
                 Residual::new(nominal_state.epoch(), prefit, postfit),
