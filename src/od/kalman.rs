@@ -228,11 +228,16 @@ where
         let gain = &covar_bar * h_tilde_t * invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
-        let prefit = real_obs - computed_obs;
+        let prefit = &real_obs - computed_obs;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
-            (&gain * prefit, Residual::zeros())
+            let state_hat = &gain * &prefit;
+            let postfit = real_obs - (&self.h_tilde * &state_hat);
+            (
+                state_hat,
+                Residual::new(nominal_state.epoch(), prefit, postfit),
+            )
         } else {
             // Must do a time update first
             let state_bar = &self.stm * &self.prev_estimate.state_deviation;
@@ -258,6 +263,7 @@ where
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
+
         self.stm_updated = false;
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();
