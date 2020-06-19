@@ -239,7 +239,7 @@ pub fn line_of_sight(
     let tau = (r1sq - r1dotr2) / (r1sq + r2sq - 2.0 * r1dotr2);
     if tau < 0.0
         || tau > 1.0
-        || (1.0 - tau * r1sq + r1dotr2 * tau) > eclipsing_body.equatorial_radius()
+        || (1.0 - tau) * r1sq + r1dotr2 * tau > eclipsing_body.equatorial_radius().powi(2)
     {
         EclipseState::Visibilis
     } else {
