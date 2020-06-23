@@ -88,12 +88,14 @@ where
         num_expected_msr: usize,
         trigger: T,
     ) -> Self {
+        let mut estimates = Vec::with_capacity(num_expected_msr + 1);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr,
-            estimates: Vec::with_capacity(num_expected_msr),
+            estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: trigger,
             _marker: PhantomData::<A>,
@@ -101,12 +103,14 @@ where
     }
 
     pub fn default_ekf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
+        let mut estimates = Vec::with_capacity(10_001);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr: false,
-            estimates: Vec::with_capacity(10_000),
+            estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
             _marker: PhantomData::<A>,
@@ -118,9 +122,10 @@ where
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
     pub fn smooth(&mut self) -> Option<FilterError> {
-        debug!("Smoothing {} estimates", self.estimates.len());
+        info!("Smoothing {} estimates", self.estimates.len());
         let mut smoothed = Vec::with_capacity(self.estimates.len());
 
+        // Is this smoothing correct ? I should try using the previous STM and start are estimates N-2
         for estimate in self.estimates.iter().rev() {
             let mut sm_est = estimate.clone();
             // TODO: Ensure that SNC was _not_ enabled
@@ -146,10 +151,19 @@ where
         // First, smooth the estimates
         self.smooth();
         // Get the first estimate post-smoothing
-        let init_smoothed = self.estimates[0].clone();
+        let mut init_smoothed = self.estimates[0].clone();
+        println!("{}", init_smoothed.epoch().as_gregorian_tai_str());
         // Reset the propagator
         self.prop.reset();
+        let mut iterated_state = self.prop.dynamics.state_vector();
+        for (i, x) in init_smoothed.state_deviation().iter().enumerate() {
+            iterated_state[i] += x;
+        }
+        self.prop
+            .dynamics
+            .set_state(self.prop.dynamics.time(), &iterated_state);
         // Set the filter's initial state to this smoothed estimate
+        init_smoothed.set_state_deviation(VectorN::<f64, Msr::StateSize>::zeros());
         self.kf.set_previous_estimate(&init_smoothed);
         // And re-run the filter
         if map_covar {
@@ -497,12 +511,14 @@ where
         simultaneous_msr: bool,
         num_expected_msr: usize,
     ) -> Self {
+        let mut estimates = Vec::with_capacity(num_expected_msr + 1);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr,
-            estimates: Vec::with_capacity(num_expected_msr),
+            estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: CkfTrigger {},
             _marker: PhantomData::<A>,
@@ -510,12 +526,14 @@ where
     }
 
     pub fn default_ckf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
+        let mut estimates = Vec::with_capacity(10_001);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr: false,
-            estimates: Vec::with_capacity(10_000),
+            estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},
             _marker: PhantomData::<A>,
