@@ -282,33 +282,132 @@ fn ckf_fixed_step_perfect_stations() {
 
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
 
-    // Smooth
-    if odp.smooth().is_some() {
-        panic!("smoothing failed");
+    // Iterate
+    if odp.iterate(&measurements, false).is_some() {
+        panic!("iteration failed");
     }
-    let smoothed_estimates = odp.estimates;
-    println!(
-        "N-1 smoothed: \n{}",
-        smoothed_estimates[estimates.len() - 2]
-    );
-    let init_smoothed = smoothed_estimates[0].clone();
-
-    // Re-initialize the propagator and the filter for iteration
-    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let mut prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
-    // Get the propagator to catch up to the first estimate
-    prop_est.until_time_elapsed(init_smoothed.epoch() - initial_state.dt);
-
-    let ckf = KF::no_snc(init_smoothed, measurement_noise);
-
-    let mut odp2 = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
-
-    odp2.process_measurements(&measurements);
 
     println!(
         "N-1 one iteration: \n{}",
-        odp2.estimates[odp2.estimates.len() - 2]
+        odp.estimates[odp.estimates.len() - 1]
     );
+
+    println!(
+        "Initial state after iteration: \n{:o}",
+        odp.estimates[0].state()
+    );
+}
+
+#[test]
+fn ckf_fixed_step_iteration_test() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+    use std::thread;
+
+    let cosm = Cosm::de438();
+
+    // Define the ground stations.
+    let elevation_mask = 0.0;
+    let range_noise = 0.1;
+    let range_rate_noise = 0.001;
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the propagator information.
+    let prop_time = SECONDS_PER_DAY;
+    let step_size = 10.0;
+    let opts = PropOpts::with_fixed_step(step_size);
+
+    // Define the storages (channels for the states and a map for the measurements).
+    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
+
+    // Define state information.
+    let eme2k = cosm.frame("EME2000");
+    let dt = Epoch::from_mjd_tai(21545.0);
+    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+
+    // Generate the truth data on one thread.
+    thread::spawn(move || {
+        let mut dynamics = OrbitalDynamics::two_body(initial_state);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        prop.tx_chan = Some(truth_tx);
+        prop.until_time_elapsed(prop_time);
+    });
+
+    // Receive the states on the main thread, and populate the measurement channel.
+    while let Ok(rx_state) = truth_rx.recv() {
+        // Convert the state to ECI.
+        for station in all_stations.iter() {
+            let meas = station.measure(&rx_state).unwrap();
+            if meas.visible() {
+                measurements.push(meas);
+                break; // We know that only one station is in visibility at each time.
+            }
+        }
+    }
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
+    // the measurements, and the same time step.
+    let opts_est = PropOpts::with_fixed_step(step_size);
+    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let covar_radius = 1.0e-3;
+    let covar_velocity = 1.0e-6;
+    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+        covar_radius,
+        covar_radius,
+        covar_radius,
+        covar_velocity,
+        covar_velocity,
+        covar_velocity,
+    ));
+
+    // Define the initial estimate
+    let mut initial_state2 = initial_state.clone();
+    initial_state2.x += 0.01;
+    initial_state2.y -= 0.01;
+    let initial_estimate = KfEstimate::from_covar(initial_state2, init_covar);
+
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+
+    let ckf = KF::no_snc(initial_estimate, measurement_noise);
+
+    let mut odp = ODProcess::ckf(
+        prop_est,
+        ckf,
+        all_stations.clone(),
+        false,
+        measurements.len(),
+    );
+
+    let rtn = odp.process_measurements(&measurements);
+    assert!(rtn.is_none(), "kf failed");
+
+    // Iterate, and check that the initial state difference is lower
+    // Iterate
+    if odp.iterate(&measurements, false).is_some() {
+        panic!("iteration failed");
+    }
+
+    let dstate_no_iteration = initial_state - initial_state2;
+    let dstate_iteration = initial_state - odp.estimates[0].state();
+
+    println!("{}\n{}", initial_state2, odp.estimates[0].state());
+
+    println!(
+        "{}\n{}",
+        dstate_no_iteration.rmag(),
+        dstate_iteration.rmag()
+    )
 }
 
 #[test]

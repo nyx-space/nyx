@@ -113,7 +113,7 @@ where
         }
     }
 
-    /// Allows to smooth the provided estimates. Returns an array of smoothed estimates.
+    /// Allows to smooth the provided estimates. If there is a result, it'll be a filter error.
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
@@ -138,6 +138,25 @@ where
         // And store
         self.estimates = smoothed;
 
+        None
+    }
+
+    /// Allows iterating on the filter solution
+    pub fn iterate(&mut self, measurements: &[Msr], map_covar: bool) -> Option<FilterError> {
+        // First, smooth the estimates
+        self.smooth();
+        // Get the first estimate post-smoothing
+        let init_smoothed = self.estimates[0].clone();
+        // Reset the propagator
+        self.prop.reset();
+        // Set the filter's initial state to this smoothed estimate
+        self.kf.set_previous_estimate(&init_smoothed);
+        // And re-run the filter
+        if map_covar {
+            self.process_measurements_covar(measurements)?;
+        } else {
+            self.process_measurements(measurements)?;
+        }
         None
     }
 

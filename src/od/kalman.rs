@@ -143,6 +143,10 @@ where
         &self.prev_estimate
     }
 
+    fn set_previous_estimate(&mut self, est: &Self::Estimate) {
+        self.prev_estimate = est.clone();
+    }
+
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
     fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
