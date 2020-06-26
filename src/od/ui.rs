@@ -220,12 +220,16 @@ where
                                 // StdEkfTrigger needs to store the time of the previous measurement).
                                 if self.ekf_trigger.enable_ekf(&est) && !self.kf.is_extended() {
                                     self.kf.set_extended(true);
-                                    info!(
-                                        "EKF enabled @ {}",
-                                        real_meas.epoch().as_gregorian_tai_str()
-                                    );
                                     if !est.within_3sigma() {
-                                        warn!("EKF enabled when filter has diverged!")
+                                        warn!(
+                                            "EKF enabled @ {} but filter DIVERGING",
+                                            real_meas.epoch().as_gregorian_tai_str()
+                                        );
+                                    } else {
+                                        info!(
+                                            "EKF enabled @ {}",
+                                            real_meas.epoch().as_gregorian_tai_str()
+                                        );
                                     }
                                 }
                                 if self.kf.is_extended() {
@@ -291,7 +295,6 @@ where
         self.estimates.push(prev);
         for msr in measurements {
             let delta_t = msr.epoch() - prev_dt;
-            println!("delta_t = {}", delta_t);
             self.prop.until_time_elapsed(delta_t);
             prev_dt = msr.epoch();
         }
@@ -384,12 +387,16 @@ where
                                                 && !self.kf.is_extended()
                                             {
                                                 self.kf.set_extended(true);
-                                                info!(
-                                                    "EKF enabled @ {}",
-                                                    real_meas.epoch().as_gregorian_tai_str()
-                                                );
                                                 if !est.within_3sigma() {
-                                                    warn!("EKF enabled when filter has diverged!")
+                                                    warn!(
+                                                        "EKF enabled @ {} but filter DIVERGING",
+                                                        real_meas.epoch().as_gregorian_tai_str()
+                                                    );
+                                                } else {
+                                                    info!(
+                                                        "EKF enabled @ {}",
+                                                        real_meas.epoch().as_gregorian_tai_str()
+                                                    );
                                                 }
                                             }
                                             if self.kf.is_extended() {
