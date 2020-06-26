@@ -116,6 +116,10 @@ fn multi_body_ckf_perfect_stations() {
     let mut printed = false;
     let mut last_est = None;
     for (no, est) in odp.estimates.iter().enumerate() {
+        if no == 0 {
+            // Skip the first estimate which is the initial estimate provided by user
+            continue;
+        }
         assert_eq!(
             est.predicted, false,
             "estimate {} should not be a prediction",
@@ -135,7 +139,7 @@ fn multi_body_ckf_perfect_stations() {
             est.state_deviation().norm()
         );
 
-        let res = &odp.residuals[no];
+        let res = &odp.residuals[no - 1];
         assert!(
             res.postfit.norm() < 1e-9,
             "postfit should be zero (perfect dynamics) ({:e})",
