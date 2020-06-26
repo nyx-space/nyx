@@ -1085,7 +1085,7 @@ impl<'a> NavSolutionFormatter<'a> {
                 }
                 NavSolutionHeader::NominalState(_) => {
                     // The formatter is already initialized
-                    for fmtval in self.nominal_headers.fmt(&sol.orbital_state()) {
+                    for fmtval in self.nominal_headers.fmt(&sol.expected_state()) {
                         formatted.push(fmtval);
                     }
                 }

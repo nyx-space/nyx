@@ -523,11 +523,16 @@ where
     T: EstimableState<U6>,
 {
     fn orbital_state(&self) -> State;
+    /// Returns the nominal state as computed by the dynamics
+    fn expected_state(&self) -> State;
 }
 
 impl NavSolution<State> for KfEstimate<U6, State> {
     fn orbital_state(&self) -> State {
         self.state()
+    }
+    fn expected_state(&self) -> State {
+        self.nominal_state()
     }
 }
 
@@ -535,16 +540,25 @@ impl NavSolution<State> for IfEstimate<U6, State> {
     fn orbital_state(&self) -> State {
         self.state()
     }
+    fn expected_state(&self) -> State {
+        self.nominal_state()
+    }
 }
 
 impl NavSolution<SpacecraftState> for KfEstimate<U6, SpacecraftState> {
     fn orbital_state(&self) -> State {
         self.state().orbit
     }
+    fn expected_state(&self) -> State {
+        self.nominal_state().orbit
+    }
 }
 
 impl NavSolution<SpacecraftState> for IfEstimate<U6, SpacecraftState> {
     fn orbital_state(&self) -> State {
         self.state().orbit
+    }
+    fn expected_state(&self) -> State {
+        self.nominal_state().orbit
     }
 }
