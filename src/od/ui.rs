@@ -291,6 +291,7 @@ where
         self.estimates.push(prev);
         for msr in measurements {
             let delta_t = msr.epoch() - prev_dt;
+            println!("delta_t = {}", delta_t);
             self.prop.until_time_elapsed(delta_t);
             prev_dt = msr.epoch();
         }
@@ -387,6 +388,9 @@ where
                                                     "EKF enabled @ {}",
                                                     real_meas.epoch().as_gregorian_tai_str()
                                                 );
+                                                if !est.within_3sigma() {
+                                                    warn!("EKF enabled when filter has diverged!")
+                                                }
                                             }
                                             if self.kf.is_extended() {
                                                 self.prop.dynamics.set_estimated_state(
