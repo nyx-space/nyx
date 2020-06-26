@@ -768,7 +768,7 @@ fn ekf_robust_test() {
     // Define the ground stations.
     let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 5.0;
+    let ekf_disable_time = 10.0;
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
@@ -794,9 +794,9 @@ fn ekf_robust_test() {
     let dt = Epoch::from_mjd_tai(21545.0);
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 1.0;
-    initial_state_dev.y -= 1.0;
-    initial_state_dev.z += 0.5;
+    initial_state_dev.x += 9.5;
+    initial_state_dev.y -= 9.5;
+    initial_state_dev.z += 9.5;
 
     println!("Initial state dev:\n{}", initial_state - initial_state_dev);
 
@@ -827,8 +827,8 @@ fn ekf_robust_test() {
     let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state_dev);
     let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
-    let covar_radius = 1.0e-6;
-    let covar_velocity = 1.0e-6;
+    let covar_radius = 1.0e1;
+    let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
         covar_radius,
@@ -840,7 +840,7 @@ fn ekf_robust_test() {
 
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
-    println!("initial estimate:\n{}", initial_estimate);
+    println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
@@ -889,4 +889,14 @@ fn ekf_robust_test() {
             );
         }
     }
+
+    assert_eq!(
+        final_truth_state.unwrap().dt,
+        est.epoch(),
+        "time of final EST and TRUTH epochs differ"
+    );
+    assert!(
+        (final_truth_state.unwrap() - est.state()).rmag() < 1e-2,
+        "final radius error should be on CM level"
+    );
 }

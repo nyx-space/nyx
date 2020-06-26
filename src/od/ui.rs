@@ -224,6 +224,9 @@ where
                                         "EKF enabled @ {}",
                                         real_meas.epoch().as_gregorian_tai_str()
                                     );
+                                    if !est.within_3sigma() {
+                                        warn!("EKF enabled when filter has diverged!")
+                                    }
                                 }
                                 if self.kf.is_extended() {
                                     self.prop.dynamics.set_estimated_state(
