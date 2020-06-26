@@ -243,8 +243,7 @@ where
                     }
                 }
                 // Let's add the process noise
-                covar_bar += delta_t.powi(2)
-                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose());
+                covar_bar += &gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose();
             }
         }
 

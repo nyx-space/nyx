@@ -1,0 +1,39 @@
+sequence = ["prop"]
+
+[state.init_state]
+x = 0.0
+y = 0.0
+z = 10000.0
+vx = 5.088611
+vy = -5.088611
+vz = 0.0
+frame = "EME2000"
+epoch = "2020-01-01T00:00:00.00"
+unit_position = "km"
+unit_velocity = "km/s"
+
+[orbital_dynamics.orbital_dyn]
+integration_frame = "EME2000"
+initial_state = "init_state"
+point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
+accel_models = ["my_models"]
+
+[spacecraft.sc1]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "orbital_dyn"
+
+[propagator.prop]
+dynamics = "sc1"
+stop_cond = "3.5 days"
+output = "my_csv"
+
+[accel_models.my_models.harmonics.jgm3_70x70]
+frame = "EME2000"
+degree = 70
+order = 70
+file = "data/JGM3.cof.gz"
+
+[output.my_csv]
+filename = "./data/quick-run.csv"
+headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz"]
