@@ -120,11 +120,7 @@ fn multi_body_ckf_perfect_stations() {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
         }
-        assert_eq!(
-            est.predicted, false,
-            "estimate {} should not be a prediction",
-            no
-        );
+
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
@@ -139,13 +135,6 @@ fn multi_body_ckf_perfect_stations() {
             est.state_deviation().norm()
         );
 
-        let res = &odp.residuals[no - 1];
-        assert!(
-            res.postfit.norm() < 1e-9,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
-        );
-
         if !printed {
             wtr.serialize(est.clone())
                 .expect("could not write to stdout");
@@ -153,6 +142,14 @@ fn multi_body_ckf_perfect_stations() {
         }
 
         last_est = Some(est);
+    }
+
+    for res in &odp.residuals {
+        assert!(
+            res.postfit.norm() < 1e-12,
+            "postfit should be zero (perfect dynamics) ({:e})",
+            res
+        );
     }
 
     // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
@@ -256,7 +253,7 @@ fn multi_body_ckf_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements_covar(&measurements);
+    let rtn = odp.process_measurements(&measurements);
 
     assert!(rtn.is_none(), "kf failed");
 

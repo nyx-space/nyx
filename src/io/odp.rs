@@ -353,7 +353,7 @@ impl<'a> OdpScenario<'a> {
             StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time),
         );
 
-        odp.process_measurements_covar(&sim_measurements);
+        odp.process_measurements(&sim_measurements);
 
         // Save to output file if requested
         // Create the output file

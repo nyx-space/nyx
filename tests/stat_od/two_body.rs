@@ -234,22 +234,10 @@ fn ckf_fixed_step_perfect_stations() {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
         }
-        assert_eq!(
-            est.predicted, false,
-            "estimate {} should not be a prediction",
-            no
-        );
         assert!(
             est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state_deviation().norm()
-        );
-
-        let res = &odp.residuals[no - 1];
-        assert!(
-            res.postfit.norm() < 1e-12,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
         );
 
         if !printed {
@@ -257,6 +245,14 @@ fn ckf_fixed_step_perfect_stations() {
                 .expect("could not write to stdout");
             printed = true;
         }
+    }
+
+    for res in &odp.residuals {
+        assert!(
+            res.postfit.norm() < 1e-12,
+            "postfit should be zero (perfect dynamics) ({:e})",
+            res
+        );
     }
 
     // Check that the covariance deflated
@@ -287,7 +283,7 @@ fn ckf_fixed_step_perfect_stations() {
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
 
     // Iterate
-    if odp.iterate(&measurements, false).is_some() {
+    if odp.iterate(&measurements).is_some() {
         panic!("iteration failed");
     }
 
@@ -399,7 +395,7 @@ fn ckf_fixed_step_iteration_test() {
 
     // Iterate, and check that the initial state difference is lower
     // Iterate
-    if odp.iterate(&measurements, false).is_some() {
+    if odp.iterate(&measurements).is_some() {
         panic!("iteration failed");
     }
 
@@ -511,7 +507,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements_covar(&measurements);
+    let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -727,7 +723,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements_covar(&measurements);
+    let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "kf failed");
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -766,7 +762,7 @@ fn ekf_robust_test() {
     let cosm = Cosm::de438();
 
     // Define the ground stations.
-    let ekf_num_meas = 100;
+    let ekf_num_meas = 400;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 10.0;
     let elevation_mask = 0.0;
@@ -776,9 +772,9 @@ fn ekf_robust_test() {
         GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss34_canberra =
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = SECONDS_PER_DAY;
@@ -808,7 +804,7 @@ fn ekf_robust_test() {
         prop.until_time_elapsed(prop_time);
     });
 
-    let mut final_truth_state = None;
+    let mut truth_states = Vec::with_capacity(10_000);
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.recv() {
         for station in all_stations.iter() {
@@ -818,8 +814,9 @@ fn ekf_robust_test() {
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        final_truth_state = Some(rx_state);
+        truth_states.push(rx_state)
     }
+    let final_truth_state = truth_states[truth_states.len() - 1];
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -862,12 +859,13 @@ fn ekf_robust_test() {
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Estimate:\n{}", est);
-    println!("Truth:\n{}", final_truth_state.unwrap());
+    println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.unwrap().dt == est.epoch(),
-        final_truth_state.unwrap() - est.state()
+        final_truth_state.dt == est.epoch(),
+        final_truth_state - est.state()
     );
+
     for i in 0..6 {
         assert!(
             est.covar[(i, i)] >= 0.0,
@@ -891,12 +889,20 @@ fn ekf_robust_test() {
     }
 
     assert_eq!(
-        final_truth_state.unwrap().dt,
+        final_truth_state.dt,
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
+    let rmag_err = (final_truth_state - est.state()).rmag();
     assert!(
-        (final_truth_state.unwrap() - est.state()).rmag() < 1e-2,
-        "final radius error should be on CM level"
+        rmag_err < 1e-2,
+        "final radius error should be on meter level (is instead {:.3e} m)",
+        rmag_err * 1e3
+    );
+
+    assert_eq!(
+        truth_states.len(),
+        odp.estimates.len() - 1,
+        "different number of estimates"
     );
 }

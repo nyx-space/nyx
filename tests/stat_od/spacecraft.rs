@@ -144,11 +144,6 @@ fn sc_ckf_perfect_stations() {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
         }
-        assert_eq!(
-            est.predicted, false,
-            "estimate {} should not be a prediction",
-            no
-        );
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
@@ -163,13 +158,6 @@ fn sc_ckf_perfect_stations() {
             est.state_deviation().norm()
         );
 
-        let res = &odp.residuals[no - 1];
-        assert!(
-            res.postfit.norm() < 1e-9,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
-        );
-
         if !printed {
             // Format the estimate
             wtr.serialize(estimate_fmtr.fmt(est))
@@ -178,6 +166,14 @@ fn sc_ckf_perfect_stations() {
         }
 
         last_est = Some(est);
+    }
+
+    for res in &odp.residuals {
+        assert!(
+            res.postfit.norm() < 1e-9,
+            "postfit should be zero (perfect dynamics) ({:e})",
+            res
+        );
     }
 
     // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
