@@ -21,7 +21,7 @@ covar_diag = [1e1, 1e1, 1e1, 1e-1, 1e-1, 1e-1]
 
 [estimate.leo_nav]
 state = "leo_nav"
-covar_diag = [1e1, 1e1, 1e1, 1e-1, 1e-1, 1e-1]
+covar_diag = [1e1, 1e1, 1e1, 1e1, 1e1, 1e1]
 
 [odp.nrho_perfect]
 navigation_prop = "nrho_truth"
@@ -37,6 +37,7 @@ msr_noise = [1e-1, 1e-2]
 snc = [1e-14, 1e-14, 1e-14]
 snc_disable = "120 * sec"
 measurements = "msr_sim_nrho"
+ekf_msr_trigger = 400
 output = "estimates"
 
 [odp.lro_perfect]
@@ -52,6 +53,7 @@ initial_estimate = "lro_nav"
 msr_noise = [1e-1, 1e-2]
 snc = [1e-14, 1e-14, 1e-14]
 measurements = "msr_sim_lro"
+ekf_msr_trigger = 100
 output = "estimates"
 
 [odp.leo_perfect]
@@ -64,7 +66,8 @@ output = "estimates"
 [odp.leo]
 navigation_prop = "leo_nav"
 initial_estimate = "leo_nav"
-msr_noise = [1e-1, 1e-2]
-# snc = [1e-16, 1e-16, 1e-16]
+msr_noise = [1e-9, 1e-9]
+snc = [1e-16, 1e-16, 1e-16]
 measurements = "msr_sim_leo"
+ekf_msr_trigger = 400
 output = "estimates"

@@ -143,7 +143,7 @@ impl<'a> OdpScenario<'a> {
                         )));
                     }
 
-                    let est_init_state_serde = &scenario.state[&est_serde.state];
+                    let est_init_state_serde = &scenario.state[&est_serde.state.to_lowercase()];
                     let state_frame = cosm.frame(est_init_state_serde.frame.as_str());
                     let est_init_state = est_init_state_serde.as_state(state_frame);
 
@@ -344,14 +344,8 @@ impl<'a> OdpScenario<'a> {
         nav.set_step(10.0, true);
 
         let kf = self.kf;
-        let mut odp = ODProcess::ekf(
-            nav,
-            kf,
-            self.stations.clone(),
-            false,
-            100_000,
-            StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time),
-        );
+        let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
+        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), false, 100_000, trig);
 
         odp.process_measurements(&sim_measurements);
 
@@ -368,5 +362,9 @@ impl<'a> OdpScenario<'a> {
                     .expect("could not format state");
             }
         };
+
+        if let Some(final_estimate) = &odp.estimates.last() {
+            println!("Final estimate:\n{}", final_estimate);
+        }
     }
 }

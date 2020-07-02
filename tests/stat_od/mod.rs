@@ -8,6 +8,7 @@ use self::nyx::od::ui::{Estimate, Filter, FilterError, KfEstimate, KF};
 
 mod measurements;
 mod multi_body;
+mod robust;
 mod spacecraft;
 mod srif;
 mod two_body;

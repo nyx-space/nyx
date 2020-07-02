@@ -219,6 +219,9 @@ where
 
                 // Check if we should do a time update or a measurement update
                 if next_msr_epoch > dt {
+                    if msr_cnt == 0 {
+                        warn!("OD arc starts prior to first measurement");
+                    }
                     // No measurement can be used here, let's just do a time update
                     debug!("time update {}", dt.as_gregorian_tai_str());
                     match self.kf.time_update(nominal_state) {
@@ -455,6 +458,7 @@ pub struct StdEkfTrigger {
     pub num_msrs: usize,
     /// In seconds!
     pub disable_time: f64,
+    pub when_converged: bool,
     prev_msr_dt: Option<Epoch>,
     cur_msrs: usize,
 }
@@ -464,6 +468,7 @@ impl StdEkfTrigger {
         Self {
             num_msrs,
             disable_time,
+            when_converged: false,
             prev_msr_dt: None,
             cur_msrs: 0,
         }
@@ -483,6 +488,7 @@ impl EkfTrigger for StdEkfTrigger {
         }
         self.cur_msrs += 1;
         self.cur_msrs >= self.num_msrs
+            && ((self.when_converged && est.within_3sigma()) || !self.when_converged)
     }
 
     fn disable_ekf(&mut self, epoch: Epoch) -> bool {
