@@ -159,6 +159,7 @@ impl Cosm {
 
     /// Load the IAU Frames as defined in Celest Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
     pub fn load_iau_frames(&mut self) {
+        let frames_start = Instant::now();
         // Load the IAU frames from the embedded TOML
         let iau_toml_str =
             EmbeddedAsset::get("iau_frames.toml").expect("Could not find iau_frames.toml as asset");
@@ -168,6 +169,11 @@ impl Cosm {
         ) {
             error!("Could not load IAU frames: {}", err);
         }
+        info!(
+            "Loaded {} frames in {} ms.",
+            self.frames.len(),
+            frames_start.elapsed().as_millis()
+        );
     }
 
     pub fn append_xb(&mut self, ephemerides: Vec<Ephemeris>) -> Option<IoError> {
@@ -265,7 +271,7 @@ impl Cosm {
                             );
                         }
                         _ => {
-                            info!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
+                            warn!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
                         }
                     }
                 }
@@ -348,7 +354,7 @@ impl Cosm {
                     self.axb_map.add_edge(node, self.j2k_nidx, 1);
                     self.axb_rotations
                         .insert(new_frame.axb_id(), Box::new(frame_rot));
-                    info!("Loaded frame {}", frame_name);
+                    debug!("Loaded frame {}", frame_name);
                     self.frames.insert(frame_name, new_frame);
                 }
                 None
@@ -895,9 +901,9 @@ pub fn load_ephemeris_from_buf(input_exb_buf: Vec<u8>) -> Result<Vec<Ephemeris>,
         panic!("no ephemerides found in EXB");
     }
     info!(
-        "Loaded {} ephemerides in {} seconds.",
+        "Loaded {} ephemerides in {} ms.",
         num_eph,
-        decode_start.elapsed().as_secs()
+        decode_start.elapsed().as_millis()
     );
     Ok(ephemerides)
 }

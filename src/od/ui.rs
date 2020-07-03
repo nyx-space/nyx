@@ -460,7 +460,8 @@ pub struct StdEkfTrigger {
     pub num_msrs: usize,
     /// In seconds!
     pub disable_time: f64,
-    pub when_converged: bool,
+    /// Set to the sigma number needed to switch to the EKF (cf. 68–95–99.7 rule). If number is negative, this is ignored.
+    pub within_sigma: f64,
     prev_msr_dt: Option<Epoch>,
     cur_msrs: usize,
 }
@@ -470,7 +471,7 @@ impl StdEkfTrigger {
         Self {
             num_msrs,
             disable_time,
-            when_converged: false,
+            within_sigma: -1.0,
             prev_msr_dt: None,
             cur_msrs: 0,
         }
@@ -490,7 +491,8 @@ impl EkfTrigger for StdEkfTrigger {
         }
         self.cur_msrs += 1;
         self.cur_msrs >= self.num_msrs
-            && ((self.when_converged && est.within_3sigma()) || !self.when_converged)
+            && ((self.within_sigma > 0.0 && est.within_sigma(self.within_sigma))
+                || self.within_sigma <= 0.0)
     }
 
     fn disable_ekf(&mut self, epoch: Epoch) -> bool {
