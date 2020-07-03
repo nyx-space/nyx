@@ -10,7 +10,7 @@ use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
 use nyx::propagators::{PropOpts, Propagator};
-use nyx::utils::rss_state_errors;
+use nyx::utils::rss_errors;
 
 #[test]
 fn srp_earth() {
@@ -54,7 +54,7 @@ fn srp_earth() {
         -5.729_183_400_502_337e-8,
     );
 
-    let (err_r, err_v) = rss_state_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!("{:e}\t{:e}", err_r, err_v);
     // Note that we have quite large SRP differences with GMAT compared to the other errors.
     // Cf. VALIDATION.MD for details.

@@ -116,7 +116,7 @@ pub mod propagators;
 /// use nyx::celestia::{bodies, Cosm, State};
 /// use nyx::dynamics::orbital::OrbitalDynamics;
 /// use nyx::propagators::*;
-/// use nyx::utils::rss_state_errors;
+/// use nyx::utils::rss_errors;
 ///
 /// let prop_time = 24.0 * 3_600.0;
 ///
@@ -151,7 +151,7 @@ pub mod propagators;
 ///
 /// let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
 /// prop.until_time_elapsed(prop_time);
-/// let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+/// let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 ///
 /// println!(
 ///     "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",

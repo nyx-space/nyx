@@ -12,6 +12,7 @@ use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 use self::nyx::io::gravity::*;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use self::nyx::utils::rss_state_errors;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -25,9 +26,9 @@ fn robust_test_ekf_two_body() {
     let cosm = Cosm::de438();
 
     // Define the ground stations.
-    let ekf_num_meas = 400;
+    let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0;
+    let ekf_disable_time = 3600.0;
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
@@ -50,14 +51,20 @@ fn robust_test_ekf_two_body() {
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21545.0);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x += 5.0;
+    initial_state_dev.y -= 5.0;
+    initial_state_dev.z += 5.0;
 
-    println!("Initial state dev:\n{}", initial_state - initial_state_dev);
+    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    println!(
+        "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
+        err_p * 1e3,
+        err_v * 1e3,
+        initial_state - initial_state_dev
+    );
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -105,7 +112,14 @@ fn robust_test_ekf_two_body() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let sigma_q = 1e-7_f64.powi(2);
+    let process_noise = Matrix3::from_diagonal(&Vector3::new(sigma_q, sigma_q, sigma_q));
+    let kf = KF::new(
+        initial_estimate,
+        process_noise,
+        measurement_noise,
+        Some(120.0),
+    );
 
     let mut odp = ODProcess::ekf(
         prop_est,
@@ -123,9 +137,12 @@ fn robust_test_ekf_two_body() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
+    let (err_p, err_v) = rss_state_errors(&est.state(), &final_truth_state);
     println!(
-        "Delta state with truth (epoch match: {}):\n{}",
+        "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
         final_truth_state.dt == est.epoch(),
+        err_p * 1e3,
+        err_v * 1e3,
         final_truth_state - est.state()
     );
 
@@ -165,7 +182,7 @@ fn robust_test_ekf_two_body() {
 
     assert_eq!(
         truth_states.len(),
-        odp.estimates.len() - 1,
+        odp.estimates.len(),
         "different number of estimates"
     );
 }

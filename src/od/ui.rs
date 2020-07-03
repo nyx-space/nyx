@@ -196,6 +196,7 @@ where
         let mut prev_dt = prev.epoch();
 
         let mut reported = vec![false; 11];
+        let mut arc_warned = false;
 
         info!(
             "Processing {} measurements with covariance mapping",
@@ -219,8 +220,9 @@ where
 
                 // Check if we should do a time update or a measurement update
                 if next_msr_epoch > dt {
-                    if msr_cnt == 0 {
+                    if msr_cnt == 0 && !arc_warned {
                         warn!("OD arc starts prior to first measurement");
+                        arc_warned = true;
                     }
                     // No measurement can be used here, let's just do a time update
                     debug!("time update {}", dt.as_gregorian_tai_str());

@@ -12,7 +12,7 @@ use nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use nyx::od::Estimable;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
-use nyx::utils::rss_state_errors;
+use nyx::utils::rss_errors;
 use std::f64::EPSILON;
 
 #[test]
@@ -49,7 +49,7 @@ fn two_body_dynamics() {
     );
     // And now do the backprop
     prop.until_time_elapsed(-prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &state.to_cartesian_vec());
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -64,7 +64,7 @@ fn two_body_dynamics() {
     assert!(
         (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
     );
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
     assert!(
         err_r < 1e-5,
         "two body back+fwd prop failed to return to the initial state in position"
@@ -117,7 +117,7 @@ fn halo_earth_moon_dynamics() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -182,7 +182,7 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -248,7 +248,7 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -316,7 +316,7 @@ fn halo_multi_body_dynamics() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -386,7 +386,7 @@ fn halo_multi_body_dynamics_adaptive() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -455,7 +455,7 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -517,7 +517,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -578,7 +578,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
     prop.until_time_elapsed(prop_time);
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
     let delta = prop.state_vector() - rslt;
@@ -784,7 +784,7 @@ fn earth_sph_harmonics_j2() {
     println!("{}", prop.state());
     println!("Error: {:3.12}", prop.state_vector() - rslt_monte);
 
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_monte);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_monte);
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
@@ -838,7 +838,7 @@ fn earth_sph_harmonics_12x12() {
 
     println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
 
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_gmat);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_gmat);
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
@@ -892,7 +892,7 @@ fn earth_sph_harmonics_70x70() {
 
     println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
 
-    let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &rslt_gmat);
+    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_gmat);
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
@@ -949,7 +949,7 @@ fn earth_sph_harmonics_70x70_partials() {
         prop.state().to_cartesian_vec() - rslt_gmat
     );
 
-    let (err_r, err_v) = rss_state_errors(&prop.state().to_cartesian_vec(), &rslt_gmat);
+    let (err_r, err_v) = rss_errors(&prop.state().to_cartesian_vec(), &rslt_gmat);
 
     // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(

@@ -11,7 +11,7 @@ use nyx::celestia::{Cosm, State};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStatePV;
 use nyx::propagators::*;
-use nyx::utils::rss_state_errors;
+use nyx::utils::rss_errors;
 
 macro_rules! assert_eq_or_abs {
     ($left:expr, $right:expr, $msg:expr) => {
@@ -216,7 +216,7 @@ fn gmat_val_leo_day_adaptive() {
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(-prop_time);
-        let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &all_rslts[0]);
+        let (err_r, err_v) = rss_errors(&prop.state_vector(), &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"
@@ -350,7 +350,7 @@ fn gmat_val_leo_day_fixed() {
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(prop_time);
         prop.until_time_elapsed(-prop_time);
-        let (err_r, err_v) = rss_state_errors(&prop.state_vector(), &all_rslts[0]);
+        let (err_r, err_v) = rss_errors(&prop.state_vector(), &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"
