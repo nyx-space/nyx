@@ -229,7 +229,13 @@ fn robust_test_ekf_multi_body() {
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
 
-    println!("Initial state dev:\n{}", initial_state - initial_state_dev);
+    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    println!(
+        "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
+        err_p * 1e3,
+        err_v * 1e3,
+        initial_state - initial_state_dev
+    );
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -280,7 +286,15 @@ fn robust_test_ekf_multi_body() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    let kf = KF::no_snc(initial_estimate, measurement_noise);
+    // let kf = KF::no_snc(initial_estimate, measurement_noise);
+    let sigma_q = 1e-7_f64.powi(2);
+    let process_noise = Matrix3::from_diagonal(&Vector3::new(sigma_q, sigma_q, sigma_q));
+    let kf = KF::new(
+        initial_estimate,
+        process_noise,
+        measurement_noise,
+        Some(120.0),
+    );
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.when_converged = true;
@@ -294,9 +308,12 @@ fn robust_test_ekf_multi_body() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
+    let (err_p, err_v) = rss_state_errors(&est.state(), &final_truth_state);
     println!(
-        "Delta state with truth (epoch match: {}):\n{}",
+        "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
         final_truth_state.dt == est.epoch(),
+        err_p * 1e3,
+        err_v * 1e3,
         final_truth_state - est.state()
     );
 
