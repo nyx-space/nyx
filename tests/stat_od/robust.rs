@@ -368,9 +368,9 @@ fn robust_test_ekf_harmonics() {
     let cosm = Cosm::de438();
 
     // Define the ground stations.
-    let ekf_num_meas = 500;
+    let ekf_num_meas = 50000;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 36000.0;
+    let ekf_disable_time = 3600.0;
     let elevation_mask = 0.0;
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
@@ -397,9 +397,9 @@ fn robust_test_ekf_harmonics() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 0.5;
-    initial_state_dev.y -= 0.5;
-    initial_state_dev.z += 0.5;
+    initial_state_dev.x += 0.00;
+    initial_state_dev.y -= 0.00;
+    initial_state_dev.z += 0.00;
 
     let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
     println!(
@@ -409,12 +409,16 @@ fn robust_test_ekf_harmonics() {
         initial_state - initial_state_dev
     );
 
+    let hh_deg = 20;
+    let hh_ord = 20;
+
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 20, 20, true).unwrap();
+        let earth_sph_harm =
+            HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
         let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
         dynamics.add_model(Box::new(harmonics));
         dynamics.add_model(Box::new(PointMasses::new(eme2k, bodies, &cosm)));
@@ -446,14 +450,14 @@ fn robust_test_ekf_harmonics() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
 
     let mut estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 20, 20, true).unwrap();
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
     let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
     estimator.add_model(Box::new(harmonics));
     estimator.add_model(Box::new(PointMasses::new(eme2k, bodies, &cosm)));
 
     let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
-    let covar_radius = 1.0e3;
-    let covar_velocity = 1.0e2;
+    let covar_radius = 1.0e2;
+    let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
         covar_radius,
@@ -481,7 +485,7 @@ fn robust_test_ekf_harmonics() {
     );
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
-    trig.within_sigma = 1.0;
+    trig.within_sigma = 3.0;
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
