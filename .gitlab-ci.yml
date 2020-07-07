@@ -9,4 +9,5 @@ stable:
     # NOTE: We don't do that with km output because the unit conversion leads to some rounding issues
     - diff ./data/scenario-run-cm.csv ./data/scenario-run-m.csv
     - cargo run --release -- data/simple-od-scenario.toml
+    - cargo run --release -- "data/od_validation/*" -a
 

@@ -122,6 +122,11 @@ pub struct AccelModel {
 }
 
 #[derive(Deserialize)]
+pub struct ForceModel {
+    pub srp: HashMap<String, SolarPressureSerde>,
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PropagatorKind {
     Dormand45,
@@ -139,6 +144,8 @@ pub struct PropagatorSerde {
     pub dynamics: String,
     /// Name of the stoping condition used
     pub stop_cond: String,
+    /// The tolerance of the propagator (default to 1e-12)
+    pub tolerance: Option<f64>,
     pub output: Option<String>,
     /// If no kind is specified, an RK89 will be used
     pub kind: Option<PropagatorKind>,
@@ -160,6 +167,8 @@ pub struct OdpSerde {
     pub snc_disable: Option<String>,
     /// Set the number of measurements to switch to an EKF
     pub ekf_msr_trigger: Option<usize>,
+    /// Set the acceptable time between measurements
+    pub ekf_disable_time: Option<f64>,
     /// An optional output of a NavSolution
     pub output: Option<String>,
 }
@@ -181,7 +190,7 @@ pub struct MeasurementSerde {
     /// Names of the measurement devices to use
     pub msr_device: Vec<String>,
     /// Name of the output file to store the measurements
-    pub output: String,
+    pub output: Option<String>,
     /// Optionally specify whether to use the file if it exists
     pub use_file_if_available: Option<bool>,
 }
@@ -204,7 +213,8 @@ pub struct ScenarioSerde {
     pub state: HashMap<String, StateSerde>,
     pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
     pub spacecraft: HashMap<String, SpacecraftSerde>,
-    pub accel_models: HashMap<String, AccelModel>,
+    pub accel_models: Option<HashMap<String, AccelModel>>,
+    pub force_models: Option<HashMap<String, ForceModel>>,
     pub output: HashMap<String, OutputSerde>,
     pub distr: Option<HashMap<String, Distribution>>,
     pub odp: Option<HashMap<String, OdpSerde>>,
@@ -221,7 +231,7 @@ fn test_md_scenario() {
         r#"
         sequence = ["prop_name"]
 
-        [state.state_name]
+        [state.STATE_NAME]
         x = -2436.45
         y = -2436.45
         z = 6891.037
@@ -256,6 +266,7 @@ fn test_md_scenario() {
         dry_mass = 100.0
         fuel_mass = 20.0
         orbital_dynamics = "conf_name"
+        force_models = ["my_frc"]
 
         [propagator.prop_name]
         flavor = "rk89"  # If unspecified, the default propagator is used
@@ -276,6 +287,11 @@ fn test_md_scenario() {
         degree = 70
         order = 70
         file = "data/JGM3.cof.gz"
+
+        [force_models.my_frc.srp.my_srp]
+        sc_area = 1.0 # in meters squared
+        cr = 1.5 # Defaults to 1.8
+
         "#,
     )
     .unwrap();
@@ -283,8 +299,13 @@ fn test_md_scenario() {
     assert_eq!(scen.state.len(), 2);
     assert_eq!(scen.orbital_dynamics.len(), 2);
     assert_eq!(scen.propagator.len(), 2);
-    assert_eq!(scen.accel_models.len(), 1);
-    assert_eq!(scen.accel_models["my_models"].harmonics.len(), 1);
+    assert_eq!(scen.accel_models.as_ref().unwrap().len(), 1);
+    assert_eq!(
+        scen.accel_models.as_ref().unwrap()["my_models"]
+            .harmonics
+            .len(),
+        1
+    );
     assert_eq!(scen.sequence.len(), 1);
 }
 
@@ -318,11 +339,13 @@ fn test_od_scenario() {
         dry_mass = 100.0
         fuel_mass = 20.0
         orbital_dynamics = "conf_name"
+        force_models = ["my_srp"]
 
         [propagator.nav_prop]
         dynamics = "sc1"
         stop_cond = "3.5 days"
         output = "my_csv"
+        tolerance = 1e-9
 
         [propagator.truth_propagator]
         dynamics = "sc1"
@@ -347,6 +370,7 @@ fn test_od_scenario() {
         snc_disable = "120 * sec"
         measurements = "msr_sim"  # Or provide a file name
         ekf_msr_trigger = 30
+        ekf_disable_time = 3600  # If no measurements for an hour, disable the EKF
         output = "estimate_csv"
 
         [output.estimate_csv]
@@ -384,8 +408,13 @@ fn test_od_scenario() {
     assert_eq!(scen.state.len(), 1);
     assert_eq!(scen.orbital_dynamics.len(), 1);
     assert_eq!(scen.propagator.len(), 2);
-    assert_eq!(scen.accel_models.len(), 1);
-    assert_eq!(scen.accel_models["my_models"].harmonics.len(), 1);
+    assert_eq!(scen.accel_models.as_ref().unwrap().len(), 1);
+    assert_eq!(
+        scen.accel_models.as_ref().unwrap()["my_models"]
+            .harmonics
+            .len(),
+        1
+    );
     assert_eq!(scen.sequence.len(), 1);
     assert_eq!(scen.odp.unwrap().len(), 1);
     assert_eq!(scen.measurements.unwrap().len(), 1);

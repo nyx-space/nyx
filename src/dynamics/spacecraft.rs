@@ -221,6 +221,12 @@ impl SpacecraftState {
             stm: None,
         }
     }
+
+    /// Extract the STM, will panic if the STM isn't set.
+    /// If unsure, use the field instead of the method.
+    pub fn stm(&self) -> Matrix6<f64> {
+        self.stm.unwrap()
+    }
 }
 
 impl PartialEq for SpacecraftState {

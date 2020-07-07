@@ -1,0 +1,7 @@
+[output.truth]
+filename = "./data/truth.csv"
+
+[output.estimates]
+# List of headers to be exported (case insensitive). Note that all Estimates and all Nominals will be grouped together (known limitation)
+# headers = ["Epoch", "Delta_x", "Delta_y", "Delta_z", "Delta_vx", "Delta_vy", "Delta_vz", "Estimate:sma:Luna", "Estimate:ecc:Luna", "NoMiNaL:sma:Luna"]
+filename = "./data/estimates.csv"

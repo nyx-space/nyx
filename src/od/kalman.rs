@@ -143,6 +143,10 @@ where
         &self.prev_estimate
     }
 
+    fn set_previous_estimate(&mut self, est: &Self::Estimate) {
+        self.prev_estimate = est.clone();
+    }
+
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
     fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
@@ -210,13 +214,36 @@ where
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = MatrixMN::<f64, S, A>::zeros();
-                for i in 0..A::dim() {
-                    gamma[(i, i)] = delta_t.powi(2);
-                    gamma[(i + A::dim(), i)] = delta_t;
+                assert_eq!(
+                    A::dim() % 3,
+                    0,
+                    "SNC can only be applied to accelerations multiple of 3"
+                );
+                for blk in 0..A::dim() / 3 {
+                    for i in 0..3 {
+                        let idx_i = i + A::dim() * blk;
+                        let idx_j = i + 3 * blk;
+                        let idx_k = i + 3 + A::dim() * blk;
+                        // For first block
+                        // (0, 0) (1, 1) (2, 2) <=> \Delta t^2/2
+                        // (3, 0) (4, 1) (5, 2) <=> \Delta t
+                        // Second block
+                        // (6, 3) (7, 4) (8, 5) <=> \Delta t^2/2
+                        // (9, 3) (10, 4) (11, 5) <=> \Delta t
+                        // * \Delta t^2/2
+                        // (i, i) when blk = 0
+                        // (i + A::dim() * blk, i + 3) when blk = 1
+                        // (i + A::dim() * blk, i + 3 * blk)
+                        // * \Delta t
+                        // (i + 3, i) when blk = 0
+                        // (i + 3, i + 9) when blk = 1 (and I think i + 12 + 3)
+                        // (i + 3 + A::dim() * blk, i + 3 * blk)
+                        gamma[(idx_i, idx_j)] = delta_t.powi(2) / 2.0;
+                        gamma[(idx_k, idx_j)] = delta_t;
+                    }
                 }
                 // Let's add the process noise
-                covar_bar += delta_t.powi(2)
-                    * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose());
+                covar_bar += &gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose();
             }
         }
 
@@ -228,11 +255,16 @@ where
         let gain = &covar_bar * h_tilde_t * invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
-        let prefit = real_obs - computed_obs;
+        let prefit = &real_obs - computed_obs;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
-            (&gain * prefit, Residual::zeros())
+            let state_hat = &gain * &prefit;
+            let postfit = &prefit - (&self.h_tilde * &state_hat);
+            (
+                state_hat,
+                Residual::new(nominal_state.epoch(), prefit, postfit),
+            )
         } else {
             // Must do a time update first
             let state_bar = &self.stm * &self.prev_estimate.state_deviation;
@@ -258,6 +290,7 @@ where
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
+
         self.stm_updated = false;
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();

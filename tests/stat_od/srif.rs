@@ -101,22 +101,14 @@ fn srif_fixed_step_perfect_stations() {
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
     for (no, est) in odp.estimates.iter().enumerate() {
-        assert_eq!(
-            est.predicted, false,
-            "estimate {} should not be a prediction",
-            no
-        );
+        if no == 0 {
+            // Skip the first estimate which is the initial estimate provided by user
+            continue;
+        }
         assert!(
             est.state_deviation().norm() < 1e-6,
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state_deviation().norm()
-        );
-
-        let res = &odp.residuals[no];
-        assert!(
-            res.postfit.norm() < 1e-12,
-            "postfit should be zero (perfect dynamics) ({:e})",
-            res
         );
 
         if !printed {
@@ -124,6 +116,14 @@ fn srif_fixed_step_perfect_stations() {
                 .expect("could not write to stdout");
             printed = true;
         }
+    }
+
+    for res in &odp.residuals {
+        assert!(
+            res.postfit.norm() < 1e-12,
+            "postfit should be zero (perfect dynamics) ({:e})",
+            res
+        );
     }
 
     // Check that the covariance deflated
@@ -240,7 +240,7 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements_covar(&measurements);
+    let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "srif failed");
 
     let mut wtr = csv::Writer::from_path("./estimation-srif.csv").unwrap();

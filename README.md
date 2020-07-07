@@ -56,18 +56,3 @@ of Colorado at Boulder. I work for Advanced Space ([we do really cool stuff](htt
 
 # Examples
 Refer to the tests for short examples.
-
-## Exporting states to a CSV file
-Refer to the test `qlaw_as_ruggiero_case_f` in `tests/prop/closedloop_multi_oe_ruggiero.rs`.
-
-Or just run it as:
-`cargo test qlaw_as_ruggiero_case_f --release -- --nocapture`
-
-And check the file called `rugg_case_f.csv`
-
-## Orbital Determination - Estimation plots of a Halo orbit using a classical Kalman filter
-**Note:** the Kalman Filtering capabilities have been validated against JPL Monte using a proprietary scenario.
-
-Data to recreate this simulation is deliberately not shared. This just provides an example of what is possible using this library.
-![Halo position covar](./data/halo_ckf_pos.png "E[Halo position]")
-![Halo velocity covar](./data/halo_ckf_vel.png "E[Halo velocity]")

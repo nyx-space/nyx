@@ -1,6 +1,6 @@
 extern crate nalgebra as na;
 
-use super::time::Epoch;
+pub use super::time::Epoch;
 
 /// A trait allowing for something to have an epoch
 pub trait TimeTagged {

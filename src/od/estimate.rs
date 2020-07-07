@@ -86,6 +86,16 @@ where
     fn default_header() -> Vec<String> {
         Self::header(EpochFormat::GregorianUtc, CovarFormat::Sqrt)
     }
+
+    /// Returns the covariance element at position (i, j) formatted with this estimate's covariance formatter
+    fn covar_ij(&self, i: usize, j: usize) -> f64 {
+        match self.covar_fmt() {
+            CovarFormat::Sqrt => self.covar()[(i, j)].sqrt(),
+            CovarFormat::Sigma1 => self.covar()[(i, j)],
+            CovarFormat::Sigma3 => self.covar()[(i, j)] * 3.0,
+            CovarFormat::MulSigma(x) => self.covar()[(i, j)] * x,
+        }
+    }
 }
 
 /// Kalman filter Estimate
@@ -513,11 +523,16 @@ where
     T: EstimableState<U6>,
 {
     fn orbital_state(&self) -> State;
+    /// Returns the nominal state as computed by the dynamics
+    fn expected_state(&self) -> State;
 }
 
 impl NavSolution<State> for KfEstimate<U6, State> {
     fn orbital_state(&self) -> State {
         self.state()
+    }
+    fn expected_state(&self) -> State {
+        self.nominal_state()
     }
 }
 
@@ -525,16 +540,25 @@ impl NavSolution<State> for IfEstimate<U6, State> {
     fn orbital_state(&self) -> State {
         self.state()
     }
+    fn expected_state(&self) -> State {
+        self.nominal_state()
+    }
 }
 
 impl NavSolution<SpacecraftState> for KfEstimate<U6, SpacecraftState> {
     fn orbital_state(&self) -> State {
         self.state().orbit
     }
+    fn expected_state(&self) -> State {
+        self.nominal_state().orbit
+    }
 }
 
 impl NavSolution<SpacecraftState> for IfEstimate<U6, SpacecraftState> {
     fn orbital_state(&self) -> State {
         self.state().orbit
+    }
+    fn expected_state(&self) -> State {
+        self.nominal_state().orbit
     }
 }

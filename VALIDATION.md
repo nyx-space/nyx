@@ -14,6 +14,7 @@ GMAT is validated on flown missions. It was also validated against other softwar
 - [Multibody dynamics](#multibody-dynamics)
 - [Propulsion](#propulsion)
 - [SRP](#srp)
+- [Orbit determination](#orbit-determination)
 
 # Propagators
 The purpose of this test is solely to test the correct implementation of the propagator coefficients, error computation, and adaptive step size. The algorithms were taken from GMAT unless noted otherwise in the source code.
@@ -166,3 +167,90 @@ However, note that nyx uses the IAU definition of an astronomical unit, whereas 
 
 Note that further differences _may_ exist as GMAT uses a simpler algorithm for penumbra computations than nyx. The algorithm for nyx can be found in the [docs](./docs/).
 
+# Orbit determination
+Nyx has an easy-to-use UI to perform orbit determination scenario.
+
+Usage example:
+
+```
+$ cargo run --release -- "data/od_validation/*"                                      
+    Finished release [optimized] target(s) in 0.03s
+     Running `target/release/nyx 'data/od_validation/*'`
+ INFO  nyx > Loaded scenario `data/od_validation/*`
+✔ 
+
+Select the sequence to execute · leo
+ INFO  nyx_space::celestia::cosm > Loaded 14 ephemerides in 0 seconds.
+ INFO  nyx_space::celestia::cosm > Loaded frame iau uranus
+ INFO  nyx_space::celestia::cosm > Loaded frame iau earth
+ INFO  nyx_space::celestia::cosm > Loaded frame iau neptune
+ INFO  nyx_space::celestia::cosm > Loaded frame iau sun
+ INFO  nyx_space::celestia::cosm > Loaded frame iau venus
+ INFO  nyx_space::celestia::cosm > Loaded frame iau jupiter
+ INFO  nyx_space::celestia::cosm > Loaded frame iau moon
+ INFO  nyx_space::celestia::cosm > Loaded frame iau saturn
+ INFO  nyx_space::celestia::cosm > Loaded frame iau mars
+ INFO  nyx_space::io::gravity    > data/Luna_jggrx_1500e_sha.tab.gz loaded with (degree, order) = (20, 20)
+ INFO  nyx_space::io::gravity    > data/JGM3.cof.gz loaded with (degree, order) = (20, 20)
+ INFO  nyx_space::io::gravity    > data/Luna_jggrx_1500e_sha.tab.gz loaded with (degree, order) = (20, 20)
+ INFO  nyx_space::io::gravity    > data/JGM3.cof.gz loaded with (degree, order) = (20, 20)
+ INFO  nyx_space::io::odp        > Saving truth to ./data/truth.csv
+ INFO  nyx_space::io::odp        > Generating measurements over 28800 seconds (~ 0.333 days)
+ INFO  nyx_space::io::odp        > Initial state: [399 (  0)] 2000-01-01T12:00:00 TAI   sma = 7712.186236 km    ecc = 0.001000  inc = 63.434003 deg     raan = 135.000000 deg   aop = 90.000000 deg     ta = 0.000000 deg       120 kg
+ INFO  nyx_space::io::odp        > Final state:   [399 (  0)] 2000-01-01T20:00:00 TAI   sma = 7725.759915 km    ecc = 0.001975  inc = 63.456750 deg     raan = 134.242870 deg   aop = 103.095351 deg    ta = 82.948194 deg      120 kg (computed in 1.251 seconds)
+ INFO  nyx_space::io::odp        > Generated 673 measurements in 0.031 seconds
+ INFO  nyx_space::od::ui         > Navigation propagating for a total of 25360 seconds (~ 0.294 days)
+ INFO  nyx_space::od::ui         > Processing 673 measurements with covariance mapping
+ INFO  nyx_space::od::ui         > [ODProcess]   0% done (1 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  10% done (68 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  20% done (135 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  30% done (202 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  40% done (270 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  50% done (337 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  60% done (404 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  70% done (472 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  80% done (539 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess]  90% done (606 measurements processed)
+ INFO  nyx_space::od::ui         > [ODProcess] 100% done (673 measurements processed)
+ INFO  nyx_space::io::odp        > Saving output to ./data/estimates.csv
+$ cargo run --release -- "data/od_validation/*"c
+$ PLOT="LEO No SNC - No noise - 0.005 km state error" pipenv run python od_plotter.py
+File loaded.
+Delta avr. -2.0e+02, -2.1e+02, -1.5e+01, -5.9e-01, -8.2e-01, -1.7e-02
+$
+```
+## Examples
+In all examples, we are running a CKF _without_ any iteration. In the "perfect" cases, the same model is used to generate the measurements and execute the navigation. In the "non-perfect" models, the harmonics used in navigation are different, and we have enabled state noise compensation at the level shown in the plots. The subtitle of the plot shows the average error between the truth trajectory and the estimated trajectory.
+
+Scenario | Truth harmonics (Earth & Moon) | Nav harmonics (Earth & Moon) | Position error (km)
+--|---|---|--
+NRHO | 20x20 | 10x10  | 0.5
+LRO | 20x20 | 10x10  | 0.05
+LEO | 20x20 | 10x10  | 0.005
+
+### Near Rectilinear Halo Orbit (NRHO)
+#### Perfect
+![State deviation & covariance](./data/od_plots/nrho-perfect-fig1.png "State deviation & covariance (perfect)")
+![Error with truth](./data/od_plots/nrho-perfect-fig2.png "Error with truth (perfect)")
+
+#### Realistic
+![State deviation & covariance](./data/od_plots/nrho-fig1.png "State deviation & covariance (perfect)")
+![Error with truth](./data/od_plots/nrho-fig2.png "Error with truth (perfect)")
+
+### Lunar Reconnaissance Orbiter
+**Note:** The state errors we see are most likely due to integration and estimation happening in the EME2000 frame where the Earth is considered the primary body, even if the Moon is significantly closer.
+
+#### Perfect
+![State deviation & covariance](./data/od_plots/lro-perfect-fig1.png "State deviation & covariance (perfect)")
+![Error with truth](./data/od_plots/lro-perfect-fig2.png "Error with truth (perfect)")
+
+#### Realistic
+![State deviation & covariance](./data/od_plots/lro-fig1.png "State deviation & covariance (perfect)")
+![Error with truth](./data/od_plots/lro-fig2.png "Error with truth (perfect)")
+
+### LEO
+**Note:** I think the spikes in covariance correspond to ground station switching.
+
+#### Perfect
+![State deviation & covariance](./data/od_plots/leo-perfect-fig1.png "State deviation & covariance (perfect)")
+![Error with truth](./data/od_plots/leo-perfect-fig2.png "Error with truth (perfect)")

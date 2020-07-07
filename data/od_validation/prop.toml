@@ -1,0 +1,28 @@
+[propagator.nrho_truth]
+dynamics = "sc_nrho"
+stop_cond = "8 hours"
+output = "truth"
+
+[propagator.nrho_nav]
+dynamics = "sc_nrho_nav"
+stop_cond = "8 hours"
+
+[propagator.lro_truth]
+dynamics = "sc_lro"
+stop_cond = "8 hours"
+output = "truth"
+tolerance = 1e-9
+
+[propagator.lro_nav]
+dynamics = "sc_lro_nav"
+stop_cond = "8 hours"
+tolerance = 1e-9
+
+[propagator.leo_truth]
+dynamics = "sc_leo"
+stop_cond = "8 hours"
+output = "truth"
+
+[propagator.leo_nav]
+dynamics = "sc_leo_nav"
+stop_cond = "8 hours"

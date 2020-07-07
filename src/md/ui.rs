@@ -1,9 +1,11 @@
 extern crate csv;
 
+use super::MdHdlr;
 pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
+use crate::dynamics::solarpressure::SolarPressure;
 use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
@@ -40,9 +42,10 @@ where
     DefaultAllocator: Allocator<f64, U6>,
 {
     sc_dyn: StmState<Spacecraft<'a, OrbitalDynamics<'a>>, Spacecraft<'a, OrbitalDynamicsStm<'a>>>,
-    formatter: Option<StateFormatter<'a>>,
+    pub formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
+    pub prop_tol: f64,
     pub name: String,
 }
 
@@ -56,7 +59,7 @@ where
         stm_flag: StmStateFlag,
         cosm: &'a Cosm,
     ) -> Result<Self, ParsingError> {
-        match scen.propagator.get(&prop_name) {
+        match scen.propagator.get(&prop_name.to_lowercase()) {
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
                 #[allow(unused_assignments)]
@@ -64,7 +67,7 @@ where
                 let mut init_state;
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
-                    match scen.output.get(output) {
+                    match scen.output.get(&output.to_lowercase()) {
                         None => {
                             return Err(ParsingError::MD(format!(
                                 "propagator `{}` refers to undefined output `{}`",
@@ -76,7 +79,7 @@ where
                 } else {
                     None
                 };
-                match scen.spacecraft.get(&prop.dynamics) {
+                match scen.spacecraft.get(&prop.dynamics.to_lowercase()) {
                     None => {
                         return Err(ParsingError::MD(format!(
                             "propagator `{}` refers to undefined spacecraft `{}`",
@@ -86,14 +89,20 @@ where
                     Some(spacecraft) =>
                     // Validate the orbital dynamics
                     {
-                        match scen.orbital_dynamics.get(&spacecraft.orbital_dynamics) {
+                        match scen
+                            .orbital_dynamics
+                            .get(&spacecraft.orbital_dynamics.to_lowercase())
+                        {
                             None => {
                                 return Err(ParsingError::MD(format!(
                                     "spacecraft `{}` refers to undefined dynamics `{}`",
                                     &prop.dynamics, spacecraft.orbital_dynamics
                                 )))
                             }
-                            Some(dynamics) => match scen.state.get(&dynamics.initial_state) {
+                            Some(dynamics) => match scen
+                                .state
+                                .get(&dynamics.initial_state.to_lowercase())
+                            {
                                 None => {
                                     return Err(ParsingError::MD(format!(
                                         "dynamics `{}` refers to unknown state `{}`",
@@ -186,6 +195,44 @@ where
                                         if let Some(fuel_mass) = spacecraft.fuel_mass {
                                             sc_dyn.fuel_mass = fuel_mass;
                                         }
+                                        // Add the force models
+                                        if let Some(force_models) = &spacecraft.force_models {
+                                            if scen.force_models.as_ref().is_none() {
+                                                return Err(ParsingError::MD(format!("spacecraft `{}` refers to force models but none are defined", prop.dynamics)));
+                                            }
+                                            for mdl in force_models {
+                                                match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
+                                                    None => {
+                                                        return Err(ParsingError::MD(format!(
+                                                        "spacecraft `{}` refers to unknown force model `{}`",
+                                                        prop.dynamics, mdl
+                                                    )))
+                                                    }
+                                                    Some(amdl) => {
+                                                        for smdl in amdl.srp.values() {
+                                                            let mut srp = SolarPressure::default(smdl.sc_area, vec![cosm.frame("EME2000"), cosm.frame("Luna")], &cosm);
+                                                            srp.phi = smdl.phi;
+                                                            srp.cr = smdl.cr;
+                                                            match sc_dyn_flagged {
+                                                                StmState::With(
+                                                                    ref mut sc_dyn_stm,
+                                                                ) => {
+                                                                    sc_dyn_stm
+                                                                        .add_model(Box::new(srp));
+                                                                },
+                                                                StmState::Without(
+                                                                    ref mut sc_dyn,
+                                                                ) => {
+                                                                    sc_dyn
+                                                                    .add_model(Box::new(srp));
+                                                                }
+                                                                _ => panic!("should not happen"),
+                                                            };
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
 
                                         sc_dyn_flagged = StmState::Without(sc_dyn);
                                     }
@@ -193,7 +240,12 @@ where
                                     // Add the acceleration models if applicable
                                     if let Some(accel_models) = &dynamics.accel_models {
                                         for mdl in accel_models {
-                                            match scen.accel_models.get(mdl) {
+                                            match scen
+                                                .accel_models
+                                                .as_ref()
+                                                .unwrap()
+                                                .get(&mdl.to_lowercase())
+                                            {
                                                 None => {
                                                     return Err(ParsingError::MD(format!(
                                                     "dynamics `{}` refers to unknown state `{}`",
@@ -262,11 +314,18 @@ where
                     }
                 };
 
+                // Let's see if it's a relative time
+                let prop_tol = match prop.tolerance {
+                    Some(tol) => tol,
+                    None => 1e-12,
+                };
+
                 Ok(Self {
                     sc_dyn: sc_dyn_flagged,
                     formatter,
                     output: Vec::with_capacity(65_535),
                     prop_time_s: Some(prop_time_s),
+                    prop_tol,
                     name: prop_name.clone(),
                 })
             }
@@ -275,7 +334,11 @@ where
 
     pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
         match self.sc_dyn {
-            StmState::Without(ref mut sc_dyn) => Propagator::default(sc_dyn, &PropOpts::default()),
+            StmState::Without(ref mut sc_dyn) => {
+                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
+                p.set_tolerance(self.prop_tol);
+                p
+            }
             _ => panic!("these dynamics are defined with stm. Use stm_propagator instead"),
         }
     }
@@ -284,7 +347,11 @@ where
         &mut self,
     ) -> Propagator<Spacecraft<'a, OrbitalDynamicsStm<'a>>, RSSStepPV> {
         match self.sc_dyn {
-            StmState::With(ref mut sc_dyn) => Propagator::default(sc_dyn, &PropOpts::default()),
+            StmState::With(ref mut sc_dyn) => {
+                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
+                p.set_tolerance(self.prop_tol);
+                p
+            }
             _ => panic!("these dynamics are defined without stm. Use propagator instead"),
         }
     }
@@ -297,7 +364,12 @@ where
         }
     }
 
-    pub fn execute(&mut self) {
+    pub fn execute(mut self) {
+        self.execute_with(vec![])
+    }
+
+    /// Execute the MD with the provided handlers. Note that you must initialize your own CSV output if that's desired.
+    pub fn execute_with(&mut self, mut hdlrs: Vec<&mut dyn MdHdlr<SpacecraftState>>) {
         // Create the output file
         let mut maybe_wtr = match &self.formatter {
             Some(fmtr) => {
@@ -315,29 +387,50 @@ where
         let prop_time = self.prop_time_s.unwrap();
 
         // Build the propagator
-        // let mut prop = Propagator::default(&mut self.sc_dyn, &PropOpts::default());
         let mut prop = self.propagator();
         // Set up the channels
         let (tx, rx) = channel();
         prop.tx_chan = Some(tx);
+
+        let mut initial_state = Some(prop.state());
+
         // Run
         info!(
             "Propagating for {} seconds (~ {:.3} days)",
             prop_time,
             prop_time / SECONDS_PER_DAY
         );
+
+        info!("Initial state: {}", prop.state());
         let start = Instant::now();
         prop.until_time_elapsed(prop_time);
         info!(
-            "Done in {:.3} seconds",
+            "Final state:   {} (computed in {:.3} seconds)",
+            prop.state(),
             (Instant::now() - start).as_secs_f64()
         );
 
         while let Ok(prop_state) = rx.try_recv() {
+            // Provide to the handler
+            for hdlr in &mut hdlrs {
+                if let Some(first_state) = initial_state {
+                    hdlr.handle(&first_state);
+                }
+                hdlr.handle(&prop_state);
+            }
             self.output.push(prop_state.orbit);
             if let Some(wtr) = &mut maybe_wtr {
+                if let Some(first_state) = initial_state {
+                    wtr.serialize(self.formatter.as_ref().unwrap().fmt(&first_state.orbit))
+                        .expect("could not format state");
+                }
                 wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state.orbit))
                     .expect("could not format state");
+            }
+
+            // We've used the initial state (if it was there)
+            if initial_state.is_some() {
+                initial_state = None;
             }
         }
     }

@@ -28,6 +28,8 @@ where
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
     fixed_step: bool,
+    init_time: f64,
+    init_state_vec: VectorN<f64, D::StateSize>,
 }
 
 /// The `Propagator` trait defines the functions of a propagator and of an event tracker.
@@ -37,6 +39,8 @@ where
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(dynamics: &'a mut D, opts: &PropOpts<E>) -> Self {
+        let init_time = dynamics.time();
+        let init_state_vec = dynamics.state_vector();
         Self {
             tx_chan: None,
             dynamics,
@@ -53,6 +57,8 @@ where
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
             fixed_step: opts.fixed_step,
+            init_time,
+            init_state_vec,
         }
     }
 
@@ -61,9 +67,26 @@ where
         Self::new::<RK89>(dynamics, opts)
     }
 
+    /// Resets the propagator to its initial time and state
+    pub fn reset(&mut self) {
+        self.dynamics
+            .set_state(self.init_time, &self.init_state_vec);
+    }
+
+    /// Allows setting the step size of the propagator
     pub fn set_step(&mut self, step_size: f64, fixed: bool) {
         self.step_size = step_size;
         self.fixed_step = fixed;
+    }
+
+    /// Set the tolerance for the propagator
+    pub fn set_tolerance(&mut self, tol: f64) {
+        self.opts.tolerance = tol;
+    }
+
+    /// Set the maximum step size for the propagator
+    pub fn set_max_step(&mut self, step: f64) {
+        self.opts.max_step = step;
     }
 
     /// Returns the time of the propagation
@@ -110,7 +133,7 @@ where
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                trace!("@{:>.9}s: {:?}", t, self.details);
+                trace!("@{:>.9}s: {}", t, self.details);
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
                 self.event_trackers
@@ -128,7 +151,7 @@ where
                 return self.dynamics.state();
             } else {
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                trace!("@{:>.9}s: {:?}", t, self.details);
+                trace!("@{:>.9}s: {}", t, self.details);
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
@@ -147,9 +170,6 @@ where
         &mut self,
         condition: StopCondition<D::StateType>,
     ) -> Result<D::StateType, ConvergenceError> {
-        // Store the initial time and state
-        let init_time = self.dynamics.time();
-        let init_state_vec = self.dynamics.state_vector();
         // Rewrite the event tracker
         if !self.event_trackers.events.is_empty() {
             warn!("Rewriting event tracker with the StopCondition");
@@ -171,7 +191,7 @@ where
         }
         let (mut xa, mut xb) = self.event_trackers.found_bounds[0][condition.trigger - 1];
         // Reinitialize the dynamics and start the search
-        self.dynamics.set_state(init_time, &init_state_vec);
+        self.reset();
         self.event_trackers.reset();
         // Compute the initial values of the condition at those bounds.
         self.until_time_elapsed(xa);

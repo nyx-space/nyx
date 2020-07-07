@@ -1,12 +1,15 @@
 extern crate clap;
 extern crate config;
 extern crate dialoguer;
+extern crate glob;
 extern crate log;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
+
 use clap::{App, Arg};
 use config::{Config, File};
 use dialoguer::{theme::ColorfulTheme, Select};
+use glob::glob;
 use log::{error, info};
 use nyx::celestia::Cosm;
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
@@ -48,8 +51,18 @@ fn main() -> Result<(), ParsingError> {
 
     // Start off by merging in the "default" configuration file
     let scenario_path = matches.value_of("SCENARIO").unwrap();
-    s.merge(File::with_name(scenario_path))
-        .expect("Could not load scenario from file or directory");
+    if scenario_path.contains('*') {
+        s.merge(
+            glob(scenario_path)
+                .unwrap()
+                .map(|path| File::from(path.unwrap()))
+                .collect::<Vec<_>>(),
+        )
+        .expect("Could not load scenario from folder");
+    } else {
+        s.merge(File::with_name(scenario_path))
+            .expect("Could not load scenario from file");
+    }
 
     let exec_all = matches.is_present("all");
     // Try to deserialize the scenario
@@ -117,7 +130,7 @@ fn main() -> Result<(), ParsingError> {
                             StmStateFlag::Without(()),
                             &cosm,
                         ) {
-                            Ok(mut md) => {
+                            Ok(md) => {
                                 info!("Executing sequence `{}`", seq_name);
                                 md.execute();
                             }

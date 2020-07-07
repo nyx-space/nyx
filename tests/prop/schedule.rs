@@ -11,7 +11,7 @@ use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
 use self::nyx::dynamics::Dynamics;
 use self::nyx::propagators::{PropOpts, Propagator};
-use self::nyx::utils::rss_state_errors;
+use self::nyx::utils::rss_errors;
 
 #[test]
 fn transfer_schedule_no_depl() {
@@ -79,7 +79,7 @@ fn transfer_schedule_no_depl() {
     prop.until_time_elapsed(prop_time);
 
     // Compute the errors
-    let (err_r, err_v) = rss_state_errors(
+    let (err_r, err_v) = rss_errors(
         &prop.dynamics.orbital_dyn.state_vector(),
         &rslt.to_cartesian_vec(),
     );
@@ -177,7 +177,7 @@ fn transfer_schedule_depl() {
     prop.until_time_elapsed(prop_time);
 
     // Compute the errors
-    let (err_r, err_v) = rss_state_errors(
+    let (err_r, err_v) = rss_errors(
         &prop.dynamics.orbital_dyn.state_vector(),
         &rslt.to_cartesian_vec(),
     );

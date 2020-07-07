@@ -215,18 +215,9 @@ fn circ_seg_area(r: f64, d: f64) -> f64 {
 }
 
 /// Computes the light of sight the provided time between two states accounting for eclipsing of the providing geoid.
-/// This works for visibility between spacecraft and a ground station. For eclipsing, use `eclipse_state`.
+/// This works for visibility between spacecraft and a ground station. For eclipsing and penumbras, use `eclipse_state`.
 ///
-/// # Algorithm
-/// This function solves the [Line-Sphere intersection](https://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection) problem.
-/// 1. We create a line between the observer and observed.
-/// 2. We then check if the line will intersect the geoid, represented as a sphere.
-/// 3. We compute the discriminant from the quadratic formula which emanates from solving the distance at which the intersection of the line and the sphere will happen.
-/// 4. If the discriminant is less than 0.0, then the distance along the starting point of the line to the sphere is an complex number, i.e. no intersection.
-/// 5. If the discriminant is greater than 0.0, then there are exactly two intersection points between the line and the sphere.
-/// 6. If the discriminant is exactly zero, then the line "skims" the sphere.
-///
-/// In practice, this code uses a tolerance of 1e-12 instead of 0.0 to account for rounding issues.
+/// Source: Algorithm 35 of Vallado, 4th edition, page 308.
 pub fn line_of_sight(
     observer: &State,
     observed: &State,
@@ -237,41 +228,22 @@ pub fn line_of_sight(
         return EclipseState::Visibilis;
     }
 
-    // Convert the observed to the same frame as the origin (fok = frame OK)
-    let observed_fok = &cosm.frame_chg(observed, eclipsing_body);
-    let observer_fok = &cosm.frame_chg(observer, eclipsing_body);
-    // Compute the unit direction between both
-    let mut l = observed_fok.radius() - observer_fok.radius();
-    l /= l.norm();
+    // Convert the states to the same frame as the eclipsing body (ensures we're in the same frame)
+    let r1 = &cosm.frame_chg(observed, eclipsing_body).radius();
+    let r2 = &cosm.frame_chg(observer, eclipsing_body).radius();
 
-    // observer minus center point of the eclipsing body is already in the eclipsing body frame, so center is zero.
-    let omc = observer_fok.radius();
-    let r = &eclipsing_body.equatorial_radius();
+    let r1sq = r1.dot(&r1);
+    let r2sq = r2.dot(&r2);
+    let r1dotr2 = r1.dot(&r2);
 
-    // l.dot(&l) should be 1.0, within rounding error.
-    let discriminant_sq = (l.dot(&omc)).powi(2) - l.dot(&l) * (omc.dot(&omc) - (r.powi(2)));
-
-    if discriminant_sq < -1e-12 {
-        // No intersection between the direction of the origin and vis_chk objects and the sphere
+    let tau = (r1sq - r1dotr2) / (r1sq + r2sq - 2.0 * r1dotr2);
+    if tau < 0.0
+        || tau > 1.0
+        || (1.0 - tau) * r1sq + r1dotr2 * tau > eclipsing_body.equatorial_radius().powi(2)
+    {
         EclipseState::Visibilis
     } else {
-        // Compute the distance from the origin to the intersection point.
-        let intersect_dist = -(l.dot(&omc)) + discriminant_sq.sqrt();
-        // And the intersection point itself.
-        let intersect_pt = observer_fok.radius() + intersect_dist * l;
-        let dist_ori_inters = observer_fok.distance_to_point(&intersect_pt);
-        let dist_oth_inters = observed_fok.distance_to_point(&intersect_pt);
-        let dist_ori_oth = observer_fok.distance_to(&observed_fok);
-        // If the intersection point is on the line between both, then it causes an eclipse.
-        if (dist_ori_inters + dist_oth_inters - dist_ori_oth).abs() < 1e-15 {
-            if discriminant_sq > 1e-12 {
-                EclipseState::Umbra
-            } else {
-                EclipseState::Penumbra(0.5)
-            }
-        } else {
-            EclipseState::Visibilis
-        }
+        EclipseState::Umbra
     }
 }
 
@@ -281,64 +253,103 @@ mod tests {
     use hifitime::Epoch;
 
     #[test]
-    fn los_trivial() {
-        /*
-        use crate::celestia::frames::*;
-        let mut cosm = Cosm::from_xb("./de438s");
-        // Let's create a ficticious Geoid
-        let gee = Frame {
-            id: XbId {
-                number: -1000,
-                name: "Ficticious".to_owned(),
-            },
-            exb_id: None,
-            info: Frame::Geoid {
-                axb_id: 0,
-                exb_id: 0,
-                gm: 1.0,
-                flattening: 0.0,
-                equatorial_radius: 1.0,
-                semi_major_radius: 0.0,
-            },
-        };
-        let ginfo = gee.info;
-        cosm.mut_add_frame(gee);
+    fn los_edge_case() {
+        let cosm = Cosm::de438();
+        let eme2k = cosm.frame("EME2000");
+        let luna = cosm.frame("Luna");
 
-        let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+        let dt1 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 7, 40, 0);
+        let dt2 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 7, 50, 0);
+        let dt3 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 8, 0, 0);
 
-        let x1 = State::cartesian(-1.0, -1.0, 0.0, 0.0, 0.0, 0.0, dt, ginfo);
-        let x2 = State::cartesian(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, ginfo);
-        let x3 = State::cartesian(-2.0, 1.0, 0.0, 0.0, 0.0, 0.0, dt, ginfo);
-        let x4 = State::cartesian(-3.0, 2.0, 0.0, 0.0, 0.0, 0.0, dt, ginfo);
-        let x5 = State::cartesian(1.0, -2.0, 0.0, 0.0, 0.0, 0.0, dt, ginfo);
-
-        let earth_id = 399;
+        let xmtr1 = State::cartesian(
+            397_477.494_485,
+            -57_258.902_156,
+            -62_857.909_437,
+            0.230_482,
+            2.331_362,
+            0.615_501,
+            dt1,
+            eme2k,
+        );
+        let rcvr1 = State::cartesian(
+            338_335.467_589,
+            -55_439.526_977,
+            -13_327.354_273,
+            0.197_141,
+            0.944_261,
+            0.337_407,
+            dt1,
+            eme2k,
+        );
+        let xmtr2 = State::cartesian(
+            397_479.756_900,
+            -57_235.586_465,
+            -62_851.758_851,
+            0.222_000,
+            2.331_768,
+            0.614_614,
+            dt2,
+            eme2k,
+        );
+        let rcvr2 = State::cartesian(
+            338_337.438_860,
+            -55_430.084_340,
+            -13_323.980_229,
+            0.197_113,
+            0.944_266,
+            0.337_402,
+            dt2,
+            eme2k,
+        );
+        let xmtr3 = State::cartesian(
+            397_481.934_480,
+            -57_212.266_970,
+            -62_845.617_185,
+            0.213_516,
+            2.332_122,
+            0.613_717,
+            dt3,
+            eme2k,
+        );
+        let rcvr3 = State::cartesian(
+            338_339.409_858,
+            -55_420.641_651,
+            -13_320.606_228,
+            0.197_086,
+            0.944_272,
+            0.337_398,
+            dt3,
+            eme2k,
+        );
 
         assert_eq!(
-            line_of_sight(&x1, &x2, earth_id, &cosm),
+            line_of_sight(&xmtr1, &rcvr1, luna, &cosm),
             EclipseState::Umbra
         );
         assert_eq!(
-            line_of_sight(&x1, &x3, earth_id, &cosm),
-            EclipseState::Visibilis
-        );
-        assert_eq!(
-            line_of_sight(&x3, &x2, earth_id, &cosm),
-            EclipseState::Penumbra(0.5)
-        );
-        assert_eq!(
-            line_of_sight(&x4, &x3, earth_id, &cosm),
-            EclipseState::Visibilis
-        );
-        assert_eq!(
-            line_of_sight(&x3, &x4, earth_id, &cosm),
-            EclipseState::Visibilis
-        );
-        assert_eq!(
-            line_of_sight(&x5, &x4, earth_id, &cosm),
+            line_of_sight(&xmtr2, &rcvr2, luna, &cosm),
             EclipseState::Umbra
         );
-        */
+        assert_eq!(
+            line_of_sight(&xmtr3, &rcvr3, luna, &cosm),
+            EclipseState::Umbra
+        );
+
+        // Test converse
+
+        assert_eq!(
+            line_of_sight(&rcvr1, &xmtr1, luna, &cosm),
+            EclipseState::Umbra
+        );
+        assert_eq!(
+            line_of_sight(&rcvr2, &xmtr2, luna, &cosm),
+            EclipseState::Umbra
+        );
+        assert_eq!(
+            line_of_sight(&rcvr3, &xmtr3, luna, &cosm),
+            EclipseState::Umbra
+        );
     }
 
     #[test]
@@ -356,6 +367,11 @@ mod tests {
 
         // Out of phase by pi.
         assert_eq!(line_of_sight(&sc1, &sc3, eme2k, &cosm), EclipseState::Umbra);
+
+        assert_eq!(
+            line_of_sight(&sc2, &sc1, eme2k, &cosm),
+            EclipseState::Visibilis
+        );
 
         // Nearly identical orbits in the same phasing
         assert_eq!(

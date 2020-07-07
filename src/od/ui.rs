@@ -20,7 +20,7 @@ pub struct ODProcess<
     D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
     E: ErrorCtrl,
     Msr: Measurement,
-    N: MeasurementDevice<Msr, MsrIn>,
+    N: MeasurementDevice<MsrIn, Msr>,
     T: EkfTrigger,
     A: DimName,
     K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
@@ -60,7 +60,7 @@ impl<
         D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
         E: ErrorCtrl,
         Msr: Measurement,
-        N: MeasurementDevice<Msr, MsrIn>,
+        N: MeasurementDevice<MsrIn, Msr>,
         T: EkfTrigger,
         A: DimName,
         K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
@@ -88,12 +88,14 @@ where
         num_expected_msr: usize,
         trigger: T,
     ) -> Self {
+        let mut estimates = Vec::with_capacity(num_expected_msr + 1);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr,
-            estimates: Vec::with_capacity(num_expected_msr),
+            estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: trigger,
             _marker: PhantomData::<A>,
@@ -101,26 +103,29 @@ where
     }
 
     pub fn default_ekf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
+        let mut estimates = Vec::with_capacity(10_001);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr: false,
-            estimates: Vec::with_capacity(10_000),
+            estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
             _marker: PhantomData::<A>,
         }
     }
 
-    /// Allows to smooth the provided estimates. Returns an array of smoothed estimates.
+    /// Allows to smooth the provided estimates. If there is a result, it'll be a filter error.
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
     pub fn smooth(&mut self) -> Option<FilterError> {
-        debug!("Smoothing {} estimates", self.estimates.len());
+        info!("Smoothing {} estimates", self.estimates.len());
         let mut smoothed = Vec::with_capacity(self.estimates.len());
 
+        // Is this smoothing correct ? I should try using the previous STM and start are estimates N-2
         for estimate in self.estimates.iter().rev() {
             let mut sm_est = estimate.clone();
             // TODO: Ensure that SNC was _not_ enabled
@@ -141,76 +146,27 @@ where
         None
     }
 
-    /// Allows processing all measurements without covariance mapping.
-    pub fn process_measurements(&mut self, measurements: &[Msr]) -> Option<FilterError> {
-        info!("Processing {} measurements", measurements.len());
-
-        let mut prev_dt = self.kf.previous_estimate().epoch();
-        let mut reported = vec![false; 11];
-        let num_msrs = measurements.len();
-
-        for (msr_cnt, real_meas) in measurements.iter().enumerate() {
-            let next_epoch = real_meas.epoch();
-            // Propagate the dynamics to the measurement, and then start the filter.
-            let delta_time = next_epoch - prev_dt;
-            prev_dt = next_epoch; // Update the epoch for the next computation
-            self.prop.until_time_elapsed(delta_time);
-            // Update the STM of the KF
-            self.kf.update_stm(self.prop.dynamics.stm());
-            let nominal_state = self.prop.state();
-            let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
-            // Get the computed observations
-            for device in self.devices.iter() {
-                if let Some(computed_meas) = device.measure(&meas_input) {
-                    if computed_meas.visible() {
-                        self.kf.update_h_tilde(computed_meas.sensitivity());
-                        match self.kf.measurement_update(
-                            nominal_state,
-                            real_meas.observation(),
-                            computed_meas.observation(),
-                        ) {
-                            Ok((est, res)) => {
-                                // Switch to extended if necessary, and update the dynamics and such
-                                if !self.kf.is_extended() && self.ekf_trigger.enable_ekf(&est) {
-                                    self.kf.set_extended(true);
-                                    info!("EKF now enabled");
-                                }
-                                if self.kf.is_extended() {
-                                    self.prop.dynamics.set_estimated_state(
-                                        self.prop.dynamics.estimated_state()
-                                            + est.state_deviation(),
-                                    );
-                                }
-                                self.estimates.push(est);
-                                self.residuals.push(res);
-                            }
-                            Err(e) => return Some(e),
-                        }
-                        if !self.simultaneous_msr {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
-            if !reported[msr_prct] {
-                info!(
-                    "[ODProcess] {:>3}% done ({:.0} measurements processed)",
-                    10 * msr_prct,
-                    msr_cnt
-                );
-                reported[msr_prct] = true;
-            }
+    /// Allows iterating on the filter solution
+    pub fn iterate(&mut self, measurements: &[Msr]) -> Option<FilterError> {
+        // First, smooth the estimates
+        self.smooth();
+        // Get the first estimate post-smoothing
+        let mut init_smoothed = self.estimates[0].clone();
+        println!("{}", init_smoothed.epoch().as_gregorian_tai_str());
+        // Reset the propagator
+        self.prop.reset();
+        let mut iterated_state = self.prop.dynamics.state_vector();
+        for (i, x) in init_smoothed.state_deviation().iter().enumerate() {
+            iterated_state[i] += x;
         }
-        // Always report the 100% mark
-        if !reported[10] {
-            info!(
-                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
-                100, num_msrs
-            );
-        }
-
+        self.prop
+            .dynamics
+            .set_state(self.prop.dynamics.time(), &iterated_state);
+        // Set the filter's initial state to this smoothed estimate
+        init_smoothed.set_state_deviation(VectorN::<f64, Msr::StateSize>::zeros());
+        self.kf.set_previous_estimate(&init_smoothed);
+        // And re-run the filter
+        self.process_measurements(measurements)?;
         None
     }
 
@@ -218,7 +174,7 @@ where
     ///
     /// Important notes:
     /// + the measurements have be to mapped to a fixed time corresponding to the step of the propagator
-    pub fn process_measurements_covar(&mut self, measurements: &[Msr]) -> Option<FilterError> {
+    pub fn process_measurements(&mut self, measurements: &[Msr]) -> Option<FilterError> {
         let (tx, rx) = channel();
         self.prop.tx_chan = Some(tx);
         assert!(
@@ -234,147 +190,142 @@ where
             prop_time,
             prop_time / 86_400.0
         );
-        let mut prev_dt = self.kf.previous_estimate().epoch();
-        for msr in measurements {
-            let delta_t = msr.epoch() - prev_dt;
-            self.prop.until_time_elapsed(delta_t);
-            prev_dt = msr.epoch();
-        }
+
+        // Push the initial estimate
+        let prev = self.kf.previous_estimate().clone();
+        let mut prev_dt = prev.epoch();
+
+        let mut reported = vec![false; 11];
+        let mut arc_warned = false;
+
         info!(
             "Processing {} measurements with covariance mapping",
             num_msrs
         );
 
-        let mut msr_cnt = 0_usize;
-        let mut reported = vec![false; 11];
+        for (msr_cnt, msr) in measurements.iter().enumerate() {
+            let next_msr_epoch = msr.epoch();
 
-        while let Ok(nominal_state) = rx.try_recv() {
-            // Get the datetime and info needed to compute the theoretical measurement according to the model
-            let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
+            let delta_t = next_msr_epoch - prev_dt;
+            self.prop.until_time_elapsed(delta_t);
 
-            let dt = nominal_state.epoch();
+            while let Ok(nominal_state) = rx.try_recv() {
+                // Get the datetime and info needed to compute the theoretical measurement according to the model
+                let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
+                let dt = nominal_state.epoch();
 
-            let mut num_msr_processed = 0_u32;
-            loop {
                 // Update the STM of the KF (needed between each measurement or time update)
                 let stm = self.prop.dynamics.extract_stm(&nominal_state);
                 self.kf.update_stm(stm);
-                if msr_cnt < num_msrs {
-                    // Get the next measurement
-                    let real_meas = &measurements[msr_cnt];
-                    let next_epoch = real_meas.epoch();
-                    if next_epoch < dt {
-                        // We missed a measurement! Let's try to catch up.
-                        error!(
-                            "Skipping msr #{}: nav and msr not in sync: msr.dt = {} \t nav.dt = {}",
-                            msr_cnt,
-                            next_epoch.as_gregorian_tai_str(),
-                            dt.as_gregorian_tai_str()
-                        );
-                        msr_cnt += 1;
-                        continue;
-                    } else if next_epoch > dt {
-                        // No measurement can be used here, let's just do a time update (unless we have already done a time update)
-                        if num_msr_processed == 0 {
-                            debug!("time update {}", dt.as_gregorian_tai_str());
-                            match self.kf.time_update(nominal_state) {
-                                Ok(est) => {
-                                    if self.kf.is_extended() {
-                                        self.prop.dynamics.set_estimated_state(
-                                            self.prop.dynamics.estimated_state()
-                                                + est.state_deviation(),
-                                        );
-                                    }
-                                    self.estimates.push(est);
-                                }
-                                Err(e) => return Some(e),
-                            }
-                        }
-                        break; // Move on to the next propagator output
-                    } else {
-                        // The epochs match, so this is a valid measurement to use
-                        // Get the computed observations
-                        for device in self.devices.iter() {
-                            if let Some(computed_meas) = device.measure(&meas_input) {
-                                if computed_meas.visible() {
-                                    self.kf.update_h_tilde(computed_meas.sensitivity());
-                                    match self.kf.measurement_update(
-                                        nominal_state,
-                                        real_meas.observation(),
-                                        computed_meas.observation(),
-                                    ) {
-                                        Ok((est, res)) => {
-                                            debug!(
-                                                "msr update msr #{} {}",
-                                                msr_cnt,
-                                                dt.as_gregorian_tai_str()
-                                            );
-                                            // Switch to EKF if necessary, and update the dynamics and such
-                                            if !self.kf.is_extended()
-                                                && self.ekf_trigger.enable_ekf(&est)
-                                            {
-                                                self.kf.set_extended(true);
-                                                info!("EKF now enabled");
-                                            }
-                                            if self.kf.is_extended() {
-                                                self.prop.dynamics.set_estimated_state(
-                                                    self.prop
-                                                        .dynamics
-                                                        .extract_estimated_state(&nominal_state)
-                                                        + est.state_deviation(),
-                                                );
-                                            }
-                                            self.estimates.push(est);
-                                            self.residuals.push(res);
-                                        }
-                                        Err(e) => return Some(e),
-                                    }
-                                    if !self.simultaneous_msr {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        // And increment the measurement counter
-                        msr_cnt += 1;
-                        num_msr_processed += 1;
-                        let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
-                        if !reported[msr_prct] {
-                            info!(
-                                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
-                                10 * msr_prct,
-                                msr_cnt
-                            );
-                            reported[msr_prct] = true;
-                        }
+
+                // Check if we should do a time update or a measurement update
+                if next_msr_epoch > dt {
+                    if msr_cnt == 0 && !arc_warned {
+                        warn!("OD arc starts prior to first measurement");
+                        arc_warned = true;
                     }
-                } else {
-                    // No more measurements, we can only do a time update
-                    debug!("final time update {:?}", dt.as_gregorian_tai_str());
+                    // No measurement can be used here, let's just do a time update
+                    debug!("time update {}", dt.as_gregorian_tai_str());
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             if self.kf.is_extended() {
                                 self.prop.dynamics.set_estimated_state(
-                                    self.prop.dynamics.extract_estimated_state(&nominal_state)
-                                        + est.state_deviation(),
+                                    self.prop.dynamics.estimated_state() + est.state_deviation(),
                                 );
                             }
                             self.estimates.push(est);
                         }
                         Err(e) => return Some(e),
                     }
-                    // Leave the loop {...} which processes several measurements at once
-                    break;
+                } else {
+                    // The epochs match, so this is a valid measurement to use
+                    // Get the computed observations
+                    for device in self.devices.iter() {
+                        if let Some(computed_meas) = device.measure(&meas_input) {
+                            if computed_meas.visible() {
+                                self.kf.update_h_tilde(computed_meas.sensitivity());
+
+                                // Switch back from extended if necessary
+                                if self.kf.is_extended() && self.ekf_trigger.disable_ekf(dt) {
+                                    self.kf.set_extended(false);
+                                    info!("EKF disabled @ {}", dt.as_gregorian_tai_str());
+                                }
+
+                                match self.kf.measurement_update(
+                                    nominal_state,
+                                    msr.observation(),
+                                    computed_meas.observation(),
+                                ) {
+                                    Ok((est, res)) => {
+                                        debug!(
+                                            "msr update msr #{} {}",
+                                            msr_cnt,
+                                            dt.as_gregorian_tai_str()
+                                        );
+
+                                        // Switch to EKF if necessary, and update the dynamics and such
+                                        // Note: we call enable_ekf first to ensure that the trigger gets
+                                        // called in case it needs to save some information (e.g. the
+                                        // StdEkfTrigger needs to store the time of the previous measurement).
+                                        if self.ekf_trigger.enable_ekf(&est)
+                                            && !self.kf.is_extended()
+                                        {
+                                            self.kf.set_extended(true);
+                                            if !est.within_3sigma() {
+                                                warn!(
+                                                    "EKF enabled @ {} but filter DIVERGING",
+                                                    dt.as_gregorian_tai_str()
+                                                );
+                                            } else {
+                                                info!(
+                                                    "EKF enabled @ {}",
+                                                    dt.as_gregorian_tai_str()
+                                                );
+                                            }
+                                        }
+                                        if self.kf.is_extended() {
+                                            self.prop.dynamics.set_estimated_state(
+                                                self.prop
+                                                    .dynamics
+                                                    .extract_estimated_state(&nominal_state)
+                                                    + est.state_deviation(),
+                                            );
+                                        }
+                                        self.estimates.push(est);
+                                        self.residuals.push(res);
+                                    }
+                                    Err(e) => return Some(e),
+                                }
+
+                                // If we do not have simultaneous measurements from different devices
+                                // then we don't need to check the visibility from other devices
+                                // if one is in visibility.
+                                if !self.simultaneous_msr {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
+                    if !reported[msr_prct] {
+                        info!(
+                            "{:>3}% done ({:.0} measurements processed)",
+                            10 * msr_prct,
+                            msr_cnt
+                        );
+                        reported[msr_prct] = true;
+                    }
                 }
             }
+
+            // Update the prev_dt for the next pass
+            prev_dt = msr.epoch();
         }
 
         // Always report the 100% mark
         if !reported[10] {
-            info!(
-                "[ODProcess] {:>3}% done ({:.0} measurements processed)",
-                100, num_msrs
-            );
+            info!("{:>3}% done ({:.0} measurements processed)", 100, num_msrs);
         }
 
         None
@@ -416,23 +367,23 @@ where
 
 impl<
         'a,
-        D: Estimable<MsrIn, LinStateSize = M::StateSize>,
+        D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
         E: ErrorCtrl,
-        M: Measurement,
-        N: MeasurementDevice<M, MsrIn>,
+        Msr: Measurement,
+        N: MeasurementDevice<MsrIn, Msr>,
         A: DimName,
-        K: Filter<D::LinStateSize, A, M::MeasurementSize, D::StateType>,
+        K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
         MsrIn,
-    > ODProcess<'a, D, E, M, N, CkfTrigger, A, K, MsrIn>
+    > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K, MsrIn>
 where
-    D::StateType: EstimableState<M::StateSize>,
+    D::StateType: EstimableState<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
-        + Allocator<f64, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, M::StateSize>
-        + Allocator<f64, M::StateSize>
-        + Allocator<f64, M::MeasurementSize, M::MeasurementSize>
-        + Allocator<f64, M::MeasurementSize, D::LinStateSize>
-        + Allocator<f64, D::LinStateSize, M::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
+        + Allocator<f64, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
+        + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
@@ -445,12 +396,14 @@ where
         simultaneous_msr: bool,
         num_expected_msr: usize,
     ) -> Self {
+        let mut estimates = Vec::with_capacity(num_expected_msr + 1);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr,
-            estimates: Vec::with_capacity(num_expected_msr),
+            estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: CkfTrigger {},
             _marker: PhantomData::<A>,
@@ -458,12 +411,14 @@ where
     }
 
     pub fn default_ckf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
+        let mut estimates = Vec::with_capacity(10_001);
+        estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
             devices,
             simultaneous_msr: false,
-            estimates: Vec::with_capacity(10_000),
+            estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},
             _marker: PhantomData::<A>,
@@ -477,6 +432,13 @@ pub trait EkfTrigger {
         S: DimName,
         E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
+
+    /// Return true if the filter should not longer be as extended.
+    /// By default, this returns false, i.e. when a filter has been switched to an EKF, it will
+    /// remain as such.
+    fn disable_ekf(&mut self, _epoch: Epoch) -> bool {
+        false
+    }
 }
 
 /// CkfTrigger will never switch a KF to an EKF
@@ -493,29 +455,58 @@ impl EkfTrigger for CkfTrigger {
     }
 }
 
-/// An EkfTrigger on the number of measurements processed
-pub struct NumMsrEkfTrigger {
+/// An EkfTrigger on the number of measurements processed and a time between measurements.
+pub struct StdEkfTrigger {
     pub num_msrs: usize,
+    /// In seconds!
+    pub disable_time: f64,
+    /// Set to the sigma number needed to switch to the EKF (cf. 68–95–99.7 rule). If number is negative, this is ignored.
+    pub within_sigma: f64,
+    prev_msr_dt: Option<Epoch>,
     cur_msrs: usize,
 }
 
-impl NumMsrEkfTrigger {
-    pub fn init(num_msrs: usize) -> Self {
+impl StdEkfTrigger {
+    pub fn new(num_msrs: usize, disable_time: f64) -> Self {
         Self {
             num_msrs,
+            disable_time,
+            within_sigma: -1.0,
+            prev_msr_dt: None,
             cur_msrs: 0,
         }
     }
 }
 
-impl EkfTrigger for NumMsrEkfTrigger {
-    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, _est: &E) -> bool
+impl EkfTrigger for StdEkfTrigger {
+    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, est: &E) -> bool
     where
         S: DimName,
         E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
+        if !est.predicted() {
+            // If this isn't a prediction, let's update the previous measurement time
+            self.prev_msr_dt = Some(est.epoch());
+        }
         self.cur_msrs += 1;
         self.cur_msrs >= self.num_msrs
+            && ((self.within_sigma > 0.0 && est.within_sigma(self.within_sigma))
+                || self.within_sigma <= 0.0)
+    }
+
+    fn disable_ekf(&mut self, epoch: Epoch) -> bool {
+        // Return true if there is a prev msr dt, and the next measurement time is more than the disable time seconds away
+        match self.prev_msr_dt {
+            Some(prev_dt) => {
+                if (epoch - prev_dt).abs() > self.disable_time {
+                    self.cur_msrs = 0;
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
+        }
     }
 }

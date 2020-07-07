@@ -101,6 +101,9 @@ where
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate;
 
+    /// Set the previous estimate
+    fn set_previous_estimate(&mut self, est: &Self::Estimate);
+
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
     fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>);
@@ -191,7 +194,7 @@ where
 }
 
 /// A trait to generalize measurement devices such as a ground station
-pub trait MeasurementDevice<Msr, MsrIn>
+pub trait MeasurementDevice<MsrIn, Msr>
 where
     Self: Sized,
     Msr: Measurement,

@@ -1,0 +1,66 @@
+[state.leo]
+# It's actually a MEO from the robuestness test of the EKF
+# State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k)
+x = -9042.862234
+y = 18536.333069
+z = 6999.957069
+vx = -3.288789
+vy = -2.226285
+vz = 1.646738
+frame = "EME2000"
+epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
+unit_position = "km"  # Default value if unspecified
+unit_velocity = "km/s"  # Default value if unspecified
+
+[state.nrho]
+x = -247_356.243_556_962_3
+y = 288_461.416_024_030_9
+z = 69_541.142_921_074_58
+vx = -0.752_594_249_361_007_8
+vy = -0.633_861_191_032_922_9
+vz = -0.189_705_982_926_050_1
+frame = "EME2000"
+epoch = "2020-01-12T04:42:54.776 TAI"
+
+[state.lro]
+x = -231_944.642_799_355_4
+y = 252_552.891_824_038_6
+z = 128_926.726_141_152 
+vx = -0.900_989_413_891_137 
+vy = -1.351_765_256_515_706
+vz = 1.268_665_304_666_975
+frame = "EME2000"
+epoch = "2020-01-12T04:42:54.776 TAI"
+
+[state.leo_nav]
+# Added +/- 9.5 km to position
+x = -9033.362234
+y = 18526.833069
+z = 7009.457069
+vx = -3.288789
+vy = -2.226285
+vz = 1.646738
+frame = "EME2000"
+epoch = "MJD 51544.5 TAI"
+
+[state.nrho_nav]
+# Added ~2.0 km to position
+x = -247_358.0
+y = 288_459.0
+z = 69_543.0
+vx = -0.752_594_249_361_007_8
+vy = -0.633_861_191_032_922_9
+vz = -0.189_705_982_926_050_1
+frame = "EME2000"
+epoch = "2020-01-12T04:42:54.776 TAI"
+
+[state.lro_nav]
+# Added ~1.0 km to position
+x = -231_945.0
+y = 252_551.0
+z = 128_925.0 
+vx = -0.900_989_413_891_137 
+vy = -1.351_765_256_515_706
+vz = 1.268_665_304_666_975
+frame = "EME2000"
+epoch = "2020-01-12T04:42:54.776 TAI"

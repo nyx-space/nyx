@@ -1,0 +1,54 @@
+sequence = ["prop"]
+
+[state.halo]
+x = 3.3332103457598656e5
+y = -7.6134322906422603e4
+z = -2.0873903263672306e4
+vx = 2.5713404516055560e-1
+vy = 9.3034950416444684e-1
+vz = 3.4629506912683045e-1
+frame = "EME2000"
+epoch = "2020-01-01T00:00:00.00"
+
+[state.llo]
+x = 3.9198721332342143e5
+y = -7.4930324786174358e4
+z = -7.0226029652694342e4
+vx = -6.8030103935078690e-1
+vy = 1.9922865304342552
+vz = 4.3674176005046117e-1
+frame = "EME2000"
+epoch = "2020-01-01T00:00:00.00"
+
+[orbital_dynamics.orbital_dyn]
+integration_frame = "EME2000"
+initial_state = "llo"
+point_masses = ["Sun", "Earth", "Jupiter", "Luna"]
+accel_models = ["my_models"]
+
+[spacecraft.sc1]
+dry_mass = 100.0
+fuel_mass = 20.0
+orbital_dynamics = "orbital_dyn"
+
+[propagator.prop]
+dynamics = "sc1"
+stop_cond = "22 days"
+output = "my_csv"
+tolerance = 1e-9
+
+[accel_models.my_models.harmonics.jgm3_70x70]
+frame = "EME2000"
+degree = 70
+order = 70
+file = "data/JGM3.cof.gz"
+
+[accel_models.my_models.harmonics.jggrx]
+frame = "iau moon"
+degree = 20
+order = 20
+file = "data/Luna_jggrx_1500e_sha.tab.gz"
+
+[output.my_csv]
+filename = "./data/llo.csv"
+headers = ["epoch:MjdTai", "x", "y", "z", "vx", "vy", "vz"]

@@ -8,6 +8,7 @@ use crate::od::estimate::NavSolution;
 use crate::od::EstimableState;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
+use std::fmt;
 use std::str::FromStr;
 
 #[derive(Deserialize)]
@@ -112,255 +113,260 @@ pub enum StateHeader {
     VZ { frame: Option<String> },
 }
 
+impl fmt::Display for StateHeader {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, fh: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StateHeader::AoL { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "AoL:{}", f)
+                } else {
+                    write!(fh, "AoL")
+                }
+            }
+            StateHeader::AoP { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "AoP:{}", f)
+                } else {
+                    write!(fh, "AoP")
+                }
+            }
+            StateHeader::apoapsis { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "apoapsis:{}", f)
+                } else {
+                    write!(fh, "apoapsis")
+                }
+            }
+            StateHeader::EA { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "EA:{}", f)
+                } else {
+                    write!(fh, "EA")
+                }
+            }
+            StateHeader::ECC { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "ECC:{}", f)
+                } else {
+                    write!(fh, "ECC")
+                }
+            }
+            StateHeader::energy { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "energy:{}", f)
+                } else {
+                    write!(fh, "energy")
+                }
+            }
+            StateHeader::evec { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "evec:{}", f)
+                } else {
+                    write!(fh, "evec")
+                }
+            }
+            StateHeader::geodetic_height { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "geodetic_height:{}", f)
+                } else {
+                    write!(fh, "geodetic_height")
+                }
+            }
+            StateHeader::geodetic_latitude { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "geodetic_latitude:{}", f)
+                } else {
+                    write!(fh, "geodetic_latitude")
+                }
+            }
+            StateHeader::geodetic_longitude { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "geodetic_longitude:{}", f)
+                } else {
+                    write!(fh, "geodetic_longitude")
+                }
+            }
+            StateHeader::hmag { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "hmag:{}", f)
+                } else {
+                    write!(fh, "hmag")
+                }
+            }
+            StateHeader::hvec { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "hvec:{}", f)
+                } else {
+                    write!(fh, "hvec")
+                }
+            }
+            StateHeader::HX { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "HX:{}", f)
+                } else {
+                    write!(fh, "HX")
+                }
+            }
+            StateHeader::HY { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "HY:{}", f)
+                } else {
+                    write!(fh, "HY")
+                }
+            }
+            StateHeader::HZ { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "HZ:{}", f)
+                } else {
+                    write!(fh, "HZ")
+                }
+            }
+            StateHeader::INC { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "INC:{}", f)
+                } else {
+                    write!(fh, "INC")
+                }
+            }
+            StateHeader::MA { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "MA:{}", f)
+                } else {
+                    write!(fh, "MA")
+                }
+            }
+            StateHeader::periapsis { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "periapsis:{}", f)
+                } else {
+                    write!(fh, "periapsis")
+                }
+            }
+            StateHeader::period { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "period:{}", f)
+                } else {
+                    write!(fh, "period")
+                }
+            }
+            StateHeader::RAAN { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "RAAN:{}", f)
+                } else {
+                    write!(fh, "RAAN")
+                }
+            }
+            StateHeader::radius { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "radius:{}", f)
+                } else {
+                    write!(fh, "radius")
+                }
+            }
+            StateHeader::rmag { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "rmag:{}", f)
+                } else {
+                    write!(fh, "rmag")
+                }
+            }
+            StateHeader::semi_parameter { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "semi_parameter:{}", f)
+                } else {
+                    write!(fh, "semi_parameter")
+                }
+            }
+            StateHeader::SMA { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "SMA:{}", f)
+                } else {
+                    write!(fh, "SMA")
+                }
+            }
+            StateHeader::TA { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "TA:{}", f)
+                } else {
+                    write!(fh, "TA")
+                }
+            }
+            StateHeader::TLong { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "TLong:{}", f)
+                } else {
+                    write!(fh, "TLong")
+                }
+            }
+            StateHeader::velocity { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "velocity:{}", f)
+                } else {
+                    write!(fh, "velocity")
+                }
+            }
+            StateHeader::vmag { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "vmag:{}", f)
+                } else {
+                    write!(fh, "vmag")
+                }
+            }
+            StateHeader::X { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "X:{}", f)
+                } else {
+                    write!(fh, "X")
+                }
+            }
+            StateHeader::Y { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "Y:{}", f)
+                } else {
+                    write!(fh, "Y")
+                }
+            }
+            StateHeader::Z { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "Z:{}", f)
+                } else {
+                    write!(fh, "Z")
+                }
+            }
+            StateHeader::VX { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "VX:{}", f)
+                } else {
+                    write!(fh, "VX")
+                }
+            }
+            StateHeader::VY { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "VY:{}", f)
+                } else {
+                    write!(fh, "VY")
+                }
+            }
+            StateHeader::VZ { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "VZ:{}", f)
+                } else {
+                    write!(fh, "VZ")
+                }
+            }
+            StateHeader::Epoch(efmt) => write!(fh, "Epoch:{:?}", efmt),
+        }
+    }
+}
+
 impl Serialize for StateHeader {
     /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        match self {
-            StateHeader::AoL { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("AoL:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("AoL")
-                }
-            }
-            StateHeader::AoP { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("AoP:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("AoP")
-                }
-            }
-            StateHeader::apoapsis { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("apoapsis:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("apoapsis")
-                }
-            }
-            StateHeader::EA { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("EA:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("EA")
-                }
-            }
-            StateHeader::ECC { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("ECC:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("ECC")
-                }
-            }
-            StateHeader::energy { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("energy:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("energy")
-                }
-            }
-            StateHeader::evec { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("evec:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("evec")
-                }
-            }
-            StateHeader::geodetic_height { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("geodetic_height:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("geodetic_height")
-                }
-            }
-            StateHeader::geodetic_latitude { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("geodetic_latitude:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("geodetic_latitude")
-                }
-            }
-            StateHeader::geodetic_longitude { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("geodetic_longitude:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("geodetic_longitude")
-                }
-            }
-            StateHeader::hmag { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("hmag:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("hmag")
-                }
-            }
-            StateHeader::hvec { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("hvec:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("hvec")
-                }
-            }
-            StateHeader::HX { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("HX:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("HX")
-                }
-            }
-            StateHeader::HY { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("HY:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("HY")
-                }
-            }
-            StateHeader::HZ { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("HZ:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("HZ")
-                }
-            }
-            StateHeader::INC { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("INC:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("INC")
-                }
-            }
-            StateHeader::MA { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("MA:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("MA")
-                }
-            }
-            StateHeader::periapsis { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("periapsis:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("periapsis")
-                }
-            }
-            StateHeader::period { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("period:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("period")
-                }
-            }
-            StateHeader::RAAN { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("RAAN:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("RAAN")
-                }
-            }
-            StateHeader::radius { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("radius:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("radius")
-                }
-            }
-            StateHeader::rmag { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("rmag:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("rmag")
-                }
-            }
-            StateHeader::semi_parameter { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("semi_parameter:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("semi_parameter")
-                }
-            }
-            StateHeader::SMA { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("SMA:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("SMA")
-                }
-            }
-            StateHeader::TA { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("TA:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("TA")
-                }
-            }
-            StateHeader::TLong { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("TLong:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("TLong")
-                }
-            }
-            StateHeader::velocity { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("velocity:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("velocity")
-                }
-            }
-            StateHeader::vmag { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("vmag:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("vmag")
-                }
-            }
-            StateHeader::X { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("X:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("X")
-                }
-            }
-            StateHeader::Y { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("Y:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("Y")
-                }
-            }
-            StateHeader::Z { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("Z:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("Z")
-                }
-            }
-            StateHeader::VX { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("VX:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("VX")
-                }
-            }
-            StateHeader::VY { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("VY:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("VY")
-                }
-            }
-            StateHeader::VZ { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("VZ:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("VZ")
-                }
-            }
-            StateHeader::Epoch(efmt) => {
-                serializer.serialize_str(format!("Epoch:{:?}", efmt).as_str())
-            }
-        }
+        serializer.serialize_str(&format!("{}", self))
     }
 }
 
@@ -431,183 +437,202 @@ pub enum NavSolutionHeader {
     Cz_dot_z_dot { frame: Option<String> },
 }
 
+impl fmt::Display for NavSolutionHeader {
+    fn fmt(&self, fh: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            NavSolutionHeader::Epoch(efmt) => write!(fh, "Epoch:{:?}", efmt),
+            NavSolutionHeader::EstimatedState(hdr) => {
+                let mut seq = Vec::with_capacity(hdr.len());
+                for element in hdr {
+                    seq.push(format!("Estimate:{}", element));
+                }
+                write!(fh, "{}", seq.join(","))
+            }
+            NavSolutionHeader::NominalState(hdr) => {
+                let mut seq = Vec::with_capacity(hdr.len());
+                for element in hdr {
+                    seq.push(format!("Nominal:{}", element));
+                }
+                write!(fh, "{}", seq.join(","))
+            }
+            NavSolutionHeader::Delta_x => write!(fh, "delta_x"),
+            NavSolutionHeader::Delta_y => write!(fh, "delta_y"),
+            NavSolutionHeader::Delta_z => write!(fh, "delta_z"),
+            NavSolutionHeader::Delta_vx => write!(fh, "delta_vx"),
+            NavSolutionHeader::Delta_vy => write!(fh, "delta_vy"),
+            NavSolutionHeader::Delta_vz => write!(fh, "delta_vz"),
+            NavSolutionHeader::Cx_x { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cx_x:{}", f)
+                } else {
+                    write!(fh, "cx_x")
+                }
+            }
+            NavSolutionHeader::Cy_x { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cy_x:{}", f)
+                } else {
+                    write!(fh, "cy_x")
+                }
+            }
+            NavSolutionHeader::Cy_y { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cy_y:{}", f)
+                } else {
+                    write!(fh, "cy_y")
+                }
+            }
+            NavSolutionHeader::Cz_x { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_x:{}", f)
+                } else {
+                    write!(fh, "cz_x")
+                }
+            }
+            NavSolutionHeader::Cz_y { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_y:{}", f)
+                } else {
+                    write!(fh, "cz_y")
+                }
+            }
+            NavSolutionHeader::Cz_z { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_z:{}", f)
+                } else {
+                    write!(fh, "cz_z")
+                }
+            }
+            NavSolutionHeader::Cx_dot_x { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cx_dot_x:{}", f)
+                } else {
+                    write!(fh, "cx_dot_x")
+                }
+            }
+            NavSolutionHeader::Cx_dot_y { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cx_dot_y:{}", f)
+                } else {
+                    write!(fh, "cx_dot_y")
+                }
+            }
+            NavSolutionHeader::Cx_dot_z { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cx_dot_z:{}", f)
+                } else {
+                    write!(fh, "cx_dot_z")
+                }
+            }
+            NavSolutionHeader::Cx_dot_x_dot { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cx_dot_x_dot:{}", f)
+                } else {
+                    write!(fh, "cx_dot_x_dot")
+                }
+            }
+            NavSolutionHeader::Cy_dot_x { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cy_dot_x:{}", f)
+                } else {
+                    write!(fh, "cy_dot_x")
+                }
+            }
+            NavSolutionHeader::Cy_dot_y { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cy_dot_y:{}", f)
+                } else {
+                    write!(fh, "cy_dot_y")
+                }
+            }
+            NavSolutionHeader::Cy_dot_z { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cy_dot_z:{}", f)
+                } else {
+                    write!(fh, "cy_dot_z")
+                }
+            }
+            NavSolutionHeader::Cy_dot_x_dot { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cy_dot_x_dot:{}", f)
+                } else {
+                    write!(fh, "cy_dot_x_dot")
+                }
+            }
+            NavSolutionHeader::Cy_dot_y_dot { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cy_dot_y_dot:{}", f)
+                } else {
+                    write!(fh, "cy_dot_y_dot")
+                }
+            }
+            NavSolutionHeader::Cz_dot_x { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_dot_x:{}", f)
+                } else {
+                    write!(fh, "cz_dot_x")
+                }
+            }
+            NavSolutionHeader::Cz_dot_y { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_dot_y:{}", f)
+                } else {
+                    write!(fh, "cz_dot_y")
+                }
+            }
+            NavSolutionHeader::Cz_dot_z { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_dot_z:{}", f)
+                } else {
+                    write!(fh, "cz_dot_z")
+                }
+            }
+            NavSolutionHeader::Cz_dot_x_dot { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_dot_x_dot:{}", f)
+                } else {
+                    write!(fh, "cz_dot_x_dot")
+                }
+            }
+            NavSolutionHeader::Cz_dot_y_dot { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_dot_y_dot:{}", f)
+                } else {
+                    write!(fh, "cz_dot_y_dot")
+                }
+            }
+            NavSolutionHeader::Cz_dot_z_dot { frame } => {
+                if let Some(f) = frame {
+                    write!(fh, "cz_dot_z_dot:{}", f)
+                } else {
+                    write!(fh, "cz_dot_z_dot")
+                }
+            }
+        }
+    }
+}
+
 impl Serialize for NavSolutionHeader {
-    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match self {
-            NavSolutionHeader::Epoch(efmt) => {
-                serializer.serialize_str(format!("Epoch:{:?}", efmt).as_str())
-            }
             NavSolutionHeader::EstimatedState(hdr) => {
                 let mut seq = serializer.serialize_seq(Some(hdr.len()))?;
                 for element in hdr {
-                    seq.serialize_element(element)?;
+                    seq.serialize_element(&format!("Estimate:{}", element))?;
                 }
                 seq.end()
             }
             NavSolutionHeader::NominalState(hdr) => {
                 let mut seq = serializer.serialize_seq(Some(hdr.len()))?;
                 for element in hdr {
-                    seq.serialize_element(element)?;
+                    seq.serialize_element(&format!("Nominal:{}", element))?;
                 }
                 seq.end()
             }
-            NavSolutionHeader::Delta_x => serializer.serialize_str("delta_x"),
-            NavSolutionHeader::Delta_y => serializer.serialize_str("delta_y"),
-            NavSolutionHeader::Delta_z => serializer.serialize_str("delta_z"),
-            NavSolutionHeader::Delta_vx => serializer.serialize_str("delta_vx"),
-            NavSolutionHeader::Delta_vy => serializer.serialize_str("delta_vy"),
-            NavSolutionHeader::Delta_vz => serializer.serialize_str("delta_vz"),
-            NavSolutionHeader::Cx_x { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cx_x:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cx_x")
-                }
-            }
-            NavSolutionHeader::Cy_x { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cy_x:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cy_x")
-                }
-            }
-            NavSolutionHeader::Cy_y { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cy_y:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cy_y")
-                }
-            }
-            NavSolutionHeader::Cz_x { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_x:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_x")
-                }
-            }
-            NavSolutionHeader::Cz_y { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_y:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_y")
-                }
-            }
-            NavSolutionHeader::Cz_z { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_z:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_z")
-                }
-            }
-            NavSolutionHeader::Cx_dot_x { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cx_dot_x:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cx_dot_x")
-                }
-            }
-            NavSolutionHeader::Cx_dot_y { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cx_dot_y:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cx_dot_y")
-                }
-            }
-            NavSolutionHeader::Cx_dot_z { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cx_dot_z:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cx_dot_z")
-                }
-            }
-            NavSolutionHeader::Cx_dot_x_dot { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cx_dot_x_dot:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cx_dot_x_dot")
-                }
-            }
-            NavSolutionHeader::Cy_dot_x { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cy_dot_x:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cy_dot_x")
-                }
-            }
-            NavSolutionHeader::Cy_dot_y { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cy_dot_y:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cy_dot_y")
-                }
-            }
-            NavSolutionHeader::Cy_dot_z { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cy_dot_z:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cy_dot_z")
-                }
-            }
-            NavSolutionHeader::Cy_dot_x_dot { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cy_dot_x_dot:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cy_dot_x_dot")
-                }
-            }
-            NavSolutionHeader::Cy_dot_y_dot { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cy_dot_y_dot:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cy_dot_y_dot")
-                }
-            }
-            NavSolutionHeader::Cz_dot_x { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_dot_x:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_dot_x")
-                }
-            }
-            NavSolutionHeader::Cz_dot_y { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_dot_y:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_dot_y")
-                }
-            }
-            NavSolutionHeader::Cz_dot_z { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_dot_z:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_dot_z")
-                }
-            }
-            NavSolutionHeader::Cz_dot_x_dot { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_dot_x_dot:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_dot_x_dot")
-                }
-            }
-            NavSolutionHeader::Cz_dot_y_dot { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_dot_y_dot:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_dot_y_dot")
-                }
-            }
-            NavSolutionHeader::Cz_dot_z_dot { frame } => {
-                if let Some(f) = frame {
-                    serializer.serialize_str(format!("cz_dot_z_dot:{}", f).as_str())
-                } else {
-                    serializer.serialize_str("cz_dot_z_dot")
-                }
-            }
+            _ => serializer.serialize_str(&format!("{}", self)),
         }
     }
 }
@@ -621,6 +646,16 @@ pub struct StateFormatter<'a> {
 }
 
 impl<'a> StateFormatter<'a> {
+    /// ```
+    /// extern crate nyx_space as nyx;
+    /// use nyx::io::formatter::StateFormatter;
+    /// use nyx::celestia::Cosm;
+    ///
+    /// let cosm = Cosm::de438();
+    /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
+    /// let hdrs = vec!["AoL".to_string(), "ea:eme2000".to_string()];
+    /// StateFormatter::from_headers(hdrs, "nope".to_string(), &cosm);
+    /// ```
     pub fn from_headers(headers: Vec<String>, filename: String, cosm: &'a Cosm) -> Self {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(20);
@@ -853,6 +888,16 @@ pub struct NavSolutionFormatter<'a> {
 }
 
 impl<'a> NavSolutionFormatter<'a> {
+    /// ```
+    /// extern crate nyx_space as nyx;
+    /// use nyx::io::formatter::NavSolutionFormatter;
+    /// use nyx::celestia::Cosm;
+    ///
+    /// let cosm = Cosm::de438();
+    /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
+    /// let hdrs = vec!["estimate:AoL".to_string(), "nominal:ea:eme2000".to_string(), "delta_x".to_string()];
+    /// NavSolutionFormatter::from_headers(hdrs, "nope".to_string(), &cosm);
+    /// ```
     pub fn from_headers(headers: Vec<String>, filename: String, cosm: &'a Cosm) -> Self {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(40);
@@ -864,7 +909,14 @@ impl<'a> NavSolutionFormatter<'a> {
             let splt: Vec<&str> = lowered.split(':').collect();
 
             let frame_name = if splt.len() == 3 {
-                Some(splt[2].to_owned())
+                // Check that the frame is valid
+                let name = splt[2].to_owned();
+                // Get the frame
+                match cosm.try_frame(&name) {
+                    Ok(frame) => frames.insert(name.clone(), frame),
+                    Err(e) => panic!("unknown frame `{}` in header ({})", name, e),
+                };
+                Some(name)
             } else {
                 None
             };
@@ -953,14 +1005,6 @@ impl<'a> NavSolutionFormatter<'a> {
                 }
                 _ => panic!("unknown header `{}`", splt[0]),
             }
-
-            if splt[0] != "epoch" && splt.len() == 2 {
-                // Get the frame
-                match cosm.try_frame(splt[1]) {
-                    Ok(frame) => frames.insert(splt[1].to_string(), frame),
-                    Err(e) => panic!("unknown frame `{}` in header ({})", splt[1], e),
-                };
-            }
         }
 
         // Add the nominal and estimate headers (needed to add the header row)
@@ -1041,7 +1085,7 @@ impl<'a> NavSolutionFormatter<'a> {
                 }
                 NavSolutionHeader::NominalState(_) => {
                     // The formatter is already initialized
-                    for fmtval in self.nominal_headers.fmt(&sol.orbital_state()) {
+                    for fmtval in self.nominal_headers.fmt(&sol.expected_state()) {
                         formatted.push(fmtval);
                     }
                 }
@@ -1065,67 +1109,67 @@ impl<'a> NavSolutionFormatter<'a> {
                     formatted.push(format!("{:.16e}", sol.state_deviation()[5]))
                 }
                 NavSolutionHeader::Cx_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(0, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(0, 0)))
                 }
                 NavSolutionHeader::Cy_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(1, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(1, 0)))
                 }
                 NavSolutionHeader::Cy_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(1, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(1, 1)))
                 }
                 NavSolutionHeader::Cz_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(2, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 0)))
                 }
                 NavSolutionHeader::Cz_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(2, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 1)))
                 }
                 NavSolutionHeader::Cz_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(2, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 2)))
                 }
                 NavSolutionHeader::Cx_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 0)))
                 }
                 NavSolutionHeader::Cx_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 1)))
                 }
                 NavSolutionHeader::Cx_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 2)))
                 }
                 NavSolutionHeader::Cx_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(3, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 3)))
                 }
                 NavSolutionHeader::Cy_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 0)))
                 }
                 NavSolutionHeader::Cy_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 1)))
                 }
                 NavSolutionHeader::Cy_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 2)))
                 }
                 NavSolutionHeader::Cy_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 3)))
                 }
                 NavSolutionHeader::Cy_dot_y_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(4, 4)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 4)))
                 }
                 NavSolutionHeader::Cz_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 0)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 0)))
                 }
                 NavSolutionHeader::Cz_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 1)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 1)))
                 }
                 NavSolutionHeader::Cz_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 2)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 2)))
                 }
                 NavSolutionHeader::Cz_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 3)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 3)))
                 }
                 NavSolutionHeader::Cz_dot_y_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 4)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 4)))
                 }
                 NavSolutionHeader::Cz_dot_z_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar()[(5, 5)]))
+                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 5)))
                 }
             };
         }

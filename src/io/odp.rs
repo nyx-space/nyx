@@ -18,6 +18,7 @@ pub struct OdpScenario<'a> {
     truth: MDProcess<'a>,
     nav: MDProcess<'a>,
     ekf_msr_trigger: usize,
+    ekf_disable_time: f64,
     kf: KF<U6, U3, U2, SpacecraftState>,
     stations: Vec<GroundStation<'a>>,
     formatter: Option<NavSolutionFormatter<'a>>,
@@ -48,17 +49,17 @@ impl<'a> OdpScenario<'a> {
         let all_estimates = scenario.estimate.as_ref().unwrap();
         let all_stations = scenario.stations.as_ref().unwrap();
 
-        if let Some(odp_seq) = odp.get(&seq_name) {
+        if let Some(odp_seq) = odp.get(&seq_name.to_lowercase()) {
             // Get the measurement generation
-            match all_measurements.get(&odp_seq.measurements) {
-                None => unimplemented!(),
+            match all_measurements.get(&odp_seq.measurements.to_lowercase()) {
+                None => unimplemented!("{}", &odp_seq.measurements),
                 Some(ref msr) => {
                     // Get the IAU Earth frame
                     let iau_earth = cosm.frame("IAU Earth");
                     // Build the stations
                     let mut stations = Vec::with_capacity(5);
                     for device in &msr.msr_device {
-                        match all_stations.get(device) {
+                        match all_stations.get(&device.to_lowercase()) {
                             None => {
                                 return Err(ParsingError::OD(format!(
                                     "station `{}` in sequence `{}` not found",
@@ -120,7 +121,10 @@ impl<'a> OdpScenario<'a> {
                     )?;
 
                     // Build the initial estimate
-                    if all_estimates.get(&odp_seq.initial_estimate).is_none() {
+                    if all_estimates
+                        .get(&odp_seq.initial_estimate.to_lowercase())
+                        .is_none()
+                    {
                         return Err(ParsingError::OD(format!(
                             "estimate `{}` not found",
                             &odp_seq.initial_estimate
@@ -128,14 +132,18 @@ impl<'a> OdpScenario<'a> {
                     }
 
                     let est_serde = &all_estimates[&odp_seq.initial_estimate];
-                    if scenario.state.get(&est_serde.state).is_none() {
+                    if scenario
+                        .state
+                        .get(&est_serde.state.to_lowercase())
+                        .is_none()
+                    {
                         return Err(ParsingError::OD(format!(
                             "state `{}` not found",
                             &est_serde.state
                         )));
                     }
 
-                    let est_init_state_serde = &scenario.state[&est_serde.state];
+                    let est_init_state_serde = &scenario.state[&est_serde.state.to_lowercase()];
                     let state_frame = cosm.frame(est_init_state_serde.frame.as_str());
                     let est_init_state = est_init_state_serde.as_state(state_frame);
 
@@ -219,7 +227,7 @@ impl<'a> OdpScenario<'a> {
 
                     // Get the formatter
                     let formatter = match &odp_seq.output {
-                        Some(output) => match &scenario.output.get(output) {
+                        Some(output) => match &scenario.output.get(&output.to_lowercase()) {
                             None => {
                                 return Err(ParsingError::OD(format!(
                                     "output `{}` not found",
@@ -239,6 +247,10 @@ impl<'a> OdpScenario<'a> {
                             Some(val) => *val,
                             None => 100_000,
                         },
+                        ekf_disable_time: match &odp_seq.ekf_disable_time {
+                            Some(val) => *val,
+                            None => 3600.0, // defaults to one hour
+                        },
                         stations,
                         formatter,
                     });
@@ -253,11 +265,28 @@ impl<'a> OdpScenario<'a> {
     pub fn execute(mut self) {
         // Generate the measurements.
         let prop_time = self.truth.prop_time_s.unwrap();
-        let mut prop = self.truth.propagator();
+
+        // Create the output file for the truth
+        let mut maybe_wtr = match &self.truth.formatter {
+            Some(fmtr) => {
+                let mut wtr =
+                    csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+                wtr.serialize(&fmtr.headers)
+                    .expect("could not write headers");
+                info!("Saving truth to {}", fmtr.filename);
+                Some(wtr)
+            }
+            None => None,
+        };
+
+        let mut truth_prop = self.truth.propagator();
+        truth_prop.set_step(10.0, true);
 
         // Set up the channels
         let (tx, rx) = channel();
-        prop.tx_chan = Some(tx);
+        truth_prop.tx_chan = Some(tx);
+
+        let mut initial_state = Some(truth_prop.state());
 
         // Generate the measurements
         info!(
@@ -267,10 +296,34 @@ impl<'a> OdpScenario<'a> {
         );
 
         let start = Instant::now();
-        prop.until_time_elapsed(prop_time);
+        info!("Initial state: {}", truth_prop.state());
+
+        truth_prop.until_time_elapsed(prop_time);
+
+        info!(
+            "Final state:   {} (computed in {:.3} seconds)",
+            truth_prop.state(),
+            (Instant::now() - start).as_secs_f64()
+        );
 
         let mut sim_measurements = Vec::with_capacity(10000);
+        let start = Instant::now();
         while let Ok(rx_state) = rx.try_recv() {
+            if let Some(wtr) = &mut maybe_wtr {
+                if let Some(first_state) = initial_state {
+                    wtr.serialize(
+                        self.truth
+                            .formatter
+                            .as_ref()
+                            .unwrap()
+                            .fmt(&first_state.orbit),
+                    )
+                    .expect("could not format state");
+                    initial_state = None;
+                }
+                wtr.serialize(self.truth.formatter.as_ref().unwrap().fmt(&rx_state.orbit))
+                    .expect("could not format state");
+            }
             for station in self.stations.iter() {
                 let meas = station.measure(&rx_state).unwrap();
                 if meas.visible() {
@@ -287,18 +340,14 @@ impl<'a> OdpScenario<'a> {
         );
 
         // Build the ODP
-        let nav = self.nav.stm_propagator();
-        let kf = self.kf;
-        let mut odp = ODProcess::ekf(
-            nav,
-            kf,
-            self.stations.clone(),
-            false,
-            100_000,
-            NumMsrEkfTrigger::init(self.ekf_msr_trigger),
-        );
+        let mut nav = self.nav.stm_propagator();
+        nav.set_step(10.0, true);
 
-        odp.process_measurements_covar(&sim_measurements);
+        let kf = self.kf;
+        let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
+        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), false, 100_000, trig);
+
+        odp.process_measurements(&sim_measurements);
 
         // Save to output file if requested
         // Create the output file
@@ -313,5 +362,9 @@ impl<'a> OdpScenario<'a> {
                     .expect("could not format state");
             }
         };
+
+        if let Some(final_estimate) = &odp.estimates.last() {
+            println!("Final estimate:\n{}", final_estimate);
+        }
     }
 }
