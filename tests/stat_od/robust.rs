@@ -359,6 +359,7 @@ fn robust_test_ekf_multi_body() {
 }
 
 #[test]
+#[ignore]
 fn robust_test_ekf_harmonics() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
@@ -543,6 +544,7 @@ fn robust_test_ekf_harmonics() {
 }
 
 #[test]
+#[ignore]
 fn robust_test_ekf_realistic() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
@@ -589,7 +591,12 @@ fn robust_test_ekf_realistic() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+        let bodies = vec![
+            bodies::EARTH_MOON,
+            bodies::SUN,
+            bodies::JUPITER_BARYCENTER,
+            bodies::SATURN_BARYCENTER,
+        ];
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
