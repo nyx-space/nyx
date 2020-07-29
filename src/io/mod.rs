@@ -3,8 +3,7 @@ extern crate regex;
 extern crate serde;
 extern crate serde_derive;
 
-use self::regex::Regex;
-use crate::time::{Epoch, SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE};
+use crate::time::Epoch;
 use std::fmt;
 use std::str::FromStr;
 
@@ -26,6 +25,8 @@ pub mod odp;
 
 pub mod formatter;
 
+pub mod quantity;
+
 #[derive(Debug)]
 pub enum ParsingError {
     MD(String),
@@ -42,6 +43,10 @@ pub enum ParsingError {
     LoadingError(String),
     PropagatorNotFound(String),
     Duration(String),
+    Quantity(String),
+    Distance(String),
+    Velocity(String),
+    IllDefined(String),
 }
 
 /// Specifies the format of the Epoch during serialization
@@ -152,49 +157,5 @@ impl FromStr for CovarFormat {
             "3sigma" | "sigma3" => Ok(CovarFormat::Sigma3),
             _ => Err(ParsingError::CovarFormat),
         }
-    }
-}
-
-/// Parse a duration
-///
-/// ```
-/// extern crate nyx_space as nyx;
-///
-/// use nyx::io::parse_duration;
-/// use std::f64::EPSILON;
-///
-/// assert!((parse_duration("1 * days").unwrap() - 86_400.0).abs() < EPSILON);
-/// assert!((parse_duration("1* day").unwrap() - 86_400.0).abs() < EPSILON);
-/// assert!((parse_duration("1 *d").unwrap() - 86_400.0).abs() < EPSILON);
-/// assert!((parse_duration("1 * h").unwrap() - 3_600.0).abs() < EPSILON);
-/// assert!((parse_duration("1.0000 * hour").unwrap() - 3_600.0).abs() < EPSILON);
-/// assert!((parse_duration("1.0000 * hours").unwrap() - 3_600.0).abs() < EPSILON);
-/// assert!((parse_duration("1.0 * min").unwrap() - 60.0).abs() < EPSILON);
-/// assert!((parse_duration("1. * s").unwrap() - 1.0).abs() < EPSILON);
-/// assert!((parse_duration("1 * s").unwrap() - 1.0).abs() < EPSILON);
-/// ```
-pub fn parse_duration(duration: &str) -> Result<f64, ParsingError> {
-    let reg = Regex::new(r"^(\d+\.?\d*)\W*(\w+)$").unwrap();
-    match reg.captures(duration) {
-        Some(cap) => {
-            let mut time_s = cap[1].to_owned().parse::<f64>().unwrap();
-            match cap[2].to_owned().to_lowercase().as_str() {
-                "days" | "day" | "d" => time_s *= SECONDS_PER_DAY,
-                "hours" | "hour" | "h" => time_s *= SECONDS_PER_HOUR,
-                "min" | "mins" | "minute" | "minutes" | "m" => time_s *= SECONDS_PER_MINUTE,
-                "s" | "sec" | "secs" => time_s *= 1.0,
-                _ => {
-                    return Err(ParsingError::Duration(format!(
-                        "unknown duration unit in `{}`",
-                        duration
-                    )))
-                }
-            }
-            Ok(time_s)
-        }
-        None => Err(ParsingError::Duration(format!(
-            "Could not parse stopping condition: `{}`",
-            duration
-        ))),
     }
 }

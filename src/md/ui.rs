@@ -10,8 +10,8 @@ use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
 use crate::io::formatter::*;
+use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
-use crate::io::{parse_duration, ParsingError};
 use crate::propagators::error_ctrl::RSSStepPV;
 use crate::propagators::{PropOpts, Propagator};
 use crate::time::{Epoch, SECONDS_PER_DAY};
@@ -64,7 +64,7 @@ where
             Some(prop) => {
                 #[allow(unused_assignments)]
                 let mut sc_dyn_flagged = StmState::Unknown;
-                let mut init_state;
+
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
                     match scen.output.get(&output.to_lowercase()) {
@@ -79,28 +79,39 @@ where
                 } else {
                     None
                 };
-                match scen.spacecraft.get(&prop.dynamics.to_lowercase()) {
+                let spacecraft = match scen.spacecraft.get(&prop.dynamics.to_lowercase()) {
                     None => {
                         return Err(ParsingError::MD(format!(
                             "propagator `{}` refers to undefined spacecraft `{}`",
                             prop_name, prop.dynamics
                         )))
                     }
-                    Some(spacecraft) =>
-                    // Validate the orbital dynamics
-                    {
-                        match scen
-                            .orbital_dynamics
-                            .get(&spacecraft.orbital_dynamics.to_lowercase())
-                        {
-                            None => {
-                                return Err(ParsingError::MD(format!(
-                                    "spacecraft `{}` refers to undefined dynamics `{}`",
-                                    &prop.dynamics, spacecraft.orbital_dynamics
-                                )))
-                            }
-                            Some(dynamics) => match scen
-                                .state
+                    Some(spacecraft) => spacecraft,
+                };
+
+                // Get and validate the orbital dynamics
+                let dynamics = match scen
+                    .orbital_dynamics
+                    .get(&spacecraft.orbital_dynamics.to_lowercase())
+                {
+                    None => {
+                        return Err(ParsingError::MD(format!(
+                            "spacecraft `{}` refers to undefined dynamics `{}`",
+                            &prop.dynamics, spacecraft.orbital_dynamics
+                        )))
+                    }
+                    Some(dynamics) => dynamics,
+                };
+
+                let state_name = &dynamics.initial_state.to_lowercase();
+                let init_state = match scen.state.get(state_name) {
+                    None => {
+                        // Let's see if there is a delta state
+                        if scen.delta_state.is_some() {
+                            match scen
+                                .delta_state
+                                .as_ref()
+                                .unwrap()
                                 .get(&dynamics.initial_state.to_lowercase())
                             {
                                 None => {
@@ -109,202 +120,186 @@ where
                                         prop.dynamics, dynamics.initial_state
                                     )))
                                 }
-                                Some(init_state_sd) => {
-                                    // Let's check the frames
-                                    let state_frame = cosm.frame(init_state_sd.frame.as_str());
-                                    init_state = init_state_sd.as_state(state_frame);
-                                    if let Some(integ_frame_name) = &dynamics.integration_frame {
-                                        let integ_frame = cosm.frame(integ_frame_name);
-                                        init_state = cosm.frame_chg(&init_state, integ_frame);
-                                    }
-                                    // Create the dynamics
-                                    if let Some(pts_masses) = &dynamics.point_masses {
-                                        // Get the object IDs from name
-                                        let mut bodies = Vec::with_capacity(10);
-                                        for obj in pts_masses {
-                                            match cosm.try_frame(obj) {
-                                                Ok(frame) => bodies.push(frame.exb_id()),
-                                                Err(_) => {
-                                                    // Let's try with "j2000" appended
-                                                    match cosm.try_frame(
-                                                        format!("{} j2000", obj).as_str(),
-                                                    ) {
-                                                        Ok(frame) => bodies.push(frame.exb_id()),
-                                                        Err(_) => {
-                                                            bodies.push(
-                                                                cosm.frame(
-                                                                    format!(
-                                                                        "{} barycenter j2000",
-                                                                        obj
-                                                                    )
-                                                                    .as_str(),
-                                                                )
-                                                                .exb_id(),
-                                                            );
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                Some(delta_state) => {
+                                    // Rebuilt the state
+                                    let inherited = match scen.state.get(&delta_state.inherit) {
+                                        None => {
+                                            return Err(ParsingError::MD(format!(
+                                                "delta state `{}` refers to unknown state `{}`",
+                                                state_name, delta_state.inherit
+                                            )))
                                         }
-                                        // Remove bodies which are part of the state
-                                        if let Some(pos) =
-                                            bodies.iter().position(|x| *x == state_frame.exb_id())
-                                        {
-                                            bodies.remove(pos);
+                                        Some(base) => {
+                                            let state_frame = cosm.frame(base.frame.as_str());
+                                            base.as_state(state_frame)?
                                         }
-                                        if stm_flag.with() {
-                                            let mut sc_dyn_stm = Spacecraft::with_stm(
-                                                OrbitalDynamicsStm::point_masses(
-                                                    init_state, bodies, cosm,
-                                                ),
-                                                spacecraft.dry_mass,
-                                            );
-                                            if let Some(fuel_mass) = spacecraft.fuel_mass {
-                                                sc_dyn_stm.fuel_mass = fuel_mass;
-                                            }
+                                    };
+                                    delta_state.as_state(inherited)?
+                                }
+                            }
+                        } else {
+                            return Err(ParsingError::MD(format!(
+                                "dynamics `{}` refers to unknown state `{}`",
+                                prop.dynamics, dynamics.initial_state
+                            )));
+                        }
+                    }
+                    Some(init_state_sd) => {
+                        let state_frame = cosm.frame(init_state_sd.frame.as_str());
+                        init_state_sd.as_state(state_frame)?
+                    }
+                };
 
-                                            sc_dyn_flagged = StmState::With(sc_dyn_stm);
-                                        } else {
-                                            let mut sc_dyn = Spacecraft::new(
-                                                OrbitalDynamics::point_masses(
-                                                    init_state, bodies, cosm,
-                                                ),
-                                                spacecraft.dry_mass,
-                                            );
-                                            if let Some(fuel_mass) = spacecraft.fuel_mass {
-                                                sc_dyn.fuel_mass = fuel_mass;
-                                            }
-
-                                            sc_dyn_flagged = StmState::Without(sc_dyn);
-                                        }
-                                    } else if stm_flag.with() {
-                                        let mut sc_dyn_stm = Spacecraft::with_stm(
-                                            OrbitalDynamicsStm::two_body(init_state),
-                                            spacecraft.dry_mass,
+                // Create the dynamics
+                if let Some(pts_masses) = &dynamics.point_masses {
+                    // Get the object IDs from name
+                    let mut bodies = Vec::with_capacity(10);
+                    for obj in pts_masses {
+                        match cosm.try_frame(obj) {
+                            Ok(frame) => bodies.push(frame.exb_id()),
+                            Err(_) => {
+                                // Let's try with "j2000" appended
+                                match cosm.try_frame(format!("{} j2000", obj).as_str()) {
+                                    Ok(frame) => bodies.push(frame.exb_id()),
+                                    Err(_) => {
+                                        bodies.push(
+                                            cosm.frame(
+                                                format!("{} barycenter j2000", obj).as_str(),
+                                            )
+                                            .exb_id(),
                                         );
-                                        if let Some(fuel_mass) = spacecraft.fuel_mass {
-                                            sc_dyn_stm.fuel_mass = fuel_mass;
-                                        }
-
-                                        sc_dyn_flagged = StmState::With(sc_dyn_stm);
-                                    } else {
-                                        let mut sc_dyn = Spacecraft::new(
-                                            OrbitalDynamics::two_body(init_state),
-                                            spacecraft.dry_mass,
-                                        );
-                                        if let Some(fuel_mass) = spacecraft.fuel_mass {
-                                            sc_dyn.fuel_mass = fuel_mass;
-                                        }
-                                        // Add the force models
-                                        if let Some(force_models) = &spacecraft.force_models {
-                                            if scen.force_models.as_ref().is_none() {
-                                                return Err(ParsingError::MD(format!("spacecraft `{}` refers to force models but none are defined", prop.dynamics)));
-                                            }
-                                            for mdl in force_models {
-                                                match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
-                                                    None => {
-                                                        return Err(ParsingError::MD(format!(
-                                                        "spacecraft `{}` refers to unknown force model `{}`",
-                                                        prop.dynamics, mdl
-                                                    )))
-                                                    }
-                                                    Some(amdl) => {
-                                                        for smdl in amdl.srp.values() {
-                                                            let mut srp = SolarPressure::default(smdl.sc_area, vec![cosm.frame("EME2000"), cosm.frame("Luna")], &cosm);
-                                                            srp.phi = smdl.phi;
-                                                            srp.cr = smdl.cr;
-                                                            match sc_dyn_flagged {
-                                                                StmState::With(
-                                                                    ref mut sc_dyn_stm,
-                                                                ) => {
-                                                                    sc_dyn_stm
-                                                                        .add_model(Box::new(srp));
-                                                                },
-                                                                StmState::Without(
-                                                                    ref mut sc_dyn,
-                                                                ) => {
-                                                                    sc_dyn
-                                                                    .add_model(Box::new(srp));
-                                                                }
-                                                                _ => panic!("should not happen"),
-                                                            };
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        sc_dyn_flagged = StmState::Without(sc_dyn);
-                                    }
-
-                                    // Add the acceleration models if applicable
-                                    if let Some(accel_models) = &dynamics.accel_models {
-                                        for mdl in accel_models {
-                                            match scen
-                                                .accel_models
-                                                .as_ref()
-                                                .unwrap()
-                                                .get(&mdl.to_lowercase())
-                                            {
-                                                None => {
-                                                    return Err(ParsingError::MD(format!(
-                                                    "dynamics `{}` refers to unknown state `{}`",
-                                                    prop.dynamics, dynamics.initial_state
-                                                )))
-                                                }
-                                                Some(amdl) => {
-                                                    for hmdl in amdl.harmonics.values() {
-                                                        let in_mem = hmdl.load();
-                                                        let compute_frame =
-                                                            cosm.frame(hmdl.frame.as_str());
-
-                                                        if stm_flag.with() {
-                                                            let hh = HarmonicsDiff::from_stor(
-                                                                compute_frame,
-                                                                in_mem,
-                                                                &cosm,
-                                                            );
-                                                            match sc_dyn_flagged {
-                                                                StmState::With(
-                                                                    ref mut sc_dyn_stm,
-                                                                ) => {
-                                                                    sc_dyn_stm
-                                                                        .orbital_dyn
-                                                                        .add_model(Box::new(hh));
-                                                                }
-                                                                _ => panic!("should not happen"),
-                                                            };
-                                                        } else {
-                                                            let hh = Harmonics::from_stor(
-                                                                compute_frame,
-                                                                in_mem,
-                                                                &cosm,
-                                                            );
-                                                            match sc_dyn_flagged {
-                                                                StmState::Without(
-                                                                    ref mut sc_dyn,
-                                                                ) => {
-                                                                    sc_dyn
-                                                                        .orbital_dyn
-                                                                        .add_model(Box::new(hh));
-                                                                }
-                                                                _ => panic!("should not happen"),
-                                                            };
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
                                     }
                                 }
-                            },
+                            }
+                        }
+                    }
+                    // Remove bodies which are part of the state
+                    if let Some(pos) = bodies.iter().position(|x| *x == init_state.frame.exb_id()) {
+                        bodies.remove(pos);
+                    }
+                    if stm_flag.with() {
+                        let mut sc_dyn_stm = Spacecraft::with_stm(
+                            OrbitalDynamicsStm::point_masses(init_state, bodies, cosm),
+                            spacecraft.dry_mass,
+                        );
+                        if let Some(fuel_mass) = spacecraft.fuel_mass {
+                            sc_dyn_stm.fuel_mass = fuel_mass;
+                        }
+
+                        sc_dyn_flagged = StmState::With(sc_dyn_stm);
+                    } else {
+                        let mut sc_dyn = Spacecraft::new(
+                            OrbitalDynamics::point_masses(init_state, bodies, cosm),
+                            spacecraft.dry_mass,
+                        );
+                        if let Some(fuel_mass) = spacecraft.fuel_mass {
+                            sc_dyn.fuel_mass = fuel_mass;
+                        }
+
+                        sc_dyn_flagged = StmState::Without(sc_dyn);
+                    }
+                } else if stm_flag.with() {
+                    let mut sc_dyn_stm = Spacecraft::with_stm(
+                        OrbitalDynamicsStm::two_body(init_state),
+                        spacecraft.dry_mass,
+                    );
+                    if let Some(fuel_mass) = spacecraft.fuel_mass {
+                        sc_dyn_stm.fuel_mass = fuel_mass;
+                    }
+
+                    sc_dyn_flagged = StmState::With(sc_dyn_stm);
+                } else {
+                    let mut sc_dyn =
+                        Spacecraft::new(OrbitalDynamics::two_body(init_state), spacecraft.dry_mass);
+                    if let Some(fuel_mass) = spacecraft.fuel_mass {
+                        sc_dyn.fuel_mass = fuel_mass;
+                    }
+                    // Add the force models
+                    if let Some(force_models) = &spacecraft.force_models {
+                        if scen.force_models.as_ref().is_none() {
+                            return Err(ParsingError::MD(format!(
+                                "spacecraft `{}` refers to force models but none are defined",
+                                prop.dynamics
+                            )));
+                        }
+                        for mdl in force_models {
+                            match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
+                                None => {
+                                    return Err(ParsingError::MD(format!(
+                                        "spacecraft `{}` refers to unknown force model `{}`",
+                                        prop.dynamics, mdl
+                                    )))
+                                }
+                                Some(amdl) => {
+                                    for smdl in amdl.srp.values() {
+                                        let mut srp = SolarPressure::default(
+                                            smdl.sc_area,
+                                            vec![cosm.frame("EME2000"), cosm.frame("Luna")],
+                                            &cosm,
+                                        );
+                                        srp.phi = smdl.phi;
+                                        srp.cr = smdl.cr;
+                                        match sc_dyn_flagged {
+                                            StmState::With(ref mut sc_dyn_stm) => {
+                                                sc_dyn_stm.add_model(Box::new(srp));
+                                            }
+                                            StmState::Without(ref mut sc_dyn) => {
+                                                sc_dyn.add_model(Box::new(srp));
+                                            }
+                                            _ => panic!("should not happen"),
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    sc_dyn_flagged = StmState::Without(sc_dyn);
+                }
+
+                // Add the acceleration models if applicable
+                if let Some(accel_models) = &dynamics.accel_models {
+                    for mdl in accel_models {
+                        match scen.accel_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
+                            None => {
+                                return Err(ParsingError::MD(format!(
+                                    "dynamics `{}` refers to unknown state `{}`",
+                                    prop.dynamics, dynamics.initial_state
+                                )))
+                            }
+                            Some(amdl) => {
+                                for hmdl in amdl.harmonics.values() {
+                                    let in_mem = hmdl.load();
+                                    let compute_frame = cosm.frame(hmdl.frame.as_str());
+
+                                    if stm_flag.with() {
+                                        let hh =
+                                            HarmonicsDiff::from_stor(compute_frame, in_mem, &cosm);
+                                        match sc_dyn_flagged {
+                                            StmState::With(ref mut sc_dyn_stm) => {
+                                                sc_dyn_stm.orbital_dyn.add_model(Box::new(hh));
+                                            }
+                                            _ => panic!("should not happen"),
+                                        };
+                                    } else {
+                                        let hh = Harmonics::from_stor(compute_frame, in_mem, &cosm);
+                                        match sc_dyn_flagged {
+                                            StmState::Without(ref mut sc_dyn) => {
+                                                sc_dyn.orbital_dyn.add_model(Box::new(hh));
+                                            }
+                                            _ => panic!("should not happen"),
+                                        };
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+
                 // Validate the stopping condition
                 // Let's see if it's a relative time
                 let prop_time_s = match parse_duration(prop.stop_cond.as_str()) {
-                    Ok(duration) => duration,
+                    Ok(duration) => duration.v(),
                     Err(e) => {
                         // Check to see if it's an Epoch
                         match Epoch::from_str(prop.stop_cond.as_str()) {

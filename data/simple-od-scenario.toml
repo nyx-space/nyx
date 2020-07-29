@@ -1,17 +1,5 @@
 sequence = ["my_flt"]
 
-[state.leo]
-x = -2436.45
-y = -2436.45
-z = 6891.037
-vx = 5.088611
-vy = -5.088611
-vz = 0.0
-frame = "EME2000"
-epoch = "MJD 51544.5 TAI" # or "2018-09-15T00:15:53.098 UTC"
-unit_position = "km"  # Default value if unspecified
-unit_velocity = "km/s"  # Default value if unspecified
-
 [state.NrHO]
 # Note: state names are case insensitive
 x = -247_356.243_556_962_3
@@ -22,6 +10,10 @@ vy = -0.633_861_191_032_922_9
 vz = -0.189_705_982_926_050_1
 frame = "EME2000"
 epoch = "2020-01-12T04:42:54.776 TAI"
+
+[delta_state.NrHO_nav]
+inherit = "nrho"
+position = ["10 m", "-5 m", "2 m"]
 
 [state.lro]
 x = -231_944.642_799_355_4
@@ -41,7 +33,7 @@ accel_models = ["my_models"]
 
 [orbital_dynamics.nav]
 integration_frame = "EME2000"
-initial_state = "nrho"
+initial_state = "NrHO_nav"
 point_masses = ["Sun", "Earth", "Luna"]
 accel_models = ["my_modEls"]
 
@@ -109,20 +101,19 @@ range_noise = 0.00
 range_rate_noise = 0.000
 
 [stations.dss65]
-from = "dss65" # Name of the station, built-in
+inherit = "dss65" # Name of the station, built-in
 elevation = 0.0
 range_noise = 0.00
 range_rate_noise = 0.000
 
 [stations.dss34]
-from = "dss34" # Name of the station, built-in
+inherit = "dss34" # Name of the station, built-in
 elevation = 0.0
 range_noise = 0.00
 range_rate_noise = 0.000
 
 [estimate.my_estimate]
 state = "nrho"
-#covar_mat = [[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1],[1e1, 1e1, 1e1, 1e1, 1e1, 1e1]]
 covar_diag = [1e3, 1e3, 1e3, 1e1, 1e1, 1e1]
 
 [force_models.my_frc.srp.my_srp]

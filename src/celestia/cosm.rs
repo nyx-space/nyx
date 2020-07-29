@@ -290,7 +290,7 @@ impl Cosm {
                     if self.try_frame(name.as_str()).is_ok() {
                         warn!("overwriting frame `{}`", name);
                     }
-                    if let Some(src_frame_name) = &definition.base {
+                    if let Some(src_frame_name) = &definition.inherit {
                         match self.try_frame(src_frame_name.as_str()) {
                             Ok(src_frame) => {
                                 definition.update_from(&src_frame);

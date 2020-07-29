@@ -2,7 +2,7 @@
 [frames.iau_sun]
 orientation = 10
 center = 10
-base = "Sun J2000"
+inherit = "Sun J2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -18,7 +18,7 @@ angle_unit = "degrees"
 [frames.iau_venus]
 orientation = 200
 center = 2
-base = "Venus barycenter J2000"
+inherit = "Venus barycenter J2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -34,7 +34,7 @@ angle_unit = "degrees"
 [frames.iau_earth]
 orientation = 300
 center = 399
-base = "EME2000"
+inherit = "EME2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -50,7 +50,7 @@ angle_unit = "degrees"
 [frames.iau_mars]
 orientation = 400
 center = 4
-base = "Mars barycenter j2000"
+inherit = "Mars barycenter j2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -66,7 +66,7 @@ angle_unit = "degrees"
 [frames.iau_jupiter]
 orientation = 500
 center = 5
-base = "Jupiter barycenter j2000"
+inherit = "Jupiter barycenter j2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -88,7 +88,7 @@ Je = "49.511251 + 64.3000*T"
 [frames.iau_saturn]
 orientation = 600
 center = 6
-base = "Saturn barycenter j2000"
+inherit = "Saturn barycenter j2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -104,7 +104,7 @@ angle_unit = "degrees"
 [frames.iau_uranus]
 orientation = 700
 center = 7
-base = "Uranus barycenter j2000"
+inherit = "Uranus barycenter j2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -120,7 +120,7 @@ angle_unit = "degrees"
 [frames.iau_neptune]
 orientation = 800
 center = 8
-base = "Neptune barycenter j2000"
+inherit = "Neptune barycenter j2000"
 gm = -1
 parent_orientation = 0
 parent_center = -1
@@ -139,7 +139,7 @@ N = "357 + 52.316*T"
 # Uses the Mean Earth rotation axis convention (like Monte)
 orientation = 301
 center = 301
-base = "Luna"
+inherit = "Luna"
 gm = -1
 parent_orientation = 0
 parent_center = -1
