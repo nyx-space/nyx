@@ -4,8 +4,8 @@ pub use crate::celestia::*;
 use crate::dimensions::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U2, U3, U6};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::io::formatter::NavSolutionFormatter;
+use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
-use crate::io::{parse_duration, ParsingError};
 use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
 use crate::od::ui::*;
@@ -67,7 +67,7 @@ impl<'a> OdpScenario<'a> {
                                 )))
                             }
                             Some(s) => {
-                                let gs = if let Some(base) = &s.from {
+                                let gs = if let Some(base) = &s.inherit {
                                     match base.to_lowercase().as_str() {
                                         "dss13" => GroundStation::dss13_goldstone(
                                             s.elevation,
@@ -145,7 +145,7 @@ impl<'a> OdpScenario<'a> {
 
                     let est_init_state_serde = &scenario.state[&est_serde.state.to_lowercase()];
                     let state_frame = cosm.frame(est_init_state_serde.frame.as_str());
-                    let est_init_state = est_init_state_serde.as_state(state_frame);
+                    let est_init_state = est_init_state_serde.as_state(state_frame)?;
 
                     // Build the covariance
                     let mut cov;
@@ -204,7 +204,7 @@ impl<'a> OdpScenario<'a> {
                                     warn!("No SNC disable time specified, assuming 120 seconds");
                                     Some(120.0)
                                 }
-                                Some(snd_disable_dt) => Some(parse_duration(snd_disable_dt)?),
+                                Some(snd_disable_dt) => Some(parse_duration(snd_disable_dt)?.v()),
                             };
 
                             // And build the filter

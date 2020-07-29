@@ -17,7 +17,7 @@ pub struct FrameSerde {
     /// Refers to, or create, a unique identifier of the center object defined by this frame.
     center: i32,
     // Set this in the TOML to clone the negative values of this frame from another frame
-    pub base: Option<String>,
+    pub inherit: Option<String>,
     gm: f64,
     /// Refers to the a unique identifier of the parent orientation of this frame (e.g. J2000 Ecliptic)
     parent_orientation: Option<i32>,
@@ -115,7 +115,7 @@ fn test_deser_frame_toml() {
         [frames.iau_sun2]
         orientation = 10
         center = 10
-        base = "Sun J2000"
+        inherit = "Sun J2000"
         gm = -1
         parent_orientation = -1
         parent_center = -1
@@ -152,7 +152,7 @@ fn test_deser_frame_toml() {
 
     assert_eq!(iau_sun.orientation, 10);
     assert_eq!(iau_sun.center, 10);
-    assert_eq!(iau_sun.base.as_ref().unwrap(), "Sun J2000");
+    assert_eq!(iau_sun.inherit.as_ref().unwrap(), "Sun J2000");
     assert!((iau_sun.gm - -1.0).abs() < std::f64::EPSILON);
     assert_eq!(iau_sun.parent_orientation.unwrap(), -1);
     assert_eq!(iau_sun.parent_center.unwrap(), -1);

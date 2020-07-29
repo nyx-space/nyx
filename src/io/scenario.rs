@@ -1,7 +1,9 @@
 use super::formatter::OutputSerde;
 use super::gravity::HarmonicsMem;
+use super::quantity::*;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
+use super::ParsingError;
 use crate::celestia::{Frame, State};
 use crate::time::Epoch;
 use std::collections::HashMap;
@@ -9,50 +11,244 @@ use std::str::FromStr;
 
 #[derive(Deserialize)]
 pub struct StateSerde {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-    pub vx: f64,
-    pub vy: f64,
-    pub vz: f64,
     pub frame: String,
     pub epoch: String,
+    pub x: Option<f64>,
+    pub y: Option<f64>,
+    pub z: Option<f64>,
+    pub vx: Option<f64>,
+    pub vy: Option<f64>,
+    pub vz: Option<f64>,
+    pub position: Option<Vec<String>>,
+    pub velocity: Option<Vec<String>>,
+    pub sma: Option<f64>,
+    pub ecc: Option<f64>,
+    pub inc: Option<f64>,
+    pub raan: Option<f64>,
+    pub aop: Option<f64>,
+    pub ta: Option<f64>,
     pub unit_position: Option<String>,
     pub unit_velocity: Option<String>,
 }
 
 impl StateSerde {
-    pub fn as_state(&self, frame: Frame) -> State {
-        let pos_mul = match &self.unit_position {
-            Some(unit) => match unit.to_lowercase().as_str() {
-                "km" => 1.0,
-                "m" => 1e-3,
-                "cm" => 1e-5,
-                _ => panic!("unknown unit `{}`", unit),
-            },
-            None => 1.0,
+    pub fn as_state(&self, frame: Frame) -> Result<State, ParsingError> {
+        let epoch = match Epoch::from_str(&self.epoch) {
+            Ok(epoch) => epoch,
+            Err(e) => return Err(ParsingError::Quantity(format!("{}", e))),
         };
 
-        let vel_mul = match &self.unit_velocity {
-            Some(unit) => match unit.to_lowercase().as_str() {
-                "km/s" => 1.0,
-                "m/s" => 1e-3,
-                "cm/s" => 1e-5,
-                _ => panic!("unknown unit `{}`", unit),
-            },
-            None => 1.0,
-        };
+        // Rebuild a valid state from the three different initializations
+        if self.x.is_some()
+            && self.y.is_some()
+            && self.z.is_some()
+            && self.vx.is_some()
+            && self.vy.is_some()
+            && self.vz.is_some()
+        {
+            let pos_mul = match &self.unit_position {
+                Some(unit) => match unit.to_lowercase().as_str() {
+                    "km" => 1.0,
+                    "m" => 1e-3,
+                    "cm" => 1e-5,
+                    _ => panic!("unknown unit `{}`", unit),
+                },
+                None => 1.0,
+            };
 
-        State::cartesian(
-            self.x * pos_mul,
-            self.y * pos_mul,
-            self.z * pos_mul,
-            self.vx * vel_mul,
-            self.vy * vel_mul,
-            self.vz * vel_mul,
-            Epoch::from_str(&self.epoch).unwrap(),
-            frame,
-        )
+            let vel_mul = match &self.unit_velocity {
+                Some(unit) => match unit.to_lowercase().as_str() {
+                    "km/s" => 1.0,
+                    "m/s" => 1e-3,
+                    "cm/s" => 1e-5,
+                    _ => panic!("unknown unit `{}`", unit),
+                },
+                None => 1.0,
+            };
+
+            Ok(State::cartesian(
+                self.x.unwrap() * pos_mul,
+                self.y.unwrap() * pos_mul,
+                self.z.unwrap() * pos_mul,
+                self.vx.unwrap() * vel_mul,
+                self.vy.unwrap() * vel_mul,
+                self.vz.unwrap() * vel_mul,
+                epoch,
+                frame,
+            ))
+        } else if self.position.is_some() && self.velocity.is_some() {
+            let position = self.position.as_ref().unwrap();
+            let velocity = self.velocity.as_ref().unwrap();
+            if position.len() != 3 || velocity.len() != 3 {
+                return Err(ParsingError::IllDefined(
+                    "State ill defined: position and velocity arrays must be of size 3 exactly"
+                        .to_string(),
+                ));
+            }
+            let x = parse_quantity(&position[0])?.v();
+            let y = parse_quantity(&position[1])?.v();
+            let z = parse_quantity(&position[2])?.v();
+            let vx = parse_quantity(&velocity[0])?.v();
+            let vy = parse_quantity(&velocity[1])?.v();
+            let vz = parse_quantity(&velocity[2])?.v();
+
+            Ok(State::cartesian(x, y, z, vx, vy, vz, epoch, frame))
+        } else if self.sma.is_some()
+            && self.ecc.is_some()
+            && self.inc.is_some()
+            && self.raan.is_some()
+            && self.aop.is_some()
+            && self.ta.is_some()
+        {
+            Ok(State::keplerian(
+                self.sma.unwrap(),
+                self.ecc.unwrap(),
+                self.inc.unwrap(),
+                self.raan.unwrap(),
+                self.aop.unwrap(),
+                self.ta.unwrap(),
+                epoch,
+                frame,
+            ))
+        } else {
+            Err(ParsingError::IllDefined("State ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
+        }
+    }
+}
+
+/// A state difference
+#[derive(Deserialize)]
+pub struct DeltaStateSerde {
+    pub inherit: String,
+    pub x: Option<f64>,
+    pub y: Option<f64>,
+    pub z: Option<f64>,
+    pub vx: Option<f64>,
+    pub vy: Option<f64>,
+    pub vz: Option<f64>,
+    pub position: Option<Vec<String>>,
+    pub velocity: Option<Vec<String>>,
+    pub sma: Option<f64>,
+    pub ecc: Option<f64>,
+    pub inc: Option<f64>,
+    pub raan: Option<f64>,
+    pub aop: Option<f64>,
+    pub ta: Option<f64>,
+    pub unit_position: Option<String>,
+    pub unit_velocity: Option<String>,
+}
+
+impl DeltaStateSerde {
+    pub fn as_state(&self, base: State) -> Result<State, ParsingError> {
+        let frame = base.frame;
+        let epoch = base.dt;
+        // Rebuild a valid state from the three different initializations
+        if self.x.is_some()
+            || self.y.is_some()
+            || self.z.is_some()
+            || self.vx.is_some()
+            || self.vy.is_some()
+            || self.vz.is_some()
+        {
+            let pos_mul = match &self.unit_position {
+                Some(unit) => match unit.to_lowercase().as_str() {
+                    "km" => 1.0,
+                    "m" => 1e-3,
+                    "cm" => 1e-5,
+                    _ => panic!("unknown unit `{}`", unit),
+                },
+                None => 1.0,
+            };
+
+            let vel_mul = match &self.unit_velocity {
+                Some(unit) => match unit.to_lowercase().as_str() {
+                    "km/s" => 1.0,
+                    "m/s" => 1e-3,
+                    "cm/s" => 1e-5,
+                    _ => panic!("unknown unit `{}`", unit),
+                },
+                None => 1.0,
+            };
+
+            Ok(State::cartesian(
+                self.x.unwrap_or(0.0) * pos_mul,
+                self.y.unwrap_or(0.0) * pos_mul,
+                self.z.unwrap_or(0.0) * pos_mul,
+                self.vx.unwrap_or(0.0) * vel_mul,
+                self.vy.unwrap_or(0.0) * vel_mul,
+                self.vz.unwrap_or(0.0) * vel_mul,
+                epoch,
+                frame,
+            ) + base)
+        } else if self.position.is_some() || self.velocity.is_some() {
+            let (x, y, z) = match &self.position {
+                Some(position) => {
+                    if position.len() != 3 {
+                        return Err(ParsingError::IllDefined(
+                            "State ill defined: position arrays must be of size 3 exactly"
+                                .to_string(),
+                        ));
+                    }
+                    let x = parse_quantity(&position[0])?.v();
+                    let y = parse_quantity(&position[1])?.v();
+                    let z = parse_quantity(&position[2])?.v();
+                    (x, y, z)
+                }
+                None => (0.0, 0.0, 0.0),
+            };
+
+            let (vx, vy, vz) = match &self.position {
+                Some(velocity) => {
+                    if velocity.len() != 3 {
+                        return Err(ParsingError::IllDefined(
+                            "State ill defined: velocity arrays must be of size 3 exactly"
+                                .to_string(),
+                        ));
+                    }
+                    let vx = parse_quantity(&velocity[0])?.v();
+                    let vy = parse_quantity(&velocity[1])?.v();
+                    let vz = parse_quantity(&velocity[2])?.v();
+                    (vx, vy, vz)
+                }
+                None => (0.0, 0.0, 0.0),
+            };
+
+            Ok(State::cartesian(x, y, z, vx, vy, vz, epoch, frame) + base)
+        } else if self.sma.is_some()
+            || self.ecc.is_some()
+            || self.inc.is_some()
+            || self.raan.is_some()
+            || self.aop.is_some()
+            || self.ta.is_some()
+        {
+            let sma = match self.sma {
+                Some(sma) => sma + base.sma(),
+                None => base.sma(),
+            };
+            let ecc = match self.ecc {
+                Some(ecc) => ecc + base.ecc(),
+                None => base.ecc(),
+            };
+            let inc = match self.inc {
+                Some(inc) => inc + base.inc(),
+                None => base.inc(),
+            };
+            let raan = match self.raan {
+                Some(raan) => raan + base.raan(),
+                None => base.raan(),
+            };
+            let aop = match self.aop {
+                Some(aop) => aop + base.aop(),
+                None => base.aop(),
+            };
+            let ta = match self.ta {
+                Some(ta) => ta + base.ta(),
+                None => base.ta(),
+            };
+            Ok(State::keplerian(sma, ecc, inc, raan, aop, ta, epoch, frame) + base)
+        } else {
+            Err(ParsingError::IllDefined("Delta state ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
+        }
     }
 }
 
@@ -203,7 +399,7 @@ pub struct StationSerde {
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
     pub height: Option<f64>,
-    pub from: Option<String>,
+    pub inherit: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -211,6 +407,7 @@ pub struct ScenarioSerde {
     pub sequence: Vec<String>,
     pub propagator: HashMap<String, PropagatorSerde>,
     pub state: HashMap<String, StateSerde>,
+    pub delta_state: Option<HashMap<String, DeltaStateSerde>>,
     pub orbital_dynamics: HashMap<String, OrbitalDynamicsSerde>,
     pub spacecraft: HashMap<String, SpacecraftSerde>,
     pub accel_models: Option<HashMap<String, AccelModel>>,
@@ -244,14 +441,33 @@ fn test_md_scenario() {
         unit_velocity = "km/s"  # Default value if unspecified
 
         [state.another_state]
-        x = -3436.45
-        y = -3436.45
-        z = 6891.037
-        vx = 5.088611
-        vy = -5.088611
-        vz = 0.0
+        # Mix and match units
+        position = ["-3436.45 km", "-3436.45 km", "6891.037e3 m"]
+        velocity = ["5.088611 km/s", "-5.088611 km/s", "0.0 cm/s"]
         frame = "EME2000"
         epoch = "MJD 51540.5 TAI"
+
+        [state.kepler_proud]
+        sma = 7000
+        inc = 27.4  # degrees
+        ecc = 0.001
+        raan = 45
+        aop = 45
+        ta = 180
+        frame = "EME2000"
+        epoch = "MJD 51540.5 TAI"
+
+        [delta_state.my_delta]
+        inherit = "another_state"
+        x = 1.0  # Will add 1 km to the x component
+
+        [delta_state.my_delta2]
+        inherit = "another_state"
+        velocity = ["1 m/s", "2 m/s", "-5.0 m/s"]
+
+        [delta_state.my_delta3]
+        inherit = "another_state"
+        vx = 5e-3
 
         [orbital_dynamics.conf_name]
         integration_frame = "EME2000"
@@ -296,7 +512,8 @@ fn test_md_scenario() {
     )
     .unwrap();
 
-    assert_eq!(scen.state.len(), 2);
+    assert_eq!(scen.state.len(), 3);
+    assert_eq!(scen.delta_state.unwrap().len(), 3);
     assert_eq!(scen.orbital_dynamics.len(), 2);
     assert_eq!(scen.propagator.len(), 2);
     assert_eq!(scen.accel_models.as_ref().unwrap().len(), 1);
@@ -392,7 +609,7 @@ fn test_od_scenario() {
         range_rate_noise = 0.01
 
         [stations.dss65]
-        from = "dss65" # Name of the station, built-in
+        inherit = "dss65" # Name of the station, built-in
         elevation = 10.0
         range_noise = 0.1
         range_rate_noise = 0.01

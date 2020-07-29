@@ -7,13 +7,13 @@ range_noise = 0.00
 range_rate_noise = 0.000
 
 [stations.dss65]
-from = "dss65" # Name of the station, built-in
+inherit = "dss65" # Name of the station, built-in
 elevation = 0.0
 range_noise = 0.00
 range_rate_noise = 0.000
 
 [stations.dss34]
-from = "dss34" # Name of the station, built-in
+inherit = "dss34" # Name of the station, built-in
 elevation = 0.0
 range_noise = 0.00
 range_rate_noise = 0.000
