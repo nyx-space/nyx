@@ -105,28 +105,22 @@ impl HarmonicsMem {
         order: usize,
         gunzipped: bool,
     ) -> Result<HarmonicsMem, ParsingError> {
-        let mut f = File::open(filepath)
-            .or_else(|_| Err(ParsingError::FileNotFound(filepath.to_string())))?;
+        let mut f =
+            File::open(filepath).map_err(|_| ParsingError::FileNotFound(filepath.to_string()))?;
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer).or_else(|_| {
-                Err(ParsingError::FileUnreadable(
-                    "could not read file as gunzip".to_string(),
-                ))
+            d.read_to_end(&mut buffer).map_err(|_| {
+                ParsingError::FileUnreadable("could not read file as gunzip".to_string())
             })?;
         } else {
-            f.read_to_end(&mut buffer).or_else(|_| {
-                Err(ParsingError::FileUnreadable(
-                    "could not read file to end".to_string(),
-                ))
+            f.read_to_end(&mut buffer).map_err(|_| {
+                ParsingError::FileUnreadable("could not read file to end".to_string())
             })?;
         }
 
-        let data_as_str = String::from_utf8(buffer).or_else(|_| {
-            Err(ParsingError::FileUnreadable(
-                "could not decode file contents as utf8".to_string(),
-            ))
+        let data_as_str = String::from_utf8(buffer).map_err(|_| {
+            ParsingError::FileUnreadable("could not decode file contents as utf8".to_string())
         })?;
 
         // Since the COF files are so specific, we just code everything up in here.
@@ -313,28 +307,22 @@ impl HarmonicsMem {
         order: usize,
         filepath: &str,
     ) -> Result<HarmonicsMem, ParsingError> {
-        let mut f = File::open(filepath)
-            .or_else(|_| Err(ParsingError::FileNotFound(filepath.to_string())))?;
+        let mut f =
+            File::open(filepath).map_err(|_| ParsingError::FileNotFound(filepath.to_string()))?;
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
-            d.read_to_end(&mut buffer).or_else(|_| {
-                Err(ParsingError::FileUnreadable(
-                    "could not read file as gunzip".to_string(),
-                ))
+            d.read_to_end(&mut buffer).map_err(|_| {
+                ParsingError::FileUnreadable("could not read file as gunzip".to_string())
             })?;
         } else {
-            f.read_to_end(&mut buffer).or_else(|_| {
-                Err(ParsingError::FileUnreadable(
-                    "could not read file to end".to_string(),
-                ))
+            f.read_to_end(&mut buffer).map_err(|_| {
+                ParsingError::FileUnreadable("could not read file to end".to_string())
             })?;
         }
 
-        let data_as_str = String::from_utf8(buffer).or_else(|_| {
-            Err(ParsingError::FileUnreadable(
-                "could not decode file contents as utf8".to_string(),
-            ))
+        let data_as_str = String::from_utf8(buffer).map_err(|_| {
+            ParsingError::FileUnreadable("could not decode file contents as utf8".to_string())
         })?;
 
         let mut c_nm_mat = DMatrix::from_element(degree + 1, degree + 1, 0.0);
