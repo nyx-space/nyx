@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6};
+use self::na::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{bodies, Cosm, State};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, PointMasses};
 use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
@@ -113,13 +113,8 @@ fn robust_test_ekf_two_body() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = Matrix3::from_diagonal(&Vector3::new(sigma_q, sigma_q, sigma_q));
-    let kf = KF::new(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        Some(120.0),
-    );
+    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
+    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut odp = ODProcess::ekf(
         prop_est,
@@ -288,13 +283,8 @@ fn robust_test_ekf_multi_body() {
 
     // let kf = KF::no_snc(initial_estimate, measurement_noise);
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = Matrix3::from_diagonal(&Vector3::new(sigma_q, sigma_q, sigma_q));
-    let kf = KF::new(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        Some(120.0),
-    );
+    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
+    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
@@ -477,13 +467,8 @@ fn robust_test_ekf_harmonics() {
 
     // let kf = KF::no_snc(initial_estimate, measurement_noise);
     let sigma_q = 1e-6_f64.powi(2);
-    let process_noise = Matrix3::from_diagonal(&Vector3::new(sigma_q, sigma_q, sigma_q));
-    let kf = KF::new(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        Some(120.0),
-    );
+    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
+    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;

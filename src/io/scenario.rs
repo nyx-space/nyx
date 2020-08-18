@@ -361,6 +361,8 @@ pub struct OdpSerde {
     pub snc: Option<Vec<f64>>,
     /// Optional SNC turn-off time
     pub snc_disable: Option<String>,
+    /// Optional SNC exponential decay
+    pub snc_decay: Option<Vec<String>>,
     /// Set the number of measurements to switch to an EKF
     pub ekf_msr_trigger: Option<usize>,
     /// Set the acceptable time between measurements
@@ -585,6 +587,7 @@ fn test_od_scenario() {
         msr_noise = [1e-6, 1e-3]
         snc = [1e-8, 1e-8, 1e-8]
         snc_disable = "120 * sec"
+        snc_decay = ["20 * min", "20 min", "15 min"]
         measurements = "msr_sim"  # Or provide a file name
         ekf_msr_trigger = 30
         ekf_disable_time = 3600  # If no measurements for an hour, disable the EKF

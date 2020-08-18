@@ -5,6 +5,7 @@ pub use super::estimate::*;
 pub use super::kalman::*;
 pub use super::ranging::*;
 pub use super::residual::*;
+pub use super::snc::*;
 pub use super::srif::*;
 pub use super::*;
 
@@ -35,6 +36,7 @@ pub struct ODProcess<
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
         + Allocator<f64, A, D::LinStateSize>,
@@ -76,6 +78,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
         + Allocator<f64, A, D::LinStateSize>,
@@ -385,6 +388,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
         + Allocator<f64, A, D::LinStateSize>,

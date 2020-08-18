@@ -13,7 +13,7 @@ mod spacecraft;
 mod srif;
 mod two_body;
 
-use self::na::{Matrix2, Matrix2x6, Matrix3, Matrix6, Vector2};
+use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2};
 use std::f64::EPSILON;
 
 macro_rules! f64_nil {
@@ -45,14 +45,13 @@ fn csv_serialize_empty_estimate() {
 #[test]
 fn filter_errors() {
     let initial_estimate = KfEstimate::zeros(State::zeros());
-    let process_noise = Matrix3::zeros();
     let measurement_noise = Matrix2::zeros();
     let real_obs = Vector2::zeros();
     let computed_obs = Vector2::zeros();
     let sensitivity = Matrix2x6::zeros();
     let stm = Matrix6::zeros();
 
-    let mut ckf = KF::new(initial_estimate, process_noise, measurement_noise, None);
+    let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
     match ckf.time_update(State::zeros()) {
         Ok(_) => panic!("expected the time update to fail"),
         Err(e) => {

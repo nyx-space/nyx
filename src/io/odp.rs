@@ -1,13 +1,14 @@
 extern crate csv;
 
 pub use crate::celestia::*;
-use crate::dimensions::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6, U2, U3, U6};
+use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U6};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
 use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
+use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
 use crate::time::SECONDS_PER_DAY;
@@ -196,24 +197,34 @@ impl<'a> OdpScenario<'a> {
                                     "SNC must have three components".to_string(),
                                 ));
                             }
-                            let process_noise =
-                                Matrix3::from_diagonal(&Vector3::new(snc[0], snc[1], snc[2]));
                             // Disable SNC if there is more than 120 seconds between two measurements
-                            let process_noise_dt = match &odp_seq.snc_disable {
+                            let disable_time_s = match &odp_seq.snc_disable {
                                 None => {
                                     warn!("No SNC disable time specified, assuming 120 seconds");
-                                    Some(120.0)
+                                    120.0
                                 }
-                                Some(snd_disable_dt) => Some(parse_duration(snd_disable_dt)?.v()),
+                                Some(snd_disable_dt) => parse_duration(snd_disable_dt)?.v(),
+                            };
+
+                            // Build the process noise
+                            let process_noise = match &odp_seq.snc_decay {
+                                None => SNC3::from_diagonal(disable_time_s, snc),
+                                Some(decay_str) => {
+                                    if decay_str.len() != 3 {
+                                        return Err(ParsingError::OD(
+                                            "SNC decay must have three components".to_string(),
+                                        ));
+                                    }
+                                    let mut scn_decay_s = [0.0; 3];
+                                    for (i, ds) in decay_str.iter().enumerate() {
+                                        scn_decay_s[i] = parse_duration(ds)?.v();
+                                    }
+                                    SNC3::with_decay(disable_time_s, snc, &scn_decay_s)
+                                }
                             };
 
                             // And build the filter
-                            KF::new(
-                                initial_estimate,
-                                process_noise,
-                                measurement_noise,
-                                process_noise_dt,
-                            )
+                            KF::new(initial_estimate, process_noise, measurement_noise)
                         }
                     };
 
