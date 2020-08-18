@@ -207,7 +207,21 @@ impl<'a> OdpScenario<'a> {
                             };
 
                             // Build the process noise
-                            let process_noise = SNC3::from_diagonal(disable_time_s, snc);
+                            let process_noise = match &odp_seq.snc_decay {
+                                None => SNC3::from_diagonal(disable_time_s, snc),
+                                Some(decay_str) => {
+                                    if decay_str.len() != 3 {
+                                        return Err(ParsingError::OD(
+                                            "SNC decay must have three components".to_string(),
+                                        ));
+                                    }
+                                    let mut scn_decay_s = [0.0; 3];
+                                    for (i, ds) in decay_str.iter().enumerate() {
+                                        scn_decay_s[i] = parse_duration(ds)?.v();
+                                    }
+                                    SNC3::with_decay(disable_time_s, snc, &scn_decay_s)
+                                }
+                            };
 
                             // And build the filter
                             KF::new(initial_estimate, process_noise, measurement_noise)
