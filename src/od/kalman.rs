@@ -262,7 +262,7 @@ where
 
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         // Try to apply an SNC, if applicable
-        for (i, snc) in self.process_noise.iter().rev().enumerate() {
+        for (i, snc) in self.process_noise.iter().enumerate().rev() {
             if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
                 // Check if we're using another SNC than the one before
                 if self.prev_used_snc != i {
@@ -300,6 +300,7 @@ where
                 // Let's add the process noise
                 covar_bar += &gamma * snc_matrix * &gamma.transpose();
                 // And break so we don't add any more process noise
+                break;
             }
         }
 
