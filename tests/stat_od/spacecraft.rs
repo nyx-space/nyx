@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector6};
+use self::na::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{bodies, Cosm, State};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::dynamics::spacecraft::{SolarPressure, Spacecraft};
@@ -113,18 +113,7 @@ fn sc_ckf_perfect_stations() {
     let measurement_noise =
         Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
 
-    // Define the process noise in order to define how many variables of the EOMs are accelerations
-    // (this is required due to the many compile-time matrix size verifications)
-    let process_noise = Matrix3::zeros();
-    // But we disable the state noise compensation / process noise by setting the delta time to None
-    let process_noise_dt = None;
-
-    let ckf = KF::new(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        process_noise_dt,
-    );
+    let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 

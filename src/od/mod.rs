@@ -28,6 +28,9 @@ pub mod ui;
 /// Provides the Square Root Information Filter
 pub mod srif;
 
+/// Provides all state noise compensation functionality
+pub mod snc;
+
 /// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
 ///
 /// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
@@ -89,6 +92,7 @@ where
     T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
+        + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, S, S>
@@ -133,8 +137,8 @@ where
     /// Sets the filter to be extended or not depending on the value of status
     fn set_extended(&mut self, status: bool);
 
-    /// Sets the process noise matrix in the frame of the estimated state
-    fn set_process_noise(&mut self, prc: MatrixMN<f64, A, A>);
+    /// Sets the process noise matrix of the estimated state
+    fn set_process_noise(&mut self, snc: snc::SNC<A>);
 }
 
 /// Stores the different kinds of filter errors.

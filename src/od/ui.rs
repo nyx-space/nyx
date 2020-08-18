@@ -35,6 +35,7 @@ pub struct ODProcess<
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
         + Allocator<f64, A, D::LinStateSize>,
@@ -76,6 +77,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
         + Allocator<f64, A, D::LinStateSize>,
@@ -385,6 +387,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
         + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
         + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, D::LinStateSize, A>
         + Allocator<f64, A, D::LinStateSize>,

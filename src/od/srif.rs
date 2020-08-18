@@ -7,6 +7,7 @@ use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
 
 pub use super::estimate::{Estimate, IfEstimate};
 pub use super::residual::Residual;
+use super::snc::SNC;
 use super::{CovarFormat, EpochFormat, EstimableState, Filter, FilterError};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
@@ -137,6 +138,7 @@ where
     T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
+        + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, DimNameSum<S, M>, DimNameSum<S, U1>>
@@ -331,7 +333,7 @@ where
         unimplemented!();
     }
 
-    fn set_process_noise(&mut self, prc: MatrixMN<f64, A, A>) {
-        self.process_noise = Some(prc);
+    fn set_process_noise(&mut self, snc: SNC<A>) {
+        unimplemented!("Cf issue-120 https://gitlab.com/chrisrabotin/nyx/-/issues/120")
     }
 }

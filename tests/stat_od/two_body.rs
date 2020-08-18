@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix3, Matrix6, Vector2, Vector3, Vector6};
+use self::na::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::celestia::{Cosm, State};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
@@ -494,16 +494,9 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = Matrix3::from_diagonal(&Vector3::new(sigma_q, sigma_q, sigma_q));
-    // Disable SNC if there is more than 120 seconds between two measurements
-    let process_noise_dt = Some(120.0);
+    let process_noise = SNC::from_diagonal(120.0, vec![sigma_q, sigma_q, sigma_q]);
 
-    let ckf = KF::new(
-        initial_estimate,
-        process_noise,
-        measurement_noise,
-        process_noise_dt,
-    );
+    let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 

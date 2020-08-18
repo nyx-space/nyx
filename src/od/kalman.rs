@@ -3,6 +3,7 @@ use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3};
 
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
+pub use super::snc::SNC;
 use super::{CovarFormat, EpochFormat, EstimableState, Filter, FilterError};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
@@ -15,6 +16,7 @@ where
     T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
+        + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, S, S>
@@ -26,10 +28,8 @@ where
     pub prev_estimate: KfEstimate<S, T>,
     /// Sets the Measurement noise (usually noted R)
     pub measurement_noise: MatrixMN<f64, M, M>,
-    /// Sets the process noise (usually noted Q) in the frame of the estimated state
-    pub process_noise: Option<MatrixMN<f64, A, A>>,
-    /// Enables state noise compensation (process noise) only be applied if the time between measurements is less than the process_noise_dt amount in seconds
-    pub process_noise_dt: Option<f64>,
+    /// A sets of process noise (usually noted Q), must be ordered chronologically
+    pub process_noise: Vec<SNC<A>>,
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
@@ -49,6 +49,7 @@ where
     T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
+        + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, S, M>
@@ -57,20 +58,65 @@ where
         + Allocator<f64, S, A>
         + Allocator<f64, A, S>,
 {
-    /// Initializes this KF with an initial estimate and measurement noise.
+    /// Initializes this KF with an initial estimate, measurement noise, and one process noise
     pub fn new(
         initial_estimate: KfEstimate<S, T>,
-        process_noise: MatrixMN<f64, A, A>,
+        process_noise: SNC<A>,
         measurement_noise: MatrixMN<f64, M, M>,
-        process_noise_dt: Option<f64>,
     ) -> Self {
         let epoch_fmt = initial_estimate.epoch_fmt;
         let covar_fmt = initial_estimate.covar_fmt;
+
+        assert_eq!(
+            A::dim() % 3,
+            0,
+            "SNC can only be applied to accelerations multiple of 3"
+        );
+
+        // Set the initial epoch of the SNC
+        let mut process_noise = process_noise;
+        process_noise.init_epoch = Some(initial_estimate.epoch());
+
         Self {
             prev_estimate: initial_estimate,
             measurement_noise,
-            process_noise: Some(process_noise),
-            process_noise_dt,
+            process_noise: vec![process_noise],
+            ekf: false,
+            h_tilde: MatrixMN::<f64, M, S>::zeros(),
+            stm: MatrixMN::<f64, S, S>::identity(),
+            stm_updated: false,
+            h_tilde_updated: false,
+            epoch_fmt,
+            covar_fmt,
+        }
+    }
+
+    /// Initializes this KF with an initial estimate, measurement noise, and several process noise
+    /// WARNING: SNCs MUST be ordered chronologically! They will be selected automatically by walking
+    /// the list of SNCs backward until one can be applied!
+    pub fn with_sncs(
+        initial_estimate: KfEstimate<S, T>,
+        process_noises: Vec<SNC<A>>,
+        measurement_noise: MatrixMN<f64, M, M>,
+    ) -> Self {
+        let epoch_fmt = initial_estimate.epoch_fmt;
+        let covar_fmt = initial_estimate.covar_fmt;
+
+        assert_eq!(
+            A::dim() % 3,
+            0,
+            "SNC can only be applied to accelerations multiple of 3"
+        );
+        let mut process_noises = process_noises.clone();
+        // Set the initial epoch of the SNC
+        for snc in &mut process_noises {
+            snc.init_epoch = Some(initial_estimate.epoch());
+        }
+
+        Self {
+            prev_estimate: initial_estimate,
+            measurement_noise,
+            process_noise: process_noises,
             ekf: false,
             h_tilde: MatrixMN::<f64, M, S>::zeros(),
             stm: MatrixMN::<f64, S, S>::identity(),
@@ -107,8 +153,7 @@ where
         Self {
             prev_estimate: initial_estimate,
             measurement_noise,
-            process_noise: None,
-            process_noise_dt: None,
+            process_noise: Vec::new(),
             ekf: false,
             h_tilde: MatrixMN::<f64, M, S>::zeros(),
             stm: MatrixMN::<f64, S, S>::identity(),
@@ -128,6 +173,7 @@ where
     T: EstimableState<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
+        + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, S, M>
@@ -187,6 +233,10 @@ where
         };
         self.stm_updated = false;
         self.prev_estimate = estimate.clone();
+        // Update the prev epoch for all SNCs
+        for snc in &mut self.process_noise {
+            snc.prev_epoch = Some(self.prev_estimate.epoch());
+        }
         Ok(estimate)
     }
 
@@ -207,18 +257,13 @@ where
         }
 
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
-        if let Some(pcr_dt) = self.process_noise_dt {
-            let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
-
-            if delta_t <= pcr_dt {
+        // Try to apply an SNC, if applicable
+        for snc in &self.process_noise {
+            if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = MatrixMN::<f64, S, A>::zeros();
-                assert_eq!(
-                    A::dim() % 3,
-                    0,
-                    "SNC can only be applied to accelerations multiple of 3"
-                );
+                let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;
@@ -243,7 +288,8 @@ where
                     }
                 }
                 // Let's add the process noise
-                covar_bar += &gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose();
+                covar_bar += &gamma * snc_matrix * &gamma.transpose();
+                // And break so we don't add any more process noise
             }
         }
 
@@ -305,7 +351,8 @@ where
         self.ekf = status;
     }
 
-    fn set_process_noise(&mut self, prc: MatrixMN<f64, A, A>) {
-        self.process_noise = Some(prc);
+    /// Overwrites all of the process noises to the one provided
+    fn set_process_noise(&mut self, snc: SNC<A>) {
+        self.process_noise = vec![snc];
     }
 }
