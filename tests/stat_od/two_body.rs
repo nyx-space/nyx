@@ -494,7 +494,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = SNC::from_diagonal(120.0, vec![sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 

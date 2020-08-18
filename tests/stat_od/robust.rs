@@ -113,7 +113,7 @@ fn robust_test_ekf_two_body() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = SNC::from_diagonal(120.0, vec![sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut odp = ODProcess::ekf(
@@ -283,7 +283,7 @@ fn robust_test_ekf_multi_body() {
 
     // let kf = KF::no_snc(initial_estimate, measurement_noise);
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = SNC::from_diagonal(120.0, vec![sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
@@ -467,7 +467,7 @@ fn robust_test_ekf_harmonics() {
 
     // let kf = KF::no_snc(initial_estimate, measurement_noise);
     let sigma_q = 1e-6_f64.powi(2);
-    let process_noise = SNC::from_diagonal(120.0, vec![sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);

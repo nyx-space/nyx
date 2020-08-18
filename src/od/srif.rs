@@ -333,7 +333,7 @@ where
         unimplemented!();
     }
 
-    fn set_process_noise(&mut self, snc: SNC<A>) {
+    fn set_process_noise(&mut self, _: SNC<A>) {
         unimplemented!("Cf issue-120 https://gitlab.com/chrisrabotin/nyx/-/issues/120")
     }
 }

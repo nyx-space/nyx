@@ -39,6 +39,7 @@ where
     h_tilde_updated: bool,
     epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
     covar_fmt: CovarFormat, // Idem
+    prev_used_snc: usize,
 }
 
 impl<S, A, M, T> KF<S, A, M, T>
@@ -88,6 +89,7 @@ where
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
+            prev_used_snc: 0,
         }
     }
 
@@ -107,7 +109,7 @@ where
             0,
             "SNC can only be applied to accelerations multiple of 3"
         );
-        let mut process_noises = process_noises.clone();
+        let mut process_noises = process_noises;
         // Set the initial epoch of the SNC
         for snc in &mut process_noises {
             snc.init_epoch = Some(initial_estimate.epoch());
@@ -124,6 +126,7 @@ where
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
+            prev_used_snc: 0,
         }
     }
 }
@@ -161,6 +164,7 @@ where
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
+            prev_used_snc: 0,
         }
     }
 }
@@ -258,8 +262,14 @@ where
 
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         // Try to apply an SNC, if applicable
-        for snc in &self.process_noise {
+        for (i, snc) in self.process_noise.iter().rev().enumerate() {
             if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
+                // Check if we're using another SNC than the one before
+                if self.prev_used_snc != i {
+                    info!("Switched to {}-th {}", i, snc);
+                    self.prev_used_snc = i;
+                }
+
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = MatrixMN::<f64, S, A>::zeros();

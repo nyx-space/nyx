@@ -1,9 +1,12 @@
 use crate::celestia::Frame;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3, U6};
 use crate::time::Epoch;
 
 use std::fmt;
+
+pub type SNC3 = SNC<U3>;
+pub type SNC6 = SNC<U6>;
 
 #[derive(Clone)]
 pub struct SNC<A: DimName>
@@ -32,13 +35,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(decay) = &self.decay_diag {
             let mut fmt_cov = Vec::with_capacity(A::dim());
-            for i in 0..A::dim() {
-                fmt_cov.push(format!("{:.3e} × exp(- {:.3e} t)", self.diag[i], decay[i]));
+            for (i, dv) in decay.iter().enumerate() {
+                fmt_cov.push(format!("{:.1e} × exp(- {:.1e} × t)", self.diag[i], dv));
             }
             write!(
                 f,
                 "SNC: diag({}) {}",
-                fmt_cov.join(","),
+                fmt_cov.join(", "),
                 if let Some(start) = self.start_time {
                     format!("starting at {}", start.as_gregorian_utc_str())
                 } else {
@@ -48,12 +51,12 @@ where
         } else {
             let mut fmt_cov = Vec::with_capacity(A::dim());
             for i in 0..A::dim() {
-                fmt_cov.push(format!("{:.3e}", self.diag[i]));
+                fmt_cov.push(format!("{:.1e}", self.diag[i]));
             }
             write!(
                 f,
                 "SNC: diag({}) {}",
-                fmt_cov.join(","),
+                fmt_cov.join(", "),
                 if let Some(start) = self.start_time {
                     format!("starting at {}", start.as_gregorian_utc_str())
                 } else {
@@ -61,6 +64,16 @@ where
                 }
             )
         }
+    }
+}
+
+impl<A> fmt::Display for SNC<A>
+where
+    A: DimName,
+    DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -147,4 +160,13 @@ where
 
         Some(snc)
     }
+}
+
+#[test]
+fn test_snc_init() {
+    let snc_expo = SNC3::with_decay(120.0, &[1e-6, 1e-6, 1e-6], &[3600.0, 3600.0, 3600.0]);
+    println!("{}", snc_expo);
+
+    let snc_std = SNC3::with_start_time(120.0, &[1e-6, 1e-6, 1e-6], Epoch::from_et_seconds(3600.0));
+    println!("{}", snc_std);
 }

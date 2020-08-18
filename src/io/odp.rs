@@ -8,6 +8,7 @@ use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
 use crate::md::ui::{MDProcess, StmStateFlag};
 use crate::od::ranging::GroundStation;
+use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
 use crate::time::SECONDS_PER_DAY;
@@ -206,7 +207,7 @@ impl<'a> OdpScenario<'a> {
                             };
 
                             // Build the process noise
-                            let process_noise = SNC::from_diagonal(disable_time_s, snc);
+                            let process_noise = SNC3::from_diagonal(disable_time_s, snc);
 
                             // And build the filter
                             KF::new(initial_estimate, process_noise, measurement_noise)
