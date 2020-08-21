@@ -254,7 +254,11 @@ fn robust_test_ekf_multi_body() {
         }
         truth_states.push(rx_state)
     }
-    let final_truth_state = truth_states[truth_states.len() - 1];
+
+    // Note that we check the second to last state so we can compare with the smoother
+    let offset = truth_states.len() - 10;
+
+    let final_truth_state = truth_states[truth_states.len() - offset];
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -294,17 +298,47 @@ fn robust_test_ekf_multi_body() {
     let rtn = odp.process_measurements(&measurements);
     assert!(rtn.is_none(), "ekf failed");
 
+    // Smoother
+    let smoothed_est = &odp.smooth().unwrap()[odp.estimates.len() - offset];
+
     // Check that the covariance deflated
-    let est = &odp.estimates[odp.estimates.len() - 1];
+    let est = &odp.estimates[odp.estimates.len() - offset];
+
     println!("Estimate:\n{}", est);
+    println!("Smoother estimate:\n{}", smoothed_est);
     println!("Truth:\n{}", final_truth_state);
+
+    // Some sanity checks to make sure that we have correctly indexed the estimates
+    assert_eq!(smoothed_est.epoch(), final_truth_state.dt);
+    assert_eq!(est.epoch(), final_truth_state.dt);
+
     let (err_p, err_v) = rss_state_errors(&est.state(), &final_truth_state);
+    let (err_p_sm, err_v_sm) = rss_state_errors(&smoothed_est.state(), &final_truth_state);
+
+    // Some printing for debugging
     println!(
-        "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
-        final_truth_state.dt == est.epoch(),
+        "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
         final_truth_state - est.state()
+    );
+
+    println!(
+        "RSS error: smoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
+        err_p_sm * 1e3,
+        err_v_sm * 1e3,
+        final_truth_state - smoothed_est.state()
+    );
+
+    // The smoothed RSS errors should be equal in the worst case
+
+    assert!(
+        err_p_sm <= err_p,
+        "RSS position error after smoothing not better"
+    );
+    assert!(
+        err_v_sm <= err_v,
+        "RSS velocity error after smoothing not better"
     );
 
     for i in 0..6 {

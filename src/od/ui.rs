@@ -120,41 +120,71 @@ where
         }
     }
 
-    /// Allows to smooth the provided estimates. If there is a result, it'll be a filter error.
+    /// Allows to smooth the provided estimates. Returns the smoothed estimates or an error.
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&mut self) -> Option<FilterError> {
-        info!("Smoothing {} estimates", self.estimates.len());
-        let mut smoothed = Vec::with_capacity(self.estimates.len());
+    pub fn smooth(&mut self) -> Result<Vec<K::Estimate>, FilterError> {
+        let num = self.estimates.len() - 1;
+        let mut k = num - 1;
 
-        // Is this smoothing correct ? I should try using the previous STM and start are estimates N-2
-        for estimate in self.estimates.iter().rev() {
-            let mut sm_est = estimate.clone();
-            // TODO: Ensure that SNC was _not_ enabled
-            let mut stm_inv = estimate.stm().clone();
-            if !stm_inv.try_inverse_mut() {
-                return Some(FilterError::StateTransitionMatrixSingular);
+        info!("Smoothing {} estimates", num + 1);
+        let mut smoothed = Vec::with_capacity(num + 1);
+        // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
+        smoothed.push(self.estimates[k].clone());
+
+        // Note: we're using `!=` because Rust ensures that k can never be negative. ("comparison is useless due to type limits").
+        loop {
+            // Borrow the previously smoothed estimate of the k+1 estimate
+            let sm_k_kp1 = &smoothed[num - k - 1];
+            // Borrow the k-th estimate, which we're smoothing with the next estimate
+            let est_k = &self.estimates[k];
+            // Borrow the k-th estimate, which we're smoothing with the next estimate
+            let est_kp1 = &self.estimates[k + 1];
+            // Clone and invert the STM \phi(k -> k+1) (this is the same STM as the estimate at k+1)
+            let mut stm_kp1_k = sm_k_kp1.stm().clone();
+            if !stm_kp1_k.try_inverse_mut() {
+                return Err(FilterError::StateTransitionMatrixSingular);
             }
-            sm_est.set_covar(&stm_inv * estimate.covar() * &stm_inv.transpose());
-            sm_est.set_state_deviation(&stm_inv * estimate.state_deviation());
-            smoothed.push(sm_est);
+            // Invert the p_k+1 covar knowing only k
+            let mut p_kp1_inv = est_kp1.covar().clone();
+            if !p_kp1_inv.try_inverse_mut() {
+                return Err(FilterError::CovarianceMatrixSingular);
+            }
+            // Compute Sk
+            let s_k = est_k.covar() * stm_kp1_k.transpose() * p_kp1_inv;
+            let mut smoothed_est_k = est_k.clone();
+            // Compute the smoothed state deviation
+            smoothed_est_k.set_state_deviation(
+                est_k.state_deviation()
+                    + &s_k * (sm_k_kp1.state_deviation() - stm_kp1_k * est_k.state_deviation()),
+            );
+            // Compute the smoothed covariance
+            smoothed_est_k.set_covar(
+                est_k.covar() + &s_k * (sm_k_kp1.covar() - est_kp1.covar()) * &s_k.transpose(),
+            );
+            // Move on
+            smoothed.push(smoothed_est_k);
+            if k == 0 {
+                break;
+            }
+            k -= 1;
         }
 
-        // And reverse to maintain order
+        // And reverse to maintain the order of estimates
         smoothed.reverse();
-        // And store
-        self.estimates = smoothed;
-
-        None
+        Ok(smoothed)
     }
 
     /// Allows iterating on the filter solution
     pub fn iterate(&mut self, measurements: &[Msr]) -> Option<FilterError> {
         // First, smooth the estimates
-        self.smooth();
+        let smoothed = match self.smooth() {
+            Ok(smoothed) => smoothed,
+            Err(e) => return Some(e),
+        };
         // Get the first estimate post-smoothing
-        let mut init_smoothed = self.estimates[0].clone();
+        let mut init_smoothed = smoothed[0].clone();
         println!("{}", init_smoothed.epoch().as_gregorian_tai_str());
         // Reset the propagator
         self.prop.reset();

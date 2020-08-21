@@ -148,6 +148,7 @@ pub enum FilterError {
     SensitivityNotUpdated,
     GainSingular,
     StateTransitionMatrixSingular,
+    CovarianceMatrixSingular,
 }
 
 impl fmt::Display for FilterError {
@@ -166,6 +167,9 @@ impl fmt::Display for FilterError {
             ),
             FilterError::StateTransitionMatrixSingular => {
                 write!(f, "STM is singular, smoothing cannot proceed")
+            }
+            FilterError::CovarianceMatrixSingular => {
+                write!(f, "Covariance is singular, smoothing cannot proceed")
             }
         }
     }
