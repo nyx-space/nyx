@@ -12,8 +12,33 @@ pub use super::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
 
+use std::fmt;
 use std::marker::PhantomData;
 use std::sync::mpsc::channel;
+
+/// Defines the stopping condition for the smoother
+#[derive(Clone, Copy, Debug)]
+pub enum SmoothingArc {
+    /// Stop smoothing when the gap between estimate is the provided floating point number in seconds
+    TimeGap(f64),
+    /// Stop smoothing at the provided Epoch.
+    Epoch(Epoch),
+    /// Stop smoothing at the first prediction
+    Prediction,
+    /// Only stop once all estimates have been processed
+    All,
+}
+
+impl fmt::Display for SmoothingArc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            SmoothingArc::All => write!(f, "all estimates smoothed"),
+            SmoothingArc::Epoch(e) => write!(f, "{}", e.as_gregorian_tai_str()),
+            SmoothingArc::TimeGap(g) => write!(f, "time gap of {} seconds", g),
+            SmoothingArc::Prediction => write!(f, "first prediction"),
+        }
+    }
+}
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 pub struct ODProcess<
@@ -124,11 +149,11 @@ where
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&mut self) -> Result<Vec<K::Estimate>, FilterError> {
+    pub fn smooth(&mut self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, FilterError> {
         let num = self.estimates.len() - 1;
         let mut k = num - 1;
 
-        info!("Smoothing {} estimates", num + 1);
+        info!("Smoothing {} estimates until {}", num + 1, condition);
         let mut smoothed = Vec::with_capacity(num + 1);
         // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
         smoothed.push(self.estimates[k].clone());
@@ -168,6 +193,46 @@ where
                 break;
             }
             k -= 1;
+            // Check the smoother stopping condition
+            let next_est = &self.estimates[k];
+            match condition {
+                SmoothingArc::Epoch(e) => {
+                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
+                    if next_est.epoch() < e {
+                        break;
+                    }
+                }
+                SmoothingArc::TimeGap(gap_s) => {
+                    if est_k.epoch() - next_est.epoch() > gap_s {
+                        break;
+                    }
+                }
+                SmoothingArc::Prediction => {
+                    if next_est.predicted() {
+                        break;
+                    }
+                }
+                _ => unimplemented!(),
+            }
+        }
+
+        println!(
+            "Condition reached after smoothing {} estimates ",
+            smoothed.len()
+        );
+
+        // Now, let's add all of the other estimates so that the same indexing can be done
+        // between all the estimates and the smoothed estimates
+        if k > 0 {
+            // Add the estimate that might have been skipped.
+            // smoothed.push(self.estimates[k + 1].clone());
+            loop {
+                smoothed.push(self.estimates[k].clone());
+                if k == 0 {
+                    break;
+                }
+                k -= 1;
+            }
         }
 
         // And reverse to maintain the order of estimates
@@ -175,10 +240,14 @@ where
         Ok(smoothed)
     }
 
-    /// Allows iterating on the filter solution
-    pub fn iterate(&mut self, measurements: &[Msr]) -> Option<FilterError> {
+    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
+    pub fn iterate(
+        &mut self,
+        measurements: &[Msr],
+        condition: SmoothingArc,
+    ) -> Option<FilterError> {
         // First, smooth the estimates
-        let smoothed = match self.smooth() {
+        let smoothed = match self.smooth(condition) {
             Ok(smoothed) => smoothed,
             Err(e) => return Some(e),
         };

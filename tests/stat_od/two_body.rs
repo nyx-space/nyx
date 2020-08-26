@@ -283,7 +283,10 @@ fn ckf_fixed_step_perfect_stations() {
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
 
     // Iterate
-    if odp.iterate(&measurements).is_some() {
+    if odp
+        .iterate(&measurements, SmoothingArc::TimeGap(10.0))
+        .is_some()
+    {
         panic!("iteration failed");
     }
 
@@ -395,7 +398,10 @@ fn ckf_fixed_step_iteration_test() {
 
     // Iterate, and check that the initial state difference is lower
     // Iterate
-    if odp.iterate(&measurements).is_some() {
+    if odp
+        .iterate(&measurements, SmoothingArc::TimeGap(10.0))
+        .is_some()
+    {
         panic!("iteration failed");
     }
 
