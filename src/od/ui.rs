@@ -133,36 +133,35 @@ where
         // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
         smoothed.push(self.estimates[k].clone());
 
-        // Note: we're using `!=` because Rust ensures that k can never be negative. ("comparison is useless due to type limits").
         loop {
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_k_kp1 = &smoothed[num - k - 1];
+            let sm_est_kp1 = &smoothed[num - k - 1];
+            let x_kp1_l = sm_est_kp1.state_deviation();
+            let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
             let est_k = &self.estimates[k];
-            // Borrow the k-th estimate, which we're smoothing with the next estimate
+            let x_k_k = &est_k.state_deviation();
+            let p_k_k = &est_k.covar();
+            // Borrow the k+1-th estimate, which we're smoothing with the next estimate
             let est_kp1 = &self.estimates[k + 1];
-            // Clone and invert the STM \phi(k -> k+1) (this is the same STM as the estimate at k+1)
-            let mut stm_kp1_k = sm_k_kp1.stm().clone();
-            if !stm_kp1_k.try_inverse_mut() {
-                return Err(FilterError::StateTransitionMatrixSingular);
-            }
-            // Invert the p_k+1 covar knowing only k
-            let mut p_kp1_inv = est_kp1.covar().clone();
-            if !p_kp1_inv.try_inverse_mut() {
-                return Err(FilterError::CovarianceMatrixSingular);
-            }
+            let p_kp1_k = &est_kp1.covar();
+            let p_kp1_k_inv = &est_kp1
+                .covar()
+                .try_inverse()
+                .ok_or_else(|| FilterError::CovarianceMatrixSingular)?;
+            let phi_kp1_k = &est_kp1.stm();
             // Compute Sk
-            let s_k = est_k.covar() * stm_kp1_k.transpose() * p_kp1_inv;
+            let sk = p_k_k * phi_kp1_k.transpose() * p_kp1_k_inv;
+            // Compute smoothed estimate
+            let x_k_l = x_k_k + &sk * (x_kp1_l - phi_kp1_k * x_k_k);
+            // Compute smoothed covariance
+            let p_k_l = p_k_k + &sk * (p_kp1_l - p_kp1_k) * &sk.transpose();
+            // Store into vector
             let mut smoothed_est_k = est_k.clone();
             // Compute the smoothed state deviation
-            smoothed_est_k.set_state_deviation(
-                est_k.state_deviation()
-                    + &s_k * (sm_k_kp1.state_deviation() - stm_kp1_k * est_k.state_deviation()),
-            );
+            smoothed_est_k.set_state_deviation(x_k_l);
             // Compute the smoothed covariance
-            smoothed_est_k.set_covar(
-                est_k.covar() + &s_k * (sm_k_kp1.covar() - est_kp1.covar()) * &s_k.transpose(),
-            );
+            smoothed_est_k.set_covar(p_k_l);
             // Move on
             smoothed.push(smoothed_est_k);
             if k == 0 {
