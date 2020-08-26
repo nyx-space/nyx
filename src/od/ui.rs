@@ -216,7 +216,7 @@ where
             }
         }
 
-        println!(
+        info!(
             "Condition reached after smoothing {} estimates ",
             smoothed.len()
         );
