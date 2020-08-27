@@ -156,7 +156,7 @@ where
         info!("Smoothing {} estimates until {}", num + 1, condition);
         let mut smoothed = Vec::with_capacity(num + 1);
         // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
-        smoothed.push(self.estimates[k].clone());
+        smoothed.push(self.estimates[k + 1].clone());
 
         loop {
             // Borrow the previously smoothed estimate of the k+1 estimate
@@ -174,7 +174,7 @@ where
                 .covar()
                 .try_inverse()
                 .ok_or_else(|| FilterError::CovarianceMatrixSingular)?;
-            let phi_kp1_k = &est_kp1.stm();
+            let phi_kp1_k = &est_kp1.stm().transpose();
             // Compute Sk
             let sk = p_k_k * phi_kp1_k.transpose() * p_kp1_k_inv;
             // Compute smoothed estimate
@@ -212,7 +212,7 @@ where
                         break;
                     }
                 }
-                _ => unimplemented!(),
+                SmoothingArc::All => {}
             }
         }
 
