@@ -715,14 +715,12 @@ fn robust_test_ckf_smoother_multi_body() {
         GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
     let dss34_canberra =
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY / 10.0;
+    let prop_time = SECONDS_PER_DAY;
     let step_size = 10.0;
     let opts = PropOpts::with_fixed_step(step_size);
 
@@ -805,13 +803,13 @@ fn robust_test_ckf_smoother_multi_body() {
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
 
-    let mut pos_errors = Vec::new();
     let mut num_pos_ok = 0;
     let mut num_vel_ok = 0;
-    let mut no_bueno_de_todo = false;
+    let mut large_smoothing_error = false;
 
     // Test smoothed estimates
-    for offset in (2..odp.estimates.len()).rev() {
+    // Skip the first 10 estimates which are surprisingly good in this case
+    for offset in (1..odp.estimates.len() - 10).rev() {
         let truth_state = truth_states[truth_states.len() - offset];
         let smoothed_est = &smoothed_estimates[odp.estimates.len() - offset];
 
@@ -889,42 +887,37 @@ fn robust_test_ckf_smoother_multi_body() {
         let err_p_sm_oom = err_p_sm.log10().floor() as i32;
         let err_v_sm_oom = err_v_sm.log10().floor() as i32;
 
-        pos_errors.push((err_p_sm_oom, err_p_oom, est.epoch()));
-
         if err_p_sm_oom - err_p_oom > 2 {
-            no_bueno_de_todo = true;
+            large_smoothing_error = true;
+
+            println!(
+                "RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
+                truth_state.dt.as_gregorian_tai_str(),
+                odp.estimates.len() - offset,
+                err_p * 1e3,
+                err_v * 1e3,
+                truth_state - est.state(),
+                err_p_sm * 1e3,
+                err_v_sm * 1e3,
+                truth_state - smoothed_est.state()
+            );
         }
 
         if err_v_sm_oom - err_v_oom > 2 {
-            no_bueno_de_todo = true;
-        }
+            large_smoothing_error = true;
 
-        /*
-        assert!(
-            err_p_sm <= err_p || (err_p_sm_oom - err_p_oom).abs() <= 1,
-            "RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-            truth_state.dt.as_gregorian_tai_str(),
-            odp.estimates.len() - offset,
-            err_p * 1e3,
-            err_v * 1e3,
-            truth_state - est.state(),
-            err_p_sm * 1e3,
-            err_v_sm * 1e3,
-            truth_state - smoothed_est.state()
-        );
-        assert!(
-            err_v_sm <= err_v || (err_v_sm_oom - err_v_oom).abs() <= 1,
-            "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-            truth_state.dt.as_gregorian_tai_str(),
-            odp.estimates.len() - offset,
-            err_p * 1e3,
-            err_v * 1e3,
-            truth_state - est.state(),
-            err_p_sm * 1e3,
-            err_v_sm * 1e3,
-            truth_state - smoothed_est.state()
-        );
-        */
+            println!(
+                "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
+                truth_state.dt.as_gregorian_tai_str(),
+                odp.estimates.len() - offset,
+                err_p * 1e3,
+                err_v * 1e3,
+                truth_state - est.state(),
+                err_p_sm * 1e3,
+                err_v_sm * 1e3,
+                truth_state - smoothed_est.state()
+            );
+        }
 
         for i in 0..6 {
             assert!(
@@ -938,17 +931,14 @@ fn robust_test_ckf_smoother_multi_body() {
         }
     }
 
-    println!("Datetime TAI\t\t\tMag. smoo.\tMag. est.");
-    for err in pos_errors.iter() {
-        println!("{}\t\t{}\t\t{}", err.2.as_gregorian_tai_str(), err.0, err.1);
-    }
-
     println!(
         "\nBig error: {}\nPos. ok: {}/{}\tVel. ok: {}/{}",
-        no_bueno_de_todo,
+        large_smoothing_error,
         num_pos_ok,
         odp.estimates.len(),
         num_vel_ok,
         odp.estimates.len()
     );
+
+    assert!(!large_smoothing_error);
 }
