@@ -1,3 +1,4 @@
+// TODO: Can the estimate return a pointed to everything instead of cloning stuff?
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::EstimableState;
@@ -36,8 +37,10 @@ where
     fn state_deviation(&self) -> VectorN<f64, S>;
     /// The nominal state as reported by the filter dynamics
     fn nominal_state(&self) -> T;
-    /// The Covariance of this estimate
+    /// The Covariance of this estimate. Will return the predicted covariance if this is a time update/prediction.
     fn covar(&self) -> MatrixMN<f64, S, S>;
+    /// The predicted covariance of this estimate from the time update
+    fn predicted_covar(&self) -> MatrixMN<f64, S, S>;
     /// Sets the state deviation.
     fn set_state_deviation(&mut self, new_state: VectorN<f64, S>);
     /// Sets the Covariance of this estimate
@@ -111,6 +114,8 @@ where
     pub state_deviation: VectorN<f64, S>,
     /// The Covariance of this estimate
     pub covar: MatrixMN<f64, S, S>,
+    /// The predicted covariance of this estimate
+    pub covar_bar: MatrixMN<f64, S, S>,
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     pub predicted: bool,
     /// The STM used to compute this Estimate
@@ -130,7 +135,8 @@ where
         Self {
             nominal_state,
             state_deviation: VectorN::<f64, S>::zeros(),
-            covar,
+            covar: covar.clone(),
+            covar_bar: covar,
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
@@ -149,6 +155,7 @@ where
             nominal_state,
             state_deviation: VectorN::<f64, S>::zeros(),
             covar: MatrixMN::<f64, S, S>::zeros(),
+            covar_bar: MatrixMN::<f64, S, S>::zeros(),
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
@@ -166,6 +173,10 @@ where
 
     fn covar(&self) -> MatrixMN<f64, S, S> {
         self.covar.clone()
+    }
+
+    fn predicted_covar(&self) -> MatrixMN<f64, S, S> {
+        self.covar_bar.clone()
     }
 
     fn predicted(&self) -> bool {
@@ -295,6 +306,8 @@ where
     pub info_state: VectorN<f64, S>,
     /// The information matrix, which is the inverse of the covariance
     pub info_mat: MatrixMN<f64, S, S>,
+    /// The predicted information matrix, which is the inverse of the covariance
+    pub info_mat_bar: MatrixMN<f64, S, S>,
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     pub predicted: bool,
     /// The STM used to compute this Estimate
@@ -319,7 +332,8 @@ where
         Self {
             nominal_state,
             info_state: VectorN::<f64, S>::zeros(),
-            info_mat,
+            info_mat: info_mat.clone(),
+            info_mat_bar: info_mat,
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
@@ -330,6 +344,16 @@ where
     /// Returns the covariance, if there is enough information to invert the information matrix
     pub fn try_covar(&self) -> Option<MatrixMN<f64, S, S>> {
         let mut covar = self.info_mat.clone();
+        if !covar.try_inverse_mut() {
+            None
+        } else {
+            Some(&covar * &covar.transpose())
+        }
+    }
+
+    /// Returns the covariance, if there is enough information to invert the information matrix
+    pub fn try_predicted_covar(&self) -> Option<MatrixMN<f64, S, S>> {
+        let mut covar = self.info_mat_bar.clone();
         if !covar.try_inverse_mut() {
             None
         } else {
@@ -354,7 +378,8 @@ where
         Self {
             nominal_state,
             info_state,
-            info_mat,
+            info_mat: info_mat.clone(),
+            info_mat_bar: info_mat,
             predicted: true,
             stm: MatrixMN::<f64, S, S>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
@@ -374,6 +399,11 @@ where
     /// Will panic if the information matrix inversion fails
     fn covar(&self) -> MatrixMN<f64, S, S> {
         self.try_covar().unwrap()
+    }
+
+    /// Will panic if the information matrix inversion fails
+    fn predicted_covar(&self) -> MatrixMN<f64, S, S> {
+        self.try_predicted_covar().unwrap()
     }
 
     fn predicted(&self) -> bool {

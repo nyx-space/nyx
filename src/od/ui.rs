@@ -171,7 +171,8 @@ where
             let est_kp1 = &self.estimates[k + 1];
 
             let phi_kp1_k = &est_kp1.stm();
-            let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
+            // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
+            let p_kp1_k = est_kp1.predicted_covar();
             let p_kp1_k_inv = &p_kp1_k
                 .try_inverse()
                 .ok_or_else(|| FilterError::CovarianceMatrixSingular)?;

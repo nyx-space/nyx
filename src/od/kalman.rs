@@ -229,7 +229,8 @@ where
         let estimate = KfEstimate {
             nominal_state,
             state_deviation: state_bar,
-            covar: covar_bar,
+            covar: covar_bar.clone(),
+            covar_bar,
             stm: self.stm.clone(),
             predicted: true,
             epoch_fmt: self.epoch_fmt,
@@ -334,7 +335,7 @@ where
 
         // Compute covariance (Joseph update)
         let first_term = MatrixMN::<f64, S, S>::identity() - &gain * &self.h_tilde;
-        let covar = &first_term * covar_bar * &first_term.transpose()
+        let covar = &first_term * &covar_bar * &first_term.transpose()
             + &gain * &self.measurement_noise * &gain.transpose();
 
         // And wrap up
@@ -342,6 +343,7 @@ where
             nominal_state,
             state_deviation: state_hat,
             covar,
+            covar_bar,
             stm: self.stm.clone(),
             predicted: false,
             epoch_fmt: self.epoch_fmt,
