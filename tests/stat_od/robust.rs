@@ -806,6 +806,9 @@ fn robust_test_ckf_smoother_multi_body() {
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
 
     let mut pos_errors = Vec::new();
+    let mut num_pos_ok = 0;
+    let mut num_vel_ok = 0;
+    let mut no_bueno_de_todo = false;
 
     // Test smoothed estimates
     for offset in (2..odp.estimates.len()).rev() {
@@ -822,13 +825,13 @@ fn robust_test_ckf_smoother_multi_body() {
         let (err_p, err_v) = rss_state_errors(&est.state(), &truth_state);
         let (err_p_sm, err_v_sm) = rss_state_errors(&smoothed_est.state(), &truth_state);
 
-        // Compute orders of magnitude
-        let err_p_oom = err_p.log10().floor() as i32;
-        let err_v_oom = err_v.log10().floor() as i32;
-        let err_p_sm_oom = err_p_sm.log10().floor() as i32;
-        let err_v_sm_oom = err_v_sm.log10().floor() as i32;
+        if err_p_sm <= err_p {
+            num_pos_ok += 1;
+        }
 
-        pos_errors.push((err_p_sm_oom, err_p_oom, est.epoch()));
+        if err_v_sm <= err_v {
+            num_vel_ok += 1;
+        }
 
         if offset == 2 {
             // Only the print the final estimate
@@ -879,6 +882,23 @@ fn robust_test_ckf_smoother_multi_body() {
         }
 
         // The smoothed RSS errors should be better, or have the same order of magnitude or not significantly worse
+
+        // Compute orders of magnitude
+        let err_p_oom = err_p.log10().floor() as i32;
+        let err_v_oom = err_v.log10().floor() as i32;
+        let err_p_sm_oom = err_p_sm.log10().floor() as i32;
+        let err_v_sm_oom = err_v_sm.log10().floor() as i32;
+
+        pos_errors.push((err_p_sm_oom, err_p_oom, est.epoch()));
+
+        if err_p_sm_oom - err_p_oom > 2 {
+            no_bueno_de_todo = true;
+        }
+
+        if err_v_sm_oom - err_v_oom > 2 {
+            no_bueno_de_todo = true;
+        }
+
         /*
         assert!(
             err_p_sm <= err_p || (err_p_sm_oom - err_p_oom).abs() <= 1,
@@ -922,4 +942,13 @@ fn robust_test_ckf_smoother_multi_body() {
     for err in pos_errors.iter() {
         println!("{}\t\t{}\t\t{}", err.2.as_gregorian_tai_str(), err.0, err.1);
     }
+
+    println!(
+        "\nBig error: {}\nPos. ok: {}/{}\tVel. ok: {}/{}",
+        no_bueno_de_todo,
+        num_pos_ok,
+        odp.estimates.len(),
+        num_vel_ok,
+        odp.estimates.len()
+    );
 }
