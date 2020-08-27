@@ -12,8 +12,33 @@ pub use super::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
 
+use std::fmt;
 use std::marker::PhantomData;
 use std::sync::mpsc::channel;
+
+/// Defines the stopping condition for the smoother
+#[derive(Clone, Copy, Debug)]
+pub enum SmoothingArc {
+    /// Stop smoothing when the gap between estimate is the provided floating point number in seconds
+    TimeGap(f64),
+    /// Stop smoothing at the provided Epoch.
+    Epoch(Epoch),
+    /// Stop smoothing at the first prediction
+    Prediction,
+    /// Only stop once all estimates have been processed
+    All,
+}
+
+impl fmt::Display for SmoothingArc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            SmoothingArc::All => write!(f, "all estimates smoothed"),
+            SmoothingArc::Epoch(e) => write!(f, "{}", e.as_gregorian_tai_str()),
+            SmoothingArc::TimeGap(g) => write!(f, "time gap of {} seconds", g),
+            SmoothingArc::Prediction => write!(f, "first prediction"),
+        }
+    }
+}
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 pub struct ODProcess<
@@ -120,41 +145,114 @@ where
         }
     }
 
-    /// Allows to smooth the provided estimates. If there is a result, it'll be a filter error.
+    /// Allows to smooth the provided estimates. Returns the smoothed estimates or an error.
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&mut self) -> Option<FilterError> {
-        info!("Smoothing {} estimates", self.estimates.len());
-        let mut smoothed = Vec::with_capacity(self.estimates.len());
+    pub fn smooth(&mut self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, FilterError> {
+        let num = self.estimates.len() - 1;
+        let mut k = num - 1;
 
-        // Is this smoothing correct ? I should try using the previous STM and start are estimates N-2
-        for estimate in self.estimates.iter().rev() {
-            let mut sm_est = estimate.clone();
-            // TODO: Ensure that SNC was _not_ enabled
-            let mut stm_inv = estimate.stm().clone();
-            if !stm_inv.try_inverse_mut() {
-                return Some(FilterError::StateTransitionMatrixSingular);
+        info!("Smoothing {} estimates until {}", num + 1, condition);
+        let mut smoothed = Vec::with_capacity(num + 1);
+        // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
+        smoothed.push(self.estimates[k].clone());
+
+        loop {
+            // Borrow the previously smoothed estimate of the k+1 estimate
+            let sm_est_kp1 = &smoothed[num - k - 1];
+            let x_kp1_l = sm_est_kp1.state_deviation();
+            let p_kp1_l = sm_est_kp1.covar();
+            // Borrow the k-th estimate, which we're smoothing with the next estimate
+            let est_k = &self.estimates[k];
+            let x_k_k = &est_k.state_deviation();
+            let p_k_k = &est_k.covar();
+            // Borrow the k+1-th estimate, which we're smoothing with the next estimate
+            let est_kp1 = &self.estimates[k + 1];
+            let p_kp1_k = &est_kp1.covar();
+            let p_kp1_k_inv = &est_kp1
+                .covar()
+                .try_inverse()
+                .ok_or_else(|| FilterError::CovarianceMatrixSingular)?;
+            let phi_kp1_k = &est_kp1.stm();
+            // Compute Sk
+            let sk = p_k_k * phi_kp1_k.transpose() * p_kp1_k_inv;
+            // Compute smoothed estimate
+            let x_k_l = x_k_k + &sk * (x_kp1_l - phi_kp1_k * x_k_k);
+            // Compute smoothed covariance
+            let p_k_l = p_k_k + &sk * (p_kp1_l - p_kp1_k) * &sk.transpose();
+            // Store into vector
+            let mut smoothed_est_k = est_k.clone();
+            // Compute the smoothed state deviation
+            smoothed_est_k.set_state_deviation(x_k_l);
+            // Compute the smoothed covariance
+            smoothed_est_k.set_covar(p_k_l);
+            // Move on
+            smoothed.push(smoothed_est_k);
+            if k == 0 {
+                break;
             }
-            sm_est.set_covar(&stm_inv * estimate.covar() * &stm_inv.transpose());
-            sm_est.set_state_deviation(&stm_inv * estimate.state_deviation());
-            smoothed.push(sm_est);
+            k -= 1;
+            // Check the smoother stopping condition
+            let next_est = &self.estimates[k];
+            match condition {
+                SmoothingArc::Epoch(e) => {
+                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
+                    if next_est.epoch() < e {
+                        break;
+                    }
+                }
+                SmoothingArc::TimeGap(gap_s) => {
+                    if est_k.epoch() - next_est.epoch() > gap_s {
+                        break;
+                    }
+                }
+                SmoothingArc::Prediction => {
+                    if next_est.predicted() {
+                        break;
+                    }
+                }
+                _ => unimplemented!(),
+            }
         }
 
-        // And reverse to maintain order
-        smoothed.reverse();
-        // And store
-        self.estimates = smoothed;
+        info!(
+            "Condition reached after smoothing {} estimates ",
+            smoothed.len()
+        );
 
-        None
+        // Now, let's add all of the other estimates so that the same indexing can be done
+        // between all the estimates and the smoothed estimates
+        if k > 0 {
+            // Add the estimate that might have been skipped.
+            // smoothed.push(self.estimates[k + 1].clone());
+            loop {
+                smoothed.push(self.estimates[k].clone());
+                if k == 0 {
+                    break;
+                }
+                k -= 1;
+            }
+        }
+
+        // And reverse to maintain the order of estimates
+        smoothed.reverse();
+        Ok(smoothed)
     }
 
-    /// Allows iterating on the filter solution
-    pub fn iterate(&mut self, measurements: &[Msr]) -> Option<FilterError> {
+    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
+    pub fn iterate(
+        &mut self,
+        measurements: &[Msr],
+        condition: SmoothingArc,
+    ) -> Option<FilterError> {
         // First, smooth the estimates
-        self.smooth();
+        let smoothed = match self.smooth(condition) {
+            Ok(smoothed) => smoothed,
+            Err(e) => return Some(e),
+        };
         // Get the first estimate post-smoothing
-        let mut init_smoothed = self.estimates[0].clone();
+        let mut init_smoothed = smoothed[0].clone();
         println!("{}", init_smoothed.epoch().as_gregorian_tai_str());
         // Reset the propagator
         self.prop.reset();
