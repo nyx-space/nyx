@@ -47,7 +47,7 @@ where
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     fn predicted(&self) -> bool;
     /// The STM used to compute this Estimate
-    fn stm(&self) -> MatrixMN<f64, S, S>;
+    fn stm(&self) -> &MatrixMN<f64, S, S>;
     /// The Epoch format upon serialization
     fn epoch_fmt(&self) -> EpochFormat;
     /// The covariance format upon serialization
@@ -181,8 +181,8 @@ where
     fn predicted(&self) -> bool {
         self.predicted
     }
-    fn stm(&self) -> MatrixMN<f64, S, S> {
-        self.stm.clone()
+    fn stm(&self) -> &MatrixMN<f64, S, S> {
+        &self.stm
     }
     fn epoch_fmt(&self) -> EpochFormat {
         self.epoch_fmt
@@ -408,8 +408,8 @@ where
     fn predicted(&self) -> bool {
         self.predicted
     }
-    fn stm(&self) -> MatrixMN<f64, S, S> {
-        self.stm.clone()
+    fn stm(&self) -> &MatrixMN<f64, S, S> {
+        &self.stm
     }
     fn epoch_fmt(&self) -> EpochFormat {
         self.epoch_fmt
