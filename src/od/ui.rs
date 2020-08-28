@@ -252,21 +252,12 @@ where
             Ok(smoothed) => smoothed,
             Err(e) => return Some(e),
         };
-        // Get the first estimate post-smoothing
-        let mut init_smoothed = smoothed[0].clone();
-        println!("{}", init_smoothed.epoch().as_gregorian_tai_str());
         // Reset the propagator
         self.prop.reset();
-        let mut iterated_state = self.prop.dynamics.state_vector();
-        for (i, x) in init_smoothed.state_deviation().iter().enumerate() {
-            iterated_state[i] += x;
-        }
-        self.prop
-            .dynamics
-            .set_state(self.prop.dynamics.time(), &iterated_state);
-        // Set the filter's initial state to this smoothed estimate
-        init_smoothed.set_state_deviation(VectorN::<f64, Msr::StateSize>::zeros());
-        self.kf.set_previous_estimate(&init_smoothed);
+        // Empty the estimates and add the first smoothed estimate as the initial estimate
+        self.estimates = Vec::new();
+        self.estimates.push(smoothed[0].clone());
+        self.kf.set_previous_estimate(&smoothed[0]);
         // And re-run the filter
         self.process_measurements(measurements)?;
         None

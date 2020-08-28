@@ -1,4 +1,3 @@
-// TODO: Can the estimate return a pointed to everything instead of cloning stuff?
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::EstimableState;
