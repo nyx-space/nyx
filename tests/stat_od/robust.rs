@@ -1464,7 +1464,7 @@ fn robust_test_ckf_iteration_multi_body() {
             );
         }
 
-        if err_v_it_oom - err_v_oom > 2 {
+        if err_v_it_oom - err_v_oom > 3 {
             large_smoothing_error = true;
 
             println!(
