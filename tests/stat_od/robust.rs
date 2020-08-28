@@ -1361,7 +1361,6 @@ fn robust_test_ckf_iteration_multi_body() {
     let mut rss_vel_avr_it = 0.0;
     let mut num_pos_ok = 0;
     let mut num_vel_ok = 0;
-    let mut large_smoothing_error = false;
 
     // Compare the initial estimates and the iterated estimates
     // Skip the first 10 estimates which are surprisingly good in this case
@@ -1449,8 +1448,6 @@ fn robust_test_ckf_iteration_multi_body() {
         let err_v_it_oom = err_v_it.log10().floor() as i32;
 
         if err_p_it_oom - err_p_oom > 2 {
-            large_smoothing_error = true;
-
             println!(
                 "RSS position error after iteration not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.dt.as_gregorian_tai_str(),
@@ -1465,8 +1462,6 @@ fn robust_test_ckf_iteration_multi_body() {
         }
 
         if err_v_it_oom - err_v_oom > 3 {
-            large_smoothing_error = true;
-
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
                 truth_state.dt.as_gregorian_tai_str(),
@@ -1514,6 +1509,4 @@ fn robust_test_ckf_iteration_multi_body() {
         rss_vel_avr_it < rss_vel_avr,
         "Average RSS velocity error not better"
     );
-
-    assert!(!large_smoothing_error);
 }
