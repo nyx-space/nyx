@@ -150,17 +150,17 @@ where
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
     pub fn smooth(&mut self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, FilterError> {
-        let num = self.estimates.len() - 1;
-        let mut k = num - 1;
+        let l = self.estimates.len() - 1;
+        let mut k = l - 1;
 
-        info!("Smoothing {} estimates until {}", num + 1, condition);
-        let mut smoothed = Vec::with_capacity(num + 1);
+        info!("Smoothing {} estimates until {}", l + 1, condition);
+        let mut smoothed = Vec::with_capacity(l + 1);
         // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
-        smoothed.push(self.estimates[k].clone());
+        smoothed.push(self.estimates[k + 1].clone());
 
         loop {
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &smoothed[num - k - 1];
+            let sm_est_kp1 = &smoothed[l - k - 1];
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
@@ -169,18 +169,19 @@ where
             let p_k_k = &est_k.covar();
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
             let est_kp1 = &self.estimates[k + 1];
-            let p_kp1_k = &est_kp1.covar();
-            let p_kp1_k_inv = &est_kp1
-                .covar()
+
+            let phi_kp1_k = est_kp1.stm();
+            // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
+            let p_kp1_k = est_kp1.predicted_covar();
+            let p_kp1_k_inv = &p_kp1_k
                 .try_inverse()
                 .ok_or_else(|| FilterError::CovarianceMatrixSingular)?;
-            let phi_kp1_k = &est_kp1.stm();
             // Compute Sk
             let sk = p_k_k * phi_kp1_k.transpose() * p_kp1_k_inv;
             // Compute smoothed estimate
             let x_k_l = x_k_k + &sk * (x_kp1_l - phi_kp1_k * x_k_k);
             // Compute smoothed covariance
-            let p_k_l = p_k_k + &sk * (p_kp1_l - p_kp1_k) * &sk.transpose();
+            let p_k_l = p_k_k + &sk * (p_kp1_l - &est_kp1.covar()) * &sk.transpose();
             // Store into vector
             let mut smoothed_est_k = est_k.clone();
             // Compute the smoothed state deviation
@@ -212,7 +213,7 @@ where
                         break;
                     }
                 }
-                _ => unimplemented!(),
+                SmoothingArc::All => {}
             }
         }
 
@@ -251,21 +252,12 @@ where
             Ok(smoothed) => smoothed,
             Err(e) => return Some(e),
         };
-        // Get the first estimate post-smoothing
-        let mut init_smoothed = smoothed[0].clone();
-        println!("{}", init_smoothed.epoch().as_gregorian_tai_str());
         // Reset the propagator
         self.prop.reset();
-        let mut iterated_state = self.prop.dynamics.state_vector();
-        for (i, x) in init_smoothed.state_deviation().iter().enumerate() {
-            iterated_state[i] += x;
-        }
-        self.prop
-            .dynamics
-            .set_state(self.prop.dynamics.time(), &iterated_state);
-        // Set the filter's initial state to this smoothed estimate
-        init_smoothed.set_state_deviation(VectorN::<f64, Msr::StateSize>::zeros());
-        self.kf.set_previous_estimate(&init_smoothed);
+        // Empty the estimates and add the first smoothed estimate as the initial estimate
+        self.estimates = Vec::new();
+        self.estimates.push(smoothed[0].clone());
+        self.kf.set_previous_estimate(&smoothed[0]);
         // And re-run the filter
         self.process_measurements(measurements)?;
         None

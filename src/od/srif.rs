@@ -206,7 +206,8 @@ where
         let estimate = IfEstimate {
             nominal_state,
             info_state: b_bar,
-            info_mat: r_bar,
+            info_mat: r_bar.clone(),
+            info_mat_bar: r_bar,
             stm: self.stm.clone(),
             predicted: true,
             epoch_fmt: self.epoch_fmt,
@@ -314,6 +315,7 @@ where
             nominal_state,
             info_state,
             info_mat: rk,
+            info_mat_bar: r_bar,
             stm: self.stm.clone(),
             predicted: false,
             epoch_fmt: self.epoch_fmt,
