@@ -18,6 +18,9 @@ The [LICENSE](./LICENSE) will be strictly enforced once this toolkit reaches pro
 # Features
 Unless specified otherwise in the documentation of specific functions, all vectors and matrices are [statically allocated](https://discourse.nphysics.org/t/statically-typed-matrices-whose-size-is-a-multiple-or-another-one/460/4).
 
+Lots of features are still being worked on, and there currently isn't any guarantee that the API won't change _between_ versions. However, you can be assured that the API will not change for previous versions.
+Outstanding mission design features available [here](https://gitlab.com/chrisrabotin/nyx/-/issues?label_name=subsys%3A%3AMD), and orbit determination features [here](https://gitlab.com/chrisrabotin/nyx/-/issues?scope=all&utf8=%E2%9C%93&state=opened&label_name[]=subsys%3A%3AOD).
+
 ## Propagation
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
 - [x] Convenient and explicit definition of the dynamics for a simulation (cf. [tests/orbitaldyn.rs](tests/orbitaldyn.rs))
@@ -39,10 +42,10 @@ Unless specified otherwise in the documentation of specific functions, all vecto
 - [x] An easy-to-use OD user interface ([#109](https://gitlab.com/chrisrabotin/nyx/issues/109))
 - [x] Estimation with spherical harmonics enabled ([#123](https://gitlab.com/chrisrabotin/nyx/issues/123))
 - [ ] Solar radiation pressure (SRP) parameter estimation ([#98](https://gitlab.com/chrisrabotin/nyx/issues/98))
-- [ ] Covariance mapping and estimate frame transformations ([#106](https://gitlab.com/chrisrabotin/nyx/issues/106), [#112](https://gitlab.com/chrisrabotin/nyx/issues/112))
+- [x] Covariance mapping and estimate frame transformations ([#106](https://gitlab.com/chrisrabotin/nyx/issues/106), [#112](https://gitlab.com/chrisrabotin/nyx/issues/112))
 - [x] State noise compensation (SNC) ([#85](https://gitlab.com/chrisrabotin/nyx/issues/85))
 - [ ] Dynamic model compensation (DMC) ([#86](https://gitlab.com/chrisrabotin/nyx/issues/86))
-- [ ] High fidelity ground station placement ([#92](https://gitlab.com/chrisrabotin/nyx/issues/92))
+- [x] High fidelity ground station placement ([#92](https://gitlab.com/chrisrabotin/nyx/issues/92))
 ## Celestial computations
 - [x] Orbital state manipulation (from GMAT source code and validated in GMAT) (cf. [tests/state.rs](tests/state.rs))
 - [x] Planetary and Solar eclipse and visibility computation (cf. [tests/eclipse.rs](tests/eclipse.rs))

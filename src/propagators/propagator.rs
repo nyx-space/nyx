@@ -1,6 +1,6 @@
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
 use super::events::{ConvergenceError, EventTrackers, StopCondition};
-use super::{IntegrationDetails, RK, RK89};
+use super::{Dormand78, IntegrationDetails, RK};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
 use dynamics::Dynamics;
@@ -62,9 +62,9 @@ where
         }
     }
 
-    /// Default propagator is an RK89.
+    /// Default propagator is an Dormand78.
     pub fn default(dynamics: &'a mut D, opts: &PropOpts<E>) -> Self {
-        Self::new::<RK89>(dynamics, opts)
+        Self::new::<Dormand78>(dynamics, opts)
     }
 
     /// Resets the propagator to its initial time and state
