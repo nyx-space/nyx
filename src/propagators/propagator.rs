@@ -1,6 +1,6 @@
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
 use super::events::{ConvergenceError, EventTrackers, StopCondition};
-use super::{Dormand78, IntegrationDetails, RK};
+use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
 use dynamics::Dynamics;
