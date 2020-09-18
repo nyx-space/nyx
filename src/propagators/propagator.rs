@@ -62,9 +62,9 @@ where
         }
     }
 
-    /// Default propagator is an Dormand78.
+    /// Default propagator is an RK89.
     pub fn default(dynamics: &'a mut D, opts: &PropOpts<E>) -> Self {
-        Self::new::<Dormand78>(dynamics, opts)
+        Self::new::<RK89>(dynamics, opts)
     }
 
     /// Resets the propagator to its initial time and state
