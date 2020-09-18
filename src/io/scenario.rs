@@ -420,6 +420,15 @@ pub struct ScenarioSerde {
     pub estimate: Option<HashMap<String, EstimateSerde>>,
     pub measurements: Option<HashMap<String, MeasurementSerde>>,
     pub stations: Option<HashMap<String, StationSerde>>,
+    pub conditions: Option<HashMap<String, ConditionSerde>>,
+}
+
+#[derive(Deserialize)]
+pub struct ConditionSerde {
+    pub kind: String,
+    pub search_until: String,
+    pub hits: Option<usize>,
+    pub tolerance: Option<f64>,
 }
 
 #[test]
@@ -509,6 +518,11 @@ fn test_md_scenario() {
         [force_models.my_frc.srp.my_srp]
         sc_area = 1.0 # in meters squared
         cr = 1.5 # Defaults to 1.8
+
+        [condition.third_apo]
+        kind = "apoapse"
+        search_until = "MJD 51540.5 TAI"
+        hits = 3  # Stopping condition triggered on third apoapse passage
 
         "#,
     )
