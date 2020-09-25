@@ -20,11 +20,12 @@ where
     // An output channel for all of the states computed by this propagator
     pub tx_chan: Option<Sender<D::StateType>>,
     pub event_trackers: EventTrackers<D::StateType>,
+    prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
     opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
-    step_size: f64,    // Stores the adapted step for the _next_ call
-    order: u8,         // Order of the integrator
-    stages: usize,     // Number of stages, i.e. how many times the derivatives will be called
+    step_size: f64,   // Stores the adapted step for the _next_ call
+    order: u8,        // Order of the integrator
+    stages: usize,    // Number of stages, i.e. how many times the derivatives will be called
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
     fixed_step: bool,
@@ -45,6 +46,7 @@ where
             tx_chan: None,
             dynamics,
             event_trackers: EventTrackers::none(),
+            prevent_tx: false,
             opts: *opts,
             details: IntegrationDetails {
                 step: 0.0,
@@ -140,9 +142,11 @@ where
                     .eval_and_save(dt, t, &self.dynamics.state());
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
-                if let Some(ref chan) = self.tx_chan {
-                    if let Err(e) = chan.send(self.dynamics.state()) {
-                        warn!("could not publish to channel: {}", e)
+                if !self.prevent_tx {
+                    if let Some(ref chan) = self.tx_chan {
+                        if let Err(e) = chan.send(self.dynamics.state()) {
+                            warn!("could not publish to channel: {}", e)
+                        }
                     }
                 }
                 if backprop {
@@ -157,9 +161,11 @@ where
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, t, &self.dynamics.state());
-                if let Some(ref chan) = self.tx_chan {
-                    if let Err(e) = chan.send(self.dynamics.state()) {
-                        warn!("could not publish to channel: {}", e)
+                if !self.prevent_tx {
+                    if let Some(ref chan) = self.tx_chan {
+                        if let Err(e) = chan.send(self.dynamics.state()) {
+                            warn!("could not publish to channel: {}", e)
+                        }
                     }
                 }
             }
@@ -170,10 +176,12 @@ where
         &mut self,
         condition: StopCondition<D::StateType>,
     ) -> Result<D::StateType, ConvergenceError> {
+        self.prevent_tx = true;
         // Rewrite the event tracker
         if !self.event_trackers.events.is_empty() {
             warn!("Rewriting event tracker with the StopCondition");
         }
+
         self.event_trackers = EventTrackers::from_event(condition.event);
         self.until_time_elapsed(condition.max_prop_time);
         // Check if the event has been triggered
@@ -286,6 +294,7 @@ where
         }
 
         // Now that we have the time at which the condition is matched, let's propagate until then
+        self.prevent_tx = false;
         self.until_time_elapsed(self.dynamics.time() - closest_t);
 
         Ok(self.dynamics.state())
