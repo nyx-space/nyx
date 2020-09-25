@@ -197,7 +197,7 @@ impl DeltaStateSerde {
                 None => (0.0, 0.0, 0.0),
             };
 
-            let (vx, vy, vz) = match &self.position {
+            let (vx, vy, vz) = match &self.velocity {
                 Some(velocity) => {
                     if velocity.len() != 3 {
                         return Err(ParsingError::IllDefined(
