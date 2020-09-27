@@ -5,6 +5,8 @@ use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::celestia::{Frame, State};
+use crate::dynamics::spacecraft::SpacecraftState;
+use crate::propagators::events::{EventKind, OrbitalEvent, SCEvent, StopCondition};
 use crate::time::Epoch;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -423,12 +425,49 @@ pub struct ScenarioSerde {
     pub conditions: Option<HashMap<String, ConditionSerde>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct ConditionSerde {
     pub kind: String,
+    pub value: Option<f64>,
     pub search_until: String,
     pub hits: Option<usize>,
     pub tolerance: Option<f64>,
+}
+
+impl ConditionSerde {
+    pub fn to_condition(&self, init_dt: Epoch) -> StopCondition<SpacecraftState> {
+        let event = match self.kind.to_lowercase().as_str() {
+            "apoapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Apoapse)),
+            "periapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Periapse)),
+            "sma" => SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(self.value.unwrap()))),
+            "ecc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(self.value.unwrap()))),
+            "inc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Inc(self.value.unwrap()))),
+            "raan" => SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(self.value.unwrap()))),
+            "ta" => SCEvent::orbital(OrbitalEvent::new(EventKind::TA(self.value.unwrap()))),
+            _ => unimplemented!(),
+        };
+
+        let search_until = Epoch::from_str(&self.search_until).unwrap();
+        match self.hits {
+            Some(hits) => StopCondition::after_hits(
+                event,
+                hits,
+                search_until - init_dt,
+                match self.tolerance {
+                    Some(tol) => tol,
+                    None => 1e-6,
+                },
+            ),
+            None => StopCondition::new(
+                event,
+                search_until - init_dt,
+                match self.tolerance {
+                    Some(tol) => tol,
+                    None => 1e-6,
+                },
+            ),
+        }
+    }
 }
 
 #[test]

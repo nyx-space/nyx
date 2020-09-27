@@ -11,6 +11,7 @@ use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 pub use crate::dynamics::Dynamics;
 use crate::io::formatter::*;
 use crate::io::quantity::{parse_duration, ParsingError};
+use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
 use crate::propagators::error_ctrl::RSSStepPV;
 use crate::propagators::{PropOpts, Propagator};
@@ -45,6 +46,7 @@ where
     pub formatter: Option<StateFormatter<'a>>,
     pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
+    pub prop_event: Option<ConditionSerde>,
     pub prop_tol: f64,
     pub name: String,
 }
@@ -297,16 +299,29 @@ where
                 }
 
                 // Validate the stopping condition
+                // Check if it's a stopping condition
+                let prop_event = if let Some(conditions) = &scen.conditions {
+                    match conditions.get(&prop.stop_cond) {
+                        Some(c) => Some(c.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                };
                 // Let's see if it's a relative time
-                let prop_time_s = match parse_duration(prop.stop_cond.as_str()) {
-                    Ok(duration) => duration.v(),
-                    Err(e) => {
-                        // Check to see if it's an Epoch
-                        match Epoch::from_str(prop.stop_cond.as_str()) {
-                            Err(_) => return Err(e),
-                            Ok(epoch) => epoch - init_state.dt,
+                let prop_time_s = if prop_event.is_none() {
+                    match parse_duration(prop.stop_cond.as_str()) {
+                        Ok(duration) => Some(duration.v()),
+                        Err(e) => {
+                            // Check to see if it's an Epoch
+                            match Epoch::from_str(prop.stop_cond.as_str()) {
+                                Err(_) => return Err(e),
+                                Ok(epoch) => Some(epoch - init_state.dt),
+                            }
                         }
                     }
+                } else {
+                    None
                 };
 
                 // Let's see if it's a relative time
@@ -319,7 +334,8 @@ where
                     sc_dyn: sc_dyn_flagged,
                     formatter,
                     output: Vec::with_capacity(65_535),
-                    prop_time_s: Some(prop_time_s),
+                    prop_time_s,
+                    prop_event,
                     prop_tol,
                     name: prop_name.clone(),
                 })
@@ -378,8 +394,9 @@ where
             None => None,
         };
 
-        // Get the prop time before the mutable ref
-        let prop_time = self.prop_time_s.unwrap();
+        // Get the prop time before the mutable ref of the propagator
+        let maybe_prop_time = self.prop_time_s;
+        let maybe_prop_event = self.prop_event.clone();
 
         // Build the propagator
         let mut prop = self.propagator();
@@ -389,16 +406,31 @@ where
 
         let mut initial_state = Some(prop.state());
 
-        // Run
-        info!(
-            "Propagating for {} seconds (~ {:.3} days)",
-            prop_time,
-            prop_time / SECONDS_PER_DAY
-        );
-
         info!("Initial state: {}", prop.state());
         let start = Instant::now();
-        prop.until_time_elapsed(prop_time);
+
+        // Run
+        match maybe_prop_event {
+            Some(prop_event) => {
+                let stop_cond = prop_event.to_condition(initial_state.unwrap().orbit.dt);
+                info!("Propagating until event {:?}", stop_cond.event);
+                let rslt = prop.until_event(stop_cond);
+                if rslt.is_err() {
+                    panic!("{:?}", rslt.err());
+                }
+            }
+            None => {
+                // Elapsed seconds propagation
+                let prop_time = maybe_prop_time.unwrap();
+                info!(
+                    "Propagating for {} seconds (~ {:.3} days)",
+                    prop_time,
+                    prop_time / SECONDS_PER_DAY
+                );
+                prop.until_time_elapsed(prop_time);
+            }
+        }
+
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
             prop.state(),

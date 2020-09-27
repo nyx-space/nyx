@@ -1,4 +1,4 @@
-use crate::celestia::{Cosm, Frame, State};
+use crate::celestia::{Cosm, Frame, State, TimeTagged};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;
@@ -122,7 +122,6 @@ pub enum EventKind {
 }
 
 impl fmt::Display for EventKind {
-    // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -176,12 +175,13 @@ impl<'a> Event for OrbitalEvent<'a> {
     }
 
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
-        let prev_val = self.eval(prev_state);
-        let next_val = self.eval(next_state);
+        println!("{}", prev_state.epoch().as_gregorian_tai_str());
+        let prev_val = dbg!(self.eval(prev_state));
+        let next_val = dbg!(self.eval(next_state));
         match self.kind {
             // XXX: Should this condition be applied to all angles?
-            EventKind::Periapse | EventKind::Apoapse => prev_val > next_val,
-            _ => self.eval(prev_state) * self.eval(next_state) <= 0.0,
+            EventKind::Periapse | EventKind::Apoapse => dbg!(prev_val > next_val),
+            _ => prev_val * next_val <= 0.0,
         }
     }
 }

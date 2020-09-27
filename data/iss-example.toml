@@ -1,4 +1,4 @@
-sequence = ["iss"]
+sequence = ["iss", "iss_cond"]
 
 # This example is taken from Poliastro
 
@@ -39,3 +39,13 @@ file = "data/JGM3.cof.gz"
 [output.my_csv]
 filename = "./data/iss.csv"
 headers = ["epoch:GregorianUtc", "x", "y", "z", "vx", "vy", "vz", "rmag:Luna"]
+
+[propagator.iss_cond]
+dynamics = "iss"
+stop_cond = "apo"
+output = "my_csv"
+tolerance = 1e-9
+
+[conditions.apo]
+kind = "apoapse"
+search_until = "2013-03-18T14:00:00.0 UTC"
