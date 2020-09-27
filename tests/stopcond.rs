@@ -1,14 +1,13 @@
-extern crate hifitime;
 extern crate nalgebra as na;
 
 extern crate nyx_space as nyx;
 
-use hifitime::{Epoch, J2000_OFFSET};
 use nyx::celestia::{bodies, Cosm, State};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
+use nyx::time::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 
 #[test]
 fn stop_cond_3rd_apo() {
@@ -24,7 +23,7 @@ fn stop_cond_3rd_apo() {
 
     // Track how many times we've passed by that TA again
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
-    let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-6);
+    let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
 
     let mut dynamics = OrbitalDynamics::two_body(state);
 
@@ -45,7 +44,47 @@ fn stop_cond_3rd_apo() {
         "converged on the wrong apoapse"
     );
     assert!(
-        (180.0 - orbit.ta()) < 1e-6,
+        (180.0 - orbit.ta()).abs() < 1e-3,
+        "converged, yet convergence critera not met"
+    );
+}
+
+#[test]
+fn stop_cond_3rd_peri() {
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    let period = state.period();
+
+    // Track how many times we've passed by that TA again
+    let apo_event = OrbitalEvent::new(EventKind::Periapse);
+    let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
+
+    let mut dynamics = OrbitalDynamics::two_body(state);
+
+    let mut prop = Propagator::default(
+        &mut dynamics,
+        &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+    );
+
+    let rslt = prop.until_event(condition);
+
+    // Check how many times we have found that event
+    println!("{}", prop.event_trackers);
+    let orbit = rslt.expect("condition should have been found");
+    println!("{:o}", orbit);
+    // Confirm that this is the third apoapse event which is found
+    assert!(
+        orbit.dt - dt < 3.0 * period && orbit.dt - dt >= 2.0 * period,
+        "converged on the wrong apoapse"
+    );
+    assert!(
+        orbit.ta().abs() < 1e-1 || (360.0 - orbit.ta().abs() < 1e-1),
         "converged, yet convergence critera not met"
     );
 }
@@ -68,25 +107,12 @@ fn nrho_apo() {
         eme2k,
     );
 
-    // Note that this expected state was generated using SRP and a lunar gravity field
-    // Hence, we allow for a greater error since these are not modeled here.
-    let expect = State::cartesian(
-        266_375.578_868_798,
-        -213_365.467_957_944,
-        -203_571.279_542_228,
-        0.741_790_420_281_572,
-        0.588_200_782_187_968,
-        0.202_695_184_897_909,
-        dt + 118_753.007_910_251,
-        eme2k,
-    );
-
     let state_luna = cosm.frame_chg(&state, luna);
 
     // Track how many times we've passed by that TA again
     // let apo_event = OrbitalEvent::in_frame(EventKind::Apoapse, luna, &cosm);
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
-    let condition = StopCondition::new(apo_event, 2.0 * 86_400.0, 1e-1);
+    let condition = StopCondition::new(apo_event, 2.0 * SECONDS_PER_DAY, 1e-1);
 
     let mut dynamics =
         OrbitalDynamics::point_masses(state_luna, vec![bodies::EARTH, bodies::SUN], &cosm);
@@ -101,14 +127,13 @@ fn nrho_apo() {
     // Check how many times we have found that event
     let orbit = rslt.expect("condition should have been found");
     println!("Luna: {:o}", orbit);
+    assert!((orbit.ta() - 180.0).abs() < 0.1);
     let rslt_eme = cosm.frame_chg(&orbit, eme2k);
     println!("EME2k: {}", rslt_eme);
-    assert!((rslt_eme - expect).rmag() < 1.0);
-    assert!((rslt_eme - expect).vmag() < 1e-5);
     let delta_t = orbit.dt - dt;
     println!(
         "Found {} seconds / {} days after",
         delta_t,
-        delta_t / 86_400.0
+        delta_t / SECONDS_PER_DAY
     );
 }

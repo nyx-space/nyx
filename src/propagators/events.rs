@@ -122,7 +122,6 @@ pub enum EventKind {
 }
 
 impl fmt::Display for EventKind {
-    // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -169,8 +168,11 @@ impl<'a> Event for OrbitalEvent<'a> {
             EventKind::Raan(raan) => state.raan() - raan,
             EventKind::Aop(aop) => state.aop() - aop,
             EventKind::TA(angle) => state.ta() - angle,
-            EventKind::Periapse => state.ta(),
-            EventKind::Apoapse => between_pm_180(state.ta()),
+            EventKind::Periapse => between_pm_180(state.ta()),
+            EventKind::Apoapse => {
+                // We use the sign change in flight path angle to determine that we have crossed the apoapse
+                state.fpa()
+            }
             _ => panic!("event {:?} not supported", self.kind),
         }
     }
@@ -180,8 +182,9 @@ impl<'a> Event for OrbitalEvent<'a> {
         let next_val = self.eval(next_state);
         match self.kind {
             // XXX: Should this condition be applied to all angles?
-            EventKind::Periapse | EventKind::Apoapse => prev_val > next_val,
-            _ => self.eval(prev_state) * self.eval(next_state) <= 0.0,
+            EventKind::Periapse => prev_val < 0.0 && next_val >= 0.0,
+            EventKind::Apoapse => prev_val > 0.0 && next_val <= 0.0,
+            _ => prev_val * next_val <= 0.0,
         }
     }
 }

@@ -5,6 +5,8 @@ use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::celestia::{Frame, State};
+use crate::dynamics::spacecraft::SpacecraftState;
+use crate::propagators::events::{EventKind, OrbitalEvent, SCEvent, StopCondition};
 use crate::time::Epoch;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -420,6 +422,52 @@ pub struct ScenarioSerde {
     pub estimate: Option<HashMap<String, EstimateSerde>>,
     pub measurements: Option<HashMap<String, MeasurementSerde>>,
     pub stations: Option<HashMap<String, StationSerde>>,
+    pub conditions: Option<HashMap<String, ConditionSerde>>,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct ConditionSerde {
+    pub kind: String,
+    pub value: Option<f64>,
+    pub search_until: String,
+    pub hits: Option<usize>,
+    pub tolerance: Option<f64>,
+}
+
+impl ConditionSerde {
+    pub fn to_condition(&self, init_dt: Epoch) -> StopCondition<SpacecraftState> {
+        let event = match self.kind.to_lowercase().as_str() {
+            "apoapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Apoapse)),
+            "periapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Periapse)),
+            "sma" => SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(self.value.unwrap()))),
+            "ecc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(self.value.unwrap()))),
+            "inc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Inc(self.value.unwrap()))),
+            "raan" => SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(self.value.unwrap()))),
+            "ta" => SCEvent::orbital(OrbitalEvent::new(EventKind::TA(self.value.unwrap()))),
+            _ => unimplemented!(),
+        };
+
+        let search_until = Epoch::from_str(&self.search_until).unwrap();
+        match self.hits {
+            Some(hits) => StopCondition::after_hits(
+                event,
+                hits,
+                search_until - init_dt,
+                match self.tolerance {
+                    Some(tol) => tol,
+                    None => 1e-6,
+                },
+            ),
+            None => StopCondition::new(
+                event,
+                search_until - init_dt,
+                match self.tolerance {
+                    Some(tol) => tol,
+                    None => 1e-6,
+                },
+            ),
+        }
+    }
 }
 
 #[test]
@@ -509,6 +557,11 @@ fn test_md_scenario() {
         [force_models.my_frc.srp.my_srp]
         sc_area = 1.0 # in meters squared
         cr = 1.5 # Defaults to 1.8
+
+        [condition.third_apo]
+        kind = "apoapse"
+        search_until = "MJD 51540.5 TAI"
+        hits = 3  # Stopping condition triggered on third apoapse passage
 
         "#,
     )
