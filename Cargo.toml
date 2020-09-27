@@ -24,7 +24,7 @@ flate2 = { version = "1.0", features = ["rust_backend"], default-features = fals
 serde = "1.0"
 serde_derive = "1.0"
 csv = "1"
-hyperdual = "0.3.5"
+hyperdual = "0.3.6"
 bytes = "0.4.12"
 prost = "0.5"
 prost-derive = "0.5"

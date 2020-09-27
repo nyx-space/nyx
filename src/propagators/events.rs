@@ -1,4 +1,4 @@
-use crate::celestia::{Cosm, Frame, State, TimeTagged};
+use crate::celestia::{Cosm, Frame, State};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;
@@ -168,19 +168,21 @@ impl<'a> Event for OrbitalEvent<'a> {
             EventKind::Raan(raan) => state.raan() - raan,
             EventKind::Aop(aop) => state.aop() - aop,
             EventKind::TA(angle) => state.ta() - angle,
-            EventKind::Periapse => state.ta(),
-            EventKind::Apoapse => between_pm_180(state.ta()),
+            EventKind::Periapse => between_pm_180(state.ta()),
+            EventKind::Apoapse => state.ta(),
             _ => panic!("event {:?} not supported", self.kind),
         }
     }
 
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
-        println!("{}", prev_state.epoch().as_gregorian_tai_str());
-        let prev_val = dbg!(self.eval(prev_state));
-        let next_val = dbg!(self.eval(next_state));
+        let prev_val = self.eval(prev_state);
+        let next_val = self.eval(next_state);
         match self.kind {
             // XXX: Should this condition be applied to all angles?
-            EventKind::Periapse | EventKind::Apoapse => dbg!(prev_val > next_val),
+            EventKind::Periapse => prev_val > next_val,
+            EventKind::Apoapse => {
+                (prev_val <= 180.0 && next_val > 180.0) || (next_val <= 180.0 && prev_val > 180.0)
+            }
             _ => prev_val * next_val <= 0.0,
         }
     }
