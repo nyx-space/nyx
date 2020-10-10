@@ -277,14 +277,3 @@ impl<S: Copy> StopCondition<S> {
         }
     }
 }
-
-/// Built-in events, will likely be expanded as development continues.
-#[derive(Clone, Copy, Debug)]
-pub enum ConvergenceError {
-    /// Event not triggered in max prop time
-    NeverTriggered,
-    /// Event not hit enough times (requested, found)
-    UnsufficientTriggers(usize, usize),
-    /// Value corresponds to the number of iterations used
-    MaxIterReached(usize),
-}

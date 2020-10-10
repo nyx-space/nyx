@@ -128,7 +128,9 @@ fn main() -> Result<(), ParsingError> {
         if should_exec {
             match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
                 Ok(odp) => {
-                    odp.execute();
+                    if let Some(e) = odp.execute().err() {
+                        return Err(ParsingError::ExecutionError(e));
+                    };
                 }
                 Err(e) => match e {
                     ParsingError::UseMdInstead => {
@@ -141,7 +143,9 @@ fn main() -> Result<(), ParsingError> {
                         ) {
                             Ok(md) => {
                                 info!("Executing sequence `{}`", seq_name);
-                                md.execute();
+                                if let Some(e) = md.execute().err() {
+                                    return Err(ParsingError::ExecutionError(e));
+                                };
                             }
                             Err(e) => {
                                 error!("{:?}", e);

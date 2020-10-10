@@ -1,6 +1,6 @@
 use super::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
 use super::propulsion::Propulsion;
-use super::{Dynamics, ForceModel};
+use super::{Dynamics, ForceModel, NyxError};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::dimension::{DimNameAdd, DimNameSum};
 use crate::dimensions::{DefaultAllocator, DimName, Matrix6, Vector1, Vector6, VectorN, U1, U6};
@@ -96,25 +96,31 @@ where
         )
     }
 
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
+    fn set_state(
+        &mut self,
+        new_t: f64,
+        new_state: &VectorN<f64, Self::StateSize>,
+    ) -> Result<(), NyxError>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
     {
         let orbital_dyn_state = new_state.fixed_rows::<D::StateSize>(0).into_owned();
-        self.orbital_dyn.set_state(new_t, &orbital_dyn_state);
+        self.orbital_dyn.set_state(new_t, &orbital_dyn_state)?;
         self.fuel_mass = new_state[Self::StateSize::dim() - 1];
         if let Some(prop) = &self.prop {
-            if prop.decrement_mass {
-                assert!(
-                    self.fuel_mass >= 0.0,
+            if prop.decrement_mass && self.fuel_mass < 0.0 {
+                error!(
                     "negative fuel mass at {:?}",
                     self.orbital_dyn.orbital_state().dt
                 );
+                return Err(NyxError::FuelExhausted);
             }
         }
         if let Some(prop) = self.prop.as_mut() {
             prop.set_state(&self.orbital_dyn.orbital_state());
         }
+
+        Ok(())
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize>

@@ -77,7 +77,7 @@ fn transfer_schedule_no_depl() {
 
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     // Compute the errors
     let (err_r, err_v) = rss_errors(
@@ -175,7 +175,7 @@ fn transfer_schedule_depl() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
     let mut prop = Propagator::default(&mut sc, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     // Compute the errors
     let (err_r, err_v) = rss_errors(

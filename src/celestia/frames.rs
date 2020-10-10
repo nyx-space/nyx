@@ -46,17 +46,11 @@ pub enum Frame {
 
 impl Frame {
     pub fn is_geoid(&self) -> bool {
-        match self {
-            Frame::Geoid { .. } => true,
-            _ => false,
-        }
+        matches!(self, Frame::Geoid { .. })
     }
 
     pub fn is_celestial(&self) -> bool {
-        match self {
-            Frame::Celestial { .. } => true,
-            _ => false,
-        }
+        matches!(self, Frame::Celestial { .. })
     }
 
     pub fn gm(&self) -> f64 {

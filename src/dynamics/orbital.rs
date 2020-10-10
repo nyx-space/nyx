@@ -1,6 +1,6 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
-use super::{AccelModel, AutoDiff, Dynamics};
+use super::{AccelModel, AutoDiff, Dynamics, NyxError};
 use crate::dimensions::{
     allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN,
     U3, U36, U4, U42, U6, U7,
@@ -114,9 +114,15 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
         self.state.to_cartesian_vec()
     }
 
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+    fn set_state(
+        &mut self,
+        new_t: f64,
+        new_state: &VectorN<f64, Self::StateSize>,
+    ) -> Result<(), NyxError> {
         self.relative_time = new_t;
         self.state = self.state_ctor(new_t, new_state);
+
+        Ok(())
     }
 
     fn state(&self) -> State {
@@ -331,7 +337,11 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
         self.state
     }
 
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
+    fn set_state(
+        &mut self,
+        new_t: f64,
+        new_state: &VectorN<f64, Self::StateSize>,
+    ) -> Result<(), NyxError> {
         self.relative_time = new_t;
         self.state.dt = Epoch::from_tai_seconds(self.init_tai_secs + new_t);
         self.state.x = new_state[0];
@@ -352,9 +362,11 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
 
         let mut stm_prev = self.state.stm();
         if !stm_prev.try_inverse_mut() {
-            panic!("STM not invertible: {}", stm_prev);
+            error!("STM not invertible: {}", stm_prev);
+            return Err(NyxError::SingularStateTransitionMatrix);
         }
         self.state.stm = Some(stm_k_to_0 * stm_prev);
+        Ok(())
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {

@@ -1,9 +1,10 @@
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
-use super::events::{ConvergenceError, EventTrackers, StopCondition};
+use super::events::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
 use dynamics::Dynamics;
+use errors::NyxError;
 use std::f64;
 use std::f64::EPSILON;
 use std::sync::mpsc::Sender;
@@ -79,7 +80,8 @@ where
     /// Resets the propagator to its initial time and state
     pub fn reset(&mut self) {
         self.dynamics
-            .set_state(self.init_time, &self.init_state_vec);
+            .set_state(self.init_time, &self.init_state_vec)
+            .unwrap();
     }
 
     /// Allows setting the step size of the propagator
@@ -121,7 +123,7 @@ where
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `self.dynamics.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> D::StateType {
+    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> Result<D::StateType, NyxError> {
         let backprop = elapsed_time < 0.0;
         if backprop {
             self.step_size *= -1.0; // Invert the step size
@@ -135,14 +137,14 @@ where
             {
                 if (stop_time - dt).abs() < f64::EPSILON {
                     // No propagation necessary
-                    return self.dynamics.state();
+                    return Ok(self.dynamics.state());
                 }
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                self.dynamics.set_state(t, &state);
+                self.dynamics.set_state(t, &state)?;
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, t, &self.dynamics.state());
@@ -158,11 +160,11 @@ where
                 if backprop {
                     self.step_size *= -1.0; // Restore to a positive step size
                 }
-                return self.dynamics.state();
+                return Ok(self.dynamics.state());
             } else {
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
                 // We haven't passed the time based stopping condition.
-                self.dynamics.set_state(t, &state);
+                self.dynamics.set_state(t, &state)?;
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, t, &self.dynamics.state());
@@ -180,7 +182,7 @@ where
     pub fn until_event(
         &mut self,
         condition: StopCondition<D::StateType>,
-    ) -> Result<D::StateType, ConvergenceError> {
+    ) -> Result<D::StateType, NyxError> {
         self.prevent_tx = true;
         // Rewrite the event tracker
         if !self.event_trackers.events.is_empty() {
@@ -188,15 +190,15 @@ where
         }
 
         self.event_trackers = EventTrackers::from_event(condition.event);
-        self.until_time_elapsed(condition.max_prop_time);
+        self.until_time_elapsed(condition.max_prop_time)?;
         // Check if the event has been triggered
         if self.event_trackers.found_bounds[0].len() < condition.trigger {
             if condition.trigger == 1 {
                 // Event was never triggered
-                return Err(ConvergenceError::NeverTriggered);
+                return Err(NyxError::ConditionNeverTriggered);
             } else {
                 // Event not triggered enough times
-                return Err(ConvergenceError::UnsufficientTriggers(
+                return Err(NyxError::UnsufficientTriggers(
                     condition.trigger,
                     self.event_trackers.found_bounds[0].len(),
                 ));
@@ -207,10 +209,10 @@ where
         self.reset();
         self.event_trackers.reset();
         // Compute the initial values of the condition at those bounds.
-        self.until_time_elapsed(xa);
+        self.until_time_elapsed(xa)?;
         let mut ya = self.event_trackers.events[0].eval(&self.dynamics.state());
         // And prop until next bound
-        self.until_time_elapsed(xb - xa);
+        self.until_time_elapsed(xb - xa)?;
         let mut yb = self.event_trackers.events[0].eval(&self.dynamics.state());
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
@@ -262,7 +264,7 @@ where
                 flag = false;
             }
             // Propagate until time s
-            self.until_time_elapsed(s - self.dynamics.time());
+            self.until_time_elapsed(s - self.dynamics.time())?;
             let ys = self.event_trackers.events[0].eval(&self.dynamics.state());
             d = c;
             c = xb;
@@ -270,7 +272,7 @@ where
             if ya * ys < 0.0 {
                 // Root bracketed between a and s
                 // Propagate until time xa
-                self.until_time_elapsed(xa - self.dynamics.time());
+                self.until_time_elapsed(xa - self.dynamics.time())?;
                 let ya_p = self.event_trackers.events[0].eval(&self.dynamics.state());
                 let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
@@ -282,7 +284,7 @@ where
             } else {
                 // Root bracketed between s and b
                 // Propagate until time xb
-                self.until_time_elapsed(xb - self.dynamics.time());
+                self.until_time_elapsed(xb - self.dynamics.time())?;
                 let yb_p = self.event_trackers.events[0].eval(&self.dynamics.state());
                 let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {
@@ -294,13 +296,13 @@ where
             }
             iter += 1;
             if iter >= condition.max_iter {
-                return Err(ConvergenceError::MaxIterReached(iter));
+                return Err(NyxError::MaxIterReached(iter));
             }
         }
 
         // Now that we have the time at which the condition is matched, let's propagate until then
         self.prevent_tx = false;
-        self.until_time_elapsed(self.dynamics.time() - closest_t);
+        self.until_time_elapsed(self.dynamics.time() - closest_t)?;
 
         Ok(self.dynamics.state())
     }

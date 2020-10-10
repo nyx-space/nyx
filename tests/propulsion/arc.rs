@@ -40,7 +40,7 @@ fn arc_example() {
 
     let mut arc = MissionArc::new(celestial, schedule);
     let mut prop = Propagator::default(&mut arc, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     println!("final state: {:o}", prop.dynamics.celestial.state());
 }

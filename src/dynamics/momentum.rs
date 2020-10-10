@@ -1,4 +1,4 @@
-use super::Dynamics;
+use super::{Dynamics, NyxError};
 use crate::dimensions::{Matrix3, Vector3, VectorN, U3};
 use std::f64;
 use utils::is_diagonal;
@@ -55,9 +55,15 @@ impl Dynamics for AngularMom {
     }
 
     /// Set the **angular velocity** ω of the system and the time.
-    fn set_state(&mut self, new_t: f64, new_angular_velocity: &VectorN<f64, Self::StateSize>) {
+    fn set_state(
+        &mut self,
+        new_t: f64,
+        new_angular_velocity: &VectorN<f64, Self::StateSize>,
+    ) -> Result<(), NyxError> {
         self.time = new_t;
         self.velocity = *new_angular_velocity;
+
+        Ok(())
     }
 
     /// Computes the instantaneous equations of motion of the angular velocity of a tensor (i.e. the angular acceleration).

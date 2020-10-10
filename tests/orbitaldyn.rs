@@ -39,7 +39,7 @@ fn two_body_dynamics() {
     let mut dynamics = OrbitalDynamics::two_body(state);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     assert!(
         (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
     );
@@ -48,7 +48,7 @@ fn two_body_dynamics() {
         "two body prop failed"
     );
     // And now do the backprop
-    prop.until_time_elapsed(-prop_time);
+    prop.until_time_elapsed(-prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
@@ -60,7 +60,7 @@ fn two_body_dynamics() {
     );
     assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days()).abs() <= EPSILON);
     // Forward propagation again to confirm that we can do repeated calls
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     assert!(
         (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
     );
@@ -116,7 +116,7 @@ fn halo_earth_moon_dynamics() {
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -181,7 +181,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -247,7 +247,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -315,7 +315,7 @@ fn halo_multi_body_dynamics() {
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -385,7 +385,7 @@ fn halo_multi_body_dynamics_adaptive() {
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -454,7 +454,7 @@ fn llo_multi_body_dynamics_adaptive() {
     let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -516,7 +516,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -577,7 +577,7 @@ fn leo_multi_body_dynamics_adaptive() {
     let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
     println!("Absolute errors");
@@ -669,13 +669,13 @@ fn two_body_dual() {
     let prop_time = SECONDS_PER_DAY;
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_state = prop.dynamics.state.to_cartesian_vec();
     let final_stm = prop.dynamics.stm();
     let final_step = prop.latest_details().step;
-    prop.until_time_elapsed(-final_step);
+    prop.until_time_elapsed(-final_step).unwrap();
 
     // And check the difference
     let stm_err = final_stm * prop.dynamics.state.to_cartesian_vec() - final_state;
@@ -710,13 +710,13 @@ fn multi_body_dynamics_dual() {
     let mut dynamics = OrbitalDynamicsStm::point_masses(halo_rcvr, bodies, &cosm);
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_state = prop.dynamics.state.to_cartesian_vec();
     let final_stm = prop.dynamics.state.stm();
     let final_step = prop.latest_details().step;
-    prop.until_time_elapsed(-final_step);
+    prop.until_time_elapsed(-final_step).unwrap();
 
     // And check the difference
     let stm_err = final_stm * prop.dynamics.state.to_cartesian_vec() - final_state;
@@ -779,7 +779,7 @@ fn earth_sph_harmonics_j2() {
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
-    prop.until_time_elapsed(SECONDS_PER_DAY);
+    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!("{}", prop.state());
     println!("Error: {:3.12}", prop.state_vector() - rslt_monte);
@@ -834,7 +834,7 @@ fn earth_sph_harmonics_12x12() {
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
-    prop.until_time_elapsed(SECONDS_PER_DAY);
+    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
 
@@ -887,7 +887,7 @@ fn earth_sph_harmonics_70x70() {
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(SECONDS_PER_DAY);
+    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
 
@@ -940,7 +940,7 @@ fn earth_sph_harmonics_70x70_partials() {
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-    prop.until_time_elapsed(SECONDS_PER_DAY);
+    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!(
         "Error: {:3.12}",
@@ -990,7 +990,7 @@ fn hf_prop() {
     dynamics.add_model(Box::new(harmonics));
 
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
-    let rslt = prop.until_time_elapsed(30.0 * SECONDS_PER_DAY);
+    let rslt = prop.until_time_elapsed(30.0 * SECONDS_PER_DAY).unwrap();
 
     println!("{}\n{:o}", rslt, rslt);
 }

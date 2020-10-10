@@ -39,7 +39,7 @@ fn srp_earth() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
     println!("{}", final_state);
@@ -92,7 +92,7 @@ fn exp_drag_earth() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
     println!("{}", final_state);
@@ -129,7 +129,7 @@ fn std_atm_drag_earth() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
     println!("{}", final_state);
@@ -188,7 +188,7 @@ fn std_atm_drag_earth_low() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::default(&mut sc, &PropOpts::default());
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
     println!("{}", final_state);

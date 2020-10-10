@@ -53,7 +53,7 @@ fn srif_fixed_step_perfect_stations() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -95,8 +95,7 @@ fn srif_fixed_step_perfect_stations() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "kf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
@@ -186,7 +185,7 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -240,8 +239,7 @@ fn srif_fixed_step_perfect_stations_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "srif failed");
+    odp.process_measurements(&measurements).unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation-srif.csv").unwrap();
 

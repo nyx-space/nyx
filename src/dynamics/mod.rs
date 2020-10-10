@@ -6,6 +6,8 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U3, U7};
 use crate::time::Epoch;
 
+pub use crate::errors::NyxError;
+
 /// The orbital module handles all Cartesian based orbital dynamics.
 ///
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
@@ -74,7 +76,11 @@ pub trait Dynamics {
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 
     /// Updates the internal state of the dynamics.
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
+    fn set_state(
+        &mut self,
+        new_t: f64,
+        new_state: &VectorN<f64, Self::StateSize>,
+    ) -> Result<(), NyxError>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 

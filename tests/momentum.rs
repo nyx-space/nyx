@@ -20,7 +20,7 @@ fn const_mom() {
         &PropOpts::with_adaptive_step(0.1, 5.0, 1e-8, LargestStep {}),
     );
 
-    prop.until_time_elapsed(5.0);
+    prop.until_time_elapsed(5.0).unwrap();
 
     println!("{:?}", prop.latest_details());
     let delta_mom = ((prop.dynamics.momentum().norm() - init_momentum) / init_momentum).abs();
@@ -31,7 +31,7 @@ fn const_mom() {
         );
     }
 
-    prop.until_time_elapsed(-5.0);
+    prop.until_time_elapsed(-5.0).unwrap();
     println!("{:?}", prop.latest_details());
     let delta_mom = ((prop.dynamics.momentum().norm() - init_momentum) / init_momentum).abs();
     if delta_mom > tolerance {

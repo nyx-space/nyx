@@ -8,7 +8,7 @@ pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalD
 use crate::dynamics::solarpressure::SolarPressure;
 use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
 use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
-pub use crate::dynamics::Dynamics;
+pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::formatter::*;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ConditionSerde;
@@ -28,10 +28,7 @@ pub enum StmState<N, M> {
 
 impl<N, M> StmState<N, M> {
     pub fn with(&self) -> bool {
-        match self {
-            StmState::With(_) => true,
-            _ => false,
-        }
+        matches!(self, StmState::With(_))
     }
 }
 
@@ -375,12 +372,15 @@ where
         }
     }
 
-    pub fn execute(mut self) {
+    pub fn execute(mut self) -> Result<(), NyxError> {
         self.execute_with(vec![])
     }
 
     /// Execute the MD with the provided handlers. Note that you must initialize your own CSV output if that's desired.
-    pub fn execute_with(&mut self, mut hdlrs: Vec<&mut dyn MdHdlr<SpacecraftState>>) {
+    pub fn execute_with(
+        &mut self,
+        mut hdlrs: Vec<&mut dyn MdHdlr<SpacecraftState>>,
+    ) -> Result<(), NyxError> {
         // Create the output file
         let mut maybe_wtr = match &self.formatter {
             Some(fmtr) => {
@@ -427,7 +427,7 @@ where
                     prop_time,
                     prop_time / SECONDS_PER_DAY
                 );
-                prop.until_time_elapsed(prop_time);
+                prop.until_time_elapsed(prop_time)?;
             }
         }
 
@@ -460,5 +460,7 @@ where
                 initial_state = None;
             }
         }
+
+        Ok(())
     }
 }

@@ -46,7 +46,7 @@ impl Propulsion {
             let thrust_inertial = self.ctrl.direction(osc);
             if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                 panic!(
-                    "thrust orientation is not a unit vector: norm = {}\n{}",
+                    "Invalid control low: thrust orientation is not a unit vector: norm = {}\n{}",
                     thrust_inertial.norm(),
                     thrust_inertial
                 );
