@@ -840,7 +840,6 @@ fn earth_sph_harmonics_12x12() {
 
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_gmat);
 
-    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
         dbg!(err_r) < 1e-1,
         format!("12x12 failed in position: {:.5e}", err_r)
@@ -894,14 +893,13 @@ fn earth_sph_harmonics_70x70() {
 
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_gmat);
 
-    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
         dbg!(err_r) < 0.2,
-        format!("12x12 failed in position: {:.5e}", err_r)
+        format!("70x70 failed in position: {:.5e}", err_r)
     );
     assert!(
         dbg!(err_v) < 1e-3,
-        format!("12x12 failed in velocity: {:.5e}", err_v)
+        format!("70x70 failed in velocity: {:.5e}", err_v)
     );
 }
 
@@ -951,7 +949,6 @@ fn earth_sph_harmonics_70x70_partials() {
 
     let (err_r, err_v) = rss_errors(&prop.state().to_cartesian_vec(), &rslt_gmat);
 
-    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
         dbg!(err_r) < 0.2,
         format!("12x12 failed in position: {:.5e}", err_r)
@@ -960,4 +957,40 @@ fn earth_sph_harmonics_70x70_partials() {
         dbg!(err_v) < 1e-3,
         format!("12x12 failed in velocity: {:.5e}", err_v)
     );
+}
+
+#[test]
+fn hf_prop() {
+    // Tests a high fidelity propagation over several days for performance analysis.
+
+    extern crate pretty_env_logger;
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+    use nyx::dynamics::sph_harmonics::Harmonics;
+    use nyx::io::gravity::*;
+
+    let mut cosm = Cosm::de438();
+    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    let eme2k = cosm.frame("EME2000");
+    let iau_earth = cosm.frame("IAU Earth");
+
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 21, 21, true).unwrap();
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+
+    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = State::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    let cosm = Cosm::de438();
+    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let mut dynamics = OrbitalDynamics::point_masses(state, bodies, &cosm);
+    dynamics.add_model(Box::new(harmonics));
+
+    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
+    let rslt = prop.until_time_elapsed(30.0 * SECONDS_PER_DAY);
+
+    println!("{}\n{:o}", rslt, rslt);
 }

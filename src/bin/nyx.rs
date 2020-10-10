@@ -5,18 +5,24 @@ extern crate glob;
 extern crate log;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
+extern crate rust_embed;
 
 use clap::{App, Arg};
 use config::{Config, File};
 use dialoguer::{theme::ColorfulTheme, Select};
 use glob::glob;
 use log::{error, info};
-use nyx::celestia::Cosm;
+use nyx::celestia::{load_ephemeris_from_buf, Cosm};
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
 use nyx::md::ui::{MDProcess, StmStateFlag};
+use rust_embed::RustEmbed;
 use std::env::{set_var, var};
 
 const LOG_VAR: &str = "NYX_LOG";
+
+#[derive(RustEmbed)]
+#[folder = "data/embed/"]
+struct EmbeddedAsset;
 
 fn main() -> Result<(), ParsingError> {
     let app = App::new("nyx")
@@ -105,8 +111,11 @@ fn main() -> Result<(), ParsingError> {
         }
     };
 
-    // Load cosm
-    let cosm = Cosm::de438();
+    // Load cosm from the embedded
+    let de438_buf: Vec<u8> = EmbeddedAsset::get("de438s-00-50.exb")
+        .expect("Could not find de438s-00-550.exb as asset")
+        .to_vec();
+    let cosm = Cosm::try_from_xb(load_ephemeris_from_buf(de438_buf).unwrap()).unwrap();
 
     // If there is an ODP setup, let's try to decode that
 

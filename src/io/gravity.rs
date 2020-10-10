@@ -10,7 +10,7 @@ use std::str::FromStr;
 /// from storing the gravity potential in another way, such as a remote database.
 pub trait GravityPotentialStor
 where
-    Self: Clone + Sized,
+    Self: Clone + Sized + Sync,
 {
     /// Returns the maximum degree of this gravity potential storage (Jn=J2,J3...)
     fn max_degree_n(&self) -> usize;

@@ -30,7 +30,7 @@ pub struct OrbitalDynamics<'a> {
     relative_time: f64,
     /// Allows us to rebuilt the true epoch
     init_tai_secs: f64,
-    pub accel_models: Vec<Box<dyn AccelModel + 'a>>,
+    pub accel_models: Vec<Box<dyn AccelModel + Sync + 'a>>,
 }
 
 impl<'a> OrbitalDynamicsT for OrbitalDynamics<'a> {
@@ -75,7 +75,7 @@ impl<'a> OrbitalDynamics<'a> {
     }
 
     /// Initialize orbital dynamics with a list of acceleration models
-    pub fn new(state: State, accel_models: Vec<Box<dyn AccelModel + 'a>>) -> Self {
+    pub fn new(state: State, accel_models: Vec<Box<dyn AccelModel + Sync + 'a>>) -> Self {
         Self {
             state,
             relative_time: 0.0,
@@ -84,7 +84,7 @@ impl<'a> OrbitalDynamics<'a> {
         }
     }
 
-    pub fn add_model(&mut self, accel_model: Box<dyn AccelModel + 'a>) {
+    pub fn add_model(&mut self, accel_model: Box<dyn AccelModel + Sync + 'a>) {
         self.accel_models.push(accel_model);
     }
 

@@ -142,7 +142,6 @@ where
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                trace!("@{:>.9}s: {}", t, self.details);
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
                 self.event_trackers
@@ -162,7 +161,6 @@ where
                 return self.dynamics.state();
             } else {
                 let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                trace!("@{:>.9}s: {}", t, self.details);
                 // We haven't passed the time based stopping condition.
                 self.dynamics.set_state(t, &state);
                 // Evaluate the event trackers
