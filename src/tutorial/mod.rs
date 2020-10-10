@@ -348,7 +348,7 @@ let mut prop = Propagator::default(&mut dynamics, &opts);
 let prop_time = SECONDS_PER_DAY;
 // Tell the propagator to integrate the trajectory for that specific amount of time.
 // You can get the last state from the output of the until_time_elapsed call
-let last_state_0 = prop.until_time_elapsed(prop_time);
+let last_state_0 = prop.until_time_elapsed(prop_time).unwrap();
 
 // Or by calling state() on the dynamics of the propagator.
 // Note that in order to call state(), we need to tell Rust that we're using
@@ -359,7 +359,7 @@ println!("{}\n{}", last_state_0, last_state_1);
 
 // We can check that the propagator works well by doing a back propagation
 // of that same amount of time, and checking that the value matches
-let backprop_state = prop.until_time_elapsed(-prop_time);
+let backprop_state = prop.until_time_elapsed(-prop_time).unwrap();
 println!("{}\n{}", state, backprop_state);
 
 // Finally, you can check the integration step used for the last step
@@ -417,7 +417,7 @@ println!("propagator options: {}", opts.info());
 // that we want the propagator to be an RK4Fixed type.
 let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
 
-let last_state = prop.until_time_elapsed(SECONDS_PER_DAY);
+let last_state = prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
 println!("{}", last_state);
 ```
@@ -630,7 +630,7 @@ thread::spawn(move || {
 });
 
 // And finally, let's propagate for a day.
-let last_state = prop.until_time_elapsed(SECONDS_PER_DAY);
+let last_state = prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 println!("{}", last_state);
 ```
 
@@ -678,7 +678,7 @@ thread::spawn(move || {
     let mut dynamics = OrbitalDynamics::point_masses(geo_bird, bodies, &cosm);
     let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
     prop.tx_chan = Some(truth_tx);
-    prop.until_time_elapsed(2.0 * SECONDS_PER_DAY);
+    prop.until_time_elapsed(2.0 * SECONDS_PER_DAY).unwrap();
 });
 
 // Get a copy of the Sun to pass it to the locator.
@@ -823,7 +823,7 @@ println!("propagator options: {}", opts.info());
 // Now let's setup the propagator.
 let mut prop = Propagator::default(&mut dynamics, &opts);
 // And finally, let's propagate for a day.
-let last_state = prop.until_time_elapsed(SECONDS_PER_DAY);
+let last_state = prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 println!("{}", last_state);
 ```
 
@@ -873,7 +873,7 @@ dynamics.add_model(Box::new(harmonics));
 dynamics.add_model(Box::new(pts_mass));
 
 let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
-prop.until_time_elapsed(prop_time);
+prop.until_time_elapsed(prop_time).unwrap();
 
 println!("Initial state: {:o}", orbit);
 println!("Final   state: {:o}", prop.state());
@@ -926,7 +926,7 @@ let mut prop = Propagator::new::<CashKarp45>(
 );
 
 // Propagate for five seconds.
-prop.until_time_elapsed(5.0);
+prop.until_time_elapsed(5.0).unwrap();
 
 println!("{:?}", prop.latest_details());
 
@@ -1026,7 +1026,7 @@ let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
 // And setup the propagator as usual.
 let mut prop = Propagator::default(&mut sc, &PropOpts::with_fixed_step(10.0));
-prop.until_time_elapsed(prop_time);
+prop.until_time_elapsed(prop_time).unwrap();
 
 println!("{}", prop.state());
 ```
@@ -1107,7 +1107,7 @@ println!("{:o}", orbit);
 
 let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
 prop.event_trackers = tracker;
-prop.until_time_elapsed(prop_time);
+prop.until_time_elapsed(prop_time).unwrap();
 
 println!("{}", prop.event_trackers);
 let final_state = prop.dynamics.orbital_dyn.state();
