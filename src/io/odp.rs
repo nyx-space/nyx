@@ -120,7 +120,8 @@ impl<'a> OdpScenario<'a> {
                         msr.propagator.as_ref().unwrap().to_string(),
                         StmStateFlag::Without(()),
                         cosm,
-                    )?;
+                    )?
+                    .0;
 
                     // Build the initial estimate
                     if all_estimates
@@ -235,7 +236,8 @@ impl<'a> OdpScenario<'a> {
                         odp_seq.navigation_prop.to_string(),
                         StmStateFlag::With(()),
                         cosm,
-                    )?;
+                    )?
+                    .0;
 
                     // Get the formatter
                     let formatter = match &odp_seq.output {

@@ -87,7 +87,7 @@ where
     }
 }
 
-impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
+impl<'a, S: GravityPotentialStor + Send> AccelModel for Harmonics<'a, S> {
     fn eom(&self, osc: &State) -> Vector3<f64> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self
@@ -274,7 +274,7 @@ where
     }
 }
 
-impl<'a, S: GravityPotentialStor> AutoDiff for HarmonicsDiff<'a, S> {
+impl<'a, S: GravityPotentialStor + Send> AutoDiff for HarmonicsDiff<'a, S> {
     type STMSize = U3;
     type HyperStateSize = U7;
 

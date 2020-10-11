@@ -11,7 +11,7 @@ pub enum ThrustingError {
 /// The `ThrustControl` trait handles control laws, optimizations, and other such methods for
 /// controlling the overall thrust direction when tied to a `Spacecraft`. For delta V control,
 /// tie the DeltaVctrl to a MissionArc.
-pub trait ThrustControl {
+pub trait ThrustControl: Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
     fn direction(&self, state: &State) -> Vector3<f64>;
 

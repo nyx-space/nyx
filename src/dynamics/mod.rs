@@ -89,7 +89,7 @@ pub trait Dynamics {
 }
 
 /// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-pub trait AutoDiff {
+pub trait AutoDiff: Send + Sync {
     /// Defines the state size of the estimated state
     type HyperStateSize: DimName;
     type STMSize: DimName;
@@ -140,7 +140,7 @@ pub trait AutoDiff {
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> {
+pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state.
     fn eom(&self, osc: &State) -> Vector3<f64>;
 }
@@ -148,7 +148,7 @@ pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> {
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
 ///
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
-pub trait AccelModel {
+pub trait AccelModel: Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
     fn eom(&self, osc: &State) -> Vector3<f64>;
 }

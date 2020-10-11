@@ -1,6 +1,8 @@
 extern crate csv;
+extern crate rayon;
 
-use super::MdHdlr;
+use self::rayon::prelude::*;
+use super::{MdHdlr, OrbitStateOutput};
 pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
@@ -18,6 +20,7 @@ use crate::propagators::{PropOpts, Propagator};
 use crate::time::{Epoch, SECONDS_PER_DAY};
 use std::str::FromStr;
 use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 pub enum StmState<N, M> {
@@ -41,7 +44,6 @@ where
 {
     sc_dyn: StmState<Spacecraft<'a, OrbitalDynamics<'a>>, Spacecraft<'a, OrbitalDynamicsStm<'a>>>,
     pub formatter: Option<StateFormatter<'a>>,
-    pub output: Vec<State>,
     pub prop_time_s: Option<f64>,
     pub prop_event: Option<ConditionSerde>,
     pub prop_tol: f64,
@@ -57,7 +59,7 @@ where
         prop_name: String,
         stm_flag: StmStateFlag,
         cosm: &'a Cosm,
-    ) -> Result<Self, ParsingError> {
+    ) -> Result<(Self, Option<StateFormatter<'a>>), ParsingError> {
         match scen.propagator.get(&prop_name.to_lowercase()) {
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
@@ -327,15 +329,17 @@ where
                     None => 1e-12,
                 };
 
-                Ok(Self {
-                    sc_dyn: sc_dyn_flagged,
+                Ok((
+                    Self {
+                        sc_dyn: sc_dyn_flagged,
+                        formatter: None,
+                        prop_time_s,
+                        prop_event,
+                        prop_tol,
+                        name: prop_name.clone(),
+                    },
                     formatter,
-                    output: Vec::with_capacity(65_535),
-                    prop_time_s,
-                    prop_event,
-                    prop_tol,
-                    name: prop_name.clone(),
-                })
+                ))
             }
         }
     }
@@ -379,20 +383,31 @@ where
     /// Execute the MD with the provided handlers. Note that you must initialize your own CSV output if that's desired.
     pub fn execute_with(
         &mut self,
-        mut hdlrs: Vec<&mut dyn MdHdlr<SpacecraftState>>,
+        // mut hdlrs: Vec<&mut dyn MdHdlr<SpacecraftState>>,
+        // mut hdlrs: Vec<Arc<Mutex<dyn MdHdlr<SpacecraftState>>>>,
+        mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>>,
     ) -> Result<(), NyxError> {
-        // Create the output file
-        let mut maybe_wtr = match &self.formatter {
-            Some(fmtr) => {
-                let mut wtr =
-                    csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
-                wtr.serialize(&fmtr.headers)
-                    .expect("could not write headers");
-                info!("Saving output to {}", fmtr.filename);
-                Some(wtr)
-            }
-            None => None,
-        };
+        // Create the output
+        // if let Some(fmtr) = self.formatter {
+        //     let mut out = Arc::new(Mutex::new(OrbitStateOutput::new(fmtr.clone())));
+        //     // let mut wtr =
+        //     //     csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+        //     // wtr.serialize(&fmtr.headers)
+        //     //     .expect("could not write headers");
+        //     // info!("Saving output to {}", fmtr.filename);
+        //     hdlrs.push(out);
+        // }
+        // let mut maybe_wtr = match &self.formatter {
+        //     Some(fmtr) => {
+        //         let mut wtr =
+        //             csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+        //         wtr.serialize(&fmtr.headers)
+        //             .expect("could not write headers");
+        //         info!("Saving output to {}", fmtr.filename);
+        //         Some(wtr)
+        //     }
+        //     None => None,
+        // };
 
         // Get the prop time before the mutable ref of the propagator
         let maybe_prop_time = self.prop_time_s;
@@ -439,22 +454,29 @@ where
 
         while let Ok(prop_state) = rx.try_recv() {
             // Provide to the handler
-            for hdlr in &mut hdlrs {
+            hdlrs.par_iter_mut().for_each(|hdlr| {
+                // let mut hdlr = hdlr_am.lock().unwrap();
                 if let Some(first_state) = initial_state {
                     hdlr.handle(&first_state);
                 }
                 hdlr.handle(&prop_state);
-            }
-            self.output.push(prop_state.orbit);
-            if let Some(wtr) = &mut maybe_wtr {
-                if let Some(first_state) = initial_state {
-                    wtr.serialize(self.formatter.as_ref().unwrap().fmt(&first_state.orbit))
-                        .expect("could not format state");
-                }
-                wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state.orbit))
-                    .expect("could not format state");
-            }
+            });
 
+            // for hdlr in &mut hdlrs {
+            //     if let Some(first_state) = initial_state {
+            //         hdlr.handle(&first_state);
+            //     }
+            //     hdlr.handle(&prop_state);
+            // }
+
+            // if let Some(wtr) = &mut maybe_wtr {
+            //     if let Some(first_state) = initial_state {
+            //         wtr.serialize(self.formatter.as_ref().unwrap().fmt(&first_state.orbit))
+            //             .expect("could not format state");
+            //     }
+            //     wtr.serialize(self.formatter.as_ref().unwrap().fmt(&prop_state.orbit))
+            //         .expect("could not format state");
+            // }
             // We've used the initial state (if it was there)
             if initial_state.is_some() {
                 initial_state = None;
@@ -464,3 +486,91 @@ where
         Ok(())
     }
 }
+
+// pub fn execute_with(
+//     mut mdp: MDProcess,
+//     formatter: Option<StateFormatter>,
+//     mut hdlrs: Vec<&mut dyn MdHdlr<SpacecraftState>>,
+// ) -> Result<(), NyxError> {
+//     // Create the output file
+//     let mut maybe_wtr = match &formatter {
+//         Some(fmtr) => {
+//             let mut wtr =
+//                 csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+//             wtr.serialize(&fmtr.headers)
+//                 .expect("could not write headers");
+//             info!("Saving output to {}", fmtr.filename);
+//             Some(wtr)
+//         }
+//         None => None,
+//     };
+
+//     // Get the prop time before the mutable ref of the propagator
+//     let maybe_prop_time = mdp.prop_time_s;
+//     let maybe_prop_event = mdp.prop_event.clone();
+
+//     // Build the propagator
+//     let mut prop = mdp.propagator();
+//     // Set up the channels
+//     let (tx, rx) = channel();
+//     prop.tx_chan = Some(tx);
+
+//     let mut initial_state = Some(prop.state());
+
+//     info!("Initial state: {}", prop.state());
+//     let start = Instant::now();
+
+//     std::thread::spawn(move || {
+//         while let Ok(prop_state) = rx.try_recv() {
+//             // Provide to the handler
+//             for hdlr in &mut hdlrs {
+//                 if let Some(first_state) = initial_state {
+//                     hdlr.handle(&first_state);
+//                 }
+//                 hdlr.handle(&prop_state);
+//             }
+//             if let Some(wtr) = &mut maybe_wtr {
+//                 if let Some(first_state) = initial_state {
+//                     wtr.serialize(formatter.as_ref().unwrap().fmt(&first_state.orbit))
+//                         .expect("could not format state");
+//                 }
+//                 wtr.serialize(formatter.as_ref().unwrap().fmt(&prop_state.orbit))
+//                     .expect("could not format state");
+//             }
+//             // We've used the initial state (if it was there)
+//             if initial_state.is_some() {
+//                 initial_state = None;
+//             }
+//         }
+//     });
+
+//     // Run
+//     match maybe_prop_event {
+//         Some(prop_event) => {
+//             let stop_cond = prop_event.to_condition(initial_state.unwrap().orbit.dt);
+//             info!("Propagating until event {:?}", stop_cond.event);
+//             let rslt = prop.until_event(stop_cond);
+//             if rslt.is_err() {
+//                 panic!("{:?}", rslt.err());
+//             }
+//         }
+//         None => {
+//             // Elapsed seconds propagation
+//             let prop_time = maybe_prop_time.unwrap();
+//             info!(
+//                 "Propagating for {} seconds (~ {:.3} days)",
+//                 prop_time,
+//                 prop_time / SECONDS_PER_DAY
+//             );
+//             prop.until_time_elapsed(prop_time)?;
+//         }
+//     }
+
+//     info!(
+//         "Final state:   {} (computed in {:.3} seconds)",
+//         prop.state(),
+//         (Instant::now() - start).as_secs_f64()
+//     );
+
+//     Ok(())
+// }
