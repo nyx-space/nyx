@@ -626,8 +626,7 @@ impl Cosm {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
-                    let mut lt_dt = datetime;
-                    lt_dt.mut_sub_secs(lt);
+                    let lt_dt = datetime - lt;
                     tgt = self.celestial_state(target_exb_id, lt_dt, ssb2k, LTCorr::None);
                 }
                 // Compute the correct state

@@ -67,11 +67,9 @@ pub struct Mnvr {
 impl Mnvr {
     /// Creates an instantaneous maneuver whose vector is the deltaV.
     pub fn instantaneous(dt: Epoch, vector: Vector3<f64>) -> Self {
-        let mut end_dt = dt;
-        end_dt.mut_add_secs(1e-6);
         Self {
             start: dt,
-            end: end_dt,
+            end: dt + 1e-6,
             thrust_lvl: 1.0,
             vector,
         }
