@@ -58,7 +58,7 @@ fn ekf_fixed_step_perfect_stations() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -107,8 +107,7 @@ fn ekf_fixed_step_perfect_stations() {
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -176,7 +175,7 @@ fn ckf_fixed_step_perfect_stations() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -224,8 +223,7 @@ fn ckf_fixed_step_perfect_stations() {
         measurements.len(),
     );
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "kf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
@@ -283,12 +281,8 @@ fn ckf_fixed_step_perfect_stations() {
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
 
     // Iterate
-    if odp
-        .iterate(&measurements, SmoothingArc::TimeGap(10.0))
-        .is_some()
-    {
-        panic!("iteration failed");
-    }
+    odp.iterate(&measurements, SmoothingArc::TimeGap(10.0))
+        .unwrap();
 
     println!(
         "N-1 one iteration: \n{}",
@@ -341,7 +335,7 @@ fn ckf_fixed_step_iteration_test() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -393,17 +387,12 @@ fn ckf_fixed_step_iteration_test() {
         measurements.len(),
     );
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "kf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Iterate, and check that the initial state difference is lower
     // Iterate
-    if odp
-        .iterate(&measurements, SmoothingArc::TimeGap(10.0))
-        .is_some()
-    {
-        panic!("iteration failed");
-    }
+    odp.iterate(&measurements, SmoothingArc::TimeGap(10.0))
+        .unwrap();
 
     let dstate_no_iteration = initial_state - initial_state2;
     let dstate_iteration = initial_state - odp.estimates[0].state();
@@ -458,7 +447,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -506,8 +495,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "kf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
@@ -599,8 +587,7 @@ fn ckf_map_covar() {
 
     let mut odp = ODProcess::default_ckf(prop_est, ckf, all_stations);
 
-    let filter_return = odp.map_covar(dt + prop_time);
-    assert!(filter_return.is_none(), "covar mapping failed");
+    odp.map_covar(dt + prop_time).unwrap();
 
     // Check that the covariance inflated
     let estimates = odp.estimates;
@@ -675,7 +662,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
         dynamics.add_model(Box::new(harmonics));
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -722,9 +709,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "kf failed");
-
+    odp.process_measurements(&measurements).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
     // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
@@ -792,7 +777,7 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -853,8 +838,7 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "kf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 

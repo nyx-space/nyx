@@ -66,7 +66,7 @@ fn sc_ckf_perfect_stations() {
         )));
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -117,8 +117,7 @@ fn sc_ckf_perfect_stations() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "kf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), &cosm);

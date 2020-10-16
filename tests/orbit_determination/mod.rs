@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::nyx::celestia::State;
-use self::nyx::od::ui::{Estimate, Filter, FilterError, KfEstimate, KF};
+use self::nyx::od::ui::{Estimate, Filter, KfEstimate, NyxError, KF};
 
 mod measurements;
 mod multi_body;
@@ -55,27 +55,27 @@ fn filter_errors() {
     match ckf.time_update(State::zeros()) {
         Ok(_) => panic!("expected the time update to fail"),
         Err(e) => {
-            assert_eq!(e, FilterError::StateTransitionMatrixNotUpdated);
+            assert_eq!(e, NyxError::StateTransitionMatrixNotUpdated);
         }
     }
     match ckf.measurement_update(State::zeros(), real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
-            assert_eq!(e, FilterError::StateTransitionMatrixNotUpdated);
+            assert_eq!(e, NyxError::StateTransitionMatrixNotUpdated);
         }
     }
     ckf.update_stm(stm);
     match ckf.measurement_update(State::zeros(), real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
-            assert_eq!(e, FilterError::SensitivityNotUpdated);
+            assert_eq!(e, NyxError::SensitivityNotUpdated);
         }
     }
     ckf.update_h_tilde(sensitivity);
     match ckf.measurement_update(State::zeros(), real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {
-            assert_eq!(e, FilterError::GainSingular);
+            assert_eq!(e, NyxError::SingularKalmanGain);
         }
     }
 }

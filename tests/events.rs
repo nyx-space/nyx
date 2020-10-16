@@ -37,7 +37,7 @@ fn event_tracker_true_anomaly() {
         &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
     prop.event_trackers = tracker;
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     // Check how many times we have found that event
     println!("{}", prop.event_trackers);

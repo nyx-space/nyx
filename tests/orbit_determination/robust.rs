@@ -71,7 +71,7 @@ fn robust_test_ekf_two_body() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -125,8 +125,7 @@ fn robust_test_ekf_two_body() {
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -239,7 +238,7 @@ fn robust_test_ekf_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -291,8 +290,7 @@ fn robust_test_ekf_multi_body() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -423,7 +421,7 @@ fn robust_test_ekf_harmonics() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -480,8 +478,7 @@ fn robust_test_ekf_harmonics() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -594,7 +591,7 @@ fn robust_test_ekf_realistic() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -643,8 +640,7 @@ fn robust_test_ekf_realistic() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -750,7 +746,7 @@ fn robust_test_ckf_smoother_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -795,8 +791,7 @@ fn robust_test_ckf_smoother_multi_body() {
 
     let mut odp = ODProcess::ckf(prop_est, kf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
@@ -1017,7 +1012,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -1076,8 +1071,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
@@ -1292,7 +1286,7 @@ fn robust_test_ckf_iteration_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -1337,15 +1331,13 @@ fn robust_test_ckf_iteration_multi_body() {
 
     let mut odp = ODProcess::ckf(prop_est, kf, all_stations, false, measurements.len());
 
-    let rtn = odp.process_measurements(&measurements);
-    assert!(rtn.is_none(), "ekf failed");
+    odp.process_measurements(&measurements).unwrap();
 
     // Clone the initial estimates
     let pre_iteration_estimates = odp.estimates.clone();
 
     // Iterate
-    let rtn = odp.iterate(&measurements, SmoothingArc::All);
-    assert!(rtn.is_none(), "ekf iteration failed");
+    odp.iterate(&measurements, SmoothingArc::All).unwrap();
 
     let mut rss_pos_avr = 0.0;
     let mut rss_vel_avr = 0.0;

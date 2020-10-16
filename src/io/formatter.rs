@@ -638,6 +638,7 @@ impl Serialize for NavSolutionHeader {
 }
 
 /// A formatter for states
+#[derive(Clone)]
 pub struct StateFormatter<'a> {
     pub filename: String,
     pub headers: Vec<StateHeader>,

@@ -58,7 +58,7 @@ pub struct Cosm {
     axb_names: HashMap<String, i32>,
     exb_map: Graph<i32, u8, Undirected>,
     axb_map: Graph<i32, u8, Undirected>,
-    // Stores the rotations, cannot be in the map because Box<dyn T> si not clonable, and therefore cannot be used for A*
+    // Stores the rotations, cannot be in the map because Box<dyn T> is not clonable, and therefore cannot be used for A*
     axb_rotations: HashMap<i32, Box<dyn ParentRotation>>,
     j2k_nidx: NodeIndex<u32>,
 }
@@ -97,20 +97,19 @@ impl Error for CosmError {
 impl Cosm {
     /// Builds a Cosm from the *XB files. Path should _not_ contain file extension. Panics if the files could not be loaded.
     pub fn from_xb(filename: &str) -> Self {
-        Self::try_from_xb(load_ephemeris(filename).unwrap())
+        Self::try_from_xb(load_ephemeris(filename).as_ref().unwrap())
             .unwrap_or_else(|_| panic!("could not open EXB file {}", filename))
     }
 
     pub fn try_from_xb_file(filename: &str) -> Result<Self, IoError> {
-        Ok(Self::try_from_xb(load_ephemeris(filename)?)?)
+        Ok(Self::try_from_xb(&load_ephemeris(filename)?)?)
     }
 
     /// Tries to load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
     pub fn try_de438() -> Result<Self, IoError> {
-        let de438_buf: Vec<u8> = EmbeddedAsset::get("de438s-00-50.exb")
-            .expect("Could not find de438s-00-550.exb as asset")
-            .to_vec();
-        Ok(Self::try_from_xb(load_ephemeris_from_buf(de438_buf)?)?)
+        let de438_buf = EmbeddedAsset::get("de438s-00-50.exb")
+            .expect("Could not find de438s-00-550.exb as asset");
+        Ok(Self::try_from_xb(&load_ephemeris_from_buf(&de438_buf)?)?)
     }
 
     /// Load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
@@ -119,7 +118,7 @@ impl Cosm {
     }
 
     /// Attempts to build a Cosm from the *XB files and the embedded IAU frames
-    pub fn try_from_xb(ephemerides: Vec<Ephemeris>) -> Result<Self, IoError> {
+    pub fn try_from_xb(ephemerides: &[Ephemeris]) -> Result<Self, IoError> {
         let mut axb_map: Graph<i32, u8, Undirected> = Graph::new_undirected();
         let j2k_nidx = axb_map.add_node(0);
 
@@ -148,9 +147,7 @@ impl Cosm {
         cosm.frames
             .insert("solar system barycenter j2000".to_owned(), ssb2k);
 
-        if let Some(err) = cosm.append_xb(ephemerides) {
-            return Err(err);
-        }
+        cosm.append_xb(ephemerides)?;
 
         cosm.load_iau_frames();
 
@@ -163,10 +160,13 @@ impl Cosm {
         // Load the IAU frames from the embedded TOML
         let iau_toml_str =
             EmbeddedAsset::get("iau_frames.toml").expect("Could not find iau_frames.toml as asset");
-        if let Some(err) = self.append_frames(
-            std::str::from_utf8(&iau_toml_str)
-                .expect("Could not deserialize iau_frames.toml as string"),
-        ) {
+        if let Some(err) = self
+            .append_frames(
+                std::str::from_utf8(&iau_toml_str)
+                    .expect("Could not deserialize iau_frames.toml as string"),
+            )
+            .err()
+        {
             error!("Could not load IAU frames: {}", err);
         }
         info!(
@@ -176,9 +176,9 @@ impl Cosm {
         );
     }
 
-    pub fn append_xb(&mut self, ephemerides: Vec<Ephemeris>) -> Option<IoError> {
+    pub fn append_xb(&mut self, ephemerides: &[Ephemeris]) -> Result<(), IoError> {
         let j2k_str = "j2000";
-        for ephem in &ephemerides {
+        for ephem in ephemerides {
             let id = ephem.id.as_ref().unwrap();
 
             self.ephemerides.insert(id.number, ephem.clone());
@@ -278,11 +278,11 @@ impl Cosm {
             }
         }
 
-        None
+        Ok(())
     }
 
     /// Append Cosm with the contents of this TOML (must _not_ be the filename)
-    pub fn append_frames(&mut self, toml_content: &str) -> Option<IoError> {
+    pub fn append_frames(&mut self, toml_content: &str) -> Result<(), IoError> {
         let maybe_frames: Result<frame_serde::FramesSerde, _> = toml::from_str(toml_content);
         match maybe_frames {
             Ok(mut frames) => {
@@ -308,7 +308,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse right_asc `{}` - are there any special characters? {}",
                             &name, &rot.right_asc, e);
                             error!("{}", msg);
-                            return Some(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
                         }
                     };
                     let declin: Expr = match rot.declin.parse() {
@@ -317,7 +317,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse declin `{}` - are there any special characters? {}",
                             &name, &rot.declin, e);
                             error!("{}", msg);
-                            return Some(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
                         }
                     };
                     let w_expr: Expr = match rot.w.parse() {
@@ -326,7 +326,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse w `{}` - are there any special characters? {}",
                             &name, &rot.w, e);
                             error!("{}", msg);
-                            return Some(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
                         }
                     };
 
@@ -357,11 +357,11 @@ impl Cosm {
                     debug!("Loaded frame {}", frame_name);
                     self.frames.insert(frame_name, new_frame);
                 }
-                None
+                Ok(())
             }
             Err(e) => {
                 error!("{}", e);
-                Some(IoError::new(IoErrorKind::InvalidData, e))
+                Err(IoError::new(IoErrorKind::InvalidData, e))
             }
         }
     }
@@ -626,8 +626,7 @@ impl Cosm {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
-                    let mut lt_dt = datetime;
-                    lt_dt.mut_sub_secs(lt);
+                    let lt_dt = datetime - lt;
                     tgt = self.celestial_state(target_exb_id, lt_dt, ssb2k, LTCorr::None);
                 }
                 // Compute the correct state
@@ -883,13 +882,13 @@ pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
         panic!("EXB file {} is empty (zero bytes read)", input_filename);
     }
 
-    load_ephemeris_from_buf(input_exb_buf)
+    load_ephemeris_from_buf(&input_exb_buf)
 }
 
 /// Loads the provided input_filename as an EXB
 ///
 /// This function may panic!
-pub fn load_ephemeris_from_buf(input_exb_buf: Vec<u8>) -> Result<Vec<Ephemeris>, IoError> {
+pub fn load_ephemeris_from_buf(input_exb_buf: &[u8]) -> Result<Vec<Ephemeris>, IoError> {
     let decode_start = Instant::now();
 
     let ephcnt =
@@ -1330,7 +1329,7 @@ mod tests {
         let mut cosm = Cosm::de438();
         let ephem_buf = load_ephemeris("./de438s").unwrap();
         // Let's load the same XB again to demonstrate idempotency.
-        cosm.append_xb(ephem_buf);
+        cosm.append_xb(&ephem_buf).unwrap();
 
         let jde = Epoch::from_jde_et(2_452_312.500_742_881);
 

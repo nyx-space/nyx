@@ -4,7 +4,8 @@ use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3};
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
 pub use super::snc::SNC;
-use super::{CovarFormat, EpochFormat, EstimableState, Filter, FilterError};
+use super::{CovarFormat, EpochFormat, EstimableState, Filter};
+pub use crate::errors::NyxError;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -214,9 +215,9 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, FilterError> {
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError> {
         if !self.stm_updated {
-            return Err(FilterError::StateTransitionMatrixNotUpdated);
+            return Err(NyxError::StateTransitionMatrixNotUpdated);
         }
 
         let covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
@@ -253,12 +254,12 @@ where
         nominal_state: T,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
-    ) -> Result<(Self::Estimate, Residual<M>), FilterError> {
+    ) -> Result<(Self::Estimate, Residual<M>), NyxError> {
         if !self.stm_updated {
-            return Err(FilterError::StateTransitionMatrixNotUpdated);
+            return Err(NyxError::StateTransitionMatrixNotUpdated);
         }
         if !self.h_tilde_updated {
-            return Err(FilterError::SensitivityNotUpdated);
+            return Err(NyxError::SensitivityNotUpdated);
         }
 
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
@@ -308,7 +309,7 @@ where
         let h_tilde_t = &self.h_tilde.transpose();
         let mut invertible_part = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
         if !invertible_part.try_inverse_mut() {
-            return Err(FilterError::GainSingular);
+            return Err(NyxError::SingularKalmanGain);
         }
         let gain = &covar_bar * h_tilde_t * invertible_part;
 

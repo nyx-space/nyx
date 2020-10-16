@@ -11,7 +11,7 @@ use std::fmt;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::str::FromStr;
 
-pub trait ParentRotation: fmt::Debug {
+pub trait ParentRotation: Send + Sync + fmt::Debug {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>>;
 }
 

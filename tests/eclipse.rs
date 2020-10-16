@@ -32,7 +32,7 @@ fn leo_sun_earth_eclipses() {
         let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
         let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Initialize the EclipseLocator
@@ -83,7 +83,7 @@ fn geo_sun_earth_eclipses() {
         let mut dynamics = OrbitalDynamics::point_masses(leo, bodies, &cosm);
         let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time);
+        prop.until_time_elapsed(prop_time).unwrap();
     });
 
     // Initialize the EclipseLocator

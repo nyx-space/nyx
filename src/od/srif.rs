@@ -8,7 +8,8 @@ use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
 pub use super::estimate::{Estimate, IfEstimate};
 pub use super::residual::Residual;
 use super::snc::SNC;
-use super::{CovarFormat, EpochFormat, EstimableState, Filter, FilterError};
+use super::{CovarFormat, EpochFormat, EstimableState, Filter};
+pub use crate::errors::NyxError;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -182,9 +183,9 @@ where
     /// Computes a time update/prediction (i.e. advances the filter estimate with the updated STM).
     ///
     /// May return a FilterError if the STM was not updated.
-    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, FilterError> {
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError> {
         if !self.stm_updated {
-            return Err(FilterError::StateTransitionMatrixNotUpdated);
+            return Err(NyxError::StateTransitionMatrixNotUpdated);
         }
 
         let stm_inv = self
@@ -227,13 +228,13 @@ where
         nominal_state: T,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
-    ) -> Result<(Self::Estimate, Residual<M>), FilterError> {
+    ) -> Result<(Self::Estimate, Residual<M>), NyxError> {
         if !self.h_tilde_updated {
-            return Err(FilterError::SensitivityNotUpdated);
+            return Err(NyxError::SensitivityNotUpdated);
         }
         // Compute the time update (copy/paste to keep the `_bar` markings)
         if !self.stm_updated {
-            return Err(FilterError::StateTransitionMatrixNotUpdated);
+            return Err(NyxError::StateTransitionMatrixNotUpdated);
         }
         let stm_inv = self
             .stm

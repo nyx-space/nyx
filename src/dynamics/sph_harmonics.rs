@@ -87,7 +87,7 @@ where
     }
 }
 
-impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
+impl<'a, S: GravityPotentialStor + Send> AccelModel for Harmonics<'a, S> {
     fn eom(&self, osc: &State) -> Vector3<f64> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self
@@ -138,16 +138,16 @@ impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
         }
 
         let rho = self.compute_frame.equatorial_radius() / r_;
+        let mut a0 = 0.0;
         let mut a1 = 0.0;
         let mut a2 = 0.0;
         let mut a3 = 0.0;
-        let mut a4 = 0.0;
 
         for n in 1..max_degree {
+            let mut sum0 = 0.0;
             let mut sum1 = 0.0;
             let mut sum2 = 0.0;
             let mut sum3 = 0.0;
-            let mut sum4 = 0.0;
 
             for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n, m);
@@ -163,23 +163,23 @@ impl<'a, S: GravityPotentialStor> AccelModel for Harmonics<'a, S> {
                     s_val * r_m[m - 1] - c_val * i_m[m - 1]
                 };
 
-                sum1 += (m as f64) * a_nm[(n, m)] * e_;
-                sum2 += (m as f64) * a_nm[(n, m)] * f_;
-                sum3 += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
-                sum4 += self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+                sum0 += (m as f64) * a_nm[(n, m)] * e_;
+                sum1 += (m as f64) * a_nm[(n, m)] * f_;
+                sum2 += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
+                sum3 += self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
             let rr = rho.powi(n as i32 + 1);
+            a0 += rr * sum0;
             a1 += rr * sum1;
             a2 += rr * sum2;
             a3 += rr * sum3;
-            a4 += rr * sum4;
         }
         let mu_fact = self.compute_frame.gm() / (self.compute_frame.equatorial_radius() * r_);
+        a0 *= mu_fact;
         a1 *= mu_fact;
         a2 *= mu_fact;
-        a3 *= mu_fact;
-        a4 *= -mu_fact;
-        let accel = Vector3::new(a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_);
+        a3 *= -mu_fact;
+        let accel = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
         // Convert back to integration frame
         dcm.transpose() * accel
     }
@@ -274,7 +274,7 @@ where
     }
 }
 
-impl<'a, S: GravityPotentialStor> AutoDiff for HarmonicsDiff<'a, S> {
+impl<'a, S: GravityPotentialStor + Send> AutoDiff for HarmonicsDiff<'a, S> {
     type STMSize = U3;
     type HyperStateSize = U7;
 

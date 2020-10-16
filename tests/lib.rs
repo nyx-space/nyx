@@ -1,2 +1,2 @@
-mod prop;
-mod stat_od;
+mod orbit_determination;
+mod propulsion;

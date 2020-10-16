@@ -24,11 +24,7 @@ fn arc_example() {
 
     let prop_time = 86_400.0;
 
-    let mut mnvr1_dt = start_time;
-    mnvr1_dt.mut_add_secs(2.0 * 3600.0);
-
-    let mut end_time = start_time;
-    end_time.mut_add_secs(prop_time);
+    let mnvr1_dt = start_time + 2.0 * 3600.0;
 
     // Define the dynamics
     let celestial = OrbitalDynamics::two_body(orbit);
@@ -40,7 +36,7 @@ fn arc_example() {
 
     let mut arc = MissionArc::new(celestial, schedule);
     let mut prop = Propagator::default(&mut arc, &PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time);
+    prop.until_time_elapsed(prop_time).unwrap();
 
     println!("final state: {:o}", prop.dynamics.celestial.state());
 }

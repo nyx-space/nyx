@@ -2,21 +2,43 @@ extern crate clap;
 extern crate config;
 extern crate dialoguer;
 extern crate glob;
+extern crate lazy_static;
 extern crate log;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
+extern crate rust_embed;
 
 use clap::{App, Arg};
 use config::{Config, File};
 use dialoguer::{theme::ColorfulTheme, Select};
 use glob::glob;
+use lazy_static::lazy_static;
 use log::{error, info};
-use nyx::celestia::Cosm;
+use nyx::celestia::{load_ephemeris_from_buf, Cosm};
+use nyx::dynamics::spacecraft::SpacecraftState;
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
 use nyx::md::ui::{MDProcess, StmStateFlag};
+use nyx::md::MdHdlr;
+use nyx::md::OrbitStateOutput;
+use rust_embed::RustEmbed;
+use std::borrow::Cow;
 use std::env::{set_var, var};
 
 const LOG_VAR: &str = "NYX_LOG";
+
+lazy_static! {
+    static ref COSM: Cosm = {
+        let de438_buf: Cow<'static, [u8]> = EmbeddedAsset::get("de438s-00-50.exb")
+            .expect("Could not find de438s-00-550.exb as asset");
+        let ephem_vec = load_ephemeris_from_buf(&de438_buf).unwrap();
+        let cosm: Cosm = Cosm::try_from_xb(&ephem_vec).unwrap();
+        cosm
+    };
+}
+
+#[derive(RustEmbed)]
+#[folder = "data/embed/"]
+struct EmbeddedAsset;
 
 fn main() -> Result<(), ParsingError> {
     let app = App::new("nyx")
@@ -105,11 +127,7 @@ fn main() -> Result<(), ParsingError> {
         }
     };
 
-    // Load cosm
-    let cosm = Cosm::de438();
-
     // If there is an ODP setup, let's try to decode that
-
     for seq_name in &scenario.sequence {
         let should_exec = if let Some(req_seq_name) = &req_seq_name {
             seq_name == req_seq_name
@@ -117,9 +135,11 @@ fn main() -> Result<(), ParsingError> {
             true
         };
         if should_exec {
-            match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), &cosm) {
+            match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), &COSM) {
                 Ok(odp) => {
-                    odp.execute();
+                    if let Some(e) = odp.execute().err() {
+                        return Err(ParsingError::ExecutionError(e));
+                    };
                 }
                 Err(e) => match e {
                     ParsingError::UseMdInstead => {
@@ -128,11 +148,19 @@ fn main() -> Result<(), ParsingError> {
                             &scenario,
                             seq_name.to_string(),
                             StmStateFlag::Without(()),
-                            &cosm,
+                            &COSM,
                         ) {
-                            Ok(md) => {
+                            Ok((mut md, maybe_fmtr)) => {
+                                let mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>> = Vec::new();
+                                if let Some(fmtr) = maybe_fmtr {
+                                    let out = Box::new(OrbitStateOutput::new(fmtr.clone()));
+                                    hdlrs.push(out);
+                                }
+
                                 info!("Executing sequence `{}`", seq_name);
-                                md.execute();
+                                if let Some(e) = md.execute_with(hdlrs).err() {
+                                    return Err(ParsingError::ExecutionError(e));
+                                };
                             }
                             Err(e) => {
                                 error!("{:?}", e);

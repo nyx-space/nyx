@@ -3,6 +3,7 @@ extern crate csv;
 pub use crate::celestia::*;
 use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U6};
 use crate::dynamics::spacecraft::SpacecraftState;
+use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
@@ -119,7 +120,8 @@ impl<'a> OdpScenario<'a> {
                         msr.propagator.as_ref().unwrap().to_string(),
                         StmStateFlag::Without(()),
                         cosm,
-                    )?;
+                    )?
+                    .0;
 
                     // Build the initial estimate
                     if all_estimates
@@ -234,7 +236,8 @@ impl<'a> OdpScenario<'a> {
                         odp_seq.navigation_prop.to_string(),
                         StmStateFlag::With(()),
                         cosm,
-                    )?;
+                    )?
+                    .0;
 
                     // Get the formatter
                     let formatter = match &odp_seq.output {
@@ -273,7 +276,7 @@ impl<'a> OdpScenario<'a> {
     }
 
     /// Will generate the measurements and run the filter.
-    pub fn execute(mut self) {
+    pub fn execute(mut self) -> Result<(), NyxError> {
         // Generate the measurements.
         let prop_time = self.truth.prop_time_s.unwrap();
 
@@ -309,7 +312,7 @@ impl<'a> OdpScenario<'a> {
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state());
 
-        truth_prop.until_time_elapsed(prop_time);
+        truth_prop.until_time_elapsed(prop_time)?;
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
@@ -358,7 +361,7 @@ impl<'a> OdpScenario<'a> {
         let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
         let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), false, 100_000, trig);
 
-        odp.process_measurements(&sim_measurements);
+        odp.process_measurements(&sim_measurements)?;
 
         // Save to output file if requested
         // Create the output file
@@ -377,5 +380,7 @@ impl<'a> OdpScenario<'a> {
         if let Some(final_estimate) = &odp.estimates.last() {
             println!("Final estimate:\n{}", final_estimate);
         }
+
+        Ok(())
     }
 }

@@ -11,7 +11,7 @@ pub enum ThrustingError {
 /// The `ThrustControl` trait handles control laws, optimizations, and other such methods for
 /// controlling the overall thrust direction when tied to a `Spacecraft`. For delta V control,
 /// tie the DeltaVctrl to a MissionArc.
-pub trait ThrustControl {
+pub trait ThrustControl: Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
     fn direction(&self, state: &State) -> Vector3<f64>;
 
@@ -67,11 +67,9 @@ pub struct Mnvr {
 impl Mnvr {
     /// Creates an instantaneous maneuver whose vector is the deltaV.
     pub fn instantaneous(dt: Epoch, vector: Vector3<f64>) -> Self {
-        let mut end_dt = dt;
-        end_dt.mut_add_secs(1e-6);
         Self {
             start: dt,
-            end: end_dt,
+            end: dt + 1e-6,
             thrust_lvl: 1.0,
             vector,
         }

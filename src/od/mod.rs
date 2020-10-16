@@ -4,7 +4,7 @@ use crate::celestia::TimeTagged;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::time::Epoch;
-use dynamics::Dynamics;
+pub use dynamics::{Dynamics, NyxError};
 use std::fmt;
 use std::ops::Add;
 
@@ -118,18 +118,18 @@ where
 
     /// Computes a time update/prediction at the provided nominal state (i.e. advances the filter estimate with the updated STM).
     ///
-    /// Returns a FilterError if the STM was not updated.
-    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, FilterError>;
+    /// Returns an error if the STM was not updated.
+    fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError>;
 
     /// Computes the measurement update with a provided real observation and computed observation.
     ///
-    ///Returns a FilterError if the STM or sensitivity matrices were not updated.
+    ///Returns an error if the STM or sensitivity matrices were not updated.
     fn measurement_update(
         &mut self,
         nominal_state: T,
         real_obs: VectorN<f64, M>,
         computed_obs: VectorN<f64, M>,
-    ) -> Result<(Self::Estimate, residual::Residual<M>), FilterError>;
+    ) -> Result<(Self::Estimate, residual::Residual<M>), NyxError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)
     fn is_extended(&self) -> bool;
@@ -139,40 +139,6 @@ where
 
     /// Sets the process noise matrix of the estimated state
     fn set_process_noise(&mut self, snc: snc::SNC<A>);
-}
-
-/// Stores the different kinds of filter errors.
-#[derive(Debug, PartialEq)]
-pub enum FilterError {
-    StateTransitionMatrixNotUpdated,
-    SensitivityNotUpdated,
-    GainSingular,
-    StateTransitionMatrixSingular,
-    CovarianceMatrixSingular,
-}
-
-impl fmt::Display for FilterError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            FilterError::StateTransitionMatrixNotUpdated => {
-                write!(f, "STM was not updated prior to time or measurement update")
-            }
-            FilterError::SensitivityNotUpdated => write!(
-                f,
-                "The measurement matrix H_tilde was not updated prior to measurement update"
-            ),
-            FilterError::GainSingular => write!(
-                f,
-                "Gain could not be computed because H*P_bar*H + R is singular"
-            ),
-            FilterError::StateTransitionMatrixSingular => {
-                write!(f, "STM is singular, smoothing cannot proceed")
-            }
-            FilterError::CovarianceMatrixSingular => {
-                write!(f, "Covariance is singular, smoothing cannot proceed")
-            }
-        }
-    }
 }
 
 /// A trait defining a measurement of size `MeasurementSize`

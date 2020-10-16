@@ -6,6 +6,8 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U3, U7};
 use crate::time::Epoch;
 
+pub use crate::errors::NyxError;
+
 /// The orbital module handles all Cartesian based orbital dynamics.
 ///
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
@@ -74,7 +76,11 @@ pub trait Dynamics {
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 
     /// Updates the internal state of the dynamics.
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>)
+    fn set_state(
+        &mut self,
+        new_t: f64,
+        new_state: &VectorN<f64, Self::StateSize>,
+    ) -> Result<(), NyxError>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
 
@@ -83,7 +89,7 @@ pub trait Dynamics {
 }
 
 /// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-pub trait AutoDiff {
+pub trait AutoDiff: Send + Sync {
     /// Defines the state size of the estimated state
     type HyperStateSize: DimName;
     type STMSize: DimName;
@@ -134,7 +140,7 @@ pub trait AutoDiff {
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> {
+pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state.
     fn eom(&self, osc: &State) -> Vector3<f64>;
 }
@@ -142,7 +148,7 @@ pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> {
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
 ///
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
-pub trait AccelModel {
+pub trait AccelModel: Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
     fn eom(&self, osc: &State) -> Vector3<f64>;
 }

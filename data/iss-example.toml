@@ -27,7 +27,7 @@ orbital_dynamics = "iss"
 
 [propagator.iss]
 dynamics = "iss"
-stop_cond = "1.0 days"
+stop_cond = "30.0 days"
 output = "my_csv"
 
 [accel_models.my_models.harmonics.jgm3_70x70]

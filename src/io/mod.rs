@@ -3,6 +3,7 @@ extern crate regex;
 extern crate serde;
 extern crate serde_derive;
 
+use crate::errors::NyxError;
 use crate::time::Epoch;
 use std::fmt;
 use std::str::FromStr;
@@ -47,6 +48,7 @@ pub enum ParsingError {
     Distance(String),
     Velocity(String),
     IllDefined(String),
+    ExecutionError(NyxError),
 }
 
 /// Specifies the format of the Epoch during serialization

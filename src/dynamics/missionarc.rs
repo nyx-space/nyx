@@ -1,6 +1,6 @@
 use super::deltavctrl::DeltaVctrl;
 use super::orbital::OrbitalDynamics;
-use super::Dynamics;
+use super::{Dynamics, NyxError};
 use crate::dimensions::{VectorN, U6};
 use celestia::State;
 
@@ -34,9 +34,15 @@ impl<'a, D: DeltaVctrl> Dynamics for MissionArc<'a, D> {
         self.celestial.state_vector()
     }
 
-    fn set_state(&mut self, new_t: f64, new_state: &VectorN<f64, Self::StateSize>) {
-        self.celestial.set_state(new_t, new_state);
+    fn set_state(
+        &mut self,
+        new_t: f64,
+        new_state: &VectorN<f64, Self::StateSize>,
+    ) -> Result<(), NyxError> {
+        self.celestial.set_state(new_t, new_state)?;
         self.ctrl.next(&self.celestial.state());
+
+        Ok(())
     }
 
     fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize> {

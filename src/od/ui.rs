@@ -149,7 +149,7 @@ where
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&mut self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, FilterError> {
+    pub fn smooth(&mut self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, NyxError> {
         let l = self.estimates.len() - 1;
         let mut k = l - 1;
 
@@ -175,7 +175,7 @@ where
             let p_kp1_k = est_kp1.predicted_covar();
             let p_kp1_k_inv = &p_kp1_k
                 .try_inverse()
-                .ok_or_else(|| FilterError::CovarianceMatrixSingular)?;
+                .ok_or_else(|| NyxError::SingularCovarianceMatrix)?;
             // Compute Sk
             let sk = p_k_k * phi_kp1_k.transpose() * p_kp1_k_inv;
             // Compute smoothed estimate
@@ -246,11 +246,11 @@ where
         &mut self,
         measurements: &[Msr],
         condition: SmoothingArc,
-    ) -> Option<FilterError> {
+    ) -> Result<(), NyxError> {
         // First, smooth the estimates
         let smoothed = match self.smooth(condition) {
             Ok(smoothed) => smoothed,
-            Err(e) => return Some(e),
+            Err(e) => return Err(e),
         };
         // Reset the propagator
         self.prop.reset();
@@ -259,15 +259,14 @@ where
         self.estimates.push(smoothed[0].clone());
         self.kf.set_previous_estimate(&smoothed[0]);
         // And re-run the filter
-        self.process_measurements(measurements)?;
-        None
+        self.process_measurements(measurements)
     }
 
     /// Allows processing all measurements with covariance mapping.
     ///
     /// Important notes:
     /// + the measurements have be to mapped to a fixed time corresponding to the step of the propagator
-    pub fn process_measurements(&mut self, measurements: &[Msr]) -> Option<FilterError> {
+    pub fn process_measurements(&mut self, measurements: &[Msr]) -> Result<(), NyxError> {
         let (tx, rx) = channel();
         self.prop.tx_chan = Some(tx);
         assert!(
@@ -300,7 +299,7 @@ where
             let next_msr_epoch = msr.epoch();
 
             let delta_t = next_msr_epoch - prev_dt;
-            self.prop.until_time_elapsed(delta_t);
+            self.prop.until_time_elapsed(delta_t)?;
 
             while let Ok(nominal_state) = rx.try_recv() {
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
@@ -328,7 +327,7 @@ where
                             }
                             self.estimates.push(est);
                         }
-                        Err(e) => return Some(e),
+                        Err(e) => return Err(e),
                     }
                 } else {
                     // The epochs match, so this is a valid measurement to use
@@ -387,7 +386,7 @@ where
                                         self.estimates.push(est);
                                         self.residuals.push(res);
                                     }
-                                    Err(e) => return Some(e),
+                                    Err(e) => return Err(e),
                                 }
 
                                 // If we do not have simultaneous measurements from different devices
@@ -421,18 +420,19 @@ where
             info!("{:>3}% done ({:.0} measurements processed)", 100, num_msrs);
         }
 
-        None
+        Ok(())
     }
 
     /// Allows for covariance mapping without processing measurements
-    pub fn map_covar(&mut self, end_epoch: Epoch) -> Option<FilterError> {
+    pub fn map_covar(&mut self, end_epoch: Epoch) -> Result<(), NyxError> {
         let (tx, rx) = channel();
         self.prop.tx_chan = Some(tx);
         // Start by propagating the estimator (on the same thread).
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Propagating for {} seconds", prop_time);
 
-        self.prop.until_time_elapsed(prop_time);
+        self.prop.until_time_elapsed(prop_time)?;
+
         info!("Mapping covariance");
 
         while let Ok(nominal_state) = rx.try_recv() {
@@ -450,11 +450,11 @@ where
                     }
                     self.estimates.push(est);
                 }
-                Err(e) => return Some(e),
+                Err(e) => return Err(e),
             }
         }
 
-        None
+        Ok(())
     }
 }
 
