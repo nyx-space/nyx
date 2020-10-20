@@ -114,8 +114,8 @@ fn nrho_apo() {
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
     let condition = StopCondition::new(apo_event, 2.0 * SECONDS_PER_DAY, 1e-1);
 
-    let mut dynamics =
-        OrbitalDynamics::point_masses(state_luna, vec![bodies::EARTH, bodies::SUN], &cosm);
+    let bodies = vec![bodies::EARTH, bodies::SUN];
+    let mut dynamics = OrbitalDynamics::point_masses(state_luna, &bodies, &cosm);
 
     let mut prop = Propagator::default(
         &mut dynamics,

@@ -57,7 +57,7 @@ fn sc_ckf_perfect_stations() {
     thread::spawn(move || {
         let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let orbital_dyn = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut dynamics = Spacecraft::new(orbital_dyn, sc_dry_mass);
         dynamics.add_model(Box::new(SolarPressure::default(
             sc_area,
@@ -86,7 +86,7 @@ fn sc_ckf_perfect_stations() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let orbital_dyn = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
+    let orbital_dyn = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
     let mut estimator = Spacecraft::with_stm(orbital_dyn, sc_dry_mass);
     let init_sc_state = estimator.state();
     estimator.add_model(Box::new(SolarPressure::default(

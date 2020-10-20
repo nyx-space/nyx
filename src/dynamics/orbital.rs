@@ -53,7 +53,7 @@ impl<'a> OrbitalDynamicsT for OrbitalDynamics<'a> {
 
 impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(state: Orbit, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+    pub fn point_masses(state: Orbit, bodies: &[i32], cosm: &'a Cosm) -> Self {
         // Create the point masses
         let pts = PointMasses::new(state.frame, bodies, cosm);
         Self {
@@ -181,7 +181,7 @@ impl<'a> OrbitalDynamicsT for OrbitalDynamicsStm<'a> {
 
 impl<'a> OrbitalDynamicsStm<'a> {
     /// Initialize third body dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(state: Orbit, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
+    pub fn point_masses(state: Orbit, bodies: &[i32], cosm: &'a Cosm) -> Self {
         let pts = PointMasses::new(state.frame, bodies, cosm);
         let mut state = state;
         state.stm_identity();
@@ -430,8 +430,8 @@ pub struct PointMasses<'a> {
 }
 
 impl<'a> PointMasses<'a> {
-    pub fn new(propagation_frame: Frame, bodies: Vec<i32>, cosm: &'a Cosm) -> Self {
-        Self::with_correction(propagation_frame, bodies, cosm, LTCorr::None)
+    pub fn new(propagation_frame: Frame, bodies: &[i32], cosm: &'a Cosm) -> Self {
+        Self::with_correction(propagation_frame, bodies.to_vec(), cosm, LTCorr::None)
     }
 
     pub fn with_correction(

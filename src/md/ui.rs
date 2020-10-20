@@ -179,7 +179,7 @@ where
                     }
                     if stm_flag.with() {
                         let mut sc_dyn_stm = Spacecraft::with_stm(
-                            OrbitalDynamicsStm::point_masses(init_state, bodies, cosm),
+                            OrbitalDynamicsStm::point_masses(init_state, &bodies, cosm),
                             spacecraft.dry_mass,
                         );
                         if let Some(fuel_mass) = spacecraft.fuel_mass {
@@ -189,7 +189,7 @@ where
                         sc_dyn_flagged = StmState::With(sc_dyn_stm);
                     } else {
                         let mut sc_dyn = Spacecraft::new(
-                            OrbitalDynamics::point_masses(init_state, bodies, cosm),
+                            OrbitalDynamics::point_masses(init_state, &bodies, cosm),
                             spacecraft.dry_mass,
                         );
                         if let Some(fuel_mass) = spacecraft.fuel_mass {

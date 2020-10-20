@@ -39,9 +39,6 @@ pub mod thrustctrl;
 /// Defines some velocity change controllers.
 pub mod deltavctrl;
 
-/// Defines a MissionArc, i.e. a section of a spacecraft mission. Enables maneuvers design.
-pub mod missionarc;
-
 /// Defines solar radiation pressure models
 pub mod solarpressure;
 

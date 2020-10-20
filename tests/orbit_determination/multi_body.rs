@@ -52,7 +52,7 @@ fn multi_body_ckf_perfect_stations() {
     thread::spawn(move || {
         let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
+        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
@@ -74,7 +74,7 @@ fn multi_body_ckf_perfect_stations() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
+    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
     let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
@@ -183,7 +183,7 @@ fn multi_body_ckf_covar_map() {
     thread::spawn(move || {
         let cosm = Cosm::de438();
         let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, bodies, &cosm);
+        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
@@ -205,7 +205,7 @@ fn multi_body_ckf_covar_map() {
     // the measurements, and the same time step.
     let opts_est = PropOpts::with_fixed_step(step_size);
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, bodies, &cosm);
+    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
 
     let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
     let covar_radius = 1.0e-3_f64.powi(2);

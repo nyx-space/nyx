@@ -280,12 +280,22 @@ pub struct FiniteBurns {
     /// Maneuvers should be provided in chronological order, first maneuver first in the list
     pub mnvrs: Vec<Mnvr>,
     pub mnvr_no: usize,
+    /// The frame in which the maneuvers are defined.
+    pub frame: Frame,
 }
 
 impl FiniteBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
-    pub fn from_mnvrs(mnvrs: Vec<Mnvr>) -> Self {
-        Self { mnvrs, mnvr_no: 0 }
+    pub fn from_mnvrs(mnvrs: Vec<Mnvr>, frame: Frame) -> Self {
+        assert!(
+            matches!(frame, Frame::Inertial | Frame::VNC),
+            "Maneuvers must be either in the inertial frame or in a body frame"
+        );
+        Self {
+            mnvrs,
+            mnvr_no: 0,
+            frame,
+        }
     }
 }
 
@@ -298,7 +308,11 @@ impl ThrustControl for FiniteBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= osc.dt {
-                osc.dcm_to_inertial(Frame::VNC) * next_mnvr.vector
+                if matches!(self.frame, Frame::Inertial) {
+                    next_mnvr.vector
+                } else {
+                    osc.dcm_to_inertial(self.frame) * next_mnvr.vector
+                }
             } else {
                 Vector3::zeros()
             }

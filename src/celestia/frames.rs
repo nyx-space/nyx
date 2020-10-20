@@ -42,6 +42,8 @@ pub enum Frame {
     RCN,
     /// Radial, in-track, normal
     RIC,
+    /// Used as a placeholder only
+    Inertial,
 }
 
 impl Frame {

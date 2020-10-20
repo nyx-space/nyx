@@ -19,7 +19,8 @@ pub trait Heuristic {
 
 /// Lambert heuristic uses a Lambert transfer to find the shortest path between two nodes.
 /// It will then use mesh refinement combined with a z-score to adequately place the control nodes.
-struct LambertHeuristic {
+/// NOTE: This is very likely a bad heuristic. The propagator tolerance is to the meter accuracy.
+pub struct LambertHeuristic {
     pub tof: f64,
 }
 
@@ -36,21 +37,18 @@ impl Heuristic for LambertHeuristic {
 
         // Get into the transfer orbit.
         let mut start_tf = start;
-        start_tf.vx += sol.v_init[0];
-        start_tf.vy += sol.v_init[1];
-        start_tf.vz += sol.v_init[2];
+        start_tf.vx = sol.v_init[0];
+        start_tf.vy = sol.v_init[1];
+        start_tf.vz = sol.v_init[2];
 
         // Propagate for the TOF
         let cosm = Cosm::de438();
-        let mut dynamics = OrbitalDynamics::point_masses(
-            start_tf,
-            vec![bodies::EARTH_MOON, bodies::SSB, bodies::JUPITER_BARYCENTER],
-            &cosm,
-        );
+        let bodies = vec![bodies::EARTH_MOON, bodies::SSB, bodies::JUPITER_BARYCENTER];
+        let mut dynamics = OrbitalDynamics::point_masses(start_tf, &bodies, &cosm);
 
         // Create the channel to receive all of the details.
         let (tx, rx) = channel();
-        let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+        let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-3));
         prop.tx_chan = Some(tx);
         prop.until_time_elapsed(self.tof)?;
 
@@ -71,4 +69,25 @@ impl Heuristic for LambertHeuristic {
 
         Ok(nodes)
     }
+}
+
+#[test]
+fn lambert_heuristic() {
+    use crate::time::Epoch;
+    let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
+    let dest_dt = Epoch::from_gregorian_utc_at_noon(2020, 1, 1);
+    let delta_t = dest_dt - orig_dt;
+
+    let h = LambertHeuristic { tof: delta_t };
+
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let end = Orbit::keplerian(24_000.0, 0.1, 36.0, 60.0, 60.0, 180.0, dest_dt, eme2k);
+
+    let start = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 180.0, orig_dt, eme2k);
+
+    let nodes = h.nodes(start, end).unwrap();
+
+    println!("{}", nodes.len());
 }

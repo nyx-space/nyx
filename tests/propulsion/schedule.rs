@@ -1,16 +1,14 @@
-extern crate hifitime;
-extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::hifitime::Epoch;
-use self::na::Vector3;
-use self::nyx::celestia::{bodies, Cosm, Orbit};
+use self::nyx::celestia::{bodies, Cosm, Frame, Orbit};
+use self::nyx::dimensions::Vector3;
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
 use self::nyx::dynamics::Dynamics;
 use self::nyx::propagators::{PropOpts, Propagator, RK89};
+use self::nyx::time::Epoch;
 use self::nyx::utils::rss_errors;
 
 #[test]
@@ -51,7 +49,7 @@ fn transfer_schedule_no_depl() {
 
     // Define the dynamics
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let dynamics = OrbitalDynamics::point_masses(orbit, bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(orbit, &bodies, &cosm);
 
     // Define the thruster
     let biprop = vec![Thruster {
@@ -67,7 +65,7 @@ fn transfer_schedule_no_depl() {
         vector: Vector3::new(1.0, 0.0, 0.0),
     };
 
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
@@ -150,7 +148,7 @@ fn transfer_schedule_depl() {
 
     // Define the dynamics
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let dynamics = OrbitalDynamics::point_masses(orbit, bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(orbit, &bodies, &cosm);
 
     // Define the thruster
     let biprop = vec![Thruster {
@@ -166,7 +164,7 @@ fn transfer_schedule_depl() {
         vector: Vector3::new(1.0, 0.0, 0.0),
     };
 
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
