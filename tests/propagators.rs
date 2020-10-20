@@ -7,7 +7,7 @@ use std::f64;
 use approx::{abs_diff_eq, relative_eq};
 use hifitime::{Epoch, J2000_OFFSET};
 use na::Vector6;
-use nyx::celestia::{Cosm, State};
+use nyx::celestia::{Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStatePV;
 use nyx::propagators::*;
@@ -50,7 +50,7 @@ fn regress_leo_day_adaptive() {
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::cartesian(
+    let init = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -147,7 +147,7 @@ fn gmat_val_leo_day_adaptive() {
     let min_step = 0.1;
     let max_step = 30.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::cartesian(
+    let init = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -290,7 +290,7 @@ fn gmat_val_leo_day_fixed() {
 
     let prop_time = 3_600.0 * 24.0;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let init = State::cartesian(
+    let init = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 

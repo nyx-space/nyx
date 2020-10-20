@@ -41,7 +41,7 @@ where
 }
 
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct IntegrationDetails {
     /// step size used
     pub step: f64,

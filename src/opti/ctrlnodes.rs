@@ -1,0 +1,74 @@
+use crate::celestia::{bodies, Cosm, Orbit};
+use crate::dimensions::Vector3;
+use crate::dynamics::orbital::OrbitalDynamics;
+use crate::errors::NyxError;
+use crate::propagators::{PropOpts, Propagator};
+use crate::tools::lambert::{standard, TransferKind};
+use std::sync::mpsc::channel;
+
+#[derive(Copy, Clone, Debug)]
+pub struct Node {
+    pub orbit: Orbit,
+    pub ctrl: Vector3<f64>,
+}
+
+/// This trait determines the initial control nodes for direct multiple shooting.
+pub trait Heuristic {
+    fn nodes(&self, start: Orbit, end: Orbit) -> Result<Vec<Node>, NyxError>;
+}
+
+/// Lambert heuristic uses a Lambert transfer to find the shortest path between two nodes.
+/// It will then use mesh refinement combined with a z-score to adequately place the control nodes.
+struct LambertHeuristic {
+    pub tof: f64,
+}
+
+impl Heuristic for LambertHeuristic {
+    fn nodes(&self, start: Orbit, end: Orbit) -> Result<Vec<Node>, NyxError> {
+        // Start by solving the Lambert solution between these nodes.
+        let sol = standard(
+            start.radius(),
+            end.radius(),
+            self.tof,
+            start.frame.gm(),
+            TransferKind::Auto,
+        )?;
+
+        // Get into the transfer orbit.
+        let mut start_tf = start;
+        start_tf.vx += sol.v_init[0];
+        start_tf.vy += sol.v_init[1];
+        start_tf.vz += sol.v_init[2];
+
+        // Propagate for the TOF
+        let cosm = Cosm::de438();
+        let mut dynamics = OrbitalDynamics::point_masses(
+            start_tf,
+            vec![bodies::EARTH_MOON, bodies::SSB, bodies::JUPITER_BARYCENTER],
+            &cosm,
+        );
+
+        // Create the channel to receive all of the details.
+        let (tx, rx) = channel();
+        let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+        prop.tx_chan = Some(tx);
+        prop.until_time_elapsed(self.tof)?;
+
+        let mut node_states = Vec::new();
+        while let Ok(state) = rx.try_recv() {
+            node_states.push(state);
+        }
+
+        // Now that we have the nodes, let's compute the direction of each control
+        let mut nodes = Vec::new();
+        for i in 0..node_states.len() - 1 {
+            let this = &node_states[i];
+            let next = &node_states[i + 1];
+            let delta = next.radius() - this.radius();
+            let ctrl = delta / delta.norm();
+            nodes.push(Node { orbit: *this, ctrl });
+        }
+
+        Ok(nodes)
+    }
+}

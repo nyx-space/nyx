@@ -13,7 +13,7 @@ use self::rust_embed::RustEmbed;
 use super::cosm::prost::Message;
 use super::frames::*;
 use super::rotations::*;
-use super::state::State;
+use super::state::Orbit;
 use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, EphemerisContainer};
 use super::SPEED_OF_LIGHT_KMS;
@@ -497,7 +497,7 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
-    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<State, CosmError> {
+    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<Orbit, CosmError> {
         let ephem = self
             .ephemerides
             .get(&exb_id)
@@ -584,7 +584,7 @@ impl Cosm {
         let ref_frame_exb_id = ref_frame_id % 100_000;
         let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
         let dt = Epoch::from_jde_tai(jde);
-        Ok(State::cartesian(
+        Ok(Orbit::cartesian(
             x,
             y,
             z,
@@ -607,11 +607,11 @@ impl Cosm {
         datetime: Epoch,
         frame: Frame,
         correction: LTCorr,
-    ) -> Result<State, CosmError> {
+    ) -> Result<Orbit, CosmError> {
         match correction {
             LTCorr::None => {
                 let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
-                let state = State::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
+                let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
             LTCorr::LightTime | LTCorr::Abberation => {
@@ -630,7 +630,7 @@ impl Cosm {
                     tgt = self.celestial_state(target_exb_id, lt_dt, ssb2k, LTCorr::None);
                 }
                 // Compute the correct state
-                let mut state = State::cartesian(
+                let mut state = Orbit::cartesian(
                     (tgt - obs).x,
                     (tgt - obs).y,
                     (tgt - obs).z,
@@ -686,7 +686,7 @@ impl Cosm {
         datetime: Epoch,
         frame: Frame,
         correction: LTCorr,
-    ) -> State {
+    ) -> Orbit {
         self.try_celestial_state(target_exb_id, datetime, frame, correction)
             .unwrap()
     }
@@ -722,7 +722,7 @@ impl Cosm {
     }
 
     /// Attempts to return the provided state in the provided frame.
-    pub fn try_frame_chg(&self, state: &State, new_frame: Frame) -> Result<State, CosmError> {
+    pub fn try_frame_chg(&self, state: &Orbit, new_frame: Frame) -> Result<Orbit, CosmError> {
         if state.frame == new_frame {
             return Ok(*state);
         }
@@ -772,12 +772,12 @@ impl Cosm {
     }
 
     /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg(&self, state: &State, new_frame: Frame) -> State {
+    pub fn frame_chg(&self, state: &Orbit, new_frame: Frame) -> Orbit {
         self.try_frame_chg(state, new_frame).unwrap()
     }
 
     /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg_by_id(&self, state: &State, new_frame: i32) -> State {
+    pub fn frame_chg_by_id(&self, state: &Orbit, new_frame: i32) -> Orbit {
         let frame = self.frame_by_exb_id(new_frame);
         self.try_frame_chg(state, frame).unwrap()
     }
@@ -1161,7 +1161,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::cartesian(
+        let lro = Orbit::cartesian(
             4.017_685_334_718_784E5,
             2.642_441_356_763_487E4,
             -3.024_209_691_251_325E4,
@@ -1172,7 +1172,7 @@ mod tests {
             eme2k,
         );
 
-        let lro_jpl = State::cartesian(
+        let lro_jpl = Orbit::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -1204,7 +1204,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::cartesian(
+        let lro = Orbit::cartesian(
             -4.393_308_217_174_602E7,
             1.874_075_194_166_327E8,
             8.763_986_396_329_135E7,
@@ -1215,7 +1215,7 @@ mod tests {
             venus,
         );
 
-        let lro_jpl = State::cartesian(
+        let lro_jpl = Orbit::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -1247,7 +1247,7 @@ mod tests {
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::cartesian(
+        let lro = Orbit::cartesian(
             4.227_396_973_787_854E7,
             1.305_852_533_250_192E8,
             5.657_002_470_685_254E7,
@@ -1258,7 +1258,7 @@ mod tests {
             ssb,
         );
 
-        let lro_jpl = State::cartesian(
+        let lro_jpl = Orbit::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -1375,7 +1375,7 @@ mod tests {
         let earth_iau = cosm.frame("IAU Earth"); // 2000 Model!!
         let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
 
-        let state_eme2k = State::cartesian(
+        let state_eme2k = Orbit::cartesian(
             5_946.673_548_288_958,
             1_656.154_606_023_661,
             2_259.012_129_598_249,
@@ -1417,7 +1417,7 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '31-JAN-2000 12:00:00.0000 TAI'
         // Pos:  3.092802381110541e+02 -3.431791232988777e+03  6.891017545171710e+03
         // Vel:  6.917077556761001e+00  6.234631407415389e-01  4.062487128428244e-05
-        let state_eme2k = State::cartesian(
+        let state_eme2k = Orbit::cartesian(
             -2436.45,
             -2436.45,
             6891.037,
@@ -1440,7 +1440,7 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-MAR-2000 12:00:00.0000 TAI'
         // Pos: -1.424497118292030e+03 -3.137502417055381e+03  6.890998090503171e+03
         // Vel:  6.323912379829687e+00 -2.871020900962905e+00  8.125749038014632e-05
-        let state_eme2k = State::cartesian(
+        let state_eme2k = Orbit::cartesian(
             -2436.45,
             -2436.45,
             6891.037,

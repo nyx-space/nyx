@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use hifitime::{Epoch, SECONDS_PER_DAY};
 use na::Vector6;
-use nyx::celestia::{Cosm, State};
+use nyx::celestia::{Cosm, Orbit};
 use nyx::dynamics::drag::Drag;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::solarpressure::SolarPressure;
@@ -20,7 +20,7 @@ fn srp_earth() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
+    let orbit = Orbit::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
@@ -70,7 +70,7 @@ fn exp_drag_earth() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
+    let orbit = Orbit::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
@@ -107,7 +107,7 @@ fn std_atm_drag_earth() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
+    let orbit = Orbit::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
     let prop_time = 24.0 * SECONDS_PER_DAY;
 
@@ -157,7 +157,7 @@ fn std_atm_drag_earth_low() {
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
 
-    let orbit = State::keplerian(
+    let orbit = Orbit::keplerian(
         eme2k.equatorial_radius() + 300.0,
         0.0,
         0.0,

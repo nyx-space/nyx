@@ -1,7 +1,7 @@
 extern crate hyperdual;
 
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
-use crate::celestia::{Frame, State};
+use crate::celestia::{Frame, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U3, U7};
 use crate::time::Epoch;
@@ -142,7 +142,7 @@ pub trait AutoDiff: Send + Sync {
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
 pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, osc: &State) -> Vector3<f64>;
+    fn eom(&self, osc: &Orbit) -> Vector3<f64>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
@@ -150,5 +150,5 @@ pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync 
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
 pub trait AccelModel: Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
-    fn eom(&self, osc: &State) -> Vector3<f64>;
+    fn eom(&self, osc: &Orbit) -> Vector3<f64>;
 }

@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::nyx::celestia::{Cosm, State};
+use self::nyx::celestia::{Cosm, Orbit};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::{Spacecraft, SpacecraftState};
@@ -25,7 +25,7 @@ fn qlaw_as_ruggiero_case_a() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
+    let orbit = Orbit::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
     let prop_time = 39.91 * SECONDS_PER_DAY;
 
@@ -91,7 +91,7 @@ fn qlaw_as_ruggiero_case_b() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, start_time, eme2k);
+    let orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 160.0 * SECONDS_PER_DAY;
 
@@ -154,7 +154,7 @@ fn qlaw_as_ruggiero_case_c() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(9222.7, 0.2, 0.573, 0.0, 0.0, 0.0, start_time, eme2k);
+    let orbit = Orbit::keplerian(9222.7, 0.2, 0.573, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 3.0 * SECONDS_PER_DAY;
 
@@ -215,7 +215,7 @@ fn qlaw_as_ruggiero_case_d() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
+    let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 113.0 * SECONDS_PER_DAY;
 
@@ -284,7 +284,7 @@ fn qlaw_as_ruggiero_case_e() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
+    let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 400.0 * SECONDS_PER_DAY;
 
@@ -366,7 +366,7 @@ fn qlaw_as_ruggiero_case_f() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(15378.0, 0.01, 98.7, 0.0, 0.0, 0.0, start_time, eme2k);
+    let orbit = Orbit::keplerian(15378.0, 0.01, 98.7, 0.0, 0.0, 0.0, start_time, eme2k);
 
     let prop_time = 30.0 * SECONDS_PER_DAY;
 
@@ -432,7 +432,7 @@ fn ruggiero_iepc_2011_102() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let orbit = State::keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, eme2k);
+    let orbit = Orbit::keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
     let prop_time = 105.0 * SECONDS_PER_DAY;
 

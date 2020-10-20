@@ -1,7 +1,7 @@
 use super::hyperdual::Hyperdual;
 use super::{AutoDiff, Epoch, ForceModel};
 use crate::dimensions::{Matrix3, Vector3, U3, U7};
-use celestia::{Cosm, Frame, State};
+use celestia::{Cosm, Frame, Orbit};
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
 #[derive(Clone, Copy, Debug)]
@@ -31,7 +31,7 @@ pub struct ConstantDrag<'a> {
 }
 
 impl<'a> ForceModel for ConstantDrag<'a> {
-    fn eom(&self, osc: &State) -> Vector3<f64> {
+    fn eom(&self, osc: &Orbit) -> Vector3<f64> {
         let osc = self.cosm.frame_chg_by_id(&osc, self.drag_frame_id);
         let velocity = osc.velocity();
         -0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity
@@ -98,7 +98,7 @@ impl<'a> Drag<'a> {
 }
 
 impl<'a> ForceModel for Drag<'a> {
-    fn eom(&self, osc: &State) -> Vector3<f64> {
+    fn eom(&self, osc: &Orbit) -> Vector3<f64> {
         let osc = self.cosm.frame_chg(&osc, self.drag_frame);
         match self.density {
             AtmDensity::Constant(rho) => {

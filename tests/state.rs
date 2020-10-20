@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
 use hifitime::Epoch;
-use nyx::celestia::{Cosm, State};
+use nyx::celestia::{Cosm, Orbit};
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
@@ -23,10 +23,10 @@ fn state_def_circ_inc() {
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::cartesian(
+    let cart = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
-    let cart2 = State::cartesian(
+    let cart2 = Orbit::cartesian(
         -2436.45,
         -2436.45,
         6891.037,
@@ -68,7 +68,7 @@ fn state_def_circ_inc() {
         "semi parameter"
     );
 
-    let kep = State::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
+    let kep = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
     f64_eq!(kep.x, 8_057.976_452_202_976, "x");
     f64_eq!(kep.y, -0.196_740_370_290_888_9, "y");
     f64_eq!(kep.z, 1_475.383_214_274_138, "z");
@@ -97,7 +97,7 @@ fn state_def_circ_inc() {
         "semi parameter"
     );
 
-    let kep = State::keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, eme2k);
+    let kep = Orbit::keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, eme2k);
     f64_eq!(kep.ta(), 260.1123, "ta");
 }
 
@@ -106,7 +106,7 @@ fn xb_conversion() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::cartesian(
+    let cart = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
     let cart_xb = cart.to_exb_state();
@@ -156,7 +156,7 @@ fn state_def_elliptical() {
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::cartesian(
+    let cart = Orbit::cartesian(
         5_946.673_548_288_958,
         1_656.154_606_023_661,
         2_259.012_129_598_249,
@@ -188,7 +188,7 @@ fn state_def_elliptical() {
         "semi parameter"
     );
 
-    let kep = State::keplerian(
+    let kep = Orbit::keplerian(
         8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
     );
     f64_eq!(kep.x, 8_087.161_618_048_522_5, "x");
@@ -227,7 +227,7 @@ fn state_def_circ_eq() {
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = State::cartesian(
+    let cart = Orbit::cartesian(
         -38_892.724_449_149_02,
         16_830.384_772_891_86,
         0.722_659_929_135_562_2,
@@ -259,7 +259,7 @@ fn state_def_circ_eq() {
         "semi parameter"
     );
 
-    let kep = State::keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, eme2k);
+    let kep = Orbit::keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, eme2k);
     f64_eq!(kep.x, 18_190.717_357_886_37, "x");
     f64_eq!(kep.y, -118.107_162_539_218_69, "y");
     f64_eq!(kep.z, 0.000_253_845_647_633_053_35, "z");
@@ -298,7 +298,7 @@ fn state_def_reciprocity() {
     let dt = Epoch::from_mjd_tai(21_545.0);
 
     assert_eq!(
-        State::cartesian(
+        Orbit::cartesian(
             -38_892.724_449_149_02,
             16_830.384_772_891_86,
             0.722_659_929_135_562_2,
@@ -308,7 +308,7 @@ fn state_def_reciprocity() {
             dt,
             eme2k
         ),
-        State::keplerian(
+        Orbit::keplerian(
             42_378.129_999_999_98,
             9.999_999_809_555_511e-9,
             0.001_000_000_401_564_538_6,
@@ -322,7 +322,7 @@ fn state_def_reciprocity() {
     );
 
     assert_eq!(
-        State::cartesian(
+        Orbit::cartesian(
             5_946.673_548_288_958,
             1_656.154_606_023_661,
             2_259.012_129_598_249,
@@ -332,7 +332,7 @@ fn state_def_reciprocity() {
             dt,
             eme2k
         ),
-        State::keplerian(
+        Orbit::keplerian(
             7_712.186_117_895_041,
             0.158_999_999_999_999_95,
             53.75369,
@@ -346,8 +346,8 @@ fn state_def_reciprocity() {
     );
 
     assert_eq!(
-        State::cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k),
-        State::keplerian(
+        Orbit::cartesian(-2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k),
+        Orbit::keplerian(
             7_712.186_117_895_043,
             0.000_999_582_831_432_052_5,
             63.434_003_407_751_14,
@@ -378,11 +378,11 @@ fn geodetic_vallado() {
     let lat = 34.352_495_139_917_26; // Valldo: 34.352496
     let long = 46.446_416_856_789_96; // Vallado 46.4464
     let height = 5_085.219_430_345_17; // Valldo: 5085.22
-    let r = State::from_position(ri, rj, rk, dt, eme2k);
+    let r = Orbit::from_position(ri, rj, rk, dt, eme2k);
     f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height, "height");
-    let r = State::from_geodesic(lat, long, height, dt, eme2k);
+    let r = Orbit::from_geodesic(lat, long, height, dt, eme2k);
     f64_eq!(r.x, ri_val, "r_i");
     f64_eq!(r.y, rj_val, "r_j");
     f64_eq!(r.z, rk, "r_k");
@@ -396,11 +396,11 @@ fn geodetic_vallado() {
     let ri = 6_119.399_587_411_616;
     let rj = -1_571.479_380_333_195;
     let rk = -871.561_161_926_003_9;
-    let r = State::from_geodesic(lat, long, height, dt, eme2k);
+    let r = Orbit::from_geodesic(lat, long, height, dt, eme2k);
     f64_eq!(r.x, ri, "r_i");
     f64_eq!(r.y, rj, "r_j");
     f64_eq!(r.z, rk, "r_k");
-    let r = State::from_position(ri, rj, rk, dt, eme2k);
+    let r = Orbit::from_position(ri, rj, rk, dt, eme2k);
     f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height_val, "height");

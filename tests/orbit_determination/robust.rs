@@ -6,7 +6,7 @@ extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{bodies, Cosm, State};
+use self::nyx::celestia::{bodies, Cosm, Orbit};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, PointMasses};
 use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 use self::nyx::io::gravity::*;
@@ -46,13 +46,13 @@ fn robust_test_ekf_two_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
     initial_state_dev.x += 5.0;
     initial_state_dev.y -= 5.0;
@@ -217,7 +217,7 @@ fn robust_test_ekf_multi_body() {
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
@@ -390,7 +390,7 @@ fn robust_test_ekf_harmonics() {
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
     initial_state_dev.x += 0.00;
     initial_state_dev.y -= 0.00;
@@ -571,7 +571,7 @@ fn robust_test_ekf_realistic() {
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
@@ -725,7 +725,7 @@ fn robust_test_ckf_smoother_multi_body() {
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
@@ -991,7 +991,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
@@ -1265,7 +1265,7 @@ fn robust_test_ckf_iteration_multi_body() {
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;

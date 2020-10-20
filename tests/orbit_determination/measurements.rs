@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 #[test]
 fn nil_measurement() {
     use self::hifitime::{Epoch, J2000_OFFSET};
-    use self::nyx::celestia::{Cosm, State};
+    use self::nyx::celestia::{Cosm, Orbit};
     use self::nyx::od::ui::*;
     use std::f64::EPSILON;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
@@ -29,7 +29,7 @@ fn nil_measurement() {
         &cosm,
     );
 
-    let at_station = State::from_geodesic(lat, long, height, dt, eme2k);
+    let at_station = Orbit::from_geodesic(lat, long, height, dt, eme2k);
 
     let meas = station.measure(&at_station).unwrap();
 

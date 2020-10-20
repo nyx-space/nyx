@@ -1,4 +1,4 @@
-use super::{Cosm, Frame, LTCorr, State};
+use super::{Cosm, Frame, LTCorr, Orbit};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::fmt;
 
@@ -88,7 +88,7 @@ pub struct EclipseLocator<'a> {
 
 impl<'a> EclipseLocator<'a> {
     /// Compute the visibility/eclipse between an observer and an observed state
-    pub fn compute(&self, observer: &State) -> EclipseState {
+    pub fn compute(&self, observer: &Orbit) -> EclipseState {
         let mut state = EclipseState::Visibilis;
         for eclipsing_body in &self.shadow_bodies {
             let this_state = eclipse_state(
@@ -108,7 +108,7 @@ impl<'a> EclipseLocator<'a> {
 
 /// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
 pub fn eclipse_state(
-    observer: &State,
+    observer: &Orbit,
     light_source: Frame,
     eclipsing_body: Frame,
     cosm: &Cosm,
@@ -219,8 +219,8 @@ fn circ_seg_area(r: f64, d: f64) -> f64 {
 ///
 /// Source: Algorithm 35 of Vallado, 4th edition, page 308.
 pub fn line_of_sight(
-    observer: &State,
-    observed: &State,
+    observer: &Orbit,
+    observed: &Orbit,
     eclipsing_body: Frame,
     cosm: &Cosm,
 ) -> EclipseState {
@@ -262,7 +262,7 @@ mod tests {
         let dt2 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 7, 50, 0);
         let dt3 = Epoch::from_gregorian_tai(2020, 1, 1, 6, 8, 0, 0);
 
-        let xmtr1 = State::cartesian(
+        let xmtr1 = Orbit::cartesian(
             397_477.494_485,
             -57_258.902_156,
             -62_857.909_437,
@@ -272,7 +272,7 @@ mod tests {
             dt1,
             eme2k,
         );
-        let rcvr1 = State::cartesian(
+        let rcvr1 = Orbit::cartesian(
             338_335.467_589,
             -55_439.526_977,
             -13_327.354_273,
@@ -282,7 +282,7 @@ mod tests {
             dt1,
             eme2k,
         );
-        let xmtr2 = State::cartesian(
+        let xmtr2 = Orbit::cartesian(
             397_479.756_900,
             -57_235.586_465,
             -62_851.758_851,
@@ -292,7 +292,7 @@ mod tests {
             dt2,
             eme2k,
         );
-        let rcvr2 = State::cartesian(
+        let rcvr2 = Orbit::cartesian(
             338_337.438_860,
             -55_430.084_340,
             -13_323.980_229,
@@ -302,7 +302,7 @@ mod tests {
             dt2,
             eme2k,
         );
-        let xmtr3 = State::cartesian(
+        let xmtr3 = Orbit::cartesian(
             397_481.934_480,
             -57_212.266_970,
             -62_845.617_185,
@@ -312,7 +312,7 @@ mod tests {
             dt3,
             eme2k,
         );
-        let rcvr3 = State::cartesian(
+        let rcvr3 = Orbit::cartesian(
             338_339.409_858,
             -55_420.641_651,
             -13_320.606_228,
@@ -361,9 +361,9 @@ mod tests {
 
         let sma = eme2k.equatorial_radius() + 300.0;
 
-        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
-        let sc2 = State::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
-        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, eme2k);
+        let sc1 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
+        let sc2 = Orbit::keplerian(sma + 1.0, 0.001, 0.1, 90.0, 75.0, 0.0, dt, eme2k);
+        let sc3 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 180.0, dt, eme2k);
 
         // Out of phase by pi.
         assert_eq!(line_of_sight(&sc1, &sc3, eme2k, &cosm), EclipseState::Umbra);
@@ -390,9 +390,9 @@ mod tests {
 
         let sma = eme2k.equatorial_radius() + 300.0;
 
-        let sc1 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, eme2k);
-        let sc2 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, eme2k);
-        let sc3 = State::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, eme2k);
+        let sc1 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, eme2k);
+        let sc2 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, eme2k);
+        let sc3 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, eme2k);
 
         let correction = LTCorr::None;
 

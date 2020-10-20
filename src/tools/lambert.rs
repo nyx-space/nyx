@@ -1,7 +1,6 @@
 use crate::dimensions::Vector3;
-use std::error::Error;
+use crate::errors::NyxError;
 use std::f64::consts::PI;
-use std::fmt;
 
 const TAU: f64 = 2.0 * PI;
 const LAMBERT_EPSILON: f64 = 1e-4; // General epsilon
@@ -22,33 +21,6 @@ pub struct LambertSolution {
     pub phi: f64,
 }
 
-#[derive(Debug)]
-pub enum LambertError {
-    TooClose,
-    MaxIter,
-    NotReasonablePhi,
-    MultiRevNotSupported,
-}
-
-impl fmt::Display for LambertError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TooClose => write!(f, "Too close: Δν ~=0 and A ~=0"),
-            Self::MultiRevNotSupported => {
-                write!(f, "Use the Izzo algorithm for multi-rev transfers")
-            }
-            Self::MaxIter => write!(f, "Maximum number of iterations reached"),
-            Self::NotReasonablePhi => write!(f, "No reasonable phi found to connect both radii"),
-        }
-    }
-}
-
-impl Error for LambertError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-}
-
 /// Solves the Lambert boundary problem using a standard secant method.
 /// Given the initial and final radii, a time of flight, and a gravitational parameters, it returns the needed initial and final velocities
 /// along with φ which is the square of the difference in eccentric anomaly. Note that the direction of motion
@@ -59,7 +31,7 @@ pub fn standard(
     tof: f64,
     gm: f64,
     kind: TransferKind,
-) -> Result<LambertSolution, LambertError> {
+) -> Result<LambertSolution, NyxError> {
     let r_init_norm = r_init.norm();
     let r_final_norm = r_final.norm();
 
@@ -82,7 +54,7 @@ pub fn standard(
         }
         TransferKind::ShortWay => 1.0,
         TransferKind::LongWay => -1.0,
-        _ => return Err(LambertError::MultiRevNotSupported),
+        _ => return Err(NyxError::LambertMultiRevNotSupported),
     };
 
     // Compute the direction of motion
@@ -92,7 +64,7 @@ pub fn standard(
     let a = dm * (r_init_norm * r_final_norm * (1.0 + cos_dnu)).sqrt();
 
     if nu_final - nu_init < LAMBERT_EPSILON_RAD && a.abs() < LAMBERT_EPSILON {
-        return Err(LambertError::TooClose);
+        return Err(NyxError::TargetsTooClose);
     }
 
     // Define the search space (note that we do not support multirevs in this algorithm)
@@ -109,7 +81,7 @@ pub fn standard(
 
     while (cur_tof - tof).abs() > LAMBERT_EPSILON_TIME {
         if iter > 1000 {
-            return Err(LambertError::MaxIter);
+            return Err(NyxError::MaxIterReached(1000));
         }
         iter += 1;
 
@@ -126,7 +98,7 @@ pub fn standard(
             }
             if y < 0.0 {
                 // If y is still negative, then our attempts have failed.
-                return Err(LambertError::NotReasonablePhi);
+                return Err(NyxError::LambertNotReasonablePhi);
             }
         }
 

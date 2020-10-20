@@ -1,6 +1,6 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, Hyperdual};
-use crate::celestia::{Cosm, Frame, State};
+use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::{DMatrix, Matrix3, Vector3, U3, U7};
 use crate::dynamics::{AccelModel, AutoDiff};
 use crate::io::gravity::GravityPotentialStor;
@@ -88,7 +88,7 @@ where
 }
 
 impl<'a, S: GravityPotentialStor + Send> AccelModel for Harmonics<'a, S> {
-    fn eom(&self, osc: &State) -> Vector3<f64> {
+    fn eom(&self, osc: &Orbit) -> Vector3<f64> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self
             .cosm

@@ -2,7 +2,7 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::EstimableState;
 use super::{CovarFormat, EpochFormat};
-use crate::celestia::State;
+use crate::celestia::Orbit;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U6};
 use crate::dynamics::spacecraft::SpacecraftState;
@@ -551,43 +551,43 @@ pub trait NavSolution<T>: Estimate<U6, T>
 where
     T: EstimableState<U6>,
 {
-    fn orbital_state(&self) -> State;
+    fn orbital_state(&self) -> Orbit;
     /// Returns the nominal state as computed by the dynamics
-    fn expected_state(&self) -> State;
+    fn expected_state(&self) -> Orbit;
 }
 
-impl NavSolution<State> for KfEstimate<U6, State> {
-    fn orbital_state(&self) -> State {
+impl NavSolution<Orbit> for KfEstimate<U6, Orbit> {
+    fn orbital_state(&self) -> Orbit {
         self.state()
     }
-    fn expected_state(&self) -> State {
+    fn expected_state(&self) -> Orbit {
         self.nominal_state()
     }
 }
 
-impl NavSolution<State> for IfEstimate<U6, State> {
-    fn orbital_state(&self) -> State {
+impl NavSolution<Orbit> for IfEstimate<U6, Orbit> {
+    fn orbital_state(&self) -> Orbit {
         self.state()
     }
-    fn expected_state(&self) -> State {
+    fn expected_state(&self) -> Orbit {
         self.nominal_state()
     }
 }
 
 impl NavSolution<SpacecraftState> for KfEstimate<U6, SpacecraftState> {
-    fn orbital_state(&self) -> State {
+    fn orbital_state(&self) -> Orbit {
         self.state().orbit
     }
-    fn expected_state(&self) -> State {
+    fn expected_state(&self) -> Orbit {
         self.nominal_state().orbit
     }
 }
 
 impl NavSolution<SpacecraftState> for IfEstimate<U6, SpacecraftState> {
-    fn orbital_state(&self) -> State {
+    fn orbital_state(&self) -> Orbit {
         self.state().orbit
     }
-    fn expected_state(&self) -> State {
+    fn expected_state(&self) -> Orbit {
         self.nominal_state().orbit
     }
 }

@@ -6,7 +6,7 @@ extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{Cosm, State};
+use self::nyx::celestia::{Cosm, Orbit};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
 use self::nyx::io::gravity::*;
@@ -45,13 +45,13 @@ fn ekf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -162,13 +162,13 @@ fn ckf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -322,13 +322,13 @@ fn ckf_fixed_step_iteration_test() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -434,13 +434,13 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -561,7 +561,7 @@ fn ckf_map_covar() {
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -644,14 +644,14 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
@@ -764,13 +764,13 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Generate the truth data on one thread.
     thread::spawn(move || {

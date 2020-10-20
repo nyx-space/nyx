@@ -2,7 +2,7 @@ extern crate nalgebra as na;
 
 extern crate nyx_space as nyx;
 
-use nyx::celestia::{bodies, Cosm, State};
+use nyx::celestia::{bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
@@ -15,7 +15,7 @@ fn stop_cond_3rd_apo() {
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -55,7 +55,7 @@ fn stop_cond_3rd_peri() {
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -96,7 +96,7 @@ fn nrho_apo() {
     let luna = cosm.frame("Luna");
 
     let dt = Epoch::from_gregorian_tai(2021, 5, 29, 19, 51, 16, 852_000);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         166_473.631_302_239_7,
         -274_715.487_253_382_7,
         -211_233.210_176_686_7,

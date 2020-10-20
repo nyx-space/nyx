@@ -1,6 +1,6 @@
 use super::thrustctrl::ThrustControl;
 use crate::dimensions::Vector3;
-use celestia::State;
+use celestia::Orbit;
 
 // TODO: Change to a trait to enable variable thrust and isp
 #[derive(Copy, Clone, Debug)]
@@ -34,12 +34,12 @@ impl Propulsion {
         }
     }
 
-    pub fn set_state(&mut self, new_orbit: &State) {
+    pub fn set_state(&mut self, new_orbit: &Orbit) {
         (*self.ctrl).next(new_orbit);
     }
 
     /// Returns the thrust and the fuel usage
-    pub fn eom(&self, osc: &State) -> (Vector3<f64>, f64) {
+    pub fn eom(&self, osc: &Orbit) -> (Vector3<f64>, f64) {
         let thrust_power = self.ctrl.throttle(osc);
         if thrust_power > 0.0 {
             // Thrust arc

@@ -14,7 +14,7 @@ use crate::dimensions::{
 };
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::time::Epoch;
-use celestia::{Cosm, Frame, State};
+use celestia::{Cosm, Frame, Orbit};
 use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
@@ -119,14 +119,14 @@ impl<'a> GroundStation<'a> {
         )
     }
 }
-impl<'a> MeasurementDevice<State, StdMeasurement> for GroundStation<'a> {
+impl<'a> MeasurementDevice<Orbit, StdMeasurement> for GroundStation<'a> {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &State) -> Option<StdMeasurement> {
+    fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
         use std::f64::consts::PI;
         // Convert the station to the state's frame
         let dt = rx.dt;
         let station_state =
-            State::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
+            Orbit::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
         let tx = self.cosm.frame_chg(&station_state, rx.frame);
         // Let's start by computing the range and range rate
         let rho_ecef = rx.radius() - tx.radius();
@@ -156,7 +156,7 @@ impl<'a> MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation<'a
                 use std::f64::consts::PI;
                 // Convert the station to the state's frame
                 let dt = rx.dt;
-                let station_state = State::from_geodesic(
+                let station_state = Orbit::from_geodesic(
                     self.latitude,
                     self.longitude,
                     self.height,
@@ -251,15 +251,15 @@ impl StdMeasurement {
     }
 
     /// Generate noiseless measurement
-    pub fn noiseless(dt: Epoch, tx: State, rx: State, visible: bool) -> StdMeasurement {
+    pub fn noiseless(dt: Epoch, tx: Orbit, rx: Orbit, visible: bool) -> StdMeasurement {
         Self::raw(dt, tx, rx, visible, 0.0, 0.0)
     }
 
     /// Generate a new measurement with the provided noise distribution.
     pub fn new<D: Distribution<f64>>(
         dt: Epoch,
-        tx: State,
-        rx: State,
+        tx: Orbit,
+        rx: Orbit,
         visible: bool,
         range_dist: &D,
         range_rate_dist: &D,
@@ -277,8 +277,8 @@ impl StdMeasurement {
     /// Generate a new measurement with the provided noise values.
     pub fn raw(
         dt: Epoch,
-        tx: State,
-        rx: State,
+        tx: Orbit,
+        rx: Orbit,
         visible: bool,
         range_noise: f64,
         range_rate_noise: f64,
@@ -387,7 +387,7 @@ impl RangeMsr {
         (fx, pmat)
     }
 
-    pub fn new(_: Epoch, tx: State, rx: State, visible: bool) -> RangeMsr {
+    pub fn new(_: Epoch, tx: Orbit, rx: Orbit, visible: bool) -> RangeMsr {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
@@ -483,7 +483,7 @@ impl DopplerMsr {
         (fx, pmat)
     }
 
-    pub fn new(_: Epoch, tx: State, rx: State, visible: bool) -> DopplerMsr {
+    pub fn new(_: Epoch, tx: Orbit, rx: Orbit, visible: bool) -> DopplerMsr {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 

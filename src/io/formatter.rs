@@ -2,7 +2,7 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::serde_derive::Deserialize;
 use super::EpochFormat;
-use crate::celestia::{Cosm, Frame, State};
+use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::U6;
 use crate::od::estimate::NavSolution;
 use crate::od::EstimableState;
@@ -361,7 +361,7 @@ impl fmt::Display for StateHeader {
 }
 
 impl Serialize for StateHeader {
-    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
+    /// NOTE: This is not part of unit testing because there is no deseralization of Orbit (yet)
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -381,17 +381,17 @@ pub enum NavSolutionHeader {
     EstimatedState(Vec<StateHeader>),
     /// Headers for the nominal state
     NominalState(Vec<StateHeader>),
-    /// State deviation X (km)
+    /// Orbit deviation X (km)
     Delta_x,
-    /// State deviation Y (km)
+    /// Orbit deviation Y (km)
     Delta_y,
-    /// State deviation Z (km)
+    /// Orbit deviation Z (km)
     Delta_z,
-    /// State deviation VX (km/s)
+    /// Orbit deviation VX (km/s)
     Delta_vx,
-    /// State deviation VY (km/s)
+    /// Orbit deviation VY (km/s)
     Delta_vy,
-    /// State deviation VZ (km/s)
+    /// Orbit deviation VZ (km/s)
     Delta_vz,
     /// Covariance matrix [1,1]
     Cx_x { frame: Option<String> },
@@ -755,7 +755,7 @@ impl<'a> StateFormatter<'a> {
         }
     }
 
-    pub fn fmt(&self, state: &State) -> Vec<String> {
+    pub fn fmt(&self, state: &Orbit) -> Vec<String> {
         // Start by computing the state in all of the frames needed
         let mut mapped = HashMap::new();
         for (name, frame) in &self.frames {

@@ -21,7 +21,7 @@ use utils::{between_0_360, between_pm_180, perpv, r1, r3};
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
 
-/// State defines an orbital state
+/// Orbit defines an orbital state
 ///
 /// Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/StateConversionUtil.cpp).
 /// Regardless of the constructor used, this struct stores all the state information in Cartesian coordinates
@@ -29,7 +29,7 @@ pub const ECC_EPSILON: f64 = 1e-11;
 /// _Note:_ although not yet supported, this struct may change once True of Date or other nutation frames
 /// are added to the toolkit.
 #[derive(Copy, Clone, Debug)]
-pub struct State {
+pub struct Orbit {
     /// in km
     pub x: f64,
     /// in km
@@ -49,8 +49,8 @@ pub struct State {
     pub stm: Option<Matrix6<f64>>,
 }
 
-impl State {
-    /// Creates a new State in the provided frame at the provided Epoch.
+impl Orbit {
+    /// Creates a new Orbit in the provided frame at the provided Epoch.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
     pub fn cartesian(
@@ -63,7 +63,7 @@ impl State {
         dt: Epoch,
         frame: Frame,
     ) -> Self {
-        State {
+        Orbit {
             x,
             y,
             z,
@@ -76,11 +76,11 @@ impl State {
         }
     }
 
-    /// Creates a new State in the provided frame at the provided Epoch in time with 0.0 velocity.
+    /// Creates a new Orbit in the provided frame at the provided Epoch in time with 0.0 velocity.
     ///
     /// **Units:** km, km, km
     pub fn from_position(x: f64, y: f64, z: f64, dt: Epoch, frame: Frame) -> Self {
-        State {
+        Orbit {
             x,
             y,
             z,
@@ -93,12 +93,12 @@ impl State {
         }
     }
 
-    /// Creates a new State around in the provided frame from the borrowed state vector
+    /// Creates a new Orbit around in the provided frame from the borrowed state vector
     ///
     /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
     pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
-        State {
+        Orbit {
             x: state[(0, 0)],
             y: state[(1, 0)],
             z: state[(2, 0)],
@@ -121,12 +121,12 @@ impl State {
         (self.vx.powi(2) + self.vy.powi(2) + self.vz.powi(2)).sqrt()
     }
 
-    /// Returns the radius vector of this State in [km, km, km]
+    /// Returns the radius vector of this Orbit in [km, km, km]
     pub fn radius(&self) -> Vector3<f64> {
         Vector3::new(self.x, self.y, self.z)
     }
 
-    /// Returns the radius vector of this State in [km, km, km]
+    /// Returns the radius vector of this Orbit in [km, km, km]
     pub fn velocity(&self) -> Vector3<f64> {
         Vector3::new(self.vx, self.vy, self.vz)
     }
@@ -140,7 +140,7 @@ impl State {
 
     /// Returns the distancein kilometers between this state and another state.
     /// Will **panic** is the frames are different
-    pub fn distance_to(&self, other: &State) -> f64 {
+    pub fn distance_to(&self, other: &Orbit) -> f64 {
         assert_eq!(
             self.frame, other.frame,
             "cannot compute the distance between two states in different frames"
@@ -191,7 +191,7 @@ impl State {
         perpv(&self.velocity(), &self.r_hat()) / self.rmag()
     }
 
-    /// Creates a new State around the provided Celestial or Geoid frame from the Keplerian orbital elements.
+    /// Creates a new Orbit around the provided Celestial or Geoid frame from the Keplerian orbital elements.
     ///
     /// **Units:** km, none, degrees, degrees, degrees, degrees
     ///
@@ -286,7 +286,7 @@ impl State {
                     sqrt_gm_p * cos_ta_ecc * (-sin_aop * sin_raan + cos_inc * cos_raan * cos_aop)
                         - sqrt_gm_p * sin_ta * (cos_aop * sin_raan + cos_inc * cos_raan * sin_aop);
                 let vz = sqrt_gm_p * (cos_ta_ecc * sin_inc * cos_aop - sin_ta * sin_inc * sin_aop);
-                State {
+                Orbit {
                     x,
                     y,
                     z,
@@ -302,7 +302,7 @@ impl State {
         }
     }
 
-    /// Creates a new State around the provided frame from the borrowed state vector
+    /// Creates a new Orbit around the provided frame from the borrowed state vector
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
@@ -315,7 +315,7 @@ impl State {
         }
     }
 
-    /// Creates a new State from the geodetic latitude (φ), longitude (λ) and height with respect to Earth's ellipsoid.
+    /// Creates a new Orbit from the geodetic latitude (φ), longitude (λ) and height with respect to Earth's ellipsoid.
     ///
     /// **Units:** degrees, degrees, km
     /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of Earth.
@@ -345,7 +345,7 @@ impl State {
                 let rk = (s_earth + height) * sin_lat;
                 let radius = Vector3::new(ri, rj, rk);
                 let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
-                State::cartesian(
+                Orbit::cartesian(
                     radius[0],
                     radius[1],
                     radius[2],
@@ -808,7 +808,7 @@ impl State {
     }
 }
 
-impl TimeTagged for State {
+impl TimeTagged for Orbit {
     fn epoch(&self) -> Epoch {
         self.dt
     }
@@ -818,12 +818,12 @@ impl TimeTagged for State {
     }
 }
 
-impl EstimableState<U6> for State {}
+impl EstimableState<U6> for Orbit {}
 
-impl Add<Vector6<f64>> for State {
-    type Output = State;
+impl Add<Vector6<f64>> for Orbit {
+    type Output = Orbit;
 
-    fn add(self, other: Vector6<f64>) -> State {
+    fn add(self, other: Vector6<f64>) -> Orbit {
         let mut me = self;
         me.x += other[0];
         me.y += other[1];
@@ -836,9 +836,9 @@ impl Add<Vector6<f64>> for State {
     }
 }
 
-impl PartialEq for State {
+impl PartialEq for Orbit {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    fn eq(&self, other: &State) -> bool {
+    fn eq(&self, other: &Orbit) -> bool {
         let distance_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
         self.dt == other.dt
@@ -852,12 +852,12 @@ impl PartialEq for State {
     }
 }
 
-impl Add for State {
-    type Output = State;
+impl Add for Orbit {
+    type Output = Orbit;
 
     /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
-    fn add(self, other: State) -> State {
-        State {
+    fn add(self, other: Orbit) -> Orbit {
+        Orbit {
             x: self.x + other.x,
             y: self.y + other.y,
             z: self.z + other.z,
@@ -871,12 +871,12 @@ impl Add for State {
     }
 }
 
-impl Sub for State {
-    type Output = State;
+impl Sub for Orbit {
+    type Output = Orbit;
 
     /// Subtract one state from another. STM will be copied from &self.
-    fn sub(self, other: State) -> State {
-        State {
+    fn sub(self, other: Orbit) -> Orbit {
+        Orbit {
             x: self.x - other.x,
             y: self.y - other.y,
             z: self.z - other.z,
@@ -890,12 +890,12 @@ impl Sub for State {
     }
 }
 
-impl Neg for State {
-    type Output = State;
+impl Neg for Orbit {
+    type Output = Orbit;
 
     /// Subtract one state from another. STM will be copied from &self.
     fn neg(self) -> Self::Output {
-        State {
+        Orbit {
             x: -self.x,
             y: -self.y,
             z: -self.z,
@@ -909,12 +909,12 @@ impl Neg for State {
     }
 }
 
-impl Add for &State {
-    type Output = State;
+impl Add for &Orbit {
+    type Output = Orbit;
 
     /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
-    fn add(self, other: &State) -> State {
-        State {
+    fn add(self, other: &Orbit) -> Orbit {
+        Orbit {
             x: self.x + other.x,
             y: self.y + other.y,
             z: self.z + other.z,
@@ -928,12 +928,12 @@ impl Add for &State {
     }
 }
 
-impl Sub for &State {
-    type Output = State;
+impl Sub for &Orbit {
+    type Output = Orbit;
 
     /// Subtract one state from another. STM will be copied from &self.
-    fn sub(self, other: &State) -> State {
-        State {
+    fn sub(self, other: &Orbit) -> Orbit {
+        Orbit {
             x: self.x - other.x,
             y: self.y - other.y,
             z: self.z - other.z,
@@ -947,12 +947,12 @@ impl Sub for &State {
     }
 }
 
-impl Neg for &State {
-    type Output = State;
+impl Neg for &Orbit {
+    type Output = Orbit;
 
     /// Subtract one state from another. STM will be copied form &self.
     fn neg(self) -> Self::Output {
-        State {
+        Orbit {
             x: -self.x,
             y: -self.y,
             z: -self.z,
@@ -966,13 +966,13 @@ impl Neg for &State {
     }
 }
 
-impl Serialize for State {
-    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
+impl Serialize for Orbit {
+    /// NOTE: This is not part of unit testing because there is no deseralization of Orbit (yet)
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("State", 7)?;
+        let mut state = serializer.serialize_struct("Orbit", 7)?;
         state.serialize_field("dt", &self.dt.as_jde_et_days())?;
         state.serialize_field("x", &self.x)?;
         state.serialize_field("y", &self.y)?;
@@ -984,7 +984,7 @@ impl Serialize for State {
     }
 }
 
-impl fmt::Display for State {
+impl fmt::Display for Orbit {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -1002,7 +1002,7 @@ impl fmt::Display for State {
     }
 }
 
-impl fmt::LowerExp for State {
+impl fmt::LowerExp for Orbit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -1019,7 +1019,7 @@ impl fmt::LowerExp for State {
     }
 }
 
-impl fmt::Octal for State {
+impl fmt::Octal for Orbit {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

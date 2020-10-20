@@ -1,6 +1,6 @@
 use crate::dimensions::Vector3;
 use crate::time::Epoch;
-use celestia::{Frame, State};
+use celestia::{Frame, Orbit};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
 #[derive(Debug)]
@@ -13,17 +13,17 @@ pub enum ThrustingError {
 /// tie the DeltaVctrl to a MissionArc.
 pub trait ThrustControl: Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, state: &State) -> Vector3<f64>;
+    fn direction(&self, state: &Orbit) -> Vector3<f64>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, state: &State) -> f64;
+    fn throttle(&self, state: &Orbit) -> f64;
 
     /// Prepares the controller for the next maneuver (called from set_state of the dynamics).
-    fn next(&mut self, state: &State);
+    fn next(&mut self, state: &Orbit);
 
     /// Returns whether this thrust control has been achieve, if it has an objective
-    fn achieved(&self, _state: &State) -> Result<bool, ThrustingError> {
+    fn achieved(&self, _state: &Orbit) -> Result<bool, ThrustingError> {
         Err(ThrustingError::NoObjectiveDefined)
     }
 }
@@ -39,7 +39,7 @@ pub enum Achieve {
 }
 
 impl Achieve {
-    pub fn achieved(&self, state: &State) -> bool {
+    pub fn achieved(&self, state: &Orbit) -> bool {
         match *self {
             Achieve::Sma { target, tol } => (state.sma() - target).abs() < tol,
             Achieve::Ecc { target, tol } => (state.ecc() - target).abs() < tol,
@@ -81,14 +81,14 @@ impl Mnvr {
 pub struct Ruggiero {
     /// Stores the objectives
     objectives: Vec<Achieve>,
-    init_state: State,
+    init_state: Orbit,
     achieved: bool,
 }
 
 /// The Ruggiero is a locally optimal control of a state for specific osculating elements.
 /// WARNING: Objectives must be in degrees!
 impl Ruggiero {
-    pub fn new(objectives: Vec<Achieve>, initial: State) -> Self {
+    pub fn new(objectives: Vec<Achieve>, initial: Orbit) -> Self {
         Self {
             objectives,
             init_state: initial,
@@ -115,7 +115,7 @@ impl Ruggiero {
 
 impl ThrustControl for Ruggiero {
     /// Returns whether the control law has achieved all goals
-    fn achieved(&self, state: &State) -> Result<bool, ThrustingError> {
+    fn achieved(&self, state: &Orbit) -> Result<bool, ThrustingError> {
         for obj in &self.objectives {
             if !obj.achieved(state) {
                 return Ok(false);
@@ -124,7 +124,7 @@ impl ThrustControl for Ruggiero {
         Ok(true)
     }
 
-    fn direction(&self, osc: &State) -> Vector3<f64> {
+    fn direction(&self, osc: &Orbit) -> Vector3<f64> {
         if self.achieved {
             Vector3::zeros()
         } else {
@@ -215,7 +215,7 @@ impl ThrustControl for Ruggiero {
     }
 
     // Either thrust full power or not at all
-    fn throttle(&self, osc: &State) -> f64 {
+    fn throttle(&self, osc: &Orbit) -> f64 {
         if self.achieved {
             0.0
         } else {
@@ -259,7 +259,7 @@ impl ThrustControl for Ruggiero {
     }
 
     /// Update the state for the next iteration
-    fn next(&mut self, osc: &State) {
+    fn next(&mut self, osc: &Orbit) {
         if self.throttle(osc) > 0.0 {
             if self.achieved {
                 info!("enabling control: {:o}", osc);
@@ -290,7 +290,7 @@ impl FiniteBurns {
 }
 
 impl ThrustControl for FiniteBurns {
-    fn direction(&self, osc: &State) -> Vector3<f64> {
+    fn direction(&self, osc: &Orbit) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
         if self.mnvr_no >= self.mnvrs.len() {
@@ -305,7 +305,7 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn throttle(&self, osc: &State) -> f64 {
+    fn throttle(&self, osc: &Orbit) -> f64 {
         if self.mnvr_no >= self.mnvrs.len() {
             0.0
         } else {
@@ -318,7 +318,7 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn next(&mut self, osc: &State) {
+    fn next(&mut self, osc: &Orbit) {
         if self.mnvr_no < self.mnvrs.len() {
             let cur_mnvr = self.mnvrs[self.mnvr_no];
             if osc.dt >= cur_mnvr.end {
@@ -346,7 +346,7 @@ mod tests {
         cosm.mut_gm_for_frame("EME2000", 398_600.433);
         let eme2k = cosm.frame("EME2000");
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-        let orbit = State::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
+        let orbit = Orbit::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
         // Define the objectives
         let objectives = vec![
@@ -362,7 +362,7 @@ mod tests {
 
         let ruggiero = Ruggiero::new(objectives, orbit);
         // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
-        let osc = State::cartesian(
+        let osc = Orbit::cartesian(
             7_303.253_461_441_64f64,
             127.478_714_816_381_75,
             0.111_246_193_227_445_4,

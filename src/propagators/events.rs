@@ -1,4 +1,4 @@
-use crate::celestia::{Cosm, Frame, State};
+use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::utils::between_pm_180;
 use std::fmt;
@@ -153,7 +153,7 @@ impl<'a> OrbitalEvent<'a> {
 }
 
 impl<'a> Event for OrbitalEvent<'a> {
-    type StateType = State;
+    type StateType = Orbit;
 
     fn eval(&self, state: &Self::StateType) -> f64 {
         let state = match self.tgt {

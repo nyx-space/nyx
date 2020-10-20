@@ -2,7 +2,7 @@ use super::deltavctrl::DeltaVctrl;
 use super::orbital::OrbitalDynamics;
 use super::{Dynamics, NyxError};
 use crate::dimensions::{VectorN, U6};
-use celestia::State;
+use celestia::Orbit;
 
 pub struct MissionArc<'a, D: DeltaVctrl> {
     pub celestial: OrbitalDynamics<'a>,
@@ -17,14 +17,14 @@ impl<'a, D: DeltaVctrl> MissionArc<'a, D> {
 
 impl<'a, D: DeltaVctrl> Dynamics for MissionArc<'a, D> {
     type StateSize = U6;
-    type StateType = State;
+    type StateType = Orbit;
 
     /// Returns the relative time
     fn time(&self) -> f64 {
         self.celestial.time()
     }
 
-    /// State of the mission arc is always the celestial state
+    /// Orbit of the mission arc is always the celestial state
     fn state(&self) -> Self::StateType {
         self.celestial.state()
     }

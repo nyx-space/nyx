@@ -6,7 +6,7 @@ extern crate pretty_env_logger;
 
 use self::hifitime::{Epoch, SECONDS_PER_DAY};
 use self::na::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{bodies, Cosm, State};
+use self::nyx::celestia::{bodies, Cosm, Orbit};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use self::nyx::dynamics::spacecraft::{SolarPressure, Spacecraft};
 use self::nyx::dynamics::Dynamics;
@@ -48,7 +48,7 @@ fn sc_ckf_perfect_stations() {
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let sc_dry_mass = 100.0; // in kg
     let sc_area = 5.0; // m^2

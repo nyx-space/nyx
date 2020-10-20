@@ -4,7 +4,7 @@ use super::ForceModel;
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
 use crate::time::Epoch;
 use celestia::eclipse::{EclipseLocator, EclipseState};
-use celestia::{Cosm, Frame, LTCorr, State, AU, SPEED_OF_LIGHT};
+use celestia::{Cosm, Frame, LTCorr, Orbit, AU, SPEED_OF_LIGHT};
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
@@ -37,7 +37,7 @@ impl<'a> SolarPressure<'a> {
 }
 
 impl<'a> ForceModel for SolarPressure<'a> {
-    fn eom(&self, osc: &State) -> Vector3<f64> {
+    fn eom(&self, osc: &Orbit) -> Vector3<f64> {
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
             .e_loc
@@ -75,7 +75,7 @@ impl<'a> AutoDiff for SolarPressure<'a> {
         // Extract data from hyperspace
         let cart_r = vector_from_hyperspace(&radius.fixed_rows::<U3>(0).into_owned());
         // Recreate the osculating state
-        let osc = State::cartesian(
+        let osc = Orbit::cartesian(
             cart_r[0],
             cart_r[1],
             cart_r[2],

@@ -6,7 +6,7 @@ use crate::dimensions::dimension::{DimNameAdd, DimNameSum};
 use crate::dimensions::{DefaultAllocator, DimName, Matrix6, Vector1, Vector6, VectorN, U1, U6};
 use crate::od::Estimable;
 use crate::time::Epoch;
-use celestia::{State, TimeTagged};
+use celestia::{Orbit, TimeTagged};
 use od::EstimableState;
 use std::cmp::PartialEq;
 use std::fmt;
@@ -212,7 +212,7 @@ impl<'a> Estimable<SpacecraftState> for Spacecraft<'a, OrbitalDynamicsStm<'a>> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct SpacecraftState {
-    pub orbit: State,
+    pub orbit: Orbit,
     pub dry_mass: f64,
     pub fuel_mass: f64,
     pub stm: Option<Matrix6<f64>>,
@@ -221,7 +221,7 @@ pub struct SpacecraftState {
 impl SpacecraftState {
     pub fn zeros() -> Self {
         Self {
-            orbit: State::zeros(),
+            orbit: Orbit::zeros(),
             dry_mass: 0.0,
             fuel_mass: 0.0,
             stm: None,

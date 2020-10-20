@@ -1,7 +1,7 @@
 extern crate num;
 
 use self::num::traits::real::Real;
-use crate::celestia::State;
+use crate::celestia::Orbit;
 use crate::dimensions::{Matrix3, Vector3, Vector6, U3};
 use std::f64;
 
@@ -131,7 +131,7 @@ pub fn rss_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f6
     (err_radius, err_velocity)
 }
 
-pub fn rss_state_errors(prop_err: &State, cur_state: &State) -> (f64, f64) {
+pub fn rss_state_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     rss_errors(&prop_err.to_cartesian_vec(), &cur_state.to_cartesian_vec())
 }
 

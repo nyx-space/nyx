@@ -4,7 +4,7 @@ use super::quantity::*;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
-use crate::celestia::{Frame, State};
+use crate::celestia::{Frame, Orbit};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::propagators::events::{EventKind, OrbitalEvent, SCEvent, StopCondition};
 use crate::time::Epoch;
@@ -34,7 +34,7 @@ pub struct StateSerde {
 }
 
 impl StateSerde {
-    pub fn as_state(&self, frame: Frame) -> Result<State, ParsingError> {
+    pub fn as_state(&self, frame: Frame) -> Result<Orbit, ParsingError> {
         let epoch = match Epoch::from_str(&self.epoch) {
             Ok(epoch) => epoch,
             Err(e) => return Err(ParsingError::Quantity(format!("{}", e))),
@@ -68,7 +68,7 @@ impl StateSerde {
                 None => 1.0,
             };
 
-            Ok(State::cartesian(
+            Ok(Orbit::cartesian(
                 self.x.unwrap() * pos_mul,
                 self.y.unwrap() * pos_mul,
                 self.z.unwrap() * pos_mul,
@@ -83,7 +83,7 @@ impl StateSerde {
             let velocity = self.velocity.as_ref().unwrap();
             if position.len() != 3 || velocity.len() != 3 {
                 return Err(ParsingError::IllDefined(
-                    "State ill defined: position and velocity arrays must be of size 3 exactly"
+                    "Orbit ill defined: position and velocity arrays must be of size 3 exactly"
                         .to_string(),
                 ));
             }
@@ -94,7 +94,7 @@ impl StateSerde {
             let vy = parse_quantity(&velocity[1])?.v();
             let vz = parse_quantity(&velocity[2])?.v();
 
-            Ok(State::cartesian(x, y, z, vx, vy, vz, epoch, frame))
+            Ok(Orbit::cartesian(x, y, z, vx, vy, vz, epoch, frame))
         } else if self.sma.is_some()
             && self.ecc.is_some()
             && self.inc.is_some()
@@ -102,7 +102,7 @@ impl StateSerde {
             && self.aop.is_some()
             && self.ta.is_some()
         {
-            Ok(State::keplerian(
+            Ok(Orbit::keplerian(
                 self.sma.unwrap(),
                 self.ecc.unwrap(),
                 self.inc.unwrap(),
@@ -113,7 +113,7 @@ impl StateSerde {
                 frame,
             ))
         } else {
-            Err(ParsingError::IllDefined("State ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
+            Err(ParsingError::IllDefined("Orbit ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
         }
     }
 }
@@ -141,7 +141,7 @@ pub struct DeltaStateSerde {
 }
 
 impl DeltaStateSerde {
-    pub fn as_state(&self, base: State) -> Result<State, ParsingError> {
+    pub fn as_state(&self, base: Orbit) -> Result<Orbit, ParsingError> {
         let frame = base.frame;
         let epoch = base.dt;
         // Rebuild a valid state from the three different initializations
@@ -172,7 +172,7 @@ impl DeltaStateSerde {
                 None => 1.0,
             };
 
-            Ok(State::cartesian(
+            Ok(Orbit::cartesian(
                 self.x.unwrap_or(0.0) * pos_mul,
                 self.y.unwrap_or(0.0) * pos_mul,
                 self.z.unwrap_or(0.0) * pos_mul,
@@ -187,7 +187,7 @@ impl DeltaStateSerde {
                 Some(position) => {
                     if position.len() != 3 {
                         return Err(ParsingError::IllDefined(
-                            "State ill defined: position arrays must be of size 3 exactly"
+                            "Orbit ill defined: position arrays must be of size 3 exactly"
                                 .to_string(),
                         ));
                     }
@@ -203,7 +203,7 @@ impl DeltaStateSerde {
                 Some(velocity) => {
                     if velocity.len() != 3 {
                         return Err(ParsingError::IllDefined(
-                            "State ill defined: velocity arrays must be of size 3 exactly"
+                            "Orbit ill defined: velocity arrays must be of size 3 exactly"
                                 .to_string(),
                         ));
                     }
@@ -215,7 +215,7 @@ impl DeltaStateSerde {
                 None => (0.0, 0.0, 0.0),
             };
 
-            Ok(State::cartesian(x, y, z, vx, vy, vz, epoch, frame) + base)
+            Ok(Orbit::cartesian(x, y, z, vx, vy, vz, epoch, frame) + base)
         } else if self.sma.is_some()
             || self.ecc.is_some()
             || self.inc.is_some()
@@ -247,7 +247,7 @@ impl DeltaStateSerde {
                 Some(ta) => ta + base.ta(),
                 None => base.ta(),
             };
-            Ok(State::keplerian(sma, ecc, inc, raan, aop, ta, epoch, frame) + base)
+            Ok(Orbit::keplerian(sma, ecc, inc, raan, aop, ta, epoch, frame) + base)
         } else {
             Err(ParsingError::IllDefined("Delta state ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
         }

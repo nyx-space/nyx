@@ -7,7 +7,7 @@ extern crate nyx_space as nyx;
 use approx::abs_diff_eq;
 use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
 use na::{Matrix6, Vector6, U3};
-use nyx::celestia::{bodies, Cosm, State};
+use nyx::celestia::{bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
 use nyx::od::Estimable;
 use nyx::propagators::error_ctrl::RSSStepPV;
@@ -23,7 +23,7 @@ fn two_body_dynamics() {
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -91,7 +91,7 @@ fn halo_earth_moon_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = State::cartesian(
+    let halo_rcvr = Orbit::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -157,7 +157,7 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = State::cartesian(
+    let halo_rcvr = Orbit::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -222,7 +222,7 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = State::cartesian(
+    let llo_xmtr = Orbit::cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -290,7 +290,7 @@ fn halo_multi_body_dynamics() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = State::cartesian(
+    let halo_rcvr = Orbit::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -360,7 +360,7 @@ fn halo_multi_body_dynamics_adaptive() {
     // let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let halo_rcvr = State::cartesian(
+    let halo_rcvr = Orbit::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -429,7 +429,7 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
 
-    let llo_xmtr = State::cartesian(
+    let llo_xmtr = Orbit::cartesian(
         3.919_869_89e5,
         -7.493_039_70e4,
         -7.022_605_11e4,
@@ -498,7 +498,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::cartesian(
+    let leo = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
     );
 
@@ -559,7 +559,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let leo = State::cartesian(
+    let leo = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
     );
 
@@ -610,7 +610,7 @@ fn two_body_dual() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let init = State::cartesian(
+    let init = Orbit::cartesian(
         -9_042.862_233_600_335,
         18_536.333_069_123_244,
         6_999.957_069_486_411_5,
@@ -695,7 +695,7 @@ fn multi_body_dynamics_dual() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = State::cartesian(
+    let halo_rcvr = Orbit::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -745,7 +745,7 @@ fn earth_sph_harmonics_j2() {
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
     // GMAT validation case
@@ -762,7 +762,7 @@ fn earth_sph_harmonics_j2() {
     );*/
 
     // Monte validation case
-    // State (km, km/sec)
+    // Orbit (km, km/sec)
     // 'Earth' -> 'test' in 'EME2000' at '02-JAN-2000 12:00:00.0000 TAI'
     // Pos: -5.751472565170783e+03  4.721183256208691e+03  2.046020865167045e+03
     // Vel: -7.976895830677169e-01 -3.656498994998706e+00  6.139616747276084e+00
@@ -816,7 +816,7 @@ fn earth_sph_harmonics_12x12() {
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -869,7 +869,7 @@ fn earth_sph_harmonics_70x70() {
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -922,7 +922,7 @@ fn earth_sph_harmonics_70x70_partials() {
     let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -980,7 +980,7 @@ fn hf_prop() {
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = State::cartesian(
+    let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 

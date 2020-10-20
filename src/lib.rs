@@ -29,7 +29,7 @@ Unless specified otherwise in the documentation of specific functions, all vecto
 - Smoothing and iterations of CKFs
 - Square Root Information Filer (SRIF)
 - An easy-to-use OD user interface
-- State noise compensation (SNC)
+- Orbit noise compensation (SNC)
 ## Celestial computations
 - Orbital state manipulation (from GMAT source code and validated in GMAT)
 - Planetary and Solar eclipse and visibility computation
@@ -61,7 +61,7 @@ pub mod propagators;
 /// extern crate hifitime;
 /// extern crate nyx_space as nyx;
 /// use hifitime::{Epoch, SECONDS_PER_DAY};
-/// use nyx::celestia::{bodies, Cosm, State};
+/// use nyx::celestia::{bodies, Cosm, Orbit};
 /// use nyx::dynamics::orbital::OrbitalDynamics;
 /// use nyx::dynamics::Dynamics;
 /// use nyx::propagators::error_ctrl::RSSStepPV;
@@ -71,7 +71,7 @@ pub mod propagators;
 /// let eme2k = cosm.frame("EME2000");
 ///
 /// let dt = Epoch::from_mjd_tai(21_545.0);
-/// let initial_state = State::cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, eme2k);
+/// let initial_state = Orbit::cartesian(-2436.45, -2436.45, 6891.037, 5.088611, -5.088611, 0.0, dt, eme2k);
 ///
 /// println!("Initial state:\n{0}\n{0:o}\n", initial_state);
 ///
@@ -80,7 +80,7 @@ pub mod propagators;
 /// let min_step = 0.1;
 /// let max_step = 60.0;
 ///
-/// let rslt = State::cartesian(
+/// let rslt = Orbit::cartesian(
 ///         -5_971.194_376_797_643,
 ///         3_945.517_912_574_178_4,
 ///         2_864.620_957_744_429_2,
@@ -113,7 +113,7 @@ pub mod propagators;
 
 /// use hifitime::Epoch;
 /// use na::Vector6;
-/// use nyx::celestia::{bodies, Cosm, State};
+/// use nyx::celestia::{bodies, Cosm, Orbit};
 /// use nyx::dynamics::orbital::OrbitalDynamics;
 /// use nyx::propagators::*;
 /// use nyx::utils::rss_errors;
@@ -125,7 +125,7 @@ pub mod propagators;
 ///
 /// let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 ///
-/// let halo_rcvr = State::cartesian(
+/// let halo_rcvr = Orbit::cartesian(
 ///     333_321.004_516,
 ///     -76_134.198_887,
 ///     -20_873.831_939,
@@ -164,20 +164,20 @@ pub mod dynamics;
 
 /// Provides the solar system planets, and state and (later) ephemeride management.
 ///
-/// # State creation and management
+/// # Orbit creation and management
 /// ```
 /// extern crate hifitime;
 /// extern crate nyx_space as nyx;
 ///
 /// use hifitime::Epoch;
-/// use nyx::celestia::{Cosm, State};
+/// use nyx::celestia::{Cosm, Orbit};
 /// let mut cosm = Cosm::from_xb("./de438s");
 /// // We're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
 /// cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
 /// // In this case, we're creating these states around a Geoid which is Earth.
 /// let eme2k = cosm.frame("EME2000");
 /// let dt = Epoch::from_mjd_tai(21545.0);
-/// let cart = State::cartesian(
+/// let cart = Orbit::cartesian(
 ///         5_946.673_548_288_958,
 ///         1_656.154_606_023_661,
 ///         2_259.012_129_598_249,
@@ -188,7 +188,7 @@ pub mod dynamics;
 ///         eme2k,
 /// );
 ///
-/// let kep = State::keplerian(
+/// let kep = Orbit::keplerian(
 ///        7_712.186_117_895_041,
 ///        0.158_999_999_999_999_95,
 ///        53.75369,
@@ -230,6 +230,8 @@ pub mod md;
 pub mod tools;
 
 pub mod tutorial;
+
+pub mod opti;
 
 #[macro_use]
 extern crate log;
