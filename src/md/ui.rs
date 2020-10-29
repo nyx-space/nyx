@@ -346,7 +346,7 @@ where
     pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
         match self.sc_dyn {
             StmState::Without(ref mut sc_dyn) => {
-                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
+                let mut p = Propagator::default(sc_dyn);
                 p.set_tolerance(self.prop_tol);
                 p
             }
@@ -359,7 +359,7 @@ where
     ) -> Propagator<Spacecraft<'a, OrbitalDynamicsStm<'a>>, RSSStepPV> {
         match self.sc_dyn {
             StmState::With(ref mut sc_dyn) => {
-                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
+                let mut p = Propagator::default(sc_dyn);
                 p.set_tolerance(self.prop_tol);
                 p
             }

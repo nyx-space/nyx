@@ -32,9 +32,9 @@ fn event_tracker_true_anomaly() {
 
     let mut dynamics = OrbitalDynamics::two_body(state);
 
-    let mut prop = Propagator::default(
+    let mut prop = Propagator::rk89(
         &mut dynamics,
-        &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
     prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time).unwrap();

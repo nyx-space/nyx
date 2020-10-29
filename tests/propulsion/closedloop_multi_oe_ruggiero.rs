@@ -66,7 +66,7 @@ fn qlaw_as_ruggiero_case_a() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time).unwrap();
     println!("{}", prop.event_trackers);
@@ -130,7 +130,7 @@ fn qlaw_as_ruggiero_case_b() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
@@ -189,7 +189,7 @@ fn qlaw_as_ruggiero_case_c() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
@@ -258,7 +258,7 @@ fn qlaw_as_ruggiero_case_d() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
@@ -331,7 +331,7 @@ fn qlaw_as_ruggiero_case_e() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
@@ -407,7 +407,7 @@ fn qlaw_as_ruggiero_case_f() {
         }
     });
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.tx_chan = Some(tx);
     prop.until_time_elapsed(prop_time).unwrap();
 
@@ -471,7 +471,7 @@ fn ruggiero_iepc_2011_102() {
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();

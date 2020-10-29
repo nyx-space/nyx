@@ -41,7 +41,7 @@ where
     DefaultAllocator: Allocator<f64, D::StateSize>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: &'a mut D, opts: &PropOpts<E>) -> Self {
+    pub fn new<T: RK>(dynamics: &'a mut D, opts: PropOpts<E>) -> Self {
         let init_time = dynamics.time();
         let init_state_vec = dynamics.state_vector();
         // Pre-allocate the k used in the propagator
@@ -54,7 +54,7 @@ where
             dynamics,
             event_trackers: EventTrackers::none(),
             prevent_tx: false,
-            opts: *opts,
+            opts,
             details: IntegrationDetails {
                 step: 0.0,
                 error: 0.0,
@@ -72,8 +72,8 @@ where
         }
     }
 
-    /// Default propagator is an RK89.
-    pub fn default(dynamics: &'a mut D, opts: &PropOpts<E>) -> Self {
+    /// An RK89 propagator (the default) with custom propagator options.
+    pub fn rk89(dynamics: &'a mut D, opts: PropOpts<E>) -> Self {
         Self::new::<RK89>(dynamics, opts)
     }
 
@@ -414,6 +414,16 @@ where
     /// Borrow the details of the latest integration step.
     pub fn latest_details(&self) -> &IntegrationDetails {
         &self.details
+    }
+}
+
+impl<'a, D: Dynamics> Propagator<'a, D, RSSStepPV>
+where
+    DefaultAllocator: Allocator<f64, D::StateSize>,
+{
+    /// Default propagator is an RK89 with the default PropOpts.
+    pub fn default(dynamics: &'a mut D) -> Self {
+        Self::new::<RK89>(dynamics, PropOpts::default())
     }
 }
 

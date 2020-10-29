@@ -38,7 +38,7 @@ fn two_body_dynamics() {
 
     let mut dynamics = OrbitalDynamics::two_body(state);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(prop_time).unwrap();
     assert!(
         (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
@@ -115,7 +115,7 @@ fn halo_earth_moon_dynamics() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -180,7 +180,7 @@ fn halo_earth_moon_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::default());
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -246,7 +246,7 @@ fn llo_earth_moon_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON];
     let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::default());
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -314,7 +314,7 @@ fn halo_multi_body_dynamics() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -384,7 +384,7 @@ fn halo_multi_body_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics);
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -453,7 +453,7 @@ fn llo_multi_body_dynamics_adaptive() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics);
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -515,7 +515,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics);
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -576,7 +576,7 @@ fn leo_multi_body_dynamics_adaptive() {
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics);
     prop.until_time_elapsed(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 
@@ -668,7 +668,7 @@ fn two_body_dual() {
 
     let prop_time = SECONDS_PER_DAY;
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
@@ -709,7 +709,7 @@ fn multi_body_dynamics_dual() {
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let mut dynamics = OrbitalDynamicsStm::point_masses(halo_rcvr, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
@@ -778,7 +778,7 @@ fn earth_sph_harmonics_j2() {
     let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::<RSSStepPV>::default());
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::<RSSStepPV>::default());
     prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!("{}", prop.state());
@@ -833,7 +833,7 @@ fn earth_sph_harmonics_12x12() {
     let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_tolerance(1e-9));
     prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
@@ -886,7 +886,7 @@ fn earth_sph_harmonics_70x70() {
     let mut dynamics = OrbitalDynamics::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics);
     prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
@@ -939,7 +939,7 @@ fn earth_sph_harmonics_70x70_partials() {
     let mut dynamics = OrbitalDynamicsStm::two_body(state);
     dynamics.add_model(Box::new(harmonics));
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
+    let mut prop = Propagator::default(&mut dynamics);
     prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
 
     println!(
@@ -989,7 +989,7 @@ fn hf_prop() {
     let mut dynamics = OrbitalDynamics::point_masses(state, &bodies, &cosm);
     dynamics.add_model(Box::new(harmonics));
 
-    let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_tolerance(1e-9));
+    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_tolerance(1e-9));
     let rslt = prop.until_time_elapsed(30.0 * SECONDS_PER_DAY).unwrap();
 
     println!("{}\n{:o}", rslt, rslt);

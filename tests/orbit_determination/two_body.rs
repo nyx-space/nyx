@@ -56,7 +56,7 @@ fn ekf_fixed_step_perfect_stations() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -75,9 +75,8 @@ fn ekf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -173,7 +172,7 @@ fn ckf_fixed_step_perfect_stations() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -193,9 +192,8 @@ fn ckf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -333,7 +331,7 @@ fn ckf_fixed_step_iteration_test() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -353,9 +351,8 @@ fn ckf_fixed_step_iteration_test() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -445,7 +442,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -465,9 +462,8 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -556,7 +552,6 @@ fn ckf_map_covar() {
     // Define the propagator information.
     let prop_time = 2.0 * SECONDS_PER_DAY;
     let step_size = 10.0;
-    let opts_est = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -568,7 +563,8 @@ fn ckf_map_covar() {
     // the measurements, and the same time step.
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
 
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est =
+        Propagator::new::<RK4Fixed>(&mut tb_estimator, PropOpts::with_fixed_step(step_size));
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -660,7 +656,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
         let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
         let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
         dynamics.add_model(Box::new(harmonics));
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -680,12 +676,11 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut estimator = OrbitalDynamicsStm::two_body(initial_state);
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
     estimator.add_model(Box::new(harmonics));
-    let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, opts);
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -775,7 +770,7 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -795,9 +790,8 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
     let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
 
     // Set up the filter
     let covar_radius = 1.0e-3;

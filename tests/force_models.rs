@@ -9,7 +9,7 @@ use nyx::dynamics::drag::Drag;
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::solarpressure::SolarPressure;
 use nyx::dynamics::spacecraft::Spacecraft;
-use nyx::propagators::{PropOpts, Propagator};
+use nyx::propagators::Propagator;
 use nyx::utils::rss_errors;
 
 #[test]
@@ -38,7 +38,7 @@ fn srp_earth() {
     sc.add_model(Box::new(srp));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc);
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
@@ -91,7 +91,7 @@ fn exp_drag_earth() {
     sc.add_model(Box::new(drag));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc);
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
@@ -128,7 +128,7 @@ fn std_atm_drag_earth() {
     sc.add_model(Box::new(drag));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc);
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
@@ -187,7 +187,7 @@ fn std_atm_drag_earth_low() {
     sc.add_model(Box::new(drag));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc, &PropOpts::default());
+    let mut prop = Propagator::default(&mut sc);
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();

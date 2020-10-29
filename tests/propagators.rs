@@ -83,7 +83,7 @@ fn regress_leo_day_adaptive() {
 
     {
         let mut dynamics = OrbitalDynamics::two_body(init);
-        let mut prop = Propagator::new::<RK2Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0));
+        let mut prop = Propagator::new::<RK2Fixed>(&mut dynamics, PropOpts::with_fixed_step(1.0));
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(prop.state_vector(), all_rslts[0], "two body prop failed");
         let prev_details = prop.latest_details();
@@ -100,7 +100,7 @@ fn regress_leo_day_adaptive() {
         let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<CashKarp45>(
             &mut dynamics,
-            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq_or_abs!(prop.state_vector(), all_rslts[1], "two body prop failed");
@@ -118,7 +118,7 @@ fn regress_leo_day_adaptive() {
         let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Fehlberg45>(
             &mut dynamics,
-            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq_or_rel!(prop.state_vector(), all_rslts[2], "two body prop failed");
@@ -190,7 +190,7 @@ fn gmat_val_leo_day_adaptive() {
         let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand45>(
             &mut dynamics,
-            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq_or_abs!(prop.state_vector(), all_rslts[0], "two body prop failed");
@@ -231,7 +231,7 @@ fn gmat_val_leo_day_adaptive() {
         let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Verner56>(
             &mut dynamics,
-            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq_or_abs!(prop.state_vector(), all_rslts[1], "two body prop failed");
@@ -249,7 +249,7 @@ fn gmat_val_leo_day_adaptive() {
         let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<Dormand78>(
             &mut dynamics,
-            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(prop.state_vector(), all_rslts[2], "two body prop failed");
@@ -267,7 +267,7 @@ fn gmat_val_leo_day_adaptive() {
         let mut dynamics = OrbitalDynamics::two_body(init);
         let mut prop = Propagator::new::<RK89>(
             &mut dynamics,
-            &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(prop.state_vector(), all_rslts[3], "two body prop failed");
@@ -339,7 +339,7 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let mut dynamics = OrbitalDynamics::two_body(init);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &PropOpts::with_fixed_step(1.0));
+        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, PropOpts::with_fixed_step(1.0));
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(
             prop.state_vector(),
@@ -363,30 +363,28 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let mut dynamics = OrbitalDynamics::two_body(init);
-        let mut prop = Propagator::new::<Verner56>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+        let mut prop = Propagator::new::<Verner56>(&mut dynamics, PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq_or_rel!(prop.state_vector(), all_rslts[1], "two body prop failed");
     }
 
     {
         let mut dynamics = OrbitalDynamics::two_body(init);
-        let mut prop =
-            Propagator::new::<Dormand45>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+        let mut prop = Propagator::new::<Dormand45>(&mut dynamics, PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(prop.state_vector(), all_rslts[2], "two body prop failed");
     }
 
     {
         let mut dynamics = OrbitalDynamics::two_body(init);
-        let mut prop =
-            Propagator::new::<Dormand78>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+        let mut prop = Propagator::new::<Dormand78>(&mut dynamics, PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(prop.state_vector(), all_rslts[3], "two body prop failed");
     }
 
     {
         let mut dynamics = OrbitalDynamics::two_body(init);
-        let mut prop = Propagator::new::<RK89>(&mut dynamics, &PropOpts::with_fixed_step(10.0));
+        let mut prop = Propagator::new::<RK89>(&mut dynamics, PropOpts::with_fixed_step(10.0));
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(prop.state_vector(), all_rslts[4], "two body prop failed");
     }

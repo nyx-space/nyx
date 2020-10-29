@@ -30,7 +30,7 @@ fn leo_sun_earth_eclipses() {
     thread::spawn(move || {
         let cosm = Cosm::de438();
         let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
-        let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
+        let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -81,7 +81,7 @@ fn geo_sun_earth_eclipses() {
     thread::spawn(move || {
         let cosm = Cosm::de438();
         let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
-        let mut prop = Propagator::default(&mut dynamics, &PropOpts::with_fixed_step(60.0));
+        let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(60.0));
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });

@@ -7,7 +7,7 @@ use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
 use self::nyx::dynamics::spacecraft::Spacecraft;
 use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
 use self::nyx::dynamics::Dynamics;
-use self::nyx::propagators::{PropOpts, Propagator, RK89};
+use self::nyx::propagators::{PropOpts, Propagator};
 use self::nyx::time::Epoch;
 use self::nyx::utils::rss_errors;
 
@@ -52,7 +52,7 @@ fn transfer_schedule_no_depl() {
     let dynamics = OrbitalDynamics::point_masses(orbit, &bodies, &cosm);
 
     // Define the thruster
-    let biprop = vec![Thruster {
+    let monoprop = vec![Thruster {
         thrust: 10.0,
         isp: 300.0,
     }];
@@ -69,12 +69,12 @@ fn transfer_schedule_no_depl() {
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let prop_subsys = Propulsion::new(Box::new(schedule), biprop, false);
+    let prop_subsys = Propulsion::new(Box::new(schedule), monoprop, false);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
     // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let mut prop = Propagator::new::<RK89>(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::rk89(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     // Compute the errors
@@ -151,7 +151,7 @@ fn transfer_schedule_depl() {
     let dynamics = OrbitalDynamics::point_masses(orbit, &bodies, &cosm);
 
     // Define the thruster
-    let biprop = vec![Thruster {
+    let monoprop = vec![Thruster {
         thrust: 10.0,
         isp: 300.0,
     }];
@@ -168,11 +168,11 @@ fn transfer_schedule_depl() {
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
 
-    let prop_subsys = Propulsion::new(Box::new(schedule), biprop, true);
+    let prop_subsys = Propulsion::new(Box::new(schedule), monoprop, true);
 
     let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
 
-    let mut prop = Propagator::default(&mut sc, &PropOpts::with_fixed_step(10.0));
+    let mut prop = Propagator::rk89(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.until_time_elapsed(prop_time).unwrap();
 
     // Compute the errors

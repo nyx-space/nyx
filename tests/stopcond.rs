@@ -27,9 +27,9 @@ fn stop_cond_3rd_apo() {
 
     let mut dynamics = OrbitalDynamics::two_body(state);
 
-    let mut prop = Propagator::default(
+    let mut prop = Propagator::rk89(
         &mut dynamics,
-        &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
 
     let rslt = prop.until_event(condition);
@@ -67,9 +67,9 @@ fn stop_cond_3rd_peri() {
 
     let mut dynamics = OrbitalDynamics::two_body(state);
 
-    let mut prop = Propagator::default(
+    let mut prop = Propagator::rk89(
         &mut dynamics,
-        &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
 
     let rslt = prop.until_event(condition);
@@ -117,9 +117,9 @@ fn nrho_apo() {
     let bodies = vec![bodies::EARTH, bodies::SUN];
     let mut dynamics = OrbitalDynamics::point_masses(state_luna, &bodies, &cosm);
 
-    let mut prop = Propagator::default(
+    let mut prop = Propagator::rk89(
         &mut dynamics,
-        &PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
 
     let rslt = prop.until_event(condition);
