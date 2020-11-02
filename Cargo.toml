@@ -19,7 +19,7 @@ travis-ci = { repository = "ChristopherRabotin/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.17"
 log = "0.4"
-hifitime = "0.1"
+hifitime = "2.1"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 rand = "0.6"
 serde = "1.0"
