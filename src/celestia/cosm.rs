@@ -17,7 +17,7 @@ use super::state::Orbit;
 use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, EphemerisContainer};
 use super::SPEED_OF_LIGHT_KMS;
-use crate::hifitime::{Epoch, SECONDS_PER_DAY};
+use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::Matrix3;
 use std::collections::HashMap;
@@ -626,7 +626,7 @@ impl Cosm {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
-                    let lt_dt = datetime - lt;
+                    let lt_dt = datetime - lt * TimeUnit::Second;
                     tgt = self.celestial_state(target_exb_id, lt_dt, ssb2k, LTCorr::None);
                 }
                 // Compute the correct state

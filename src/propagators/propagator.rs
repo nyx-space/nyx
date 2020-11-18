@@ -3,6 +3,7 @@ use super::events::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
+use crate::time::{Duration, TimeUnit};
 use dynamics::Dynamics;
 use errors::NyxError;
 use std::f64;
@@ -24,7 +25,7 @@ where
     prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
     opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     details: IntegrationDetails, // Stores the details of the previous integration step
-    step_size: f64,   // Stores the adapted step for the _next_ call
+    step_size: Duration, // Stores the adapted step for the _next_ call
     order: u8,        // Order of the integrator
     stages: usize,    // Number of stages, i.e. how many times the derivatives will be called
     a_coeffs: &'a [f64],
@@ -85,7 +86,7 @@ where
     }
 
     /// Allows setting the step size of the propagator
-    pub fn set_step(&mut self, step_size: f64, fixed: bool) {
+    pub fn set_step(&mut self, step_size: Duration, fixed: bool) {
         self.step_size = step_size;
         self.fixed_step = fixed;
     }
@@ -96,7 +97,7 @@ where
     }
 
     /// Set the maximum step size for the propagator
-    pub fn set_max_step(&mut self, step: f64) {
+    pub fn set_max_step(&mut self, step: Duration) {
         self.opts.max_step = step;
     }
 
@@ -123,13 +124,13 @@ where
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `self.dynamics.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed(&mut self, elapsed_time: f64) -> Result<D::StateType, NyxError> {
-        let backprop = elapsed_time < 0.0;
+    pub fn until_time_elapsed(&mut self, elapsed_time: Duration) -> Result<D::StateType, NyxError> {
+        let backprop = elapsed_time < TimeUnit::Nanosecond;
         if backprop {
             self.step_size *= -1.0; // Invert the step size
         }
         let init_seconds = self.dynamics.time();
-        let stop_time = init_seconds + elapsed_time;
+        let stop_time = init_seconds + elapsed_time.in_unit_f64(TimeUnit::Second);
         loop {
             let dt = self.dynamics.time();
             if (!backprop && dt + self.step_size > stop_time)
@@ -436,9 +437,9 @@ where
 /// fixed step options will lead to an RK4 being used instead of an RK45.
 #[derive(Clone, Copy, Debug)]
 pub struct PropOpts<E: ErrorCtrl> {
-    init_step: f64,
-    min_step: f64,
-    max_step: f64,
+    init_step: Duration,
+    min_step: Duration,
+    max_step: Duration,
     tolerance: f64,
     attempts: u8,
     fixed_step: bool,
@@ -448,7 +449,12 @@ pub struct PropOpts<E: ErrorCtrl> {
 impl<E: ErrorCtrl> PropOpts<E> {
     /// `with_adaptive_step` initializes an `PropOpts` such that the integrator is used with an
     ///  adaptive step size. The number of attempts is currently fixed to 50 (as in GMAT).
-    pub fn with_adaptive_step(min_step: f64, max_step: f64, tolerance: f64, errctrl: E) -> Self {
+    pub fn with_adaptive_step(
+        min_step: Duration,
+        max_step: Duration,
+        tolerance: f64,
+        errctrl: E,
+    ) -> Self {
         PropOpts {
             init_step: max_step,
             min_step,
@@ -458,6 +464,15 @@ impl<E: ErrorCtrl> PropOpts<E> {
             fixed_step: false,
             errctrl,
         }
+    }
+
+    pub fn with_adaptive_step_s(min_step: f64, max_step: f64, tolerance: f64, errctrl: E) -> Self {
+        Self::with_adaptive_step(
+            min_step * TimeUnit::Second,
+            max_step * TimeUnit::Second,
+            tolerance,
+            errctrl,
+        )
     }
 
     /// Returns a string with the information about these options
@@ -472,7 +487,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
 impl PropOpts<RSSStepPV> {
     /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
     ///  step size.
-    pub fn with_fixed_step(step: f64) -> Self {
+    pub fn with_fixed_step(step: Duration) -> Self {
         PropOpts {
             init_step: step,
             min_step: step,
@@ -482,6 +497,10 @@ impl PropOpts<RSSStepPV> {
             attempts: 0,
             errctrl: RSSStepPV {},
         }
+    }
+
+    pub fn with_fixed_step_s(step: f64) -> Self {
+        Self::with_fixed_step(step * TimeUnit::Second)
     }
 
     /// Returns the default options with a specific tolerance.
@@ -496,9 +515,9 @@ impl Default for PropOpts<RSSStepPV> {
     /// `default` returns the same default options as GMAT.
     fn default() -> PropOpts<RSSStepPV> {
         PropOpts {
-            init_step: 60.0,
-            min_step: 0.001,
-            max_step: 2700.0,
+            init_step: 60.0 * TimeUnit::Second,
+            min_step: 0.001 * TimeUnit::Second,
+            max_step: 2700.0 * TimeUnit::Second,
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
@@ -509,32 +528,25 @@ impl Default for PropOpts<RSSStepPV> {
 
 #[test]
 fn test_options() {
-    use std::f64::EPSILON;
-    macro_rules! f64_eq {
-        ($x:expr, $val:expr) => {
-            assert!(($x - $val).abs() < EPSILON)
-        };
-    }
-
     use super::error_ctrl::RSSStep;
 
-    let opts = PropOpts::with_fixed_step(1e-1);
-    f64_eq!(opts.min_step, 1e-1);
-    f64_eq!(opts.max_step, 1e-1);
-    f64_eq!(opts.tolerance, 0.0);
+    let opts = PropOpts::with_fixed_step_s(1e-1);
+    assert_eq!(opts.min_step, 1e-1 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 1e-1 * TimeUnit::Second);
+    assert!(opts.tolerance.abs() < std::f64::EPSILON);
     assert_eq!(opts.fixed_step, true);
 
-    let opts = PropOpts::with_adaptive_step(1e-2, 10.0, 1e-12, RSSStep {});
-    f64_eq!(opts.min_step, 1e-2);
-    f64_eq!(opts.max_step, 10.0);
-    f64_eq!(opts.tolerance, 1e-12);
+    let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
+    assert_eq!(opts.min_step, 1e-2 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 10.0 * TimeUnit::Second);
+    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
     assert_eq!(opts.fixed_step, false);
 
     let opts: PropOpts<RSSStepPV> = Default::default();
-    f64_eq!(opts.init_step, 60.0);
-    f64_eq!(opts.min_step, 0.001);
-    f64_eq!(opts.max_step, 2700.0);
-    f64_eq!(opts.tolerance, 1e-12);
+    assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 0.001 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);
+    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
     assert_eq!(opts.attempts, 50);
     assert_eq!(opts.fixed_step, false);
 }

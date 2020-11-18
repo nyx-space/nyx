@@ -1,5 +1,6 @@
 use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dynamics::spacecraft::SpacecraftState;
+use crate::time::Duration;
 use crate::utils::between_pm_180;
 use std::fmt;
 
@@ -237,7 +238,7 @@ impl<'a> Event for SCEvent<'a> {
 #[derive(Debug)]
 pub struct StopCondition<S: Copy> {
     /// Set to a negative number to search backward
-    pub max_prop_time: f64,
+    pub max_prop_time: Duration,
     /// The event which should be the stopping condition
     pub event: Box<dyn Event<StateType = S>>,
     /// The number of times the event must be hit prior to stopping (should be at least 1)
@@ -250,7 +251,7 @@ pub struct StopCondition<S: Copy> {
 
 impl<S: Copy> StopCondition<S> {
     /// Finds the closest time at which this condition is met. Stops on first occurence.
-    pub fn new(event: Box<dyn Event<StateType = S>>, prop_time: f64, epsilon: f64) -> Self {
+    pub fn new(event: Box<dyn Event<StateType = S>>, prop_time: Duration, epsilon: f64) -> Self {
         Self {
             max_prop_time: prop_time,
             event,
@@ -264,7 +265,7 @@ impl<S: Copy> StopCondition<S> {
     pub fn after_hits(
         event: Box<dyn Event<StateType = S>>,
         hits: usize,
-        prop_time: f64,
+        prop_time: Duration,
         epsilon: f64,
     ) -> Self {
         assert!(hits >= 1, "cannot stop on zero-th event passing");

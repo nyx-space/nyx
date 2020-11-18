@@ -1,5 +1,5 @@
 use crate::dimensions::Vector3;
-use crate::time::Epoch;
+use crate::time::{Epoch, TimeUnit};
 use celestia::{Frame, Orbit};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
@@ -69,7 +69,7 @@ impl Mnvr {
     pub fn instantaneous(dt: Epoch, vector: Vector3<f64>) -> Self {
         Self {
             start: dt,
-            end: dt + 1e-6,
+            end: dt + TimeUnit::Microsecond,
             thrust_lvl: 1.0,
             vector,
         }
