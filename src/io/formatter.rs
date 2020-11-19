@@ -5,7 +5,7 @@ use super::EpochFormat;
 use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::U6;
 use crate::od::estimate::NavSolution;
-use crate::od::EstimableState;
+use crate::State;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
@@ -1073,7 +1073,7 @@ impl<'a> NavSolutionFormatter<'a> {
         }
     }
 
-    pub fn fmt<T: EstimableState<U6>, S: NavSolution<T>>(&self, sol: &S) -> Vec<String> {
+    pub fn fmt<T: State<U6>, S: NavSolution<T>>(&self, sol: &S) -> Vec<String> {
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {

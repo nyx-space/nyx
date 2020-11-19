@@ -19,7 +19,8 @@ gitlab = { repository = "chrisrabotin/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.22"
 log = "0.4"
-hifitime = "2"
+# hifitime = "2"
+hifitime = {path = "../hifitime"}
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"

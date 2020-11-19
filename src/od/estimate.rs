@@ -1,6 +1,6 @@
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
-use super::EstimableState;
+use super::State;
 use super::{CovarFormat, EpochFormat};
 use crate::celestia::Orbit;
 use crate::dimensions::allocator::Allocator;
@@ -12,7 +12,7 @@ use std::f64::INFINITY;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
-pub trait Estimate<S, T: EstimableState<S>>
+pub trait Estimate<S, T: State<S>>
 where
     Self: Clone + PartialEq + Sized,
     S: DimName,
@@ -102,7 +102,7 @@ where
 
 /// Kalman filter Estimate
 #[derive(Debug, Clone, PartialEq)]
-pub struct KfEstimate<S, T: EstimableState<S>>
+pub struct KfEstimate<S, T: State<S>>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
@@ -125,7 +125,7 @@ where
     pub covar_fmt: CovarFormat,
 }
 
-impl<S, T: EstimableState<S>> KfEstimate<S, T>
+impl<S, T: State<S>> KfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
@@ -144,7 +144,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> Estimate<S, T> for KfEstimate<S, T>
+impl<S, T: State<S>> Estimate<S, T> for KfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
@@ -198,7 +198,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> fmt::Display for KfEstimate<S, T>
+impl<S, T: State<S>> fmt::Display for KfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator:
@@ -226,7 +226,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> fmt::LowerExp for KfEstimate<S, T>
+impl<S, T: State<S>> fmt::LowerExp for KfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator:
@@ -241,7 +241,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> Serialize for KfEstimate<S, T>
+impl<S, T: State<S>> Serialize for KfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator:
@@ -294,7 +294,7 @@ where
 
 /// Information filter Estimate
 #[derive(Debug, Clone, PartialEq)]
-pub struct IfEstimate<S, T: EstimableState<S>>
+pub struct IfEstimate<S, T: State<S>>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
@@ -317,7 +317,7 @@ where
     pub covar_fmt: CovarFormat,
 }
 
-impl<S, T: EstimableState<S>> IfEstimate<S, T>
+impl<S, T: State<S>> IfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
@@ -361,7 +361,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> Estimate<S, T> for IfEstimate<S, T>
+impl<S, T: State<S>> Estimate<S, T> for IfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
@@ -427,7 +427,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> fmt::Display for IfEstimate<S, T>
+impl<S, T: State<S>> fmt::Display for IfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator:
@@ -458,7 +458,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> fmt::LowerExp for IfEstimate<S, T>
+impl<S, T: State<S>> fmt::LowerExp for IfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator:
@@ -478,7 +478,7 @@ where
     }
 }
 
-impl<S, T: EstimableState<S>> Serialize for IfEstimate<S, T>
+impl<S, T: State<S>> Serialize for IfEstimate<S, T>
 where
     S: DimName,
     DefaultAllocator:
@@ -549,7 +549,7 @@ where
 /// A trait to store a navigation solution, can be used in conjunction with KfEstimate or IfEstimate
 pub trait NavSolution<T>: Estimate<U6, T>
 where
-    T: EstimableState<U6>,
+    T: State<U6>,
 {
     fn orbital_state(&self) -> Orbit;
     /// Returns the nominal state as computed by the dynamics

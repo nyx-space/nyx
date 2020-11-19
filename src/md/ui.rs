@@ -16,7 +16,7 @@ use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
 use crate::propagators::error_ctrl::RSSStepPV;
-use crate::propagators::{PropOpts, Propagator};
+use crate::propagators::Propagator;
 use crate::time::{Epoch, SECONDS_PER_DAY};
 use std::str::FromStr;
 use std::sync::mpsc::channel;

@@ -1,12 +1,10 @@
 extern crate serde;
 
-use crate::celestia::TimeTagged;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::time::Epoch;
+use crate::{State, TimeTagged};
 pub use dynamics::{Dynamics, NyxError};
-use std::fmt;
-use std::ops::Add;
 
 use crate::io::{CovarFormat, EpochFormat};
 
@@ -89,7 +87,7 @@ where
     S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, A>
@@ -179,12 +177,4 @@ where
 {
     /// Returns the measurement if the device and generate one, else returns None
     fn measure(&self, input: &MsrIn) -> Option<Msr>;
-}
-
-pub trait EstimableState<S: DimName>:
-    TimeTagged + Add<VectorN<f64, S>, Output = Self> + Clone + PartialEq + fmt::Display + fmt::LowerExp
-where
-    Self: Sized,
-    DefaultAllocator: Allocator<f64, S>,
-{
 }

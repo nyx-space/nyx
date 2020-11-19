@@ -6,11 +6,12 @@ use crate::dimensions::dimension::{DimNameAdd, DimNameSum};
 use crate::dimensions::{DefaultAllocator, DimName, Matrix6, Vector1, Vector6, VectorN, U1, U6};
 use crate::od::Estimable;
 use crate::time::Epoch;
-use celestia::{Orbit, TimeTagged};
-use od::EstimableState;
+use crate::TimeTagged;
+use celestia::Orbit;
 use std::cmp::PartialEq;
 use std::fmt;
 use std::ops::Add;
+use State;
 
 pub use super::solarpressure::SolarPressure;
 
@@ -68,68 +69,58 @@ where
         + Allocator<f64, D::StateSize, U1>,
 {
     type StateSize = DimNameSum<D::StateSize, U1>;
-    type StateType = SpacecraftState;
+    // fn state_vector(&self) -> VectorN<f64, Self::StateSize>
+    // where
+    //     DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
+    // {
+    //     VectorN::<f64, Self::StateSize>::from_iterator(
+    //         self.orbital_dyn
+    //             .state_vector()
+    //             .iter()
+    //             .chain(Vector1::new(self.fuel_mass).iter())
+    //             .cloned(),
+    //     )
+    // }
 
-    fn time(&self) -> f64 {
-        self.orbital_dyn.time()
-    }
+    // fn set_state(
+    //     &mut self,
+    //     new_t: f64,
+    //     new_state: &VectorN<f64, Self::StateSize>,
+    // ) -> Result<(), NyxError>
+    // where
+    //     DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
+    // {
+    //     let orbital_dyn_state = new_state.fixed_rows::<D::StateSize>(0).into_owned();
+    //     self.orbital_dyn.set_state(new_t, &orbital_dyn_state)?;
+    //     self.fuel_mass = new_state[Self::StateSize::dim() - 1];
+    //     if let Some(prop) = &self.prop {
+    //         if prop.decrement_mass && self.fuel_mass < 0.0 {
+    //             error!(
+    //                 "negative fuel mass at {:?}",
+    //                 self.orbital_dyn.orbital_state().dt
+    //             );
+    //             return Err(NyxError::FuelExhausted);
+    //         }
+    //     }
+    //     if let Some(prop) = self.prop.as_mut() {
+    //         prop.set_state(&self.orbital_dyn.orbital_state());
+    //     }
 
-    fn state(&self) -> Self::StateType {
-        SpacecraftState {
-            orbit: self.orbital_dyn.orbital_state(),
-            dry_mass: self.dry_mass,
-            fuel_mass: self.fuel_mass,
-            stm: self.orbital_dyn.stm(),
-        }
-    }
+    //     Ok(())
+    // }
 
-    fn state_vector(&self) -> VectorN<f64, Self::StateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
-    {
-        VectorN::<f64, Self::StateSize>::from_iterator(
-            self.orbital_dyn
-                .state_vector()
-                .iter()
-                .chain(Vector1::new(self.fuel_mass).iter())
-                .cloned(),
-        )
-    }
-
-    fn set_state(
-        &mut self,
-        new_t: f64,
-        new_state: &VectorN<f64, Self::StateSize>,
-    ) -> Result<(), NyxError>
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
-    {
-        let orbital_dyn_state = new_state.fixed_rows::<D::StateSize>(0).into_owned();
-        self.orbital_dyn.set_state(new_t, &orbital_dyn_state)?;
-        self.fuel_mass = new_state[Self::StateSize::dim() - 1];
-        if let Some(prop) = &self.prop {
-            if prop.decrement_mass && self.fuel_mass < 0.0 {
-                error!(
-                    "negative fuel mass at {:?}",
-                    self.orbital_dyn.orbital_state().dt
-                );
-                return Err(NyxError::FuelExhausted);
-            }
-        }
-        if let Some(prop) = self.prop.as_mut() {
-            prop.set_state(&self.orbital_dyn.orbital_state());
-        }
-
-        Ok(())
-    }
-
-    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize>
+    fn eom(
+        &self,
+        t: f64,
+        state: &VectorN<f64, Self::StateSize>,
+        ctx: &SpacecraftState,
+    ) -> VectorN<f64, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>,
     {
         // Compute the orbital dynamics
         let orbital_dyn_vec = state.fixed_rows::<D::StateSize>(0).into_owned();
-        let d_x_orbital_dyn = self.orbital_dyn.eom(t, &orbital_dyn_vec);
+        let d_x_orbital_dyn = self.orbital_dyn.eom(t, &orbital_dyn_vec, &ctx.orbit);
         let mut d_x = VectorN::<f64, Self::StateSize>::from_iterator(
             d_x_orbital_dyn
                 .iter()
@@ -216,6 +207,7 @@ pub struct SpacecraftState {
     pub dry_mass: f64,
     pub fuel_mass: f64,
     pub stm: Option<Matrix6<f64>>,
+    pub prop: Option<Propulsion>,
 }
 
 impl SpacecraftState {
@@ -271,7 +263,22 @@ impl TimeTagged for SpacecraftState {
     }
 }
 
-impl EstimableState<U6> for SpacecraftState {}
+impl State<U6> for SpacecraftState {
+    fn as_vector(&self) -> VectorN<f64, U6> {
+        self.orbit.to_cartesian_vec()
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U6>) -> Result<(), NyxError> {
+        self.orbit.set_epoch(epoch);
+        self.orbit.x = vector[0];
+        self.orbit.y = vector[1];
+        self.orbit.z = vector[2];
+        self.orbit.vx = vector[3];
+        self.orbit.vy = vector[4];
+        self.orbit.vz = vector[5];
+        Ok(())
+    }
+}
 
 impl Add<Vector6<f64>> for SpacecraftState {
     type Output = SpacecraftState;

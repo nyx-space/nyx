@@ -15,6 +15,7 @@ pub enum TransferKind {
     NRevs(u8),
 }
 
+#[derive(Debug)]
 pub struct LambertSolution {
     pub v_init: Vector3<f64>,
     pub v_final: Vector3<f64>,

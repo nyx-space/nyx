@@ -1,15 +1,5 @@
 extern crate nalgebra as na;
 
-pub use super::time::Epoch;
-
-/// A trait allowing for something to have an epoch
-pub trait TimeTagged {
-    /// Retrieve the Epoch
-    fn epoch(&self) -> Epoch;
-    /// Set the Epoch
-    fn set_epoch(&mut self, dt: Epoch);
-}
-
 /// Known orientation IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
 pub mod orientations {
     /// J2000 orientation frame

@@ -3,6 +3,7 @@ use crate::dimensions::Vector3;
 use crate::dynamics::orbital::OrbitalDynamics;
 use crate::errors::NyxError;
 use crate::propagators::{PropOpts, Propagator};
+use crate::time::{Duration, TimeUnit};
 use crate::tools::lambert::{standard, TransferKind};
 use std::sync::mpsc::channel;
 
@@ -21,7 +22,7 @@ pub trait Heuristic {
 /// TODO: It will then use mesh refinement combined with a z-score to adequately place the control nodes.
 /// NOTE: This is very likely a bad heuristic. The propagator tolerance is to the meter accuracy.
 pub struct LambertHeuristic {
-    pub tof: f64,
+    pub tof: Duration,
 }
 
 impl Heuristic for LambertHeuristic {
@@ -30,7 +31,7 @@ impl Heuristic for LambertHeuristic {
         let sol = standard(
             start.radius(),
             end.radius(),
-            self.tof,
+            self.tof.in_unit_f64(TimeUnit::Second),
             start.frame.gm(),
             TransferKind::Auto,
         )?;
@@ -48,7 +49,7 @@ impl Heuristic for LambertHeuristic {
 
         // Create the channel to receive all of the details.
         let (tx, rx) = channel();
-        let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_tolerance(1e-3));
+        let mut prop = Propagator::rk89(start_tf, &dynamics, PropOpts::with_tolerance(1e-3));
         prop.tx_chan = Some(tx);
         prop.until_time_elapsed(self.tof)?;
 

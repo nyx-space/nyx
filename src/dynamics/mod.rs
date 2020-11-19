@@ -4,7 +4,8 @@ use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use crate::celestia::{Frame, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U3, U7};
-use crate::time::Epoch;
+use crate::dynamics::spacecraft::SpacecraftState;
+use crate::{time::Epoch, State};
 
 pub use crate::errors::NyxError;
 
@@ -54,35 +55,27 @@ pub mod sph_harmonics;
 /// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
 ///  parameters), it is up to the implementor to handle time and state organization correctly.
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
-pub trait Dynamics {
+pub trait Dynamics: Clone
+where
+    DefaultAllocator: Allocator<f64, Self::StateSize>,
+{
     /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
     type StateSize: DimName;
-    /// Defines the type which will be published on the propagator channel
-    type StateType: Copy;
-    /// Returns the time of the current state
-    fn time(&self) -> f64;
-
-    /// Returns the current state of the dynamics as a vector so it can be integrated.
-    fn state_vector(&self) -> VectorN<f64, Self::StateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize>;
+    type StateType: State<Self::StateSize>;
 
     /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
-    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize>
+    /// The time delta_t is in seconds PAST the context epoch. The state vector is the state which
+    /// changes for every intermediate step of the integration. The state context is the state of
+    /// what is being propagated, it should allow rebuilding a new state context from the
+    /// provided state vector.
+    fn eom(
+        &self,
+        delta_t: f64,
+        state_vec: &VectorN<f64, Self::StateSize>,
+        state_ctx: &Self::StateType,
+    ) -> VectorN<f64, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize>;
-
-    /// Updates the internal state of the dynamics.
-    fn set_state(
-        &mut self,
-        new_t: f64,
-        new_state: &VectorN<f64, Self::StateSize>,
-    ) -> Result<(), NyxError>
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize>;
-
-    /// Returns the state of the dynamics
-    fn state(&self) -> Self::StateType;
 }
 
 /// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
@@ -139,7 +132,7 @@ pub trait AutoDiff: Send + Sync {
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
 pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, osc: &Orbit) -> Vector3<f64>;
+    fn eom(&self, osc: &Orbit, ctx: SpacecraftState) -> Vector3<f64>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.

@@ -11,6 +11,8 @@ pub use super::*;
 
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::Propagator;
+use crate::time::Duration;
+use crate::State;
 
 use std::fmt;
 use std::marker::PhantomData;
@@ -20,7 +22,7 @@ use std::sync::mpsc::channel;
 #[derive(Clone, Copy, Debug)]
 pub enum SmoothingArc {
     /// Stop smoothing when the gap between estimate is the provided floating point number in seconds
-    TimeGap(f64),
+    TimeGap(Duration),
     /// Stop smoothing at the provided Epoch.
     Epoch(Epoch),
     /// Stop smoothing at the first prediction
@@ -34,7 +36,7 @@ impl fmt::Display for SmoothingArc {
         match *self {
             SmoothingArc::All => write!(f, "all estimates smoothed"),
             SmoothingArc::Epoch(e) => write!(f, "{}", e.as_gregorian_tai_str()),
-            SmoothingArc::TimeGap(g) => write!(f, "time gap of {} seconds", g),
+            SmoothingArc::TimeGap(g) => write!(f, "time gap of {}", g),
             SmoothingArc::Prediction => write!(f, "first prediction"),
         }
     }
@@ -49,10 +51,10 @@ pub struct ODProcess<
     N: MeasurementDevice<MsrIn, Msr>,
     T: EkfTrigger,
     A: DimName,
-    K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
+    S: State<Msr::StateSize>,
+    K: Filter<D::LinStateSize, A, Msr::MeasurementSize, S>,
     MsrIn,
 > where
-    D::StateType: EstimableState<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
@@ -67,7 +69,7 @@ pub struct ODProcess<
         + Allocator<f64, A, D::LinStateSize>,
 {
     /// Propagator used for the estimation
-    pub prop: Propagator<'a, D, E>,
+    pub prop: Propagator<'a, D, E, S>,
     /// Kalman filter itself
     pub kf: K,
     /// List of measurement devices used
@@ -90,11 +92,11 @@ impl<
         N: MeasurementDevice<MsrIn, Msr>,
         T: EkfTrigger,
         A: DimName,
-        K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
+        S: State<Msr::StateSize>,
+        K: Filter<D::LinStateSize, A, Msr::MeasurementSize, S>,
         MsrIn,
-    > ODProcess<'a, D, E, Msr, N, T, A, K, MsrIn>
+    > ODProcess<'a, D, E, Msr, N, T, A, S, K, MsrIn>
 where
-    D::StateType: EstimableState<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
@@ -109,7 +111,7 @@ where
         + Allocator<f64, A, D::LinStateSize>,
 {
     pub fn ekf(
-        prop: Propagator<'a, D, E>,
+        prop: Propagator<'a, D, E, S>,
         kf: K,
         devices: Vec<N>,
         simultaneous_msr: bool,
@@ -130,7 +132,7 @@ where
         }
     }
 
-    pub fn default_ekf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
+    pub fn default_ekf(prop: Propagator<'a, D, E, S>, kf: K, devices: Vec<N>, trigger: T) -> Self {
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -469,7 +471,7 @@ impl<
         MsrIn,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K, MsrIn>
 where
-    D::StateType: EstimableState<Msr::StateSize>,
+    D::StateType: State<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
@@ -521,7 +523,7 @@ where
 }
 /// A trait detailing when to switch to from a CKF to an EKF
 pub trait EkfTrigger {
-    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, est: &E) -> bool
+    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
     where
         S: DimName,
         E: Estimate<S, T>,
@@ -539,7 +541,7 @@ pub trait EkfTrigger {
 pub struct CkfTrigger;
 
 impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, _est: &E) -> bool
+    fn enable_ekf<S, E, T: State<S>>(&mut self, _est: &E) -> bool
     where
         S: DimName,
         E: Estimate<S, T>,
@@ -573,7 +575,7 @@ impl StdEkfTrigger {
 }
 
 impl EkfTrigger for StdEkfTrigger {
-    fn enable_ekf<S, E, T: EstimableState<S>>(&mut self, est: &E) -> bool
+    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
     where
         S: DimName,
         E: Estimate<S, T>,

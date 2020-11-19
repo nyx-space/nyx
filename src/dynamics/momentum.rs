@@ -1,5 +1,6 @@
 use super::{Dynamics, NyxError};
 use crate::dimensions::{Matrix3, Vector3, VectorN, U3};
+use crate::time::Epoch;
 use std::f64;
 use utils::is_diagonal;
 // use alga::general::operator::Inverse;
@@ -10,6 +11,11 @@ pub struct AngularMom {
     time: f64, // Needed to stop the integration by calling dyn.time()
     tensor: Matrix3<f64>,
     velocity: Vector3<f64>,
+}
+
+pub struct AngularVelocity {
+    dt: Epoch,
+    vel: Vector3<f64>,
 }
 
 impl AngularMom {
@@ -39,32 +45,23 @@ impl AngularMom {
 
 impl Dynamics for AngularMom {
     type StateSize = U3;
-    type StateType = Vector3<f64>;
 
-    fn time(&self) -> f64 {
-        self.time
-    }
+    // /// Returns the **angular velocity** ω of the system, not its momentum.
+    // fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
+    //     self.velocity
+    // }
 
-    /// Returns the **angular velocity** ω of the system, not its momentum.
-    fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
-        self.velocity
-    }
+    // /// Set the **angular velocity** ω of the system and the time.
+    // fn set_state(
+    //     &mut self,
+    //     new_t: f64,
+    //     new_angular_velocity: &VectorN<f64, Self::StateSize>,
+    // ) -> Result<(), NyxError> {
+    //     self.time = new_t;
+    //     self.velocity = *new_angular_velocity;
 
-    fn state(&self) -> Vector3<f64> {
-        self.velocity
-    }
-
-    /// Set the **angular velocity** ω of the system and the time.
-    fn set_state(
-        &mut self,
-        new_t: f64,
-        new_angular_velocity: &VectorN<f64, Self::StateSize>,
-    ) -> Result<(), NyxError> {
-        self.time = new_t;
-        self.velocity = *new_angular_velocity;
-
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     /// Computes the instantaneous equations of motion of the angular velocity of a tensor (i.e. the angular acceleration).
     /// [I]̲̇ω = -[̃ω][I]̲ω + ̲L

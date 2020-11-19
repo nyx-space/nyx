@@ -1,6 +1,6 @@
 use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dynamics::spacecraft::SpacecraftState;
-use crate::time::Duration;
+use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::between_pm_180;
 use std::fmt;
 
@@ -20,7 +20,7 @@ pub trait Event: fmt::Debug {
 #[derive(Debug)]
 pub struct EventTrackers<S: Copy> {
     pub events: Vec<Box<dyn Event<StateType = S>>>,
-    pub found_bounds: Vec<Vec<(f64, f64)>>,
+    pub found_bounds: Vec<Vec<(Epoch, Epoch)>>,
     prev_values: Vec<S>,
 }
 
@@ -58,7 +58,7 @@ impl<S: Copy> EventTrackers<S> {
     }
 
     /// Evaluate whether we have crossed the boundary of an event
-    pub fn eval_and_save(&mut self, prev_time: f64, next_time: f64, state: &S) {
+    pub fn eval_and_save(&mut self, prev_time: Epoch, next_time: Epoch, state: &S) {
         for event_no in 0..self.events.len() {
             if self.prev_values.len() > event_no {
                 // Evaluate the event crossing
@@ -245,8 +245,10 @@ pub struct StopCondition<S: Copy> {
     pub trigger: usize,
     /// Maximum number of iterations of the Brent solver.
     pub max_iter: usize,
-    /// Maximum error in the event, used as convergence criteria.
-    pub epsilon: f64,
+    /// Maximum error in the event, used as time convergence criteria, defaults to one second
+    pub epsilon: Duration,
+    /// Maximum error in the evaluation of the event (e.g. 0.1 )
+    pub epsilon_eval: f64,
 }
 
 impl<S: Copy> StopCondition<S> {
@@ -257,7 +259,8 @@ impl<S: Copy> StopCondition<S> {
             event,
             trigger: 1,
             max_iter: 50,
-            epsilon,
+            epsilon: 1 * TimeUnit::Second,
+            epsilon_eval: epsilon,
         }
     }
 
@@ -274,7 +277,8 @@ impl<S: Copy> StopCondition<S> {
             event,
             trigger: hits,
             max_iter: 50,
-            epsilon,
+            epsilon: 1 * TimeUnit::Second,
+            epsilon_eval: epsilon,
         }
     }
 }

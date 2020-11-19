@@ -18,6 +18,8 @@ pub use self::verner::*;
 mod propagator;
 pub use self::propagator::*;
 
+use crate::time::Duration;
+
 /// The `RK` trait defines a Runge Kutta integrator.
 pub trait RK
 where
@@ -44,7 +46,7 @@ where
 #[derive(Copy, Clone, Debug)]
 pub struct IntegrationDetails {
     /// step size used
-    pub step: f64,
+    pub step: Duration,
     /// error in the previous integration step
     pub error: f64,
     /// number of attempts needed by an adaptive step size to be within the tolerance

@@ -15,6 +15,8 @@ pub enum NyxError {
     MaxIterReached(usize),
     /// The STM was not updated prior to requesting a filter update
     StateTransitionMatrixNotUpdated,
+    /// The operation was expecting the state to have an STM, but it isn't present.
+    StateTransitionMatrixUnset,
     /// The sensitivity matrix was not updated prior to requesting a filter measurement update
     SensitivityNotUpdated,
     /// Kalman gain is singular, file a bug if this is encountered

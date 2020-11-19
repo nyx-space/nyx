@@ -3,7 +3,8 @@ use super::events::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
-use crate::time::{Duration, TimeUnit};
+use crate::time::{Duration, Epoch, TimeUnit};
+use crate::{State, TimeTagged};
 use dynamics::Dynamics;
 use errors::NyxError;
 use std::f64;
@@ -13,27 +14,17 @@ use std::sync::mpsc::Sender;
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
 /// details of the previous step, and the set of coefficients used for the monomorphic instance.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>,
 {
-    pub dynamics: &'a mut D, // Stores the dynamics used. *Must* use this to get the latest values
-    // An output channel for all of the states computed by this propagator
-    pub tx_chan: Option<Sender<D::StateType>>,
-    pub event_trackers: EventTrackers<D::StateType>,
-    prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
-    opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
-    details: IntegrationDetails, // Stores the details of the previous integration step
-    step_size: Duration, // Stores the adapted step for the _next_ call
-    order: u8,        // Order of the integrator
-    stages: usize,    // Number of stages, i.e. how many times the derivatives will be called
+    pub dynamics: &'a D, // Stores the dynamics used. *Must* use this to get the latest values
+    pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
+    order: u8,             // Order of the integrator
+    stages: usize,         // Number of stages, i.e. how many times the derivatives will be called
     a_coeffs: &'a [f64],
     b_coeffs: &'a [f64],
-    fixed_step: bool,
-    init_time: f64,
-    init_state_vec: VectorN<f64, D::StateSize>,
-    k: Vec<VectorN<f64, D::StateSize>>,
 }
 
 /// The `Propagator` trait defines the functions of a propagator and of an event tracker.
@@ -42,53 +33,15 @@ where
     DefaultAllocator: Allocator<f64, D::StateSize>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: &'a mut D, opts: PropOpts<E>) -> Self {
-        let init_time = dynamics.time();
-        let init_state_vec = dynamics.state_vector();
-        // Pre-allocate the k used in the propagator
-        let mut k = Vec::with_capacity(T::stages() + 1);
-        for _ in 0..T::stages() {
-            k.push(VectorN::<f64, D::StateSize>::zeros());
-        }
+    pub fn new<T: RK>(dynamics: &'a D, opts: PropOpts<E>) -> Self {
         Self {
-            tx_chan: None,
             dynamics,
-            event_trackers: EventTrackers::none(),
-            prevent_tx: false,
             opts,
-            details: IntegrationDetails {
-                step: 0.0,
-                error: 0.0,
-                attempts: 1,
-            },
-            step_size: opts.init_step,
             stages: T::stages(),
             order: T::order(),
             a_coeffs: T::a_coeffs(),
             b_coeffs: T::b_coeffs(),
-            fixed_step: opts.fixed_step,
-            init_time,
-            init_state_vec,
-            k,
         }
-    }
-
-    /// An RK89 propagator (the default) with custom propagator options.
-    pub fn rk89(dynamics: &'a mut D, opts: PropOpts<E>) -> Self {
-        Self::new::<RK89>(dynamics, opts)
-    }
-
-    /// Resets the propagator to its initial time and state
-    pub fn reset(&mut self) {
-        self.dynamics
-            .set_state(self.init_time, &self.init_state_vec)
-            .unwrap();
-    }
-
-    /// Allows setting the step size of the propagator
-    pub fn set_step(&mut self, step_size: Duration, fixed: bool) {
-        self.step_size = step_size;
-        self.fixed_step = fixed;
     }
 
     /// Set the tolerance for the propagator
@@ -101,77 +54,161 @@ where
         self.opts.max_step = step;
     }
 
+    /// An RK89 propagator (the default) with custom propagator options.
+    pub fn rk89(dynamics: &'a D, opts: PropOpts<E>) -> Self {
+        Self::new::<RK89>(dynamics, opts)
+    }
+
+    pub fn with(&self, state: D::StateType) -> PropInstance<D, E> {
+        // let init_time = state.epoch();
+        // let init_state_vec = dynamics.state_vector();
+        // Pre-allocate the k used in the propagator
+        let mut k = Vec::with_capacity(self.stages + 1);
+        for _ in 0..self.stages {
+            k.push(VectorN::<f64, D::StateSize>::zeros());
+        }
+        PropInstance {
+            state,
+            prop: &self,
+            tx_chan: None,
+            event_trackers: EventTrackers::none(),
+            prevent_tx: false,
+            details: IntegrationDetails {
+                step: self.opts.init_step,
+                error: 0.0,
+                attempts: 1,
+            },
+            step_size: self.opts.init_step,
+            fixed_step: self.opts.fixed_step,
+            // init_time,
+            k,
+        }
+    }
+}
+
+impl<'a, D: Dynamics> Propagator<'a, D, RSSStepPV>
+where
+    DefaultAllocator: Allocator<f64, D::StateSize>,
+{
+    /// Default propagator is an RK89 with the default PropOpts.
+    pub fn default(dynamics: &'a D) -> Self {
+        Self::new::<RK89>(dynamics, PropOpts::default())
+    }
+}
+
+/// A Propagator allows propagating a set of dynamics forward or backward in time.
+/// It is an EventTracker, without any event tracking. It includes the options, the integrator
+/// details of the previous step, and the set of coefficients used for the monomorphic instance.
+#[derive(Debug)]
+pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
+where
+    DefaultAllocator: Allocator<f64, D::StateSize>,
+{
+    /// The state of this propagator instance
+    pub state: D::StateType,
+    /// The propagator setup (kind, stages, etc.)
+    pub prop: &'a Propagator<'a, D, E>,
+    /// An output channel for all of the states computed by this propagator instance
+    pub tx_chan: Option<Sender<D::StateType>>,
+    /// An event tracking instance
+    pub event_trackers: EventTrackers<D::StateType>,
+    /// Stores the details of the previous integration step
+    pub details: IntegrationDetails,
+    prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
+    step_size: Duration, // Stores the adapted step for the _next_ call
+    fixed_step: bool,
+    // init_time: Epoch,
+    // init_state_vec: VectorN<f64, D::StateSize>,
+    // Allows us to do pre-allocation of the ki vectors
+    k: Vec<VectorN<f64, D::StateSize>>,
+}
+
+impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
+where
+    DefaultAllocator: Allocator<f64, D::StateSize>,
+{
+    /// Allows setting the step size of the propagator
+    pub fn set_step(&mut self, step_size: Duration, fixed: bool) {
+        self.step_size = step_size;
+        self.fixed_step = fixed;
+    }
+
     /// Returns the time of the propagation
     ///
     /// WARNING: Do not use the dynamics to get the time, it will be the initial value!
     pub fn time(&self) -> f64 {
-        self.dynamics.time()
+        self.state.epoch().as_tai_seconds()
     }
 
     /// Returns the state of the propagation
     ///
     /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
     pub fn state_vector(&self) -> VectorN<f64, D::StateSize> {
-        self.dynamics.state_vector()
+        self.state.as_vector()
     }
 
     /// A shortcut to dynamics.state()
+    /// TODO: Rremove this
     pub fn state(&self) -> D::StateType {
-        self.dynamics.state()
+        self.state
     }
 
     /// This method propagates the provided Dynamics `dyn` for `elapsed_time` seconds. WARNING: This function has many caveats (please read detailed docs).
+    /// TODO: Rename this to `for` such that we have `prop.with(state).for(5 * TimeUnit::Hour)`.
     ///
     /// ### IMPORTANT CAVEAT of `until_time_elapsed`
     /// - It is **assumed** that `self.dynamics.time()` returns a time in the same units as elapsed_time.
     pub fn until_time_elapsed(&mut self, elapsed_time: Duration) -> Result<D::StateType, NyxError> {
         let backprop = elapsed_time < TimeUnit::Nanosecond;
         if backprop {
-            self.step_size *= -1.0; // Invert the step size
+            self.step_size = -self.step_size; // Invert the step size
         }
-        let init_seconds = self.dynamics.time();
-        let stop_time = init_seconds + elapsed_time.in_unit_f64(TimeUnit::Second);
+        // let init_seconds = self.dynamics.time();
+        // let stop_time = init_seconds + elapsed_time.in_unit_f64(TimeUnit::Second);
+        let stop_time = self.state.epoch() + elapsed_time;
         loop {
-            let dt = self.dynamics.time();
+            let dt = self.state.epoch();
             if (!backprop && dt + self.step_size > stop_time)
                 || (backprop && dt + self.step_size <= stop_time)
             {
-                if (stop_time - dt).abs() < f64::EPSILON {
+                if stop_time == dt {
                     // No propagation necessary
-                    return Ok(self.dynamics.state());
+                    return Ok(self.state);
                 }
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
-                let (t, state) = self.derive(dt, &self.dynamics.state_vector());
-                self.dynamics.set_state(t, &state)?;
+                let (t, state_vec) =
+                    self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state);
+                self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
                 // Evaluate the event trackers
                 self.event_trackers
-                    .eval_and_save(dt, t, &self.dynamics.state());
+                    .eval_and_save(dt, self.state.epoch(), &self.state);
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
                 if !self.prevent_tx {
                     if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send(self.dynamics.state()) {
+                        if let Err(e) = chan.send(self.state) {
                             warn!("could not publish to channel: {}", e)
                         }
                     }
                 }
                 if backprop {
-                    self.step_size *= -1.0; // Restore to a positive step size
+                    self.step_size = -self.step_size; // Restore to a positive step size
                 }
-                return Ok(self.dynamics.state());
+                return Ok(self.state);
             } else {
-                let (t, state) = self.derive(dt, &self.dynamics.state_vector());
+                let (t, state_vec) =
+                    self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state);
                 // We haven't passed the time based stopping condition.
-                self.dynamics.set_state(t, &state)?;
+                self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
                 // Evaluate the event trackers
                 self.event_trackers
-                    .eval_and_save(dt, t, &self.dynamics.state());
+                    .eval_and_save(dt, self.state.epoch(), &self.state);
                 if !self.prevent_tx {
                     if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send(self.dynamics.state()) {
+                        if let Err(e) = chan.send(self.state) {
                             warn!("could not publish to channel: {}", e)
                         }
                     }
@@ -184,6 +221,7 @@ where
         &mut self,
         condition: StopCondition<D::StateType>,
     ) -> Result<D::StateType, NyxError> {
+        let init_state = self.state;
         self.prevent_tx = true;
         // Rewrite the event tracker
         if !self.event_trackers.events.is_empty() {
@@ -205,22 +243,26 @@ where
                 ));
             }
         }
-        let (mut xa, mut xb) = self.event_trackers.found_bounds[0][condition.trigger - 1];
+        // TODO: Convert all of the epochs into TAI seconds, and do the math that way
+        let (xa_e, xb_e) = self.event_trackers.found_bounds[0][condition.trigger - 1];
+        let mut xa = xa_e.as_tai_seconds();
+        let mut xb = xb_e.as_tai_seconds();
         // Reinitialize the dynamics and start the search
-        self.reset();
+        self.state = init_state;
         self.event_trackers.reset();
+        let initial_epoch = self.state.epoch();
         // Compute the initial values of the condition at those bounds.
-        self.until_time_elapsed(xa)?;
-        let mut ya = self.event_trackers.events[0].eval(&self.dynamics.state());
+        self.until_time_elapsed(xa_e - initial_epoch)?;
+        let mut ya = self.event_trackers.events[0].eval(&self.state);
         // And prop until next bound
-        self.until_time_elapsed(xb - xa)?;
-        let mut yb = self.event_trackers.events[0].eval(&self.dynamics.state());
+        self.until_time_elapsed((xb - xa) * TimeUnit::Second)?;
+        let mut yb = self.event_trackers.events[0].eval(&self.state);
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
 
         // Helper lambdas, for f64s only
         let eps = condition.epsilon;
-        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() < eps.abs();
+        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() <= eps.in_unit_f64(TimeUnit::Second);
         let arrange = |a: f64, ya: f64, b: f64, yb: f64| {
             if ya.abs() > yb.abs() {
                 (a, ya, b, yb)
@@ -234,11 +276,11 @@ where
         let mut iter = 0;
         let closest_t;
         loop {
-            if ya.abs() < condition.epsilon.abs() {
+            if ya.abs() < condition.epsilon_eval.abs() {
                 closest_t = xa;
                 break;
             }
-            if yb.abs() < condition.epsilon.abs() {
+            if yb.abs() < condition.epsilon_eval.abs() {
                 closest_t = xb;
                 break;
             }
@@ -265,16 +307,17 @@ where
                 flag = false;
             }
             // Propagate until time s
-            self.until_time_elapsed(s - self.dynamics.time())?;
-            let ys = self.event_trackers.events[0].eval(&self.dynamics.state());
+            // self.until_time_elapsed(s - self.dynamics.time())?;
+            self.until_time_elapsed(s * TimeUnit::Second)?;
+            let ys = self.event_trackers.events[0].eval(&self.state);
             d = c;
             c = xb;
             yc = yb;
             if ya * ys < 0.0 {
                 // Root bracketed between a and s
                 // Propagate until time xa
-                self.until_time_elapsed(xa - self.dynamics.time())?;
-                let ya_p = self.event_trackers.events[0].eval(&self.dynamics.state());
+                self.until_time_elapsed(xa * TimeUnit::Second)?;
+                let ya_p = self.event_trackers.events[0].eval(&self.state);
                 let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
                     xa = _a;
@@ -285,8 +328,8 @@ where
             } else {
                 // Root bracketed between s and b
                 // Propagate until time xb
-                self.until_time_elapsed(xb - self.dynamics.time())?;
-                let yb_p = self.event_trackers.events[0].eval(&self.dynamics.state());
+                self.until_time_elapsed(xb * TimeUnit::Second)?;
+                let yb_p = self.event_trackers.events[0].eval(&self.state);
                 let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {
                     xa = _a;
@@ -303,12 +346,14 @@ where
 
         // Now that we have the time at which the condition is matched, let's propagate until then
         self.prevent_tx = false;
-        self.until_time_elapsed(self.dynamics.time() - closest_t)?;
+        let elapsed_time = -(closest_t * TimeUnit::Second);
+        // self.until_time_elapsed(self.state.time() - closest_t)?;
+        self.until_time_elapsed(elapsed_time);
 
-        Ok(self.dynamics.state())
+        Ok(self.state)
     }
 
-    /// This method integrates whichever function is provided as `d_xdt`.
+    /// This method integrates whichever function is provided as `d_xdt`. Everything passed to this function is in **seconds**.
     ///
     /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
     /// then derives the dynamics at that time (i.e. propagates for one time step). The `d_xdt` parameter is the derivative
@@ -318,33 +363,37 @@ where
     /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
     /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
     /// size. This static allocation allows for high execution speeds.
-    pub fn derive(
+    fn derive(
         &mut self,
         t: f64,
         state: &VectorN<f64, D::StateSize>,
+        ctx: &D::StateType,
     ) -> (f64, VectorN<f64, D::StateSize>) {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
+        // Convert the step size to seconds;
+        let step_size = self.step_size.in_unit_f64(TimeUnit::Second);
         loop {
-            let ki = self.dynamics.eom(t, &state);
+            let ki = self.prop.dynamics.eom(0.0, &state, ctx);
             self.k[0] = ki;
             let mut a_idx: usize = 0;
-            for i in 0..(self.stages - 1) {
+            for i in 0..(self.prop.stages - 1) {
                 // Let's compute the c_i by summing the relevant items from the list of coefficients.
                 // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
                 // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
                 let mut wi = VectorN::<f64, D::StateSize>::from_element(0.0);
                 for kj in &self.k[0..i + 1] {
-                    let a_ij = self.a_coeffs[a_idx];
+                    let a_ij = self.prop.a_coeffs[a_idx];
                     ci += a_ij;
                     wi += a_ij * kj;
                     a_idx += 1;
                 }
 
                 let ki = self
+                    .prop
                     .dynamics
-                    .eom(t + ci * self.step_size, &(state + self.step_size * wi));
+                    .eom(ci * step_size, &(state + step_size * wi), ctx);
                 self.k[i + 1] = ki;
             }
             // Compute the next state and the error
@@ -353,26 +402,26 @@ where
             // This is consistent with GMAT https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L537
             let mut error_est = VectorN::<f64, D::StateSize>::from_element(0.0);
             for (i, ki) in self.k.iter().enumerate() {
-                let b_i = self.b_coeffs[i];
+                let b_i = self.prop.b_coeffs[i];
                 if !self.fixed_step {
-                    let b_i_star = self.b_coeffs[i + self.stages];
-                    error_est += self.step_size * (b_i - b_i_star) * ki;
+                    let b_i_star = self.prop.b_coeffs[i + self.prop.stages];
+                    error_est += step_size * (b_i - b_i_star) * ki;
                 }
-                next_state += self.step_size * b_i * ki;
+                next_state += step_size * b_i * ki;
             }
 
             if self.fixed_step {
                 // Using a fixed step, no adaptive step necessary
                 self.details.step = self.step_size;
-                return ((t + self.details.step), next_state);
+                return ((t + step_size), next_state);
             } else {
                 // Compute the error estimate.
                 self.details.error = E::estimate(&error_est, &next_state.clone(), &state);
-                if self.details.error <= self.opts.tolerance
-                    || self.step_size <= self.opts.min_step
-                    || self.details.attempts >= self.opts.attempts
+                if self.details.error <= self.prop.opts.tolerance
+                    || self.step_size <= self.prop.opts.min_step
+                    || self.details.attempts >= self.prop.opts.attempts
                 {
-                    if self.details.attempts >= self.opts.attempts {
+                    if self.details.attempts >= self.prop.opts.attempts {
                         warn!(
                             "maximum number of attempts reached ({})",
                             self.details.attempts
@@ -380,30 +429,33 @@ where
                     }
 
                     self.details.step = self.step_size;
-                    if self.details.error < self.opts.tolerance {
+                    if self.details.error < self.prop.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
                         let proposed_step = 0.9
                             * self.step_size
-                            * (self.opts.tolerance / self.details.error)
-                                .powf(1.0 / f64::from(self.order));
-                        self.step_size = if proposed_step > self.opts.max_step {
-                            self.opts.max_step
+                            * (self.prop.opts.tolerance / self.details.error)
+                                .powf(1.0 / f64::from(self.prop.order));
+                        self.step_size = if proposed_step > self.prop.opts.max_step {
+                            self.prop.opts.max_step
                         } else {
                             proposed_step
                         };
                     }
-                    return ((t + self.details.step), next_state);
+                    return (
+                        (t + self.details.step.in_unit_f64(TimeUnit::Second)),
+                        next_state,
+                    );
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
                     // So let's adapt the step size.
                     self.details.attempts += 1;
                     let proposed_step = 0.9
                         * self.step_size
-                        * (self.opts.tolerance / self.details.error)
-                            .powf(1.0 / f64::from(self.order - 1));
-                    self.step_size = if proposed_step < self.opts.min_step {
-                        self.opts.min_step
+                        * (self.prop.opts.tolerance / self.details.error)
+                            .powf(1.0 / f64::from(self.prop.order - 1));
+                    self.step_size = if proposed_step < self.prop.opts.min_step {
+                        self.prop.opts.min_step
                     } else {
                         proposed_step
                     };
@@ -415,16 +467,6 @@ where
     /// Borrow the details of the latest integration step.
     pub fn latest_details(&self) -> &IntegrationDetails {
         &self.details
-    }
-}
-
-impl<'a, D: Dynamics> Propagator<'a, D, RSSStepPV>
-where
-    DefaultAllocator: Allocator<f64, D::StateSize>,
-{
-    /// Default propagator is an RK89 with the default PropOpts.
-    pub fn default(dynamics: &'a mut D) -> Self {
-        Self::new::<RK89>(dynamics, PropOpts::default())
     }
 }
 

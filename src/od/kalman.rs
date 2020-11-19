@@ -4,7 +4,7 @@ use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3};
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
 pub use super::snc::SNC;
-use super::{CovarFormat, EpochFormat, EstimableState, Filter};
+use super::{CovarFormat, EpochFormat, Filter, State};
 pub use crate::errors::NyxError;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
@@ -14,7 +14,7 @@ where
     S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, A>
@@ -48,7 +48,7 @@ where
     S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, A>
@@ -136,7 +136,7 @@ impl<S, M, T> KF<S, U3, M, T>
 where
     S: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -175,7 +175,7 @@ where
     S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, A>

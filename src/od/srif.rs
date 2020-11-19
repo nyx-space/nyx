@@ -8,8 +8,9 @@ use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U1};
 pub use super::estimate::{Estimate, IfEstimate};
 pub use super::residual::Residual;
 use super::snc::SNC;
-use super::{CovarFormat, EpochFormat, EstimableState, Filter};
+use super::{CovarFormat, EpochFormat, Filter};
 pub use crate::errors::NyxError;
+use crate::State;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -18,7 +19,7 @@ where
     S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -49,7 +50,7 @@ where
     S: DimName + DimNameAdd<M> + DimMin<M>,
     A: DimName,
     M: DimName + DimNameAdd<S>,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -91,7 +92,7 @@ impl<S, M, T> SRIF<S, U1, M, T>
 where
     S: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -136,7 +137,7 @@ where
     A: DimName,
     M: DimName + DimNameAdd<S> + DimNameAdd<M> + DimNameAdd<U1>,
     DimNameSum<S, M>: DimMin<DimNameSum<S, U1>>,
-    T: EstimableState<S>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, A>

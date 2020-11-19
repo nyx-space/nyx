@@ -4,13 +4,15 @@ extern crate serde;
 use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
-use super::na::{Matrix3, Matrix6, Vector3, Vector6, U6};
-use super::{Frame, TimeTagged};
+use super::na::{Matrix3, Matrix6, Vector3, Vector6, VectorN, U42, U6};
+use super::Frame;
+use crate::State;
+use crate::TimeTagged;
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
 use celestia::xb::Vector as XBVector;
 use celestia::xb::{TimeRepr, TimeSystem, Unit};
-use od::EstimableState;
+use errors::NyxError;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
@@ -818,8 +820,6 @@ impl TimeTagged for Orbit {
     }
 }
 
-impl EstimableState<U6> for Orbit {}
-
 impl Add<Vector6<f64>> for Orbit {
     type Output = Orbit;
 
@@ -1034,5 +1034,84 @@ impl fmt::Octal for Orbit {
             self.aop(),
             self.ta()
         )
+    }
+}
+
+/// Implementation of Orbit as a State for orbital dynamics without STM
+impl State<U6> for Orbit {
+    fn as_vector(&self) -> Result<Vector6<f64>, NyxError> {
+        Ok(Vector6::new(
+            self.x, self.y, self.z, self.vx, self.vy, self.vz,
+        ))
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &Vector6<f64>) -> Result<(), NyxError> {
+        self.x = vector[0];
+        self.y = vector[1];
+        self.z = vector[2];
+        self.x = vector[3];
+        self.y = vector[4];
+        self.z = vector[5];
+        self.dt = epoch;
+        Ok(())
+    }
+}
+
+/// Implementation of Orbit as a State for orbital dynamics with STM
+impl State<U42> for Orbit {
+    fn as_vector(&self) -> Result<VectorN<f64, U42>, NyxError> {
+        let mut as_vec = VectorN::<f64, U42>::zeros();
+        as_vec[0] = self.x;
+        as_vec[1] = self.y;
+        as_vec[2] = self.z;
+        as_vec[3] = self.vx;
+        as_vec[4] = self.vy;
+        as_vec[5] = self.vz;
+        let mut stm_idx = 6;
+        match self.stm {
+            Some(stm) => {
+                for i in 0..6 {
+                    for j in 0..6 {
+                        as_vec[stm_idx] = stm[(i, j)];
+                        stm_idx += 1;
+                    }
+                }
+            }
+            None => return Err(NyxError::StateTransitionMatrixUnset),
+        }
+        Ok(as_vec)
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U42>) -> Result<(), NyxError> {
+        self.set_epoch(epoch);
+        self.x = vector[0];
+        self.y = vector[1];
+        self.z = vector[2];
+        self.vx = vector[3];
+        self.vy = vector[4];
+        self.vz = vector[5];
+        // And update the STM
+        let mut stm_k_to_0 = Matrix6::zeros();
+        let mut stm_idx = 6;
+        for i in 0..6 {
+            for j in 0..6 {
+                stm_k_to_0[(i, j)] = vector[(stm_idx, 0)];
+                stm_idx += 1;
+            }
+        }
+
+        match self.stm {
+            Some(stm_prev) => {
+                // let mut stm_prev = self.state.stm();
+                if !stm_prev.try_inverse_mut() {
+                    error!("STM not invertible: {}", stm_prev);
+                    return Err(NyxError::SingularStateTransitionMatrix);
+                }
+                self.stm = Some(stm_k_to_0 * stm_prev);
+                // self.state.stm = Some(stm_k_to_0);
+                Ok(())
+            }
+            None => Err(NyxError::StateTransitionMatrixUnset),
+        }
     }
 }
