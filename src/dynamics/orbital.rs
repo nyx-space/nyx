@@ -7,7 +7,7 @@ use crate::dimensions::{
     U3, U36, U4, U42, U6, U7,
 };
 use crate::time::Epoch;
-use crate::State;
+use crate::{State, TimeTagged};
 use od::Estimable;
 use std::f64;
 
@@ -15,8 +15,8 @@ pub use super::sph_harmonics::{Harmonics, HarmonicsDiff};
 
 // TODO: I don't think I need this anymore, I think I can simply initialize the Dynamics as a <T1, T2>
 // like a Result since it doesn't store the state anymore
-pub trait OrbitalDynamicsT: Dynamics {}
-
+pub trait OrbitalDynamicsT: Dynamics<StateType = Orbit> {}
+// D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
 // pub trait OrbitalDynamicsT: Dynamics {
 //     fn stm(&self) -> Option<Matrix6<f64>>;
 
@@ -126,7 +126,7 @@ pub struct OrbitalDynamicsStm<'a> {
     // relative_time: f64,
     // // Allows us to rebuilt the true epoch
     // init_tai_secs: f64,
-    pub accel_models: Vec<Box<dyn AutoDiff<STMSize = U3, HyperStateSize = U7> + 'a>>,
+    pub accel_models: Vec<Box<dyn AutoDiff<U7, U3, CtxType = Orbit> + 'a>>,
 }
 
 impl<'a> OrbitalDynamicsT for OrbitalDynamicsStm<'a> {
@@ -174,10 +174,7 @@ impl<'a> OrbitalDynamicsStm<'a> {
     }
 
     /// Add a model to these celestial dynamics (must be differentiable by automatic differentiation)
-    pub fn add_model(
-        &mut self,
-        accel_model: Box<dyn AutoDiff<STMSize = U3, HyperStateSize = U7> + 'a>,
-    ) {
+    pub fn add_model(&mut self, accel_model: Box<dyn AutoDiff<U7, U3, CtxType = Orbit> + 'a>) {
         self.accel_models.push(accel_model);
     }
 
@@ -222,15 +219,17 @@ impl<'a> OrbitalDynamicsStm<'a> {
     // }
 }
 
-impl<'a> AutoDiff for OrbitalDynamicsStm<'a> {
-    type STMSize = U6;
-    type HyperStateSize = U7;
+impl<'a> AutoDiff<U7, U6> for OrbitalDynamicsStm<'a> {
+    // type STMRows = U6;
+    // type HyperStateSize = U7;
+    type CtxType = Orbit;
 
     fn dual_eom(
         &self,
-        epoch: Epoch,
-        integr_frame: Frame,
+        // epoch: Epoch,
+        // integr_frame: Frame,
         state: &VectorN<Hyperdual<f64, U7>, U6>,
+        ctx: &Orbit,
     ) -> (Vector6<f64>, Matrix6<f64>) {
         // Extract data from hyperspace
         let radius = state.fixed_rows::<U3>(0).into_owned();
@@ -239,7 +238,7 @@ impl<'a> AutoDiff for OrbitalDynamicsStm<'a> {
         // Code up math as usual
         let rmag = norm(&radius);
         let body_acceleration =
-            radius * (Hyperdual::<f64, U7>::from_real(-self.state.frame.gm()) / rmag.powi(3));
+            radius * (Hyperdual::<f64, U7>::from_real(-ctx.frame.gm()) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector6::zeros();
@@ -261,7 +260,7 @@ impl<'a> AutoDiff for OrbitalDynamicsStm<'a> {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.dual_eom(epoch, integr_frame, &radius);
+            let (model_acc, model_grad) = model.dual_eom(&radius, ctx);
             for i in 0..U3::dim() {
                 fx[i + 3] += model_acc[i];
                 for j in 1..U4::dim() {
@@ -438,15 +437,15 @@ impl<'a> AccelModel for PointMasses<'a> {
     }
 }
 
-impl<'a> AutoDiff for PointMasses<'a> {
-    type HyperStateSize = U7;
-    type STMSize = U3;
+impl<'a> AutoDiff<U7, U3> for PointMasses<'a> {
+    // type HyperStateSize = U7;
+    // type STMRows = U3;
+    type CtxType = Orbit;
 
     fn dual_eom(
         &self,
-        epoch: Epoch,
-        _integr_frame: Frame,
         state: &VectorN<Hyperdual<f64, U7>, U3>,
+        ctx: &Orbit,
     ) -> (Vector3<f64>, Matrix3<f64>) {
         // Extract data from hyperspace
         let radius = state.fixed_rows::<U3>(0).into_owned();
@@ -460,9 +459,9 @@ impl<'a> AutoDiff for PointMasses<'a> {
             let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
 
             // Orbit of j-th body as seen from primary body
-            let st_ij = self
-                .cosm
-                .celestial_state(*exb_id, epoch, self.frame, self.correction);
+            let st_ij =
+                self.cosm
+                    .celestial_state(*exb_id, ctx.epoch(), self.frame, self.correction);
 
             let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
             let r_ij3 = norm(&r_ij).powi(3) / gm_d;

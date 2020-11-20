@@ -144,7 +144,7 @@ where
     ///
     /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
     pub fn state_vector(&self) -> VectorN<f64, D::StateSize> {
-        self.state.as_vector()
+        self.state.as_vector().unwrap()
     }
 
     /// A shortcut to dynamics.state()

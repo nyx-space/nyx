@@ -1,7 +1,8 @@
 use super::hyperdual::Hyperdual;
 use super::{AutoDiff, Epoch, ForceModel};
+use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::{Matrix3, Vector3, U3, U7};
-use celestia::{Cosm, Frame, Orbit};
+use crate::dynamics::spacecraft::SpacecraftState;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
 #[derive(Clone, Copy, Debug)]
@@ -38,9 +39,10 @@ impl<'a> ForceModel for ConstantDrag<'a> {
     }
 }
 
-impl<'a> AutoDiff for ConstantDrag<'a> {
-    type HyperStateSize = U7;
-    type STMSize = U3;
+impl<'a> AutoDiff<U7, U3> for ConstantDrag<'a> {
+    // type HyperStateSize = U7;
+    // type STMRows = U3;
+    type CtxType = SpacecraftState;
 
     fn dual_eom(
         &self,
@@ -154,9 +156,10 @@ impl<'a> ForceModel for Drag<'a> {
     }
 }
 
-impl<'a> AutoDiff for Drag<'a> {
-    type HyperStateSize = U7;
-    type STMSize = U3;
+impl<'a> AutoDiff<U7, U3> for Drag<'a> {
+    // type HyperStateSize = U7;
+    // type STMRows = U3;
+    type CtxType = SpacecraftState;
 
     fn dual_eom(
         &self,

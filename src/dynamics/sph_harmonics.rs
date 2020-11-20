@@ -4,7 +4,7 @@ use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::{DMatrix, Matrix3, Vector3, U3, U7};
 use crate::dynamics::{AccelModel, AutoDiff};
 use crate::io::gravity::GravityPotentialStor;
-use crate::time::Epoch;
+use crate::TimeTagged;
 use std::cmp::min;
 
 #[derive(Clone)]
@@ -274,20 +274,20 @@ where
     }
 }
 
-impl<'a, S: GravityPotentialStor + Send> AutoDiff for HarmonicsDiff<'a, S> {
-    type STMSize = U3;
-    type HyperStateSize = U7;
+impl<'a, S: GravityPotentialStor + Send> AutoDiff<U7, U3> for HarmonicsDiff<'a, S> {
+    // type STMRows = U3;
+    // type HyperStateSize = U7;
+    type CtxType = Orbit;
 
     fn dual_eom(
         &self,
-        dt: Epoch,
-        integr_frame: Frame,
         radius: &Vector3<Hyperdual<f64, U7>>,
+        ctx: &Orbit,
     ) -> (Vector3<f64>, Matrix3<f64>) {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self
             .cosm
-            .try_frame_chg_dcm_from_to(&integr_frame, &self.compute_frame, dt)
+            .try_frame_chg_dcm_from_to(&ctx.frame, &self.compute_frame, ctx.epoch())
             .unwrap();
         // Convert DCM to Hyperdual DCMs
         let mut dcm_d = Matrix3::<Hyperdual<f64, U7>>::zeros();

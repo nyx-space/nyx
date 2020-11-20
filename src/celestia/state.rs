@@ -4,7 +4,7 @@ extern crate serde;
 use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
-use super::na::{Matrix3, Matrix6, Vector3, Vector6, VectorN, U42, U6};
+use super::na::{Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U42, U6};
 use super::Frame;
 use crate::State;
 use crate::TimeTagged;
@@ -1049,9 +1049,24 @@ impl State<U6> for Orbit {
         self.x = vector[0];
         self.y = vector[1];
         self.z = vector[2];
-        self.x = vector[3];
-        self.y = vector[4];
-        self.z = vector[5];
+        self.vx = vector[3];
+        self.vy = vector[4];
+        self.vz = vector[5];
+        self.dt = epoch;
+        Ok(())
+    }
+}
+
+/// Implementation of the orbit Radius (only!) as a State for orbital dynamics without STM
+impl State<U3> for Orbit {
+    fn as_vector(&self) -> Result<Vector3<f64>, NyxError> {
+        Ok(Vector3::new(self.x, self.y, self.z))
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &Vector3<f64>) -> Result<(), NyxError> {
+        self.x = vector[0];
+        self.y = vector[1];
+        self.z = vector[2];
         self.dt = epoch;
         Ok(())
     }

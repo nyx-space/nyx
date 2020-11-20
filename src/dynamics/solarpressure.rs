@@ -1,10 +1,11 @@
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, vector_from_hyperspace, Hyperdual};
 use super::AutoDiff;
 use super::ForceModel;
+use crate::celestia::eclipse::{EclipseLocator, EclipseState};
+use crate::celestia::{Cosm, Frame, LTCorr, Orbit, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
+use crate::dynamics::spacecraft::SpacecraftState;
 use crate::time::Epoch;
-use celestia::eclipse::{EclipseLocator, EclipseState};
-use celestia::{Cosm, Frame, LTCorr, Orbit, AU, SPEED_OF_LIGHT};
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
@@ -62,9 +63,10 @@ impl<'a> ForceModel for SolarPressure<'a> {
     }
 }
 
-impl<'a> AutoDiff for SolarPressure<'a> {
-    type HyperStateSize = U7;
-    type STMSize = U3;
+impl<'a> AutoDiff<U7, U3> for SolarPressure<'a> {
+    // type HyperStateSize = U7;
+    // type STMRows = U3;
+    type CtxType = SpacecraftState;
 
     fn dual_eom(
         &self,

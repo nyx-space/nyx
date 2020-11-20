@@ -1,9 +1,11 @@
 extern crate hyperdual;
 
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
-use crate::celestia::{Frame, Orbit};
+use crate::celestia::Orbit;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U3, U7};
+use crate::dimensions::{
+    DefaultAllocator, DimName, DimNameDiff, DimNameSub, MatrixMN, Vector3, VectorN, U1, U3, U7,
+};
 use crate::dynamics::spacecraft::SpacecraftState;
 use crate::{time::Epoch, State};
 
@@ -79,32 +81,32 @@ where
 }
 
 /// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-pub trait AutoDiff: Send + Sync {
+pub trait AutoDiff<H: DimName + DimNameSub<U1>, R: DimName>: Send + Sync {
     /// Defines the state size of the estimated state
-    type HyperStateSize: DimName;
-    type STMSize: DimName;
+    // type HyperStateSize: DimName + DimNameSub<U1>;
+    /// Defines the number of rows in the state transition matrix
+    // type STMRows: DimName;
+    /// Defines the acceptable context type, e.g. SpacecraftState for a Spacecraft related automatic differentiation.
+    // type CtxType: State<DimNameDiff<H, U1>>;
+    type CtxType: State<DimNameDiff<H, U1>>;
 
     /// Computes both the state and the gradient of the dynamics.
     fn eom_grad(
         &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &VectorN<f64, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
+        state: &VectorN<f64, R>,
+        ctx: &Self::CtxType,
+    ) -> (VectorN<f64, R>, MatrixMN<f64, R, R>)
     where
-        DefaultAllocator: Allocator<f64, Self::STMSize>
-            + Allocator<f64, Self::STMSize, Self::STMSize>
-            + Allocator<f64, Self::HyperStateSize>
-            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-        Owned<f64, Self::HyperStateSize>: Copy,
+        DefaultAllocator: Allocator<f64, R>
+            + Allocator<f64, R, R>
+            + Allocator<f64, H>
+            + Allocator<f64, DimNameDiff<H, U1>>
+            + Allocator<Hyperdual<f64, H>, R>,
+        Owned<f64, H>: Copy,
     {
-        let hyperstate: VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize> =
-            hyperspace_from_vector(&state);
+        let hyperstate: VectorN<Hyperdual<f64, H>, R> = hyperspace_from_vector(&state);
 
-        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
+        let (state, grad) = self.dual_eom(&hyperstate, &ctx);
 
         (state, grad)
     }
@@ -112,27 +114,24 @@ pub trait AutoDiff: Send + Sync {
     /// Defines the equations of motion for Dual numbers for these dynamics.
     fn dual_eom(
         &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
+        state: &VectorN<Hyperdual<f64, H>, R>,
+        ctx: &Self::CtxType,
+    ) -> (VectorN<f64, R>, MatrixMN<f64, R, R>)
     where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::STMSize>
-            + Allocator<f64, Self::STMSize, Self::STMSize>
-            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-        Owned<f64, Self::HyperStateSize>: Copy;
+        DefaultAllocator: Allocator<f64, H>
+            + Allocator<f64, R>
+            + Allocator<f64, R, R>
+            + Allocator<f64, DimNameDiff<H, U1>>
+            + Allocator<Hyperdual<f64, H>, R>,
+        Owned<f64, H>: Copy;
 }
 
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync {
+pub trait ForceModel: AutoDiff<U7, U3> + Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, osc: &Orbit, ctx: SpacecraftState) -> Vector3<f64>;
+    fn eom(&self, osc: &Orbit, ctx: &SpacecraftState) -> Vector3<f64>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.

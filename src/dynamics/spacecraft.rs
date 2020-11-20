@@ -3,7 +3,9 @@ use super::propulsion::Propulsion;
 use super::{Dynamics, ForceModel, NyxError};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::dimension::{DimNameAdd, DimNameSum};
-use crate::dimensions::{DefaultAllocator, DimName, Matrix6, Vector1, Vector6, VectorN, U1, U6};
+use crate::dimensions::{
+    DefaultAllocator, DimName, Matrix6, Vector1, Vector6, VectorN, U1, U6, U7,
+};
 use crate::od::Estimable;
 use crate::time::Epoch;
 use crate::TimeTagged;
@@ -17,7 +19,7 @@ pub use super::solarpressure::SolarPressure;
 
 pub struct Spacecraft<'a, D: OrbitalDynamicsT> {
     pub orbital_dyn: D,
-    pub force_models: Vec<Box<dyn ForceModel + 'a>>,
+    pub force_models: Vec<Box<dyn ForceModel<CtxType = SpacecraftState> + 'a>>,
     pub prop: Option<Propulsion>,
     /// in kg
     pub dry_mass: f64,
@@ -54,7 +56,7 @@ impl<'a> Spacecraft<'a, OrbitalDynamics<'a>> {
         }
     }
 
-    pub fn add_model(&mut self, force_model: Box<dyn ForceModel + 'a>) {
+    pub fn add_model(&mut self, force_model: Box<dyn ForceModel<CtxType = SpacecraftState> + 'a>) {
         self.force_models.push(force_model);
     }
 }
@@ -69,6 +71,7 @@ where
         + Allocator<f64, D::StateSize, U1>,
 {
     type StateSize = DimNameSum<D::StateSize, U1>;
+    type StateType = SpacecraftState;
     // fn state_vector(&self) -> VectorN<f64, Self::StateSize>
     // where
     //     DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
@@ -128,7 +131,8 @@ where
                 .cloned(),
         );
 
-        let orbital_dyn_state = self.orbital_dyn.orbital_state_ctor(t, &orbital_dyn_vec);
+        // let orbital_dyn_state = self.orbital_dyn.orbital_state_ctor(t, &orbital_dyn_vec);
+        let orbital_dyn_state = ctx.orbit.ctor_from(t, &orbital_dyn_vec);
         let mut total_mass = self.dry_mass;
 
         // Now compute the other dynamics as needed.
