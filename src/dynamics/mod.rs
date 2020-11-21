@@ -1,12 +1,11 @@
 extern crate hyperdual;
 
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
-use crate::celestia::Orbit;
+use crate::celestia::{Orbit, SpacecraftState};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{
     DefaultAllocator, DimName, DimNameDiff, DimNameSub, MatrixMN, Vector3, VectorN, U1, U3, U7,
 };
-use crate::dynamics::spacecraft::SpacecraftState;
 use crate::{time::Epoch, State};
 
 pub use crate::errors::NyxError;

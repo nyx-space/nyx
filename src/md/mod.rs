@@ -1,7 +1,7 @@
 extern crate csv;
 
-use crate::dynamics::spacecraft::SpacecraftState;
 use crate::io::formatter::StateFormatter;
+use crate::SpacecraftState;
 use std::fs::File;
 pub mod ui;
 

@@ -2,9 +2,8 @@ use super::hyperdual::{hyperspace_from_vector, linalg::norm, vector_from_hypersp
 use super::AutoDiff;
 use super::ForceModel;
 use crate::celestia::eclipse::{EclipseLocator, EclipseState};
-use crate::celestia::{Cosm, Frame, LTCorr, Orbit, AU, SPEED_OF_LIGHT};
+use crate::celestia::{Cosm, Frame, LTCorr, Orbit, SpacecraftState, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
-use crate::dynamics::spacecraft::SpacecraftState;
 use crate::time::Epoch;
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .

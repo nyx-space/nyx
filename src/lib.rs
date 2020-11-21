@@ -240,11 +240,6 @@ extern crate prost_derive;
 extern crate hifitime;
 extern crate nalgebra as na;
 
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, VectorN};
-use crate::errors::NyxError;
-use std::fmt;
-use std::ops::Add;
 /// Re-export of hifitime
 pub mod time {
     pub use hifitime::*;
@@ -255,38 +250,7 @@ pub mod dimensions {
     pub use na::base::*;
 }
 
-use self::time::{Epoch, TimeUnit};
-/// A trait allowing for something to have an epoch
-pub trait TimeTagged {
-    /// Retrieve the Epoch
-    fn epoch(&self) -> Epoch;
-    /// Set the Epoch
-    fn set_epoch(&mut self, epoch: Epoch);
-}
-
-pub trait State<S: DimName>:
-    TimeTagged
-    + Add<VectorN<f64, S>, Output = Self>
-    + Copy
-    + Clone
-    + PartialEq
-    + fmt::Display
-    + fmt::LowerExp
-where
-    Self: Sized,
-    DefaultAllocator: Allocator<f64, S>,
-{
-    fn as_vector(&self) -> Result<VectorN<f64, S>, NyxError>
-    where
-        DefaultAllocator: Allocator<f64, S>;
-
-    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, S>) -> Result<(), NyxError>;
-
-    /// Reconstruct a new State from the provided delta time in seconds compared to the current state
-    /// and with the provided vector.
-    fn ctor_from(self, delta_t_s: f64, vector: &VectorN<f64, S>) -> Self {
-        let mut me = self;
-        me.set(me.epoch() + delta_t_s * TimeUnit::Second, vector);
-        me
-    }
-}
+/// Re-export some useful things
+pub mod state;
+pub use self::state::{State, TimeTagged};
+pub use celestia::{Orbit, SpacecraftState};

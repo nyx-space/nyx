@@ -8,7 +8,7 @@ use crate::dimensions::{
 };
 use crate::time::Epoch;
 use crate::{State, TimeTagged};
-use od::Estimable;
+// use od::Estimable;
 use std::f64;
 
 pub use super::sph_harmonics::{Harmonics, HarmonicsDiff};
@@ -335,9 +335,9 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
         ctx: &Orbit,
     ) -> VectorN<f64, Self::StateSize> {
         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
-        let epoch = Epoch::from_tai_seconds(self.init_tai_secs + t);
-        let (state, grad) = self.eom_grad(epoch, self.state.frame, &pos_vel);
-        let stm_dt = self.state.stm() * grad;
+        // let epoch = Epoch::from_tai_seconds(self.init_tai_secs + t);
+        let (state, grad) = self.eom_grad(&pos_vel, ctx);
+        let stm_dt = ctx.stm() * grad;
         // Rebuild the STM as a vector.
         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
         let mut stm_idx = 0;
@@ -353,31 +353,31 @@ impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
     }
 }
 
-impl<'a> Estimable<Orbit> for OrbitalDynamicsStm<'a> {
-    type LinStateSize = U6;
+// impl<'a> Estimable<Orbit> for OrbitalDynamicsStm<'a> {
+//     type LinStateSize = U6;
 
-    fn to_measurement(&self, prop_state: &Orbit) -> Orbit {
-        *prop_state
-    }
+//     fn to_measurement(&self, prop_state: &Orbit) -> Orbit {
+//         *prop_state
+//     }
 
-    fn extract_stm(&self, prop_state: &Orbit) -> Matrix6<f64> {
-        prop_state.stm()
-    }
+//     fn extract_stm(&self, prop_state: &Orbit) -> Matrix6<f64> {
+//         prop_state.stm()
+//     }
 
-    fn extract_estimated_state(&self, prop_state: &Orbit) -> VectorN<f64, Self::LinStateSize> {
-        prop_state.to_cartesian_vec()
-    }
+//     fn extract_estimated_state(&self, prop_state: &Orbit) -> VectorN<f64, Self::LinStateSize> {
+//         prop_state.to_cartesian_vec()
+//     }
 
-    /// Returns the estimated state
-    fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>) {
-        self.state.x = new_state[0];
-        self.state.y = new_state[1];
-        self.state.z = new_state[2];
-        self.state.vx = new_state[3];
-        self.state.vy = new_state[4];
-        self.state.vz = new_state[5];
-    }
-}
+//     /// Returns the estimated state
+//     fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>) {
+//         self.state.x = new_state[0];
+//         self.state.y = new_state[1];
+//         self.state.z = new_state[2];
+//         self.state.vx = new_state[3];
+//         self.state.vy = new_state[4];
+//         self.state.vz = new_state[5];
+//     }
+// }
 
 /// PointMasses model
 pub struct PointMasses<'a> {

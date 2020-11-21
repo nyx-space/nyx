@@ -5,9 +5,9 @@ use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::celestia::{Frame, Orbit};
-use crate::dynamics::spacecraft::SpacecraftState;
 use crate::propagators::events::{EventKind, OrbitalEvent, SCEvent, StopCondition};
 use crate::time::Epoch;
+use crate::SpacecraftState;
 use std::collections::HashMap;
 use std::str::FromStr;
 

@@ -4,15 +4,15 @@ extern crate serde;
 use self::hifitime::Epoch;
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
-use super::na::{Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U42, U6};
+use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::Frame;
+use crate::dynamics::propulsion::Thruster;
 use crate::State;
 use crate::TimeTagged;
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
 use celestia::xb::Vector as XBVector;
 use celestia::xb::{TimeRepr, TimeSystem, Unit};
-use errors::NyxError;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
@@ -776,29 +776,6 @@ impl Orbit {
         self.vz = new_v[2];
     }
 
-    /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
-    pub fn zeros() -> Self {
-        let frame = Frame::Celestial {
-            axb_id: 0,
-            exb_id: 0,
-            gm: 159.0,
-            parent_axb_id: None,
-            parent_exb_id: None,
-        };
-
-        Self {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            vx: 0.0,
-            vy: 0.0,
-            vz: 0.0,
-            dt: Epoch::from_tai_seconds(0.0),
-            frame,
-            stm: Some(Matrix6::identity()),
-        }
-    }
-
     /// Sets the STM of this state of identity
     pub fn stm_identity(&mut self) {
         self.stm = Some(Matrix6::identity());
@@ -817,22 +794,6 @@ impl TimeTagged for Orbit {
 
     fn set_epoch(&mut self, epoch: Epoch) {
         self.dt = epoch
-    }
-}
-
-impl Add<Vector6<f64>> for Orbit {
-    type Output = Orbit;
-
-    fn add(self, other: Vector6<f64>) -> Orbit {
-        let mut me = self;
-        me.x += other[0];
-        me.y += other[1];
-        me.z += other[2];
-        me.vx += other[3];
-        me.vy += other[4];
-        me.vz += other[5];
-
-        me
     }
 }
 
@@ -1037,96 +998,42 @@ impl fmt::Octal for Orbit {
     }
 }
 
-/// Implementation of Orbit as a State for orbital dynamics without STM
-impl State<U6> for Orbit {
-    fn as_vector(&self) -> Result<Vector6<f64>, NyxError> {
-        Ok(Vector6::new(
-            self.x, self.y, self.z, self.vx, self.vy, self.vz,
-        ))
-    }
+/// A spacecraft state
+/// TODO: Remove the propulsion from spaceraft. Add the thruster itself (a single thruster).
+/// TODO: Then add the thrust control to the spacecraft Dynamics. Find a way to store the results of
+/// TODO: those (the set_state) somewhere... I don't know where. This is needed to keep track of which
+/// TODO: objectives have been met.
+#[derive(Clone, Copy, Debug)]
+pub struct SpacecraftState {
+    pub orbit: Orbit,
+    pub dry_mass: f64,
+    pub fuel_mass: f64,
+    pub stm: Option<Matrix6<f64>>,
+    pub thruster: Option<Thruster>,
+}
 
-    fn set(&mut self, epoch: Epoch, vector: &Vector6<f64>) -> Result<(), NyxError> {
-        self.x = vector[0];
-        self.y = vector[1];
-        self.z = vector[2];
-        self.vx = vector[3];
-        self.vy = vector[4];
-        self.vz = vector[5];
-        self.dt = epoch;
-        Ok(())
+impl PartialEq for SpacecraftState {
+    fn eq(&self, other: &SpacecraftState) -> bool {
+        let mass_tol = 1e-6; // milligram
+        self.orbit == other.orbit
+            && (self.dry_mass - other.dry_mass).abs() < mass_tol
+            && (self.fuel_mass - other.fuel_mass).abs() < mass_tol
     }
 }
 
-/// Implementation of the orbit Radius (only!) as a State for orbital dynamics without STM
-impl State<U3> for Orbit {
-    fn as_vector(&self) -> Result<Vector3<f64>, NyxError> {
-        Ok(Vector3::new(self.x, self.y, self.z))
-    }
-
-    fn set(&mut self, epoch: Epoch, vector: &Vector3<f64>) -> Result<(), NyxError> {
-        self.x = vector[0];
-        self.y = vector[1];
-        self.z = vector[2];
-        self.dt = epoch;
-        Ok(())
+impl fmt::Display for SpacecraftState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:o}\t{} kg", self.orbit, self.dry_mass + self.fuel_mass)
     }
 }
 
-/// Implementation of Orbit as a State for orbital dynamics with STM
-impl State<U42> for Orbit {
-    fn as_vector(&self) -> Result<VectorN<f64, U42>, NyxError> {
-        let mut as_vec = VectorN::<f64, U42>::zeros();
-        as_vec[0] = self.x;
-        as_vec[1] = self.y;
-        as_vec[2] = self.z;
-        as_vec[3] = self.vx;
-        as_vec[4] = self.vy;
-        as_vec[5] = self.vz;
-        let mut stm_idx = 6;
-        match self.stm {
-            Some(stm) => {
-                for i in 0..6 {
-                    for j in 0..6 {
-                        as_vec[stm_idx] = stm[(i, j)];
-                        stm_idx += 1;
-                    }
-                }
-            }
-            None => return Err(NyxError::StateTransitionMatrixUnset),
-        }
-        Ok(as_vec)
-    }
-
-    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U42>) -> Result<(), NyxError> {
-        self.set_epoch(epoch);
-        self.x = vector[0];
-        self.y = vector[1];
-        self.z = vector[2];
-        self.vx = vector[3];
-        self.vy = vector[4];
-        self.vz = vector[5];
-        // And update the STM
-        let mut stm_k_to_0 = Matrix6::zeros();
-        let mut stm_idx = 6;
-        for i in 0..6 {
-            for j in 0..6 {
-                stm_k_to_0[(i, j)] = vector[(stm_idx, 0)];
-                stm_idx += 1;
-            }
-        }
-
-        match self.stm {
-            Some(stm_prev) => {
-                // let mut stm_prev = self.state.stm();
-                if !stm_prev.try_inverse_mut() {
-                    error!("STM not invertible: {}", stm_prev);
-                    return Err(NyxError::SingularStateTransitionMatrix);
-                }
-                self.stm = Some(stm_k_to_0 * stm_prev);
-                // self.state.stm = Some(stm_k_to_0);
-                Ok(())
-            }
-            None => Err(NyxError::StateTransitionMatrixUnset),
-        }
+impl fmt::LowerExp for SpacecraftState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:o}\t{:e} kg",
+            self.orbit,
+            self.dry_mass + self.fuel_mass
+        )
     }
 }

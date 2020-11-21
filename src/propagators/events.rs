@@ -1,7 +1,7 @@
 use crate::celestia::{Cosm, Frame, Orbit};
-use crate::dynamics::spacecraft::SpacecraftState;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::between_pm_180;
+use crate::SpacecraftState;
 use std::fmt;
 
 /// A general Event

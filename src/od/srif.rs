@@ -10,6 +10,7 @@ pub use super::residual::Residual;
 use super::snc::SNC;
 use super::{CovarFormat, EpochFormat, Filter};
 pub use crate::errors::NyxError;
+use crate::time::{Duration, TimeUnit};
 use crate::State;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
@@ -33,7 +34,7 @@ where
     /// Sets the process noise (usually noted Q) in the frame of the estimated state
     pub process_noise: Option<MatrixMN<f64, A, A>>,
     /// Enables state noise compensation (process noise) only be applied if the time between measurements is less than the process_noise_dt amount in seconds
-    pub process_noise_dt: Option<f64>,
+    pub process_noise_dt: Option<Duration>,
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
@@ -63,7 +64,7 @@ where
         initial_estimate: IfEstimate<S, T>,
         process_noise: MatrixMN<f64, A, A>,
         measurement_noise: MatrixMN<f64, M, M>,
-        process_noise_dt: Option<f64>,
+        process_noise_dt: Option<Duration>,
     ) -> Self {
         let inv_measurement_noise = measurement_noise
             .try_inverse()
@@ -248,15 +249,16 @@ where
             let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
 
             if delta_t <= pcr_dt {
+                let delta_t_s = delta_t.in_unit_f64(TimeUnit::Second);
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = MatrixMN::<f64, S, A>::zeros();
                 for i in 0..A::dim() {
-                    gamma[(i, i)] = delta_t.powi(2);
-                    gamma[(i + A::dim(), i)] = delta_t;
+                    gamma[(i, i)] = delta_t_s.powi(2);
+                    gamma[(i + A::dim(), i)] = delta_t_s;
                 }
                 // Let's add the process noise
-                let mut covar_prc = delta_t.powi(2)
+                let mut covar_prc = delta_t_s.powi(2)
                     * (&gamma * self.process_noise.as_ref().unwrap() * &gamma.transpose());
                 if !covar_prc.try_inverse_mut() {
                     panic!("process noise singular");

@@ -1,6 +1,8 @@
 use super::thrustctrl::ThrustControl;
+use crate::celestia::Orbit;
 use crate::dimensions::Vector3;
-use celestia::Orbit;
+use std::fmt;
+use std::sync::Arc;
 
 // TODO: Change to a trait to enable variable thrust and isp
 #[derive(Copy, Clone, Debug)]
@@ -13,22 +15,25 @@ const NORM_ERR: f64 = 1e-12;
 const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edition
 
 /// Propulsion allows returning a propulsion FORCE (not acceleration).
+#[derive(Clone)]
 pub struct Propulsion {
-    /// Will eventually support tank depletion
-    pub thrusters: Vec<Thruster>,
+    /// Will eventually support tank depletion. TODO: Implement thrusting from different thrusters independently
+    pub thruster: Thruster,
     /// Set to true to decrement the fuel mass
     pub decrement_mass: bool,
-    pub ctrl: Box<dyn ThrustControl>,
+    pub ctrl: Arc<dyn ThrustControl>,
+}
+
+impl fmt::Debug for Propulsion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Prop with {:?} thruster", self.thruster)
+    }
 }
 
 impl Propulsion {
-    pub fn new(
-        ctrl: Box<dyn ThrustControl>,
-        thrusters: Vec<Thruster>,
-        decrement_mass: bool,
-    ) -> Self {
+    pub fn new(ctrl: Arc<dyn ThrustControl>, thruster: Thruster, decrement_mass: bool) -> Self {
         Self {
-            thrusters,
+            thruster,
             decrement_mass,
             ctrl,
         }
@@ -55,11 +60,9 @@ impl Propulsion {
             // Compute the thrust in Newtons and Isp
             let mut total_thrust = 0.0;
             let mut fuel_usage = 0.0;
-            // TODO: Implement thrusting from different thrusters independently
-            for thruster in &self.thrusters {
-                total_thrust += thrust_power * thruster.thrust;
-                fuel_usage += thrust_power * thruster.thrust / (thruster.isp * STD_GRAVITY);
-            }
+
+            total_thrust += thrust_power * self.thruster.thrust;
+            fuel_usage += thrust_power * self.thruster.thrust / (self.thruster.isp * STD_GRAVITY);
             total_thrust *= 1e-3; // Convert m/s^-2 to km/s^-2
             (
                 thrust_inertial * total_thrust,

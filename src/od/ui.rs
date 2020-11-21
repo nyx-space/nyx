@@ -10,7 +10,7 @@ pub use super::srif::*;
 pub use super::*;
 
 use crate::propagators::error_ctrl::ErrorCtrl;
-use crate::propagators::Propagator;
+use crate::propagators::PropInstance;
 use crate::time::Duration;
 use crate::State;
 
@@ -45,31 +45,32 @@ impl fmt::Display for SmoothingArc {
 /// An orbit determination process. Note that everything passed to this structure is moved.
 pub struct ODProcess<
     'a,
-    D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
+    // D: Dynamics<StateSize = Msr::StateSize>,
+    D: Dynamics,
     E: ErrorCtrl,
     Msr: Measurement,
-    N: MeasurementDevice<MsrIn, Msr>,
+    N: MeasurementDevice<D::StateType, Msr>,
     T: EkfTrigger,
     A: DimName,
-    S: State<Msr::StateSize>,
-    K: Filter<D::LinStateSize, A, Msr::MeasurementSize, S>,
-    MsrIn,
+    // S: D::StateType,
+    K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+    // MsrIn,
 > where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
-        + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
-        + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, Msr::MeasurementSize, D::StateSize>
+        + Allocator<f64, D::StateSize, Msr::MeasurementSize>
+        + Allocator<f64, D::StateSize, D::StateSize>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
-        + Allocator<f64, D::LinStateSize, A>
-        + Allocator<f64, A, D::LinStateSize>,
+        + Allocator<f64, D::StateSize, A>
+        + Allocator<f64, A, D::StateSize>,
 {
-    /// Propagator used for the estimation
-    pub prop: Propagator<'a, D, E, S>,
+    /// PropInstance used for the estimation
+    pub prop: PropInstance<'a, D, E>,
     /// Kalman filter itself
     pub kf: K,
     /// List of measurement devices used
@@ -81,43 +82,45 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
+    init_state: D::StateType,
     _marker: PhantomData<A>,
 }
 
 impl<
         'a,
-        D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
+        D: Dynamics,
         E: ErrorCtrl,
         Msr: Measurement,
-        N: MeasurementDevice<MsrIn, Msr>,
+        N: MeasurementDevice<D::StateType, Msr>,
         T: EkfTrigger,
         A: DimName,
-        S: State<Msr::StateSize>,
-        K: Filter<D::LinStateSize, A, Msr::MeasurementSize, S>,
-        MsrIn,
-    > ODProcess<'a, D, E, Msr, N, T, A, S, K, MsrIn>
+        // S: State<D::StateSize>,
+        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+        // MsrIn,
+    > ODProcess<'a, D, E, Msr, N, T, A, K>
 where
     DefaultAllocator: Allocator<f64, D::StateSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
-        + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
-        + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, Msr::MeasurementSize, D::StateSize>
+        + Allocator<f64, D::StateSize, Msr::MeasurementSize>
+        + Allocator<f64, D::StateSize, D::StateSize>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
-        + Allocator<f64, D::LinStateSize, A>
-        + Allocator<f64, A, D::LinStateSize>,
+        + Allocator<f64, D::StateSize, A>
+        + Allocator<f64, A, D::StateSize>,
 {
     pub fn ekf(
-        prop: Propagator<'a, D, E, S>,
+        prop: PropInstance<'a, D, E>,
         kf: K,
         devices: Vec<N>,
         simultaneous_msr: bool,
         num_expected_msr: usize,
         trigger: T,
     ) -> Self {
+        let init_state = prop.state();
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -128,11 +131,13 @@ where
             estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: trigger,
+            init_state,
             _marker: PhantomData::<A>,
         }
     }
 
-    pub fn default_ekf(prop: Propagator<'a, D, E, S>, kf: K, devices: Vec<N>, trigger: T) -> Self {
+    pub fn default_ekf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
+        let init_state = prop.state();
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -143,6 +148,7 @@ where
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
+            init_state,
             _marker: PhantomData::<A>,
         }
     }
@@ -255,7 +261,7 @@ where
             Err(e) => return Err(e),
         };
         // Reset the propagator
-        self.prop.reset();
+        self.prop.state = self.init_state;
         // Empty the estimates and add the first smoothed estimate as the initial estimate
         self.estimates = Vec::new();
         self.estimates.push(smoothed[0].clone());
@@ -305,11 +311,11 @@ where
 
             while let Ok(nominal_state) = rx.try_recv() {
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
-                let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
+                // let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
                 let dt = nominal_state.epoch();
 
                 // Update the STM of the KF (needed between each measurement or time update)
-                let stm = self.prop.dynamics.extract_stm(&nominal_state);
+                let stm = nominal_state.stm().unwrap();
                 self.kf.update_stm(stm);
 
                 // Check if we should do a time update or a measurement update
@@ -323,9 +329,10 @@ where
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             if self.kf.is_extended() {
-                                self.prop.dynamics.set_estimated_state(
-                                    self.prop.dynamics.estimated_state() + est.state_deviation(),
-                                );
+                                // self.prop.state
+                                // self.prop.dynamics.set_estimated_state(
+                                //     self.prop.dynamics.estimated_state() + est.state_deviation(),
+                                // );
                             }
                             self.estimates.push(est);
                         }
@@ -335,7 +342,7 @@ where
                     // The epochs match, so this is a valid measurement to use
                     // Get the computed observations
                     for device in self.devices.iter() {
-                        if let Some(computed_meas) = device.measure(&meas_input) {
+                        if let Some(computed_meas) = device.measure(&nominal_state) {
                             if computed_meas.visible() {
                                 self.kf.update_h_tilde(computed_meas.sensitivity());
 
@@ -462,14 +469,14 @@ where
 
 impl<
         'a,
-        D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
+        D: Dynamics<StateSize = Msr::StateSize>,
         E: ErrorCtrl,
         Msr: Measurement,
-        N: MeasurementDevice<MsrIn, Msr>,
+        N: MeasurementDevice<D::StateType, Msr>,
         A: DimName,
-        K: Filter<D::LinStateSize, A, Msr::MeasurementSize, D::StateType>,
-        MsrIn,
-    > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K, MsrIn>
+        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+        // MsrIn,
+    > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K>
 where
     D::StateType: State<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
@@ -477,16 +484,16 @@ where
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, D::LinStateSize>
-        + Allocator<f64, D::LinStateSize, Msr::MeasurementSize>
-        + Allocator<f64, D::LinStateSize, D::LinStateSize>
+        + Allocator<f64, Msr::MeasurementSize, D::StateSize>
+        + Allocator<f64, D::StateSize, Msr::MeasurementSize>
+        + Allocator<f64, D::StateSize, D::StateSize>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
-        + Allocator<f64, D::LinStateSize, A>
-        + Allocator<f64, A, D::LinStateSize>,
+        + Allocator<f64, D::StateSize, A>
+        + Allocator<f64, A, D::StateSize>,
 {
     pub fn ckf(
-        prop: Propagator<'a, D, E>,
+        prop: PropInstance<'a, D, E>,
         kf: K,
         devices: Vec<N>,
         simultaneous_msr: bool,
@@ -506,7 +513,7 @@ where
         }
     }
 
-    pub fn default_ckf(prop: Propagator<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
+    pub fn default_ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {

@@ -2,7 +2,6 @@ extern crate csv;
 
 pub use crate::celestia::*;
 use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U6};
-use crate::dynamics::spacecraft::SpacecraftState;
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
@@ -13,6 +12,7 @@ use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
 use crate::time::SECONDS_PER_DAY;
+use crate::SpacecraftState;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 

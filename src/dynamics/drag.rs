@@ -1,8 +1,7 @@
 use super::hyperdual::Hyperdual;
 use super::{AutoDiff, Epoch, ForceModel};
-use crate::celestia::{Cosm, Frame, Orbit};
+use crate::celestia::{Cosm, Frame, Orbit, SpacecraftState};
 use crate::dimensions::{Matrix3, Vector3, U3, U7};
-use crate::dynamics::spacecraft::SpacecraftState;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
 #[derive(Clone, Copy, Debug)]

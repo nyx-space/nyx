@@ -1,7 +1,7 @@
 use crate::celestia::Frame;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3, U6};
-use crate::time::Epoch;
+use crate::time::{Duration, Epoch, TimeUnit};
 
 use std::fmt;
 
@@ -17,8 +17,8 @@ where
     pub start_time: Option<Epoch>,
     /// Specify the frame of this SNC -- CURRENTLY UNIMPLEMENTED
     pub frame: Option<Frame>,
-    /// Enables state noise compensation (process noise) only be applied if the time between measurements is less than the disable_time_s amount in seconds
-    pub disable_time_s: f64,
+    /// Enables state noise compensation (process noise) only be applied if the time between measurements is less than the disable_time amount in seconds
+    pub disable_time: Duration,
     // Stores the initial epoch when the SNC is requested, needed for decay. Kalman filter will edit this automatically.
     pub init_epoch: Option<Epoch>,
     diag: VectorN<f64, A>,
@@ -82,7 +82,7 @@ where
     DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
 {
     /// Initialize a state noise compensation structure from the diagonal values
-    pub fn from_diagonal(disable_time_s: f64, values: &[f64]) -> Self {
+    pub fn from_diagonal(disable_time: Duration, values: &[f64]) -> Self {
         assert_eq!(
             values.len(),
             A::dim(),
@@ -96,7 +96,7 @@ where
 
         Self {
             diag,
-            disable_time_s,
+            disable_time,
             start_time: None,
             frame: None,
             decay_diag: None,
@@ -106,22 +106,26 @@ where
     }
 
     /// Initialize an SNC with a time at which it should start
-    pub fn with_start_time(disable_time_s: f64, values: &[f64], start_time: Epoch) -> Self {
-        let mut me = Self::from_diagonal(disable_time_s, values);
+    pub fn with_start_time(disable_time: Duration, values: &[f64], start_time: Epoch) -> Self {
+        let mut me = Self::from_diagonal(disable_time, values);
         me.start_time = Some(start_time);
         me
     }
 
     /// Initialize an exponentially decaying SNC with initial SNC and decay constants.
     /// Decay constants in seconds since start of the tracking pass.
-    pub fn with_decay(disable_time_s: f64, initial_snc: &[f64], decay_constants_s: &[f64]) -> Self {
+    pub fn with_decay(
+        disable_time: Duration,
+        initial_snc: &[f64],
+        decay_constants_s: &[f64],
+    ) -> Self {
         assert_eq!(
             decay_constants_s.len(),
             A::dim(),
             "Not enough decay constants for the size of the SNC matrix"
         );
 
-        let mut me = Self::from_diagonal(disable_time_s, initial_snc);
+        let mut me = Self::from_diagonal(disable_time, initial_snc);
         me.decay_diag = Some(decay_constants_s.to_vec());
         me
     }
@@ -140,7 +144,7 @@ where
 
         // Check the disable time, and return no SNC if the previous SNC was computed too long ago
         if let Some(prev_epoch) = self.prev_epoch {
-            if epoch - prev_epoch > self.disable_time_s {
+            if epoch - prev_epoch > self.disable_time {
                 return None;
             }
         }
@@ -152,7 +156,7 @@ where
 
         if let Some(decay) = &self.decay_diag {
             // Let's apply the decay to the diagonals
-            let total_delta_t = epoch - self.init_epoch.unwrap();
+            let total_delta_t = (epoch - self.init_epoch.unwrap()).in_unit_f64(TimeUnit::Second);
             for i in 0..self.diag.nrows() {
                 snc[(i, i)] *= (-decay[i] * total_delta_t).exp();
             }
@@ -164,9 +168,17 @@ where
 
 #[test]
 fn test_snc_init() {
-    let snc_expo = SNC3::with_decay(120.0, &[1e-6, 1e-6, 1e-6], &[3600.0, 3600.0, 3600.0]);
+    let snc_expo = SNC3::with_decay(
+        2 * TimeUnit::Minute,
+        &[1e-6, 1e-6, 1e-6],
+        &[3600.0, 3600.0, 3600.0],
+    );
     println!("{}", snc_expo);
 
-    let snc_std = SNC3::with_start_time(120.0, &[1e-6, 1e-6, 1e-6], Epoch::from_et_seconds(3600.0));
+    let snc_std = SNC3::with_start_time(
+        2 * TimeUnit::Minute,
+        &[1e-6, 1e-6, 1e-6],
+        Epoch::from_et_seconds(3600.0),
+    );
     println!("{}", snc_std);
 }

@@ -6,6 +6,7 @@ pub use super::residual::Residual;
 pub use super::snc::SNC;
 use super::{CovarFormat, EpochFormat, Filter, State};
 pub use crate::errors::NyxError;
+use crate::time::TimeUnit;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
@@ -275,7 +276,8 @@ where
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = MatrixMN::<f64, S, A>::zeros();
-                let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch())
+                    .in_unit_f64(TimeUnit::Second);
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;
