@@ -1,8 +1,8 @@
 use crate::celestia::{Frame, Orbit, SpacecraftState};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{
-    DefaultAllocator, DimName, Matrix3, Matrix6, Matrix7, MatrixN, Vector1, Vector3, Vector6,
-    VectorN, U3, U42, U43, U6, U7,
+    DefaultAllocator, DimName, Matrix3, Matrix6, MatrixN, Vector1, Vector3, Vector6, VectorN, U3,
+    U42, U43, U6, U7,
 };
 use crate::errors::NyxError;
 use crate::time::{Epoch, TimeUnit};
@@ -18,9 +18,11 @@ pub trait TimeTagged {
 }
 
 /// A trait for generate propagation and estimation state.
+/// TODO: Rewrite this... OrbitalDynamics is no longer size 6, but size 42. And Spacecraft state is 43, but the STM is not.
+/// Must support different spacecraft state sizes depending on whether we need to estimate Cr/Cd as well. Dammit.
 pub trait State<S: DimName>:
     TimeTagged
-    + Add<VectorN<f64, S>, Output = Self>
+    // + Add<VectorN<f64, S>, Output = Self>
     + Copy
     + Clone
     + PartialEq
@@ -119,16 +121,16 @@ impl State<U6> for Orbit {
     }
 }
 
-impl Add<VectorN<f64, U6>> for Orbit {
-    type Output = Self;
+// impl Add<VectorN<f64, U6>> for Orbit {
+//     type Output = Self;
 
-    fn add(self, other: VectorN<f64, U6>) -> Self {
-        let mut me = self;
-        me.set(self.epoch(), &(me.as_vector().unwrap() + other));
+//     fn add(self, other: VectorN<f64, U6>) -> Self {
+//         let mut me = self;
+//         me.set(self.epoch(), &(me.as_vector().unwrap() + other));
 
-        me
-    }
-}
+//         me
+//     }
+// }
 
 /// Implementation of the orbit Radius (only!) as a State for orbital dynamics without STM
 impl State<U3> for Orbit {
@@ -174,19 +176,19 @@ impl State<U3> for Orbit {
     }
 }
 
-impl Add<VectorN<f64, U3>> for Orbit {
-    type Output = Self;
+// impl Add<VectorN<f64, U3>> for Orbit {
+//     type Output = Self;
 
-    fn add(self, other: VectorN<f64, U3>) -> Self
-    where
-        DefaultAllocator: Allocator<f64, U3>,
-    {
-        let mut me = self;
-        me.set(self.epoch(), &(me.as_vector().unwrap() + other));
+//     fn add(self, other: VectorN<f64, U3>) -> Self
+//     where
+//         DefaultAllocator: Allocator<f64, U3>,
+//     {
+//         let mut me = self;
+//         me.set(self.epoch(), &(me.as_vector().unwrap() + other));
 
-        me
-    }
-}
+//         me
+//     }
+// }
 
 /// Implementation of Orbit as a State for orbital dynamics with STM
 impl State<U42> for Orbit {
@@ -222,16 +224,13 @@ impl State<U42> for Orbit {
         as_vec[4] = self.vy;
         as_vec[5] = self.vz;
         let mut stm_idx = 6;
-        match self.stm {
-            Some(stm) => {
-                for i in 0..6 {
-                    for j in 0..6 {
-                        as_vec[stm_idx] = stm[(i, j)];
-                        stm_idx += 1;
-                    }
+        if let Some(stm) = self.stm {
+            for i in 0..6 {
+                for j in 0..6 {
+                    as_vec[stm_idx] = stm[(i, j)];
+                    stm_idx += 1;
                 }
             }
-            None => return Err(NyxError::StateTransitionMatrixUnset),
         }
         Ok(as_vec)
     }
@@ -244,29 +243,26 @@ impl State<U42> for Orbit {
         self.vx = vector[3];
         self.vy = vector[4];
         self.vz = vector[5];
-        // And update the STM
-        let mut stm_k_to_0 = Matrix6::zeros();
-        let mut stm_idx = 6;
-        for i in 0..6 {
-            for j in 0..6 {
-                stm_k_to_0[(i, j)] = vector[(stm_idx, 0)];
-                stm_idx += 1;
-            }
-        }
-
-        match self.stm {
-            Some(stm_prev) => {
-                // let mut stm_prev = self.state.stm();
-                if !stm_prev.try_inverse_mut() {
-                    error!("STM not invertible: {}", stm_prev);
-                    return Err(NyxError::SingularStateTransitionMatrix);
+        // And update the STM if applicable
+        if let Some(stm_prev) = self.stm {
+            let mut stm_k_to_0 = Matrix6::zeros();
+            let mut stm_idx = 6;
+            for i in 0..6 {
+                for j in 0..6 {
+                    stm_k_to_0[(i, j)] = vector[(stm_idx, 0)];
+                    stm_idx += 1;
                 }
-                self.stm = Some(stm_k_to_0 * stm_prev);
-                // self.state.stm = Some(stm_k_to_0);
-                Ok(())
             }
-            None => Err(NyxError::StateTransitionMatrixUnset),
+
+            // let mut stm_prev = self.state.stm();
+            if !stm_prev.try_inverse_mut() {
+                error!("STM not invertible: {}", stm_prev);
+                return Err(NyxError::SingularStateTransitionMatrix);
+            }
+            self.stm = Some(stm_k_to_0 * stm_prev);
+            // self.state.stm = Some(stm_k_to_0);
         }
+        Ok(())
     }
 
     fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
@@ -277,19 +273,19 @@ impl State<U42> for Orbit {
     }
 }
 
-impl Add<VectorN<f64, U42>> for Orbit {
-    type Output = Self;
+// impl Add<VectorN<f64, U42>> for Orbit {
+//     type Output = Self;
 
-    fn add(self, other: VectorN<f64, U42>) -> Self
-    where
-        DefaultAllocator: Allocator<f64, U42>,
-    {
-        let mut me = self;
-        me.set(self.epoch(), &(me.as_vector().unwrap() + other));
+//     fn add(self, other: VectorN<f64, U42>) -> Self
+//     where
+//         DefaultAllocator: Allocator<f64, U42>,
+//     {
+//         let mut me = self;
+//         me.set(self.epoch(), &(me.as_vector().unwrap() + other));
 
-        me
-    }
-}
+//         me
+//     }
+// }
 
 impl TimeTagged for SpacecraftState {
     fn epoch(&self) -> Epoch {
@@ -304,7 +300,7 @@ impl TimeTagged for SpacecraftState {
 impl State<U6> for SpacecraftState {
     fn zeros() -> Self {
         Self {
-            orbit: Orbit::zeros(),
+            orbit: <Orbit as State<U6>>::zeros(),
             dry_mass: 0.0,
             fuel_mass: 0.0,
             stm: None,
@@ -335,24 +331,24 @@ impl State<U6> for SpacecraftState {
     }
 }
 
-impl Add<VectorN<f64, U6>> for SpacecraftState {
-    type Output = Self;
+// impl Add<VectorN<f64, U6>> for SpacecraftState {
+//     type Output = Self;
 
-    fn add(self, other: VectorN<f64, U6>) -> Self
-    where
-        DefaultAllocator: Allocator<f64, U6>,
-    {
-        let mut me = self;
-        me.set(self.epoch(), &(me.as_vector().unwrap() + other));
+//     fn add(self, other: VectorN<f64, U6>) -> Self
+//     where
+//         DefaultAllocator: Allocator<f64, U6>,
+//     {
+//         let mut me = self;
+//         me.set(self.epoch(), &(me.as_vector().unwrap() + other));
 
-        me
-    }
-}
+//         me
+//     }
+// }
 
 impl State<U7> for SpacecraftState {
     fn zeros() -> Self {
         Self {
-            orbit: Orbit::zeros(),
+            orbit: <Orbit as State<U6>>::zeros(),
             dry_mass: 0.0,
             fuel_mass: 0.0,
             stm: None,
@@ -387,16 +383,16 @@ impl State<U7> for SpacecraftState {
     }
 
     /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
-    fn stm(&self) -> Result<Matrix7<f64>, NyxError> {
+    fn stm(&self) -> Result<MatrixN<f64, U7>, NyxError> {
         match self.orbit.stm {
             Some(stm) => {
-                let rtn = Matrix7::zeros();
+                let rtn = MatrixN::<f64, U7>::zeros();
                 for i in 0..6 {
                     for j in 0..6 {
                         rtn[(i, j)] = stm[(i, j)];
                     }
                 }
-                rtn[(6, 6)] = 1.0;
+                rtn[(6, 6)] = 0.0;
                 Ok(rtn)
             }
             None => Err(NyxError::StateTransitionMatrixUnset),
@@ -404,16 +400,51 @@ impl State<U7> for SpacecraftState {
     }
 }
 
-impl Add<VectorN<f64, U7>> for SpacecraftState {
-    type Output = Self;
+// impl Add<VectorN<f64, U7>> for SpacecraftState {
+//     type Output = Self;
 
-    fn add(self, other: VectorN<f64, U7>) -> Self
-    where
-        DefaultAllocator: Allocator<f64, U7>,
-    {
-        let mut me = self;
-        me.set(self.epoch(), &(me.as_vector().unwrap() + other));
+//     fn add(self, other: VectorN<f64, U7>) -> Self {
+//         let mut me = self;
+//         me.set(self.epoch(), &(me.as_vector().unwrap() + other));
 
-        me
+//         me
+//     }
+// }
+
+impl State<U43> for SpacecraftState {
+    /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
+    fn zeros() -> Self {
+        Self {
+            orbit: <Orbit as State<U6>>::zeros(),
+            dry_mass: 0.0,
+            fuel_mass: 0.0,
+            stm: Some(Matrix6::identity()),
+            thruster: None,
+        }
+    }
+
+    fn as_vector(&self) -> Result<VectorN<f64, U43>, NyxError> {
+        let orb_vec: VectorN<f64, U42> = self.orbit.as_vector()?;
+        Ok(VectorN::<f64, U43>::from_iterator(
+            orb_vec
+                .iter()
+                .chain(Vector1::new(self.fuel_mass).iter())
+                .cloned(),
+        ))
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U43>) -> Result<(), NyxError> {
+        self.set_epoch(epoch);
+        let orbit_vec = vector.fixed_rows::<U42>(0).into_owned();
+        self.orbit.set(epoch, &orbit_vec);
+        self.fuel_mass = vector[U43::dim() - 1];
+        Ok(())
+    }
+
+    fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
+        match self.stm {
+            Some(stm) => Ok(stm),
+            None => Err(NyxError::StateTransitionMatrixUnset),
+        }
     }
 }

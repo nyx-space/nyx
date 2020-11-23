@@ -1,10 +1,10 @@
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, vector_from_hyperspace, Hyperdual};
-use super::AutoDiff;
+// use super::AutoDiff;
 use super::ForceModel;
 use crate::celestia::eclipse::{EclipseLocator, EclipseState};
-use crate::celestia::{Cosm, Frame, LTCorr, Orbit, SpacecraftState, AU, SPEED_OF_LIGHT};
+use crate::celestia::{Cosm, Frame, LTCorr, SpacecraftState, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
-use crate::time::Epoch;
+use crate::errors::NyxError;
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
@@ -37,7 +37,8 @@ impl<'a> SolarPressure<'a> {
 }
 
 impl<'a> ForceModel for SolarPressure<'a> {
-    fn eom(&self, osc: &Orbit) -> Vector3<f64> {
+    fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
+        let osc = &ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
             .e_loc
@@ -58,34 +59,18 @@ impl<'a> ForceModel for SolarPressure<'a> {
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        -1e-3 * self.cr * self.sc_area * flux_pressure * r_sun_unit
+        Ok(-1e-3 * self.cr * self.sc_area * flux_pressure * r_sun_unit)
     }
-}
-
-impl<'a> AutoDiff<U7, U3> for SolarPressure<'a> {
-    // type HyperStateSize = U7;
-    // type STMRows = U3;
-    type CtxType = SpacecraftState;
 
     fn dual_eom(
         &self,
-        dt: Epoch,
-        integr_frame: Frame,
         radius: &Vector3<Hyperdual<f64, U7>>,
-    ) -> (Vector3<f64>, Matrix3<f64>) {
+        ctx: &SpacecraftState,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Extract data from hyperspace
         let cart_r = vector_from_hyperspace(&radius.fixed_rows::<U3>(0).into_owned());
         // Recreate the osculating state
-        let osc = Orbit::cartesian(
-            cart_r[0],
-            cart_r[1],
-            cart_r[2],
-            0.0,
-            0.0,
-            0.0,
-            dt,
-            integr_frame,
-        );
+        let osc = ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
@@ -129,6 +114,6 @@ impl<'a> AutoDiff<U7, U3> for SolarPressure<'a> {
             }
         }
 
-        (fx, grad)
+        Ok((fx, grad))
     }
 }

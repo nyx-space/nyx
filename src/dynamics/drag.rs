@@ -1,7 +1,8 @@
 use super::hyperdual::Hyperdual;
-use super::{AutoDiff, Epoch, ForceModel};
+use super::{Epoch, ForceModel};
 use crate::celestia::{Cosm, Frame, Orbit, SpacecraftState};
 use crate::dimensions::{Matrix3, Vector3, U3, U7};
+use crate::errors::NyxError;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
 #[derive(Clone, Copy, Debug)]
@@ -31,25 +32,18 @@ pub struct ConstantDrag<'a> {
 }
 
 impl<'a> ForceModel for ConstantDrag<'a> {
-    fn eom(&self, osc: &Orbit) -> Vector3<f64> {
-        let osc = self.cosm.frame_chg_by_id(&osc, self.drag_frame_id);
+    fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
+        let osc = self.cosm.frame_chg_by_id(&ctx.orbit, self.drag_frame_id);
         let velocity = osc.velocity();
-        -0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity
+        Ok(-0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity)
     }
-}
-
-impl<'a> AutoDiff<U7, U3> for ConstantDrag<'a> {
-    // type HyperStateSize = U7;
-    // type STMRows = U3;
-    type CtxType = SpacecraftState;
 
     fn dual_eom(
         &self,
-        _: Epoch,
-        _: Frame,
-        _: &Vector3<Hyperdual<f64, U7>>,
-    ) -> (Vector3<f64>, Matrix3<f64>) {
-        unimplemented!("drag models not differentiable yet");
+        radius: &Vector3<Hyperdual<f64, U7>>,
+        osc_ctx: &SpacecraftState,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+        Err(NyxError::PartialsUndefined)
     }
 }
 
@@ -99,12 +93,12 @@ impl<'a> Drag<'a> {
 }
 
 impl<'a> ForceModel for Drag<'a> {
-    fn eom(&self, osc: &Orbit) -> Vector3<f64> {
-        let osc = self.cosm.frame_chg(&osc, self.drag_frame);
+    fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
+        let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc.velocity();
-                -0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity
+                Ok(-0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity)
             }
             AtmDensity::Exponential {
                 rho0,
@@ -121,7 +115,7 @@ impl<'a> ForceModel for Drag<'a> {
                     .velocity();
 
                 let velocity = velocity_eme2k - osc.velocity();
-                -0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity
+                Ok(-0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity)
             }
             AtmDensity::StdAtm { max_alt_m } => {
                 let altitude_km = osc.rmag() - self.drag_frame.equatorial_radius();
@@ -149,23 +143,16 @@ impl<'a> ForceModel for Drag<'a> {
                     .velocity();
 
                 let velocity = velocity_eme2k - osc.velocity();
-                -0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity
+                Ok(-0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity)
             }
         }
     }
-}
-
-impl<'a> AutoDiff<U7, U3> for Drag<'a> {
-    // type HyperStateSize = U7;
-    // type STMRows = U3;
-    type CtxType = SpacecraftState;
 
     fn dual_eom(
         &self,
-        _: Epoch,
-        _: Frame,
-        _: &Vector3<Hyperdual<f64, U7>>,
-    ) -> (Vector3<f64>, Matrix3<f64>) {
-        unimplemented!("drag models not differentiable yet");
+        radius: &Vector3<Hyperdual<f64, U7>>,
+        osc_ctx: &SpacecraftState,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+        Err(NyxError::PartialsUndefined)
     }
 }

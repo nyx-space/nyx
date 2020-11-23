@@ -26,6 +26,18 @@ pub enum NyxError {
     TargetsTooClose,
     LambertNotReasonablePhi,
     LambertMultiRevNotSupported,
+    /// Returns this error if the partials for this model are not defined, thereby preventing the computation of the STM
+    PartialsUndefined,
+    ObjectIDNotFound(i32),
+    ObjectNameNotFound(String),
+    NoInterpolationData(i32),
+    InvalidInterpolationData(String),
+    NoStateData(i32),
+    /// No path was found to convert from the first center to the second
+    DisjointFrameCenters(i32, i32),
+    /// No path was found to convert from the first orientation to the second
+    DisjointFrameOrientations(i32, i32),
+    InvalidThrusterCtrlNorm(f64),
     /// Some custom error for new dynamics
     CustomError(String),
 }

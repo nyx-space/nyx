@@ -180,7 +180,7 @@ where
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
                 let (t, state_vec) =
-                    self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state);
+                    self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state)?;
                 self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
                 // Evaluate the event trackers
                 self.event_trackers
@@ -368,13 +368,13 @@ where
         t: f64,
         state: &VectorN<f64, D::StateSize>,
         ctx: &D::StateType,
-    ) -> (f64, VectorN<f64, D::StateSize>) {
+    ) -> Result<(f64, VectorN<f64, D::StateSize>), NyxError> {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds;
         let step_size = self.step_size.in_unit_f64(TimeUnit::Second);
         loop {
-            let ki = self.prop.dynamics.eom(0.0, &state, ctx);
+            let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
             for i in 0..(self.prop.stages - 1) {
@@ -393,7 +393,7 @@ where
                 let ki = self
                     .prop
                     .dynamics
-                    .eom(ci * step_size, &(state + step_size * wi), ctx);
+                    .eom(ci * step_size, &(state + step_size * wi), ctx)?;
                 self.k[i + 1] = ki;
             }
             // Compute the next state and the error

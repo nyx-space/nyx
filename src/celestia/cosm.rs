@@ -17,6 +17,7 @@ use super::state::Orbit;
 use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, EphemerisContainer};
 use super::SPEED_OF_LIGHT_KMS;
+use crate::errors::NyxError;
 use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::Matrix3;
@@ -66,31 +67,6 @@ pub struct Cosm {
 impl fmt::Debug for Cosm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Cosm with {} ephemerides", self.ephemerides.keys().len())
-    }
-}
-
-#[derive(Debug)]
-pub enum CosmError {
-    ObjectIDNotFound(i32),
-    ObjectNameNotFound(String),
-    NoInterpolationData(i32),
-    InvalidInterpolationData(String),
-    NoStateData(i32),
-    /// No path was found to convert from the first center to the second
-    DisjointFrameCenters(i32, i32),
-    /// No path was found to convert from the first orientation to the second
-    DisjointFrameOrientations(i32, i32),
-}
-
-impl fmt::Display for CosmError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CosmError: {:?}", self)
-    }
-}
-
-impl Error for CosmError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
     }
 }
 
@@ -366,22 +342,22 @@ impl Cosm {
         }
     }
 
-    fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
+    fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, NyxError> {
         for (idx, node) in self.exb_map.raw_nodes().iter().enumerate() {
             if node.weight == id {
                 return Ok(NodeIndex::new(idx));
             }
         }
-        Err(CosmError::ObjectIDNotFound(id))
+        Err(NyxError::ObjectIDNotFound(id))
     }
 
-    fn axbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
+    fn axbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, NyxError> {
         for (idx, node) in self.axb_map.raw_nodes().iter().enumerate() {
             if node.weight == id {
                 return Ok(NodeIndex::new(idx));
             }
         }
-        Err(CosmError::ObjectIDNotFound(id))
+        Err(NyxError::ObjectIDNotFound(id))
     }
 
     fn frame_idx_name(name: &str) -> String {
@@ -397,10 +373,10 @@ impl Cosm {
         }
     }
 
-    pub fn try_frame(&self, name: &str) -> Result<Frame, CosmError> {
+    pub fn try_frame(&self, name: &str) -> Result<Frame, NyxError> {
         match self.frames.get(Self::frame_idx_name(name).as_str()) {
             Some(f) => Ok(*f),
-            None => Err(CosmError::ObjectNameNotFound(name.to_owned())),
+            None => Err(NyxError::ObjectNameNotFound(name.to_owned())),
         }
     }
 
@@ -409,7 +385,7 @@ impl Cosm {
         self.try_frame(name).unwrap()
     }
 
-    pub fn try_frame_by_exb_id(&self, id: i32) -> Result<Frame, CosmError> {
+    pub fn try_frame_by_exb_id(&self, id: i32) -> Result<Frame, NyxError> {
         if id == 0 {
             // Requesting the SSB in J2k
             return Ok(self.frames["solar system barycenter j2000"]);
@@ -428,7 +404,7 @@ impl Cosm {
                     )]),
                 }
             }
-            None => Err(CosmError::ObjectIDNotFound(id)),
+            None => Err(NyxError::ObjectIDNotFound(id)),
         }
     }
 
@@ -447,7 +423,7 @@ impl Cosm {
         self.frames.values().cloned().collect::<Vec<Frame>>()
     }
 
-    pub fn try_frame_by_axb_id(&self, id: i32) -> Result<Frame, CosmError> {
+    pub fn try_frame_by_axb_id(&self, id: i32) -> Result<Frame, NyxError> {
         if id == 0 {
             // Requesting the J2k orientation
             return Ok(self.frames["solar system barycenter j2000"]);
@@ -458,7 +434,7 @@ impl Cosm {
             }
         }
 
-        Err(CosmError::ObjectIDNotFound(id))
+        Err(NyxError::ObjectIDNotFound(id))
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
@@ -497,24 +473,24 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
-    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<Orbit, CosmError> {
+    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<Orbit, NyxError> {
         let ephem = self
             .ephemerides
             .get(&exb_id)
-            .ok_or(CosmError::ObjectIDNotFound(exb_id))?;
+            .ok_or(NyxError::ObjectIDNotFound(exb_id))?;
 
         // Compute the position as per the algorithm from jplephem
         let interp = ephem
             .interpolator
             .as_ref()
-            .ok_or(CosmError::NoInterpolationData(exb_id))?;
+            .ok_or(NyxError::NoInterpolationData(exb_id))?;
 
         // the DE file epochs are all in ET mod julian
         let start_mod_julian = ephem.start_epoch.as_ref().unwrap().value;
         let coefficient_count: usize = interp.position_degree as usize;
         if coefficient_count <= 2 {
             // Cf. https://gitlab.com/chrisrabotin/nyx/-/issues/131
-            return Err(CosmError::InvalidInterpolationData(format!(
+            return Err(NyxError::InvalidInterpolationData(format!(
                 "position_degree is less than 3 for EXB ID {}",
                 exb_id
             )));
@@ -523,7 +499,7 @@ impl Cosm {
         let exb_states = match interp
             .state_data
             .as_ref()
-            .ok_or(CosmError::NoStateData(exb_id))?
+            .ok_or(NyxError::NoStateData(exb_id))?
         {
             EqualStates(states) => states,
             VarwindowStates(_) => panic!("var window not yet supported by Cosm"),
@@ -607,7 +583,7 @@ impl Cosm {
         datetime: Epoch,
         frame: Frame,
         correction: LTCorr,
-    ) -> Result<Orbit, CosmError> {
+    ) -> Result<Orbit, NyxError> {
         match correction {
             LTCorr::None => {
                 let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
@@ -697,7 +673,7 @@ impl Cosm {
         from: &Frame,
         to: &Frame,
         dt: Epoch,
-    ) -> Result<Matrix3<f64>, CosmError> {
+    ) -> Result<Matrix3<f64>, NyxError> {
         // And now let's compute the rotation path
         let rot_path = self.rotation_path(to, from)?;
         let mut prev_axb = from.axb_id();
@@ -722,7 +698,7 @@ impl Cosm {
     }
 
     /// Attempts to return the provided state in the provided frame.
-    pub fn try_frame_chg(&self, state: &Orbit, new_frame: Frame) -> Result<Orbit, CosmError> {
+    pub fn try_frame_chg(&self, state: &Orbit, new_frame: Frame) -> Result<Orbit, NyxError> {
         if state.frame == new_frame {
             return Ok(*state);
         }
@@ -783,7 +759,7 @@ impl Cosm {
     }
 
     /// Returns the conversion path from the target `from` as seen from `to`.
-    fn translation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<Frame>, CosmError> {
+    fn translation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<Frame>, NyxError> {
         if from == to {
             // Same frames, nothing to do
             return Ok(Vec::new());
@@ -817,12 +793,12 @@ impl Cosm {
                 f_path.remove(denom_idx);
                 Ok(f_path)
             }
-            None => Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
+            None => Err(NyxError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
         }
     }
 
     /// Returns the rotation path of AXB IDs from the target `from` as seen from `to`.
-    fn rotation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<i32>, CosmError> {
+    fn rotation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<i32>, NyxError> {
         if from == to {
             // Same frames, nothing to do
             return Ok(Vec::new());
@@ -856,7 +832,7 @@ impl Cosm {
                 f_path.remove(denom_idx);
                 Ok(f_path)
             }
-            None => Err(CosmError::DisjointFrameOrientations(
+            None => Err(NyxError::DisjointFrameOrientations(
                 from.axb_id(),
                 to.axb_id(),
             )),
