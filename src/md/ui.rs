@@ -6,21 +6,21 @@ use super::MdHdlr;
 pub use crate::celestia::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
-pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
+pub use crate::dynamics::orbital::OrbitalDynamics;
 use crate::dynamics::solarpressure::SolarPressure;
 use crate::dynamics::spacecraft::Spacecraft;
-use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
+use crate::dynamics::sph_harmonics::Harmonics;
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::formatter::*;
-use crate::io::quantity::{parse_duration, ParsingError};
+use crate::io::quantity::ParsingError;
 use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
 use crate::propagators::error_ctrl::RSSStepPV;
-use crate::propagators::Propagator;
-use crate::time::{Epoch, SECONDS_PER_DAY};
+use crate::propagators::{PropInstance, Propagator};
+use crate::time::{Duration, Epoch, SECONDS_PER_DAY};
 use crate::SpacecraftState;
 use std::str::FromStr;
-use std::sync::mpsc::channel;
+use std::sync::{mpsc::channel, Arc};
 use std::time::Instant;
 
 pub enum StmState<N, M> {
@@ -42,9 +42,10 @@ pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    sc_dyn: StmState<Spacecraft<'a, OrbitalDynamics<'a>>, Spacecraft<'a, OrbitalDynamicsStm<'a>>>,
+    sc_dyn: Spacecraft<'a>,
+    init_state: SpacecraftState,
     pub formatter: Option<StateFormatter<'a>>,
-    pub prop_time_s: Option<f64>,
+    pub prop_time: Option<Duration>,
     pub prop_event: Option<ConditionSerde>,
     pub prop_tol: f64,
     pub name: String,
@@ -64,7 +65,8 @@ where
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
                 #[allow(unused_assignments)]
-                let mut sc_dyn_flagged = StmState::Unknown;
+                let mut sc_dyn_flagged;
+                let init_sc;
 
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
@@ -147,7 +149,12 @@ where
                     }
                     Some(init_state_sd) => {
                         let state_frame = cosm.frame(init_state_sd.frame.as_str());
-                        init_state_sd.as_state(state_frame)?
+                        let mut init = init_state_sd.as_state(state_frame)?;
+                        if stm_flag.with() {
+                            // Specify that we want to compute the STM.
+                            init.stm_identity();
+                        }
+                        init
                     }
                 };
 
@@ -178,43 +185,33 @@ where
                     if let Some(pos) = bodies.iter().position(|x| *x == init_state.frame.exb_id()) {
                         bodies.remove(pos);
                     }
-                    if stm_flag.with() {
-                        let mut sc_dyn_stm = Spacecraft::with_stm(
-                            OrbitalDynamicsStm::point_masses(init_state, &bodies, cosm),
-                            spacecraft.dry_mass,
-                        );
-                        if let Some(fuel_mass) = spacecraft.fuel_mass {
-                            sc_dyn_stm.fuel_mass = fuel_mass;
-                        }
 
-                        sc_dyn_flagged = StmState::With(sc_dyn_stm);
-                    } else {
-                        let mut sc_dyn = Spacecraft::new(
-                            OrbitalDynamics::point_masses(init_state, &bodies, cosm),
-                            spacecraft.dry_mass,
-                        );
-                        if let Some(fuel_mass) = spacecraft.fuel_mass {
-                            sc_dyn.fuel_mass = fuel_mass;
-                        }
+                    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::point_masses(
+                        init_state.frame,
+                        &bodies,
+                        cosm,
+                    ));
 
-                        sc_dyn_flagged = StmState::Without(sc_dyn);
-                    }
-                } else if stm_flag.with() {
-                    let mut sc_dyn_stm = Spacecraft::with_stm(
-                        OrbitalDynamicsStm::two_body(init_state),
+                    init_sc = SpacecraftState::new(
+                        init_state,
                         spacecraft.dry_mass,
+                        match spacecraft.fuel_mass {
+                            Some(fuel_mass) => fuel_mass,
+                            None => 0.0,
+                        },
                     );
-                    if let Some(fuel_mass) = spacecraft.fuel_mass {
-                        sc_dyn_stm.fuel_mass = fuel_mass;
-                    }
-
-                    sc_dyn_flagged = StmState::With(sc_dyn_stm);
                 } else {
-                    let mut sc_dyn =
-                        Spacecraft::new(OrbitalDynamics::two_body(init_state), spacecraft.dry_mass);
-                    if let Some(fuel_mass) = spacecraft.fuel_mass {
-                        sc_dyn.fuel_mass = fuel_mass;
-                    }
+                    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
+
+                    init_sc = SpacecraftState::new(
+                        init_state,
+                        spacecraft.dry_mass,
+                        match spacecraft.fuel_mass {
+                            Some(fuel_mass) => fuel_mass,
+                            None => 0.0,
+                        },
+                    );
+
                     // Add the force models
                     if let Some(force_models) = &spacecraft.force_models {
                         if scen.force_models.as_ref().is_none() {
@@ -240,22 +237,14 @@ where
                                         );
                                         srp.phi = smdl.phi;
                                         srp.cr = smdl.cr;
-                                        match sc_dyn_flagged {
-                                            StmState::With(ref mut sc_dyn_stm) => {
-                                                sc_dyn_stm.add_model(Box::new(srp));
-                                            }
-                                            StmState::Without(ref mut sc_dyn) => {
-                                                sc_dyn.add_model(Box::new(srp));
-                                            }
-                                            _ => panic!("should not happen"),
-                                        };
+                                        sc_dyn.add_model(Arc::new(srp));
                                     }
                                 }
                             }
                         }
                     }
 
-                    sc_dyn_flagged = StmState::Without(sc_dyn);
+                    sc_dyn_flagged = sc_dyn;
                 }
 
                 // Add the acceleration models if applicable
@@ -273,24 +262,8 @@ where
                                     let in_mem = hmdl.load();
                                     let compute_frame = cosm.frame(hmdl.frame.as_str());
 
-                                    if stm_flag.with() {
-                                        let hh =
-                                            HarmonicsDiff::from_stor(compute_frame, in_mem, &cosm);
-                                        match sc_dyn_flagged {
-                                            StmState::With(ref mut sc_dyn_stm) => {
-                                                sc_dyn_stm.orbital_dyn.add_model(Box::new(hh));
-                                            }
-                                            _ => panic!("should not happen"),
-                                        };
-                                    } else {
-                                        let hh = Harmonics::from_stor(compute_frame, in_mem, &cosm);
-                                        match sc_dyn_flagged {
-                                            StmState::Without(ref mut sc_dyn) => {
-                                                sc_dyn.orbital_dyn.add_model(Box::new(hh));
-                                            }
-                                            _ => panic!("should not happen"),
-                                        };
-                                    }
+                                    let hh = Harmonics::from_stor(compute_frame, in_mem, &cosm);
+                                    sc_dyn_flagged.orbital_dyn.add_model(Arc::new(hh));
                                 }
                             }
                         }
@@ -308,16 +281,13 @@ where
                     None
                 };
                 // Let's see if it's a relative time
-                let prop_time_s = if prop_event.is_none() {
-                    match parse_duration(prop.stop_cond.as_str()) {
-                        Ok(duration) => Some(duration.v()),
-                        Err(e) => {
-                            // Check to see if it's an Epoch
-                            match Epoch::from_str(prop.stop_cond.as_str()) {
-                                Err(_) => return Err(e),
-                                Ok(epoch) => Some(epoch - init_state.dt),
-                            }
-                        }
+                let prop_time = if prop_event.is_none() {
+                    match Duration::from_str(prop.stop_cond.as_str()) {
+                        Ok(d) => Some(d),
+                        Err(_) => match Epoch::from_str(prop.stop_cond.as_str()) {
+                            Err(e) => return Err(ParsingError::IllDefined(format!("{}", e))),
+                            Ok(epoch) => Some(epoch - init_state.dt),
+                        },
                     }
                 } else {
                     None
@@ -332,8 +302,9 @@ where
                 Ok((
                     Self {
                         sc_dyn: sc_dyn_flagged,
+                        init_state: init_sc,
                         formatter: None,
-                        prop_time_s,
+                        prop_time,
                         prop_event,
                         prop_tol,
                         name: prop_name.clone(),
@@ -344,36 +315,10 @@ where
         }
     }
 
-    pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
-        match self.sc_dyn {
-            StmState::Without(ref mut sc_dyn) => {
-                let mut p = Propagator::default(sc_dyn);
-                p.set_tolerance(self.prop_tol);
-                p
-            }
-            _ => panic!("these dynamics are defined with stm. Use stm_propagator instead"),
-        }
-    }
-
-    pub fn stm_propagator(
-        &mut self,
-    ) -> Propagator<Spacecraft<'a, OrbitalDynamicsStm<'a>>, RSSStepPV> {
-        match self.sc_dyn {
-            StmState::With(ref mut sc_dyn) => {
-                let mut p = Propagator::default(sc_dyn);
-                p.set_tolerance(self.prop_tol);
-                p
-            }
-            _ => panic!("these dynamics are defined without stm. Use propagator instead"),
-        }
-    }
-
-    pub fn state(&self) -> SpacecraftState {
-        match &self.sc_dyn {
-            StmState::With(sc_dyn) => sc_dyn.state(),
-            StmState::Without(sc_dyn) => sc_dyn.state(),
-            _ => panic!("only call state() on an initialized MDProcess"),
-        }
+    pub fn propagator(&mut self) -> PropInstance<Spacecraft<'a>, RSSStepPV> {
+        let mut p = Propagator::default(&self.sc_dyn);
+        p.set_tolerance(self.prop_tol);
+        p.with(self.init_state)
     }
 
     pub fn execute(mut self) -> Result<(), NyxError> {
@@ -386,7 +331,7 @@ where
         mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>>,
     ) -> Result<(), NyxError> {
         // Get the prop time before the mutable ref of the propagator
-        let maybe_prop_time = self.prop_time_s;
+        let maybe_prop_time = self.prop_time;
         let maybe_prop_event = self.prop_event.clone();
 
         // Build the propagator

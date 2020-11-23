@@ -52,7 +52,7 @@ impl<'a> OrbitalDynamics<'a> {
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
-    pub fn two_body(state: Orbit) -> Self {
+    pub fn two_body() -> Self {
         Self {
             // state,
             // relative_time: 0.0,

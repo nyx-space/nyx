@@ -10,6 +10,8 @@ use crate::dimensions::{
 };
 use dynamics::Hyperdual;
 // use crate::od::Estimable;
+use crate::time::TimeUnit;
+use crate::TimeTagged;
 use celestia::SpacecraftState;
 use errors::NyxError;
 use std::sync::Arc;
@@ -23,7 +25,7 @@ const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edi
 #[derive(Clone)]
 pub struct Spacecraft<'a> {
     pub orbital_dyn: OrbitalDynamics<'a>,
-    pub force_models: Vec<Arc<dyn ForceModel>>,
+    pub force_models: Vec<Arc<dyn ForceModel + 'a>>,
     pub ctrl: Option<Arc<dyn ThrustControl + 'a>>,
     pub decrement_mass: bool,
 }
@@ -50,7 +52,7 @@ impl<'a> Spacecraft<'a> {
         }
     }
 
-    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel>) {
+    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel + 'a>) {
         self.force_models.push(force_model);
     }
 }
@@ -207,7 +209,17 @@ impl<'a> Dynamics for Spacecraft<'a>
         // Call the EOMs
         let mut total_mass = ctx.dry_mass;
         let radius = state_vec.fixed_rows::<U3>(0).into_owned();
-        let osc_sc = ctx.ctor_from(delta_t_s, &d_x);
+
+        // Recreate the osculating state.
+        let mut osc_sc = ctx;
+        osc_sc.set_epoch(ctx.epoch() + delta_t_s * TimeUnit::Second);
+        osc_sc.orbit.x = orb_state[0];
+        osc_sc.orbit.y = orb_state[1];
+        osc_sc.orbit.z = orb_state[2];
+        osc_sc.orbit.vx = orb_state[3];
+        osc_sc.orbit.vy = orb_state[4];
+        osc_sc.orbit.vz = orb_state[5];
+
         for model in &self.force_models {
             // let model_frc = model.dual_eom(delta_t, &radius, &osc_sc)? / total_mass;
             let (model_frc, model_grad) = model.dual_eom(delta_t_s, &radius, &osc_sc)?;

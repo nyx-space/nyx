@@ -1008,8 +1008,19 @@ pub struct SpacecraftState {
     pub orbit: Orbit,
     pub dry_mass: f64,
     pub fuel_mass: f64,
-    pub stm: Option<Matrix6<f64>>,
+    // pub stm: Option<Matrix6<f64>>, // TODO: Remove this STM, we're using the orbit's STM
     pub thruster: Option<Thruster>,
+}
+
+impl SpacecraftState {
+    pub fn new(orbit: Orbit, dry_mass: f64, fuel_mass: f64) -> Self {
+        Self {
+            orbit,
+            dry_mass,
+            fuel_mass,
+            thruster: None,
+        }
+    }
 }
 
 impl PartialEq for SpacecraftState {

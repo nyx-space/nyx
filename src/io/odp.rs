@@ -11,8 +11,9 @@ use crate::od::ranging::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
-use crate::time::SECONDS_PER_DAY;
+use crate::time::{Duration, TimeUnit, SECONDS_PER_DAY};
 use crate::SpacecraftState;
+use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
 
@@ -200,17 +201,23 @@ impl<'a> OdpScenario<'a> {
                                 ));
                             }
                             // Disable SNC if there is more than 120 seconds between two measurements
-                            let disable_time_s = match &odp_seq.snc_disable {
+                            let disable_time = match &odp_seq.snc_disable {
                                 None => {
                                     warn!("No SNC disable time specified, assuming 120 seconds");
-                                    120.0
+                                    2 * TimeUnit::Minute
                                 }
-                                Some(snd_disable_dt) => parse_duration(snd_disable_dt)?.v(),
+                                // Some(snd_disable_dt) => parse_duration(snd_disable_dt)?.v(),
+                                Some(snc_disable_dt) => match Duration::from_str(snc_disable_dt) {
+                                    Ok(d) => d,
+                                    Err(e) => {
+                                        return Err(ParsingError::IllDefined(format!("{}", e)))
+                                    }
+                                },
                             };
 
                             // Build the process noise
                             let process_noise = match &odp_seq.snc_decay {
-                                None => SNC3::from_diagonal(disable_time_s, snc),
+                                None => SNC3::from_diagonal(disable_time, snc),
                                 Some(decay_str) => {
                                     if decay_str.len() != 3 {
                                         return Err(ParsingError::OD(
@@ -221,7 +228,7 @@ impl<'a> OdpScenario<'a> {
                                     for (i, ds) in decay_str.iter().enumerate() {
                                         scn_decay_s[i] = parse_duration(ds)?.v();
                                     }
-                                    SNC3::with_decay(disable_time_s, snc, &scn_decay_s)
+                                    SNC3::with_decay(disable_time, snc, &scn_decay_s)
                                 }
                             };
 
