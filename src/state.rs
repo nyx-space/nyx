@@ -1,8 +1,7 @@
 use crate::celestia::{Frame, Orbit, SpacecraftState};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{
-    DefaultAllocator, DimName, Matrix3, Matrix6, MatrixN, Vector1, Vector3, Vector6, VectorN, U3,
-    U42, U43, U6, U7,
+    DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, VectorN, U42, U43, U6, U7,
 };
 use crate::errors::NyxError;
 use crate::time::{Epoch, TimeUnit};
@@ -19,9 +18,9 @@ pub trait TimeTagged {
 
 /// A trait for generate propagation and estimation state.
 /// The first parameter is the size of the state, the second is the size of the propagated state including STM and extra items.
-pub trait State<S: DimName, P:DimName>:
+pub trait State<S: DimName, P: DimName>:
     TimeTagged
-    // + Add<VectorN<f64, S>, Output = Self>
+    + Add<VectorN<f64, S>, Output = Self>
     + Copy
     + Clone
     + PartialEq
@@ -272,6 +271,23 @@ impl State<U6, U42> for Orbit {
     }
 }
 
+impl Add<VectorN<f64, U6>> for Orbit {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: VectorN<f64, U6>) -> Self {
+        let mut me = self;
+        me.x += other[0];
+        me.y += other[1];
+        me.z += other[2];
+        me.vx += other[3];
+        me.vy += other[4];
+        me.vz += other[5];
+
+        me
+    }
+}
+
 // impl Add<VectorN<f64, U42>> for Orbit {
 //     type Output = Self;
 
@@ -302,7 +318,6 @@ impl State<U7, U43> for SpacecraftState {
             orbit: <Orbit as State<U6, U42>>::zeros(),
             dry_mass: 0.0,
             fuel_mass: 0.0,
-            stm: None,
             thruster: None,
         }
     }
@@ -330,6 +345,71 @@ impl State<U7, U43> for SpacecraftState {
             Some(stm) => Ok(stm),
             None => Err(NyxError::StateTransitionMatrixUnset),
         }
+    }
+}
+
+impl Add<VectorN<f64, U7>> for SpacecraftState {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: VectorN<f64, U7>) -> Self {
+        let mut me = self;
+        me.orbit.x += other[0];
+        me.orbit.y += other[1];
+        me.orbit.z += other[2];
+        me.orbit.vx += other[3];
+        me.orbit.vy += other[4];
+        me.orbit.vz += other[5];
+        me.fuel_mass += other[6];
+
+        me
+    }
+}
+
+/// Allows estimating the orbit of a spacecraft state only
+impl State<U6, U42> for SpacecraftState {
+    fn zeros() -> Self {
+        Self {
+            orbit: <Orbit as State<U6, U42>>::zeros(),
+            dry_mass: 0.0,
+            fuel_mass: 0.0,
+            thruster: None,
+        }
+    }
+
+    fn as_vector(&self) -> Result<VectorN<f64, U42>, NyxError> {
+        self.orbit.as_vector()
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U42>) -> Result<(), NyxError> {
+        self.set_epoch(epoch);
+        let orbit_vec = vector.fixed_rows::<U42>(0).into_owned();
+        self.orbit.set(epoch, &orbit_vec);
+        Ok(())
+    }
+
+    fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
+        match self.orbit.stm {
+            Some(stm) => Ok(stm),
+            None => Err(NyxError::StateTransitionMatrixUnset),
+        }
+    }
+}
+
+impl Add<VectorN<f64, U6>> for SpacecraftState {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: VectorN<f64, U6>) -> Self {
+        let mut me = self;
+        me.orbit.x += other[0];
+        me.orbit.y += other[1];
+        me.orbit.z += other[2];
+        me.orbit.vx += other[3];
+        me.orbit.vy += other[4];
+        me.orbit.vz += other[5];
+
+        me
     }
 }
 

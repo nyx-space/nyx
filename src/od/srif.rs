@@ -15,20 +15,22 @@ use crate::State;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
-pub struct SRIF<S, A, M, T>
+pub struct SRIF<S, P, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
-    T: State<S>,
+    P: DimName,
+    T: State<S, P>,
     DefaultAllocator: Allocator<f64, S>
+        + Allocator<f64, P>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, S, S>
         + Allocator<f64, A, A>,
 {
     /// The previous estimate used in the KF computations.
-    pub prev_estimate: IfEstimate<S, T>,
+    pub prev_estimate: IfEstimate<S, P, T>,
     /// Sets the Measurement noise (usually noted R)
     pub inv_measurement_noise: MatrixMN<f64, M, M>,
     /// Sets the process noise (usually noted Q) in the frame of the estimated state
@@ -46,13 +48,15 @@ where
     covar_fmt: CovarFormat, // Idem
 }
 
-impl<S, A, M, T> SRIF<S, A, M, T>
+impl<S, P, A, M, T> SRIF<S, P, A, M, T>
 where
     S: DimName + DimNameAdd<M> + DimMin<M>,
     A: DimName,
+    P: DimName,
     M: DimName + DimNameAdd<S>,
-    T: State<S>,
+    T: State<S, P>,
     DefaultAllocator: Allocator<f64, S>
+        + Allocator<f64, P>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, DimNameSum<S, M>, S>
@@ -61,7 +65,7 @@ where
 {
     /// Initializes this KF with an initial estimate and measurement noise.
     pub fn initialize(
-        initial_estimate: IfEstimate<S, T>,
+        initial_estimate: IfEstimate<S, P, T>,
         process_noise: MatrixMN<f64, A, A>,
         measurement_noise: MatrixMN<f64, M, M>,
         process_noise_dt: Option<Duration>,
@@ -89,13 +93,15 @@ where
     }
 }
 
-impl<S, M, T> SRIF<S, U1, M, T>
+impl<S, P, M, T> SRIF<S, P, U1, M, T>
 where
     S: DimName,
+    P: DimName,
     M: DimName,
-    T: State<S>,
+    T: State<S, P>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
+        + Allocator<f64, P>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, S, M>
@@ -106,7 +112,7 @@ where
 {
     /// Initializes this KF without SNC
     pub fn no_snc(
-        initial_estimate: IfEstimate<S, T>,
+        initial_estimate: IfEstimate<S, P, T>,
         measurement_noise: MatrixMN<f64, M, M>,
     ) -> Self {
         let inv_measurement_noise = measurement_noise
@@ -132,15 +138,17 @@ where
     }
 }
 
-impl<S, A, M, T> Filter<S, A, M, T> for SRIF<S, A, M, T>
+impl<S, P, A, M, T> Filter<S, P, A, M, T> for SRIF<S, P, A, M, T>
 where
     S: DimName + DimNameAdd<M> + DimNameAdd<S> + DimNameAdd<U1> + DimMin<U1>,
     A: DimName,
+    P: DimName,
     M: DimName + DimNameAdd<S> + DimNameAdd<M> + DimNameAdd<U1>,
     DimNameSum<S, M>: DimMin<DimNameSum<S, U1>>,
-    T: State<S>,
+    T: State<S, P>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
+        + Allocator<f64, P>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -157,7 +165,7 @@ where
         + Allocator<f64, A, S>
         + Allocator<f64, S, U1>,
 {
-    type Estimate = IfEstimate<S, T>;
+    type Estimate = IfEstimate<S, P, T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {

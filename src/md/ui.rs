@@ -43,7 +43,7 @@ where
     DefaultAllocator: Allocator<f64, U6>,
 {
     sc_dyn: Spacecraft<'a>,
-    init_state: SpacecraftState,
+    pub init_state: SpacecraftState,
     pub formatter: Option<StateFormatter<'a>>,
     pub prop_time: Option<Duration>,
     pub prop_event: Option<ConditionSerde>,

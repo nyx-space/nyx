@@ -53,7 +53,7 @@ pub struct ODProcess<
     T: EkfTrigger,
     A: DimName,
     // S: D::StateType,
-    K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+    K: Filter<D::StateSize, D::PropVecSize, A, Msr::MeasurementSize, D::StateType>,
     // MsrIn,
 > where
     DefaultAllocator: Allocator<f64, D::StateSize>
@@ -95,7 +95,7 @@ impl<
         T: EkfTrigger,
         A: DimName,
         // S: State<D::StateSize>,
-        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+        K: Filter<D::StateSize, D::PropVecSize, A, Msr::MeasurementSize, D::StateType>,
         // MsrIn,
     > ODProcess<'a, D, E, Msr, N, T, A, K>
 where
@@ -107,6 +107,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, D::StateSize>
         + Allocator<f64, D::StateSize, Msr::MeasurementSize>
         + Allocator<f64, D::StateSize, D::StateSize>
+        + Allocator<f64, D::PropVecSize>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, D::StateSize, A>
@@ -385,12 +386,14 @@ where
                                             }
                                         }
                                         if self.kf.is_extended() {
-                                            self.prop.dynamics.set_estimated_state(
-                                                self.prop
-                                                    .dynamics
-                                                    .extract_estimated_state(&nominal_state)
-                                                    + est.state_deviation(),
-                                            );
+                                            self.prop.state =
+                                                self.prop.state + est.state_deviation();
+                                            // self.prop.dynamics.set_estimated_state(
+                                            //     self.prop
+                                            //         .dynamics
+                                            //         .extract_estimated_state(&nominal_state)
+                                            //         + est.state_deviation(),
+                                            // );
                                         }
                                         self.estimates.push(est);
                                         self.residuals.push(res);
@@ -446,16 +449,17 @@ where
 
         while let Ok(nominal_state) = rx.try_recv() {
             // Update the STM of the KF (needed between each measurement or time update)
-            let stm = self.prop.dynamics.extract_stm(&nominal_state);
-            self.kf.update_stm(stm);
+            // let stm = self.prop.dynamics.extract_stm(&nominal_state);
+            self.kf.update_stm(nominal_state.stm()?);
             info!("final time update {:?}", nominal_state.epoch());
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
                     if self.kf.is_extended() {
-                        let est_state = est.state_deviation().clone();
-                        self.prop.dynamics.set_estimated_state(
-                            self.prop.dynamics.extract_estimated_state(&nominal_state) + est_state,
-                        );
+                        // let est_state = est.state_deviation().clone();
+                        self.prop.state = self.prop.state + est.state_deviation();
+                        // self.prop.dynamics.set_estimated_state(
+                        //     self.prop.dynamics.extract_estimated_state(&nominal_state) + est_state,
+                        // );
                     }
                     self.estimates.push(est);
                 }
@@ -469,17 +473,18 @@ where
 
 impl<
         'a,
-        D: Dynamics<StateSize = Msr::StateSize>,
+        // D: Dynamics<StateSize = Msr::StateSize>,
+        D: Dynamics,
         E: ErrorCtrl,
         Msr: Measurement,
         N: MeasurementDevice<D::StateType, Msr>,
         A: DimName,
-        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+        K: Filter<D::StateSize, D::PropVecSize, A, Msr::MeasurementSize, D::StateType>,
         // MsrIn,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K>
 where
-    D::StateType: State<Msr::StateSize>,
     DefaultAllocator: Allocator<f64, D::StateSize>
+        + Allocator<f64, D::PropVecSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
@@ -499,6 +504,7 @@ where
         simultaneous_msr: bool,
         num_expected_msr: usize,
     ) -> Self {
+        let init_state = prop.state();
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -509,11 +515,13 @@ where
             estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: CkfTrigger {},
+            init_state,
             _marker: PhantomData::<A>,
         }
     }
 
     pub fn default_ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
+        let init_state = prop.state();
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -524,16 +532,18 @@ where
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},
+            init_state,
             _marker: PhantomData::<A>,
         }
     }
 }
 /// A trait detailing when to switch to from a CKF to an EKF
 pub trait EkfTrigger {
-    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
+    fn enable_ekf<S, P, E, T: State<S, P>>(&mut self, est: &E) -> bool
     where
         S: DimName,
-        E: Estimate<S, T>,
+        P: DimName,
+        E: Estimate<S, P, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
 
     /// Return true if the filter should not longer be as extended.
@@ -548,10 +558,11 @@ pub trait EkfTrigger {
 pub struct CkfTrigger;
 
 impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<S, E, T: State<S>>(&mut self, _est: &E) -> bool
+    fn enable_ekf<S, P, E, T: State<S, P>>(&mut self, _est: &E) -> bool
     where
         S: DimName,
-        E: Estimate<S, T>,
+        P: DimName,
+        E: Estimate<S, P, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
         false
@@ -562,7 +573,7 @@ impl EkfTrigger for CkfTrigger {
 pub struct StdEkfTrigger {
     pub num_msrs: usize,
     /// In seconds!
-    pub disable_time: f64,
+    pub disable_time: Duration,
     /// Set to the sigma number needed to switch to the EKF (cf. 68–95–99.7 rule). If number is negative, this is ignored.
     pub within_sigma: f64,
     prev_msr_dt: Option<Epoch>,
@@ -570,7 +581,7 @@ pub struct StdEkfTrigger {
 }
 
 impl StdEkfTrigger {
-    pub fn new(num_msrs: usize, disable_time: f64) -> Self {
+    pub fn new(num_msrs: usize, disable_time: Duration) -> Self {
         Self {
             num_msrs,
             disable_time,
@@ -582,11 +593,12 @@ impl StdEkfTrigger {
 }
 
 impl EkfTrigger for StdEkfTrigger {
-    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
+    fn enable_ekf<S, P, E, T: State<S, P>>(&mut self, est: &E) -> bool
     where
         S: DimName,
-        E: Estimate<S, T>,
-        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+        P: DimName,
+        E: Estimate<S, P, T>,
+        DefaultAllocator: Allocator<f64, S> + Allocator<f64, P> + Allocator<f64, S, S>,
     {
         if !est.predicted() {
             // If this isn't a prediction, let's update the previous measurement time

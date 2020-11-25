@@ -1,7 +1,7 @@
 extern crate csv;
 
 pub use crate::celestia::*;
-use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U6};
+use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U42, U6};
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
@@ -11,7 +11,7 @@ use crate::od::ranging::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
-use crate::time::{Duration, TimeUnit, SECONDS_PER_DAY};
+use crate::time::{Duration, TimeUnit};
 use crate::SpacecraftState;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
@@ -21,8 +21,8 @@ pub struct OdpScenario<'a> {
     truth: MDProcess<'a>,
     nav: MDProcess<'a>,
     ekf_msr_trigger: usize,
-    ekf_disable_time: f64,
-    kf: KF<U6, U3, U2, SpacecraftState>,
+    ekf_disable_time: Duration,
+    kf: KF<U6, U42, U3, U2, SpacecraftState>,
     stations: Vec<GroundStation<'a>>,
     formatter: Option<NavSolutionFormatter<'a>>,
 }
@@ -183,7 +183,7 @@ impl<'a> OdpScenario<'a> {
                             &odp_seq.initial_estimate
                         )));
                     }
-                    let mut init_sc_state = md.state();
+                    let mut init_sc_state = md.init_state;
                     init_sc_state.orbit = est_init_state;
                     let initial_estimate = KfEstimate::from_covar(init_sc_state, cov);
                     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(
@@ -270,7 +270,7 @@ impl<'a> OdpScenario<'a> {
                         },
                         ekf_disable_time: match &odp_seq.ekf_disable_time {
                             Some(val) => *val,
-                            None => 3600.0, // defaults to one hour
+                            None => 1 * TimeUnit::Hour, // defaults to one hour
                         },
                         stations,
                         formatter,
@@ -285,7 +285,7 @@ impl<'a> OdpScenario<'a> {
     /// Will generate the measurements and run the filter.
     pub fn execute(mut self) -> Result<(), NyxError> {
         // Generate the measurements.
-        let prop_time = self.truth.prop_time_s.unwrap();
+        let prop_time = self.truth.prop_time.unwrap();
 
         // Create the output file for the truth
         let mut maybe_wtr = match &self.truth.formatter {
@@ -301,7 +301,7 @@ impl<'a> OdpScenario<'a> {
         };
 
         let mut truth_prop = self.truth.propagator();
-        truth_prop.set_step(10.0, true);
+        truth_prop.set_step(10.0 * TimeUnit::Second, true);
 
         // Set up the channels
         let (tx, rx) = channel();
@@ -310,11 +310,7 @@ impl<'a> OdpScenario<'a> {
         let mut initial_state = Some(truth_prop.state());
 
         // Generate the measurements
-        info!(
-            "Generating measurements over {} seconds (~ {:.3} days)",
-            prop_time,
-            prop_time / SECONDS_PER_DAY
-        );
+        info!("Generating measurements over {} ", prop_time);
 
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state());
@@ -361,8 +357,8 @@ impl<'a> OdpScenario<'a> {
         );
 
         // Build the ODP
-        let mut nav = self.nav.stm_propagator();
-        nav.set_step(10.0, true);
+        let mut nav = self.nav.propagator();
+        nav.set_step(10.0 * TimeUnit::Second, true);
 
         let kf = self.kf;
         let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);

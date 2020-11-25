@@ -6,7 +6,7 @@ use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::celestia::{Frame, Orbit};
 use crate::propagators::events::{EventKind, OrbitalEvent, SCEvent, StopCondition};
-use crate::time::Epoch;
+use crate::time::{Duration, Epoch};
 use crate::SpacecraftState;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -368,7 +368,7 @@ pub struct OdpSerde {
     /// Set the number of measurements to switch to an EKF
     pub ekf_msr_trigger: Option<usize>,
     /// Set the acceptable time between measurements
-    pub ekf_disable_time: Option<f64>,
+    pub ekf_disable_time: Option<Duration>,
     /// An optional output of a NavSolution
     pub output: Option<String>,
 }
@@ -643,7 +643,7 @@ fn test_od_scenario() {
         snc_decay = ["20 * min", "20 min", "15 min"]
         measurements = "msr_sim"  # Or provide a file name
         ekf_msr_trigger = 30
-        ekf_disable_time = 3600  # If no measurements for an hour, disable the EKF
+        ekf_disable_time = 3600 s  # If no measurements for an hour, disable the EKF
         output = "estimate_csv"
 
         [output.estimate_csv]
