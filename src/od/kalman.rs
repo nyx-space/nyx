@@ -15,16 +15,14 @@ use crate::time::TimeUnit;
 /// T: Type of state
 /// P: Propagated vector size
 #[derive(Debug, Clone)]
-pub struct KF<S, P, A, M, T>
+pub struct KF<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
-    P: DimName,
-    T: State<S, P>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
-        + Allocator<f64, P>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -34,7 +32,7 @@ where
         + Allocator<f64, A, S>,
 {
     /// The previous estimate used in the KF computations.
-    pub prev_estimate: KfEstimate<S, P, T>,
+    pub prev_estimate: KfEstimate<S, T>,
     /// Sets the Measurement noise (usually noted R)
     pub measurement_noise: MatrixMN<f64, M, M>,
     /// A sets of process noise (usually noted Q), must be ordered chronologically
@@ -51,16 +49,14 @@ where
     prev_used_snc: usize,
 }
 
-impl<S, P, A, M, T> KF<S, P, A, M, T>
+impl<S, A, M, T> KF<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
-    P: DimName,
-    T: State<S, P>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
-        + Allocator<f64, P>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -72,7 +68,7 @@ where
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
     pub fn new(
-        initial_estimate: KfEstimate<S, P, T>,
+        initial_estimate: KfEstimate<S, T>,
         process_noise: SNC<A>,
         measurement_noise: MatrixMN<f64, M, M>,
     ) -> Self {
@@ -108,7 +104,7 @@ where
     /// WARNING: SNCs MUST be ordered chronologically! They will be selected automatically by walking
     /// the list of SNCs backward until one can be applied!
     pub fn with_sncs(
-        initial_estimate: KfEstimate<S, P, T>,
+        initial_estimate: KfEstimate<S, T>,
         process_noises: Vec<SNC<A>>,
         measurement_noise: MatrixMN<f64, M, M>,
     ) -> Self {
@@ -142,15 +138,13 @@ where
     }
 }
 
-impl<S, P, M, T> KF<S, P, U3, M, T>
+impl<S, M, T> KF<S, U3, M, T>
 where
     S: DimName,
-    P: DimName,
     M: DimName,
-    T: State<S, P>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
-        + Allocator<f64, P>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
         + Allocator<f64, S, M>
@@ -161,7 +155,7 @@ where
 {
     /// Initializes this KF without SNC
     pub fn no_snc(
-        initial_estimate: KfEstimate<S, P, T>,
+        initial_estimate: KfEstimate<S, T>,
         measurement_noise: MatrixMN<f64, M, M>,
     ) -> Self {
         let epoch_fmt = initial_estimate.epoch_fmt;
@@ -182,16 +176,14 @@ where
     }
 }
 
-impl<S, P, A, M, T> Filter<S, P, A, M, T> for KF<S, P, A, M, T>
+impl<S, A, M, T> Filter<S, A, M, T> for KF<S, A, M, T>
 where
     S: DimName,
     A: DimName,
     M: DimName,
-    P: DimName,
-    T: State<S, P>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
-        + Allocator<f64, P>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -201,7 +193,7 @@ where
         + Allocator<f64, S, A>
         + Allocator<f64, A, S>,
 {
-    type Estimate = KfEstimate<S, P, T>;
+    type Estimate = KfEstimate<S, T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {

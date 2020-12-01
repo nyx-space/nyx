@@ -2,7 +2,7 @@ extern crate serde;
 
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
-use crate::time::{Duration, Epoch};
+use crate::time::Epoch;
 use crate::{State, TimeTagged};
 pub use dynamics::{Dynamics, NyxError};
 
@@ -82,16 +82,14 @@ pub mod snc;
 // }
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
-pub trait Filter<S, P, A, M, T>
+pub trait Filter<S, A, M, T>
 where
     S: DimName,
-    P: DimName,
     A: DimName,
     M: DimName,
-    T: State<S, P>,
+    T: State<S>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
-        + Allocator<f64, P>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -100,7 +98,7 @@ where
         + Allocator<f64, S, A>
         + Allocator<f64, A, S>,
 {
-    type Estimate: estimate::Estimate<S, P, T>;
+    type Estimate: estimate::Estimate<S, T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate;
@@ -173,7 +171,6 @@ where
     Self: Sized,
     Msr: Measurement,
     DefaultAllocator: Allocator<f64, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>,
 {

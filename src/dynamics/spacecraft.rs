@@ -1,13 +1,7 @@
 use super::orbital::OrbitalDynamics;
-use super::propulsion::Propulsion;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::dimension::{DimNameAdd, DimNameSum};
-use crate::dimensions::{
-    DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, Vector3, VectorN, U1, U3, U4, U42, U43,
-    U44, U6, U7,
-};
+use crate::dimensions::{DimName, MatrixN, Vector1, Vector3, VectorN, U3, U4, U42, U43, U6, U7};
 use dynamics::Hyperdual;
 // use crate::od::Estimable;
 use crate::time::TimeUnit;
@@ -194,7 +188,7 @@ impl<'a> Dynamics for Spacecraft<'a>
         ctx: &Self::StateType,
     ) -> Result<(VectorN<f64, Self::StateSize>, MatrixN<f64, Self::StateSize>), NyxError> {
         let pos_vel = state_vec.fixed_rows::<U6>(0).into_owned();
-        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(&pos_vel, &ctx.orbit)?;
+        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &pos_vel, &ctx.orbit)?;
         // Rebuild the appropriately sized state and STM.
         let mut d_x = VectorN::<f64, Self::StateSize>::from_iterator(
             orb_state.iter().chain(Vector1::new(0.0).iter()).cloned(),
@@ -222,7 +216,7 @@ impl<'a> Dynamics for Spacecraft<'a>
 
         for model in &self.force_models {
             // let model_frc = model.dual_eom(delta_t, &radius, &osc_sc)? / total_mass;
-            let (model_frc, model_grad) = model.dual_eom(delta_t_s, &radius, &osc_sc)?;
+            let (model_frc, model_grad) = model.dual_eom(&radius, &osc_sc)?;
             for i in 0..U3::dim() {
                 d_x[i + 3] += model_frc[i] / total_mass;
                 for j in 1..U4::dim() {

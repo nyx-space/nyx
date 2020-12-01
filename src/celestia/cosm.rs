@@ -22,7 +22,6 @@ use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::Matrix3;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;

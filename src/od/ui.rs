@@ -48,15 +48,16 @@ pub struct ODProcess<
     // D: Dynamics<StateSize = Msr::StateSize>,
     D: Dynamics,
     E: ErrorCtrl,
-    Msr: Measurement,
+    Msr: Measurement<StateSize = D::StateSize>,
     N: MeasurementDevice<D::StateType, Msr>,
     T: EkfTrigger,
     A: DimName,
     // S: D::StateType,
-    K: Filter<D::StateSize, D::PropVecSize, A, Msr::MeasurementSize, D::StateType>,
+    K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
     // MsrIn,
 > where
     DefaultAllocator: Allocator<f64, D::StateSize>
+        + Allocator<f64, D::PropVecSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
@@ -90,12 +91,12 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement,
+        Msr: Measurement<StateSize = D::StateSize>,
         N: MeasurementDevice<D::StateType, Msr>,
         T: EkfTrigger,
         A: DimName,
         // S: State<D::StateSize>,
-        K: Filter<D::StateSize, D::PropVecSize, A, Msr::MeasurementSize, D::StateType>,
+        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
         // MsrIn,
     > ODProcess<'a, D, E, Msr, N, T, A, K>
 where
@@ -476,10 +477,10 @@ impl<
         // D: Dynamics<StateSize = Msr::StateSize>,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement,
+        Msr: Measurement<StateSize = D::StateSize>,
         N: MeasurementDevice<D::StateType, Msr>,
         A: DimName,
-        K: Filter<D::StateSize, D::PropVecSize, A, Msr::MeasurementSize, D::StateType>,
+        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
         // MsrIn,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K>
 where
@@ -539,11 +540,10 @@ where
 }
 /// A trait detailing when to switch to from a CKF to an EKF
 pub trait EkfTrigger {
-    fn enable_ekf<S, P, E, T: State<S, P>>(&mut self, est: &E) -> bool
+    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
     where
         S: DimName,
-        P: DimName,
-        E: Estimate<S, P, T>,
+        E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
 
     /// Return true if the filter should not longer be as extended.
@@ -558,11 +558,10 @@ pub trait EkfTrigger {
 pub struct CkfTrigger;
 
 impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<S, P, E, T: State<S, P>>(&mut self, _est: &E) -> bool
+    fn enable_ekf<S, E, T: State<S>>(&mut self, _est: &E) -> bool
     where
         S: DimName,
-        P: DimName,
-        E: Estimate<S, P, T>,
+        E: Estimate<S, T>,
         DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
         false
@@ -593,12 +592,11 @@ impl StdEkfTrigger {
 }
 
 impl EkfTrigger for StdEkfTrigger {
-    fn enable_ekf<S, P, E, T: State<S, P>>(&mut self, est: &E) -> bool
+    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
     where
         S: DimName,
-        P: DimName,
-        E: Estimate<S, P, T>,
-        DefaultAllocator: Allocator<f64, S> + Allocator<f64, P> + Allocator<f64, S, S>,
+        E: Estimate<S, T>,
+        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
     {
         if !est.predicted() {
             // If this isn't a prediction, let's update the previous measurement time

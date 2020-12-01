@@ -1,7 +1,7 @@
 extern crate csv;
 
 pub use crate::celestia::*;
-use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U42, U6};
+use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U6};
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
@@ -12,7 +12,7 @@ use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
 use crate::time::{Duration, TimeUnit};
-use crate::SpacecraftState;
+use crate::{SpacecraftState, State};
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -22,7 +22,7 @@ pub struct OdpScenario<'a> {
     nav: MDProcess<'a>,
     ekf_msr_trigger: usize,
     ekf_disable_time: Duration,
-    kf: KF<U6, U42, U3, U2, SpacecraftState>,
+    kf: KF<U6, U3, U2, SpacecraftState>,
     stations: Vec<GroundStation<'a>>,
     formatter: Option<NavSolutionFormatter<'a>>,
 }

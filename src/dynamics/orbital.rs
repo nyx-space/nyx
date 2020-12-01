@@ -3,10 +3,8 @@ use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Floa
 use super::{AccelModel, Dynamics, NyxError};
 use crate::celestia::{Cosm, Frame, LTCorr, Orbit};
 use crate::dimensions::{
-    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN,
-    U3, U36, U4, U42, U6, U7,
+    DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
 };
-use crate::time::Epoch;
 use crate::{State, TimeTagged};
 // use od::Estimable;
 use std::f64;
@@ -166,7 +164,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.dual_eom(delta_t_s, &radius, ctx)?;
+            let (model_acc, model_grad) = model.dual_eom(&radius, ctx)?;
             for i in 0..U3::dim() {
                 fx[i + 3] += model_acc[i];
                 for j in 1..U4::dim() {

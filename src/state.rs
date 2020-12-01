@@ -18,7 +18,7 @@ pub trait TimeTagged {
 
 /// A trait for generate propagation and estimation state.
 /// The first parameter is the size of the state, the second is the size of the propagated state including STM and extra items.
-pub trait State<S: DimName, P: DimName>:
+pub trait State<S: DimName>:
     TimeTagged
     + Add<VectorN<f64, S>, Output = Self>
     + Copy
@@ -28,15 +28,16 @@ pub trait State<S: DimName, P: DimName>:
     + fmt::LowerExp
 where
     Self: Sized,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, P>,
+    DefaultAllocator: Allocator<f64, S>,
 {
+    type PropVecSize: DimName;
     /// Initialize an empty state
     fn zeros() -> Self;
 
     /// Return this state as a vector for the propagation/estimation
-    fn as_vector(&self) -> Result<VectorN<f64, P>, NyxError>
+    fn as_vector(&self) -> Result<VectorN<f64, Self::PropVecSize>, NyxError>
     where
-        DefaultAllocator: Allocator<f64, P>;
+        DefaultAllocator: Allocator<f64, Self::PropVecSize>;
 
     /// Return this state as a vector for the propagation/estimation
     fn stm(&self) -> Result<MatrixN<f64, S>, NyxError>
@@ -44,11 +45,20 @@ where
         DefaultAllocator: Allocator<f64, S, S>;
 
     /// Set this state
-    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, P>) -> Result<(), NyxError>;
+    fn set(
+        &mut self,
+        epoch: Epoch,
+        vector: &VectorN<f64, Self::PropVecSize>,
+    ) -> Result<(), NyxError>
+    where
+        DefaultAllocator: Allocator<f64, Self::PropVecSize>;
 
     /// Reconstruct a new State from the provided delta time in seconds compared to the current state
     /// and with the provided vector.
-    fn ctor_from(self, delta_t_s: f64, vector: &VectorN<f64, P>) -> Self {
+    fn ctor_from(self, delta_t_s: f64, vector: &VectorN<f64, Self::PropVecSize>) -> Self
+    where
+        DefaultAllocator: Allocator<f64, Self::PropVecSize>,
+    {
         let mut me = self;
         me.set(me.epoch() + delta_t_s * TimeUnit::Second, vector);
         me
@@ -189,7 +199,8 @@ where
 // }
 
 /// Implementation of Orbit as a State for orbital dynamics with STM
-impl State<U6, U42> for Orbit {
+impl State<U6> for Orbit {
+    type PropVecSize = U42;
     /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
     fn zeros() -> Self {
         let frame = Frame::Celestial {
@@ -312,10 +323,11 @@ impl TimeTagged for SpacecraftState {
     }
 }
 
-impl State<U7, U43> for SpacecraftState {
+impl State<U7> for SpacecraftState {
+    type PropVecSize = U43;
     fn zeros() -> Self {
         Self {
-            orbit: <Orbit as State<U6, U42>>::zeros(),
+            orbit: Orbit::zeros(),
             dry_mass: 0.0,
             fuel_mass: 0.0,
             thruster: None,
@@ -340,9 +352,19 @@ impl State<U7, U43> for SpacecraftState {
         Ok(())
     }
 
-    fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
+    /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
+    fn stm(&self) -> Result<MatrixN<f64, U7>, NyxError> {
         match self.orbit.stm {
-            Some(stm) => Ok(stm),
+            Some(stm) => {
+                let rtn = MatrixN::<f64, U7>::zeros();
+                for i in 0..6 {
+                    for j in 0..6 {
+                        rtn[(i, j)] = stm[(i, j)];
+                    }
+                }
+                rtn[(6, 6)] = 0.0;
+                Ok(rtn)
+            }
             None => Err(NyxError::StateTransitionMatrixUnset),
         }
     }
@@ -367,10 +389,11 @@ impl Add<VectorN<f64, U7>> for SpacecraftState {
 }
 
 /// Allows estimating the orbit of a spacecraft state only
-impl State<U6, U42> for SpacecraftState {
+impl State<U6> for SpacecraftState {
+    type PropVecSize = U42;
     fn zeros() -> Self {
         Self {
-            orbit: <Orbit as State<U6, U42>>::zeros(),
+            orbit: <Orbit as State<U6>>::zeros(),
             dry_mass: 0.0,
             fuel_mass: 0.0,
             thruster: None,

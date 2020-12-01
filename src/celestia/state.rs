@@ -7,7 +7,6 @@ use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::Frame;
 use crate::dynamics::propulsion::Thruster;
-use crate::State;
 use crate::TimeTagged;
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;

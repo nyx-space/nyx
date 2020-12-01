@@ -4,7 +4,7 @@ use super::State;
 use super::{CovarFormat, EpochFormat};
 use crate::celestia::Orbit;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U42, U6};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U6};
 use crate::hifitime::Epoch;
 use crate::SpacecraftState;
 use std::cmp::PartialEq;
@@ -12,12 +12,11 @@ use std::f64::INFINITY;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
-pub trait Estimate<S, P, T: State<S, P>>
+pub trait Estimate<S, T: State<S>>
 where
     Self: Clone + PartialEq + Sized,
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, P> + Allocator<f64, S, S>,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     fn zeros(state: T) -> Self;
@@ -109,10 +108,9 @@ where
 
 /// Kalman filter Estimate
 #[derive(Debug, Clone, PartialEq)]
-pub struct KfEstimate<S, P, T: State<S, P>>
+pub struct KfEstimate<S, T: State<S>>
 where
     S: DimName,
-    P: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     /// The estimated state
@@ -133,11 +131,10 @@ where
     pub covar_fmt: CovarFormat,
 }
 
-impl<S, P, T: State<S, P>> KfEstimate<S, P, T>
+impl<S, T: State<S>> KfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S> + Allocator<f64, P>,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     pub fn from_covar(nominal_state: T, covar: MatrixMN<f64, S, S>) -> Self {
         Self {
@@ -153,10 +150,9 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> Estimate<S, P, T> for KfEstimate<S, P, T>
+impl<S, T: State<S>> Estimate<S, T> for KfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
     DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     fn zeros(nominal_state: T) -> Self {
@@ -208,15 +204,11 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> fmt::Display for KfEstimate<S, P, T>
+impl<S, T: State<S>> fmt::Display for KfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S>
-        + Allocator<f64, P>
-        + Allocator<f64, S, S>
-        + Allocator<usize, S>
-        + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let word = if self.predicted {
@@ -240,15 +232,11 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> fmt::LowerExp for KfEstimate<S, P, T>
+impl<S, T: State<S>> fmt::LowerExp for KfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S>
-        + Allocator<f64, P>
-        + Allocator<f64, S, S>
-        + Allocator<usize, S>
-        + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -259,15 +247,11 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> Serialize for KfEstimate<S, P, T>
+impl<S, T: State<S>> Serialize for KfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S>
-        + Allocator<f64, P>
-        + Allocator<f64, S, S>
-        + Allocator<usize, S>
-        + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     /// Serializes the estimate
     fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
@@ -316,11 +300,10 @@ where
 
 /// Information filter Estimate
 #[derive(Debug, Clone, PartialEq)]
-pub struct IfEstimate<S, P, T: State<S, P>>
+pub struct IfEstimate<S, T: State<S>>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, P> + Allocator<f64, S, S>,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     /// The nominal state
     pub nominal_state: T,
@@ -340,11 +323,10 @@ where
     pub covar_fmt: CovarFormat,
 }
 
-impl<S, P, T: State<S, P>> IfEstimate<S, P, T>
+impl<S, T: State<S>> IfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, P> + Allocator<f64, S, S>,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     pub fn from_covar(nominal_state: T, covar: MatrixMN<f64, S, S>) -> Self {
         let mut info_mat = covar;
@@ -385,11 +367,10 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> Estimate<S, P, T> for IfEstimate<S, P, T>
+impl<S, T: State<S>> Estimate<S, T> for IfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, P> + Allocator<f64, S, S>,
+    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
 {
     fn zeros(nominal_state: T) -> Self {
         let mut info_state = VectorN::<f64, S>::zeros();
@@ -452,15 +433,11 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> fmt::Display for IfEstimate<S, P, T>
+impl<S, T: State<S>> fmt::Display for IfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S>
-        + Allocator<f64, P>
-        + Allocator<f64, S, S>
-        + Allocator<usize, S>
-        + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.try_covar() {
@@ -487,15 +464,11 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> fmt::LowerExp for IfEstimate<S, P, T>
+impl<S, T: State<S>> fmt::LowerExp for IfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S>
-        + Allocator<f64, P>
-        + Allocator<f64, S, S>
-        + Allocator<usize, S>
-        + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.try_covar() {
@@ -511,15 +484,11 @@ where
     }
 }
 
-impl<S, P, T: State<S, P>> Serialize for IfEstimate<S, P, T>
+impl<S, T: State<S>> Serialize for IfEstimate<S, T>
 where
     S: DimName,
-    P: DimName,
-    DefaultAllocator: Allocator<f64, S>
-        + Allocator<f64, P>
-        + Allocator<f64, S, S>
-        + Allocator<usize, S>
-        + Allocator<usize, S, S>,
+    DefaultAllocator:
+        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
 {
     /// Serializes the estimate
     fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
@@ -584,16 +553,16 @@ where
 }
 
 /// A trait to store a navigation solution, can be used in conjunction with KfEstimate or IfEstimate
-pub trait NavSolution<T>: Estimate<U6, U42, T>
+pub trait NavSolution<T>: Estimate<U6, T>
 where
-    T: State<U6, U42>,
+    T: State<U6>,
 {
     fn orbital_state(&self) -> Orbit;
     /// Returns the nominal state as computed by the dynamics
     fn expected_state(&self) -> Orbit;
 }
 
-impl NavSolution<Orbit> for KfEstimate<U6, U42, Orbit> {
+impl NavSolution<Orbit> for KfEstimate<U6, Orbit> {
     fn orbital_state(&self) -> Orbit {
         self.state()
     }
@@ -602,7 +571,7 @@ impl NavSolution<Orbit> for KfEstimate<U6, U42, Orbit> {
     }
 }
 
-impl NavSolution<Orbit> for IfEstimate<U6, U42, Orbit> {
+impl NavSolution<Orbit> for IfEstimate<U6, Orbit> {
     fn orbital_state(&self) -> Orbit {
         self.state()
     }
@@ -611,7 +580,7 @@ impl NavSolution<Orbit> for IfEstimate<U6, U42, Orbit> {
     }
 }
 
-impl NavSolution<SpacecraftState> for KfEstimate<U6, U42, SpacecraftState> {
+impl NavSolution<SpacecraftState> for KfEstimate<U6, SpacecraftState> {
     fn orbital_state(&self) -> Orbit {
         self.state().orbit
     }
@@ -620,7 +589,7 @@ impl NavSolution<SpacecraftState> for KfEstimate<U6, U42, SpacecraftState> {
     }
 }
 
-impl NavSolution<SpacecraftState> for IfEstimate<U6, U42, SpacecraftState> {
+impl NavSolution<SpacecraftState> for IfEstimate<U6, SpacecraftState> {
     fn orbital_state(&self) -> Orbit {
         self.state().orbit
     }

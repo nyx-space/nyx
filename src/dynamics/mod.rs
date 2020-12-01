@@ -3,11 +3,8 @@ extern crate hyperdual;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use crate::celestia::{Orbit, SpacecraftState};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{
-    DefaultAllocator, DimName, DimNameDiff, DimNameSub, Matrix3, MatrixMN, MatrixN, Vector3,
-    VectorN, U1, U3, U7,
-};
-use crate::{time::Epoch, State};
+use crate::dimensions::{DefaultAllocator, DimName, Matrix3, MatrixN, Vector3, VectorN, U7};
+use crate::State;
 
 pub use crate::errors::NyxError;
 
@@ -24,11 +21,6 @@ pub mod orbital;
 
 /// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
 // pub mod drag;
-
-/// The angular momentum module handles all angular momentum dynamics.
-///
-/// Note that this module does not handle attitude parameters or control. Refer to the relevant modules.
-pub mod momentum;
 
 /// The spacecraft module allows for simulation of spacecraft dynamics in general, including propulsion/maneuvers.
 pub mod spacecraft;
@@ -67,7 +59,7 @@ where
     type PropVecSize: DimName;
     /// The state of the associated hyperdual state, almost always StateType + U1
     type HyperdualSize: DimName;
-    type StateType: State<Self::StateSize, Self::PropVecSize>;
+    type StateType: State<Self::StateSize, PropVecSize = Self::PropVecSize>;
 
     /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
     /// The time delta_t is in seconds PAST the context epoch. The state vector is the state which
@@ -88,6 +80,7 @@ where
     /// then the dynamics should prevent initialization with a context which has an STM defined.
     fn dual_eom(
         &self,
+        delta_t: f64,
         state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, Self::StateSize>,
         state_ctx: &Self::StateType,
     ) -> Result<(VectorN<f64, Self::StateSize>, MatrixN<f64, Self::StateSize>), NyxError>
@@ -115,7 +108,7 @@ where
         let hyperstate: VectorN<Hyperdual<f64, Self::HyperdualSize>, Self::StateSize> =
             hyperspace_from_vector(&state_vec);
 
-        let (state, grad) = self.dual_eom(&hyperstate, &state_ctx)?;
+        let (state, grad) = self.dual_eom(delta_t_s, &hyperstate, &state_ctx)?;
 
         Ok((state, grad))
     }
@@ -178,7 +171,6 @@ pub trait ForceModel: Send + Sync {
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
     fn dual_eom(
         &self,
-        delta_t_s: f64,
         radius: &Vector3<Hyperdual<f64, U7>>,
         osc_ctx: &SpacecraftState,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
@@ -195,7 +187,6 @@ pub trait AccelModel: Send + Sync {
     /// computation of the STM.
     fn dual_eom(
         &self,
-        delta_t_s: f64,
         radius: &Vector3<Hyperdual<f64, U7>>,
         osc_ctx: &Orbit,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;

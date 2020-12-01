@@ -1,7 +1,7 @@
 use super::hyperdual::Hyperdual;
-use super::{Epoch, ForceModel};
-use crate::celestia::{Cosm, Frame, Orbit, SpacecraftState};
-use crate::dimensions::{Matrix3, Vector3, U3, U7};
+use super::ForceModel;
+use crate::celestia::{Cosm, Frame, SpacecraftState};
+use crate::dimensions::{Matrix3, Vector3, U7};
 use crate::errors::NyxError;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
