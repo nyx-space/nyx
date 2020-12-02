@@ -6,6 +6,8 @@ use crate::time::Epoch;
 use crate::{State, TimeTagged};
 pub use dynamics::{Dynamics, NyxError};
 
+use std::ops::Add;
+
 use crate::io::{CovarFormat, EpochFormat};
 
 /// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.
@@ -23,8 +25,8 @@ pub mod residual;
 /// Provides some helper for filtering.
 pub mod ui;
 
-/// Provides the Square Root Information Filter
-pub mod srif;
+// / Provides the Square Root Information Filter
+// pub mod srif;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
@@ -87,6 +89,7 @@ where
     A: DimName,
     M: DimName,
     T: State,
+    // T: EstimateFrom<O>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
@@ -124,8 +127,8 @@ where
     fn measurement_update(
         &mut self,
         nominal_state: T,
-        real_obs: VectorN<f64, M>,
-        computed_obs: VectorN<f64, M>,
+        real_obs: &VectorN<f64, M>,
+        computed_obs: &VectorN<f64, M>,
     ) -> Result<(Self::Estimate, residual::Residual<M>), NyxError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)
@@ -180,10 +183,11 @@ where
 pub trait EstimateFrom<O: State>
 where
     Self: State,
+    DefaultAllocator: Allocator<f64, <O as State>::Size>
+        + Allocator<f64, <O as State>::Size, <O as State>::Size>
+        + Allocator<f64, Self::Size>
+        + Allocator<f64, Self::Size, Self::Size>,
 {
-    // TODO: I need a `from` as well because somehow I need to update the state of the propagator... ugh
     fn extract(from: &O) -> Self;
+    fn add_dev(to: &O, dev: VectorN<f64, Self::Size>) -> O;
 }
-
-// impl EstimateAs<Orbit> for SpacecraftState;
-// impl EstimateFrom<SpacecraftState> for Orbit;

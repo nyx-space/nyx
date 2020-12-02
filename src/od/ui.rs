@@ -6,7 +6,7 @@ pub use super::kalman::*;
 pub use super::ranging::*;
 pub use super::residual::*;
 pub use super::snc::*;
-pub use super::srif::*;
+// pub use super::srif::*;
 pub use super::*;
 
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -69,10 +69,13 @@ pub struct ODProcess<
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <S as State>::Size, <S as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, <D::StateType as State>::Size, A>
-        + Allocator<f64, A, <D::StateType as State>::Size>,
+        + Allocator<f64, A, <D::StateType as State>::Size>
+        + Allocator<f64, <S as State>::Size, A>
+        + Allocator<f64, A, <S as State>::Size>,
 {
     /// PropInstance used for the estimation
     pub prop: PropInstance<'a, D, E>,
@@ -376,8 +379,8 @@ where
 
                                 match self.kf.measurement_update(
                                     nominal_state,
-                                    msr.observation(),
-                                    computed_meas.observation(),
+                                    &msr.observation(),
+                                    &computed_meas.observation(),
                                 ) {
                                     Ok((est, res)) => {
                                         debug!(

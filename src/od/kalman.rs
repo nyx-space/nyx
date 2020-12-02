@@ -251,8 +251,8 @@ where
     fn measurement_update(
         &mut self,
         nominal_state: T,
-        real_obs: VectorN<f64, M>,
-        computed_obs: VectorN<f64, M>,
+        real_obs: &VectorN<f64, M>,
+        computed_obs: &VectorN<f64, M>,
     ) -> Result<(Self::Estimate, Residual<M>), NyxError> {
         if !self.stm_updated {
             return Err(NyxError::StateTransitionMatrixNotUpdated);
@@ -314,7 +314,7 @@ where
         let gain = &covar_bar * h_tilde_t * invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
-        let prefit = &real_obs - computed_obs;
+        let prefit = real_obs - computed_obs;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {

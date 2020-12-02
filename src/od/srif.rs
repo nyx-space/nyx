@@ -15,20 +15,19 @@ use crate::State;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 #[derive(Debug, Clone)]
-pub struct SRIF<S, A, M, T>
+pub struct SRIF<T, A, M>
 where
-    S: DimName,
     A: DimName,
     M: DimName,
     T: State,
-    DefaultAllocator: Allocator<f64, S>
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>,
 {
     /// The previous estimate used in the KF computations.
-    pub prev_estimate: IfEstimate<S, T>,
+    pub prev_estimate: IfEstimate<T>,
     /// Sets the Measurement noise (usually noted R)
     pub inv_measurement_noise: MatrixMN<f64, M, M>,
     /// Sets the process noise (usually noted Q) in the frame of the estimated state
@@ -38,30 +37,31 @@ where
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
-    h_tilde: MatrixMN<f64, M, S>,
-    stm: MatrixMN<f64, S, S>,
+    h_tilde: MatrixMN<f64, M, <T as State>::Size>,
+    stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     stm_updated: bool,
     h_tilde_updated: bool,
     epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
     covar_fmt: CovarFormat, // Idem
 }
 
-impl<S, A, M, T> SRIF<S, A, M, T>
+impl<T, A, M> SRIF<T, A, M>
 where
-    S: DimName + DimNameAdd<M> + DimMin<M>,
     A: DimName,
-    M: DimName + DimNameAdd<S>,
+    M: DimName + DimNameAdd<<T as State>::Size>,
     T: State,
-    DefaultAllocator: Allocator<f64, S>
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, M>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, DimNameSum<S, M>, S>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, M>
+        + Allocator<f64, DimNameSum<<T as State>::Size, M>, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>,
 {
     /// Initializes this KF with an initial estimate and measurement noise.
     pub fn initialize(
-        initial_estimate: IfEstimate<S, T>,
+        initial_estimate: IfEstimate<T>,
         process_noise: MatrixMN<f64, A, A>,
         measurement_noise: MatrixMN<f64, M, M>,
         process_noise_dt: Option<Duration>,
@@ -89,26 +89,22 @@ where
     }
 }
 
-impl<S, M, T> SRIF<S, U1, M, T>
+impl<T, M> SRIF<T, U1, M>
 where
-    S: DimName,
     M: DimName,
     T: State,
     DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, S>
+        + Allocator<f64, <T as State>::Size>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, S, M>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, M>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, U1, U1>
-        + Allocator<f64, S, U1>
-        + Allocator<f64, U1, S>,
+        + Allocator<f64, <T as State>::Size, U1>
+        + Allocator<f64, U1, <T as State>::Size>,
 {
     /// Initializes this KF without SNC
-    pub fn no_snc(
-        initial_estimate: IfEstimate<S, T>,
-        measurement_noise: MatrixMN<f64, M, M>,
-    ) -> Self {
+    pub fn no_snc(initial_estimate: IfEstimate<T>, measurement_noise: MatrixMN<f64, M, M>) -> Self {
         let inv_measurement_noise = measurement_noise
             .try_inverse()
             .expect("measurement noise singular");
@@ -122,8 +118,8 @@ where
             process_noise: None,
             process_noise_dt: None,
             ekf: false,
-            h_tilde: MatrixMN::<f64, M, S>::zeros(),
-            stm: MatrixMN::<f64, S, S>::identity(),
+            h_tilde: MatrixMN::<f64, M, <T as State>::Size>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
@@ -132,32 +128,36 @@ where
     }
 }
 
-impl<S, A, M, T> Filter<S, A, M, T> for SRIF<S, A, M, T>
+impl<T, A, M> Filter<T, A, M> for SRIF<T, A, M>
 where
-    S: DimName + DimNameAdd<M> + DimNameAdd<S> + DimNameAdd<U1> + DimMin<U1>,
     A: DimName,
-    M: DimName + DimNameAdd<S> + DimNameAdd<M> + DimNameAdd<U1>,
-    DimNameSum<S, M>: DimMin<DimNameSum<S, U1>>,
+    M: DimName + DimNameAdd<<T as State>::Size> + DimNameAdd<M> + DimNameAdd<U1>,
+    DimNameSum<<T as State>::Size, M>: DimMin<DimNameSum<<T as State>::Size, U1>>,
     T: State,
     DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, S>
+        + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, DimNameSum<S, M>, DimNameSum<S, U1>>
-        + Allocator<f64, DimNameSum<S, U1>, DimNameSum<S, M>>
-        + Allocator<f64, DimNameSum<S, M>>
-        + Allocator<f64, DimNameSum<S, U1>>
-        + Allocator<f64, DimMinimum<DimNameSum<S, M>, DimNameSum<S, U1>>>
-        + Allocator<f64, DimMinimum<DimNameSum<S, M>, DimNameSum<S, U1>>, DimNameSum<S, U1>>
-        + Allocator<f64, S, M>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, DimNameSum<<T as State>::Size, M>, DimNameSum<<T as State>::Size, U1>>
+        + Allocator<f64, DimNameSum<<T as State>::Size, U1>, DimNameSum<<T as State>::Size, M>>
+        + Allocator<f64, DimNameSum<<T as State>::Size, M>>
+        + Allocator<f64, DimNameSum<<T as State>::Size, U1>>
+        + Allocator<
+            f64,
+            DimMinimum<DimNameSum<<T as State>::Size, M>, DimNameSum<<T as State>::Size, U1>>,
+        > + Allocator<
+            f64,
+            DimMinimum<DimNameSum<<T as State>::Size, M>, DimNameSum<<T as State>::Size, U1>>,
+            DimNameSum<<T as State>::Size, U1>,
+        > + Allocator<f64, <T as State>::Size, M>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
-        + Allocator<f64, S, A>
-        + Allocator<f64, A, S>
-        + Allocator<f64, S, U1>,
+        + Allocator<f64, <T as State>::Size, A>
+        + Allocator<f64, A, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, U1>,
 {
-    type Estimate = IfEstimate<S, T>;
+    type Estimate = IfEstimate<T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {
@@ -170,14 +170,14 @@ where
 
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
-    fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
+    fn update_stm(&mut self, new_stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>) {
         self.stm = new_stm;
         self.stm_updated = true;
     }
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
-    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>) {
+    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, <T as State>::Size>) {
         self.h_tilde = h_tilde;
         self.h_tilde_updated = true;
     }

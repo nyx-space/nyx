@@ -575,6 +575,8 @@ where
 pub trait NavSolution<T>: Estimate<Orbit>
 where
     T: State,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
     fn orbital_state(&self) -> Orbit;
     /// Returns the nominal state as computed by the dynamics
@@ -599,32 +601,40 @@ impl NavSolution<Orbit> for IfEstimate<Orbit> {
     }
 }
 
-impl NavSolution<SpacecraftState> for KfEstimate<SpacecraftState> {
-    fn orbital_state(&self) -> Orbit {
-        self.state().orbit
-    }
-    fn expected_state(&self) -> Orbit {
-        self.nominal_state().orbit
-    }
-}
+// impl NavSolution<SpacecraftState> for KfEstimate<SpacecraftState> {
+//     fn orbital_state(&self) -> Orbit {
+//         self.state().orbit
+//     }
+//     fn expected_state(&self) -> Orbit {
+//         self.nominal_state().orbit
+//     }
+// }
 
-impl NavSolution<SpacecraftState> for IfEstimate<SpacecraftState> {
-    fn orbital_state(&self) -> Orbit {
-        self.state().orbit
-    }
-    fn expected_state(&self) -> Orbit {
-        self.nominal_state().orbit
-    }
-}
+// impl NavSolution<SpacecraftState> for IfEstimate<SpacecraftState> {
+//     fn orbital_state(&self) -> Orbit {
+//         self.state().orbit
+//     }
+//     fn expected_state(&self) -> Orbit {
+//         self.nominal_state().orbit
+//     }
+// }
 
 impl EstimateFrom<SpacecraftState> for Orbit {
     fn extract(from: &SpacecraftState) -> Self {
         from.orbit
+    }
+
+    fn add_dev(to: &SpacecraftState, dev: VectorN<f64, Self::Size>) -> SpacecraftState {
+        *to + dev
     }
 }
 
 impl EstimateFrom<Orbit> for Orbit {
     fn extract(from: &Orbit) -> Self {
         *from
+    }
+
+    fn add_dev(to: &Orbit, dev: VectorN<f64, Self::Size>) -> Orbit {
+        *to + dev
     }
 }

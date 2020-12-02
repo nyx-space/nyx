@@ -3,7 +3,8 @@ use super::serde::{Serialize, Serializer};
 use super::serde_derive::Deserialize;
 use super::EpochFormat;
 use crate::celestia::{Cosm, Frame, Orbit};
-use crate::dimensions::U6;
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::DefaultAllocator;
 use crate::od::estimate::NavSolution;
 use crate::State;
 use std::cmp::PartialEq;
@@ -1073,7 +1074,11 @@ impl<'a> NavSolutionFormatter<'a> {
         }
     }
 
-    pub fn fmt<T: State, S: NavSolution<T>>(&self, sol: &S) -> Vec<String> {
+    pub fn fmt<T: State, S: NavSolution<T>>(&self, sol: &S) -> Vec<String>
+    where
+        DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    {
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {

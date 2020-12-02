@@ -386,6 +386,23 @@ impl Add<VectorN<f64, U7>> for SpacecraftState {
     }
 }
 
+impl Add<VectorN<f64, U6>> for SpacecraftState {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: VectorN<f64, U6>) -> Self {
+        let mut me = self;
+        me.orbit.x += other[0];
+        me.orbit.y += other[1];
+        me.orbit.z += other[2];
+        me.orbit.vx += other[3];
+        me.orbit.vy += other[4];
+        me.orbit.vz += other[5];
+
+        me
+    }
+}
+
 // / Allows estimating the orbit of a spacecraft state only
 // impl State<U6> for SpacecraftState {
 //     type PropVecSize = U42;
