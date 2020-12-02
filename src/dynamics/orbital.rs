@@ -75,27 +75,27 @@ impl<'a> OrbitalDynamics<'a> {
 }
 
 impl<'a> Dynamics for OrbitalDynamics<'a> {
-    type StateSize = U6;
-    type PropVecSize = U42;
+    // type StateSize = U6;
+    // type PropVecSize = U42;
     type HyperdualSize = U7;
     type StateType = Orbit;
 
     fn eom(
         &self,
         delta_t_s: f64,
-        state: &VectorN<f64, Self::PropVecSize>,
+        state: &VectorN<f64, U42>,
         ctx: &Orbit,
-    ) -> Result<VectorN<f64, Self::PropVecSize>, NyxError> {
+    ) -> Result<VectorN<f64, U42>, NyxError> {
         let (new_state, new_stm) = if ctx.stm.is_some() {
             // Then call the dual_eom with the correct state size
-            let pos_vel = state.fixed_rows::<Self::StateSize>(0).into_owned();
+            let pos_vel = state.fixed_rows::<U6>(0).into_owned();
             let (state, grad) = self.eom_grad(delta_t_s, &pos_vel, ctx)?;
             let stm_dt = ctx.stm() * grad;
             // Rebuild the STM as a vector.
             let mut stm_as_vec = VectorN::<f64, U36>::zeros();
             let mut stm_idx = 0;
-            for i in 0..Self::StateSize::dim() {
-                for j in 0..Self::StateSize::dim() {
+            for i in 0..U6::dim() {
+                for j in 0..U6::dim() {
                     stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
                     stm_idx += 1;
                 }
@@ -124,7 +124,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 
             (d_x, VectorN::<f64, U36>::zeros())
         };
-        Ok(VectorN::<f64, Self::PropVecSize>::from_iterator(
+        Ok(VectorN::<f64, U42>::from_iterator(
             new_state.iter().chain(new_stm.iter()).cloned(),
         ))
     }

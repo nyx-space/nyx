@@ -1,10 +1,10 @@
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
-use super::State;
 use super::{CovarFormat, EpochFormat};
+use super::{EstimateFrom, State};
 use crate::celestia::Orbit;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U6};
+use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
 use crate::SpacecraftState;
 use std::cmp::PartialEq;
@@ -12,11 +12,11 @@ use std::f64::INFINITY;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
-pub trait Estimate<S, T: State<S>>
+pub trait Estimate<T: State>
 where
     Self: Clone + PartialEq + Sized,
-    S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
     /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     fn zeros(state: T) -> Self;
@@ -39,21 +39,21 @@ where
         // state
     }
     /// The state deviation as computed by the filter.
-    fn state_deviation(&self) -> VectorN<f64, S>;
+    fn state_deviation(&self) -> VectorN<f64, <T as State>::Size>;
     /// The nominal state as reported by the filter dynamics
     fn nominal_state(&self) -> T;
     /// The Covariance of this estimate. Will return the predicted covariance if this is a time update/prediction.
-    fn covar(&self) -> MatrixMN<f64, S, S>;
+    fn covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size>;
     /// The predicted covariance of this estimate from the time update
-    fn predicted_covar(&self) -> MatrixMN<f64, S, S>;
+    fn predicted_covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size>;
     /// Sets the state deviation.
-    fn set_state_deviation(&mut self, new_state: VectorN<f64, S>);
+    fn set_state_deviation(&mut self, new_state: VectorN<f64, <T as State>::Size>);
     /// Sets the Covariance of this estimate
-    fn set_covar(&mut self, new_covar: MatrixMN<f64, S, S>);
+    fn set_covar(&mut self, new_covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>);
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     fn predicted(&self) -> bool;
     /// The STM used to compute this Estimate
-    fn stm(&self) -> &MatrixMN<f64, S, S>;
+    fn stm(&self) -> &MatrixMN<f64, <T as State>::Size, <T as State>::Size>;
     /// The Epoch format upon serialization
     fn epoch_fmt(&self) -> EpochFormat;
     /// The covariance format upon serialization
@@ -77,14 +77,15 @@ where
     }
     /// Returns the header
     fn header(epoch_fmt: EpochFormat, covar_fmt: CovarFormat) -> Vec<String> {
-        let mut hdr_v = Vec::with_capacity(3 * S::dim() + 1);
+        let dim = <T as State>::Size::dim();
+        let mut hdr_v = Vec::with_capacity(3 * dim + 1);
         hdr_v.push(format!("{}", epoch_fmt));
-        for i in 0..S::dim() {
+        for i in 0..dim {
             hdr_v.push(format!("state_{}", i));
         }
         // Serialize the covariance
-        for i in 0..S::dim() {
-            for j in 0..S::dim() {
+        for i in 0..dim {
+            for j in 0..dim {
                 hdr_v.push(format!("{}_{}_{}", covar_fmt, i, j));
             }
         }
@@ -108,61 +109,64 @@ where
 
 /// Kalman filter Estimate
 #[derive(Debug, Clone, PartialEq)]
-pub struct KfEstimate<S, T: State<S>>
+pub struct KfEstimate<T: State>
 where
-    S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
     /// The estimated state
     pub nominal_state: T,
     /// The state deviation
-    pub state_deviation: VectorN<f64, S>,
+    pub state_deviation: VectorN<f64, <T as State>::Size>,
     /// The Covariance of this estimate
-    pub covar: MatrixMN<f64, S, S>,
+    pub covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     /// The predicted covariance of this estimate
-    pub covar_bar: MatrixMN<f64, S, S>,
+    pub covar_bar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     pub predicted: bool,
     /// The STM used to compute this Estimate
-    pub stm: MatrixMN<f64, S, S>,
+    pub stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     /// The Epoch format upon serialization
     pub epoch_fmt: EpochFormat,
     /// The covariance format upon serialization
     pub covar_fmt: CovarFormat,
 }
 
-impl<S, T: State<S>> KfEstimate<S, T>
+impl<T: State> KfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
-    pub fn from_covar(nominal_state: T, covar: MatrixMN<f64, S, S>) -> Self {
+    pub fn from_covar(
+        nominal_state: T,
+        covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
+    ) -> Self {
         Self {
             nominal_state,
-            state_deviation: VectorN::<f64, S>::zeros(),
+            state_deviation: VectorN::<f64, <T as State>::Size>::zeros(),
             covar: covar.clone(),
             covar_bar: covar,
             predicted: true,
-            stm: MatrixMN::<f64, S, S>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
     }
 }
 
-impl<S, T: State<S>> Estimate<S, T> for KfEstimate<S, T>
+impl<T: State> Estimate<T> for KfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
     fn zeros(nominal_state: T) -> Self {
         Self {
             nominal_state,
-            state_deviation: VectorN::<f64, S>::zeros(),
-            covar: MatrixMN::<f64, S, S>::zeros(),
-            covar_bar: MatrixMN::<f64, S, S>::zeros(),
+            state_deviation: VectorN::<f64, <T as State>::Size>::zeros(),
+            covar: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            covar_bar: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             predicted: true,
-            stm: MatrixMN::<f64, S, S>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
@@ -172,22 +176,22 @@ where
         self.nominal_state.clone()
     }
 
-    fn state_deviation(&self) -> VectorN<f64, S> {
+    fn state_deviation(&self) -> VectorN<f64, <T as State>::Size> {
         self.state_deviation.clone()
     }
 
-    fn covar(&self) -> MatrixMN<f64, S, S> {
+    fn covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
         self.covar.clone()
     }
 
-    fn predicted_covar(&self) -> MatrixMN<f64, S, S> {
+    fn predicted_covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
         self.covar_bar.clone()
     }
 
     fn predicted(&self) -> bool {
         self.predicted
     }
-    fn stm(&self) -> &MatrixMN<f64, S, S> {
+    fn stm(&self) -> &MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
         &self.stm
     }
     fn epoch_fmt(&self) -> EpochFormat {
@@ -196,28 +200,30 @@ where
     fn covar_fmt(&self) -> CovarFormat {
         self.covar_fmt
     }
-    fn set_state_deviation(&mut self, new_state: VectorN<f64, S>) {
+    fn set_state_deviation(&mut self, new_state: VectorN<f64, <T as State>::Size>) {
         self.state_deviation = new_state;
     }
-    fn set_covar(&mut self, new_covar: MatrixMN<f64, S, S>) {
+    fn set_covar(&mut self, new_covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>) {
         self.covar = new_covar;
     }
 }
 
-impl<S, T: State<S>> fmt::Display for KfEstimate<S, T>
+impl<T: State> fmt::Display for KfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator:
-        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let dim = <T as State>::Size::dim();
         let word = if self.predicted {
             "Prediction"
         } else {
             "Estimate"
         };
-        let mut fmt_cov = Vec::with_capacity(S::dim());
-        for i in 0..S::dim() {
+        let mut fmt_cov = Vec::with_capacity(dim);
+        for i in 0..dim {
             fmt_cov.push(format!("{:e}", &self.covar[(i, i)]));
         }
         write!(
@@ -232,11 +238,12 @@ where
     }
 }
 
-impl<S, T: State<S>> fmt::LowerExp for KfEstimate<S, T>
+impl<T: State> fmt::LowerExp for KfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator:
-        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -247,18 +254,20 @@ where
     }
 }
 
-impl<S, T: State<S>> Serialize for KfEstimate<S, T>
+impl<T: State> Serialize for KfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator:
-        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// Serializes the estimate
     fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
     where
         O: Serializer,
     {
-        let mut seq = serializer.serialize_seq(Some(S::dim() * 3 + 1))?;
+        let dim = <T as State>::Size::dim();
+        let mut seq = serializer.serialize_seq(Some(dim * 3 + 1))?;
         match self.epoch_fmt {
             EpochFormat::GregorianUtc => {
                 seq.serialize_element(&self.epoch().as_gregorian_utc_str())?
@@ -279,12 +288,12 @@ where
             EpochFormat::TaiDays(e) => seq.serialize_element(&(self.epoch().as_tai_days() - e))?,
         }
         // Serialize the state
-        for i in 0..S::dim() {
+        for i in 0..dim {
             seq.serialize_element(&self.state_deviation[i])?;
         }
         // Serialize the covariance
-        for i in 0..S::dim() {
-            for j in 0..S::dim() {
+        for i in 0..dim {
+            for j in 0..dim {
                 let ser_covar = match self.covar_fmt {
                     CovarFormat::Sqrt => self.covar[(i, j)].sqrt(),
                     CovarFormat::Sigma1 => self.covar[(i, j)],
@@ -300,35 +309,38 @@ where
 
 /// Information filter Estimate
 #[derive(Debug, Clone, PartialEq)]
-pub struct IfEstimate<S, T: State<S>>
+pub struct IfEstimate<T: State>
 where
-    S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
     /// The nominal state
     pub nominal_state: T,
     /// The information state
-    pub info_state: VectorN<f64, S>,
+    pub info_state: VectorN<f64, <T as State>::Size>,
     /// The information matrix, which is the inverse of the covariance
-    pub info_mat: MatrixMN<f64, S, S>,
+    pub info_mat: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     /// The predicted information matrix, which is the inverse of the covariance
-    pub info_mat_bar: MatrixMN<f64, S, S>,
+    pub info_mat_bar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     pub predicted: bool,
     /// The STM used to compute this Estimate
-    pub stm: MatrixMN<f64, S, S>,
+    pub stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     /// The Epoch format upon serialization
     pub epoch_fmt: EpochFormat,
     /// The covariance format upon serialization
     pub covar_fmt: CovarFormat,
 }
 
-impl<S, T: State<S>> IfEstimate<S, T>
+impl<T: State> IfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
-    pub fn from_covar(nominal_state: T, covar: MatrixMN<f64, S, S>) -> Self {
+    pub fn from_covar(
+        nominal_state: T,
+        covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
+    ) -> Self {
         let mut info_mat = covar;
         if !info_mat.try_inverse_mut() {
             panic!("provided covariance is singular");
@@ -336,18 +348,18 @@ where
 
         Self {
             nominal_state,
-            info_state: VectorN::<f64, S>::zeros(),
+            info_state: VectorN::<f64, <T as State>::Size>::zeros(),
             info_mat: info_mat.clone(),
             info_mat_bar: info_mat,
             predicted: true,
-            stm: MatrixMN::<f64, S, S>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
     }
 
     /// Returns the covariance, if there is enough information to invert the information matrix
-    pub fn try_covar(&self) -> Option<MatrixMN<f64, S, S>> {
+    pub fn try_covar(&self) -> Option<MatrixMN<f64, <T as State>::Size, <T as State>::Size>> {
         let mut covar = self.info_mat.clone();
         if !covar.try_inverse_mut() {
             None
@@ -357,7 +369,9 @@ where
     }
 
     /// Returns the covariance, if there is enough information to invert the information matrix
-    pub fn try_predicted_covar(&self) -> Option<MatrixMN<f64, S, S>> {
+    pub fn try_predicted_covar(
+        &self,
+    ) -> Option<MatrixMN<f64, <T as State>::Size, <T as State>::Size>> {
         let mut covar = self.info_mat_bar.clone();
         if !covar.try_inverse_mut() {
             None
@@ -367,16 +381,16 @@ where
     }
 }
 
-impl<S, T: State<S>> Estimate<S, T> for IfEstimate<S, T>
+impl<T: State> Estimate<T> for IfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+    DefaultAllocator:
+        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
     fn zeros(nominal_state: T) -> Self {
-        let mut info_state = VectorN::<f64, S>::zeros();
-        let mut info_mat = MatrixMN::<f64, S, S>::zeros();
+        let mut info_state = VectorN::<f64, <T as State>::Size>::zeros();
+        let mut info_mat = MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros();
         // Initialize everything to infinity
-        for i in 0..S::dim() {
+        for i in 0..<T as State>::Size::dim() {
             info_state[i] = INFINITY;
             info_mat[(i, i)] = INFINITY;
         }
@@ -386,7 +400,7 @@ where
             info_mat: info_mat.clone(),
             info_mat_bar: info_mat,
             predicted: true,
-            stm: MatrixMN::<f64, S, S>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
@@ -397,24 +411,24 @@ where
     }
 
     /// Will panic if the information matrix inversion fails
-    fn state_deviation(&self) -> VectorN<f64, S> {
+    fn state_deviation(&self) -> VectorN<f64, <T as State>::Size> {
         &self.covar() * &self.info_state
     }
 
     /// Will panic if the information matrix inversion fails
-    fn covar(&self) -> MatrixMN<f64, S, S> {
+    fn covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
         self.try_covar().unwrap()
     }
 
     /// Will panic if the information matrix inversion fails
-    fn predicted_covar(&self) -> MatrixMN<f64, S, S> {
+    fn predicted_covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
         self.try_predicted_covar().unwrap()
     }
 
     fn predicted(&self) -> bool {
         self.predicted
     }
-    fn stm(&self) -> &MatrixMN<f64, S, S> {
+    fn stm(&self) -> &MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
         &self.stm
     }
     fn epoch_fmt(&self) -> EpochFormat {
@@ -424,26 +438,28 @@ where
         self.covar_fmt
     }
     /// WARNING: This sets the information state, not the filter state
-    fn set_state_deviation(&mut self, new_info_state: VectorN<f64, S>) {
+    fn set_state_deviation(&mut self, new_info_state: VectorN<f64, <T as State>::Size>) {
         self.info_state = new_info_state;
     }
     /// WARNING: This sets the information matrix
-    fn set_covar(&mut self, new_info_mat: MatrixMN<f64, S, S>) {
+    fn set_covar(&mut self, new_info_mat: MatrixMN<f64, <T as State>::Size, <T as State>::Size>) {
         self.info_mat = new_info_mat;
     }
 }
 
-impl<S, T: State<S>> fmt::Display for IfEstimate<S, T>
+impl<T: State> fmt::Display for IfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator:
-        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.try_covar() {
             Some(covar) => {
-                let mut fmt_cov = Vec::with_capacity(S::dim());
-                for i in 0..S::dim() {
+                let dim = <T as State>::Size::dim();
+                let mut fmt_cov = Vec::with_capacity(dim);
+                for i in 0..dim {
                     fmt_cov.push(format!("{:e}", covar[(i, i)]));
                 }
                 write!(
@@ -464,11 +480,12 @@ where
     }
 }
 
-impl<S, T: State<S>> fmt::LowerExp for IfEstimate<S, T>
+impl<T: State> fmt::LowerExp for IfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator:
-        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.try_covar() {
@@ -484,18 +501,20 @@ where
     }
 }
 
-impl<S, T: State<S>> Serialize for IfEstimate<S, T>
+impl<T: State> Serialize for IfEstimate<T>
 where
-    S: DimName,
-    DefaultAllocator:
-        Allocator<f64, S> + Allocator<f64, S, S> + Allocator<usize, S> + Allocator<usize, S, S>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// Serializes the estimate
     fn serialize<O>(&self, serializer: O) -> Result<O::Ok, O::Error>
     where
         O: Serializer,
     {
-        let mut seq = serializer.serialize_seq(Some(S::dim() * 3 + 1))?;
+        let dim = <T as State>::Size::dim();
+        let mut seq = serializer.serialize_seq(Some(dim * 3 + 1))?;
         match self.epoch_fmt {
             EpochFormat::GregorianUtc => {
                 seq.serialize_element(&self.epoch().as_gregorian_utc_str())?
@@ -519,12 +538,12 @@ where
             Some(covar) => {
                 let state = self.state_deviation();
                 // Serialize the state
-                for i in 0..S::dim() {
+                for i in 0..dim {
                     seq.serialize_element(&state[(i, 0)])?;
                 }
                 // Serialize the covariance
-                for i in 0..S::dim() {
-                    for j in 0..S::dim() {
+                for i in 0..dim {
+                    for j in 0..dim {
                         let ser_covar = match self.covar_fmt {
                             CovarFormat::Sqrt => covar[(i, j)].sqrt(),
                             CovarFormat::Sigma1 => covar[(i, j)],
@@ -537,12 +556,12 @@ where
             }
             None => {
                 // Set all of the numbers to 1e32
-                for _ in 0..S::dim() {
+                for _ in 0..dim {
                     seq.serialize_element(&1e32)?;
                 }
                 // Serialize the covariance
-                for _ in 0..S::dim() {
-                    for _ in 0..S::dim() {
+                for _ in 0..dim {
+                    for _ in 0..dim {
                         seq.serialize_element(&1e32)?;
                     }
                 }
@@ -553,16 +572,16 @@ where
 }
 
 /// A trait to store a navigation solution, can be used in conjunction with KfEstimate or IfEstimate
-pub trait NavSolution<T>: Estimate<U6, T>
+pub trait NavSolution<T>: Estimate<Orbit>
 where
-    T: State<U6>,
+    T: State,
 {
     fn orbital_state(&self) -> Orbit;
     /// Returns the nominal state as computed by the dynamics
     fn expected_state(&self) -> Orbit;
 }
 
-impl NavSolution<Orbit> for KfEstimate<U6, Orbit> {
+impl NavSolution<Orbit> for KfEstimate<Orbit> {
     fn orbital_state(&self) -> Orbit {
         self.state()
     }
@@ -571,7 +590,7 @@ impl NavSolution<Orbit> for KfEstimate<U6, Orbit> {
     }
 }
 
-impl NavSolution<Orbit> for IfEstimate<U6, Orbit> {
+impl NavSolution<Orbit> for IfEstimate<Orbit> {
     fn orbital_state(&self) -> Orbit {
         self.state()
     }
@@ -580,7 +599,7 @@ impl NavSolution<Orbit> for IfEstimate<U6, Orbit> {
     }
 }
 
-impl NavSolution<SpacecraftState> for KfEstimate<U6, SpacecraftState> {
+impl NavSolution<SpacecraftState> for KfEstimate<SpacecraftState> {
     fn orbital_state(&self) -> Orbit {
         self.state().orbit
     }
@@ -589,11 +608,23 @@ impl NavSolution<SpacecraftState> for KfEstimate<U6, SpacecraftState> {
     }
 }
 
-impl NavSolution<SpacecraftState> for IfEstimate<U6, SpacecraftState> {
+impl NavSolution<SpacecraftState> for IfEstimate<SpacecraftState> {
     fn orbital_state(&self) -> Orbit {
         self.state().orbit
     }
     fn expected_state(&self) -> Orbit {
         self.nominal_state().orbit
+    }
+}
+
+impl EstimateFrom<SpacecraftState> for Orbit {
+    fn extract(from: &SpacecraftState) -> Self {
+        from.orbit
+    }
+}
+
+impl EstimateFrom<Orbit> for Orbit {
+    fn extract(from: &Orbit) -> Self {
+        *from
     }
 }

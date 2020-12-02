@@ -51,15 +51,16 @@ pub mod sph_harmonics;
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
 pub trait Dynamics: Clone
 where
-    DefaultAllocator: Allocator<f64, Self::StateSize>,
+    DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>,
 {
     /// Defines the state size for these dynamics.
-    type StateSize: DimName;
-    /// Defines the size of the vector to be propagated, equa lto StateSize if no STM will ever be computed.
-    type PropVecSize: DimName;
+    // type StateSize: DimName;
+    /// Defines the size of the vector to be propagated, equalto StateSize if no STM will ever be computed.
+    // type PropVecSize: DimName;
     /// The state of the associated hyperdual state, almost always StateType + U1
     type HyperdualSize: DimName;
-    type StateType: State<Self::StateSize, PropVecSize = Self::PropVecSize>;
+    // type StateType: State<Self::StateSize, PropVecSize = Self::PropVecSize>;
+    type StateType: State;
 
     /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
     /// The time delta_t is in seconds PAST the context epoch. The state vector is the state which
@@ -69,11 +70,11 @@ where
     fn eom(
         &self,
         delta_t: f64,
-        state_vec: &VectorN<f64, Self::PropVecSize>,
+        state_vec: &VectorN<f64, <Self::StateType as State>::PropVecSize>,
         state_ctx: &Self::StateType,
-    ) -> Result<VectorN<f64, Self::PropVecSize>, NyxError>
+    ) -> Result<VectorN<f64, <Self::StateType as State>::PropVecSize>, NyxError>
     where
-        DefaultAllocator: Allocator<f64, Self::PropVecSize>;
+        DefaultAllocator: Allocator<f64, <Self::StateType as State>::PropVecSize>;
 
     /// Defines the equations of motion for Dual numbers for these dynamics.
     /// _All_ dynamics need to allow for automatic differentiation. However, if differentiation is not supported,
@@ -81,32 +82,46 @@ where
     fn dual_eom(
         &self,
         delta_t: f64,
-        state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, Self::StateSize>,
+        state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         state_ctx: &Self::StateType,
-    ) -> Result<(VectorN<f64, Self::StateSize>, MatrixN<f64, Self::StateSize>), NyxError>
+    ) -> Result<
+        (
+            VectorN<f64, <Self::StateType as State>::Size>,
+            MatrixN<f64, <Self::StateType as State>::Size>,
+        ),
+        NyxError,
+    >
     where
         DefaultAllocator: Allocator<f64, Self::HyperdualSize>
-            + Allocator<f64, Self::StateSize>
-            + Allocator<f64, Self::StateSize, Self::StateSize>
-            + Allocator<Hyperdual<f64, Self::HyperdualSize>, Self::StateSize>,
+            + Allocator<f64, <Self::StateType as State>::Size>
+            + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
+            + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy;
 
     /// Computes both the state and the gradient of the dynamics. This function is pre-implemented.
     fn eom_grad(
         &self,
         delta_t_s: f64,
-        state_vec: &VectorN<f64, Self::StateSize>,
+        state_vec: &VectorN<f64, <Self::StateType as State>::Size>,
         state_ctx: &Self::StateType,
-    ) -> Result<(VectorN<f64, Self::StateSize>, MatrixN<f64, Self::StateSize>), NyxError>
+    ) -> Result<
+        (
+            VectorN<f64, <Self::StateType as State>::Size>,
+            MatrixN<f64, <Self::StateType as State>::Size>,
+        ),
+        NyxError,
+    >
     where
-        DefaultAllocator: Allocator<f64, Self::StateSize>
-            + Allocator<f64, Self::StateSize, Self::StateSize>
+        DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>
+            + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
             + Allocator<f64, Self::HyperdualSize>
-            + Allocator<Hyperdual<f64, Self::HyperdualSize>, Self::StateSize>,
+            + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy,
     {
-        let hyperstate: VectorN<Hyperdual<f64, Self::HyperdualSize>, Self::StateSize> =
-            hyperspace_from_vector(&state_vec);
+        let hyperstate: VectorN<
+            Hyperdual<f64, Self::HyperdualSize>,
+            <Self::StateType as State>::Size,
+        > = hyperspace_from_vector(&state_vec);
 
         let (state, grad) = self.dual_eom(delta_t_s, &hyperstate, &state_ctx)?;
 

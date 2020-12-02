@@ -12,7 +12,7 @@ use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
 use crate::time::{Duration, TimeUnit};
-use crate::{SpacecraftState, State};
+use crate::{Orbit, SpacecraftState, State};
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -22,7 +22,7 @@ pub struct OdpScenario<'a> {
     nav: MDProcess<'a>,
     ekf_msr_trigger: usize,
     ekf_disable_time: Duration,
-    kf: KF<U6, U3, U2, SpacecraftState>,
+    kf: KF<Orbit, U3, U2>,
     stations: Vec<GroundStation<'a>>,
     formatter: Option<NavSolutionFormatter<'a>>,
 }
@@ -185,7 +185,7 @@ impl<'a> OdpScenario<'a> {
                     }
                     let mut init_sc_state = md.init_state;
                     init_sc_state.orbit = est_init_state;
-                    let initial_estimate = KfEstimate::from_covar(init_sc_state, cov);
+                    let initial_estimate = KfEstimate::from_covar(init_sc_state.orbit, cov);
                     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(
                         odp_seq.msr_noise[0],
                         odp_seq.msr_noise[1],

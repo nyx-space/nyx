@@ -48,27 +48,31 @@ pub struct ODProcess<
     // D: Dynamics<StateSize = Msr::StateSize>,
     D: Dynamics,
     E: ErrorCtrl,
-    Msr: Measurement<StateSize = D::StateSize>,
-    N: MeasurementDevice<D::StateType, Msr>,
+    Msr: Measurement<StateSize = <S as State>::Size>,
+    N: MeasurementDevice<S, Msr>,
+    // Msr: Measurement<StateSize = <D::StateType as State>::Size>,
+    // N: MeasurementDevice<D::StateType, Msr>,
     T: EkfTrigger,
     A: DimName,
+    S: EstimateFrom<D::StateType>,
+    K: Filter<S, A, Msr::MeasurementSize>,
     // S: D::StateType,
-    K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+    // K: Filter<<D::StateType as State>::Size, A, Msr::MeasurementSize, D::StateType>,
     // MsrIn,
 > where
-    DefaultAllocator: Allocator<f64, D::StateSize>
-        + Allocator<f64, D::PropVecSize>
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, D::StateSize>
-        + Allocator<f64, D::StateSize, Msr::MeasurementSize>
-        + Allocator<f64, D::StateSize, D::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
-        + Allocator<f64, D::StateSize, A>
-        + Allocator<f64, A, D::StateSize>,
+        + Allocator<f64, <D::StateType as State>::Size, A>
+        + Allocator<f64, A, <D::StateType as State>::Size>,
 {
     /// PropInstance used for the estimation
     pub prop: PropInstance<'a, D, E>,
@@ -83,6 +87,7 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
+    init_estimate: K::Estimate,
     init_state: D::StateType,
     _marker: PhantomData<A>,
 }
@@ -91,28 +96,38 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement<StateSize = D::StateSize>,
-        N: MeasurementDevice<D::StateType, Msr>,
+        Msr: Measurement<StateSize = <S as State>::Size>,
+        N: MeasurementDevice<S, Msr>,
+        // Msr: Measurement<StateSize = <D::StateType as State>::Size>,
+        // N: MeasurementDevice<D::StateType, Msr>,
         T: EkfTrigger,
         A: DimName,
-        // S: State<D::StateSize>,
-        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+        S: EstimateFrom<D::StateType>,
+        K: Filter<S, A, Msr::MeasurementSize>,
+        // S: State<<D::StateType as State>::Size>,
+        // K: Filter<<D::StateType as State>::Size, A, Msr::MeasurementSize, D::StateType>,
         // MsrIn,
-    > ODProcess<'a, D, E, Msr, N, T, A, K>
+    > ODProcess<'a, D, E, Msr, N, T, A, S, K>
 where
-    DefaultAllocator: Allocator<f64, D::StateSize>
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, D::StateSize>
-        + Allocator<f64, D::StateSize, Msr::MeasurementSize>
-        + Allocator<f64, D::StateSize, D::StateSize>
-        + Allocator<f64, D::PropVecSize>
+        + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
+        + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
-        + Allocator<f64, D::StateSize, A>
-        + Allocator<f64, A, D::StateSize>,
+        + Allocator<f64, <D::StateType as State>::Size, A>
+        + Allocator<f64, A, <D::StateType as State>::Size>
+        + Allocator<f64, <S as State>::Size>
+        + Allocator<f64, <S as State>::Size, <S as State>::Size>
+        + Allocator<f64, <S as State>::Size, A>
+        + Allocator<f64, A, <S as State>::Size>,
 {
     pub fn ekf(
         prop: PropInstance<'a, D, E>,
@@ -123,6 +138,7 @@ where
         trigger: T,
     ) -> Self {
         let init_state = prop.state();
+        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -133,6 +149,7 @@ where
             estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: trigger,
+            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -140,6 +157,7 @@ where
 
     pub fn default_ekf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
         let init_state = prop.state();
+        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -150,6 +168,7 @@ where
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
+            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -311,7 +330,8 @@ where
             let delta_t = next_msr_epoch - prev_dt;
             self.prop.until_time_elapsed(delta_t)?;
 
-            while let Ok(nominal_state) = rx.try_recv() {
+            while let Ok(prop_state) = rx.try_recv() {
+                let nominal_state = S::extract(&prop_state);
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 // let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
                 let dt = nominal_state.epoch();
@@ -448,7 +468,8 @@ where
 
         info!("Mapping covariance");
 
-        while let Ok(nominal_state) = rx.try_recv() {
+        while let Ok(prop_state) = rx.try_recv() {
+            let nominal_state = S::extract(&prop_state);
             // Update the STM of the KF (needed between each measurement or time update)
             // let stm = self.prop.dynamics.extract_stm(&nominal_state);
             self.kf.update_stm(nominal_state.stm()?);
@@ -477,26 +498,36 @@ impl<
         // D: Dynamics<StateSize = Msr::StateSize>,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement<StateSize = D::StateSize>,
-        N: MeasurementDevice<D::StateType, Msr>,
+        Msr: Measurement<StateSize = <S as State>::Size>,
+        N: MeasurementDevice<S, Msr>,
+        // Msr: Measurement<StateSize = <D::StateType as State>::Size>,
+        // N: MeasurementDevice<D::StateType, Msr>,
         A: DimName,
-        K: Filter<D::StateSize, A, Msr::MeasurementSize, D::StateType>,
+        S: EstimateFrom<D::StateType>,
+        K: Filter<S, A, Msr::MeasurementSize>,
+        // K: Filter<<D::StateType as State>::Size, A, Msr::MeasurementSize, D::StateType>,
         // MsrIn,
-    > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, K>
+    > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, S, K>
 where
-    DefaultAllocator: Allocator<f64, D::StateSize>
-        + Allocator<f64, D::PropVecSize>
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, D::StateSize>
-        + Allocator<f64, D::StateSize, Msr::MeasurementSize>
-        + Allocator<f64, D::StateSize, D::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
+        + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <S as State>::Size>
+        + Allocator<f64, <S as State>::Size, <S as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
-        + Allocator<f64, D::StateSize, A>
-        + Allocator<f64, A, D::StateSize>,
+        + Allocator<f64, <D::StateType as State>::Size, A>
+        + Allocator<f64, A, <D::StateType as State>::Size>
+        + Allocator<f64, <S as State>::Size, A>
+        + Allocator<f64, A, <S as State>::Size>,
 {
     pub fn ckf(
         prop: PropInstance<'a, D, E>,
@@ -506,6 +537,7 @@ where
         num_expected_msr: usize,
     ) -> Self {
         let init_state = prop.state();
+        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -516,6 +548,7 @@ where
             estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: CkfTrigger {},
+            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -523,6 +556,7 @@ where
 
     pub fn default_ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
         let init_state = prop.state();
+        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -533,6 +567,7 @@ where
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},
+            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -540,11 +575,11 @@ where
 }
 /// A trait detailing when to switch to from a CKF to an EKF
 pub trait EkfTrigger {
-    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
+    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
     where
-        S: DimName,
-        E: Estimate<S, T>,
-        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>;
+        E: Estimate<T>,
+        DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::Size, <T as State>::Size>;
 
     /// Return true if the filter should not longer be as extended.
     /// By default, this returns false, i.e. when a filter has been switched to an EKF, it will
@@ -558,11 +593,11 @@ pub trait EkfTrigger {
 pub struct CkfTrigger;
 
 impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<S, E, T: State<S>>(&mut self, _est: &E) -> bool
+    fn enable_ekf<T: State, E>(&mut self, _est: &E) -> bool
     where
-        S: DimName,
-        E: Estimate<S, T>,
-        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+        E: Estimate<T>,
+        DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
     {
         false
     }
@@ -592,11 +627,11 @@ impl StdEkfTrigger {
 }
 
 impl EkfTrigger for StdEkfTrigger {
-    fn enable_ekf<S, E, T: State<S>>(&mut self, est: &E) -> bool
+    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
     where
-        S: DimName,
-        E: Estimate<S, T>,
-        DefaultAllocator: Allocator<f64, S> + Allocator<f64, S, S>,
+        E: Estimate<T>,
+        DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
     {
         if !est.predicted() {
             // If this isn't a prediction, let's update the previous measurement time

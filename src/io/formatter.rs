@@ -1073,7 +1073,7 @@ impl<'a> NavSolutionFormatter<'a> {
         }
     }
 
-    pub fn fmt<T: State<U6>, S: NavSolution<T>>(&self, sol: &S) -> Vec<String> {
+    pub fn fmt<T: State, S: NavSolution<T>>(&self, sol: &S) -> Vec<String> {
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {

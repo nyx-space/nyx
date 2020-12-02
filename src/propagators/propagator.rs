@@ -17,7 +17,8 @@ use std::sync::mpsc::Sender;
 #[derive(Clone, Debug)]
 pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
 where
-    DefaultAllocator: Allocator<f64, D::StateSize> + Allocator<f64, D::PropVecSize>,
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
     pub dynamics: &'a D, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
@@ -30,7 +31,8 @@ where
 /// The `Propagator` trait defines the functions of a propagator and of an event tracker.
 impl<'a, D: Dynamics, E: ErrorCtrl> Propagator<'a, D, E>
 where
-    DefaultAllocator: Allocator<f64, D::StateSize> + Allocator<f64, D::PropVecSize>,
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(dynamics: &'a D, opts: PropOpts<E>) -> Self {
@@ -65,7 +67,7 @@ where
         // Pre-allocate the k used in the propagator
         let mut k = Vec::with_capacity(self.stages + 1);
         for _ in 0..self.stages {
-            k.push(VectorN::<f64, D::PropVecSize>::zeros());
+            k.push(VectorN::<f64, <D::StateType as State>::PropVecSize>::zeros());
         }
         PropInstance {
             state,
@@ -88,7 +90,8 @@ where
 
 impl<'a, D: Dynamics> Propagator<'a, D, RSSStepPV>
 where
-    DefaultAllocator: Allocator<f64, D::StateSize> + Allocator<f64, D::PropVecSize>,
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
     pub fn default(dynamics: &'a D) -> Self {
@@ -102,7 +105,8 @@ where
 #[derive(Debug)]
 pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
 where
-    DefaultAllocator: Allocator<f64, D::StateSize> + Allocator<f64, D::PropVecSize>,
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
     /// The state of this propagator instance
     pub state: D::StateType,
@@ -118,14 +122,16 @@ where
     step_size: Duration, // Stores the adapted step for the _next_ call
     fixed_step: bool,
     // init_time: Epoch,
-    // init_state_vec: VectorN<f64, D::StateSize>,
+    // init_state_vec: VectorN<f64, <D::StateType as State>::Size>,
     // Allows us to do pre-allocation of the ki vectors
-    k: Vec<VectorN<f64, D::PropVecSize>>,
+    k: Vec<VectorN<f64, <D::StateType as State>::PropVecSize>>,
 }
 
 impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
 where
-    DefaultAllocator: Allocator<f64, D::StateSize> + Allocator<f64, D::PropVecSize>,
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::PropVecSize>
+        + Allocator<f64, <D::StateType as State>::Size>,
 {
     /// Allows setting the step size of the propagator
     pub fn set_step(&mut self, step_size: Duration, fixed: bool) {
@@ -143,7 +149,7 @@ where
     /// Returns the state of the propagation
     ///
     /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
-    pub fn state_vector(&self) -> VectorN<f64, D::PropVecSize> {
+    pub fn state_vector(&self) -> VectorN<f64, <D::StateType as State>::PropVecSize> {
         self.state.as_vector().unwrap()
     }
 
@@ -366,9 +372,9 @@ where
     fn derive(
         &mut self,
         t: f64,
-        state: &VectorN<f64, D::PropVecSize>,
+        state: &VectorN<f64, <D::StateType as State>::PropVecSize>,
         ctx: &D::StateType,
-    ) -> Result<(f64, VectorN<f64, D::PropVecSize>), NyxError> {
+    ) -> Result<(f64, VectorN<f64, <D::StateType as State>::PropVecSize>), NyxError> {
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds;
@@ -382,7 +388,8 @@ where
                 // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
                 // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
-                let mut wi = VectorN::<f64, D::PropVecSize>::from_element(0.0);
+                let mut wi =
+                    VectorN::<f64, <D::StateType as State>::PropVecSize>::from_element(0.0);
                 for kj in &self.k[0..i + 1] {
                     let a_ij = self.prop.a_coeffs[a_idx];
                     ci += a_ij;
@@ -400,7 +407,8 @@ where
             let mut next_state = state.clone();
             // State error estimation from https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Adaptive_Runge%E2%80%93Kutta_methods
             // This is consistent with GMAT https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L537
-            let mut error_est = VectorN::<f64, D::PropVecSize>::from_element(0.0);
+            let mut error_est =
+                VectorN::<f64, <D::StateType as State>::PropVecSize>::from_element(0.0);
             for (i, ki) in self.k.iter().enumerate() {
                 let b_i = self.prop.b_coeffs[i];
                 if !self.fixed_step {

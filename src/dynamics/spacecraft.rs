@@ -62,8 +62,8 @@ impl<'a> Dynamics for Spacecraft<'a>
 //         + Allocator<f64, DimNameSum<D::StateSize, U1>, U1>
 //         + Allocator<f64, U1, DimNameSum<D::StateSize, U1>>,
 {
-    type StateSize = U7;
-    type PropVecSize = U43; // This implies that we are NOT computing the STM with the mass
+    // type StateSize = U7;
+    // type PropVecSize = U43; // This implies that we are NOT computing the STM with the mass
     type HyperdualSize = U7; // This implies that we are NOT computing the STM with the mass
     type StateType = SpacecraftState;
     // fn state_vector(&self) -> VectorN<f64, Self::StateSize>
@@ -109,15 +109,15 @@ impl<'a> Dynamics for Spacecraft<'a>
     fn eom(
         &self,
         delta_t: f64,
-        state: &VectorN<f64, Self::PropVecSize>,
+        state: &VectorN<f64, U43>,
         ctx: &SpacecraftState,
-    ) -> Result<VectorN<f64, Self::PropVecSize>, NyxError> {
+    ) -> Result<VectorN<f64, U43>, NyxError> {
         // Compute the orbital dynamics
         let orbital_dyn_vec = state.fixed_rows::<U42>(0).into_owned();
         let d_x_orbital_dyn = self
             .orbital_dyn
             .eom(delta_t, &orbital_dyn_vec, &ctx.orbit)?;
-        let mut d_x = VectorN::<f64, Self::PropVecSize>::from_iterator(
+        let mut d_x = VectorN::<f64, U43>::from_iterator(
             d_x_orbital_dyn
                 .iter()
                 .chain(Vector1::new(0.0).iter())
@@ -165,9 +165,9 @@ impl<'a> Dynamics for Spacecraft<'a>
             // Add the fuel mass to the total mass, minus the change in fuel
             total_mass += ctx.fuel_mass + fuel_rate;
             for i in 0..3 {
-                d_x[i + 3] += thrust_force[i] / (ctx.dry_mass + state[Self::StateSize::dim() - 1]);
+                d_x[i + 3] += thrust_force[i] / (ctx.dry_mass + state[U7::dim() - 1]);
             }
-            d_x[Self::StateSize::dim() - 1] += fuel_rate;
+            d_x[U7::dim() - 1] += fuel_rate;
         }
 
         // Compute additional force models as needed
@@ -184,16 +184,16 @@ impl<'a> Dynamics for Spacecraft<'a>
     fn dual_eom(
         &self,
         delta_t_s: f64,
-        state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, Self::StateSize>,
+        state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, U7>,
         ctx: &Self::StateType,
-    ) -> Result<(VectorN<f64, Self::StateSize>, MatrixN<f64, Self::StateSize>), NyxError> {
+    ) -> Result<(VectorN<f64, U7>, MatrixN<f64, U7>), NyxError> {
         let pos_vel = state_vec.fixed_rows::<U6>(0).into_owned();
         let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &pos_vel, &ctx.orbit)?;
         // Rebuild the appropriately sized state and STM.
-        let mut d_x = VectorN::<f64, Self::StateSize>::from_iterator(
+        let mut d_x = VectorN::<f64, U7>::from_iterator(
             orb_state.iter().chain(Vector1::new(0.0).iter()).cloned(),
         );
-        let mut grad = MatrixN::<f64, Self::StateSize>::zeros();
+        let mut grad = MatrixN::<f64, U7>::zeros();
         for i in 0..U6::dim() {
             for j in 0..U6::dim() {
                 grad[(i, j)] = orb_grad[(i, j)];

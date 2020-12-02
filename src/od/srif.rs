@@ -20,7 +20,7 @@ where
     S: DimName,
     A: DimName,
     M: DimName,
-    T: State<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -51,7 +51,7 @@ where
     S: DimName + DimNameAdd<M> + DimMin<M>,
     A: DimName,
     M: DimName + DimNameAdd<S>,
-    T: State<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, S>
         + Allocator<f64, M, M>
         + Allocator<f64, M, S>
@@ -93,7 +93,7 @@ impl<S, M, T> SRIF<S, U1, M, T>
 where
     S: DimName,
     M: DimName,
-    T: State<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, M, M>
@@ -138,7 +138,7 @@ where
     A: DimName,
     M: DimName + DimNameAdd<S> + DimNameAdd<M> + DimNameAdd<U1>,
     DimNameSum<S, M>: DimMin<DimNameSum<S, U1>>,
-    T: State<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, S>
         + Allocator<f64, A>
