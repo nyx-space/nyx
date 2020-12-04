@@ -16,6 +16,7 @@ use crate::State;
 
 use std::fmt;
 use std::marker::PhantomData;
+use std::ops::Add;
 use std::sync::mpsc::channel;
 
 /// Defines the stopping condition for the smoother
@@ -60,7 +61,9 @@ pub struct ODProcess<
     // K: Filter<<D::StateType as State>::Size, A, Msr::MeasurementSize, D::StateType>,
     // MsrIn,
 > where
+    D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <S as State>::Size>
         + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
@@ -112,6 +115,7 @@ impl<
         // MsrIn,
     > ODProcess<'a, D, E, Msr, N, T, A, S, K>
 where
+    D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
@@ -410,6 +414,8 @@ where
                                             }
                                         }
                                         if self.kf.is_extended() {
+                                            // self.prop.state =
+                                            //     self.prop.state.add(est.state_deviation());
                                             self.prop.state =
                                                 self.prop.state + est.state_deviation();
                                             // self.prop.dynamics.set_estimated_state(
@@ -480,6 +486,7 @@ where
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
                     if self.kf.is_extended() {
+                        // self.prop.state = self.prop.state.add(est.state_deviation());
                         // let est_state = est.state_deviation().clone();
                         self.prop.state = self.prop.state + est.state_deviation();
                         // self.prop.dynamics.set_estimated_state(
@@ -512,6 +519,7 @@ impl<
         // MsrIn,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, S, K>
 where
+    D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, Msr::MeasurementSize>

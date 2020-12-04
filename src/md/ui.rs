@@ -42,7 +42,7 @@ pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    sc_dyn: Spacecraft<'a>,
+    pub sc_dyn: Spacecraft<'a>,
     pub init_state: SpacecraftState,
     pub formatter: Option<StateFormatter<'a>>,
     pub prop_time: Option<Duration>,
@@ -200,6 +200,8 @@ where
                             None => 0.0,
                         },
                     );
+
+                    sc_dyn_flagged = sc_dyn;
                 } else {
                     let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
 
@@ -315,11 +317,12 @@ where
         }
     }
 
-    pub fn propagator(&mut self) -> PropInstance<Spacecraft<'a>, RSSStepPV> {
-        let mut p = Propagator::default(&self.sc_dyn);
-        p.set_tolerance(self.prop_tol);
-        p.with(self.init_state)
-    }
+    // #[inline]
+    // pub fn propagator(&'a self) -> PropInstance<'a, Spacecraft<'a>, RSSStepPV> {
+    //     let mut p = Propagator::default(&self.sc_dyn);
+    //     p.set_tolerance(self.prop_tol);
+    //     p.with(self.init_state)
+    // }
 
     pub fn execute(mut self) -> Result<(), NyxError> {
         self.execute_with(vec![])
@@ -335,7 +338,10 @@ where
         let maybe_prop_event = self.prop_event.clone();
 
         // Build the propagator
-        let mut prop = self.propagator();
+        let mut prop_setup = Propagator::default(&self.sc_dyn);
+        prop_setup.set_tolerance(self.prop_tol);
+        let mut prop = prop_setup.with(self.init_state);
+        // let mut prop = self.propagator();
         // Set up the channels
         let (tx, rx) = channel();
         prop.tx_chan = Some(tx);

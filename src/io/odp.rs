@@ -11,6 +11,7 @@ use crate::od::ranging::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
+use crate::propagators::{PropInstance, Propagator};
 use crate::time::{Duration, TimeUnit};
 use crate::{Orbit, SpacecraftState, State};
 use std::str::FromStr;
@@ -300,7 +301,11 @@ impl<'a> OdpScenario<'a> {
             None => None,
         };
 
-        let mut truth_prop = self.truth.propagator();
+        let mut prop_setup = Propagator::default(&self.truth.sc_dyn);
+        prop_setup.set_tolerance(self.truth.prop_tol);
+        let mut truth_prop = prop_setup.with(self.truth.init_state);
+
+        // let mut truth_prop = self.truth.propagator();
         truth_prop.set_step(10.0 * TimeUnit::Second, true);
 
         // Set up the channels
@@ -357,7 +362,12 @@ impl<'a> OdpScenario<'a> {
         );
 
         // Build the ODP
-        let mut nav = self.nav.propagator();
+        // let mut nav = self.nav.propagator();
+
+        let mut prop_setup = Propagator::default(&self.nav.sc_dyn);
+        prop_setup.set_tolerance(self.nav.prop_tol);
+        let mut nav = prop_setup.with(self.nav.init_state);
+
         nav.set_step(10.0 * TimeUnit::Second, true);
 
         let kf = self.kf;

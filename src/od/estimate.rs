@@ -30,7 +30,8 @@ where
     }
     /// The estimated state
     fn state(&self) -> T {
-        self.nominal_state() + self.state_deviation()
+        // self.nominal_state() + self.state_deviation()
+        self.nominal_state().add(self.state_deviation())
         // let mut state = self.nominal_state();
         // state.set(
         //     state.epoch(),

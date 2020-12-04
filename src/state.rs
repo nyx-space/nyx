@@ -59,6 +59,8 @@ where
         me.set(me.epoch() + delta_t_s * TimeUnit::Second, vector);
         me
     }
+
+    fn add(self, other: VectorN<f64, Self::Size>) -> Self;
 }
 
 // impl<S: DimName, T: State<S>> Add<VectorN<f64, S>> for T {
@@ -250,7 +252,7 @@ impl State for Orbit {
         self.vy = vector[4];
         self.vz = vector[5];
         // And update the STM if applicable
-        if let Some(stm_prev) = self.stm {
+        if let Some(mut stm_prev) = self.stm {
             let mut stm_k_to_0 = Matrix6::zeros();
             let mut stm_idx = 6;
             for i in 0..6 {
@@ -276,6 +278,10 @@ impl State for Orbit {
             Some(stm) => Ok(stm),
             None => Err(NyxError::StateTransitionMatrixUnset),
         }
+    }
+
+    fn add(self, other: VectorN<f64, Self::Size>) -> Self {
+        self + other
     }
 }
 
@@ -354,7 +360,7 @@ impl State for SpacecraftState {
     fn stm(&self) -> Result<MatrixN<f64, U7>, NyxError> {
         match self.orbit.stm {
             Some(stm) => {
-                let rtn = MatrixN::<f64, U7>::zeros();
+                let mut rtn = MatrixN::<f64, U7>::zeros();
                 for i in 0..6 {
                     for j in 0..6 {
                         rtn[(i, j)] = stm[(i, j)];
@@ -365,6 +371,10 @@ impl State for SpacecraftState {
             }
             None => Err(NyxError::StateTransitionMatrixUnset),
         }
+    }
+
+    fn add(self, other: VectorN<f64, Self::Size>) -> Self {
+        self + other
     }
 }
 

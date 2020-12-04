@@ -89,7 +89,7 @@ pub struct Ruggiero {
 /// WARNING: Objectives must be in degrees!
 impl Ruggiero {
     pub fn new(objectives: Vec<Achieve>, initial: Orbit) -> Self {
-        let mut objs: [Option<Achieve>; 5];
+        let mut objs: [Option<Achieve>; 5] = [None, None, None, None, None];
         for i in 0..objectives.len() {
             objs[i] = Some(objectives[i]);
         }

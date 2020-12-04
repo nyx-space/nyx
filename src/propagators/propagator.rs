@@ -61,7 +61,7 @@ where
         Self::new::<RK89>(dynamics, opts)
     }
 
-    pub fn with(&self, state: D::StateType) -> PropInstance<D, E> {
+    pub fn with(&'a self, state: D::StateType) -> PropInstance<'a, D, E> {
         // let init_time = state.epoch();
         // let init_state_vec = dynamics.state_vector();
         // Pre-allocate the k used in the propagator
@@ -185,8 +185,10 @@ where
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
-                let (t, state_vec) =
-                    self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state)?;
+                // let state_vector = &self.state_vector();
+                // let state = &self.state;
+                // let (t, state_vec) = self.derive(dt.as_tai_seconds(), state_vector, state)?;
+                let (t, state_vec) = self.derive(dt.as_tai_seconds())?;
                 self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
                 // Evaluate the event trackers
                 self.event_trackers
@@ -205,8 +207,9 @@ where
                 }
                 return Ok(self.state);
             } else {
-                let (t, state_vec) =
-                    self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state)?;
+                let (t, state_vec) = self.derive(dt.as_tai_seconds())?;
+                // let (t, state_vec) =
+                //     self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state)?;
                 // We haven't passed the time based stopping condition.
                 self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
                 // Evaluate the event trackers
@@ -372,9 +375,11 @@ where
     fn derive(
         &mut self,
         t: f64,
-        state: &VectorN<f64, <D::StateType as State>::PropVecSize>,
-        ctx: &D::StateType,
+        // state: &VectorN<f64, <D::StateType as State>::PropVecSize>,
+        // ctx: &D::StateType,
     ) -> Result<(f64, VectorN<f64, <D::StateType as State>::PropVecSize>), NyxError> {
+        let state = &self.state_vector();
+        let ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds;

@@ -40,7 +40,8 @@ impl Propulsion {
     }
 
     pub fn set_state(&mut self, new_orbit: &Orbit) {
-        (*self.ctrl).next(new_orbit);
+        // TODO: Fix this.
+        // self.ctrl.next(new_orbit);
     }
 
     /// Returns the thrust and the fuel usage

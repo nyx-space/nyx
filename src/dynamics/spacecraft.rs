@@ -200,12 +200,16 @@ impl<'a> Dynamics for Spacecraft<'a>
             }
         }
 
+        if self.ctrl.is_some() {
+            return Err(NyxError::PartialsUndefined);
+        }
+
         // Call the EOMs
-        let mut total_mass = ctx.dry_mass;
+        let total_mass = ctx.dry_mass;
         let radius = state_vec.fixed_rows::<U3>(0).into_owned();
 
         // Recreate the osculating state.
-        let mut osc_sc = ctx;
+        let mut osc_sc = ctx.clone();
         osc_sc.set_epoch(ctx.epoch() + delta_t_s * TimeUnit::Second);
         osc_sc.orbit.x = orb_state[0];
         osc_sc.orbit.y = orb_state[1];
