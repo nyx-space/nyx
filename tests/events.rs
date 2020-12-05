@@ -1,16 +1,13 @@
-extern crate hifitime;
-extern crate nalgebra as na;
-
 extern crate nyx_space as nyx;
 
 #[test]
 fn event_tracker_true_anomaly() {
-    use hifitime::{Epoch, J2000_OFFSET};
     use nyx::celestia::{Cosm, Orbit};
     use nyx::dynamics::orbital::OrbitalDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent};
     use nyx::propagators::*;
+    use nyx::time::{Epoch, J2000_OFFSET};
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -30,12 +27,12 @@ fn event_tracker_true_anomaly() {
 
     let tracker = EventTrackers::from_events(vec![peri_event, apo_event, ta_event0, ta_event1]);
 
-    let mut dynamics = OrbitalDynamics::two_body(state);
-
-    let mut prop = Propagator::rk89(
-        &mut dynamics,
-        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+    let dynamics = OrbitalDynamics::two_body();
+    let setup = Propagator::rk89(
+        &dynamics,
+        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
+    let mut prop = setup.with(state);
     prop.event_trackers = tracker;
     prop.until_time_elapsed(prop_time).unwrap();
 

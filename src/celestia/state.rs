@@ -1,12 +1,14 @@
+extern crate approx;
 extern crate hifitime;
 extern crate serde;
 
-use self::hifitime::Epoch;
+use self::approx::{abs_diff_eq, relative_eq};
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::Frame;
 use crate::dynamics::propulsion::Thruster;
+use crate::time::{Duration, Epoch, TimeUnit};
 use crate::TimeTagged;
 use celestia::xb::ephem_registry::State as XBState;
 use celestia::xb::Epoch as XBEpoch;
@@ -21,6 +23,46 @@ use utils::{between_0_360, between_pm_180, perpv, r1, r3};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
+
+pub fn assert_orbit_eq_or_abs<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg: &'a str) {
+    if !(left.to_cartesian_vec() == right.to_cartesian_vec())
+        && !abs_diff_eq!(
+            left.to_cartesian_vec(),
+            right.to_cartesian_vec(),
+            epsilon = epsilon
+        )
+        && left.epoch() != right.epoch()
+    {
+        panic!(
+            r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`: {}"#,
+            left.to_cartesian_vec(),
+            right.to_cartesian_vec(),
+            msg
+        )
+    }
+}
+
+pub fn assert_orbit_eq_or_rel<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg: &'a str) {
+    if !(left.to_cartesian_vec() == right.to_cartesian_vec())
+        && !relative_eq!(
+            left.to_cartesian_vec(),
+            right.to_cartesian_vec(),
+            max_relative = epsilon
+        )
+        && left.epoch() != right.epoch()
+    {
+        panic!(
+            r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`: {}"#,
+            left.to_cartesian_vec(),
+            right.to_cartesian_vec(),
+            msg
+        )
+    }
+}
 
 /// Orbit defines an orbital state
 ///
@@ -75,6 +117,22 @@ impl Orbit {
             frame,
             stm: None,
         }
+    }
+
+    /// Creates a new Orbit and initializes its STM.
+    pub fn cartesian_stm(
+        x: f64,
+        y: f64,
+        z: f64,
+        vx: f64,
+        vy: f64,
+        vz: f64,
+        dt: Epoch,
+        frame: Frame,
+    ) -> Self {
+        let mut me = Self::cartesian(x, y, z, vx, vy, vz, dt, frame);
+        me.stm_identity();
+        me
     }
 
     /// Creates a new Orbit in the provided frame at the provided Epoch in time with 0.0 velocity.
@@ -419,10 +477,10 @@ impl Orbit {
     }
 
     /// Returns the period in seconds
-    pub fn period(&self) -> f64 {
+    pub fn period(&self) -> Duration {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                2.0 * PI * (self.sma().powi(3) / gm).sqrt()
+                2.0 * PI * (self.sma().powi(3) / gm).sqrt() * TimeUnit::Second
             }
             _ => panic!("orbital period not defined in this frame"),
         }

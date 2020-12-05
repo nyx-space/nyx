@@ -56,7 +56,8 @@ where
         DefaultAllocator: Allocator<f64, Self::PropVecSize>,
     {
         let mut me = self;
-        me.set(me.epoch() + delta_t_s * TimeUnit::Second, vector);
+        me.set(me.epoch() + delta_t_s * TimeUnit::Second, vector)
+            .unwrap();
         me
     }
 

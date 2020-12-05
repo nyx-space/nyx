@@ -1,17 +1,13 @@
-extern crate hifitime;
-extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use hifitime::{Epoch, SECONDS_PER_DAY};
-use na::Vector6;
-use nyx::celestia::{Cosm, Orbit};
-use nyx::dynamics::drag::Drag;
-use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::dynamics::solarpressure::SolarPressure;
-use nyx::dynamics::spacecraft::Spacecraft;
+use nyx::celestia::{Cosm, Orbit, SpacecraftState};
+use nyx::dimensions::Vector6;
+use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, Spacecraft};
 use nyx::propagators::Propagator;
+use nyx::time::{Epoch, TimeUnit};
 use nyx::utils::rss_errors;
 
+use std::sync::Arc;
 #[test]
 fn srp_earth() {
     let mut cosm = Cosm::de438();
@@ -22,10 +18,9 @@ fn srp_earth() {
 
     let orbit = Orbit::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = 24 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
 
     let shadow_bodies = vec![eme2k];
 
@@ -33,15 +28,17 @@ fn srp_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::new(dynamics, dry_mass);
+    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc.add_model(Box::new(srp));
+    sc_dyn.add_model(Arc::new(srp));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc);
-    prop.until_time_elapsed(prop_time).unwrap();
+    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
 
-    let final_state = prop.state();
+    let setup = Propagator::default(&sc_dyn);
+    let mut prop = setup.with(sc);
+    let final_state = prop.until_time_elapsed(prop_time).unwrap();
+
     println!("{}", final_state);
 
     // GMAT result
@@ -72,10 +69,9 @@ fn exp_drag_earth() {
 
     let orbit = Orbit::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = 24 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
 
     let shadow_bodies = vec![eme2k];
 
@@ -84,14 +80,17 @@ fn exp_drag_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::new(dynamics, dry_mass);
+    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc.add_model(Box::new(srp));
+    sc_dyn.add_model(Arc::new(srp));
     // Add the drag model to the spacecraft
-    sc.add_model(Box::new(drag));
+    sc_dyn.add_model(Arc::new(drag));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc);
+    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
+
+    let setup = Propagator::default(&sc_dyn);
+    let mut prop = setup.with(sc);
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
@@ -109,10 +108,9 @@ fn std_atm_drag_earth() {
 
     let orbit = Orbit::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, dt, eme2k);
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = 24 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
 
     let shadow_bodies = vec![eme2k];
 
@@ -121,14 +119,17 @@ fn std_atm_drag_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::new(dynamics, dry_mass);
+    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc.add_model(Box::new(srp));
+    sc_dyn.add_model(Arc::new(srp));
     // Add the drag model to the spacecraft
-    sc.add_model(Box::new(drag));
+    sc_dyn.add_model(Arc::new(drag));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc);
+    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
+
+    let setup = Propagator::default(&sc_dyn);
+    let mut prop = setup.with(sc);
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();
@@ -168,10 +169,9 @@ fn std_atm_drag_earth_low() {
         eme2k,
     );
 
-    let prop_time = 24.0 * SECONDS_PER_DAY;
+    let prop_time = 24 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
 
     let shadow_bodies = vec![eme2k];
 
@@ -180,14 +180,17 @@ fn std_atm_drag_earth_low() {
 
     let dry_mass = 300.0;
 
-    let mut sc = Spacecraft::new(dynamics, dry_mass);
+    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc.add_model(Box::new(srp));
+    sc_dyn.add_model(Arc::new(srp));
     // Add the drag model to the spacecraft
-    sc.add_model(Box::new(drag));
+    sc_dyn.add_model(Arc::new(drag));
     println!("{:o}", orbit);
 
-    let mut prop = Propagator::default(&mut sc);
+    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
+
+    let setup = Propagator::default(&sc_dyn);
+    let mut prop = setup.with(sc);
     prop.until_time_elapsed(prop_time).unwrap();
 
     let final_state = prop.state();

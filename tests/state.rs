@@ -1,9 +1,8 @@
-extern crate hifitime;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
-use hifitime::Epoch;
 use nyx::celestia::{Cosm, Orbit};
+use nyx::time::{Epoch, TimeUnit};
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
@@ -47,7 +46,11 @@ fn state_def_circ_inc() {
     f64_eq!(cart.vy, -5.088_611, "vy");
     f64_eq!(cart.vz, 0.0, "vz");
     f64_eq!(cart.energy(), -25.842_247_282_849_137, "energy");
-    f64_eq!(cart.period(), 6_740.269_063_643_045, "period");
+    assert_eq!(
+        cart.period(),
+        6_740.269_063_643_045 * TimeUnit::Second,
+        "period"
+    );
     f64_eq!(cart.hx(), 35_065.806_679_607_005, "HX");
     f64_eq!(cart.hy(), 35_065.806_679_607_005, "HY");
     f64_eq!(cart.hz(), 24_796.292_541_9, "HZ");
@@ -82,7 +85,11 @@ fn state_def_circ_inc() {
     f64_eq!(kep.aop(), 314.189_999_994_618_1, "aop");
     f64_eq!(kep.ta(), 99.887_700_005_381_9, "ta");
     f64_eq!(kep.energy(), -24.328_848_116_377_95, "energy");
-    f64_eq!(kep.period(), 7_378.877_993_957_958, "period");
+    assert_eq!(
+        kep.period(),
+        7_378.877_993_957_958 * TimeUnit::Second,
+        "period"
+    );
     f64_eq!(kep.hx(), -10_200.784_799_426_574, "HX");
     f64_eq!(kep.hy(), -7_579.639_346_783_497, "HY");
     f64_eq!(kep.hz(), 55_711.757_929_384_25, "HZ");
@@ -167,7 +174,11 @@ fn state_def_elliptical() {
         eme2k,
     );
     f64_eq!(cart.energy(), -25.842_247_282_849_144, "energy");
-    f64_eq!(cart.period(), 6_740.269_063_643_042_5, "period");
+    assert_eq!(
+        cart.period(),
+        6_740.269_063_643_042_5 * TimeUnit::Second,
+        "period"
+    );
     f64_eq!(cart.hx(), 0.015_409_898_034_704_383, "HX");
     f64_eq!(cart.hy(), -44_146.106_010_690_01, "HY");
     f64_eq!(cart.hz(), 32_364.892_694_481_765, "HZ");
@@ -204,7 +215,11 @@ fn state_def_elliptical() {
     f64_eq!(kep.aop(), 314.190_000_000_000_4, "aop");
     f64_eq!(kep.ta(), 99.887_699_999_999_58, "ta");
     f64_eq!(kep.energy(), -24.328_848_116_377_94, "energy");
-    f64_eq!(kep.period(), 7_378.877_993_957_964, "period");
+    assert_eq!(
+        kep.period(),
+        7_378.877_993_957_964 * TimeUnit::Second,
+        "period"
+    );
     f64_eq!(kep.hx(), -10_197.722_829_337_885, "HX");
     f64_eq!(kep.hy(), -7_577.364_166_057_776, "HY");
     f64_eq!(kep.hz(), 55_695.034_928_191_49, "HZ");
@@ -238,7 +253,11 @@ fn state_def_circ_eq() {
         eme2k,
     );
     f64_eq!(cart.energy(), -4.702_902_670_552_006, "energy");
-    f64_eq!(cart.period(), 86_820.776_152_986_1, "period");
+    assert_eq!(
+        cart.period(),
+        86_820.776_152_986_1 * TimeUnit::Second,
+        "period"
+    );
     f64_eq!(cart.hx(), 2.225_951_522_241_969_5, "HX");
     f64_eq!(cart.hy(), -0.436_714_326_090_944_6, "HY");
     f64_eq!(cart.hz(), 129_969.001_391_865_75, "HZ");
@@ -273,7 +292,11 @@ fn state_def_circ_eq() {
     f64_eq!(kep.aop(), 314.320_000_025_403_66, "aop");
     f64_eq!(kep.ta(), 98.764_999_974_596_28, "ta");
     f64_eq!(kep.energy(), -10.955_920_349_063_035, "energy");
-    f64_eq!(kep.period(), 24_417.396_242_570_256, "period");
+    assert_eq!(
+        kep.period(),
+        24_417.396_242_570_256 * TimeUnit::Second,
+        "period"
+    );
     f64_eq!(kep.hx(), -0.001_194_024_028_558_358_7, "HX");
     f64_eq!(kep.hy(), -0.000_884_918_835_027_750_6, "HY");
     f64_eq!(kep.hz(), 85_152.684_597_507_06, "HZ");

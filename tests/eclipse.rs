@@ -3,18 +3,17 @@ extern crate nalgebra as na;
 
 extern crate nyx_space as nyx;
 
-use hifitime::{Epoch, SECONDS_PER_DAY};
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
 use nyx::celestia::{bodies, Cosm, LTCorr, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
+use nyx::time::{Epoch, TimeUnit};
 use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 
 #[test]
 fn leo_sun_earth_eclipses() {
-    let prop_time = 2.0 * SECONDS_PER_DAY;
+    let prop_time = 2.0 * TimeUnit::Day;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -23,14 +22,16 @@ fn leo_sun_earth_eclipses() {
 
     let leo = Orbit::keplerian(6778.0, 0.1, 60.0, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
+    let (truth_tx, truth_rx) = mpsc::channel();
 
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
 
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
-        let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(60.0));
+        let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+        let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step_s(60.0));
+        let mut prop = setup.with(leo);
+
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });
@@ -64,7 +65,7 @@ fn leo_sun_earth_eclipses() {
 
 #[test]
 fn geo_sun_earth_eclipses() {
-    let prop_time = 2.0 * SECONDS_PER_DAY;
+    let prop_time = 2 * TimeUnit::Day;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -72,16 +73,18 @@ fn geo_sun_earth_eclipses() {
     // GEO are in shadow or near shadow during the equinoxes.
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 3, 19);
 
-    let leo = Orbit::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, eme2k);
+    let geo = Orbit::keplerian(42000.0, 0.1, 0.1, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
+    let (truth_tx, truth_rx) = mpsc::channel();
 
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
 
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
-        let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(60.0));
+        let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+        let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step_s(60.0));
+        let mut prop = setup.with(geo);
+
         prop.tx_chan = Some(truth_tx);
         prop.until_time_elapsed(prop_time).unwrap();
     });

@@ -5,7 +5,7 @@ use crate::SpacecraftState;
 use std::fmt;
 
 /// A general Event
-pub trait Event: fmt::Debug {
+pub trait Event: Send + Sync + fmt::Debug {
     /// Defines the type which will be accepted by the condition
     type StateType: Copy;
 

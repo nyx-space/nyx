@@ -7,7 +7,7 @@ use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
-use nyx::time::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
+use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
 
 #[test]
 fn stop_cond_3rd_apo() {
@@ -25,12 +25,14 @@ fn stop_cond_3rd_apo() {
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
     let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
 
-    let mut dynamics = OrbitalDynamics::two_body(state);
+    let dynamics = OrbitalDynamics::two_body();
 
-    let mut prop = Propagator::rk89(
-        &mut dynamics,
-        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+    let setup = Propagator::rk89(
+        &dynamics,
+        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
+
+    let mut prop = setup.with(state);
 
     let rslt = prop.until_event(condition);
 
@@ -65,12 +67,14 @@ fn stop_cond_3rd_peri() {
     let apo_event = OrbitalEvent::new(EventKind::Periapse);
     let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
 
-    let mut dynamics = OrbitalDynamics::two_body(state);
+    let dynamics = OrbitalDynamics::two_body();
 
-    let mut prop = Propagator::rk89(
-        &mut dynamics,
-        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+    let setup = Propagator::rk89(
+        &dynamics,
+        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
+
+    let mut prop = setup.with(state);
 
     let rslt = prop.until_event(condition);
 
@@ -112,15 +116,17 @@ fn nrho_apo() {
     // Track how many times we've passed by that TA again
     // let apo_event = OrbitalEvent::in_frame(EventKind::Apoapse, luna, &cosm);
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
-    let condition = StopCondition::new(apo_event, 2.0 * SECONDS_PER_DAY, 1e-1);
+    let condition = StopCondition::new(apo_event, 2 * TimeUnit::Day, 1e-1);
 
     let bodies = vec![bodies::EARTH, bodies::SUN];
-    let mut dynamics = OrbitalDynamics::point_masses(state_luna, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(luna, &bodies, &cosm);
 
-    let mut prop = Propagator::rk89(
-        &mut dynamics,
-        PropOpts::with_adaptive_step(1.0, 60.0, 1e-9, RSSStepPV {}),
+    let setup = Propagator::rk89(
+        &dynamics,
+        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
+
+    let mut prop = setup.with(state_luna);
 
     let rslt = prop.until_event(condition);
 
@@ -131,9 +137,5 @@ fn nrho_apo() {
     let rslt_eme = cosm.frame_chg(&orbit, eme2k);
     println!("EME2k: {}", rslt_eme);
     let delta_t = orbit.dt - dt;
-    println!(
-        "Found {} seconds / {} days after",
-        delta_t,
-        delta_t / SECONDS_PER_DAY
-    );
+    println!("Found {}days after", delta_t);
 }

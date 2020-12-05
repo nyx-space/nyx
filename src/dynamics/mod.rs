@@ -13,6 +13,7 @@ pub use crate::errors::NyxError;
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
 /// from this module match, or perform the appropriate coordinate transformations.
 pub mod orbital;
+pub use self::orbital::*;
 
 /// The gravity module handles spherical harmonics only. It _must_ be combined with a OrbitalDynamics dynamics
 ///
@@ -24,6 +25,7 @@ pub mod orbital;
 
 /// The spacecraft module allows for simulation of spacecraft dynamics in general, including propulsion/maneuvers.
 pub mod spacecraft;
+pub use self::spacecraft::*;
 
 /// Defines what a propulsion subsystem must implement, with some common propulsion systems.
 pub mod propulsion;
@@ -36,12 +38,15 @@ pub mod deltavctrl;
 
 /// Defines solar radiation pressure models
 pub mod solarpressure;
+pub use self::solarpressure::*;
 
 /// Define drag models
 pub mod drag;
+pub use self::drag::*;
 
 /// Define the spherical harmonic models.
 pub mod sph_harmonics;
+pub use self::sph_harmonics::*;
 
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///

@@ -1,23 +1,19 @@
-extern crate approx;
-extern crate hifitime;
-extern crate nalgebra as na;
-
 extern crate nyx_space as nyx;
 
-use approx::abs_diff_eq;
-use hifitime::{Epoch, J2000_OFFSET, SECONDS_PER_DAY};
-use na::{Matrix6, Vector6, U3};
-use nyx::celestia::{bodies, Cosm, Orbit};
-use nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
-use nyx::od::Estimable;
+use nyx::celestia::{assert_orbit_eq_or_abs, bodies, Cosm, Orbit};
+use nyx::dimensions::{Matrix6, Vector6, U3};
+use nyx::dynamics::{Dynamics, OrbitalDynamics};
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
-use nyx::utils::rss_errors;
-use std::f64::EPSILON;
+use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
+use nyx::utils::{rss_errors, rss_state_errors};
+use nyx::TimeTagged;
+use std::sync::Arc;
 
+#[allow(clippy::identity_op)]
 #[test]
 fn two_body_dynamics() {
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -27,29 +23,25 @@ fn two_body_dynamics() {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
-    let rslt = Vector6::new(
+    let rslt = Orbit::cartesian(
         -5_971.194_376_797_643,
         3_945.517_912_574_178_4,
         2_864.620_957_744_429_2,
         0.049_083_101_605_507_95,
         -4.185_084_125_817_658,
         5.848_947_462_472_877,
+        dt + prop_time,
+        eme2k,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body(state);
-
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::<RSSStepPV>::default());
+    let dynamics = OrbitalDynamics::two_body();
+    let setup = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default());
+    let mut prop = setup.with(state);
     prop.until_time_elapsed(prop_time).unwrap();
-    assert!(
-        (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
-    );
-    assert!(
-        abs_diff_eq!(prop.state_vector(), rslt, epsilon = 2e-9),
-        "two body prop failed"
-    );
+    assert_orbit_eq_or_abs(&prop.state, &rslt, 2e-9, "two body prop failed");
     // And now do the backprop
     prop.until_time_elapsed(-prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &state.to_cartesian_vec());
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &state.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back prop failed to return to the initial state in position"
@@ -58,13 +50,11 @@ fn two_body_dynamics() {
         err_v < 1e-8,
         "two body back prop failed to return to the initial state in velocity"
     );
-    assert!((prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days()).abs() <= EPSILON);
+    assert_eq!(prop.state.epoch(), dt);
     // Forward propagation again to confirm that we can do repeated calls
     prop.until_time_elapsed(prop_time).unwrap();
-    assert!(
-        (prop.dynamics.state.dt.as_mjd_tai_days() - dt.as_mjd_tai_days() - 1.0).abs() <= EPSILON
-    );
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    assert_eq!(prop.state.epoch(), dt + prop_time);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back+fwd prop failed to return to the initial state in position"
@@ -75,13 +65,14 @@ fn two_body_dynamics() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn halo_earth_moon_dynamics() {
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -103,24 +94,27 @@ fn halo_earth_moon_dynamics() {
     );
 
     // GMAT data
-    let rslt = Vector6::new(
+    let rslt = Orbit::cartesian(
         345_395.216_758_754_4,
         5_967.890_264_751_025,
         7_350.734_617_702_599,
         0.022_370_754_768_832_33,
         0.957_450_818_399_485_1,
         0.303_172_019_604_272_5,
+        start_time + prop_time,
+        eme2k,
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
+    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let mut prop = setup.with(halo_rcvr);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_state_errors(&prop.state, &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt.to_cartesian_vec();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -128,7 +122,7 @@ fn halo_earth_moon_dynamics() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.dynamics.state
+        err_r, err_v, halo_rcvr, prop.state
     );
 
     assert!(
@@ -141,13 +135,14 @@ fn halo_earth_moon_dynamics() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn halo_earth_moon_dynamics_adaptive() {
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -178,14 +173,15 @@ fn halo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::default());
+    let setup = Propagator::rk89(&dynamics, PropOpts::default());
+    let mut prop = setup.with(halo_rcvr);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -193,7 +189,7 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.dynamics.state
+        err_r, err_v, halo_rcvr, prop.state
     );
 
     assert!(
@@ -206,13 +202,14 @@ fn halo_earth_moon_dynamics_adaptive() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn llo_earth_moon_dynamics_adaptive() {
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -244,14 +241,15 @@ fn llo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON];
-    let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::default());
+    let setup = Propagator::rk89(&dynamics, PropOpts::default());
+    let mut prop = setup.with(llo_xmtr);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -259,7 +257,7 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, llo_xmtr, prop.dynamics.state
+        err_r, err_v, llo_xmtr, prop.state
     );
 
     assert!(
@@ -272,13 +270,14 @@ fn llo_earth_moon_dynamics_adaptive() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn halo_multi_body_dynamics() {
     /*
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -312,14 +311,15 @@ fn halo_multi_body_dynamics() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
+    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let mut prop = setup.with(halo_rcvr);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -327,7 +327,7 @@ fn halo_multi_body_dynamics() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.dynamics.state
+        err_r, err_v, halo_rcvr, prop.state
     );
 
     assert!(
@@ -340,6 +340,7 @@ fn halo_multi_body_dynamics() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn halo_multi_body_dynamics_adaptive() {
     /*
@@ -347,7 +348,7 @@ fn halo_multi_body_dynamics_adaptive() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -382,14 +383,15 @@ fn halo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics);
+    let setup = Propagator::default(&dynamics);
+    let mut prop = setup.with(halo_rcvr);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -397,7 +399,7 @@ fn halo_multi_body_dynamics_adaptive() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.dynamics.state
+        err_r, err_v, halo_rcvr, prop.state
     );
 
     assert!(
@@ -410,6 +412,7 @@ fn halo_multi_body_dynamics_adaptive() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn llo_multi_body_dynamics_adaptive() {
     /*
@@ -417,7 +420,7 @@ fn llo_multi_body_dynamics_adaptive() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -451,14 +454,15 @@ fn llo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = OrbitalDynamics::point_masses(llo_xmtr, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics);
+    let setup = Propagator::default(&dynamics);
+    let mut prop = setup.with(llo_xmtr);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -466,7 +470,7 @@ fn llo_multi_body_dynamics_adaptive() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, llo_xmtr, prop.dynamics.state
+        err_r, err_v, llo_xmtr, prop.state
     );
 
     assert!(
@@ -479,6 +483,7 @@ fn llo_multi_body_dynamics_adaptive() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn leo_multi_body_dynamics_adaptive_wo_moon() {
     /*
@@ -486,7 +491,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -513,14 +518,15 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics);
+    let setup = Propagator::default(&dynamics);
+    let mut prop = setup.with(leo);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -528,7 +534,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, leo, prop.dynamics.state
+        err_r, err_v, leo, prop.state
     );
 
     assert!(
@@ -541,6 +547,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn leo_multi_body_dynamics_adaptive() {
     /*
@@ -548,7 +555,7 @@ fn leo_multi_body_dynamics_adaptive() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
@@ -574,14 +581,15 @@ fn leo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = OrbitalDynamics::point_masses(leo, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::default(&mut dynamics);
+    let setup = Propagator::default(&dynamics);
+    let mut prop = setup.with(leo);
     prop.until_time_elapsed(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
-    let delta = prop.state_vector() - rslt;
+    let delta = prop.state.to_cartesian_vec() - rslt;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -589,7 +597,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
     println!(
         "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, leo, prop.dynamics.state
+        err_r, err_v, leo, prop.state
     );
 
     assert!(
@@ -602,15 +610,15 @@ fn leo_multi_body_dynamics_adaptive() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn two_body_dual() {
-    use self::nyx::dynamics::AutoDiff;
     // This is a duplicate of the differentials test in hyperdual.
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let init = Orbit::cartesian(
+    let init = Orbit::cartesian_stm(
         -9_042.862_233_600_335,
         18_536.333_069_123_244,
         6_999.957_069_486_411_5,
@@ -630,12 +638,10 @@ fn two_body_dual() {
         -0.000_270_059_537_150_490_5,
     );
 
-    let mut dynamics = OrbitalDynamicsStm::two_body(init);
-    let (fx, grad) = dynamics.eom_grad(
-        Epoch::from_tai_seconds(0.0),
-        eme2k,
-        &init.to_cartesian_vec(),
-    );
+    let dynamics = OrbitalDynamics::two_body();
+    let (fx, grad) = dynamics
+        .eom_grad(0.0, &init.to_cartesian_vec(), &init)
+        .unwrap();
 
     assert!(
         (fx - expected_fx).norm() < 1e-16,
@@ -664,21 +670,19 @@ fn two_body_dual() {
         (grad - expected).norm()
     );
 
-    assert_eq!(dynamics.state, init);
+    let prop_time = 1 * TimeUnit::Day;
 
-    let prop_time = SECONDS_PER_DAY;
-
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let mut prop = setup.with(init);
+    let final_state = prop.until_time_elapsed(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
-    let final_state = prop.dynamics.state.to_cartesian_vec();
-    let final_stm = prop.dynamics.stm();
+    let final_stm = final_state.stm.unwrap();
     let final_step = prop.latest_details().step;
     prop.until_time_elapsed(-final_step).unwrap();
 
     // And check the difference
-    let stm_err = final_stm * prop.dynamics.state.to_cartesian_vec() - final_state;
+    let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
     let radius_err = stm_err.fixed_rows::<U3>(0).into_owned();
     let velocity_err = stm_err.fixed_rows::<U3>(3).into_owned();
 
@@ -686,9 +690,10 @@ fn two_body_dual() {
     assert!(velocity_err.norm() < 1e-1);
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn multi_body_dynamics_dual() {
-    let prop_time = SECONDS_PER_DAY;
+    let prop_time = 1 * TimeUnit::Day;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -707,19 +712,19 @@ fn multi_body_dynamics_dual() {
     );
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = OrbitalDynamicsStm::point_masses(halo_rcvr, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let mut prop = setup.with(halo_rcvr);
+    let final_state = prop.until_time_elapsed(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
-    let final_state = prop.dynamics.state.to_cartesian_vec();
-    let final_stm = prop.dynamics.state.stm();
+    let final_stm = final_state.stm.unwrap();
     let final_step = prop.latest_details().step;
     prop.until_time_elapsed(-final_step).unwrap();
 
     // And check the difference
-    let stm_err = final_stm * prop.dynamics.state.to_cartesian_vec() - final_state;
+    let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
     let radius_err = stm_err.fixed_rows::<U3>(0).into_owned();
     let velocity_err = stm_err.fixed_rows::<U3>(3).into_owned();
 
@@ -727,9 +732,10 @@ fn multi_body_dynamics_dual() {
     assert!(velocity_err.norm() < 1e-3);
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn earth_sph_harmonics_j2() {
-    use nyx::dynamics::sph_harmonics::Harmonics;
+    use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
     let monte_earth_gm = 3.986_004_328_969_392e5;
@@ -775,18 +781,18 @@ fn earth_sph_harmonics_j2() {
         6.139_616_747_276_084,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body(state);
-    dynamics.add_model(Box::new(harmonics));
+    let mut dynamics = OrbitalDynamics::two_body();
+    dynamics.add_model(Arc::new(harmonics));
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::<RSSStepPV>::default());
-    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
+    let setup = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default());
+    let mut prop = setup.with(state);
+    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
 
     println!("{}", prop.state());
-    println!("Error: {:3.12}", prop.state_vector() - rslt_monte);
+    println!("Error: {:3.12}", prop.state.to_cartesian_vec() - rslt_monte);
 
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_monte);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt_monte);
 
-    // TODO: Increase the precision of this once https://github.com/ChristopherRabotin/hifitime/issues/47 is implemented
     assert!(
         err_r < 1e-1,
         format!("J2 failed in position: {:.5e}", err_r)
@@ -797,6 +803,7 @@ fn earth_sph_harmonics_j2() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn earth_sph_harmonics_12x12() {
     extern crate pretty_env_logger;
@@ -830,15 +837,16 @@ fn earth_sph_harmonics_12x12() {
         6.138_852_391_455_04,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body(state);
-    dynamics.add_model(Box::new(harmonics));
+    let mut dynamics = OrbitalDynamics::two_body();
+    dynamics.add_model(Arc::new(harmonics));
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_tolerance(1e-9));
-    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
+    let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));
+    let mut prop = setup.with(state);
+    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
 
-    println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
+    println!("Error: {:3.12}", prop.state.to_cartesian_vec() - rslt_gmat);
 
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_gmat);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt_gmat);
 
     assert!(
         dbg!(err_r) < 1e-1,
@@ -850,13 +858,14 @@ fn earth_sph_harmonics_12x12() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn earth_sph_harmonics_70x70() {
     extern crate pretty_env_logger;
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use nyx::dynamics::sph_harmonics::Harmonics;
+    use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
     let mut cosm = Cosm::de438();
@@ -883,15 +892,16 @@ fn earth_sph_harmonics_70x70() {
         6.138_865_498_487_843,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body(state);
-    dynamics.add_model(Box::new(harmonics));
+    let mut dynamics = OrbitalDynamics::two_body();
+    dynamics.add_model(Arc::new(harmonics));
 
-    let mut prop = Propagator::default(&mut dynamics);
-    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
+    let setup = Propagator::default(&dynamics);
+    let mut prop = setup.with(state);
+    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
 
-    println!("Error: {:3.12}", prop.state_vector() - rslt_gmat);
+    println!("Error: {:3.12}", prop.state.to_cartesian_vec() - rslt_gmat);
 
-    let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt_gmat);
+    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt_gmat);
 
     assert!(
         dbg!(err_r) < 0.2,
@@ -903,13 +913,14 @@ fn earth_sph_harmonics_70x70() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
 fn earth_sph_harmonics_70x70_partials() {
     extern crate pretty_env_logger;
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use nyx::dynamics::sph_harmonics::HarmonicsDiff;
+    use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
     let mut cosm = Cosm::de438();
@@ -919,10 +930,10 @@ fn earth_sph_harmonics_70x70_partials() {
     let iau_earth = cosm.frame("IAU Earth");
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
-    let state = Orbit::cartesian(
+    let state = Orbit::cartesian_stm(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
 
@@ -936,11 +947,12 @@ fn earth_sph_harmonics_70x70_partials() {
         6.138_865_498_487_843,
     );
 
-    let mut dynamics = OrbitalDynamicsStm::two_body(state);
-    dynamics.add_model(Box::new(harmonics));
+    let mut dynamics = OrbitalDynamics::two_body();
+    dynamics.add_model(Arc::new(harmonics));
 
-    let mut prop = Propagator::default(&mut dynamics);
-    prop.until_time_elapsed(SECONDS_PER_DAY).unwrap();
+    let setup = Propagator::default(&dynamics);
+    let mut prop = setup.with(state);
+    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
 
     println!(
         "Error: {:3.12}",
@@ -986,11 +998,12 @@ fn hf_prop() {
 
     let cosm = Cosm::de438();
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut dynamics = OrbitalDynamics::point_masses(state, &bodies, &cosm);
-    dynamics.add_model(Box::new(harmonics));
+    let mut dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    dynamics.add_model(Arc::new(harmonics));
 
-    let mut prop = Propagator::rk89(&mut dynamics, PropOpts::with_tolerance(1e-9));
-    let rslt = prop.until_time_elapsed(30.0 * SECONDS_PER_DAY).unwrap();
+    let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));
+    let mut prop = setup.with(state);
+    let rslt = prop.until_time_elapsed(30.0 * TimeUnit::Day).unwrap();
 
     println!("{}\n{:o}", rslt, rslt);
 }
