@@ -174,7 +174,7 @@ where
     }
 
     fn nominal_state(&self) -> T {
-        self.nominal_state.clone()
+        self.nominal_state
     }
 
     fn state_deviation(&self) -> VectorN<f64, <T as State>::Size> {

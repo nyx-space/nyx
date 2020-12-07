@@ -6,8 +6,6 @@ use crate::time::Epoch;
 use crate::{State, TimeTagged};
 pub use dynamics::{Dynamics, NyxError};
 
-use std::ops::Add;
-
 use crate::io::{CovarFormat, EpochFormat};
 
 /// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.

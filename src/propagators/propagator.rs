@@ -80,7 +80,7 @@ where
                 error: 0.0,
                 attempts: 1,
             },
-            step_size: self.opts.init_step.in_unit_f64(TimeUnit::Second),
+            step_size: self.opts.init_step,
             fixed_step: self.opts.fixed_step,
             // init_time,
             k,
@@ -119,7 +119,7 @@ where
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
     prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
-    step_size: f64,   // Stores the adapted step for the _next_ call
+    step_size: Duration, // Stores the adapted step for the _next_ call
     fixed_step: bool,
     // init_time: Epoch,
     // init_state_vec: VectorN<f64, <D::StateType as State>::Size>,
@@ -135,7 +135,7 @@ where
 {
     /// Allows setting the step size of the propagator
     pub fn set_step(&mut self, step_size: Duration, fixed: bool) {
-        self.step_size = step_size.in_unit_f64(TimeUnit::Second);
+        self.step_size = step_size;
         self.fixed_step = fixed;
     }
 
@@ -175,14 +175,14 @@ where
         // let stop_time_s = stop_time.as_tai_seconds();
         loop {
             let dt = self.state.epoch();
-            let next_dt = dt + self.step_size * TimeUnit::Second;
             // let dt_s = self.state.epoch().as_tai_seconds();
             // println!("{}\t{}", dt, self.step_size);
-            if (!backprop && next_dt > stop_time) || (backprop && next_dt <= stop_time)
+            if (!backprop && dt + self.step_size > stop_time)
+                || (backprop && dt + self.step_size <= stop_time)
             /*if (!backprop && dt_s + self.step_size.in_unit_f64(TimeUnit::Second) > stop_time_s)
             || (backprop && dt_s + self.step_size.in_unit_f64(TimeUnit::Second) <= stop_time_s)*/
             {
-                if stop_time == next_dt {
+                if stop_time == dt {
                     // No propagation necessary
                     return Ok(self.state);
                 }
@@ -199,9 +199,7 @@ where
                 self.event_trackers
                     .eval_and_save(dt, self.state.epoch(), &self.state);
                 // Restore the step size for subsequent calls
-                // self.set_step(prev_step_size, prev_step_kind);
-                self.step_size = prev_step_size;
-                self.fixed_step = prev_step_kind;
+                self.set_step(prev_step_size, prev_step_kind);
                 if !self.prevent_tx {
                     if let Some(ref chan) = self.tx_chan {
                         if let Err(e) = chan.send(self.state) {
@@ -390,7 +388,7 @@ where
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds;
-        let step_size = self.step_size;
+        let step_size = self.step_size.in_unit_f64(TimeUnit::Second);
         loop {
             let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
             self.k[0] = ki;
@@ -432,13 +430,13 @@ where
 
             if self.fixed_step {
                 // Using a fixed step, no adaptive step necessary
-                self.details.step = self.step_size * TimeUnit::Second;
+                self.details.step = self.step_size;
                 return Ok(((t + step_size), next_state));
             } else {
                 // Compute the error estimate.
                 self.details.error = E::estimate(&error_est, &next_state.clone(), &state);
                 if self.details.error <= self.prop.opts.tolerance
-                    || self.step_size <= self.prop.opts.min_step.in_unit_f64(TimeUnit::Second)
+                    || self.step_size <= self.prop.opts.min_step
                     || self.details.attempts >= self.prop.opts.attempts
                 {
                     if self.details.attempts >= self.prop.opts.attempts {
@@ -448,20 +446,20 @@ where
                         );
                     }
 
-                    self.details.step = self.step_size * TimeUnit::Second;
+                    self.details.step = self.step_size;
                     if self.details.error < self.prop.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
                         let proposed_step = 0.9
-                            * self.step_size
+                            * self.step_size.in_unit_f64(TimeUnit::Second)
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.order));
                         self.step_size = if proposed_step
                             > self.prop.opts.max_step.in_unit_f64(TimeUnit::Second)
                         {
-                            self.prop.opts.max_step.in_unit_f64(TimeUnit::Second)
+                            self.prop.opts.max_step
                         } else {
-                            proposed_step
+                            proposed_step * TimeUnit::Second
                         };
                     }
                     return Ok((
@@ -473,14 +471,14 @@ where
                     // So let's adapt the step size.
                     self.details.attempts += 1;
                     let proposed_step = 0.9
-                        * self.step_size
+                        * self.step_size.in_unit_f64(TimeUnit::Second)
                         * (self.prop.opts.tolerance / self.details.error)
                             .powf(1.0 / f64::from(self.prop.order - 1));
                     self.step_size =
                         if proposed_step < self.prop.opts.min_step.in_unit_f64(TimeUnit::Second) {
-                            self.prop.opts.min_step.in_unit_f64(TimeUnit::Second)
+                            self.prop.opts.min_step
                         } else {
-                            proposed_step
+                            proposed_step * TimeUnit::Second
                         };
                 }
             }
