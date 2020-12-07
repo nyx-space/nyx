@@ -11,9 +11,9 @@ use crate::od::ranging::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
-use crate::propagators::{PropInstance, Propagator};
+use crate::propagators::Propagator;
 use crate::time::{Duration, TimeUnit};
-use crate::{Orbit, SpacecraftState, State};
+use crate::Orbit;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::time::Instant;
@@ -284,7 +284,7 @@ impl<'a> OdpScenario<'a> {
     }
 
     /// Will generate the measurements and run the filter.
-    pub fn execute(mut self) -> Result<(), NyxError> {
+    pub fn execute(self) -> Result<(), NyxError> {
         // Generate the measurements.
         let prop_time = self.truth.prop_time.unwrap();
 

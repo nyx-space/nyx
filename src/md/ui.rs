@@ -15,8 +15,7 @@ use crate::io::formatter::*;
 use crate::io::quantity::ParsingError;
 use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
-use crate::propagators::error_ctrl::RSSStepPV;
-use crate::propagators::{PropInstance, Propagator};
+use crate::propagators::Propagator;
 use crate::time::{Duration, Epoch, SECONDS_PER_DAY};
 use crate::SpacecraftState;
 use std::str::FromStr;
@@ -186,7 +185,7 @@ where
                         bodies.remove(pos);
                     }
 
-                    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::point_masses(
+                    let sc_dyn = Spacecraft::new(OrbitalDynamics::point_masses(
                         init_state.frame,
                         &bodies,
                         cosm,

@@ -13,7 +13,7 @@ fn regress_leo_day_adaptive() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let prop_time = 1 * TimeUnit::Hour;
+    let prop_time = 1 * TimeUnit::Day;
     let accuracy = 1e-12;
     let min_step = 0.1 * TimeUnit::Second;
     let max_step = 30.0 * TimeUnit::Second;

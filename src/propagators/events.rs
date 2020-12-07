@@ -251,6 +251,7 @@ pub struct StopCondition<S: Copy> {
     pub epsilon_eval: f64,
 }
 
+#[allow(clippy::identity_op)]
 impl<S: Copy> StopCondition<S> {
     /// Finds the closest time at which this condition is met. Stops on first occurence.
     pub fn new(event: Box<dyn Event<StateType = S>>, prop_time: Duration, epsilon: f64) -> Self {

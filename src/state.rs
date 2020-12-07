@@ -352,7 +352,7 @@ impl State for SpacecraftState {
     fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U43>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
         let orbit_vec = vector.fixed_rows::<U42>(0).into_owned();
-        self.orbit.set(epoch, &orbit_vec);
+        self.orbit.set(epoch, &orbit_vec)?;
         self.fuel_mass = vector[U43::dim() - 1];
         Ok(())
     }

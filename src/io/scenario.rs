@@ -643,7 +643,7 @@ fn test_od_scenario() {
         snc_decay = ["20 * min", "20 min", "15 min"]
         measurements = "msr_sim"  # Or provide a file name
         ekf_msr_trigger = 30
-        ekf_disable_time = 3600 s  # If no measurements for an hour, disable the EKF
+        ekf_disable_time = "3600 s"  # If no measurements for an hour, disable the EKF
         output = "estimate_csv"
 
         [output.estimate_csv]

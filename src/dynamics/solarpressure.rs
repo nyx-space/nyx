@@ -68,7 +68,7 @@ impl<'a> ForceModel for SolarPressure<'a> {
         ctx: &SpacecraftState,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Extract data from hyperspace
-        let cart_r = vector_from_hyperspace(&radius.fixed_rows::<U3>(0).into_owned());
+        // let cart_r = vector_from_hyperspace(&radius.fixed_rows::<U3>(0).into_owned());
         // Recreate the osculating state
         let osc = ctx.orbit;
 

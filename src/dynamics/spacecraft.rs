@@ -209,7 +209,7 @@ impl<'a> Dynamics for Spacecraft<'a>
         let radius = state_vec.fixed_rows::<U3>(0).into_owned();
 
         // Recreate the osculating state.
-        let mut osc_sc = ctx.clone();
+        let mut osc_sc = *ctx;
         osc_sc.set_epoch(ctx.epoch() + delta_t_s * TimeUnit::Second);
         osc_sc.orbit.x = orb_state[0];
         osc_sc.orbit.y = orb_state[1];

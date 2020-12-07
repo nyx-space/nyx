@@ -51,8 +51,6 @@ impl Heuristic for LambertHeuristic {
         let (tx, rx) = channel();
         let prop_setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-3));
         let mut prop = prop_setup.with(start_tf);
-        // let mut prop2 = prop_setup.with(start_tf);
-        // let mut prop = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-3)).with(start_tf);
         prop.tx_chan = Some(tx);
         prop.until_time_elapsed(self.tof)?;
 
@@ -81,6 +79,7 @@ fn lambert_heuristic() {
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
     let dest_dt = Epoch::from_gregorian_utc_at_noon(2020, 1, 1);
     let delta_t = dest_dt - orig_dt;
+    println!("{}", delta_t);
 
     let h = LambertHeuristic { tof: delta_t };
 

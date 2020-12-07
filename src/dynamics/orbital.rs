@@ -60,7 +60,7 @@ impl<'a> OrbitalDynamics<'a> {
     }
 
     /// Initialize orbital dynamics with a list of acceleration models
-    pub fn new(state: Orbit, accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
+    pub fn new(_: Orbit, accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
         Self {
             // state,
             // relative_time: 0.0,
@@ -131,7 +131,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 
     fn dual_eom(
         &self,
-        delta_t_s: f64,
+        _delta_t_s: f64,
         state: &VectorN<Hyperdual<f64, U7>, U6>,
         ctx: &Orbit,
     ) -> Result<(Vector6<f64>, Matrix6<f64>), NyxError> {
