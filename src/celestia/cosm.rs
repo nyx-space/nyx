@@ -472,7 +472,7 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
-    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<Orbit, NyxError> {
+    pub fn raw_celestial_state(&self, exb_id: i32, epoch: Epoch) -> Result<Orbit, NyxError> {
         let ephem = self
             .ephemerides
             .get(&exb_id)
@@ -506,6 +506,7 @@ impl Cosm {
 
         let interval_length: f64 = exb_states.window_duration;
 
+        let jde = epoch.as_jde_tdb_days();
         let delta_jde = jde - start_mod_julian;
         let index_f = (delta_jde / interval_length).floor();
         let mut offset = delta_jde - index_f * interval_length;
@@ -558,7 +559,7 @@ impl Cosm {
         let ref_frame_id = ephem.ref_frame.as_ref().unwrap().number;
         let ref_frame_exb_id = ref_frame_id % 100_000;
         let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
-        let dt = Epoch::from_jde_tai(jde);
+
         Ok(Orbit::cartesian(
             x,
             y,
@@ -566,7 +567,7 @@ impl Cosm {
             vx / SECONDS_PER_DAY,
             vy / SECONDS_PER_DAY,
             vz / SECONDS_PER_DAY,
-            dt,
+            epoch,
             storage_geoid,
         ))
     }
@@ -725,8 +726,7 @@ impl Cosm {
                 continue;
             }
             // This means the target or the origin is exactly this path.
-            let mut next_state =
-                self.raw_celestial_state(body.exb_id(), state.dt.as_jde_tdb_days())?;
+            let mut next_state = self.raw_celestial_state(body.exb_id(), state.dt)?;
             if prev_frame_exb_id == next_state.frame.exb_id() || neg_needed {
                 // Let's negate the next state prior to adding it.
                 next_state = -next_state;
