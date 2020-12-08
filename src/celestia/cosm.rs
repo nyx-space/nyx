@@ -156,8 +156,12 @@ impl Cosm {
         for ephem in ephemerides {
             let id = ephem.id.as_ref().unwrap();
 
-            self.ephemerides.insert(id.number, ephem.clone());
-            self.ephemerides_names.insert(id.name.clone(), id.number);
+            let mut ephemc = ephem.clone();
+            // Convert all of the names to lowercase now, so we don't have to do so later.
+            let name = ephemc.id.as_ref().unwrap().name.to_lowercase();
+            ephemc.id.as_mut().unwrap().name = name.clone();
+            self.ephemerides.insert(id.number, ephemc);
+            self.ephemerides_names.insert(name, id.number);
 
             // Compute the exb_id.
             let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
@@ -392,15 +396,15 @@ impl Cosm {
         match self.ephemerides.get(&id) {
             Some(e) => {
                 // Now that we have the ephem for this ID, let's get the original frame
-                match self.frames.get(&format!(
-                    "{} j2000",
-                    e.id.as_ref().unwrap().name.to_lowercase()
-                )) {
+                match self
+                    .frames
+                    .get(&format!("{} j2000", &e.id.as_ref().unwrap().name))
+                {
                     Some(f) => Ok(*f),
-                    None => Ok(self.frames[&format!(
-                        "{} barycenter j2000",
-                        e.id.as_ref().unwrap().name.to_lowercase()
-                    )]),
+                    None => {
+                        Ok(self.frames
+                            [&format!("{} barycenter j2000", e.id.as_ref().unwrap().name)])
+                    }
                 }
             }
             None => Err(NyxError::ObjectIDNotFound(id)),
