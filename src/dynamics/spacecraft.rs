@@ -117,12 +117,51 @@ impl<'a> Dynamics for Spacecraft<'a>
         let d_x_orbital_dyn = self
             .orbital_dyn
             .eom(delta_t, &orbital_dyn_vec, &ctx.orbit)?;
+        println!("{}", state.fixed_rows::<U6>(0));
         let mut d_x = VectorN::<f64, U43>::from_iterator(
             d_x_orbital_dyn
                 .iter()
                 .chain(Vector1::new(0.0).iter())
                 .cloned(),
         );
+
+        /*
+              Quickly goes to shits
+
+
+        ┌                   ┐
+        │             24396 │
+        │                 0 │
+        │                 0 │
+        │                 0 │
+        │ 4.042123470854365 │
+        │                 0 │
+        └                   ┘
+
+
+
+        ┌                    ┐
+        │              24396 │
+        │ 20.210617354271825 │
+        │                  0 │
+        │                inf │
+        │                inf │
+        │               -inf │
+        └                    ┘
+
+
+
+        ┌      ┐
+        │  inf │
+        │  inf │
+        │ -inf │
+        │  NaN │
+        │  NaN │
+        │  NaN │
+        └      ┘
+
+
+              */
 
         // let orbital_dyn_state = self.orbital_dyn.orbital_state_ctor(t, &orbital_dyn_vec);
         // let orbital_dyn_state = ctx.orbit.ctor_from(delta_t, &orbital_dyn_vec);
@@ -177,6 +216,16 @@ impl<'a> Dynamics for Spacecraft<'a>
                 d_x[i + 3] += model_frc[i];
             }
         }
+
+        // XXX: Somehow, the flux pressure is correct on the first call to EOM, but then
+        // the input state for the second call is +/- inf on the top three items and already
+        // NaN on the velocity. So every subsequent call fails.
+        //         -0.0,
+        //         7.725760634075587,
+        //         0.0,
+        //         inf,
+        //         inf,
+        //         -inf,
 
         Ok(d_x)
     }

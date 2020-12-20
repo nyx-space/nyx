@@ -3,7 +3,7 @@ use super::events::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch, TimeSystem, TimeUnit};
 use crate::{State, TimeTagged};
 use dynamics::Dynamics;
 use errors::NyxError;
@@ -170,17 +170,22 @@ where
             self.step_size = -self.step_size; // Invert the step size
         }
         // let init_seconds = self.dynamics.time();
-        // let stop_time = init_seconds + elapsed_time.in_unit_f64(TimeUnit::Second);
+        // let stop_time = init_seconds + elapsed_time.in_seconds();
         let stop_time = self.state.epoch() + elapsed_time;
         // let stop_time_s = stop_time.as_tai_seconds();
+        println!("{}", self.state.epoch());
         loop {
             let dt = self.state.epoch();
             // let dt_s = self.state.epoch().as_tai_seconds();
-            // println!("{}\t{}", dt, self.step_size);
+            println!(
+                "{}\t{}",
+                dt.as_gregorian_str(TimeSystem::ET),
+                self.step_size
+            );
             if (!backprop && dt + self.step_size > stop_time)
                 || (backprop && dt + self.step_size <= stop_time)
-            /*if (!backprop && dt_s + self.step_size.in_unit_f64(TimeUnit::Second) > stop_time_s)
-            || (backprop && dt_s + self.step_size.in_unit_f64(TimeUnit::Second) <= stop_time_s)*/
+            /*if (!backprop && dt_s + self.step_size.in_seconds() > stop_time_s)
+            || (backprop && dt_s + self.step_size.in_seconds() <= stop_time_s)*/
             {
                 if stop_time == dt {
                     // No propagation necessary
@@ -216,7 +221,9 @@ where
                 // let (t, state_vec) =
                 //     self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state)?;
                 // We haven't passed the time based stopping condition.
+                dbg!(dt.as_tai_seconds(), t);
                 self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
+                dbg!(self.state.epoch());
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, self.state.epoch(), &self.state);
@@ -276,7 +283,7 @@ where
 
         // Helper lambdas, for f64s only
         let eps = condition.epsilon;
-        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() <= eps.in_unit_f64(TimeUnit::Second);
+        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() <= eps.in_seconds();
         let arrange = |a: f64, ya: f64, b: f64, yb: f64| {
             if ya.abs() > yb.abs() {
                 (a, ya, b, yb)
@@ -383,12 +390,14 @@ where
         // state: &VectorN<f64, <D::StateType as State>::PropVecSize>,
         // ctx: &D::StateType,
     ) -> Result<(f64, VectorN<f64, <D::StateType as State>::PropVecSize>), NyxError> {
+        dbg!(self.details);
         let state = &self.state_vector();
         let ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds;
-        let step_size = self.step_size.in_unit_f64(TimeUnit::Second);
+        let step_size = self.step_size.in_seconds();
+        dbg!(step_size);
         loop {
             let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
             self.k[0] = ki;
@@ -427,6 +436,7 @@ where
                 }
                 next_state += step_size * b_i * ki;
             }
+            dbg!(&next_state);
 
             if self.fixed_step {
                 // Using a fixed step, no adaptive step necessary
@@ -434,7 +444,8 @@ where
                 return Ok(((t + step_size), next_state));
             } else {
                 // Compute the error estimate.
-                self.details.error = E::estimate(&error_est, &next_state.clone(), &state);
+                self.details.error = E::estimate(&error_est, &next_state, &state);
+                dbg!(self.details.error);
                 if self.details.error <= self.prop.opts.tolerance
                     || self.step_size <= self.prop.opts.min_step
                     || self.details.attempts >= self.prop.opts.attempts
@@ -451,35 +462,32 @@ where
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
                         let proposed_step = 0.9
-                            * self.step_size.in_unit_f64(TimeUnit::Second)
+                            * self.step_size.in_seconds()
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.order));
-                        self.step_size = if proposed_step
-                            > self.prop.opts.max_step.in_unit_f64(TimeUnit::Second)
-                        {
+                        self.step_size = if proposed_step > self.prop.opts.max_step.in_seconds() {
                             self.prop.opts.max_step
                         } else {
                             proposed_step * TimeUnit::Second
                         };
                     }
-                    return Ok((
-                        (t + self.details.step.in_unit_f64(TimeUnit::Second)),
-                        next_state,
-                    ));
+                    return Ok(((t + self.details.step.in_seconds()), next_state));
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
                     // So let's adapt the step size.
                     self.details.attempts += 1;
+                    dbg!(self.step_size, self.details);
                     let proposed_step = 0.9
-                        * self.step_size.in_unit_f64(TimeUnit::Second)
-                        * (self.prop.opts.tolerance / self.details.error)
+                        * self.step_size.in_seconds()
+                        * dbg!(self.prop.opts.tolerance / self.details.error)
                             .powf(1.0 / f64::from(self.prop.order - 1));
-                    self.step_size =
-                        if proposed_step < self.prop.opts.min_step.in_unit_f64(TimeUnit::Second) {
-                            self.prop.opts.min_step
-                        } else {
-                            proposed_step * TimeUnit::Second
-                        };
+                    dbg!(proposed_step);
+                    assert!(!proposed_step.is_nan());
+                    self.step_size = if proposed_step < self.prop.opts.min_step.in_seconds() {
+                        self.prop.opts.min_step
+                    } else {
+                        proposed_step * TimeUnit::Second
+                    };
                 }
             }
         }

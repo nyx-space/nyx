@@ -31,7 +31,7 @@ impl Heuristic for LambertHeuristic {
         let sol = standard(
             start.radius(),
             end.radius(),
-            self.tof.in_unit_f64(TimeUnit::Second),
+            self.tof.in_seconds(),
             start.frame.gm(),
             TransferKind::Auto,
         )?;

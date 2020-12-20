@@ -249,7 +249,7 @@ where
             let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
 
             if delta_t <= pcr_dt {
-                let delta_t_s = delta_t.in_unit_f64(TimeUnit::Second);
+                let delta_t_s = delta_t.in_seconds();
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = MatrixMN::<f64, S, A>::zeros();
