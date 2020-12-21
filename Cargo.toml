@@ -21,7 +21,7 @@ nalgebra = "0.17"
 log = "0.4"
 hifitime = "0.1"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
-rand = "0.6"
+rand = "0.8"
 serde = "1.0"
 csv = "1"
 dual_num = { git = "https://github.com/novacrazy/dual_num", branch = "master" }
