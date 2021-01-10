@@ -64,7 +64,7 @@ impl<'a> ForceModel for SolarPressure<'a> {
 
     fn dual_eom(
         &self,
-        radius: &Vector3<Hyperdual<f64, U7>>,
+        _radius: &Vector3<Hyperdual<f64, U7>>,
         ctx: &SpacecraftState,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Extract data from hyperspace

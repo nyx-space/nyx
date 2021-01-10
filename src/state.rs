@@ -4,7 +4,7 @@ use crate::dimensions::{
     DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, VectorN, U42, U43, U6, U7,
 };
 use crate::errors::NyxError;
-use crate::time::{Epoch, TimeUnit};
+use crate::time::Epoch;
 use std::fmt;
 use std::ops::Add;
 
@@ -578,3 +578,36 @@ impl Add<VectorN<f64, U6>> for SpacecraftState {
 //         }
 //     }
 // }
+
+#[test]
+fn test_set_state() {
+    let delta_t_s: f64 = 0.0;
+    let mut new_vec = vec![0.0; 42];
+    new_vec[0] = 1.0;
+    new_vec[1] = 2.0;
+    new_vec[2] = 3.0;
+    new_vec[3] = 4.0;
+    new_vec[4] = 5.0;
+    new_vec[5] = 6.0;
+
+    let state = VectorN::<f64, U42>::from_iterator(new_vec);
+    let dummy_frame = Frame::Celestial {
+        axb_id: 0,
+        exb_id: 399,
+        gm: 398600.4415,
+        parent_axb_id: None,
+        parent_exb_id: None,
+    };
+    let ctx = Orbit::cartesian(
+        6678.1363,
+        2.0,
+        3.0,
+        4.0,
+        7.725760634075587,
+        6.0,
+        Epoch::from_tai_days(0.0),
+        dummy_frame,
+    );
+    let osc = ctx.ctor_from(delta_t_s, &state);
+    println!("{}", osc);
+}

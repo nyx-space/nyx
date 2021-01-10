@@ -117,7 +117,7 @@ impl<'a> Dynamics for Spacecraft<'a>
         let d_x_orbital_dyn = self
             .orbital_dyn
             .eom(delta_t, &orbital_dyn_vec, &ctx.orbit)?;
-        println!("{}", state.fixed_rows::<U6>(0));
+        // Note: 0.0 is the current fuel usage at this point.
         let mut d_x = VectorN::<f64, U43>::from_iterator(
             d_x_orbital_dyn
                 .iter()
@@ -125,50 +125,13 @@ impl<'a> Dynamics for Spacecraft<'a>
                 .cloned(),
         );
 
-        /*
-              Quickly goes to shits
-
-
-        ┌                   ┐
-        │             24396 │
-        │                 0 │
-        │                 0 │
-        │                 0 │
-        │ 4.042123470854365 │
-        │                 0 │
-        └                   ┘
-
-
-
-        ┌                    ┐
-        │              24396 │
-        │ 20.210617354271825 │
-        │                  0 │
-        │                inf │
-        │                inf │
-        │               -inf │
-        └                    ┘
-
-
-
-        ┌      ┐
-        │  inf │
-        │  inf │
-        │ -inf │
-        │  NaN │
-        │  NaN │
-        │  NaN │
-        └      ┘
-
-
-              */
-
         // let orbital_dyn_state = self.orbital_dyn.orbital_state_ctor(t, &orbital_dyn_vec);
         // let orbital_dyn_state = ctx.orbit.ctor_from(delta_t, &orbital_dyn_vec);
         let mut total_mass = ctx.dry_mass;
 
         // Rebuild the osculating state for the EOM context.
-        let osc_sc = ctx.ctor_from(delta_t, &d_x);
+        // let osc_sc = ctx.ctor_from(delta_t, &d_x);
+        let osc_sc = ctx;
 
         // Now compute the other dynamics as needed.
         if let Some(ctrl) = &self.ctrl {
