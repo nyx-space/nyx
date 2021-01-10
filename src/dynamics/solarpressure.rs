@@ -1,4 +1,4 @@
-use super::hyperdual::{hyperspace_from_vector, linalg::norm, vector_from_hyperspace, Hyperdual};
+use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
 // use super::AutoDiff;
 use super::ForceModel;
 use crate::celestia::eclipse::{EclipseLocator, EclipseState};
@@ -67,9 +67,6 @@ impl<'a> ForceModel for SolarPressure<'a> {
         _radius: &Vector3<Hyperdual<f64, U7>>,
         ctx: &SpacecraftState,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
-        // Extract data from hyperspace
-        // let cart_r = vector_from_hyperspace(&radius.fixed_rows::<U3>(0).into_owned());
-        // Recreate the osculating state
         let osc = ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft

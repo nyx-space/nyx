@@ -1,7 +1,7 @@
 extern crate csv;
 
 pub use crate::celestia::*;
-use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U6};
+use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
@@ -29,6 +29,7 @@ pub struct OdpScenario<'a> {
 }
 
 impl<'a> OdpScenario<'a> {
+    #[allow(clippy::identity_op)]
     pub fn try_from_scenario(
         scenario: &ScenarioSerde,
         seq_name: String,

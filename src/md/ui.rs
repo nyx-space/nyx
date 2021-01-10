@@ -194,10 +194,7 @@ where
                     init_sc = SpacecraftState::new(
                         init_state,
                         spacecraft.dry_mass,
-                        match spacecraft.fuel_mass {
-                            Some(fuel_mass) => fuel_mass,
-                            None => 0.0,
-                        },
+                        spacecraft.fuel_mass.unwrap_or(0.0),
                     );
 
                     sc_dyn_flagged = sc_dyn;
@@ -207,10 +204,7 @@ where
                     init_sc = SpacecraftState::new(
                         init_state,
                         spacecraft.dry_mass,
-                        match spacecraft.fuel_mass {
-                            Some(fuel_mass) => fuel_mass,
-                            None => 0.0,
-                        },
+                        spacecraft.fuel_mass.unwrap_or(0.0),
                     );
 
                     // Add the force models
@@ -295,10 +289,7 @@ where
                 };
 
                 // Let's see if it's a relative time
-                let prop_tol = match prop.tolerance {
-                    Some(tol) => tol,
-                    None => 1e-12,
-                };
+                let prop_tol = prop.tolerance.unwrap_or(1e-12);
 
                 Ok((
                     Self {

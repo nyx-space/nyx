@@ -1,7 +1,7 @@
 use crate::celestia::Frame;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3, U6};
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch};
 
 use std::fmt;
 
@@ -168,6 +168,7 @@ where
 
 #[test]
 fn test_snc_init() {
+    use crate::time::TimeUnit;
     let snc_expo = SNC3::with_decay(
         2 * TimeUnit::Minute,
         &[1e-6, 1e-6, 1e-6],

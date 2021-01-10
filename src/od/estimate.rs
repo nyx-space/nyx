@@ -408,7 +408,7 @@ where
     }
 
     fn nominal_state(&self) -> T {
-        self.nominal_state.clone()
+        self.nominal_state
     }
 
     /// Will panic if the information matrix inversion fails

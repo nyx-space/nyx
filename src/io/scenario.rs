@@ -298,10 +298,7 @@ pub struct Harmonics {
 impl Harmonics {
     pub fn load(&self) -> HarmonicsMem {
         let gunzipped = self.file.contains("gz");
-        let order = match self.order {
-            Some(order) => order,
-            None => 0,
-        };
+        let order = self.order.unwrap_or(0);
         if self.file.contains("cof") {
             HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped).unwrap()
         } else if self.file.contains("sha") {
@@ -453,18 +450,12 @@ impl ConditionSerde {
                 event,
                 hits,
                 search_until - init_dt,
-                match self.tolerance {
-                    Some(tol) => tol,
-                    None => 1e-6,
-                },
+                self.tolerance.unwrap_or(1e-6),
             ),
             None => StopCondition::new(
                 event,
                 search_until - init_dt,
-                match self.tolerance {
-                    Some(tol) => tol,
-                    None => 1e-6,
-                },
+                self.tolerance.unwrap_or(1e-6),
             ),
         }
     }

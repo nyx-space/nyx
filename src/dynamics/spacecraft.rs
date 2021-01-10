@@ -9,7 +9,6 @@ use crate::TimeTagged;
 use celestia::SpacecraftState;
 use errors::NyxError;
 use std::sync::Arc;
-use State;
 
 pub use super::solarpressure::SolarPressure;
 

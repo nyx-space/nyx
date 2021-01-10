@@ -3,7 +3,7 @@ use crate::dimensions::Vector3;
 use crate::dynamics::orbital::OrbitalDynamics;
 use crate::errors::NyxError;
 use crate::propagators::{PropOpts, Propagator};
-use crate::time::{Duration, TimeUnit};
+use crate::time::Duration;
 use crate::tools::lambert::{standard, TransferKind};
 use std::sync::mpsc::channel;
 

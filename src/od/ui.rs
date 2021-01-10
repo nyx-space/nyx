@@ -211,7 +211,7 @@ where
             let p_kp1_k = est_kp1.predicted_covar();
             let p_kp1_k_inv = &p_kp1_k
                 .try_inverse()
-                .ok_or_else(|| NyxError::SingularCovarianceMatrix)?;
+                .ok_or(NyxError::SingularCovarianceMatrix)?;
             // Compute Sk
             let sk = p_k_k * phi_kp1_k.transpose() * p_kp1_k_inv;
             // Compute smoothed estimate

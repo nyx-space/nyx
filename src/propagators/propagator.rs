@@ -3,7 +3,7 @@ use super::events::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
-use crate::time::{Duration, Epoch, TimeSystem, TimeUnit};
+use crate::time::{Duration, Epoch, TimeUnit};
 use crate::{State, TimeTagged};
 use dynamics::Dynamics;
 use errors::NyxError;
@@ -188,7 +188,7 @@ where
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
-                self.set_step(stop_time - dt, true);
+                self.set_step(dbg!(stop_time - dt), true);
                 // let state_vector = &self.state_vector();
                 // let state = &self.state;
                 // let (t, state_vec) = self.derive(dt.as_tai_seconds(), state_vector, state)?;
@@ -561,6 +561,7 @@ impl PropOpts<RSSStepPV> {
     }
 
     /// Returns the default options with a specific tolerance.
+    #[allow(clippy::field_reassign_with_default)]
     pub fn with_tolerance(tolerance: f64) -> Self {
         let mut opts = Self::default();
         opts.tolerance = tolerance;
