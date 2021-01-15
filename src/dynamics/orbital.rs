@@ -105,6 +105,11 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
             // Still return something of size 42, but the STM will be zeros.
 
             let osc = ctx.ctor_from(delta_t_s, state);
+            println!(
+                "[src/dynamics/orbital.rs:108] {} (was ctx= {})",
+                osc.epoch(),
+                ctx.epoch()
+            );
             // TODO: Speed check this with the PointMasses only, including the integration frame point mass
             let body_acceleration = (-osc.frame.gm() / osc.rmag().powi(3)) * osc.radius();
             let mut d_x = Vector6::from_iterator(
@@ -429,6 +434,7 @@ impl<'a> PointMasses<'a> {
 
 impl<'a> AccelModel for PointMasses<'a> {
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
+        println!("{}", osc.epoch());
         let mut d_x = Vector3::zeros();
         // Get all of the position vectors between the center body and the third bodies
         for exb_id in &self.bodies {

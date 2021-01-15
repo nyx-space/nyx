@@ -4,7 +4,7 @@ use crate::dimensions::{
     DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, VectorN, U42, U43, U6, U7,
 };
 use crate::errors::NyxError;
-use crate::time::Epoch;
+use crate::time::{Duration, Epoch};
 use std::fmt;
 use std::ops::Add;
 
@@ -14,6 +14,11 @@ pub trait TimeTagged {
     fn epoch(&self) -> Epoch;
     /// Set the Epoch
     fn set_epoch(&mut self, epoch: Epoch);
+
+    /// Adds a duration to this time tagged item
+    fn add_duration(&mut self, other: Duration) {
+        self.set_epoch(self.epoch() + other);
+    }
 }
 
 /// A trait for generate propagation and estimation state.

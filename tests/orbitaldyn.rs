@@ -38,8 +38,10 @@ fn two_body_dynamics() {
     let setup = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default());
     let mut prop = setup.with(state);
     prop.until_time_elapsed(prop_time).unwrap();
+    dbg!((&prop.state.to_cartesian_vec() - &rslt.to_cartesian_vec()).norm());
     assert_orbit_eq_or_abs(&prop.state, &rslt, 2e-9, "two body prop failed");
-    // And now do the backprop
+    // And now do the backprop by re-initializing a propagator to ensure correct step size
+    // let mut prop = setup.with(prop.state);
     prop.until_time_elapsed(-prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &state.to_cartesian_vec());
     println!("RTN:  {}\nINIT: {}", prop.state, state);
