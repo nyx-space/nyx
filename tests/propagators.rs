@@ -360,8 +360,7 @@ fn gmat_val_leo_day_fixed() {
         let mut prop = setup.with(init);
         prop.until_time_elapsed(prop_time).unwrap();
         assert_eq!(
-            prop.state_vector(),
-            all_rslts[0].to_cartesian_vec(),
+            prop.state, all_rslts[0],
             "first forward two body prop failed"
         );
         prop.until_time_elapsed(-prop_time).unwrap();
@@ -396,11 +395,7 @@ fn gmat_val_leo_day_fixed() {
         );
         let mut prop = setup.with(init);
         prop.until_time_elapsed(prop_time).unwrap();
-        assert_eq!(
-            prop.state.to_cartesian_vec(),
-            all_rslts[2].to_cartesian_vec(),
-            "two body prop failed"
-        );
+        assert_eq!(prop.state, all_rslts[2], "two body prop failed");
     }
 
     {
@@ -410,11 +405,7 @@ fn gmat_val_leo_day_fixed() {
         );
         let mut prop = setup.with(init);
         prop.until_time_elapsed(prop_time).unwrap();
-        assert_eq!(
-            prop.state.to_cartesian_vec(),
-            all_rslts[3].to_cartesian_vec(),
-            "two body prop failed"
-        );
+        assert_eq!(prop.state, all_rslts[3], "two body prop failed");
     }
 
     {
@@ -424,10 +415,6 @@ fn gmat_val_leo_day_fixed() {
         );
         let mut prop = setup.with(init);
         prop.until_time_elapsed(prop_time).unwrap();
-        assert_eq!(
-            prop.state.to_cartesian_vec(),
-            all_rslts[4].to_cartesian_vec(),
-            "two body prop failed"
-        );
+        assert_eq!(prop.state, all_rslts[4], "two body prop failed");
     }
 }

@@ -9,6 +9,7 @@ use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
 
+#[ignore]
 #[test]
 fn stop_cond_3rd_apo() {
     let cosm = Cosm::de438();
@@ -51,6 +52,7 @@ fn stop_cond_3rd_apo() {
     );
 }
 
+#[ignore]
 #[test]
 fn stop_cond_3rd_peri() {
     let cosm = Cosm::de438();
@@ -93,6 +95,7 @@ fn stop_cond_3rd_peri() {
     );
 }
 
+#[ignore]
 #[test]
 fn nrho_apo() {
     let cosm = Cosm::de438();

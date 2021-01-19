@@ -3,7 +3,7 @@ use super::events::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, TimeUnit};
 use crate::{State, TimeTagged};
 use dynamics::Dynamics;
 use errors::NyxError;
@@ -169,15 +169,9 @@ where
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
-        // let init_seconds = self.dynamics.time();
-        // let stop_time = init_seconds + elapsed_time.in_seconds();
-        let start_time = self.state.epoch();
         let stop_time = self.state.epoch() + elapsed_time;
-        let mut delta_t: f64 = 0.0;
-        // let stop_time_s = stop_time.as_tai_seconds();
         loop {
             let dt = self.state.epoch();
-            println!("{}", dt);
             if (!backprop && dt + self.step_size > stop_time)
                 || (backprop && dt + self.step_size <= stop_time)
             {
@@ -189,16 +183,8 @@ where
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
-                // let state_vector = &self.state_vector();
-                // let state = &self.state;
-                // let (t, state_vec) = self.derive(dt.as_tai_seconds(), state_vector, state)?;
-                // let (t, state_vec) = self.derive(dt.as_tai_seconds())?;
-                let (t, state_vec) = self.derive(delta_t)?;
-                // delta_t += t;
-                // let (t, state_vec) = self.derive((dt - start_time).in_seconds())?;
-                // self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
-                self.state
-                    .set(self.state.epoch() + t * TimeUnit::Second, &state_vec)?;
+                let (t, state_vec) = self.derive()?;
+                self.state.set(self.state.epoch() + t, &state_vec)?;
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, self.state.epoch(), &self.state);
@@ -216,24 +202,9 @@ where
                 }
                 return Ok(self.state);
             } else {
-                // let (t, state_vec) = self.derive(dt.as_tai_seconds())?;
-                let (t, state_vec) = self.derive(delta_t)?;
-                dbg!(t);
-                // delta_t = t;
-                // let (t, state_vec) =
-                //     self.derive(dt.as_tai_seconds(), &self.state_vector(), &self.state)?;
-                // We haven't passed the time based stopping condition.
-                // self.state.set(Epoch::from_tai_seconds(t), &state_vec)?;
-                let incr = self.state.epoch() + t * TimeUnit::Second;
-                self.state.set(incr, &state_vec)?;
-                println!(
-                    "[src/propagators/propagator.rs:229] Adding {} ({} s) to {} ==> {}",
-                    t * TimeUnit::Second,
-                    t,
-                    start_time,
-                    self.state.epoch()
-                );
+                let (t, state_vec) = self.derive()?;
 
+                self.state.set(self.state.epoch() + t, &state_vec)?;
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, self.state.epoch(), &self.state);
@@ -386,48 +357,18 @@ where
 
     /// This method integrates whichever function is provided as `d_xdt`. Everything passed to this function is in **seconds**.
     ///
-    /// The `derive` method is monomorphic to increase speed. This function takes a time `t` and a current state `state`
-    /// then derives the dynamics at that time (i.e. propagates for one time step). The `d_xdt` parameter is the derivative
-    /// function which take a time t of type f64 and a reference to a state of type VectorN<f64, N>, and returns the
-    /// result as VectorN<f64, N> of the derivative. The reference should preferrably only be borrowed.
-    /// This function returns the next time (i.e. the previous time incremented by the timestep used) and
-    /// the new state as y_{n+1} = y_n + \frac{dy_n}{dt}. To get the integration details, check `Self.latest_details`.
-    /// Note: using VectorN<f64, N> instead of DVector implies that the function *must* always return a vector of the same
-    /// size. This static allocation allows for high execution speeds.
+    /// This function returns the step sized used (as a Duration) and the new state as y_{n+1} = y_n + \frac{dy_n}{dt}.
+    /// To get the integration details, check `self.latest_details`.
     fn derive(
         &mut self,
-        t: f64,
-        // state: &VectorN<f64, <D::StateType as State>::PropVecSize>,
-        // ctx: &D::StateType,
-    ) -> Result<(f64, VectorN<f64, <D::StateType as State>::PropVecSize>), NyxError> {
+    ) -> Result<(Duration, VectorN<f64, <D::StateType as State>::PropVecSize>), NyxError> {
         let state = &self.state_vector();
         let ctx = &self.state;
-        println!(
-            "[src/propagator/propagator.rs:405] ctx epoch now {}",
-            ctx.epoch()
-        );
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds;
         let step_size = self.step_size.in_seconds();
         loop {
-            // BUG: This should not be 0.0 but the delta time between the state and the first call.
-            /* This does not solve all of the errors... should be 0.0 and is 1e-10.
-            In fact, although this fixes the backward propagation, the leo_multi_body_dynamics_adaptive_wo_moon test shits the bed really badly.
-            Without this fix, the error is
-            5e-7    4e-5    6e-5    5e-8    3e-8    2e-8
-            RSS errors:     pos = 7.11121e-5 km     vel = 6.63174e-8 km/s
-            But with it:
-            1e-3    8e-3    1e-2    9e-6    8e-6    6e-6
-            RSS errors:     pos = 1.46907e-2 km     vel = 1.35696e-5 km/s
-
-            Ideas:
-            1. Does the EOM call expect the parameter to be the absolute time? If so, the multibody dynamics will fail.
-            2. Would it make sense to refactor the EOM call to, in fact, ingest an Epoch instead of an f64 without units. That's kind of the whole point of hifitime with units.
-            ... but that would lead to more computations (and don't forget about the step_size*wi issue either)
-
-            */
-            dbg!(t);
             let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
@@ -469,7 +410,7 @@ where
             if self.fixed_step {
                 // Using a fixed step, no adaptive step necessary
                 self.details.step = self.step_size;
-                return Ok(((t + step_size), next_state));
+                return Ok(((self.details.step), next_state));
             } else {
                 // Compute the error estimate.
                 self.details.error = E::estimate(&error_est, &next_state, &state);
@@ -498,7 +439,7 @@ where
                             proposed_step * TimeUnit::Second
                         };
                     }
-                    return Ok(((t + step_size), next_state));
+                    return Ok((self.details.step, next_state));
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
                     // So let's adapt the step size.

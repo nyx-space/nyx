@@ -704,7 +704,7 @@ fn multi_body_dynamics_dual() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = Orbit::cartesian(
+    let mut halo_rcvr = Orbit::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -714,6 +714,7 @@ fn multi_body_dynamics_dual() {
         start_time,
         eme2k,
     );
+    halo_rcvr.stm_identity();
 
     let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
