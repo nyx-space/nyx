@@ -2,7 +2,7 @@ extern crate nalgebra as na;
 
 extern crate nyx_space as nyx;
 
-use nyx::celestia::{bodies, Cosm, Orbit};
+use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
@@ -121,7 +121,7 @@ fn nrho_apo() {
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
     let condition = StopCondition::new(apo_event, 2 * TimeUnit::Day, 1e-1);
 
-    let bodies = vec![bodies::EARTH, bodies::SUN];
+    let bodies = vec![Bodies::Earth, Bodies::Sun];
     let dynamics = OrbitalDynamics::point_masses(luna, &bodies, &cosm);
 
     let setup = Propagator::rk89(

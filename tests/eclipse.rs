@@ -4,7 +4,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
-use nyx::celestia::{bodies, Cosm, LTCorr, Orbit};
+use nyx::celestia::{Bodies, Cosm, LTCorr, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnit};
@@ -24,7 +24,7 @@ fn leo_sun_earth_eclipses() {
 
     let (truth_tx, truth_rx) = mpsc::channel();
 
-    let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
 
     thread::spawn(move || {
         let cosm = Cosm::de438();
@@ -77,7 +77,7 @@ fn geo_sun_earth_eclipses() {
 
     let (truth_tx, truth_rx) = mpsc::channel();
 
-    let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
 
     thread::spawn(move || {
         let cosm = Cosm::de438();

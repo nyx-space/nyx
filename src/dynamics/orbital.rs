@@ -1,7 +1,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, Dynamics, NyxError};
-use crate::celestia::{Cosm, Frame, LTCorr, Orbit, Xb};
+use crate::celestia::{Bodies, Cosm, Frame, LTCorr, Orbit};
 use crate::dimensions::{
     DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
 };
@@ -38,7 +38,7 @@ pub struct OrbitalDynamics<'a> {
 
 impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(integr_frame: Frame, bodies: &[String], cosm: &'a Cosm) -> Self {
+    pub fn point_masses(integr_frame: Frame, bodies: &[Bodies], cosm: &'a Cosm) -> Self {
         // Create the point masses
         let pts = PointMasses::new(integr_frame, bodies, cosm);
         Self {
@@ -396,7 +396,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 // }
 
 /// Stores the reference to the third body, including the gm to avoid having to fetch it every time
-struct ThirdBodyRef {
+pub struct ThirdBodyRef {
     ephem: Vec<usize>,
     gm: f64,
 }
@@ -413,20 +413,54 @@ pub struct PointMasses<'a> {
 }
 
 impl<'a> PointMasses<'a> {
-    pub fn new(propagation_frame: Frame, body_names: &[String], cosm: &'a Cosm) -> Self {
+    /// Initializes the multibody point mass dynamics with the provided list of bodies
+    pub fn new(propagation_frame: Frame, body_names: &[Bodies], cosm: &'a Cosm) -> Self {
         Self::with_correction(propagation_frame, body_names, cosm, LTCorr::None)
     }
 
+    /// Initializes the multibody point mass dynamics with the provided list of bodies, and accounting for some light time correction
     pub fn with_correction(
+        propagation_frame: Frame,
+        bodies: &[Bodies],
+        cosm: &'a Cosm,
+        correction: LTCorr,
+    ) -> Self {
+        let mut refs = Vec::new();
+        // Check that these celestial bodies exist and build their references
+        for body in bodies {
+            let gm = cosm
+                .xb
+                .ephemeris_from_path(&body.ephem_path())
+                .unwrap()
+                .constants
+                .get("GM")
+                .unwrap()
+                .value;
+            refs.push(ThirdBodyRef {
+                ephem: body.ephem_path().to_vec(),
+                gm,
+            });
+        }
+
+        Self {
+            frame: propagation_frame,
+            bodies: refs,
+            cosm,
+            correction,
+        }
+    }
+
+    /// Allows using bodies by name, defined in the non-default XB
+    pub fn specific(
         propagation_frame: Frame,
         bodies: &[String],
         cosm: &'a Cosm,
         correction: LTCorr,
     ) -> Self {
-        let refs = Vec::new();
+        let mut refs = Vec::new();
         // Check that these celestial bodies exist and build their references
         for body in bodies {
-            let path = cosm.xb.ephemeris_find_path(body).unwrap();
+            let path = cosm.xb.ephemeris_find_path(body.to_string()).unwrap();
             let gm = cosm
                 .xb
                 .ephemeris_from_path(&path)

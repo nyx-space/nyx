@@ -121,7 +121,7 @@ pub fn eclipse_state(
 
     if light_source.equatorial_radius() < std::f64::EPSILON {
         let observed = cosm.celestial_state(
-            light_source.exb_id(),
+            &light_source.ephem_path(),
             observer.dt,
             observer.frame,
             correction,
@@ -136,7 +136,7 @@ pub fn eclipse_state(
     // Vector from EB to LS
     let r_eb_ls = cosm
         .celestial_state(
-            light_source.exb_id(),
+            &light_source.ephem_path(),
             observer.dt,
             eclipsing_body,
             correction,

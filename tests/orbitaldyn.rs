@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::celestia::{assert_orbit_eq_or_abs, bodies, Cosm, Orbit};
+use nyx::celestia::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
 use nyx::dimensions::{Matrix6, Vector6, U3};
 use nyx::dynamics::{Dynamics, OrbitalDynamics};
 use nyx::propagators::error_ctrl::RSSStepPV;
@@ -109,7 +109,7 @@ fn halo_earth_moon_dynamics() {
         eme2k,
     );
 
-    let bodies = vec![bodies::EARTH_MOON];
+    let bodies = vec![Bodies::Luna];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
@@ -176,7 +176,7 @@ fn halo_earth_moon_dynamics_adaptive() {
         0.351_738_121_709_363_5,
     );
 
-    let bodies = vec![bodies::EARTH_MOON];
+    let bodies = vec![Bodies::Luna];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::default());
@@ -244,7 +244,7 @@ fn llo_earth_moon_dynamics_adaptive() {
         0.472_630_895_504_854_4,
     );
 
-    let bodies = vec![bodies::EARTH_MOON];
+    let bodies = vec![Bodies::Luna];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::default());
@@ -314,7 +314,7 @@ fn halo_multi_body_dynamics() {
         0.302_817_582_487_008_6,
     );
 
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
@@ -386,7 +386,7 @@ fn halo_multi_body_dynamics_adaptive() {
         0.350_981_431_322_089_4,
     );
 
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::default(&dynamics);
@@ -457,7 +457,7 @@ fn llo_multi_body_dynamics_adaptive() {
         0.472_036_197_968_369_3,
     );
 
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::default(&dynamics);
@@ -521,7 +521,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
         5.848_971_837_743_221,
     );
 
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::default(&dynamics);
@@ -584,7 +584,7 @@ fn leo_multi_body_dynamics_adaptive() {
         5.848_960_991_136_447,
     );
 
-    let bodies = vec![bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::default(&dynamics);
@@ -716,7 +716,7 @@ fn multi_body_dynamics_dual() {
     );
     halo_rcvr.stm_identity();
 
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
@@ -1002,7 +1002,7 @@ fn hf_prop() {
     );
 
     let cosm = Cosm::de438();
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
     dynamics.add_model(Arc::new(harmonics));
 

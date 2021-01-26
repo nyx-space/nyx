@@ -26,14 +26,14 @@ pub struct ConstantDrag<'a> {
     /// atmospheric density in kg/m^3
     pub rho: f64,
     /// Geoid causing the drag
-    pub drag_frame_id: i32,
+    pub drag_frame: Frame,
     /// a Cosm reference is needed to convert to the state around the correct planet
     pub cosm: &'a Cosm,
 }
 
 impl<'a> ForceModel for ConstantDrag<'a> {
     fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
-        let osc = self.cosm.frame_chg_by_id(&ctx.orbit, self.drag_frame_id);
+        let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
         Ok(-0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity)
     }

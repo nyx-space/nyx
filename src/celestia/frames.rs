@@ -24,6 +24,7 @@ pub enum Frame {
         gm: f64,
         parent_axb_id: Option<i32>,
         parent_exb_id: Option<i32>,
+        ephem_path: [Option<usize>; 3],
         frame_path: [Option<usize>; 3],
     },
     /// Any Geoid which has a GM, flattening value, etc.
@@ -36,6 +37,7 @@ pub enum Frame {
         flattening: f64,
         equatorial_radius: f64,
         semi_major_radius: f64,
+        ephem_path: [Option<usize>; 3],
         frame_path: [Option<usize>; 3],
     },
     /// Velocity, Normal, Cross
@@ -55,6 +57,21 @@ impl Frame {
 
     pub fn is_celestial(&self) -> bool {
         matches!(self, Frame::Celestial { .. })
+    }
+
+    pub fn ephem_path(&self) -> Vec<usize> {
+        match self {
+            Frame::Celestial { ephem_path, .. } | Frame::Geoid { ephem_path, .. } => {
+                let mut path = Vec::with_capacity(3);
+                for p in ephem_path {
+                    if let Some(f) = p {
+                        path.push(*f)
+                    }
+                }
+                path
+            }
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
     }
 
     pub fn frame_path(&self) -> Vec<usize> {

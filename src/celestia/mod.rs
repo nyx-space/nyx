@@ -76,68 +76,71 @@ impl Xb {
     }
 
     /// Finds the ephemeris provided the path as usize, e.g. [3,1] would return the Moon with any DE xb.
-    pub fn ephemeris_from_path(&self, path: &[usize]) -> Result<&Ephemeris, NyxError> {
-        match self.ephemeris_root {
+    pub fn ephemeris_from_path<'a>(&'a self, path: &[usize]) -> Result<&'a Ephemeris, NyxError> {
+        match &self.ephemeris_root {
             None => return Err(NyxError::ObjectNotFound("not ephemeris root".to_string())),
             Some(root) => {
-                let mut cur_ephem = &root;
                 if path.is_empty() {
-                    return Ok(cur_ephem);
+                    return Ok(&root);
                 }
                 for pos in path {
-                    match root.children.get(*pos) {
-                        None => {
-                            let hpath: String =
-                                path.iter().map(|p| format!("{}", p)).collect::<String>();
-                            return Err(NyxError::ObjectNotFound(hpath));
-                        }
-                        Some(ephem) => cur_ephem = ephem,
-                    };
+                    if root.children.get(*pos).is_none() {
+                        let hpath: String =
+                            path.iter().map(|p| format!("{}", p)).collect::<String>();
+                        return Err(NyxError::ObjectNotFound(hpath));
+                    }
                 }
-                Ok(cur_ephem)
+
+                // This is absolutely terrible, and there must be a better way to do it, but it's late.
+                match path.len() {
+                    1 => Ok(&self.ephemeris_root.as_ref().unwrap().children[path[0]]),
+                    2 => Ok(
+                        &self.ephemeris_root.as_ref().unwrap().children[path[0]].children[path[1]],
+                    ),
+                    3 => Ok(
+                        &self.ephemeris_root.as_ref().unwrap().children[path[0]].children[path[1]]
+                            .children[path[2]],
+                    ),
+                    _ => unimplemented!(),
+                }
             }
         }
     }
 
-    /// Returns the machine path to the provided human path
-    pub fn ephemeris_human2machine_path(&self, path: &[usize]) -> Result<Vec<String>, NyxError> {
-        unimplemented!()
-    }
-
     /// Seek an ephemeris from its celestial name (e.g. Earth Moon Barycenter)
     fn ephemeris_seek_by_name(
-        name: &String,
+        name: &str,
         cur_path: &mut Vec<usize>,
         e: &Ephemeris,
     ) -> Result<Vec<usize>, NyxError> {
-        if &e.name == name {
+        if e.name == name {
             Ok(cur_path.to_vec())
         } else if e.children.is_empty() {
-            Err(NyxError::ObjectNotFound(name.clone()))
+            Err(NyxError::ObjectNotFound(name.to_string()))
         } else {
-            for (cno, child) in e.children.iter().enumerate() {
-                let this_path = cur_path.clone();
+            for child in &e.children {
+                let mut this_path = cur_path.clone();
                 let child_attempt = Self::ephemeris_seek_by_name(name, &mut this_path, child);
                 if let Ok(found_path) = child_attempt {
                     return Ok(found_path);
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(name.clone()))
+            Err(NyxError::ObjectNotFound(name.to_string()))
         }
     }
 
     /// Returns the machine path of the requested ephemeris
-    pub fn ephemeris_find_path(&self, name: &String) -> Result<Vec<usize>, NyxError> {
-        match self.ephemeris_root {
-            None => return Err(NyxError::ObjectNotFound("".to_string())),
+    pub fn ephemeris_find_path(&self, name: String) -> Result<Vec<usize>, NyxError> {
+        match &self.ephemeris_root {
+            None => return Err(NyxError::ObjectNotFound("No root!".to_string())),
             Some(root) => {
-                if &root.name == name {
+                if root.name == name {
                     // Return an empty vector (but OK because we're asking for the root)
                     Ok(Vec::new())
                 } else {
                     let mut path = Vec::new();
-                    Self::ephemeris_seek_by_name(name, &mut path, &root)
+                    Self::ephemeris_seek_by_name(&name, &mut path, &root)
                 }
             }
         }
@@ -148,6 +151,106 @@ impl Xb {
 pub mod orientations {
     /// J2000 orientation frame
     pub const J2000: i32 = 1;
+}
+
+/// Defines the default celestial bodies in the provided de438 XB.
+#[derive(Copy, Clone, Debug)]
+pub enum Bodies {
+    SSB,
+    Sun,
+    MercuryBarycenter,
+    Mercury,
+    VenusBarycenter,
+    Venus,
+    EarthBarycenter,
+    Earth,
+    Luna,
+    MarsBarycenter,
+    JupiterBarycenter,
+    SaturnBarycenter,
+    UranusBarycenter,
+    NeptuneBarycenter,
+}
+
+impl Bodies {
+    /// Returns the path in the standard de438 XB
+    pub fn ephem_path(&self) -> &'static [usize] {
+        match *self {
+            Self::SSB => &[],
+            Self::Sun => &[0],
+            Self::MercuryBarycenter => &[1],
+            Self::Mercury => &[1],
+            Self::VenusBarycenter => &[2],
+            Self::Venus => &[2],
+            Self::EarthBarycenter => &[3],
+            Self::Earth => &[3, 0],
+            Self::Luna => &[3, 1],
+            Self::MarsBarycenter => &[4],
+            Self::JupiterBarycenter => &[5],
+            Self::SaturnBarycenter => &[6],
+            Self::UranusBarycenter => &[7],
+            Self::NeptuneBarycenter => &[8],
+        }
+    }
+
+    /// Returns the human name
+    pub fn name(&self) -> String {
+        match *self {
+            Self::SSB => "Solar System Barycenter".to_string(),
+            Self::Sun => "Sun".to_string(),
+            Self::MercuryBarycenter => "Mercury".to_string(),
+            Self::Mercury => "Mercury".to_string(),
+            Self::VenusBarycenter => "Venus".to_string(),
+            Self::Venus => "Venus".to_string(),
+            Self::EarthBarycenter => "Earth Moon Barycenter".to_string(),
+            Self::Earth => "Earth".to_string(),
+            Self::Luna => "Moon".to_string(),
+            Self::MarsBarycenter => "Mars".to_string(),
+            Self::JupiterBarycenter => "Jupiter Barycenter".to_string(),
+            Self::SaturnBarycenter => "Saturn Barycenter".to_string(),
+            Self::UranusBarycenter => "Uranus Barycenter".to_string(),
+            Self::NeptuneBarycenter => "Neptune Barycenter".to_string(),
+        }
+    }
+
+    /// Returns the EXB center ID of this celestial object
+    pub fn exb_id(&self) -> i32 {
+        match *self {
+            Self::SSB => 0,
+            Self::Sun => 10,
+            Self::MercuryBarycenter => 1,
+            Self::Mercury => 1,
+            Self::VenusBarycenter => 2,
+            Self::Venus => 2,
+            Self::EarthBarycenter => 3,
+            Self::Earth => 399,
+            Self::Luna => 301,
+            Self::MarsBarycenter => 4,
+            Self::JupiterBarycenter => 5,
+            Self::SaturnBarycenter => 6,
+            Self::UranusBarycenter => 7,
+            Self::NeptuneBarycenter => 8,
+        }
+    }
+
+    /// Attempts to load the default body from the provided name
+    pub fn from_name(name: String) -> Result<Self, NyxError> {
+        match name.to_lowercase().as_str() {
+            "Solar System Barycenter" => Ok(Self::SSB),
+            "Sun" => Ok(Self::Sun),
+            "Mercury" => Ok(Self::Mercury),
+            "Venus" => Ok(Self::Venus),
+            "Earth Moon Barycenter" => Ok(Self::EarthBarycenter),
+            "Earth" => Ok(Self::Earth),
+            "Moon" => Ok(Self::Luna),
+            "Mars" => Ok(Self::MarsBarycenter),
+            "Jupiter Barycenter" => Ok(Self::JupiterBarycenter),
+            "Saturn Barycenter" => Ok(Self::SaturnBarycenter),
+            "Uranus Barycenter" => Ok(Self::UranusBarycenter),
+            "Neptune Barycenter" => Ok(Self::NeptuneBarycenter),
+            _ => Err(NyxError::ObjectNameNotFound(name)),
+        }
+    }
 }
 
 // TODO: Check that these names are correct

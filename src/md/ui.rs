@@ -162,26 +162,18 @@ where
                     // Get the object IDs from name
                     let mut bodies = Vec::with_capacity(10);
                     for obj in pts_masses {
-                        match cosm.try_frame(obj) {
-                            Ok(frame) => bodies.push(frame.exb_id()),
-                            Err(_) => {
-                                // Let's try with "j2000" appended
-                                match cosm.try_frame(format!("{} j2000", obj).as_str()) {
-                                    Ok(frame) => bodies.push(frame.exb_id()),
-                                    Err(_) => {
-                                        bodies.push(
-                                            cosm.frame(
-                                                format!("{} barycenter j2000", obj).as_str(),
-                                            )
-                                            .exb_id(),
-                                        );
-                                    }
-                                }
+                        match Bodies::from_name(obj.to_string()) {
+                            Ok(b) => bodies.push(b),
+                            Err(e) => {
+                                return Err(ParsingError::LoadingError(format!("{:?}", e)));
                             }
                         }
                     }
                     // Remove bodies which are part of the state
-                    if let Some(pos) = bodies.iter().position(|x| *x == init_state.frame.exb_id()) {
+                    if let Some(pos) = bodies
+                        .iter()
+                        .position(|x| x.exb_id() == init_state.frame.exb_id())
+                    {
                         bodies.remove(pos);
                     }
 

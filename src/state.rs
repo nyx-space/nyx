@@ -213,6 +213,7 @@ impl State for Orbit {
             gm: 159.0,
             parent_axb_id: None,
             parent_exb_id: None,
+            ephem_path: [None, None, None],
             frame_path: [None, None, None],
         };
 
@@ -603,6 +604,7 @@ fn test_set_state() {
         gm: 398600.4415,
         parent_axb_id: None,
         parent_exb_id: None,
+        ephem_path: [None, None, None],
         frame_path: [None, None, None],
     };
     let ctx = Orbit::cartesian(

@@ -1,4 +1,4 @@
-use crate::celestia::{bodies, Cosm, Orbit};
+use crate::celestia::{Bodies, Cosm, Orbit};
 use crate::dimensions::Vector3;
 use crate::dynamics::orbital::OrbitalDynamics;
 use crate::errors::NyxError;
@@ -44,11 +44,7 @@ impl Heuristic for LambertHeuristic {
 
         // Propagate for the TOF
         let cosm = Cosm::de438();
-        let bodies = vec![
-            bodies::EARTH_MOON.to_string(),
-            bodies::SSB.to_string(),
-            bodies::JUPITER_BARYCENTER.to_string(),
-        ];
+        let bodies = vec![Bodies::Luna, Bodies::SSB, Bodies::JupiterBarycenter];
         let dynamics = OrbitalDynamics::point_masses(start.frame, &bodies, &cosm);
 
         // Create the channel to receive all of the details.

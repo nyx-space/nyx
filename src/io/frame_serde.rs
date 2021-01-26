@@ -40,6 +40,7 @@ impl FrameSerde {
             flattening: self.flattening,
             equatorial_radius: self.equatorial_radius,
             semi_major_radius: self.semi_major_radius,
+            ephem_path: [None, None, None],
             frame_path: [None, None, None],
         }
     }
@@ -79,6 +80,7 @@ impl FrameSerde {
             flattening: self.flattening,
             equatorial_radius: self.equatorial_radius,
             semi_major_radius: self.semi_major_radius,
+            ephem_path: [None, None, None],
             frame_path: [None, None, None],
         }
     }
