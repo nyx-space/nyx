@@ -11,7 +11,7 @@ keywords = ["space", "mission", "design", "orbit", "estimation"]
 categories = ["science", "simulation"]
 readme = "README.md"
 license = "LGPLv3"
-exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data/*.gz", "rustfmt.toml", "de438*"]
+exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data/*.gz", "rustfmt.toml", "de438s.xb"]
 
 [badges]
 maintenance = { status = "actively-developed" }

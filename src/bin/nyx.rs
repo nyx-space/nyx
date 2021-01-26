@@ -14,7 +14,7 @@ use dialoguer::{theme::ColorfulTheme, Select};
 use glob::glob;
 use lazy_static::lazy_static;
 use log::{error, info};
-use nyx::celestia::{load_ephemeris_from_buf, Cosm};
+use nyx::celestia::{Cosm, Xb};
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
 use nyx::md::ui::{MDProcess, StmStateFlag};
 use nyx::md::MdHdlr;
@@ -29,9 +29,9 @@ const LOG_VAR: &str = "NYX_LOG";
 lazy_static! {
     static ref COSM: Cosm = {
         let de438_buf: Cow<'static, [u8]> = EmbeddedAsset::get("de438s-00-50.exb")
-            .expect("Could not find de438s-00-550.exb as asset");
-        let ephem_vec = load_ephemeris_from_buf(&de438_buf).unwrap();
-        let cosm: Cosm = Cosm::try_from_xb(&ephem_vec).unwrap();
+            .expect("Could not find de438s-00-55.exb as asset");
+        let xb = Xb::from_buffer(&de438_buf).unwrap();
+        let cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
         cosm
     };
 }
