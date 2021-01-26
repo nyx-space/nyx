@@ -1,6 +1,6 @@
+use crate::celestia::{Frame, Orbit};
 use crate::dimensions::Vector3;
 use crate::time::{Epoch, TimeUnit};
-use celestia::{Frame, Orbit};
 use std::f64::consts::FRAC_PI_2 as half_pi;
 
 #[derive(Debug)]
@@ -372,10 +372,10 @@ fn unit_vector_from_angles(alpha: f64, beta: f64) -> Vector3<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use celestia::Cosm;
+    use crate::celestia::Cosm;
     #[test]
     fn ruggiero_weight() {
-        let mut cosm = Cosm::from_xb("./de438s");
+        let mut cosm = Cosm::from_xb("./de438s").unwrap();
         cosm.mut_gm_for_frame("EME2000", 398_600.433);
         let eme2k = cosm.frame("EME2000");
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);

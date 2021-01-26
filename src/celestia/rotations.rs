@@ -4,7 +4,6 @@ use crate::log::error;
 use crate::na::Matrix3;
 use crate::time::{Epoch, DAYS_PER_CENTURY, J2000_OFFSET, MJD_OFFSET};
 use crate::utils::{r1, r2, r3};
-pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
@@ -98,7 +97,10 @@ impl FromStr for AngleUnit {
 
 /// A time varying three-axis Euler rotation
 #[derive(Clone)]
-pub struct Euler3AxisDt {
+pub struct Euler3AxisDt
+where
+    Self: Send + Sync,
+{
     pub base_context: HashMap<String, String>,
     pub rot_order: [(EulerRotation, Expr); 3],
     pub unit: AngleUnit,

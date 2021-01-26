@@ -1,5 +1,5 @@
+use crate::celestia::{Frame, Orbit};
 use crate::dimensions::Vector3;
-use celestia::{Frame, Orbit};
 
 pub use super::thrustctrl::Mnvr;
 

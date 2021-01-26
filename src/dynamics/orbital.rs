@@ -1,7 +1,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, Dynamics, NyxError};
-use crate::celestia::{Cosm, Frame, LTCorr, Orbit};
+use crate::celestia::{Cosm, Frame, LTCorr, Orbit, Xb};
 use crate::dimensions::{
     DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
 };
@@ -38,7 +38,7 @@ pub struct OrbitalDynamics<'a> {
 
 impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(integr_frame: Frame, bodies: &[i32], cosm: &'a Cosm) -> Self {
+    pub fn point_masses(integr_frame: Frame, bodies: &[String], cosm: &'a Cosm) -> Self {
         // Create the point masses
         let pts = PointMasses::new(integr_frame, bodies, cosm);
         Self {
@@ -395,11 +395,17 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 //     }
 // }
 
+/// Stores the reference to the third body, including the gm to avoid having to fetch it every time
+struct ThirdBodyRef {
+    ephem: Vec<usize>,
+    gm: f64,
+}
+
 /// PointMasses model
 pub struct PointMasses<'a> {
     /// The propagation frame
     pub frame: Frame,
-    pub bodies: Vec<i32>,
+    pub bodies: Vec<ThirdBodyRef>,
     /// Optional point to a Cosm, needed if extra point masses are needed
     pub cosm: &'a Cosm,
     /// Light-time correction computation if extra point masses are needed
@@ -407,25 +413,37 @@ pub struct PointMasses<'a> {
 }
 
 impl<'a> PointMasses<'a> {
-    pub fn new(propagation_frame: Frame, bodies: &[i32], cosm: &'a Cosm) -> Self {
-        Self::with_correction(propagation_frame, bodies.to_vec(), cosm, LTCorr::None)
+    pub fn new(propagation_frame: Frame, body_names: &[String], cosm: &'a Cosm) -> Self {
+        Self::with_correction(propagation_frame, body_names, cosm, LTCorr::None)
     }
 
     pub fn with_correction(
         propagation_frame: Frame,
-        bodies: Vec<i32>,
+        bodies: &[String],
         cosm: &'a Cosm,
         correction: LTCorr,
     ) -> Self {
-        // Check that these celestial bodies exist
-        for exb_id in &bodies {
-            cosm.try_frame_by_exb_id(*exb_id)
-                .expect("unknown EXB ID in list of third bodies");
+        let refs = Vec::new();
+        // Check that these celestial bodies exist and build their references
+        for body in bodies {
+            let path = cosm.xb.ephemeris_find_path(body).unwrap();
+            let gm = cosm
+                .xb
+                .ephemeris_from_path(&path)
+                .unwrap()
+                .constants
+                .get("GM")
+                .unwrap()
+                .value;
+            refs.push(ThirdBodyRef {
+                ephem: path.to_vec(),
+                gm,
+            });
         }
 
         Self {
             frame: propagation_frame,
-            bodies,
+            bodies: refs,
             cosm,
             correction,
         }
@@ -434,21 +452,20 @@ impl<'a> PointMasses<'a> {
 
 impl<'a> AccelModel for PointMasses<'a> {
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
-        println!("{}", osc.epoch());
         let mut d_x = Vector3::zeros();
         // Get all of the position vectors between the center body and the third bodies
-        for exb_id in &self.bodies {
-            let third_body = self.cosm.frame_by_exb_id(*exb_id);
+        for third_body in &self.bodies {
+            // let third_body = self.cosm.frame_by_exb_id(*exb_id);
             // Orbit of j-th body as seen from primary body
-            let st_ij = self
-                .cosm
-                .celestial_state(*exb_id, osc.dt, self.frame, self.correction);
+            let st_ij =
+                self.cosm
+                    .celestial_state(&third_body.ephem, osc.dt, self.frame, self.correction);
 
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
             let r_j = osc.radius() - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
-            d_x += -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
+            d_x += -third_body.gm * (r_j / r_j3 + r_ij / r_ij3);
         }
         Ok(d_x)
     }
@@ -465,14 +482,16 @@ impl<'a> AccelModel for PointMasses<'a> {
         let mut grad = Matrix3::zeros();
 
         // Get all of the position vectors between the center body and the third bodies
-        for exb_id in &self.bodies {
-            let third_body = self.cosm.frame_by_exb_id(*exb_id);
-            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
+        for third_body in &self.bodies {
+            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm);
 
             // Orbit of j-th body as seen from primary body
-            let st_ij =
-                self.cosm
-                    .try_celestial_state(*exb_id, ctx.epoch(), self.frame, self.correction)?;
+            let st_ij = self.cosm.try_celestial_state(
+                &third_body.ephem,
+                ctx.epoch(),
+                self.frame,
+                self.correction,
+            )?;
 
             let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
             let r_ij3 = norm(&r_ij).powi(3) / gm_d;

@@ -109,54 +109,6 @@ fn state_def_circ_inc() {
 }
 
 #[test]
-fn xb_conversion() {
-    let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21_545.0);
-    let cart = Orbit::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
-    );
-    let cart_xb = cart.to_exb_state();
-    f64_eq!(
-        cart.x,
-        cart_xb.position.as_ref().unwrap().x,
-        "EXB conversion failed"
-    );
-    f64_eq!(
-        cart.y,
-        cart_xb.position.as_ref().unwrap().y,
-        "EXB conversion failed"
-    );
-    f64_eq!(
-        cart.z,
-        cart_xb.position.as_ref().unwrap().z,
-        "EXB conversion failed"
-    );
-    f64_eq!(
-        cart.vx,
-        cart_xb.velocity.as_ref().unwrap().x,
-        "EXB conversion failed"
-    );
-    f64_eq!(
-        cart.vy,
-        cart_xb.velocity.as_ref().unwrap().y,
-        "EXB conversion failed"
-    );
-    f64_eq!(
-        cart.vz,
-        cart_xb.velocity.as_ref().unwrap().z,
-        "EXB conversion failed"
-    );
-    f64_eq!(
-        dt.as_mjd_tai_days(),
-        cart_xb.epoch.as_ref().unwrap().value,
-        "EXB conversion failed"
-    );
-    assert!(cart_xb.covariance.is_none());
-    assert!(cart_xb.covariance_exponent.abs() < std::f64::EPSILON);
-}
-
-#[test]
 fn state_def_elliptical() {
     let mut cosm = Cosm::de438();
     cosm.mut_gm_for_frame("EME2000", 398_600.441_5);

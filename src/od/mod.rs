@@ -2,9 +2,9 @@ extern crate serde;
 
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
+pub use crate::dynamics::{Dynamics, NyxError};
 use crate::time::Epoch;
 use crate::{State, TimeTagged};
-pub use dynamics::{Dynamics, NyxError};
 
 use crate::io::{CovarFormat, EpochFormat};
 

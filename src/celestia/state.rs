@@ -9,17 +9,12 @@ use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::Frame;
 use crate::dynamics::propulsion::Thruster;
 use crate::time::{Duration, Epoch, TimeUnit};
+use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3};
 use crate::TimeTagged;
-use celestia::xb::ephem_registry::State as XBState;
-use celestia::xb::Epoch as XBEpoch;
-use celestia::xb::Vector as XBVector;
-use celestia::xb::{TimeRepr, TimeSystem, Unit};
-use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
 use std::ops::{Add, Neg, Sub};
-use utils::{between_0_360, between_pm_180, perpv, r1, r3};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
@@ -211,33 +206,6 @@ impl Orbit {
     pub fn distance_to_point(&self, other: &Vector3<f64>) -> f64 {
         ((self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2))
             .sqrt()
-    }
-
-    pub fn to_exb_state(&self) -> XBState {
-        XBState {
-            epoch: Some(XBEpoch {
-                ts: i32::from(TimeSystem::Tai),
-                repr: i32::from(TimeRepr::DaysJ1900),
-                value: self.dt.as_mjd_tai_days(),
-            }),
-            position: Some(XBVector {
-                x: self.x,
-                y: self.y,
-                z: self.z,
-                is_zero: false,
-                unit: i32::from(Unit::Km),
-            }),
-            velocity: Some(XBVector {
-                x: self.vx,
-                y: self.vy,
-                z: self.vz,
-                is_zero: false,
-                unit: i32::from(Unit::KmS),
-            }),
-            covariance: None,
-            covariance_exponent: 0.0,
-            parameters: HashMap::new(),
-        }
     }
 
     /// Returns the unit vector in the direction of the state radius

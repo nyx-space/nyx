@@ -9,13 +9,13 @@ use self::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice, TimeTagged};
+use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::{
     DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7,
 };
 use crate::time::Epoch;
+use crate::utils::{r2, r3};
 use crate::SpacecraftState;
-use celestia::{Cosm, Frame, Orbit};
-use utils::{r2, r3};
 
 /// GroundStation defines a Two Way ranging equipment.
 #[derive(Debug, Clone)]

@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn los_earth_eclipse() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::from_xb("./de438s").unwrap();
         let eme2k = cosm.frame("EME2000");
 
         let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn eclipse_sun_eclipse() {
-        let cosm = Cosm::from_xb("./de438s");
+        let cosm = Cosm::from_xb("./de438s").unwrap();
         let sun = cosm.frame("Sun J2000");
         let eme2k = cosm.frame("EME2000");
 

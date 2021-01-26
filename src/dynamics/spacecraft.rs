@@ -2,12 +2,12 @@ use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
 use crate::dimensions::{DimName, MatrixN, Vector1, Vector3, VectorN, U3, U4, U42, U43, U6, U7};
-use dynamics::Hyperdual;
+use crate::dynamics::Hyperdual;
 // use crate::od::Estimable;
+use crate::celestia::SpacecraftState;
+use crate::errors::NyxError;
 use crate::time::TimeUnit;
 use crate::TimeTagged;
-use celestia::SpacecraftState;
-use errors::NyxError;
 use std::sync::Arc;
 
 pub use super::solarpressure::SolarPressure;

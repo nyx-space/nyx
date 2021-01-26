@@ -5,30 +5,26 @@ extern crate prost;
 extern crate rust_embed;
 extern crate toml;
 
-use self::bytes::IntoBuf;
 use self::meval::Expr;
 use self::petgraph::algo::astar;
 use self::petgraph::prelude::*;
 use self::rust_embed::RustEmbed;
-use super::cosm::prost::Message;
 use super::frames::*;
 use super::rotations::*;
 use super::state::Orbit;
 use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
-use super::xb::{Ephemeris, EphemerisContainer};
+use super::xb::{Ephemeris, Xb};
 use super::SPEED_OF_LIGHT_KMS;
 use crate::errors::NyxError;
 use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::Matrix3;
+use crate::utils::rotv;
 use std::collections::HashMap;
 use std::fmt;
-use std::fs::File;
-use std::io::Read;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::str::FromStr;
 use std::time::Instant;
-use utils::rotv;
 
 #[derive(RustEmbed)]
 #[folder = "data/embed/"]
@@ -50,10 +46,20 @@ pub enum LTCorr {
     Abberation,
 }
 
+pub struct FrameTree {
+    name: String,
+    frame: Frame,
+    children: Vec<FrameTree>,
+}
+
 // Defines Cosm, from the Greek word for "world" or "universe".
 pub struct Cosm {
-    ephemerides: HashMap<i32, Ephemeris>,
-    ephemerides_names: HashMap<String, i32>,
+    pub xb: Xb,
+    pub frame_root: FrameTree,
+    // Maps the ephemeris path to the frame root path
+    ephem2frame_map: HashMap<Vec<usize>, Vec<usize>>,
+    // Maps the frame path to the ephemeris path
+    frame2ephem_map: HashMap<Vec<usize>, Vec<usize>>,
     frames: HashMap<String, Frame>,
     axb_names: HashMap<String, i32>,
     exb_map: Graph<i32, u8, Undirected>,
@@ -65,26 +71,28 @@ pub struct Cosm {
 
 impl fmt::Debug for Cosm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Cosm with {} ephemerides", self.ephemerides.keys().len())
+        write!(
+            f,
+            "Cosm with `{}` as ephemerides root",
+            match self.xb.ephemeris_root {
+                Some(r) => r.name,
+                None => "NONE".to_string(),
+            }
+        )
     }
 }
 
 impl Cosm {
     /// Builds a Cosm from the *XB files. Path should _not_ contain file extension. Panics if the files could not be loaded.
-    pub fn from_xb(filename: &str) -> Self {
-        Self::try_from_xb(load_ephemeris(filename).as_ref().unwrap())
-            .unwrap_or_else(|_| panic!("could not open EXB file {}", filename))
+    pub fn from_xb(filename: &str) -> Result<Self, NyxError> {
+        Self::try_from_xb(Xb::from_file(filename)?)
     }
 
-    pub fn try_from_xb_file(filename: &str) -> Result<Self, IoError> {
-        Ok(Self::try_from_xb(&load_ephemeris(filename)?)?)
-    }
-
-    /// Tries to load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
-    pub fn try_de438() -> Result<Self, IoError> {
-        let de438_buf = EmbeddedAsset::get("de438s-00-50.exb")
-            .expect("Could not find de438s-00-550.exb as asset");
-        Ok(Self::try_from_xb(&load_ephemeris_from_buf(&de438_buf)?)?)
+    /// Tries to load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TDB.
+    pub fn try_de438() -> Result<Self, NyxError> {
+        let de438_buf =
+            EmbeddedAsset::get("de438s-00-50.xb").expect("Could not find asset de438s-00-550.xb");
+        Self::try_from_xb(Xb::from_buffer(&de438_buf)?)
     }
 
     /// Load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
@@ -92,14 +100,27 @@ impl Cosm {
         Self::try_de438().expect("could not load embedded de438s EXB file")
     }
 
-    /// Attempts to build a Cosm from the *XB files and the embedded IAU frames
-    pub fn try_from_xb(ephemerides: &[Ephemeris]) -> Result<Self, IoError> {
+    /// Attempts to build a Cosm from the XB files and the embedded IAU frames
+    pub fn try_from_xb(xb: Xb) -> Result<Self, NyxError> {
         let mut axb_map: Graph<i32, u8, Undirected> = Graph::new_undirected();
         let j2k_nidx = axb_map.add_node(0);
 
         let mut cosm = Cosm {
-            ephemerides: HashMap::new(),
-            ephemerides_names: HashMap::new(),
+            xb,
+            frame_root: FrameTree {
+                name: "SSB J2000".to_string(),
+                frame: Frame::Celestial {
+                    axb_id: 0,
+                    exb_id: 0,
+                    gm: SS_MASS * SUN_GM,
+                    parent_axb_id: None,
+                    parent_exb_id: None,
+                    frame_path: [None, None, None],
+                },
+                children: Vec::new(),
+            },
+            ephem2frame_map: HashMap::new(),
+            frame2ephem_map: HashMap::new(),
             frames: HashMap::new(),
             axb_names: HashMap::new(),
             exb_map: Graph::new_undirected(),
@@ -109,20 +130,13 @@ impl Cosm {
         };
 
         // Add J2000 as the main AXB reference frame
-        let ssb2k = Frame::Celestial {
-            axb_id: 0,
-            exb_id: 0,
-            gm: SS_MASS * SUN_GM,
-            parent_axb_id: None,
-            parent_exb_id: None,
-        };
 
-        cosm.exb_map.add_node(0);
-        cosm.axb_names.insert("J2000".to_owned(), 0);
-        cosm.frames
-            .insert("solar system barycenter j2000".to_owned(), ssb2k);
+        // cosm.exb_map.add_node(0);
+        // cosm.axb_names.insert("J2000".to_owned(), 0);
+        // cosm.frames
+        //     .insert("solar system barycenter j2000".to_owned(), ssb2k);
 
-        cosm.append_xb(ephemerides)?;
+        cosm.append_xb();
 
         cosm.load_iau_frames();
 
@@ -151,113 +165,250 @@ impl Cosm {
         );
     }
 
-    pub fn append_xb(&mut self, ephemerides: &[Ephemeris]) -> Result<(), IoError> {
-        let j2k_str = "j2000";
-        for ephem in ephemerides {
-            let id = ephem.id.as_ref().unwrap();
+    /// Returns the machine path of the ephemeris whose orientation is requested
+    pub fn frame_find_path_for_orientation(&self, name: &String) -> Result<Vec<usize>, NyxError> {
+        if &self.frame_root.name == name {
+            // Return an empty vector (but OK because we're asking for the root)
+            Ok(Vec::new())
+        } else {
+            let mut path = Vec::new();
+            Self::frame_find_path(name, &mut path, &self.frame_root)
+        }
+    }
 
-            let mut ephemc = ephem.clone();
-            // Convert all of the names to lowercase now, so we don't have to do so later.
-            let name = ephemc.id.as_ref().unwrap().name.to_lowercase();
-            ephemc.id.as_mut().unwrap().name = name.clone();
-            self.ephemerides.insert(id.number, ephemc);
-            self.ephemerides_names.insert(name, id.number);
+    /// Seek a frame from its orientation name
+    fn frame_find_path(
+        frame_name: &String,
+        cur_path: &mut Vec<usize>,
+        f: &FrameTree,
+    ) -> Result<Vec<usize>, NyxError> {
+        if &f.name == frame_name {
+            Ok(cur_path.to_vec())
+        } else if f.children.is_empty() {
+            Err(NyxError::ObjectNotFound(frame_name.clone()))
+        } else {
+            for (cno, child) in f.children.iter().enumerate() {
+                let this_path = cur_path.clone();
+                let child_attempt = Self::frame_find_path(frame_name, &mut this_path, child);
+                if let Ok(found_path) = child_attempt {
+                    return Ok(found_path);
+                }
+            }
+            // Could not find name in iteration, fail
+            Err(NyxError::ObjectNotFound(frame_name.clone()))
+        }
+    }
 
-            // Compute the exb_id.
-            let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
-
-            // Add this EXB to the map, and link it to its parent
-            let this_node = self.exb_map.add_node(id.number);
-            let parent_node = match self.exbid_to_map_idx(exb_id) {
-                Ok(p) => p,
-                Err(e) => panic!(e),
-            };
-            // All edges are of value 1
-            self.exb_map.add_edge(parent_node, this_node, 1);
-
-            // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
-
-            // Ephemeris exists
-            match ephem.parameters.get("GM") {
-                Some(gm) => {
-                    // It's a geoid, and we assume everything else is there
-                    let flattening = match ephem.parameters.get("Flattening") {
-                        Some(param) => param.value,
-                        None => {
-                            if id.name == "Moon" {
-                                0.0012
-                            } else {
-                                0.0
-                            }
+    /// Returns the correct frame for this ephemeris
+    fn default_frame_value(e: &Ephemeris, pos: usize) -> Option<FrameTree> {
+        match e.constants.get("GM") {
+            Some(gm) => {
+                // It's a geoid, and we assume everything else is there
+                let flattening = match e.constants.get("Flattening") {
+                    Some(param) => param.value,
+                    None => {
+                        if e.name == "Moon" {
+                            0.0012
+                        } else {
+                            0.0
                         }
-                    };
-                    let equatorial_radius = match ephem.parameters.get("Equatorial radius") {
-                        Some(param) => param.value,
-                        None => {
-                            if id.name == "Moon" {
-                                1738.1
-                            } else {
-                                0.0
-                            }
+                    }
+                };
+                let equatorial_radius = match e.constants.get("Equatorial radius") {
+                    Some(param) => param.value,
+                    None => {
+                        if e.name == "Moon" {
+                            1738.1
+                        } else {
+                            0.0
                         }
-                    };
-                    let semi_major_radius = match ephem.parameters.get("Equatorial radius") {
-                        Some(param) => {
-                            if id.name == "Earth Barycenter" {
-                                6378.1370
-                            } else {
-                                param.value
-                            }
+                    }
+                };
+                let semi_major_radius = match e.constants.get("Equatorial radius") {
+                    Some(param) => {
+                        if e.name == "Earth Barycenter" {
+                            6378.1370
+                        } else {
+                            param.value
                         }
-                        None => equatorial_radius, // assume spherical if unspecified
-                    };
+                    }
+                    None => equatorial_radius, // assume spherical if unspecified
+                };
 
-                    // Let's now build the J2000 version of this body
-                    let obj = Frame::Geoid {
-                        axb_id: 0, // TODO: Get this from the EXB
-                        exb_id: id.number,
+                // Let's now build the J2000 version of this body
+                Some(FrameTree {
+                    name: format!("{} J2000", e.name.clone()),
+                    frame: Frame::Geoid {
                         gm: gm.value,
-                        parent_axb_id: None,
-                        parent_exb_id: Some(exb_id),
                         flattening,
                         equatorial_radius,
                         semi_major_radius,
-                    };
-                    self.frames.insert(
-                        format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
-                        obj,
-                    );
+                        axb_id: 0,
+                        exb_id: 0,
+                        parent_axb_id: None,
+                        parent_exb_id: None,
+                        frame_path: [Some(pos), None, None],
+                    },
+                    children: Vec::new(),
+                })
+            }
+            None => {
+                if e.name.to_lowercase() == "sun".to_string() {
+                    // Build the Sun frame in J2000
+                    Some(FrameTree {
+                        name: "Sun J2000".to_string(),
+                        frame: Frame::Geoid {
+                            gm: SUN_GM,
+                            flattening: 0.0,
+                            // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+                            equatorial_radius: 696_342.0,
+                            semi_major_radius: 696_342.0,
+                            axb_id: 0,
+                            exb_id: 0,
+                            parent_axb_id: None,
+                            parent_exb_id: None,
+                            frame_path: [Some(pos), None, None],
+                        },
+                        children: Vec::new(),
+                    })
+                } else {
+                    warn!("no GM value for XB {}", e.name);
+                    None
                 }
-                None => {
-                    match id.number {
-                        10 => {
-                            // Build the Sun frame in J2000
-                            let sun2k = Frame::Geoid {
-                                axb_id: 0,
-                                exb_id: id.number,
-                                gm: SUN_GM,
-                                parent_axb_id: None,
-                                parent_exb_id: Some(exb_id),
-                                flattening: 0.0,
-                                // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
-                                equatorial_radius: 696_342.0,
-                                semi_major_radius: 696_342.0,
-                            };
+            }
+        }
+    }
 
-                            self.frames.insert(
-                                format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
-                                sun2k,
-                            );
-                        }
-                        _ => {
-                            warn!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
+    pub fn append_xb(&mut self) {
+        let j2k_str = "j2000";
+        // Build the frames
+        for i in 0..self.xb.ephemeris_root.as_ref().unwrap().children.len() {
+            if let Ok(child) = self.xb.ephemeris_from_path(&[i]) {
+                // Try to go one level deeper
+                for j in 0..child.children.len() {
+                    if let Ok(next_child) = self.xb.ephemeris_from_path(&[i, j]) {
+                        // Create the frame
+                        if let Some(frame) =
+                            Self::default_frame_value(next_child, self.frame_root.children.len())
+                        {
+                            // At this stage, they are all children of the J2000 frame
+                            // Bug: This should eventually use the orientation of the XB or it'll fail if it isn't J2000 based
+                            self.frame_root.children.push(frame);
+                            self.ephem2frame_map
+                                .insert(vec![i, j], vec![self.frame_root.children.len() - 1]);
+                            self.frame2ephem_map
+                                .insert(vec![self.frame_root.children.len() - 1], vec![i, j]);
                         }
                     }
                 }
             }
         }
 
-        Ok(())
+        // for ephem in ephemerides {
+        //     let id = ephem.id.as_ref().unwrap();
+
+        //     let mut ephemc = ephem.clone();
+        //     // Convert all of the names to lowercase now, so we don't have to do so later.
+        //     let name = ephemc.id.as_ref().unwrap().name.to_lowercase();
+        //     ephemc.id.as_mut().unwrap().name = name.clone();
+        //     // Compute the exb_id.
+        //     let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
+
+        //     // Add this EXB to the map, and link it to its parent
+        //     let this_node = self.exb_map.add_node(id.number);
+        //     let parent_node = match self.exbid_to_map_idx(exb_id) {
+        //         Ok(p) => p,
+        //         Err(e) => panic!(e),
+        //     };
+        //     // All edges are of value 1
+        //     self.exb_map.add_edge(parent_node, this_node, 1);
+
+        //     // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
+
+        //     // Ephemeris exists
+        //     match ephem.parameters.get("GM") {
+        //         Some(gm) => {
+        //             // It's a geoid, and we assume everything else is there
+        //             let flattening = match ephem.parameters.get("Flattening") {
+        //                 Some(param) => param.value,
+        //                 None => {
+        //                     if id.name == "Moon" {
+        //                         0.0012
+        //                     } else {
+        //                         0.0
+        //                     }
+        //                 }
+        //             };
+        //             let equatorial_radius = match ephem.parameters.get("Equatorial radius") {
+        //                 Some(param) => param.value,
+        //                 None => {
+        //                     if id.name == "Moon" {
+        //                         1738.1
+        //                     } else {
+        //                         0.0
+        //                     }
+        //                 }
+        //             };
+        //             let semi_major_radius = match ephem.parameters.get("Equatorial radius") {
+        //                 Some(param) => {
+        //                     if id.name == "Earth Barycenter" {
+        //                         6378.1370
+        //                     } else {
+        //                         param.value
+        //                     }
+        //                 }
+        //                 None => equatorial_radius, // assume spherical if unspecified
+        //             };
+
+        //             // Let's now build the J2000 version of this body
+        //             let obj = Frame::Geoid {
+        //                 axb_id: 0, // TODO: Get this from the EXB
+        //                 exb_id: id.number,
+        //                 gm: gm.value,
+        //                 parent_axb_id: None,
+        //                 parent_exb_id: Some(exb_id),
+        //                 flattening,
+        //                 equatorial_radius,
+        //                 semi_major_radius,
+        //             };
+        //             self.frames.insert(
+        //                 format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
+        //                 obj,
+        //             );
+        //         }
+        //         None => {
+        //             match id.number {
+        //                 10 => {
+        //                     // Build the Sun frame in J2000
+        //                     let sun2k = Frame::Geoid {
+        //                         axb_id: 0,
+        //                         exb_id: id.number,
+        //                         gm: SUN_GM,
+        //                         parent_axb_id: None,
+        //                         parent_exb_id: Some(exb_id),
+        //                         flattening: 0.0,
+        //                         // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+        //                         equatorial_radius: 696_342.0,
+        //                         semi_major_radius: 696_342.0,
+        //                     };
+
+        //                     // XXX: Use this split find the ephemeris by name, in the frames appending guy
+        //                     // The problem with this is that I won't create the frames for the objects in the
+        //                     // ephemeris if there isn't a frame which inherits it (Sun does inherit something).
+        //                     self.frames.insert(
+        //                         format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
+        //                         sun2k,
+        //                     );
+        //                 }
+        //                 _ => {
+        //                     warn!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        // Ok(())
     }
 
     /// Append Cosm with the contents of this TOML (must _not_ be the filename)
@@ -322,6 +473,7 @@ impl Cosm {
                             None => AngleUnit::Degrees,
                         },
                     );
+                    // TODO: Fix the insertion of the frames
                     let frame_name = name.replace("_", " ").trim().to_string();
                     // Let's now create the Frame
                     let new_frame = definition.as_frame();
@@ -376,10 +528,23 @@ impl Cosm {
         }
     }
 
+    /// Fetch the frame associated with this ephemeris name
+    /// This is slow, so avoid using it.
     pub fn try_frame(&self, name: &str) -> Result<Frame, NyxError> {
-        match self.frames.get(Self::frame_idx_name(name).as_str()) {
-            Some(f) => Ok(*f),
-            None => Err(NyxError::ObjectNameNotFound(name.to_owned())),
+        let path = self.xb.ephemeris_find_path(&name.to_string())?;
+
+        Ok(self.frame_from_ephem_path(&path))
+    }
+
+    /// Provided an ephemeris path, returns the Frame of that ephemeris.
+    /// For example, if [3, 1] is provided (Moon in J2000 in the DE file), return Moon J2000
+    pub fn frame_from_ephem_path(&self, ephem_path: &[usize]) -> Frame {
+        let frame_path = self.ephem2frame_map.get(&ephem_path.to_vec()).unwrap();
+        if frame_path.len() == 2 {
+            self.frame_root.children[frame_path[0]].children[frame_path[1]].frame
+        } else {
+            // Bug: this will fail if more than two!
+            self.frame_root.children[frame_path[0]].frame
         }
     }
 
@@ -476,42 +641,45 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
-    pub fn raw_celestial_state(&self, exb_id: i32, epoch: Epoch) -> Result<Orbit, NyxError> {
-        let ephem = self
-            .ephemerides
-            .get(&exb_id)
-            .ok_or(NyxError::ObjectIDNotFound(exb_id))?;
+    // pub fn raw_celestial_state(&self, exb_id: i32, epoch: Epoch) -> Result<Orbit, NyxError> {
+    pub fn raw_celestial_state(&self, path: &[usize], epoch: Epoch) -> Result<Orbit, NyxError> {
+        let ephem = self.xb.ephemeris_from_path(path)?;
+        // let ephem = self
+        //     .ephemerides
+        //     .get(&exb_id)
+        //     .ok_or(NyxError::ObjectIDNotFound(exb_id))?;
 
         // Compute the position as per the algorithm from jplephem
         let interp = ephem
             .interpolator
             .as_ref()
-            .ok_or(NyxError::NoInterpolationData(exb_id))?;
+            .ok_or(NyxError::NoInterpolationData(ephem.name.clone()))?;
 
         // the DE file epochs are all in ET mod julian
-        let start_mod_julian = ephem.start_epoch.as_ref().unwrap().value;
+        let start_mod_julian = ephem.start_epoch.as_ref().unwrap().to_epoch();
         let coefficient_count: usize = interp.position_degree as usize;
         if coefficient_count <= 2 {
             // Cf. https://gitlab.com/chrisrabotin/nyx/-/issues/131
             return Err(NyxError::InvalidInterpolationData(format!(
-                "position_degree is less than 3 for EXB ID {}",
-                exb_id
+                "position_degree is less than 3 for XB {}",
+                ephem.name
             )));
         }
 
         let exb_states = match interp
             .state_data
             .as_ref()
-            .ok_or(NyxError::NoStateData(exb_id))?
+            .ok_or(NyxError::NoStateData(ephem.name))?
         {
             EqualStates(states) => states,
-            VarwindowStates(_) => panic!("var window not yet supported by Cosm"),
+            VarwindowStates(_) => panic!("variable window not yet supported by Cosm"),
         };
 
         let interval_length: f64 = exb_states.window_duration;
 
-        let jde = epoch.as_jde_tdb_days();
-        let delta_jde = jde - start_mod_julian;
+        // let jde = epoch.as_jde_tdb_days();
+        // let delta_jde = (jde - start_mod_julian).in_seconds();
+        let delta_jde = (epoch - start_mod_julian).in_seconds();
         let index_f = (delta_jde / interval_length).floor();
         let mut offset = delta_jde - index_f * interval_length;
         let mut index = index_f as usize;
@@ -560,9 +728,10 @@ impl Cosm {
         }
 
         // Get the Geoid associated with the ephemeris frame
-        let ref_frame_id = ephem.ref_frame.as_ref().unwrap().number;
-        let ref_frame_exb_id = ref_frame_id % 100_000;
-        let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
+        let storage_geoid = self.frame_from_ephem_path(path);
+        // let ref_frame_id = ephem.ref_frame.as_ref().unwrap().number;
+        // let ref_frame_exb_id = ref_frame_id % 100_000;
+        // let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
 
         Ok(Orbit::cartesian(
             x,
@@ -583,31 +752,35 @@ impl Cosm {
     /// https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/stelab.c#L255
     pub fn try_celestial_state(
         &self,
-        target_exb_id: i32,
+        target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
         correction: LTCorr,
     ) -> Result<Orbit, NyxError> {
+        let target_frame = self.frame_from_ephem_path(target_ephem);
         match correction {
             LTCorr::None => {
-                let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
+                // let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
                 let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
             LTCorr::LightTime | LTCorr::Abberation => {
                 // Get the geometric states as seen from SSB
-                let ssb2k = self.frame_by_exb_id(0);
-                let obs =
-                    self.try_celestial_state(frame.exb_id(), datetime, ssb2k, LTCorr::None)?;
+                let ssb2k = self.frame_root.frame;
+
+                let cur_frame = self.frame2ephem_map.get(&frame.frame_path()).unwrap();
+                let obs = self.try_celestial_state(cur_frame, datetime, ssb2k, LTCorr::None)?;
                 let mut tgt =
-                    self.try_celestial_state(target_exb_id, datetime, ssb2k, LTCorr::None)?;
+                    self.try_celestial_state(target_ephem, datetime, ssb2k, LTCorr::None)?;
                 // It will take less than three iterations to converge
                 for _ in 0..3 {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
                     let lt_dt = datetime - lt * TimeUnit::Second;
-                    tgt = self.celestial_state(target_exb_id, lt_dt, ssb2k, LTCorr::None);
+                    tgt = self
+                        .try_celestial_state(target_ephem, lt_dt, ssb2k, LTCorr::None)
+                        .unwrap();
                 }
                 // Compute the correct state
                 let mut state = Orbit::cartesian(
@@ -662,12 +835,12 @@ impl Cosm {
     /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`, or panics
     pub fn celestial_state(
         &self,
-        target_exb_id: i32,
+        target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
         correction: LTCorr,
     ) -> Orbit {
-        self.try_celestial_state(target_exb_id, datetime, frame, correction)
+        self.try_celestial_state(target_ephem, datetime, frame, correction)
             .unwrap()
     }
 
@@ -706,44 +879,70 @@ impl Cosm {
         if state.frame == new_frame {
             return Ok(*state);
         }
+        let mut new_frame_path = new_frame.frame_path();
+        let mut state_frame_path = state.frame.frame_path();
         // Let's get the translation path between both both states.
-        let tr_path = if state.rmag() > 0.0 {
+        let e_common_path = if state.rmag() > 0.0 {
             // This is a state transformation, not a celestial position, so let's iterate backward
             // Not entirely sure why, but this works.
-            self.translation_path(&new_frame, &state.frame)?
+            self.ephemeris_common_root(&new_frame_path, &state_frame_path)?
         } else {
-            self.translation_path(&state.frame, &new_frame)?
+            self.ephemeris_common_root(&state_frame_path, &new_frame_path)?
         };
 
-        let mut new_state = if state.frame.exb_id() == 0 {
+        // Remove the common objects from these paths
+        for common in &e_common_path {
+            new_frame_path.retain(|x| x != common);
+            state_frame_path.retain(|x| x != common);
+        }
+
+        let mut new_state = if state_frame_path.len() == 0 {
             // SSB, let's invert this
             -*state
         } else {
             *state
         };
         new_state.frame = new_frame;
-        let mut prev_frame_exb_id = new_state.frame.exb_id();
-        let mut neg_needed = false;
-        for body in tr_path {
-            if body.exb_id() == 0 {
-                neg_needed = !neg_needed;
-                continue;
-            }
-            // This means the target or the origin is exactly this path.
-            let mut next_state = self.raw_celestial_state(body.exb_id(), state.dt)?;
-            if prev_frame_exb_id == next_state.frame.exb_id() || neg_needed {
-                // Let's negate the next state prior to adding it.
-                next_state = -next_state;
-                neg_needed = true;
-            }
+
+        // XXX: is this correct?  I'm afraid it only works for a one-depth ephemeris
+
+        // Walk backward from current state up to common node
+        for i in (0..state_frame_path.len()).rev() {
+            let mut next_state = self.raw_celestial_state(&state_frame_path[0..i], state.dt)?;
             new_state = new_state + next_state;
-            prev_frame_exb_id = next_state.frame.exb_id();
         }
-        // If we started by opposing the state, let's do it again
-        if state.frame.exb_id() == 0 {
-            new_state = -new_state;
+        // Walk forward from the destination state
+        for i in (0..new_frame_path.len()).rev() {
+            let mut next_state = self.raw_celestial_state(&new_frame_path[0..i], state.dt)?;
+            new_state = new_state + next_state;
         }
 
+        // let mut prev_frame_exb_id = new_state.frame.exb_id();
+        // let mut neg_needed = false;
+        // // Problem: Previous, this would return the translation, e.g. Moon -> EM Bary -> SSB -> Mars (if start at Earth and end at Mars)
+        // // Now, this would simply return [] (empty) to say that we need to pass via the SSB.
+        // // Similarly, if in the same frame, then the translation path is actually that of either frame.
+        // for body in tr_path {
+        //     if body.exb_id() == 0 {
+        //         neg_needed = !neg_needed;
+        //         continue;
+        //     }
+        //     // This means the target or the origin is exactly this path.
+        //     let mut next_state = self.raw_celestial_state(body.exb_id(), state.dt)?;
+        //     if prev_frame_exb_id == next_state.frame.exb_id() || neg_needed {
+        //         // Let's negate the next state prior to adding it.
+        //         next_state = -next_state;
+        //         neg_needed = true;
+        //     }
+        //     new_state = new_state + next_state;
+        //     prev_frame_exb_id = next_state.frame.exb_id();
+        // }
+        // // If we started by opposing the state, let's do it again
+        // if state.frame.exb_id() == 0 {
+        //     new_state = -new_state;
+        // }
+
+        /// XXX: HERE. Must fix the rotation path stuff too.
         // And now let's compute the rotation path
         new_state.apply_dcm(self.try_frame_chg_dcm_from_to(&state.frame, &new_frame, state.dt)?);
 
@@ -761,43 +960,71 @@ impl Cosm {
         self.try_frame_chg(state, frame).unwrap()
     }
 
-    /// Returns the conversion path from the target `from` as seen from `to`.
-    fn translation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<Frame>, NyxError> {
-        if from == to {
-            // Same frames, nothing to do
-            return Ok(Vec::new());
-        }
-
-        let start_exb_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
-        let end_exb_idx = self.exbid_to_map_idx(from.exb_id()).unwrap();
-
-        match astar(
-            &self.exb_map,
-            start_exb_idx,
-            |finish| finish == end_exb_idx,
-            |_| 1,
-            |_| 0,
-        ) {
-            Some((_, path)) => {
-                // Build the path with the frames
-                let mut f_path = Vec::new();
-                // Arbitrarily high number
-                let mut common_denom = 1_000_000_000;
-                let mut denom_idx = 0;
-                for (i, idx) in path.iter().enumerate() {
-                    let exb_id = self.exb_map[*idx];
-                    if exb_id < common_denom {
-                        common_denom = exb_id;
-                        denom_idx = i;
+    /// Returns the conversion path from the target ephemeris `from` as seen from `to`.
+    fn ephemeris_common_root(&self, from: &[usize], to: &[usize]) -> Result<Vec<usize>, NyxError> {
+        let mut common_root = Vec::with_capacity(3); // Unlikely to be more than 3 items
+        if from.is_empty() || to.is_empty() {
+            // It will necessarily be the root of the ephemeris
+            Ok(common_root)
+        } else {
+            if from.len() < to.len() {
+                // Iterate through the items in from
+                for (n, obj) in from.iter().enumerate() {
+                    if &to[n] == obj {
+                        common_root.push(*obj);
+                    } else {
+                        // Found the end of the matching objects
+                        break;
                     }
-                    f_path.push(self.frame_by_exb_id(exb_id));
                 }
-                // Remove the common denominator
-                f_path.remove(denom_idx);
-                Ok(f_path)
+            } else {
+                // Iterate through the items in from
+                for (n, obj) in to.iter().enumerate() {
+                    if &from[n] == obj {
+                        common_root.push(*obj);
+                    } else {
+                        // Found the end of the matching objects
+                        break;
+                    }
+                }
             }
-            None => Err(NyxError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
+            Ok(common_root)
         }
+        // if from == to {
+        //     // Same frames, nothing to do
+        //     return Ok(Vec::new());
+        // }
+
+        // let start_exb_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
+        // let end_exb_idx = self.exbid_to_map_idx(from.exb_id()).unwrap();
+
+        // match astar(
+        //     &self.exb_map,
+        //     start_exb_idx,
+        //     |finish| finish == end_exb_idx,
+        //     |_| 1,
+        //     |_| 0,
+        // ) {
+        //     Some((_, path)) => {
+        //         // Build the path with the frames
+        //         let mut f_path = Vec::new();
+        //         // Arbitrarily high number
+        //         let mut common_denom = 1_000_000_000;
+        //         let mut denom_idx = 0;
+        //         for (i, idx) in path.iter().enumerate() {
+        //             let exb_id = self.exb_map[*idx];
+        //             if exb_id < common_denom {
+        //                 common_denom = exb_id;
+        //                 denom_idx = i;
+        //             }
+        //             f_path.push(self.frame_by_exb_id(exb_id));
+        //         }
+        //         // Remove the common denominator
+        //         f_path.remove(denom_idx);
+        //         Ok(f_path)
+        //     }
+        //     None => Err(NyxError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
+        // }
     }
 
     /// Returns the rotation path of AXB IDs from the target `from` as seen from `to`.
@@ -835,61 +1062,15 @@ impl Cosm {
                 f_path.remove(denom_idx);
                 Ok(f_path)
             }
-            None => Err(NyxError::DisjointFrameOrientations(
-                from.axb_id(),
-                to.axb_id(),
-            )),
+            None => Err(NyxError::DisjointFrameOrientations("from.name", "to.name")),
         }
     }
-}
-
-/// Loads the provided input_filename as an EXB
-///
-/// This function may panic!
-pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
-    let mut input_exb_buf = Vec::new();
-
-    let mut f = File::open(if !input_filename.ends_with(".exb") {
-        format!("{}.exb", input_filename)
-    } else {
-        input_filename.to_string()
-    })?;
-    f.read_to_end(&mut input_exb_buf)
-        .expect("something went wrong reading the file");
-
-    if input_exb_buf.is_empty() {
-        panic!("EXB file {} is empty (zero bytes read)", input_filename);
-    }
-
-    load_ephemeris_from_buf(&input_exb_buf)
-}
-
-/// Loads the provided input_filename as an EXB
-///
-/// This function may panic!
-pub fn load_ephemeris_from_buf(input_exb_buf: &[u8]) -> Result<Vec<Ephemeris>, IoError> {
-    let decode_start = Instant::now();
-
-    let ephcnt =
-        EphemerisContainer::decode(input_exb_buf.into_buf()).expect("could not decode EXB");
-
-    let ephemerides = ephcnt.ephemerides;
-    let num_eph = ephemerides.len();
-    if num_eph == 0 {
-        panic!("no ephemerides found in EXB");
-    }
-    info!(
-        "Loaded {} ephemerides in {} ms.",
-        num_eph,
-        decode_start.elapsed().as_millis()
-    );
-    Ok(ephemerides)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use celestia::bodies;
+    use crate::celestia::bodies;
 
     /// Tests direct transformations. Test cases generated via jplephem, hence the EPSILON precision.
     /// Note however that there is a difference between jplephem and spiceypy, cf.
@@ -899,14 +1080,16 @@ mod tests {
         use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
+        let earth_path = cosm
+            .xb
+            .ephemeris_find_path(&bodies::EARTH.to_string())
+            .unwrap();
+
         assert_eq!(
-            cosm.translation_path(
-                &cosm.frame("Earth Barycenter J2000"),
-                &cosm.frame("Earth Barycenter J2000"),
-            )
-            .unwrap()
-            .len(),
-            0,
+            cosm.ephemeris_common_root(&earth_path, &earth_path)
+                .unwrap()
+                .len(),
+            2,
             "Conversions within Earth does not require any translation"
         );
 
@@ -928,14 +1111,24 @@ mod tests {
         let ssb2k = cosm.frame("SSB");
         let earth_moon2k = cosm.frame("Luna");
 
+        let earth_bary_path = cosm
+            .xb
+            .ephemeris_find_path(&bodies::EARTH_BARYCENTER.to_string())
+            .unwrap();
+
+        let moon_path = cosm
+            .xb
+            .ephemeris_find_path(&bodies::EARTH_BARYCENTER.to_string())
+            .unwrap();
+
         assert!(
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, earth_bary2k, c)
+            cosm.celestial_state(&earth_bary_path, jde, earth_bary2k, c)
                 .rmag()
                 < EPSILON
         );
 
-        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, ssb2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::SSB);
+        let out_state = cosm.celestial_state(&earth_bary_path, jde, ssb2k, c);
+        assert_eq!(out_state.frame.frame_path(), vec![]);
         assert!((out_state.x - -109_837_695.021_661_42).abs() < 1e-12);
         assert!((out_state.y - 89_798_622.194_651_56).abs() < 1e-12);
         assert!((out_state.z - 38_943_878.275_922_61).abs() < 1e-12);
@@ -943,8 +1136,8 @@ mod tests {
         assert!((out_state.vy - -20.413_134_121_084_312).abs() < 1e-12);
         assert!((out_state.vz - -8.850_448_420_104_028).abs() < 1e-12);
 
-        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, earth_moon2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::EARTH_MOON);
+        let out_state = cosm.celestial_state(&earth_bary_path, jde, earth_moon2k, c);
+        assert_eq!(out_state.frame.frame_path(), moon_path);
         assert!((out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
         assert!((out_state.y - 345_462.617_249_631_9).abs() < 1e-9);
         assert!((out_state.z - 144_380.059_413_586_45).abs() < 1e-9);
@@ -952,8 +1145,8 @@ mod tests {
         assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < 1e-12);
         assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < 1e-12);
         // Add the reverse test too
-        let out_state = cosm.celestial_state(bodies::EARTH_MOON, jde, earth_bary2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::EARTH_BARYCENTER);
+        let out_state = cosm.celestial_state(&moon_path, jde, earth_bary2k, c);
+        assert_eq!(out_state.frame.frame_path(), &earth_bary_path);
         assert!((out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
         assert!((out_state.y - -345_462.617_249_631_9).abs() < 1e-10);
         assert!((out_state.z - -144_380.059_413_586_45).abs() < 1e-10);
@@ -962,8 +1155,8 @@ mod tests {
         assert!((out_state.vz - -0.183_869_552_742_917_6).abs() < EPSILON);
 
         // The following test case comes from jplephem loaded with de438s.bsp
-        let out_state = cosm.celestial_state(bodies::SUN, jde, ssb2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::SSB);
+        let out_state = cosm.celestial_state(&[0], jde, ssb2k, c);
+        assert_eq!(out_state.frame.frame_path(), &[0]);
         assert!((out_state.x - -182_936.040_274_732_14).abs() < EPSILON);
         assert!((out_state.y - -769_329.776_328_230_7).abs() < EPSILON);
         assert!((out_state.z - -321_490.795_782_183_1).abs() < EPSILON);
@@ -971,8 +1164,8 @@ mod tests {
         assert!((out_state.vy - 0.001_242_263_392_603_425).abs() < EPSILON);
         assert!((out_state.vz - 0.000_134_043_776_253_089_48).abs() < EPSILON);
 
-        let out_state = cosm.celestial_state(bodies::EARTH, jde, earth_bary2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::EARTH_BARYCENTER);
+        let out_state = cosm.celestial_state(&earth_path, jde, earth_bary2k, c);
+        assert_eq!(out_state.frame.frame_path(), earth_bary_path);
         assert!((out_state.x - 1_004.153_534_699_454_6).abs() < EPSILON);
         assert!((out_state.y - 4_249.202_979_894_305).abs() < EPSILON);
         assert!((out_state.z - 1_775.880_075_192_657_8).abs() < EPSILON);
@@ -990,7 +1183,7 @@ mod tests {
         let cosm = Cosm::de438();
 
         let ven2ear = cosm
-            .translation_path(&cosm.frame("VENUS BARYCENTER J2000"), &cosm.frame("Luna"))
+            .ephemeris_common_root(&cosm.frame("VENUS BARYCENTER J2000"), &cosm.frame("Luna"))
             .unwrap();
         assert_eq!(
             ven2ear.len(),
@@ -1297,29 +1490,6 @@ mod tests {
         assert!((out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
         assert!((out_state.y - -5.812_356_237_533_56e7).abs() < 1e-3);
         assert!((out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
-        // Reenable this test after #96 is implemented.
-        dbg!(out_state.vx - -3.463_585_965_206_417);
-        dbg!(out_state.vy - -3.698_169_177_803_263e1);
-        dbg!(out_state.vz - -1.690_783_648_756_073e1);
-    }
-
-    #[test]
-    fn test_cosm_append() {
-        let mut cosm = Cosm::de438();
-        let ephem_buf = load_ephemeris("./de438s").unwrap();
-        // Let's load the same XB again to demonstrate idempotency.
-        cosm.append_xb(&ephem_buf).unwrap();
-
-        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
-
-        let mars2k = cosm.frame("Mars Barycenter J2000");
-
-        let out_state =
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, mars2k, LTCorr::Abberation);
-
-        assert!((dbg!(out_state.x) - -2.577_231_712_700_484_4e8).abs() < 1e-3);
-        assert!((dbg!(out_state.y) - -5.812_356_237_533_56e7).abs() < 1e-3);
-        assert!((dbg!(out_state.z) - -2.493_146_410_521_204_8e7).abs() < 1e-3);
         // Reenable this test after #96 is implemented.
         dbg!(out_state.vx - -3.463_585_965_206_417);
         dbg!(out_state.vy - -3.698_169_177_803_263e1);

@@ -1,7 +1,8 @@
 [package]
 name = "nyx-space"
 version = "0.1.0-beta1"
-authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>", "Sai Chikine <sai.chikine@advanced-space.com>"]
+edition = "2018"
+authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://gitlab.com/chrisrabotin/nyx"
 documentation = "https://docs.rs/nyx-space/"
@@ -9,7 +10,7 @@ repository = "https://gitlab.com/chrisrabotin/nyx"
 keywords = ["space", "mission", "design", "orbit", "estimation"]
 categories = ["science", "simulation"]
 readme = "README.md"
-license = "Apache-2.0"
+license = "LGPLv3"
 exclude = ["tests/GMAT_scripts/GMAT_V&V_ProcessAndResults.pdf", "examples", "data/*.gz", "rustfmt.toml", "de438*"]
 
 [badges]
@@ -17,34 +18,33 @@ maintenance = { status = "actively-developed" }
 gitlab = { repository = "chrisrabotin/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "0.22"
+nalgebra = "0.24"
 log = "0.4"
-# hifitime = "2"
-hifitime = {path = "../hifitime"}
+hifitime = "2.2"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"
 csv = "1"
-hyperdual = "=0.3.6"
-bytes = "0.4.12"
-prost = "0.5"
-prost-derive = "0.5"
-petgraph = "0.4"
-rand = "0.7"
-rand_distr = "0.2"
+hyperdual = "=0.3.7"
+bytes = "1.0"
+prost = "0.7"
+prost-derive = "0.7"
+petgraph = "0.5"
+rand = "0.8"
+rand_distr = "0.4"
 meval = "0.2"
-num = {version = "0.2", default-features = false}
+num = {version = "0.3", default-features = false}
 rust-embed = "5.5"
 toml = "0.5"
 clap = "2"
-config = "0.9"
+config = "0.10"
 regex = "1.1"
 pretty_env_logger = "0.3"
-dialoguer = "0.6"
+dialoguer = "0.7"
 glob = "0.3"
 rayon = "1.4"
 lazy_static = "1.4.0"
-approx = "0.3.2"
+approx = "0.4"
 
 [profile.dev]
 opt-level = 0

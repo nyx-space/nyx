@@ -3,7 +3,7 @@ use super::rotations::*;
 use crate::na::Matrix3;
 use crate::time::Epoch;
 */
-pub use celestia::xb::Identifier as XbId;
+// pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
 use std::fmt;
 
@@ -24,6 +24,7 @@ pub enum Frame {
         gm: f64,
         parent_axb_id: Option<i32>,
         parent_exb_id: Option<i32>,
+        frame_path: [Option<usize>; 3],
     },
     /// Any Geoid which has a GM, flattening value, etc.
     Geoid {
@@ -35,6 +36,7 @@ pub enum Frame {
         flattening: f64,
         equatorial_radius: f64,
         semi_major_radius: f64,
+        frame_path: [Option<usize>; 3],
     },
     /// Velocity, Normal, Cross
     VNC,
@@ -53,6 +55,21 @@ impl Frame {
 
     pub fn is_celestial(&self) -> bool {
         matches!(self, Frame::Celestial { .. })
+    }
+
+    pub fn frame_path(&self) -> Vec<usize> {
+        match self {
+            Frame::Celestial { frame_path, .. } | Frame::Geoid { frame_path, .. } => {
+                let mut path = Vec::with_capacity(3);
+                for p in frame_path {
+                    if let Some(f) = p {
+                        path.push(*f)
+                    }
+                }
+                path
+            }
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
     }
 
     pub fn gm(&self) -> f64 {
