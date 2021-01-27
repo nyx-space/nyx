@@ -135,6 +135,15 @@ pub fn rss_state_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     rss_errors(&prop_err.to_cartesian_vec(), &cur_state.to_cartesian_vec())
 }
 
+// Source: https://stackoverflow.com/questions/38406793/why-is-capitalizing-the-first-letter-of-a-string-so-convoluted-in-rust
+pub fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+    }
+}
+
 #[test]
 fn test_tilde_matrix() {
     let vec = Vector3::new(1.0, 2.0, 3.0);

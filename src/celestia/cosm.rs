@@ -19,7 +19,7 @@ use crate::errors::NyxError;
 use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::Matrix3;
-use crate::utils::rotv;
+use crate::utils::{capitalize, rotv};
 use std::collections::HashMap;
 use std::fmt;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
@@ -62,7 +62,6 @@ pub struct Cosm {
     frame2ephem_map: HashMap<Vec<usize>, Vec<usize>>,
     frames: HashMap<String, Frame>,
     axb_names: HashMap<String, i32>,
-    exb_map: Graph<i32, u8, Undirected>,
     axb_map: Graph<i32, u8, Undirected>,
     // Stores the rotations, cannot be in the map because Box<dyn T> is not clonable, and therefore cannot be used for A*
     axb_rotations: HashMap<i32, Box<dyn ParentRotation>>,
@@ -124,7 +123,6 @@ impl Cosm {
             frame2ephem_map: HashMap::new(),
             frames: HashMap::new(),
             axb_names: HashMap::new(),
-            exb_map: Graph::new_undirected(),
             axb_map,
             axb_rotations: HashMap::new(),
             j2k_nidx,
@@ -287,7 +285,10 @@ impl Cosm {
     }
 
     pub fn append_xb(&mut self) {
-        let j2k_str = "j2000";
+        // Insert the links between the SSB ephem and the J2000 frame (data stored in self.frame_root!)
+        self.ephem2frame_map.insert(Vec::new(), Vec::new());
+        self.frame2ephem_map.insert(Vec::new(), Vec::new());
+
         // Build the frames
         for i in 0..self.xb.ephemeris_root.as_ref().unwrap().children.len() {
             if let Ok(child) = self.xb.ephemeris_from_path(&[i]) {
@@ -303,12 +304,22 @@ impl Cosm {
                             // At this stage, they are all children of the J2000 frame
                             // Bug: This should eventually use the orientation of the XB or it'll fail if it isn't J2000 based
                             self.frame_root.children.push(frame);
-                            self.ephem2frame_map
-                                .insert(vec![i, j], vec![self.frame_root.children.len() - 1]);
-                            self.frame2ephem_map
-                                .insert(vec![self.frame_root.children.len() - 1], vec![i, j]);
+                            let frame_path = vec![self.frame_root.children.len() - 1];
+                            self.ephem2frame_map.insert(vec![i, j], frame_path.clone());
+                            self.frame2ephem_map.insert(frame_path, vec![i, j]);
                         }
                     }
+                }
+                // Add base J2000 frame for all barycenters
+                if let Some(frame) = Self::default_frame_value(
+                    child,
+                    [Some(i), None, None],
+                    self.frame_root.children.len(),
+                ) {
+                    self.frame_root.children.push(frame);
+                    let frame_path = vec![self.frame_root.children.len() - 1];
+                    self.ephem2frame_map.insert(vec![i], frame_path.clone());
+                    self.frame2ephem_map.insert(frame_path, vec![i]);
                 }
             }
         }
@@ -506,15 +517,6 @@ impl Cosm {
         }
     }
 
-    fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, NyxError> {
-        for (idx, node) in self.exb_map.raw_nodes().iter().enumerate() {
-            if node.weight == id {
-                return Ok(NodeIndex::new(idx));
-            }
-        }
-        Err(NyxError::ObjectIDNotFound(id))
-    }
-
     fn axbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, NyxError> {
         for (idx, node) in self.axb_map.raw_nodes().iter().enumerate() {
             if node.weight == id {
@@ -524,37 +526,58 @@ impl Cosm {
         Err(NyxError::ObjectIDNotFound(id))
     }
 
-    fn frame_idx_name(name: &str) -> String {
-        let name = name.replace("_", " ");
-        if name.to_lowercase() == "eme2000" {
-            String::from("earth j2000")
-        } else if name.to_lowercase() == "luna" {
-            String::from("moon j2000")
-        } else if name.to_lowercase() == "ssb" {
-            String::from("solar system barycenter j2000")
+    /// Returns the expected ephemeris name and frame name
+    fn fix_frame_name(name: &str) -> (String, String) {
+        let name = name.to_lowercase().replace("_", " ");
+        if name == "eme2000" {
+            (String::from("Earth"), String::from("j2000"))
+        } else if name == "luna" {
+            (String::from("Moon"), String::from("j2000"))
+        } else if name == "ssb" {
+            (
+                String::from("Solar System Barycenter"),
+                String::from("j2000"),
+            )
         } else {
-            name.to_lowercase()
+            let splt: Vec<_> = name.split(' ').collect();
+            // Likely a default center and frame, so let's do some clever guessing
+            let frame_name = splt[splt.len() - 1].to_string();
+            let ephem_name = splt[0..splt.len() - 1]
+                .iter()
+                .map(|word| capitalize(word))
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            (ephem_name, frame_name)
         }
     }
 
     /// Fetch the frame associated with this ephemeris name
     /// This is slow, so avoid using it.
     pub fn try_frame(&self, name: &str) -> Result<Frame, NyxError> {
-        let path = self.xb.ephemeris_find_path(name.to_string())?;
+        let (ephem_name, frame_name) = Self::fix_frame_name(name);
+        let path = self.xb.ephemeris_find_path(ephem_name)?;
 
-        Ok(self.frame_from_ephem_path(&path))
+        Ok(self.frame_from_ephem_path(&path, Some(frame_name)))
     }
 
-    /// Provided an ephemeris path, returns the Frame of that ephemeris.
+    /// Provided an ephemeris path and an optional frame name, returns the Frame of that ephemeris.
     /// For example, if [3, 1] is provided (Moon in J2000 in the DE file), return Moon J2000
-    pub fn frame_from_ephem_path(&self, ephem_path: &[usize]) -> Frame {
+    /// If no frame name is provided, then the storage frame is returned. Otherwise, the correct frame is returned.
+    pub fn frame_from_ephem_path(&self, ephem_path: &[usize], frame_name: Option<String>) -> Frame {
         let frame_path = self.ephem2frame_map.get(&ephem_path.to_vec()).unwrap();
-        if frame_path.len() == 2 {
+        let mut req_frame = if frame_path.len() == 2 {
             self.frame_root.children[frame_path[0]].children[frame_path[1]].frame
         } else {
             // Bug: this will fail if more than two!
             self.frame_root.children[frame_path[0]].frame
+        };
+
+        if let Some(fname) = frame_name {
+            // Retrieve that frame
         }
+
+        req_frame
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
@@ -638,7 +661,8 @@ impl Cosm {
 
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
     pub fn mut_gm_for_frame(&mut self, name: &str, new_gm: f64) {
-        match self.frames.get_mut(Self::frame_idx_name(name).as_str()) {
+        let (ephem_name, _) = Self::fix_frame_name(name);
+        match self.frames.get_mut(&ephem_name) {
             Some(Frame::Celestial { gm, .. }) => {
                 *gm = new_gm;
             }
@@ -652,6 +676,19 @@ impl Cosm {
     /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
     // pub fn raw_celestial_state(&self, exb_id: i32, epoch: Epoch) -> Result<Orbit, NyxError> {
     pub fn raw_celestial_state(&self, path: &[usize], epoch: Epoch) -> Result<Orbit, NyxError> {
+        if path.is_empty() {
+            // This is the solar system barycenter, so we just return a state of zeros
+            return Ok(Orbit::cartesian(
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                epoch,
+                self.frame_root.frame,
+            ));
+        }
         let ephem = self.xb.ephemeris_from_path(path)?;
         // let ephem = self
         //     .ephemerides
@@ -662,7 +699,7 @@ impl Cosm {
         let interp = ephem
             .interpolator
             .as_ref()
-            .ok_or(NyxError::NoInterpolationData(ephem.name.clone()))?;
+            .ok_or_else(|| NyxError::NoInterpolationData(ephem.name.clone()))?;
 
         // the DE file epochs are all in ET mod julian
         let start_mod_julian = ephem.start_epoch.as_ref().unwrap().to_epoch();
@@ -678,7 +715,7 @@ impl Cosm {
         let exb_states = match interp
             .state_data
             .as_ref()
-            .ok_or(NyxError::NoStateData(ephem.name.clone()))?
+            .ok_or_else(|| NyxError::NoStateData(ephem.name.clone()))?
         {
             EqualStates(states) => states,
             VarwindowStates(_) => panic!("variable window not yet supported by Cosm"),
@@ -737,7 +774,7 @@ impl Cosm {
         }
 
         // Get the Geoid associated with the ephemeris frame
-        let storage_geoid = self.frame_from_ephem_path(path);
+        let storage_geoid = self.frame_from_ephem_path(path, None);
         // let ref_frame_id = ephem.ref_frame.as_ref().unwrap().number;
         // let ref_frame_exb_id = ref_frame_id % 100_000;
         // let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
@@ -766,7 +803,7 @@ impl Cosm {
         frame: Frame,
         correction: LTCorr,
     ) -> Result<Orbit, NyxError> {
-        let target_frame = self.frame_from_ephem_path(target_ephem);
+        let target_frame = self.frame_from_ephem_path(target_ephem, None);
         match correction {
             LTCorr::None => {
                 // let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
@@ -905,7 +942,7 @@ impl Cosm {
             state_frame_path.retain(|x| x != common);
         }
 
-        let mut new_state = if state_frame_path.len() == 0 {
+        let mut new_state = if state_frame_path.is_empty() {
             // SSB, let's invert this
             -*state
         } else {
@@ -917,13 +954,13 @@ impl Cosm {
 
         // Walk backward from current state up to common node
         for i in (0..state_frame_path.len()).rev() {
-            let mut next_state = self.raw_celestial_state(&state_frame_path[0..i], state.dt)?;
+            let next_state = self.raw_celestial_state(&state_frame_path[0..i], state.dt)?;
             new_state = new_state + next_state;
         }
         // Walk forward from the destination state
         for i in (0..new_frame_path.len()).rev() {
-            let mut next_state = self.raw_celestial_state(&new_frame_path[0..i], state.dt)?;
-            new_state = new_state + next_state;
+            let next_state = self.raw_celestial_state(&new_frame_path[0..i], state.dt)?;
+            new_state = new_state - next_state;
         }
 
         // let mut prev_frame_exb_id = new_state.frame.exb_id();
@@ -1653,5 +1690,12 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn test_fix_frame_name() {
+        let (e, f) = Cosm::fix_frame_name("Mars barycenter j2000");
+        assert_eq!(e, "Mars Barycenter");
+        assert_eq!(f, "j2000");
     }
 }

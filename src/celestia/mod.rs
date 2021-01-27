@@ -78,7 +78,7 @@ impl Xb {
     /// Finds the ephemeris provided the path as usize, e.g. [3,1] would return the Moon with any DE xb.
     pub fn ephemeris_from_path<'a>(&'a self, path: &[usize]) -> Result<&'a Ephemeris, NyxError> {
         match &self.ephemeris_root {
-            None => return Err(NyxError::ObjectNotFound("not ephemeris root".to_string())),
+            None => Err(NyxError::ObjectNotFound("not ephemeris root".to_string())),
             Some(root) => {
                 if path.is_empty() {
                     return Ok(&root);
@@ -118,8 +118,9 @@ impl Xb {
         } else if e.children.is_empty() {
             Err(NyxError::ObjectNotFound(name.to_string()))
         } else {
-            for child in &e.children {
+            for (cno, child) in e.children.iter().enumerate() {
                 let mut this_path = cur_path.clone();
+                this_path.push(cno);
                 let child_attempt = Self::ephemeris_seek_by_name(name, &mut this_path, child);
                 if let Ok(found_path) = child_attempt {
                     return Ok(found_path);
@@ -133,7 +134,7 @@ impl Xb {
     /// Returns the machine path of the requested ephemeris
     pub fn ephemeris_find_path(&self, name: String) -> Result<Vec<usize>, NyxError> {
         match &self.ephemeris_root {
-            None => return Err(NyxError::ObjectNotFound("No root!".to_string())),
+            None => Err(NyxError::ObjectNotFound("No root!".to_string())),
             Some(root) => {
                 if root.name == name {
                     // Return an empty vector (but OK because we're asking for the root)
