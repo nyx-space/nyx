@@ -18,6 +18,7 @@ use crate::io::scenario::ScenarioSerde;
 use crate::propagators::Propagator;
 use crate::time::{Duration, Epoch, SECONDS_PER_DAY};
 use crate::SpacecraftState;
+use std::convert::TryFrom;
 use std::str::FromStr;
 use std::sync::{mpsc::channel, Arc};
 use std::time::Instant;
@@ -162,7 +163,7 @@ where
                     // Get the object IDs from name
                     let mut bodies = Vec::with_capacity(10);
                     for obj in pts_masses {
-                        match Bodies::from_name(obj.to_string()) {
+                        match Bodies::try_from(obj.to_string()) {
                             Ok(b) => bodies.push(b),
                             Err(e) => {
                                 return Err(ParsingError::LoadingError(format!("{:?}", e)));

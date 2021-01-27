@@ -1,5 +1,6 @@
 extern crate nalgebra as na;
 extern crate prost;
+use std::convert::TryFrom;
 use std::fs::File;
 use std::io::Read;
 use std::time::Instant;
@@ -233,9 +234,12 @@ impl Bodies {
             Self::NeptuneBarycenter => 8,
         }
     }
+}
 
-    /// Attempts to load the default body from the provided name
-    pub fn from_name(name: String) -> Result<Self, NyxError> {
+impl TryFrom<String> for Bodies {
+    type Error = NyxError;
+
+    fn try_from(name: String) -> Result<Self, Self::Error> {
         match name.to_lowercase().as_str() {
             "Solar System Barycenter" => Ok(Self::SSB),
             "Sun" => Ok(Self::Sun),
@@ -250,6 +254,35 @@ impl Bodies {
             "Uranus Barycenter" => Ok(Self::UranusBarycenter),
             "Neptune Barycenter" => Ok(Self::NeptuneBarycenter),
             _ => Err(NyxError::ObjectNameNotFound(name)),
+        }
+    }
+}
+
+impl TryFrom<Vec<usize>> for Bodies {
+    type Error = NyxError;
+
+    fn try_from(ephem_path: Vec<usize>) -> Result<Self, Self::Error> {
+        match ephem_path.len() {
+            0 => Ok(Self::SSB),
+            1 => match ephem_path[0] {
+                0 => Ok(Self::Sun),
+                1 => Ok(Self::Mercury),
+                2 => Ok(Self::Venus),
+                3 => Ok(Self::EarthBarycenter),
+                4 => Ok(Self::MarsBarycenter),
+                5 => Ok(Self::JupiterBarycenter),
+                6 => Ok(Self::SaturnBarycenter),
+                7 => Ok(Self::UranusBarycenter),
+                8 => Ok(Self::NeptuneBarycenter),
+                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+            },
+            2 if ephem_path[0] == 3 => match ephem_path[1] {
+                // This only support the Earth system
+                0 => Ok(Self::Earth),
+                1 => Ok(Self::Luna),
+                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+            },
+            _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
         }
     }
 }

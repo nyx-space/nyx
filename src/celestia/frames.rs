@@ -4,7 +4,9 @@ use crate::na::Matrix3;
 use crate::time::Epoch;
 */
 // pub use celestia::xb::Identifier as XbId;
+use super::Bodies;
 use std::cmp::PartialEq;
+use std::convert::TryFrom;
 use std::fmt;
 
 // TODO: Rename to Frame, and add an ID. Then then &Frame will be stored only in the Cosm
@@ -162,21 +164,8 @@ impl fmt::Display for Frame {
                 write!(
                     f,
                     "{} {}",
-                    match exb_id {
-                        0 => "SSB".to_string(),
-                        10 => "Sun".to_string(),
-                        100 => "Mercury".to_string(),
-                        200 => "Venus".to_string(),
-                        300 => "Earth-Moon barycenter".to_string(),
-                        399 => "Earth".to_string(),
-                        400 => "Mars barycenter".to_string(),
-                        500 => "Jupiter barycenter".to_string(),
-                        600 => "Saturn barycenter".to_string(),
-                        700 => "Uranus barycenter".to_string(),
-                        800 => "Neptune barycenter".to_string(),
-                        _ => format!("{:3}", exb_id),
-                    },
-                    if axb_id == exb_id || exb_id - axb_id == 99 {
+                    Bodies::try_from(self.ephem_path()).unwrap().name(),
+                    if exb_id - axb_id == 99 {
                         "IAU Fixed".to_string()
                     } else {
                         match axb_id / 100 {
