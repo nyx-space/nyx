@@ -888,22 +888,12 @@ impl Cosm {
         if state.frame == new_frame {
             return Ok(*state);
         }
-        let mut new_ephem_path = new_frame.ephem_path();
-        let mut state_ephem_path = state.frame.ephem_path();
-        // Let's get the translation path between both both states.
-        let e_common_path = if state.rmag() > 0.0 {
-            // This is a state transformation, not a celestial position, so let's iterate backward
-            // Not entirely sure why, but this works.
-            self.ephemeris_common_root(&new_ephem_path, &state_ephem_path)?
-        } else {
-            self.ephemeris_common_root(&state_ephem_path, &new_ephem_path)?
-        };
+        let new_ephem_path = new_frame.ephem_path();
+        let state_ephem_path = state.frame.ephem_path();
 
-        // Remove the common objects from these paths
-        for common in &e_common_path {
-            new_ephem_path.retain(|x| x != common);
-            state_ephem_path.retain(|x| x != common);
-        }
+        // Let's get the translation path between both both states.
+        // Ephem root should be order invariant.
+        let e_common_path = self.ephemeris_common_root(&new_ephem_path, &state_ephem_path)?;
 
         let mut new_state = if state_ephem_path.is_empty() {
             // SSB, let's invert this
@@ -914,12 +904,12 @@ impl Cosm {
         new_state.frame = new_frame;
 
         // Walk forward from the destination state
-        for i in (0..new_ephem_path.len()).rev() {
+        for i in (e_common_path.len()..new_ephem_path.len()).rev() {
             let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
             new_state = new_state + next_state;
         }
         // Walk backward from current state up to common node
-        for i in (0..state_ephem_path.len()).rev() {
+        for i in (e_common_path.len()..state_ephem_path.len()).rev() {
             let next_state = self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
             if i == state_ephem_path.len() - 1 {
                 // We just crossed the common point, so let's negate this state
@@ -1074,17 +1064,30 @@ mod tests {
         );
 
         let out_state = cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, ssb2k, c);
-        assert_eq!(out_state.frame.frame_path(), vec![]);
-        assert!((out_state.x - -109_837_695.021_661_42).abs() < 1e-12);
-        assert!((out_state.y - 89_798_622.194_651_56).abs() < 1e-12);
-        assert!((out_state.z - 38_943_878.275_922_61).abs() < 1e-12);
-        assert!((out_state.vx - -20.400_327_981_451_596).abs() < 1e-12);
-        assert!((out_state.vy - -20.413_134_121_084_312).abs() < 1e-12);
-        assert!((out_state.vz - -8.850_448_420_104_028).abs() < 1e-12);
+        assert_eq!(out_state.frame.ephem_path(), vec![]);
+        assert!((out_state.x - -109_837_695.021_661_42).abs() < 1e-13);
+        assert!((out_state.y - 89_798_622.194_651_56).abs() < 1e-13);
+        assert!((out_state.z - 38_943_878.275_922_61).abs() < 1e-13);
+        assert!((out_state.vx - -20.400_327_981_451_596).abs() < 1e-13);
+        assert!((out_state.vy - -20.413_134_121_084_312).abs() < 1e-13);
+        assert!((out_state.vz - -8.850_448_420_104_028).abs() < 1e-13);
+
+        // And the opposite transformation
+        let out_state = cosm.celestial_state(Bodies::SSB.ephem_path(), jde, earth_bary2k, c);
+        assert_eq!(
+            out_state.frame.ephem_path(),
+            Bodies::EarthBarycenter.ephem_path()
+        );
+        assert!((out_state.x - 109_837_695.021_661_42).abs() < 1e-13);
+        assert!((out_state.y - -89_798_622.194_651_56).abs() < 1e-13);
+        assert!((out_state.z - -38_943_878.275_922_61).abs() < 1e-13);
+        assert!((out_state.vx - 20.400_327_981_451_596).abs() < 1e-13);
+        assert!((out_state.vy - 20.413_134_121_084_312).abs() < 1e-13);
+        assert!((out_state.vz - 8.850_448_420_104_028).abs() < 1e-13);
 
         let out_state =
             cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_moon2k, c);
-        assert_eq!(out_state.frame.frame_path(), Bodies::Luna.ephem_path());
+        assert_eq!(out_state.frame.ephem_path(), Bodies::Luna.ephem_path());
         assert!((out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
         assert!((out_state.y - 345_462.617_249_631_9).abs() < 1e-9);
         assert!((out_state.z - 144_380.059_413_586_45).abs() < 1e-9);
@@ -1094,7 +1097,7 @@ mod tests {
         // Add the reverse test too
         let out_state = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, earth_bary2k, c);
         assert_eq!(
-            out_state.frame.frame_path(),
+            out_state.frame.ephem_path(),
             Bodies::EarthBarycenter.ephem_path()
         );
         assert!((out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
@@ -1105,8 +1108,8 @@ mod tests {
         assert!((out_state.vz - -0.183_869_552_742_917_6).abs() < EPSILON);
 
         // The following test case comes from jplephem loaded with de438s.bsp
-        let out_state = cosm.celestial_state(&[0], jde, ssb2k, c);
-        assert_eq!(out_state.frame.frame_path(), &[0]);
+        let out_state = cosm.celestial_state(Bodies::Sun.ephem_path(), jde, ssb2k, c);
+        assert_eq!(out_state.frame.ephem_path(), Bodies::SSB.ephem_path());
         assert!((out_state.x - -182_936.040_274_732_14).abs() < EPSILON);
         assert!((out_state.y - -769_329.776_328_230_7).abs() < EPSILON);
         assert!((out_state.z - -321_490.795_782_183_1).abs() < EPSILON);
@@ -1114,9 +1117,20 @@ mod tests {
         assert!((out_state.vy - 0.001_242_263_392_603_425).abs() < EPSILON);
         assert!((out_state.vz - 0.000_134_043_776_253_089_48).abs() < EPSILON);
 
+        // And the opposite transformation
+        let out_state =
+            cosm.celestial_state(Bodies::SSB.ephem_path(), jde, cosm.frame("Sun J2000"), c);
+        assert_eq!(out_state.frame.ephem_path(), Bodies::Sun.ephem_path());
+        assert!((out_state.x - 182_936.040_274_732_14).abs() < EPSILON);
+        assert!((out_state.y - 769_329.776_328_230_7).abs() < EPSILON);
+        assert!((out_state.z - 321_490.795_782_183_1).abs() < EPSILON);
+        assert!((out_state.vx - -0.014_716_178_620_115_785).abs() < EPSILON);
+        assert!((out_state.vy - -0.001_242_263_392_603_425).abs() < EPSILON);
+        assert!((out_state.vz - -0.000_134_043_776_253_089_48).abs() < EPSILON);
+
         let out_state = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, earth_bary2k, c);
         assert_eq!(
-            out_state.frame.frame_path(),
+            out_state.frame.ephem_path(),
             Bodies::EarthBarycenter.ephem_path()
         );
         assert!((out_state.x - 1_004.153_534_699_454_6).abs() < EPSILON);
@@ -1125,6 +1139,21 @@ mod tests {
         assert!((out_state.vx - -0.011_816_329_461_539_0).abs() < EPSILON);
         assert!((out_state.vy - 0.002_505_966_193_458_6).abs() < EPSILON);
         assert!((out_state.vz - 0.002_261_602_304_895_6).abs() < EPSILON);
+
+        // And the opposite transformation
+        let out_state = cosm.celestial_state(
+            Bodies::EarthBarycenter.ephem_path(),
+            jde,
+            cosm.frame("EME2000"),
+            c,
+        );
+        assert_eq!(out_state.frame.ephem_path(), Bodies::Earth.ephem_path());
+        assert!((out_state.x - -1_004.153_534_699_454_6).abs() < EPSILON);
+        assert!((out_state.y - -4_249.202_979_894_305).abs() < EPSILON);
+        assert!((out_state.z - -1_775.880_075_192_657_8).abs() < EPSILON);
+        assert!((out_state.vx - 0.011_816_329_461_539_0).abs() < EPSILON);
+        assert!((out_state.vy - -0.002_505_966_193_458_6).abs() < EPSILON);
+        assert!((out_state.vz - -0.002_261_602_304_895_6).abs() < EPSILON);
     }
 
     #[test]
