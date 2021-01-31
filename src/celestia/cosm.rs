@@ -843,41 +843,70 @@ impl Cosm {
         // Let's get the translation path between both both states.
         let e_common_path = self.find_common_root(&new_ephem_path, &state_ephem_path)?;
 
-        let mut new_state = if state_ephem_path.is_empty() {
-            // SSB, let's invert this
-            -*state
+        // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
+        let mut new_state = if state.rmag() > 0.0 {
+            let mut new_state = *state;
+            // Walk backward from current state up to common node
+            for i in (e_common_path.len()..state_ephem_path.len()).rev() {
+                let next_state = self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
+                println!(
+                    "2' - Fetching {:?}: {}",
+                    &state_ephem_path[0..=i],
+                    next_state
+                );
+                new_state = new_state + next_state;
+            }
+
+            // Walk forward from the destination state
+            for i in (e_common_path.len()..new_ephem_path.len()).rev() {
+                let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
+                println!("1' - Fetching {:?}: {}", &new_ephem_path[0..=i], next_state);
+
+                new_state = new_state - next_state;
+            }
+
+            new_state
         } else {
-            *state
+            let mut negated_fwd = false;
+
+            let mut new_state = if state_ephem_path.is_empty() {
+                // SSB, let's invert this
+                -*state
+            } else {
+                *state
+            };
+
+            // Walk forward from the destination state
+            for i in (e_common_path.len()..new_ephem_path.len()).rev() {
+                let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
+                if new_ephem_path.len() < state_ephem_path.len() && i == e_common_path.len() {
+                    // We just crossed the common point going forward, so let's add the opposite of this state
+                    new_state = new_state - next_state;
+                    negated_fwd = true;
+                } else {
+                    new_state = new_state + next_state;
+                }
+            }
+            // Walk backward from current state up to common node
+            for i in (e_common_path.len()..state_ephem_path.len()).rev() {
+                let next_state = self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
+                if !negated_fwd && i == e_common_path.len() {
+                    // We just crossed the common point (and haven't passed it going forward), so let's negate this state
+                    new_state = new_state - next_state;
+                } else {
+                    new_state = new_state + next_state;
+                }
+            }
+
+            if negated_fwd {
+                // Because we negated the state going forward, let's flip it back to its correct orientation now.
+                -new_state
+            } else {
+                new_state
+            }
         };
+
         new_state.frame = new_frame;
-
-        let mut negated_fwd = false;
-        // Walk forward from the destination state
-        for i in (e_common_path.len()..new_ephem_path.len()).rev() {
-            let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
-            if new_ephem_path.len() < state_ephem_path.len() && i == e_common_path.len() {
-                // We just crossed the common point going forward, so let's add the opposite of this state
-                new_state = new_state - next_state;
-                negated_fwd = true;
-            } else {
-                new_state = new_state + next_state;
-            }
-        }
-        // Walk backward from current state up to common node
-        for i in (e_common_path.len()..state_ephem_path.len()).rev() {
-            let next_state = self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
-            if !negated_fwd && i == e_common_path.len() {
-                // We just crossed the common point (and haven't passed it going forward), so let's negate this state
-                new_state = new_state - next_state;
-            } else {
-                new_state = new_state + next_state;
-            }
-        }
-
-        if negated_fwd {
-            // Because we negated the state going forward, let's flip it back to its correct orientation now.
-            new_state = -new_state;
-        }
 
         // And now let's compute the rotation path
         new_state.apply_dcm(self.try_frame_chg_dcm_from_to(&state.frame, &new_frame, state.dt)?);
@@ -1231,7 +1260,7 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_change_earth2luna() {
+    fn test_cosm_frame_change_earth2luna() {
         let cosm = Cosm::de438();
         let eme2k = cosm.frame("EME2000");
         let luna = cosm.frame("Luna");
@@ -1274,7 +1303,7 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_change_ven2luna() {
+    fn test_cosm_frame_change_ven2luna() {
         let cosm = Cosm::de438();
         let luna = cosm.frame("Luna");
         let venus = cosm.frame("Venus Barycenter J2000");
@@ -1317,7 +1346,7 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_change_ssb2luna() {
+    fn test_cosm_frame_change_ssb2luna() {
         let cosm = Cosm::de438();
         let luna = cosm.frame("Luna");
         let ssb = cosm.frame("SSB");
@@ -1377,12 +1406,12 @@ mod tests {
         // Note that the following data comes from SPICE (via spiceypy).
         // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
         // However, in writing this test, I also checked the computed light time, which matches SPICE to 2.999058779096231e-10 seconds.
-        assert!(dbg!(out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-4);
-        assert!(dbg!(out_state.y - -5.814_057_247_686_307e7).abs() < 1e-3);
-        assert!(dbg!(out_state.z - -2.493_960_187_215_911_6e7).abs() < 1e-3);
-        assert!(dbg!(out_state.vx - -3.460_563_654_257_750_7).abs() < 1e-7);
-        assert!(dbg!(out_state.vy - -3.698_207_386_702_523_5e1).abs() < 1e-7);
-        assert!(dbg!(out_state.vz - -1.690_807_917_994_789_7e1).abs() < 1e-7);
+        assert!((out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-4);
+        assert!((out_state.y - -5.814_057_247_686_307e7).abs() < 1e-3);
+        assert!((out_state.z - -2.493_960_187_215_911_6e7).abs() < 1e-3);
+        assert!((out_state.vx - -3.460_563_654_257_750_7).abs() < 1e-7);
+        assert!((out_state.vy - -3.698_207_386_702_523_5e1).abs() < 1e-7);
+        assert!((out_state.vz - -1.690_807_917_994_789_7e1).abs() < 1e-7);
     }
 
     #[test]
@@ -1414,7 +1443,7 @@ mod tests {
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
         let cosm = Cosm::de438();
 
-        // println!("Available ephems: {:?}", cosm.xb.ephemeris_get_names());
+        println!("Available ephems: {:?}", cosm.xb.ephemeris_get_names());
         println!("Available frames: {:?}", cosm.frames_get_names());
 
         let sun2k = cosm.frame("Sun J2000");
