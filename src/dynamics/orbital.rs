@@ -105,11 +105,6 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
             // Still return something of size 42, but the STM will be zeros.
 
             let osc = ctx.ctor_from(delta_t_s, state);
-            println!(
-                "[src/dynamics/orbital.rs:108] {} (was ctx= {})",
-                osc.epoch(),
-                ctx.epoch()
-            );
             // TODO: Speed check this with the PointMasses only, including the integration frame point mass
             let body_acceleration = (-osc.frame.gm() / osc.rmag().powi(3)) * osc.radius();
             let mut d_x = Vector6::from_iterator(
@@ -428,17 +423,9 @@ impl<'a> PointMasses<'a> {
         let mut refs = Vec::new();
         // Check that these celestial bodies exist and build their references
         for body in bodies {
-            let gm = cosm
-                .xb
-                .ephemeris_from_path(&body.ephem_path())
-                .unwrap()
-                .constants
-                .get("GM")
-                .unwrap()
-                .value;
             refs.push(ThirdBodyRef {
                 ephem: body.ephem_path().to_vec(),
-                gm,
+                gm: cosm.frame_from_ephem_path(&body.ephem_path()).gm(),
             });
         }
 

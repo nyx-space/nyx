@@ -459,7 +459,7 @@ impl Cosm {
 
     /// Returns the expected frame name with its ephemeris name for querying
     fn fix_frame_name(name: &str) -> String {
-        let name = name.to_lowercase().replace("_", " ");
+        let name = name.to_lowercase().trim().replace("_", " ");
         // Handle the specific frames
         if name == "eme2000" {
             String::from("Earth J2000")
@@ -849,19 +849,12 @@ impl Cosm {
             // Walk backward from current state up to common node
             for i in (e_common_path.len()..state_ephem_path.len()).rev() {
                 let next_state = self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
-                println!(
-                    "2' - Fetching {:?}: {}",
-                    &state_ephem_path[0..=i],
-                    next_state
-                );
                 new_state = new_state + next_state;
             }
 
             // Walk forward from the destination state
             for i in (e_common_path.len()..new_ephem_path.len()).rev() {
                 let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
-                println!("1' - Fetching {:?}: {}", &new_ephem_path[0..=i], next_state);
-
                 new_state = new_state - next_state;
             }
 

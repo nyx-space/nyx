@@ -375,7 +375,7 @@ mod tests {
     use crate::celestia::Cosm;
     #[test]
     fn ruggiero_weight() {
-        let mut cosm = Cosm::from_xb("./de438s").unwrap();
+        let mut cosm = Cosm::de438();
         cosm.frame_mut_gm("EME2000", 398_600.433);
         let eme2k = cosm.frame("EME2000");
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
