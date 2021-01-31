@@ -98,6 +98,14 @@ impl Frame {
         }
     }
 
+    /// Allows mutuating the GM for this frame
+    pub fn gm_mut(&mut self, new_gm: f64) {
+        match self {
+            Self::Geoid { ref mut gm, .. } | Self::Celestial { ref mut gm, .. } => *gm = new_gm,
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
+    }
+
     pub fn axb_id(&self) -> i32 {
         match self {
             Frame::Geoid { axb_id, .. } | Frame::Celestial { axb_id, .. } => *axb_id,

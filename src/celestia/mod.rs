@@ -147,6 +147,21 @@ impl Xb {
             }
         }
     }
+
+    fn ephemeris_names(mut names: &mut Vec<String>, e: &Ephemeris) {
+        names.push(e.name.clone());
+        for child in &e.children {
+            Self::ephemeris_names(&mut names, child);
+        }
+    }
+
+    pub fn ephemeris_get_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        if let Some(root) = &self.ephemeris_root {
+            Self::ephemeris_names(&mut names, &root);
+        }
+        names
+    }
 }
 
 /// Known orientation IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.

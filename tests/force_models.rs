@@ -11,7 +11,7 @@ use std::sync::Arc;
 #[test]
 fn srp_earth() {
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
@@ -62,7 +62,7 @@ fn srp_earth() {
 #[test]
 fn exp_drag_earth() {
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
@@ -101,7 +101,7 @@ fn exp_drag_earth() {
 #[test]
 fn std_atm_drag_earth() {
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
@@ -153,7 +153,7 @@ fn std_atm_drag_earth() {
 #[test]
 fn std_atm_drag_earth_low() {
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);

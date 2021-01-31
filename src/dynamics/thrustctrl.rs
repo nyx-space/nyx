@@ -376,7 +376,7 @@ mod tests {
     #[test]
     fn ruggiero_weight() {
         let mut cosm = Cosm::from_xb("./de438s").unwrap();
-        cosm.mut_gm_for_frame("EME2000", 398_600.433);
+        cosm.frame_mut_gm("EME2000", 398_600.433);
         let eme2k = cosm.frame("EME2000");
         let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
         let orbit = Orbit::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);

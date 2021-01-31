@@ -80,8 +80,8 @@ fn halo_earth_moon_dynamics() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -150,8 +150,8 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -217,8 +217,8 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -285,10 +285,10 @@ fn halo_multi_body_dynamics() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -356,10 +356,10 @@ fn halo_multi_body_dynamics_adaptive() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
     // let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -428,10 +428,10 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -499,10 +499,10 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -563,9 +563,9 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -747,8 +747,8 @@ fn earth_sph_harmonics_j2() {
     let monte_earth_j2 = -0.000_484_169_325_971;
 
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", monte_earth_gm);
-    cosm.mut_gm_for_frame("IAU Earth", monte_earth_gm);
+    cosm.frame_mut_gm("EME2000", monte_earth_gm);
+    cosm.frame_mut_gm("IAU Earth", monte_earth_gm);
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
@@ -819,8 +819,8 @@ fn earth_sph_harmonics_12x12() {
     use nyx::io::gravity::*;
 
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
@@ -874,8 +874,8 @@ fn earth_sph_harmonics_70x70() {
     use nyx::io::gravity::*;
 
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
@@ -929,8 +929,8 @@ fn earth_sph_harmonics_70x70_partials() {
     use nyx::io::gravity::*;
 
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
@@ -988,8 +988,8 @@ fn hf_prop() {
     use nyx::io::gravity::*;
 
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("IAU Earth", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 

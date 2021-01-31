@@ -124,7 +124,7 @@ fn gmat_val_leo_day_adaptive() {
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
     let prop_time = 1 * TimeUnit::Day;
@@ -287,7 +287,7 @@ fn gmat_val_leo_day_adaptive() {
 #[test]
 fn gmat_val_leo_day_fixed() {
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
     let eme2k = cosm.frame("EME2000");
 
     let prop_time = 1 * TimeUnit::Day;

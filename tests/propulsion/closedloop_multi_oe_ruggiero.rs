@@ -20,7 +20,7 @@ fn qlaw_as_ruggiero_case_a() {
     // Source: AAS-2004-5089
 
     let mut cosm = Cosm::de438();
-    cosm.mut_gm_for_frame("EME2000", 398_600.433);
+    cosm.frame_mut_gm("EME2000", 398_600.433);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);

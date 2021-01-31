@@ -21,7 +21,6 @@ use std::collections::HashMap;
 use std::fmt;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::str::FromStr;
-use std::time::Instant;
 
 #[derive(RustEmbed)]
 #[folder = "data/embed/"]
@@ -84,7 +83,6 @@ pub struct Cosm {
     pub frame_root: FrameTree,
     // Maps the ephemeris path to the frame root path (remove this with the upcoming xb file)
     ephem2frame_map: HashMap<Vec<usize>, Vec<usize>>,
-    frames: HashMap<String, Frame>,
 }
 
 impl fmt::Debug for Cosm {
@@ -137,33 +135,21 @@ impl Cosm {
                 children: Vec::new(),
             },
             ephem2frame_map: HashMap::new(),
-            frames: HashMap::new(),
         };
         cosm.append_xb();
-        cosm.load_iau_frames();
+        cosm.load_iau_frames()?;
         Ok(cosm)
     }
 
     /// Load the IAU Frames as defined in Celest Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
-    pub fn load_iau_frames(&mut self) {
-        let frames_start = Instant::now();
+    pub fn load_iau_frames(&mut self) -> Result<(), NyxError> {
         // Load the IAU frames from the embedded TOML
         let iau_toml_str =
             EmbeddedAsset::get("iau_frames.toml").expect("Could not find iau_frames.toml as asset");
-        if let Some(err) = self
-            .append_frames(
-                std::str::from_utf8(&iau_toml_str)
-                    .expect("Could not deserialize iau_frames.toml as string"),
-            )
-            .err()
-        {
-            error!("Could not load IAU frames: {}", err);
-        }
-        info!(
-            "Loaded {} frames in {} ms.",
-            self.frames.len(),
-            frames_start.elapsed().as_millis()
-        );
+        self.append_frames(
+            std::str::from_utf8(&iau_toml_str)
+                .expect("Could not deserialize iau_frames.toml as string"),
+        )
     }
 
     /// Returns the machine path of the ephemeris whose orientation is requested
@@ -328,7 +314,7 @@ impl Cosm {
     }
 
     /// Append Cosm with the contents of this TOML (must _not_ be the filename)
-    pub fn append_frames(&mut self, toml_content: &str) -> Result<(), IoError> {
+    pub fn append_frames(&mut self, toml_content: &str) -> Result<(), NyxError> {
         let maybe_frames: Result<frame_serde::FramesSerde, _> = toml::from_str(toml_content);
         match maybe_frames {
             Ok(mut frames) => {
@@ -354,7 +340,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse right_asc `{}` - are there any special characters? {}",
                             &name, &rot.right_asc, e);
                             error!("{}", msg);
-                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(NyxError::LoadingError(msg));
                         }
                     };
                     let declin: Expr = match rot.declin.parse() {
@@ -363,7 +349,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse declin `{}` - are there any special characters? {}",
                             &name, &rot.declin, e);
                             error!("{}", msg);
-                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(NyxError::LoadingError(msg));
                         }
                     };
                     let w_expr: Expr = match rot.w.parse() {
@@ -372,7 +358,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse w `{}` - are there any special characters? {}",
                             &name, &rot.w, e);
                             error!("{}", msg);
-                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(NyxError::LoadingError(msg));
                         }
                     };
 
@@ -466,33 +452,28 @@ impl Cosm {
             }
             Err(e) => {
                 error!("{}", e);
-                Err(IoError::new(IoErrorKind::InvalidData, e))
+                Err(NyxError::LoadingError(format!("{}", e)))
             }
         }
     }
 
-    /// Returns the expected ephemeris name and frame name
-    /// TODO: Convert that to a single String
-    fn fix_frame_name(name: &str) -> (String, String) {
+    /// Returns the expected frame name with its ephemeris name for querying
+    fn fix_frame_name(name: &str) -> String {
         let name = name.to_lowercase().replace("_", " ");
         // Handle the specific frames
         if name == "eme2000" {
-            (String::from("Earth"), String::from("J2000"))
+            String::from("Earth J2000")
         } else if name == "luna" {
-            (String::from("Moon"), String::from("J2000"))
+            String::from("Moon J2000")
         } else if name == "earth moon barycenter" {
-            (String::from("Earth Barycenter"), String::from("J2000"))
+            String::from("Earth Barycenter J2000")
         } else if name == "ssb" {
-            (
-                // String::from("Solar System Barycenter"),
-                String::from("SSB"),
-                String::from("J2000"),
-            )
+            String::from("SSB J2000")
         } else {
             let splt: Vec<_> = name.split(' ').collect();
             if splt[0] == "iau" {
                 // This is an IAU frame, so the orientation is specified first, and we don't capitalize the ephemeris name
-                (splt[0].to_string(), splt[1..splt.len()].join(" "))
+                vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ")
             } else {
                 // Likely a default center and frame, so let's do some clever guessing and capitalize the words
                 let frame_name = capitalize(&splt[splt.len() - 1].to_string());
@@ -502,7 +483,7 @@ impl Cosm {
                     .collect::<Vec<_>>()
                     .join(" ");
 
-                (ephem_name, frame_name)
+                vec![ephem_name, frame_name].join(" ")
             }
         }
     }
@@ -510,8 +491,7 @@ impl Cosm {
     /// Fetch the frame associated with this ephemeris name
     /// This is slow, so avoid using it.
     pub fn try_frame(&self, name: &str) -> Result<Frame, NyxError> {
-        let (ephem_name, frame_name) = Self::fix_frame_name(name);
-        let name = vec![ephem_name, frame_name].join(" ");
+        let name = Self::fix_frame_name(name);
         if self.frame_root.name == name {
             // Return an empty vector (but OK because we're asking for the root)
             Ok(self.frame_root.frame)
@@ -542,56 +522,36 @@ impl Cosm {
         }
     }
 
+    fn frame_names(mut names: &mut Vec<String>, f: &FrameTree) {
+        names.push(f.name.clone());
+        for child in &f.children {
+            Self::frame_names(&mut names, child);
+        }
+    }
+
+    pub fn frames_get_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        Self::frame_names(&mut names, &self.frame_root);
+        names
+    }
+
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
     pub fn frame(&self, name: &str) -> Frame {
         self.try_frame(name).unwrap()
     }
 
-    /// Return the names of all the frames
-    pub fn get_frame_names(&self) -> Vec<String> {
-        self.frames.keys().cloned().collect::<Vec<String>>()
-    }
-
-    /// Returns all the frames themselves
-    pub fn get_frames(&self) -> Vec<Frame> {
-        self.frames.values().cloned().collect::<Vec<Frame>>()
-    }
-
-    pub fn try_frame_by_axb_id(&self, id: i32) -> Result<Frame, NyxError> {
-        if id == 0 {
-            // Requesting the J2k orientation
-            return Ok(self.frames["solar system barycenter j2000"]);
-        }
-        for frame in self.frames.values() {
-            if frame.axb_id() == id {
-                return Ok(*frame);
-            }
-        }
-
-        Err(NyxError::ObjectIDNotFound(id))
-    }
-
-    /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame_by_axb_id(&self, id: i32) -> Frame {
-        self.try_frame_by_axb_id(id).unwrap()
-    }
-
-    /// Returns the list of loaded geoids
-    pub fn frames(&self) -> Vec<Frame> {
-        self.frames.iter().map(|(_, g)| *g).collect()
-    }
-
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
-    pub fn mut_gm_for_frame(&mut self, name: &str, new_gm: f64) {
-        let (ephem_name, _) = Self::fix_frame_name(name);
-        match self.frames.get_mut(&ephem_name) {
-            Some(Frame::Celestial { gm, .. }) => {
-                *gm = new_gm;
-            }
-            Some(Frame::Geoid { gm, .. }) => {
-                *gm = new_gm;
-            }
-            _ => panic!("frame {} not found, or does not have a GM", name),
+    pub fn frame_mut_gm(&mut self, name: &str, new_gm: f64) {
+        // Grab the frame -- this may panic!
+        let frame_path = self.frame(name).frame_path();
+
+        match frame_path.len() {
+            2 => self.frame_root.children[frame_path[0]].children[frame_path[1]]
+                .frame
+                .gm_mut(new_gm),
+            1 => self.frame_root.children[frame_path[0]].frame.gm_mut(new_gm),
+            0 => self.frame_root.frame.gm_mut(new_gm),
+            _ => unimplemented!("Not expecting three layers of attitude frames"),
         }
     }
 
@@ -964,12 +924,9 @@ mod tests {
         use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
-        assert_eq!(
-            cosm.xb
-                .ephemeris_find_path(Cosm::fix_frame_name(&Bodies::EarthBarycenter.name()).0)
-                .unwrap(),
-            Bodies::EarthBarycenter.ephem_path()
-        );
+        let eb_frame = cosm.frame(&Bodies::EarthBarycenter.name());
+
+        assert_eq!(eb_frame.ephem_path(), Bodies::EarthBarycenter.ephem_path());
 
         assert_eq!(
             cosm.find_common_root(Bodies::Earth.ephem_path(), Bodies::Earth.ephem_path())
@@ -1446,7 +1403,9 @@ mod tests {
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
         let cosm = Cosm::de438();
 
-        println!("Available frames: {:?}", cosm.get_frame_names());
+        println!("Available ephems: {:?}", cosm.xb.ephemeris_get_names());
+
+        println!("Available frames: {:?}", cosm.frames_get_names());
 
         let sun2k = cosm.frame("Sun J2000");
         let sun_iau = cosm.frame("IAU Sun");
@@ -1554,8 +1513,9 @@ mod tests {
 
     #[test]
     fn test_fix_frame_name() {
-        let (e, f) = Cosm::fix_frame_name("Mars barycenter j2000");
-        assert_eq!(e, "Mars Barycenter");
-        assert_eq!(f, "j2000");
+        assert_eq!(
+            Cosm::fix_frame_name("Mars barycenter j2000"),
+            "Mars Barycenter J2000"
+        );
     }
 }

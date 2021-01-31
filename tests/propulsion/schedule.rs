@@ -20,10 +20,10 @@ fn transfer_schedule_no_depl() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
@@ -119,10 +119,10 @@ fn transfer_schedule_depl() {
 
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
-    cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
-    cosm.mut_gm_for_frame("Luna", 4_902.800_582_147_8);
-    cosm.mut_gm_for_frame("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.mut_gm_for_frame("Sun J2000", 132_712_440_017.99);
+    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);

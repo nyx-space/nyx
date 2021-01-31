@@ -173,7 +173,7 @@ pub mod dynamics;
 /// use nyx::celestia::{Cosm, Orbit};
 /// let mut cosm = Cosm::from_xb("./de438s");
 /// // We're actually going to use the GMAT value for Earth GM (de438s has a slightly different value).
-/// cosm.mut_gm_for_frame("EME2000", 398_600.441_5);
+/// cosm.frame_mut_gm("EME2000", 398_600.441_5);
 /// // In this case, we're creating these states around a Geoid which is Earth.
 /// let eme2k = cosm.frame("EME2000");
 /// let dt = Epoch::from_mjd_tai(21545.0);
@@ -235,10 +235,9 @@ pub mod opti;
 
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate prost_derive;
 extern crate hifitime;
 extern crate nalgebra as na;
+extern crate prost_derive;
 
 /// Re-export of hifitime
 pub mod time {
