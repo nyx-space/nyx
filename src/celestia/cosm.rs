@@ -1,13 +1,10 @@
 extern crate bytes;
 extern crate meval;
-extern crate petgraph;
 extern crate prost;
 extern crate rust_embed;
 extern crate toml;
 
 use self::meval::Expr;
-use self::petgraph::algo::astar;
-use self::petgraph::prelude::*;
 use self::rust_embed::RustEmbed;
 use super::frames::*;
 use super::rotations::*;
@@ -170,8 +167,8 @@ impl Cosm {
     }
 
     /// Returns the machine path of the ephemeris whose orientation is requested
-    pub fn frame_find_path_for_orientation(&self, name: &String) -> Result<Vec<usize>, NyxError> {
-        if &self.frame_root.name == name {
+    pub fn frame_find_path_for_orientation(&self, name: &str) -> Result<Vec<usize>, NyxError> {
+        if self.frame_root.name == name {
             // Return an empty vector (but OK because we're asking for the root)
             Ok(Vec::new())
         } else {
@@ -182,14 +179,14 @@ impl Cosm {
 
     /// Seek a frame from its orientation name
     fn frame_find_path(
-        frame_name: &String,
+        frame_name: &str,
         cur_path: &mut Vec<usize>,
         f: &FrameTree,
     ) -> Result<Vec<usize>, NyxError> {
-        if &f.name == frame_name {
+        if f.name == frame_name {
             Ok(cur_path.to_vec())
         } else if f.children.is_empty() {
-            Err(NyxError::ObjectNotFound(frame_name.clone()))
+            Err(NyxError::ObjectNotFound(frame_name.to_string()))
         } else {
             for child in &f.children {
                 let mut this_path = cur_path.clone();
@@ -199,7 +196,7 @@ impl Cosm {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(frame_name.clone()))
+            Err(NyxError::ObjectNotFound(frame_name.to_string()))
         }
     }
 
@@ -525,21 +522,7 @@ impl Cosm {
                 &mut path,
                 &self.frame_root,
             )?))
-            // Self::ephemeris_seek_by_name(&name, &mut path, &root)
         }
-
-        // let (ephem_name, _) = Self::fix_frame_name(name);
-
-        // let path = self.xb.ephemeris_find_path(ephem_name)?;
-
-        // BUG: Here, I am ignoring the frame_name returned by the fix_frame_name call
-        // However, that mean "IAU Sun" is equivalent to "Sun J2000", which is wrong.
-        // Therefore, I need to account for this frame name, search it in the tree
-        // (note that it will probably be the name itself) and return that frame.
-        // Actually, since it's likely the frame itself, that means I can probably just search the frame root first
-        // and then grab the ephemeris path directly! This is slow, but there's a warning at the top of the function
-        // so whatever.
-        // Ok(self.frame_from_ephem_path(&path))
     }
 
     /// Provided an ephemeris path and an optional frame name, returns the Frame of that ephemeris.
@@ -1426,7 +1409,7 @@ mod tests {
         // Note that the following data comes from SPICE (via spiceypy).
         // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
         // However, in writing this test, I also checked the computed light time, which matches SPICE to 2.999058779096231e-10 seconds.
-        assert!(dbg!(out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-3);
+        assert!(dbg!(out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-4);
         assert!(dbg!(out_state.y - -5.814_057_247_686_307e7).abs() < 1e-3);
         assert!(dbg!(out_state.z - -2.493_960_187_215_911_6e7).abs() < 1e-3);
         assert!(dbg!(out_state.vx - -3.460_563_654_257_750_7).abs() < 1e-7);
@@ -1567,30 +1550,6 @@ mod tests {
         assert!(dbg!(state_ecef.x - -1_424.497_118_292_03).abs() < 1e-5 || true);
         assert!(dbg!(state_ecef.y - -3_137.502_417_055_381).abs() < 1e-5 || true);
         assert!(dbg!(state_ecef.z - 6_890.998_090_503_171).abs() < 1e-5 || true);
-    }
-
-    #[test]
-    fn test_cosm_frame_context() {
-        let cosm = Cosm::de438();
-
-        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
-
-        for frame in &cosm.frames() {
-            if frame.exb_id() == 199 || frame.exb_id() == 299 {
-                // Mercury and Venus formed differently than the standard algo expects.
-                continue;
-            }
-            print!("{}: ", frame);
-            println!(
-                "{}",
-                cosm.celestial_state(
-                    Bodies::EarthBarycenter.ephem_path(),
-                    jde,
-                    *frame,
-                    LTCorr::Abberation
-                )
-            );
-        }
     }
 
     #[test]
