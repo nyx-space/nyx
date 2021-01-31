@@ -64,7 +64,7 @@ fn regress_leo_day_adaptive() {
             PropOpts::with_fixed_step(1.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_eq!(
             prop.state.to_cartesian_vec(),
             all_rslts[0].to_cartesian_vec(),
@@ -86,7 +86,7 @@ fn regress_leo_day_adaptive() {
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
@@ -104,7 +104,7 @@ fn regress_leo_day_adaptive() {
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_orbit_eq_or_rel(&prop.state, &all_rslts[2], 1e-7, "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
@@ -188,7 +188,7 @@ fn gmat_val_leo_day_adaptive() {
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_orbit_eq_or_abs(&prop.state, &all_rslts[0], 1e-8, "two body prop failed");
 
         let prev_details = prop.latest_details();
@@ -205,10 +205,10 @@ fn gmat_val_leo_day_adaptive() {
             1e-8,
             "first forward two body prop failed",
         );
-        prop.until_time_elapsed(-prop_time).unwrap();
-        prop.until_time_elapsed(prop_time).unwrap();
-        prop.until_time_elapsed(prop_time).unwrap();
-        prop.until_time_elapsed(-prop_time).unwrap();
+        prop.for_duration(-prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
+        prop.for_duration(-prop_time).unwrap();
         let (err_r, err_v) = rss_state_errors(&prop.state, &all_rslts[0]);
         assert!(
             err_r < 1e-5,
@@ -226,7 +226,7 @@ fn gmat_val_leo_day_adaptive() {
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-8, "two body prop failed");
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
@@ -244,7 +244,7 @@ fn gmat_val_leo_day_adaptive() {
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_eq!(
             prop.state.to_cartesian_vec(),
             all_rslts[2].to_cartesian_vec(),
@@ -266,7 +266,7 @@ fn gmat_val_leo_day_adaptive() {
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_eq!(
             prop.state.to_cartesian_vec(),
             all_rslts[3].to_cartesian_vec(),
@@ -358,15 +358,15 @@ fn gmat_val_leo_day_fixed() {
             PropOpts::with_fixed_step(1.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_eq!(
             prop.state, all_rslts[0],
             "first forward two body prop failed"
         );
-        prop.until_time_elapsed(-prop_time).unwrap();
-        prop.until_time_elapsed(prop_time).unwrap();
-        prop.until_time_elapsed(prop_time).unwrap();
-        prop.until_time_elapsed(-prop_time).unwrap();
+        prop.for_duration(-prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
+        prop.for_duration(-prop_time).unwrap();
         let (err_r, err_v) = rss_state_errors(&prop.state, &all_rslts[0]);
         assert!(
             err_r < 1e-5,
@@ -384,7 +384,7 @@ fn gmat_val_leo_day_fixed() {
             PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_orbit_eq_or_rel(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
     }
 
@@ -394,7 +394,7 @@ fn gmat_val_leo_day_fixed() {
             PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[2], "two body prop failed");
     }
 
@@ -404,7 +404,7 @@ fn gmat_val_leo_day_fixed() {
             PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[3], "two body prop failed");
     }
 
@@ -414,7 +414,7 @@ fn gmat_val_leo_day_fixed() {
             PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[4], "two body prop failed");
     }
 }

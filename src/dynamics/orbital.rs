@@ -12,27 +12,9 @@ use std::sync::Arc;
 
 pub use super::sph_harmonics::Harmonics;
 
-// TODO: I don't think I need this anymore, I think I can simply initialize the Dynamics as a <T1, T2>
-// like a Result since it doesn't store the state anymore
-// pub trait OrbitalDynamicsT: Dynamics<StateType = Orbit> {}
-// D: Estimable<MsrIn, LinStateSize = Msr::StateSize>,
-// pub trait OrbitalDynamicsT: Dynamics {
-//     fn stm(&self) -> Option<Matrix6<f64>>;
-
-//     fn orbital_state_ctor(&self, rel_time: f64, state_vec: &VectorN<f64, Self::StateSize>) -> Orbit
-//     where
-//         DefaultAllocator: Allocator<f64, Self::StateSize>;
-// }
-
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 #[derive(Clone)]
 pub struct OrbitalDynamics<'a> {
-    /// Current state of these dynamics
-    // pub integr_frame: Frame,
-    // /// Loss in precision is avoided by using a relative time parameter initialized to zero
-    // relative_time: f64,
-    // /// Allows us to rebuilt the true epoch
-    // init_tai_secs: f64,
     pub accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>,
 }
 
@@ -42,9 +24,6 @@ impl<'a> OrbitalDynamics<'a> {
         // Create the point masses
         let pts = PointMasses::new(integr_frame, bodies, cosm);
         Self {
-            // integr_frame,
-            // relative_time: 0.0,
-            // init_tai_secs: state.dt.as_tai_seconds(),
             accel_models: vec![Arc::new(pts)],
         }
     }
@@ -52,21 +31,13 @@ impl<'a> OrbitalDynamics<'a> {
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
     pub fn two_body() -> Self {
         Self {
-            // state,
-            // relative_time: 0.0,
-            // init_tai_secs: state.dt.as_tai_seconds(),
             accel_models: Vec::new(),
         }
     }
 
     /// Initialize orbital dynamics with a list of acceleration models
     pub fn new(_: Orbit, accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
-        Self {
-            // state,
-            // relative_time: 0.0,
-            // init_tai_secs: state.dt.as_tai_seconds(),
-            accel_models,
-        }
+        Self { accel_models }
     }
 
     pub fn add_model(&mut self, accel_model: Arc<dyn AccelModel + Sync + 'a>) {
@@ -75,8 +46,6 @@ impl<'a> OrbitalDynamics<'a> {
 }
 
 impl<'a> Dynamics for OrbitalDynamics<'a> {
-    // type StateSize = U6;
-    // type PropVecSize = U42;
     type HyperdualSize = U7;
     type StateType = Orbit;
 
@@ -177,219 +146,6 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
     }
 }
 
-/// `OrbitalDynamicsStm` provides the equations of motion for any celestial dynamic, **with** state transition matrix computation.
-// #[derive(Clone)]
-// pub struct OrbitalDynamicsStm<'a> {
-//     // pub state: Orbit,
-//     // // Loss in precision is avoided by using a relative time parameter initialized to zero
-//     // relative_time: f64,
-//     // // Allows us to rebuilt the true epoch
-//     // init_tai_secs: f64,
-//     pub accel_models: Vec<Arc<dyn AutoDiff<U7, U3, CtxType = Orbit> + 'a>>,
-// }
-
-// impl<'a> OrbitalDynamicsT for OrbitalDynamicsStm<'a> {
-//     fn orbital_state(&self) -> Orbit {
-//         self.state
-//     }
-
-//     fn stm(&self) -> Option<Matrix6<f64>> {
-//         self.state.stm
-//     }
-
-//     fn orbital_state_ctor(
-//         &self,
-//         rel_time: f64,
-//         state_vec: &VectorN<f64, Self::StateSize>,
-//     ) -> Orbit {
-//         self.state_ctor(rel_time, state_vec).0
-//     }
-// }
-
-// impl<'a> OrbitalDynamicsStm<'a> {
-//     /// Initialize third body dynamics given the EXB IDs and a Cosm
-//     pub fn point_masses(state: Orbit, bodies: &[i32], cosm: &'a Cosm) -> Self {
-//         let pts = PointMasses::new(state.frame, bodies, cosm);
-//         let mut state = state;
-//         state.stm_identity();
-//         Self {
-//             // state,
-//             // relative_time: 0.0,
-//             // init_tai_secs: state.dt.as_tai_seconds(),
-//             accel_models: vec![Arc::new(pts)],
-//         }
-//     }
-
-//     /// Initializes a OrbitalDynamicsStm which does not simulate the gravity pull of other celestial objects but the primary one.
-//     pub fn two_body(state: Orbit) -> Self {
-//         let mut state = state;
-//         state.stm_identity();
-//         Self {
-//             // state,
-//             // relative_time: 0.0,
-//             // init_tai_secs: state.dt.as_tai_seconds(),
-//             accel_models: vec![],
-//         }
-//     }
-
-//     /// Add a model to these celestial dynamics (must be differentiable by automatic differentiation)
-//     pub fn add_model(&mut self, accel_model: Arc<dyn AutoDiff<U7, U3, CtxType = Orbit> + 'a>) {
-//         self.accel_models.push(accel_model);
-//     }
-
-// /// Provides a copy to the state.
-// pub fn as_state(&self) -> Orbit {
-//     self.state
-// }
-
-// TODO: Figure this out
-// / Used only to set the orbital state, useful for Extended Kalman Filters.
-// pub fn set_orbital_state(&mut self, new_t: f64, new_state: &Vector6<f64>) {
-//     self.relative_time = new_t;
-//     self.state.dt = Epoch::from_tai_seconds(self.init_tai_secs + new_t);
-//     self.state.x = new_state[0];
-//     self.state.y = new_state[1];
-//     self.state.z = new_state[2];
-//     self.state.vx = new_state[3];
-//     self.state.vy = new_state[4];
-//     self.state.vz = new_state[5];
-// }
-
-// / Rebuild the state and STM from the provided vector
-// pub fn state_ctor(&self, t: f64, in_state: &VectorN<f64, U42>) -> (Orbit, Matrix6<f64>) {
-//     // Copy the current state, and then modify it
-//     let mut state = self.state();
-//     state.dt = Epoch::from_tai_seconds(self.init_tai_secs + t);
-//     state.x = in_state[0];
-//     state.y = in_state[1];
-//     state.z = in_state[2];
-//     state.vx = in_state[3];
-//     state.vy = in_state[4];
-//     state.vz = in_state[5];
-
-//     let mut stm = state.stm();
-//     for i in 0..6 {
-//         for j in 0..6 {
-//             stm[(i, j)] = in_state[i * 6 + j + 6];
-//         }
-//     }
-
-//     (state, stm)
-// }
-// }
-
-// impl<'a> AutoDiff<U7, U6> for OrbitalDynamicsStm<'a> {
-//     // type STMRows = U6;
-//     // type HyperStateSize = U7;
-//     type CtxType = Orbit;
-// }
-
-// impl<'a> Dynamics for OrbitalDynamicsStm<'a> {
-//     type StateSize = U42;
-
-//     // fn state_vector(&self) -> VectorN<f64, Self::StateSize> {
-//     //     let mut stm_as_vec = VectorN::<f64, U36>::zeros();
-//     //     let mut stm_idx = 0;
-//     //     let stm = self.state.stm();
-//     //     for i in 0..6 {
-//     //         for j in 0..6 {
-//     //             stm_as_vec[(stm_idx, 0)] = stm[(i, j)];
-//     //             stm_idx += 1;
-//     //         }
-//     //     }
-//     //     VectorN::<f64, Self::StateSize>::from_iterator(
-//     //         self.state
-//     //             .to_cartesian_vec()
-//     //             .iter()
-//     //             .chain(stm_as_vec.iter())
-//     //             .cloned(),
-//     //     )
-//     // }
-
-//     // fn set_state(
-//     //     &mut self,
-//     //     new_t: f64,
-//     //     new_state: &VectorN<f64, Self::StateSize>,
-//     // ) -> Result<(), NyxError> {
-//     //     self.relative_time = new_t;
-//     //     self.state.dt = Epoch::from_tai_seconds(self.init_tai_secs + new_t);
-//     //     self.state.x = new_state[0];
-//     //     self.state.y = new_state[1];
-//     //     self.state.z = new_state[2];
-//     //     self.state.vx = new_state[3];
-//     //     self.state.vy = new_state[4];
-//     //     self.state.vz = new_state[5];
-//     //     // And update the STM
-//     //     let mut stm_k_to_0 = Matrix6::zeros();
-//     //     let mut stm_idx = 6;
-//     //     for i in 0..6 {
-//     //         for j in 0..6 {
-//     //             stm_k_to_0[(i, j)] = new_state[(stm_idx, 0)];
-//     //             stm_idx += 1;
-//     //         }
-//     //     }
-
-//     //     let mut stm_prev = self.state.stm();
-//     //     if !stm_prev.try_inverse_mut() {
-//     //         error!("STM not invertible: {}", stm_prev);
-//     //         return Err(NyxError::SingularStateTransitionMatrix);
-//     //     }
-//     //     self.state.stm = Some(stm_k_to_0 * stm_prev);
-//     //     // self.state.stm = Some(stm_k_to_0);
-//     //     Ok(())
-//     // }
-
-//     fn eom(
-//         &self,
-//         delta_t_s: f64,
-//         state: &VectorN<f64, Self::StateSize>,
-//         ctx: &Orbit,
-//     ) -> VectorN<f64, Self::StateSize> {
-//         let pos_vel = state.fixed_rows::<U6>(0).into_owned();
-//         // let epoch = Epoch::from_tai_seconds(self.init_tai_secs + t);
-//         let (state, grad) = self.eom_grad(&pos_vel, ctx);
-//         let stm_dt = ctx.stm() * grad;
-//         // Rebuild the STM as a vector.
-//         let mut stm_as_vec = VectorN::<f64, U36>::zeros();
-//         let mut stm_idx = 0;
-//         for i in 0..6 {
-//             for j in 0..6 {
-//                 stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
-//                 stm_idx += 1;
-//             }
-//         }
-//         VectorN::<f64, Self::StateSize>::from_iterator(
-//             state.iter().chain(stm_as_vec.iter()).cloned(),
-//         )
-//     }
-// }
-
-// impl<'a> Estimable<Orbit> for OrbitalDynamicsStm<'a> {
-//     type LinStateSize = U6;
-
-//     fn to_measurement(&self, prop_state: &Orbit) -> Orbit {
-//         *prop_state
-//     }
-
-//     fn extract_stm(&self, prop_state: &Orbit) -> Matrix6<f64> {
-//         prop_state.stm()
-//     }
-
-//     fn extract_estimated_state(&self, prop_state: &Orbit) -> VectorN<f64, Self::LinStateSize> {
-//         prop_state.to_cartesian_vec()
-//     }
-
-//     /// Returns the estimated state
-//     fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>) {
-//         self.state.x = new_state[0];
-//         self.state.y = new_state[1];
-//         self.state.z = new_state[2];
-//         self.state.vx = new_state[3];
-//         self.state.vy = new_state[4];
-//         self.state.vz = new_state[5];
-//     }
-// }
-
 /// Stores the reference to the third body, including the gm to avoid having to fetch it every time
 pub struct ThirdBodyRef {
     ephem: Vec<usize>,
@@ -448,17 +204,9 @@ impl<'a> PointMasses<'a> {
         // Check that these celestial bodies exist and build their references
         for body in bodies {
             let path = cosm.xb.ephemeris_find_path(body.to_string()).unwrap();
-            let gm = cosm
-                .xb
-                .ephemeris_from_path(&path)
-                .unwrap()
-                .constants
-                .get("GM")
-                .unwrap()
-                .value;
             refs.push(ThirdBodyRef {
                 ephem: path.to_vec(),
-                gm,
+                gm: cosm.frame_from_ephem_path(&path).gm(),
             });
         }
 

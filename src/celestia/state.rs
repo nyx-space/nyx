@@ -1033,7 +1033,6 @@ pub struct SpacecraftState {
     pub orbit: Orbit,
     pub dry_mass: f64,
     pub fuel_mass: f64,
-    // pub stm: Option<Matrix6<f64>>, // TODO: Remove this STM, we're using the orbit's STM
     pub thruster: Option<Thruster>,
 }
 

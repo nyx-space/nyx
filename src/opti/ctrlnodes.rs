@@ -52,7 +52,7 @@ impl Heuristic for LambertHeuristic {
         let prop_setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-3));
         let mut prop = prop_setup.with(start_tf);
         prop.tx_chan = Some(tx);
-        prop.until_time_elapsed(self.tof)?;
+        prop.for_duration(self.tof)?;
 
         let mut node_states = Vec::new();
         while let Ok(state) = rx.try_recv() {

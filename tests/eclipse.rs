@@ -33,7 +33,7 @@ fn leo_sun_earth_eclipses() {
         let mut prop = setup.with(leo);
 
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     // Initialize the EclipseLocator
@@ -86,7 +86,7 @@ fn geo_sun_earth_eclipses() {
         let mut prop = setup.with(geo);
 
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     // Initialize the EclipseLocator

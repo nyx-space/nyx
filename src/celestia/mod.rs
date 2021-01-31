@@ -302,7 +302,6 @@ impl TryFrom<Vec<usize>> for Bodies {
     }
 }
 
-// TODO: Check that these names are correct
 /// Known planets IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
 pub mod bodies {
     /// Solar System Barycenter

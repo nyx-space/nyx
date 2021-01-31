@@ -34,7 +34,7 @@ fn event_tracker_true_anomaly() {
     );
     let mut prop = setup.with(state);
     prop.event_trackers = tracker;
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     // Check how many times we have found that event
     println!("{}", prop.event_trackers);

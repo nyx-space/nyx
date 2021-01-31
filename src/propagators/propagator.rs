@@ -159,17 +159,14 @@ where
         self.state
     }
 
-    /// This method propagates the provided Dynamics `dyn` for `elapsed_time` seconds. WARNING: This function has many caveats (please read detailed docs).
-    /// TODO: Rename this to `for` such that we have `prop.with(state).for(5 * TimeUnit::Hour)`.
-    ///
-    /// ### IMPORTANT CAVEAT of `until_time_elapsed`
-    /// - It is **assumed** that `self.dynamics.time()` returns a time in the same units as elapsed_time.
-    pub fn until_time_elapsed(&mut self, elapsed_time: Duration) -> Result<D::StateType, NyxError> {
-        let backprop = elapsed_time < TimeUnit::Nanosecond;
+    /// This method propagates the provided Dynamics for the provided duration.
+    /// TODO: Rename this to `for` such that we have `prop.with(state).for_duration(5 * TimeUnit::Hour)`.
+    pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
+        let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
-        let stop_time = self.state.epoch() + elapsed_time;
+        let stop_time = self.state.epoch() + duration;
         loop {
             let dt = self.state.epoch();
             if (!backprop && dt + self.step_size > stop_time)
@@ -231,7 +228,7 @@ where
         }
 
         self.event_trackers = EventTrackers::from_event(condition.event);
-        self.until_time_elapsed(condition.max_prop_time)?;
+        self.for_duration(condition.max_prop_time)?;
         // Check if the event has been triggered
         if self.event_trackers.found_bounds[0].len() < condition.trigger {
             if condition.trigger == 1 {
@@ -245,7 +242,7 @@ where
                 ));
             }
         }
-        // TODO: Convert all of the epochs into TAI seconds, and do the math that way
+
         let (xa_e, xb_e) = self.event_trackers.found_bounds[0][condition.trigger - 1];
         let mut xa = xa_e.as_tai_seconds();
         let mut xb = xb_e.as_tai_seconds();
@@ -254,10 +251,10 @@ where
         self.event_trackers.reset();
         let initial_epoch = self.state.epoch();
         // Compute the initial values of the condition at those bounds.
-        self.until_time_elapsed(xa_e - initial_epoch)?;
+        self.for_duration(xa_e - initial_epoch)?;
         let mut ya = self.event_trackers.events[0].eval(&self.state);
         // And prop until next bound
-        self.until_time_elapsed((xb - xa) * TimeUnit::Second)?;
+        self.for_duration((xb - xa) * TimeUnit::Second)?;
         let mut yb = self.event_trackers.events[0].eval(&self.state);
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
@@ -309,8 +306,8 @@ where
                 flag = false;
             }
             // Propagate until time s
-            // self.until_time_elapsed(s - self.dynamics.time())?;
-            self.until_time_elapsed(s * TimeUnit::Second)?;
+            // self.for_duration(s - self.dynamics.time())?;
+            self.for_duration(s * TimeUnit::Second)?;
             let ys = self.event_trackers.events[0].eval(&self.state);
             d = c;
             c = xb;
@@ -318,7 +315,7 @@ where
             if ya * ys < 0.0 {
                 // Root bracketed between a and s
                 // Propagate until time xa
-                self.until_time_elapsed(xa * TimeUnit::Second)?;
+                self.for_duration(xa * TimeUnit::Second)?;
                 let ya_p = self.event_trackers.events[0].eval(&self.state);
                 let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
@@ -330,7 +327,7 @@ where
             } else {
                 // Root bracketed between s and b
                 // Propagate until time xb
-                self.until_time_elapsed(xb * TimeUnit::Second)?;
+                self.for_duration(xb * TimeUnit::Second)?;
                 let yb_p = self.event_trackers.events[0].eval(&self.state);
                 let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {
@@ -349,8 +346,8 @@ where
         // Now that we have the time at which the condition is matched, let's propagate until then
         self.prevent_tx = false;
         let elapsed_time = -(closest_t * TimeUnit::Second);
-        // self.until_time_elapsed(self.state.time() - closest_t)?;
-        self.until_time_elapsed(elapsed_time)?;
+        // self.for_duration(self.state.time() - closest_t)?;
+        self.for_duration(elapsed_time)?;
 
         Ok(self.state)
     }

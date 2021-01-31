@@ -37,12 +37,12 @@ fn two_body_dynamics() {
     let dynamics = OrbitalDynamics::two_body();
     let setup = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default());
     let mut prop = setup.with(state);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     dbg!((&prop.state.to_cartesian_vec() - &rslt.to_cartesian_vec()).norm());
     assert_orbit_eq_or_abs(&prop.state, &rslt, 2e-9, "two body prop failed");
     // And now do the backprop by re-initializing a propagator to ensure correct step size
     // let mut prop = setup.with(prop.state);
-    prop.until_time_elapsed(-prop_time).unwrap();
+    prop.for_duration(-prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &state.to_cartesian_vec());
     println!("RTN:  {}\nINIT: {}", prop.state, state);
     dbg!(err_r);
@@ -56,7 +56,7 @@ fn two_body_dynamics() {
     );
     assert_eq!(prop.state.epoch(), dt);
     // Forward propagation again to confirm that we can do repeated calls
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     assert_eq!(prop.state.epoch(), dt + prop_time);
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt.to_cartesian_vec());
     assert!(
@@ -114,7 +114,7 @@ fn halo_earth_moon_dynamics() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_state_errors(&prop.state, &rslt);
 
     println!("Absolute errors");
@@ -181,7 +181,7 @@ fn halo_earth_moon_dynamics_adaptive() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::default());
     let mut prop = setup.with(halo_rcvr);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
@@ -249,7 +249,7 @@ fn llo_earth_moon_dynamics_adaptive() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::default());
     let mut prop = setup.with(llo_xmtr);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
@@ -319,7 +319,7 @@ fn halo_multi_body_dynamics() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
@@ -391,7 +391,7 @@ fn halo_multi_body_dynamics_adaptive() {
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(halo_rcvr);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
@@ -462,7 +462,7 @@ fn llo_multi_body_dynamics_adaptive() {
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(llo_xmtr);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
@@ -526,7 +526,7 @@ fn leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(leo);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
@@ -589,7 +589,7 @@ fn leo_multi_body_dynamics_adaptive() {
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(leo);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("Absolute errors");
@@ -678,12 +678,12 @@ fn two_body_dual() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(init);
-    let final_state = prop.until_time_elapsed(prop_time).unwrap();
+    let final_state = prop.for_duration(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_stm = final_state.stm.unwrap();
     let final_step = prop.latest_details().step;
-    prop.until_time_elapsed(-final_step).unwrap();
+    prop.for_duration(-final_step).unwrap();
 
     // And check the difference
     let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
@@ -721,12 +721,12 @@ fn multi_body_dynamics_dual() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
-    let final_state = prop.until_time_elapsed(prop_time).unwrap();
+    let final_state = prop.for_duration(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_stm = final_state.stm.unwrap();
     let final_step = prop.latest_details().step;
-    prop.until_time_elapsed(-final_step).unwrap();
+    prop.for_duration(-final_step).unwrap();
 
     // And check the difference
     let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
@@ -791,7 +791,7 @@ fn earth_sph_harmonics_j2() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default());
     let mut prop = setup.with(state);
-    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
+    prop.for_duration(1 * TimeUnit::Day).unwrap();
 
     println!("{}", prop.state());
     println!("Error: {:3.12}", prop.state.to_cartesian_vec() - rslt_monte);
@@ -847,7 +847,7 @@ fn earth_sph_harmonics_12x12() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));
     let mut prop = setup.with(state);
-    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
+    prop.for_duration(1 * TimeUnit::Day).unwrap();
 
     println!("Error: {:3.12}", prop.state.to_cartesian_vec() - rslt_gmat);
 
@@ -902,7 +902,7 @@ fn earth_sph_harmonics_70x70() {
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(state);
-    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
+    prop.for_duration(1 * TimeUnit::Day).unwrap();
 
     println!("Error: {:3.12}", prop.state.to_cartesian_vec() - rslt_gmat);
 
@@ -957,7 +957,7 @@ fn earth_sph_harmonics_70x70_partials() {
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(state);
-    prop.until_time_elapsed(1 * TimeUnit::Day).unwrap();
+    prop.for_duration(1 * TimeUnit::Day).unwrap();
 
     println!(
         "Error: {:3.12}",
@@ -1008,7 +1008,7 @@ fn hf_prop() {
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));
     let mut prop = setup.with(state);
-    let rslt = prop.until_time_elapsed(30.0 * TimeUnit::Day).unwrap();
+    let rslt = prop.for_duration(30.0 * TimeUnit::Day).unwrap();
 
     println!("{}\n{:o}", rslt, rslt);
 }

@@ -68,7 +68,7 @@ where
     type StateType: State;
 
     /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
-    /// The time delta_t is in seconds PAST the context epoch. The state vector is the state which
+    /// The time delta_t is in **seconds** PAST the context epoch. The state vector is the state which
     /// changes for every intermediate step of the integration. The state context is the state of
     /// what is being propagated, it should allow rebuilding a new state context from the
     /// provided state vector.

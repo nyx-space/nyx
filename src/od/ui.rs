@@ -335,7 +335,7 @@ where
             let next_msr_epoch = msr.epoch();
 
             let delta_t = next_msr_epoch - prev_dt;
-            self.prop.until_time_elapsed(delta_t)?;
+            self.prop.for_duration(delta_t)?;
 
             while let Ok(prop_state) = rx.try_recv() {
                 let nominal_state = S::extract(&prop_state);
@@ -473,7 +473,7 @@ where
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
         info!("Propagating for {} seconds", prop_time);
 
-        self.prop.until_time_elapsed(prop_time)?;
+        self.prop.for_duration(prop_time)?;
 
         info!("Mapping covariance");
 

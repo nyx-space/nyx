@@ -9,13 +9,6 @@ use std::cmp::PartialEq;
 use std::convert::TryFrom;
 use std::fmt;
 
-// TODO: Rename to Frame, and add an ID. Then then &Frame will be stored only in the Cosm
-// and the state can be Clonable again. Also removes any lifetime problem.
-// All transformations need to happen with the Cosm again, which isn't a bad thing!
-// Should this also have a exb ID so that we know the center object of the frame?
-// Celestial {id: i32, exb: i32, gm: f64}
-// Think about printing the state. If [399] this gives only the center, not rotation.
-// So maybe Celestial{fxb:i32, exb:i32, ...} since eventually everything here will be in an fxb?
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Frame {

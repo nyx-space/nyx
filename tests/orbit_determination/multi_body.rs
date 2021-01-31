@@ -55,7 +55,7 @@ fn multi_body_ckf_perfect_stations() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.
@@ -185,7 +185,7 @@ fn multi_body_ckf_covar_map() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     // Receive the states on the main thread, and populate the measurement channel.

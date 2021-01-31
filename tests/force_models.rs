@@ -37,7 +37,7 @@ fn srp_earth() {
 
     let setup = Propagator::default(&sc_dyn);
     let mut prop = setup.with(sc);
-    let final_state = prop.until_time_elapsed(prop_time).unwrap();
+    let final_state = prop.for_duration(prop_time).unwrap();
 
     println!("{}", final_state);
 
@@ -91,7 +91,7 @@ fn exp_drag_earth() {
 
     let setup = Propagator::default(&sc_dyn);
     let mut prop = setup.with(sc);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state();
     println!("{}", final_state);
@@ -130,7 +130,7 @@ fn std_atm_drag_earth() {
 
     let setup = Propagator::default(&sc_dyn);
     let mut prop = setup.with(sc);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state();
     println!("{}", final_state);
@@ -191,7 +191,7 @@ fn std_atm_drag_earth_low() {
 
     let setup = Propagator::default(&sc_dyn);
     let mut prop = setup.with(sc);
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.state();
     println!("{}", final_state);

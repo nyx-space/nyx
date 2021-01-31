@@ -49,7 +49,7 @@ fn rugg_sma() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -100,7 +100,7 @@ fn rugg_sma_decr() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -153,7 +153,7 @@ fn rugg_inc() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -206,7 +206,7 @@ fn rugg_inc_decr() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -259,7 +259,7 @@ fn rugg_ecc() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -312,7 +312,7 @@ fn rugg_ecc_decr() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -367,7 +367,7 @@ fn rugg_aop() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -421,7 +421,7 @@ fn rugg_aop_decr() {
     println!("{:o}", orbit);
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     let final_state = prop.dynamics.orbital_dyn.state();
     let fuel_usage = fuel_mass - sc.fuel_mass;
@@ -478,7 +478,7 @@ fn rugg_raan() {
 
     let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
     prop.event_trackers = tracker;
-    prop.until_time_elapsed(prop_time).unwrap();
+    prop.for_duration(prop_time).unwrap();
 
     println!("{}", prop.event_trackers);
 

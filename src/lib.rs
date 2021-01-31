@@ -96,7 +96,7 @@ pub mod propagators;
 ///     &mut dynamics,
 ///     &PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStepPV {}),
 /// );
-/// prop.until_time_elapsed(prop_time);
+/// prop.for_duration(prop_time);
 ///
 /// assert_eq!(prop.dynamics.state, rslt, "two body prop failed");
 ///
@@ -150,7 +150,7 @@ pub mod propagators;
 /// let mut dynamics = OrbitalDynamics::point_masses(halo_rcvr, bodies, &cosm);
 ///
 /// let mut prop = Propagator::default(&mut dynamics, &PropOpts::default());
-/// prop.until_time_elapsed(prop_time);
+/// prop.for_duration(prop_time);
 /// let (err_r, err_v) = rss_errors(&prop.state_vector(), &rslt);
 ///
 /// println!(

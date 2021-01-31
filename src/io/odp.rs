@@ -321,7 +321,7 @@ impl<'a> OdpScenario<'a> {
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state());
 
-        truth_prop.until_time_elapsed(prop_time)?;
+        truth_prop.for_duration(prop_time)?;
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",

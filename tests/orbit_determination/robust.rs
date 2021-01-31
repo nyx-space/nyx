@@ -71,7 +71,7 @@ fn robust_test_ekf_two_body() {
         let mut dynamics = OrbitalDynamics::two_body(initial_state);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -237,7 +237,7 @@ fn robust_test_ekf_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -419,7 +419,7 @@ fn robust_test_ekf_harmonics() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -588,7 +588,7 @@ fn robust_test_ekf_realistic() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -742,7 +742,7 @@ fn robust_test_ckf_smoother_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -1007,7 +1007,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);
@@ -1280,7 +1280,7 @@ fn robust_test_ckf_iteration_multi_body() {
         let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
         let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
         prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
+        prop.for_duration(prop_time).unwrap();
     });
 
     let mut truth_states = Vec::with_capacity(10_000);

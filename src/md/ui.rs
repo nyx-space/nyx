@@ -352,7 +352,7 @@ where
                     prop_time,
                     prop_time / SECONDS_PER_DAY
                 );
-                prop.until_time_elapsed(prop_time)?;
+                prop.for_duration(prop_time)?;
             }
         }
 

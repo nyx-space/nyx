@@ -73,7 +73,7 @@ impl HarmonicsMem {
 
     /// Initialize `HarmonicsMem` from the file path (must be a gunzipped file)
     ///
-    /// Gravity models provided by `nyx`: TODO: add github links and examples
+    /// Gravity models provided by `nyx`:
     /// + EMG2008 to 2190 for Earth (tide free)
     /// + Moon to 1500 (from SHADR file)
     /// + Mars to 120 (from SHADR file)
