@@ -152,7 +152,7 @@ where
                         let mut init = init_state_sd.as_state(state_frame)?;
                         if stm_flag.with() {
                             // Specify that we want to compute the STM.
-                            init.stm_identity();
+                            init.enable_stm();
                         }
                         init
                     }

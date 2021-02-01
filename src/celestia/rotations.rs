@@ -177,6 +177,7 @@ impl ParentRotation for Euler3AxisDt {
         let days_d = datetime.as_jde_tdb_days() - MJD_OFFSET - J2000_OFFSET;
         let centuries_t = days_d / DAYS_PER_CENTURY;
         // Let's create a new context, add the time variables, and compute the rotation's context
+        // Note: this will be resolved with Chi/racr files.
         let mut ctx = Context::default();
         ctx.var("d", days_d);
         ctx.var("T", centuries_t);

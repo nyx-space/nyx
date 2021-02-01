@@ -556,7 +556,6 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
-    // pub fn raw_celestial_state(&self, exb_id: i32, epoch: Epoch) -> Result<Orbit, NyxError> {
     pub fn raw_celestial_state(&self, path: &[usize], epoch: Epoch) -> Result<Orbit, NyxError> {
         if path.is_empty() {
             // This is the solar system barycenter, so we just return a state of zeros

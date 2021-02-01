@@ -126,7 +126,7 @@ impl Orbit {
         frame: Frame,
     ) -> Self {
         let mut me = Self::cartesian(x, y, z, vx, vy, vz, dt, frame);
-        me.stm_identity();
+        me.enable_stm();
         me
     }
 
@@ -799,6 +799,11 @@ impl Orbit {
         self.vx = new_v[0];
         self.vy = new_v[1];
         self.vz = new_v[2];
+    }
+
+    /// Sets the STM of this state of identity, which enables computation of the STM
+    pub fn enable_stm(&mut self) {
+        self.stm = Some(Matrix6::identity());
     }
 
     /// Sets the STM of this state of identity
