@@ -7,7 +7,7 @@ use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::Frame;
-use crate::dynamics::propulsion::Thruster;
+use crate::dynamics::thrustctrl::Thruster;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3};
 use crate::TimeTagged;
@@ -1028,6 +1028,13 @@ impl fmt::Octal for Orbit {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GNCMode {
+    Coast,
+    Thrust,
+    Custom(u8),
+}
+
 /// A spacecraft state
 /// TODO: Remove the propulsion from spaceraft. Add the thruster itself (a single thruster).
 /// TODO: Then add the thrust control to the spacecraft Dynamics. Find a way to store the results of
@@ -1039,6 +1046,7 @@ pub struct SpacecraftState {
     pub dry_mass: f64,
     pub fuel_mass: f64,
     pub thruster: Option<Thruster>,
+    pub mode: GNCMode,
 }
 
 impl SpacecraftState {
@@ -1048,6 +1056,7 @@ impl SpacecraftState {
             dry_mass,
             fuel_mass,
             thruster: None,
+            mode: GNCMode::Coast,
         }
     }
 }

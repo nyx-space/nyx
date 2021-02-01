@@ -268,7 +268,7 @@ impl TryFrom<String> for Bodies {
             "Saturn Barycenter" => Ok(Self::SaturnBarycenter),
             "Uranus Barycenter" => Ok(Self::UranusBarycenter),
             "Neptune Barycenter" => Ok(Self::NeptuneBarycenter),
-            _ => Err(NyxError::ObjectNameNotFound(name)),
+            _ => Err(NyxError::ObjectNotFound(name)),
         }
     }
 }
@@ -300,38 +300,6 @@ impl TryFrom<Vec<usize>> for Bodies {
             _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
         }
     }
-}
-
-/// Known planets IDs defined for ease of access. All Cosm objects may be accessed via Cosm directly.
-pub mod bodies {
-    /// Solar System Barycenter
-    pub const SSB: &str = "Solar System Barycenter";
-    /// Sun center ID
-    pub const SUN: &str = "Sun";
-    /// Mercury barycenter ID
-    pub const MERCURY_BARYCENTER: &str = "Mercury Barycenter";
-    /// Mercury center ID
-    pub const MERCURY: &str = "Mercury Barycenter";
-    /// Venus barycenter ID
-    pub const VENUS_BARYCENTER: &str = "Venus Barycenter";
-    /// Venus center ID
-    pub const VENUS: &str = "Venus Barycenter";
-    /// Earth barycenter ID
-    pub const EARTH_BARYCENTER: &str = "Earth Moon Barycenter";
-    /// Earth planet ID
-    pub const EARTH: &str = "Earth Barycenter";
-    /// Earth's MOon planet ID
-    pub const EARTH_MOON: &str = "Moon Barycenter";
-    /// Mars barycenter ID
-    pub const MARS_BARYCENTER: &str = "Mars Barycenter";
-    /// Jupiter barycenter ID
-    pub const JUPITER_BARYCENTER: &str = "Jupiter Barycenter";
-    /// Saturn barycenter ID
-    pub const SATURN_BARYCENTER: &str = "Staturn Barycenter";
-    /// Uranus barycenter ID
-    pub const URANUS_BARYCENTER: &str = "Uranus Barycenter";
-    /// Neptune barycenter ID
-    pub const NEPTUNE_BARYCENTER: &str = "Neputer Barycenter";
 }
 
 // Re-Export state

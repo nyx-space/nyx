@@ -29,16 +29,14 @@ pub enum NyxError {
     /// Returns this error if the partials for this model are not defined, thereby preventing the computation of the STM
     PartialsUndefined,
     LoadingError(String),
-    ObjectIDNotFound(i32),
-    ObjectNameNotFound(String),
     ObjectNotFound(String),
     NoInterpolationData(String),
     InvalidInterpolationData(String),
     NoStateData(String),
-    /// No path was found to convert from the first center to the second
-    DisjointFrameCenters(String, String),
-    /// No path was found to convert from the first orientation to the second
     DisjointFrameOrientations(String, String),
+    /// When there is a controller but there isn't any thruster available
+    CtrlExistsButNoThrusterAvail,
+    /// The control vector returned by a controller must be a unit vector. Use the throttle() function to specify the amount.
     InvalidThrusterCtrlNorm(f64),
     /// Some custom error for new dynamics
     CustomError(String),

@@ -182,6 +182,7 @@ where
                 self.set_step(stop_time - dt, true);
                 let (t, state_vec) = self.derive()?;
                 self.state.set(self.state.epoch() + t, &state_vec)?;
+                self.state = self.prop.dynamics.finally(self.state)?;
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, self.state.epoch(), &self.state);
@@ -202,6 +203,7 @@ where
                 let (t, state_vec) = self.derive()?;
 
                 self.state.set(self.state.epoch() + t, &state_vec)?;
+                self.state = self.prop.dynamics.finally(self.state)?;
                 // Evaluate the event trackers
                 self.event_trackers
                     .eval_and_save(dt, self.state.epoch(), &self.state);

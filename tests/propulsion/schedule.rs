@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use self::nyx::celestia::{bodies, Cosm, Frame, Orbit};
+use self::nyx::celestia::{Bodies, Cosm, Frame, Orbit};
 use self::nyx::dimensions::Vector3;
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
@@ -48,8 +48,8 @@ fn transfer_schedule_no_depl() {
     );
 
     // Define the dynamics
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let dynamics = OrbitalDynamics::point_masses(orbit, &bodies, &cosm);
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let dynamics = OrbitalDynamics::point_masses(orbit.frame, &bodies, &cosm);
 
     // Define the thruster
     let monoprop = vec![Thruster {

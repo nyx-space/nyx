@@ -1,7 +1,16 @@
-use crate::celestia::{Frame, Orbit};
+use crate::celestia::{Frame, GNCMode, Orbit, SpacecraftState};
 use crate::dimensions::Vector3;
-use crate::time::{Epoch, TimeUnit};
 use std::f64::consts::FRAC_PI_2 as half_pi;
+
+mod finiteburns;
+pub use finiteburns::{FiniteBurns, Mnvr};
+
+/// Defines a thruster with a maximum isp and a maximum thrust.
+#[derive(Copy, Clone, Debug)]
+pub struct Thruster {
+    pub thrust: f64,
+    pub isp: f64,
+}
 
 #[derive(Debug)]
 pub enum ThrustingError {
@@ -13,14 +22,14 @@ pub enum ThrustingError {
 /// tie the DeltaVctrl to a MissionArc.
 pub trait ThrustControl: Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, state: &Orbit) -> Vector3<f64>;
+    fn direction(&self, state: &SpacecraftState) -> Vector3<f64>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, state: &Orbit) -> f64;
+    fn throttle(&self, state: &SpacecraftState) -> f64;
 
-    /// Prepares the controller for the next maneuver (called from set_state of the dynamics).
-    fn next(&mut self, state: &Orbit);
+    /// Prepares the controller for the next maneuver.
+    fn next(&self, state: &SpacecraftState) -> GNCMode;
 
     /// Returns whether this thrust control has been achieve, if it has an objective
     fn achieved(&self, _state: &Orbit) -> Result<bool, ThrustingError> {
@@ -46,32 +55,6 @@ impl Achieve {
             Achieve::Inc { target, tol } => (state.inc() - target).abs() < tol,
             Achieve::Raan { target, tol } => (state.raan() - target).abs() < tol,
             Achieve::Aop { target, tol } => (state.aop() - target).abs() < tol,
-        }
-    }
-}
-
-/// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
-/// It may be used with a maneuver scheduler.
-#[derive(Copy, Clone, Debug)]
-pub struct Mnvr {
-    /// Start epoch of the maneuver
-    pub start: Epoch,
-    /// End epoch of the maneuver
-    pub end: Epoch,
-    /// Thrust level, if 1.0 use all thruster available at full power
-    pub thrust_lvl: f64,
-    /// Direction of the thrust in the VNC frame
-    pub vector: Vector3<f64>,
-}
-
-impl Mnvr {
-    /// Creates an instantaneous maneuver whose vector is the deltaV.
-    pub fn instantaneous(dt: Epoch, vector: Vector3<f64>) -> Self {
-        Self {
-            start: dt,
-            end: dt + TimeUnit::Microsecond,
-            thrust_lvl: 1.0,
-            vector,
         }
     }
 }
@@ -130,10 +113,11 @@ impl ThrustControl for Ruggiero {
         Ok(true)
     }
 
-    fn direction(&self, osc: &Orbit) -> Vector3<f64> {
+    fn direction(&self, sc: &SpacecraftState) -> Vector3<f64> {
         if self.achieved {
             Vector3::zeros()
         } else {
+            let osc = sc.orbit;
             let mut ctrl = Vector3::zeros();
             for maybe_obj in &self.objectives {
                 if let Some(obj) = maybe_obj {
@@ -228,10 +212,11 @@ impl ThrustControl for Ruggiero {
     }
 
     // Either thrust full power or not at all
-    fn throttle(&self, osc: &Orbit) -> f64 {
+    fn throttle(&self, sc: &SpacecraftState) -> f64 {
         if self.achieved {
             0.0
         } else {
+            let osc = sc.orbit;
             for maybe_obj in &self.objectives {
                 if let Some(obj) = maybe_obj {
                     match *obj {
@@ -278,85 +263,17 @@ impl ThrustControl for Ruggiero {
     }
 
     /// Update the state for the next iteration
-    fn next(&mut self, osc: &Orbit) {
-        if self.throttle(osc) > 0.0 {
-            if self.achieved {
-                info!("enabling control: {:o}", osc);
+    fn next(&self, sc: &SpacecraftState) -> GNCMode {
+        if self.throttle(sc) > 0.0 {
+            if sc.mode == GNCMode::Coast {
+                info!("enabling control: {:o}", sc.orbit);
             }
-            self.achieved = false;
+            GNCMode::Thrust
         } else {
-            if !self.achieved {
-                info!("disabling control: {:o}", osc);
+            if sc.mode == GNCMode::Thrust {
+                info!("disabling control: {:o}", sc.orbit);
             }
-            self.achieved = true;
-        }
-    }
-}
-
-/// A controller for a set of pre-determined maneuvers.
-#[derive(Clone, Debug)]
-pub struct FiniteBurns {
-    /// Maneuvers should be provided in chronological order, first maneuver first in the list
-    pub mnvrs: Vec<Mnvr>,
-    pub mnvr_no: usize,
-    /// The frame in which the maneuvers are defined.
-    pub frame: Frame,
-}
-
-impl FiniteBurns {
-    /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
-    pub fn from_mnvrs(mnvrs: Vec<Mnvr>, frame: Frame) -> Self {
-        assert!(
-            matches!(frame, Frame::Inertial | Frame::VNC),
-            "Maneuvers must be either in the inertial frame or in a body frame"
-        );
-        Self {
-            mnvrs,
-            mnvr_no: 0,
-            frame,
-        }
-    }
-}
-
-impl ThrustControl for FiniteBurns {
-    fn direction(&self, osc: &Orbit) -> Vector3<f64> {
-        // NOTE: We do not increment the mnvr number here. The power function is called first,
-        // so we let that function handle starting and stopping of the maneuver.
-        if self.mnvr_no >= self.mnvrs.len() {
-            Vector3::zeros()
-        } else {
-            let next_mnvr = self.mnvrs[self.mnvr_no];
-            if next_mnvr.start <= osc.dt {
-                if matches!(self.frame, Frame::Inertial) {
-                    next_mnvr.vector
-                } else {
-                    osc.dcm_to_inertial(self.frame) * next_mnvr.vector
-                }
-            } else {
-                Vector3::zeros()
-            }
-        }
-    }
-
-    fn throttle(&self, osc: &Orbit) -> f64 {
-        if self.mnvr_no >= self.mnvrs.len() {
-            0.0
-        } else {
-            let next_mnvr = self.mnvrs[self.mnvr_no];
-            if next_mnvr.start <= osc.dt {
-                next_mnvr.thrust_lvl
-            } else {
-                0.0
-            }
-        }
-    }
-
-    fn next(&mut self, osc: &Orbit) {
-        if self.mnvr_no < self.mnvrs.len() {
-            let cur_mnvr = self.mnvrs[self.mnvr_no];
-            if osc.dt >= cur_mnvr.end {
-                self.mnvr_no += 1;
-            }
+            GNCMode::Coast
         }
     }
 }
@@ -373,6 +290,7 @@ fn unit_vector_from_angles(alpha: f64, beta: f64) -> Vector3<f64> {
 mod tests {
     use super::*;
     use crate::celestia::Cosm;
+    use crate::time::Epoch;
     #[test]
     fn ruggiero_weight() {
         let mut cosm = Cosm::de438();
@@ -405,13 +323,15 @@ mod tests {
             start_time,
             eme2k,
         );
+        let osc_sc = SpacecraftState::new(osc, 1.0, 0.0);
+
         let expected = Vector3::new(
             -0.017_279_636_133_108_3,
             0.999_850_315_226_803,
             0.000_872_534_222_883_2,
         );
 
-        let got = ruggiero.direction(&osc);
+        let got = ruggiero.direction(&osc_sc);
 
         println!("{}", expected - got);
         assert!(

@@ -27,8 +27,9 @@ pub use self::orbital::*;
 pub mod spacecraft;
 pub use self::spacecraft::*;
 
-/// Defines what a propulsion subsystem must implement, with some common propulsion systems.
-pub mod propulsion;
+// Defines what a propulsion subsystem must implement, with some common propulsion systems.
+// TODO: Remove propulsion.rs
+// pub mod propulsion;
 
 /// Defines a few examples of thrust controllers.
 pub mod thrustctrl;
@@ -132,53 +133,13 @@ where
 
         Ok((state, grad))
     }
+
+    /// Optionally performs some final changes after each successful integration of the equations of motion.
+    /// For example, this can be used to update the GNC mode.
+    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
+        Ok(next_state)
+    }
 }
-
-// /// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-// pub trait AutoDiff<H: DimName + DimNameSub<U1>, R: DimName>: Send + Sync {
-//     /// Defines the state size of the estimated state
-//     // type HyperStateSize: DimName + DimNameSub<U1>;
-//     /// Defines the number of rows in the state transition matrix
-//     // type STMRows: DimName;
-//     /// Defines the acceptable context type, e.g. SpacecraftState for a Spacecraft related automatic differentiation.
-//     // type CtxType: State<DimNameDiff<H, U1>>;
-//     type CtxType: State<DimNameDiff<H, U1>>;
-
-//     /// Computes both the state and the gradient of the dynamics.
-//     fn eom_grad(
-//         &self,
-//         state: &VectorN<f64, R>,
-//         ctx: &Self::CtxType,
-//     ) -> (VectorN<f64, R>, MatrixMN<f64, R, R>)
-//     where
-//         DefaultAllocator: Allocator<f64, R>
-//             + Allocator<f64, R, R>
-//             + Allocator<f64, H>
-//             + Allocator<f64, DimNameDiff<H, U1>>
-//             + Allocator<Hyperdual<f64, H>, R>,
-//         Owned<f64, H>: Copy,
-//     {
-//         let hyperstate: VectorN<Hyperdual<f64, H>, R> = hyperspace_from_vector(&state);
-
-//         let (state, grad) = self.dual_eom(&hyperstate, &ctx);
-
-//         (state, grad)
-//     }
-
-//     /// Defines the equations of motion for Dual numbers for these dynamics.
-//     fn dual_eom(
-//         &self,
-//         state: &VectorN<Hyperdual<f64, H>, R>,
-//         ctx: &Self::CtxType,
-//     ) -> (VectorN<f64, R>, MatrixMN<f64, R, R>)
-//     where
-//         DefaultAllocator: Allocator<f64, H>
-//             + Allocator<f64, R>
-//             + Allocator<f64, R, R>
-//             + Allocator<f64, DimNameDiff<H, U1>>
-//             + Allocator<Hyperdual<f64, H>, R>,
-//         Owned<f64, H>: Copy;
-// }
 
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///

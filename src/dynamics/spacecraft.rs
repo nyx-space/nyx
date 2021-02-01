@@ -50,60 +50,25 @@ impl<'a> Spacecraft<'a> {
     }
 }
 
-impl<'a> Dynamics for Spacecraft<'a>
-// where
-//     // D::StateSize: DimNameAdd<U1>,
-//     DefaultAllocator: Allocator<f64, DimNameSum<D::StateSize, U1>>
-//         + Allocator<f64, D::StateSize>
-//         + Allocator<f64, U1>
-//         + Allocator<f64, U1, D::StateSize>
-//         + Allocator<f64, D::StateSize, U1>
-//         + Allocator<f64, DimNameSum<D::StateSize, U1>, U1>
-//         + Allocator<f64, U1, DimNameSum<D::StateSize, U1>>,
-{
-    // type StateSize = U7;
-    // type PropVecSize = U43; // This implies that we are NOT computing the STM with the mass
+impl<'a> Dynamics for Spacecraft<'a> {
     type HyperdualSize = U7; // This implies that we are NOT computing the STM with the mass
     type StateType = SpacecraftState;
-    // fn state_vector(&self) -> VectorN<f64, Self::StateSize>
-    // where
-    //     DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
-    // {
-    //     VectorN::<f64, Self::StateSize>::from_iterator(
-    //         self.orbital_dyn
-    //             .state_vector()
-    //             .iter()
-    //             .chain(Vector1::new(self.fuel_mass).iter())
-    //             .cloned(),
-    //     )
-    // }
 
-    // fn set_state(
-    //     &mut self,
-    //     new_t: f64,
-    //     new_state: &VectorN<f64, Self::StateSize>,
-    // ) -> Result<(), NyxError>
-    // where
-    //     DefaultAllocator: Allocator<f64, Self::StateSize> + Allocator<f64, D::StateSize>,
-    // {
-    //     let orbital_dyn_state = new_state.fixed_rows::<D::StateSize>(0).into_owned();
-    //     self.orbital_dyn.set_state(new_t, &orbital_dyn_state)?;
-    //     self.fuel_mass = new_state[Self::StateSize::dim() - 1];
-    //     if let Some(prop) = &self.prop {
-    //         if prop.decrement_mass && self.fuel_mass < 0.0 {
-    //             error!(
-    //                 "negative fuel mass at {:?}",
-    //                 self.orbital_dyn.orbital_state().dt
-    //             );
-    //             return Err(NyxError::FuelExhausted);
-    //         }
-    //     }
-    //     if let Some(prop) = self.prop.as_mut() {
-    //         prop.set_state(&self.orbital_dyn.orbital_state());
-    //     }
+    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
+        if next_state.fuel_mass < 0.0 {
+            error!("negative fuel mass at {}", next_state.epoch());
+            return Err(NyxError::FuelExhausted);
+        }
 
-    //     Ok(())
-    // }
+        if let Some(ctrl) = &self.ctrl {
+            let mut state = next_state;
+            // Update the control mode
+            state.mode = ctrl.next(&state);
+            Ok(state)
+        } else {
+            Ok(next_state)
+        }
+    }
 
     fn eom(
         &self,
@@ -132,14 +97,17 @@ impl<'a> Dynamics for Spacecraft<'a>
         // let osc_sc = ctx.ctor_from(delta_t, &d_x);
         let osc_sc = ctx;
 
-        // Now compute the other dynamics as needed.
+        // Now include the control as needed.
         if let Some(ctrl) = &self.ctrl {
             let (thrust_force, fuel_rate) = {
+                if osc_sc.thruster.is_none() {
+                    return Err(NyxError::CtrlExistsButNoThrusterAvail);
+                }
                 let thruster = osc_sc.thruster.unwrap();
-                let thrust_power = ctrl.throttle(&osc_sc.orbit);
+                let thrust_power = ctrl.throttle(&osc_sc);
                 if thrust_power > 0.0 {
                     // Thrust arc
-                    let thrust_inertial = ctrl.direction(&osc_sc.orbit);
+                    let thrust_inertial = ctrl.direction(&osc_sc);
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         return Err(NyxError::InvalidThrusterCtrlNorm(thrust_inertial.norm()));
                     }
@@ -171,23 +139,13 @@ impl<'a> Dynamics for Spacecraft<'a>
             d_x[U7::dim() - 1] += fuel_rate;
         }
 
-        // Compute additional force models as needed
+        // Compute additional force models as needed.
         for model in &self.force_models {
             let model_frc = model.eom(&osc_sc)? / total_mass;
             for i in 0..3 {
                 d_x[i + 3] += model_frc[i];
             }
         }
-
-        // XXX: Somehow, the flux pressure is correct on the first call to EOM, but then
-        // the input state for the second call is +/- inf on the top three items and already
-        // NaN on the velocity. So every subsequent call fails.
-        //         -0.0,
-        //         7.725760634075587,
-        //         0.0,
-        //         inf,
-        //         inf,
-        //         -inf,
 
         Ok(d_x)
     }
