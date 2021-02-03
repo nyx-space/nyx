@@ -10,7 +10,6 @@ pub struct Ruggiero {
     /// Stores the objectives
     objectives: [Option<Achieve>; 5],
     init_state: Orbit,
-    achieved: bool,
 }
 
 /// The Ruggiero is a locally optimal control of a state for specific osculating elements.
@@ -24,7 +23,6 @@ impl Ruggiero {
         Self {
             objectives: objs,
             init_state: initial,
-            achieved: false,
         }
     }
 
@@ -47,10 +45,10 @@ impl Ruggiero {
 
 impl ThrustControl for Ruggiero {
     /// Returns whether the control law has achieved all goals
-    fn achieved(&self, state: &Orbit) -> Result<bool, NyxError> {
+    fn achieved(&self, state: &SpacecraftState) -> Result<bool, NyxError> {
         for maybe_obj in &self.objectives {
             if let Some(obj) = maybe_obj {
-                if !obj.achieved(state) {
+                if !obj.achieved(&state.orbit) {
                     return Ok(false);
                 }
             }
@@ -59,9 +57,9 @@ impl ThrustControl for Ruggiero {
     }
 
     fn direction(&self, sc: &SpacecraftState) -> Vector3<f64> {
-        if self.achieved {
+        if sc.mode == GuidanceMode::Coast {
             Vector3::zeros()
-        } else {
+        } else if sc.mode == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut ctrl = Vector3::zeros();
             for maybe_obj in &self.objectives {
@@ -74,7 +72,6 @@ impl ThrustControl for Ruggiero {
                                 let num = osc.ecc() * osc.ta().to_radians().sin();
                                 let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
                                 let alpha = num.atan2(denom);
-                                // TODO: Add efficiency
                                 ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
                             }
                         }
@@ -86,7 +83,6 @@ impl ThrustControl for Ruggiero {
                                 let denom =
                                     osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
                                 let alpha = num.atan2(denom);
-                                // TODO: Add efficiency
                                 ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
                             }
                         }
@@ -96,7 +92,6 @@ impl ThrustControl for Ruggiero {
                             if weight.abs() > 0.0 {
                                 let beta =
                                     half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
-                                // TODO: Add efficiency
                                 ctrl += unit_vector_from_angles(0.0, beta) * weight;
                             }
                         }
@@ -107,7 +102,6 @@ impl ThrustControl for Ruggiero {
                             if weight.abs() > 0.0 {
                                 let beta =
                                     half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
-                                // TODO: Add efficiency
                                 ctrl += unit_vector_from_angles(0.0, beta) * weight;
                             }
                         }
@@ -151,16 +145,18 @@ impl ThrustControl for Ruggiero {
             } else {
                 ctrl
             };
-            // Convert to inertial
+            // Convert to inertial -- this whole control is computed in the RCN frame
             osc.dcm_to_inertial(Frame::RCN) * ctrl
+        } else {
+            panic!("Unsupported guidance mode {:?}", sc.mode);
         }
     }
 
     // Either thrust full power or not at all
     fn throttle(&self, sc: &SpacecraftState) -> f64 {
-        if self.achieved {
+        if sc.mode == GuidanceMode::Coast {
             0.0
-        } else {
+        } else if sc.mode == GuidanceMode::Thrust {
             let osc = sc.orbit;
             for maybe_obj in &self.objectives {
                 if let Some(obj) = maybe_obj {
@@ -204,6 +200,8 @@ impl ThrustControl for Ruggiero {
                 }
             }
             0.0
+        } else {
+            panic!("Unsupported guidance mode {:?}", sc.mode);
         }
     }
 

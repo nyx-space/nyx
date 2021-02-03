@@ -49,6 +49,14 @@ impl<'a> Spacecraft<'a> {
     pub fn add_model(&mut self, force_model: Arc<dyn ForceModel + 'a>) {
         self.force_models.push(force_model);
     }
+
+    /// A shortcut to spacecraft.ctrl if the control is defined
+    pub fn ctrl_achieved(&self, state: &SpacecraftState) -> Result<bool, NyxError> {
+        match &self.ctrl {
+            Some(ctrl) => ctrl.achieved(state),
+            None => Err(NyxError::NoObjectiveDefined),
+        }
+    }
 }
 
 impl<'a> Dynamics for Spacecraft<'a> {

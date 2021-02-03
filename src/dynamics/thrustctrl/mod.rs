@@ -29,8 +29,8 @@ pub trait ThrustControl: Send + Sync {
     /// Prepares the controller for the next maneuver by returning the next guidance mode.
     fn next(&self, state: &SpacecraftState) -> GuidanceMode;
 
-    /// Returns whether this thrust control has been achieve, if it has an objective
-    fn achieved(&self, _state: &Orbit) -> Result<bool, NyxError> {
+    /// Returns whether this thrust control has been achieved, if it has an objective
+    fn achieved(&self, _state: &SpacecraftState) -> Result<bool, NyxError> {
         Err(NyxError::NoObjectiveDefined)
     }
 }
