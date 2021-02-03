@@ -1029,7 +1029,7 @@ impl fmt::Octal for Orbit {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum GNCMode {
+pub enum GuidanceMode {
     Coast,
     Thrust,
     Custom(u8),
@@ -1043,20 +1043,36 @@ pub enum GNCMode {
 #[derive(Clone, Copy, Debug)]
 pub struct SpacecraftState {
     pub orbit: Orbit,
-    pub dry_mass: f64,
-    pub fuel_mass: f64,
+    pub dry_mass_kg: f64,
+    pub fuel_mass_kg: f64,
     pub thruster: Option<Thruster>,
-    pub mode: GNCMode,
+    pub mode: GuidanceMode,
 }
 
 impl SpacecraftState {
-    pub fn new(orbit: Orbit, dry_mass: f64, fuel_mass: f64) -> Self {
+    pub fn new(orbit: Orbit, dry_mass_kg: f64, fuel_mass_kg: f64) -> Self {
         Self {
             orbit,
-            dry_mass,
-            fuel_mass,
+            dry_mass_kg,
+            fuel_mass_kg,
             thruster: None,
-            mode: GNCMode::Coast,
+            mode: GuidanceMode::Coast,
+        }
+    }
+
+    pub fn with_thruster(
+        orbit: Orbit,
+        dry_mass_kg: f64,
+        fuel_mass_kg: f64,
+        thruster: Thruster,
+        init_mode: GuidanceMode,
+    ) -> Self {
+        Self {
+            orbit,
+            dry_mass_kg,
+            fuel_mass_kg,
+            thruster: Some(thruster),
+            mode: init_mode,
         }
     }
 }
@@ -1065,14 +1081,19 @@ impl PartialEq for SpacecraftState {
     fn eq(&self, other: &SpacecraftState) -> bool {
         let mass_tol = 1e-6; // milligram
         self.orbit == other.orbit
-            && (self.dry_mass - other.dry_mass).abs() < mass_tol
-            && (self.fuel_mass - other.fuel_mass).abs() < mass_tol
+            && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
+            && (self.fuel_mass_kg - other.fuel_mass_kg).abs() < mass_tol
     }
 }
 
 impl fmt::Display for SpacecraftState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:o}\t{} kg", self.orbit, self.dry_mass + self.fuel_mass)
+        write!(
+            f,
+            "{:o}\t{} kg",
+            self.orbit,
+            self.dry_mass_kg + self.fuel_mass_kg
+        )
     }
 }
 
@@ -1082,7 +1103,7 @@ impl fmt::LowerExp for SpacecraftState {
             f,
             "{:o}\t{:e} kg",
             self.orbit,
-            self.dry_mass + self.fuel_mass
+            self.dry_mass_kg + self.fuel_mass_kg
         )
     }
 }

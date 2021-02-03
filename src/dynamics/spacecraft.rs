@@ -6,6 +6,7 @@ use crate::dynamics::Hyperdual;
 // use crate::od::Estimable;
 use crate::celestia::SpacecraftState;
 use crate::errors::NyxError;
+use crate::state::State;
 use crate::time::TimeUnit;
 use crate::TimeTagged;
 use std::sync::Arc;
@@ -55,7 +56,7 @@ impl<'a> Dynamics for Spacecraft<'a> {
     type StateType = SpacecraftState;
 
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
-        if next_state.fuel_mass < 0.0 {
+        if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
             return Err(NyxError::FuelExhausted);
         }
@@ -89,13 +90,10 @@ impl<'a> Dynamics for Spacecraft<'a> {
                 .cloned(),
         );
 
-        // let orbital_dyn_state = self.orbital_dyn.orbital_state_ctor(t, &orbital_dyn_vec);
-        // let orbital_dyn_state = ctx.orbit.ctor_from(delta_t, &orbital_dyn_vec);
-        let mut total_mass = ctx.dry_mass;
+        let mut total_mass = ctx.dry_mass_kg;
 
         // Rebuild the osculating state for the EOM context.
-        // let osc_sc = ctx.ctor_from(delta_t, &d_x);
-        let osc_sc = ctx;
+        let osc_sc = ctx.ctor_from(delta_t, state);
 
         // Now include the control as needed.
         if let Some(ctrl) = &self.ctrl {
@@ -105,23 +103,21 @@ impl<'a> Dynamics for Spacecraft<'a> {
                 }
                 let thruster = osc_sc.thruster.unwrap();
                 let thrust_power = ctrl.throttle(&osc_sc);
-                if thrust_power > 0.0 {
+                if !(0.0..=1.0).contains(&thrust_power) {
+                    return Err(NyxError::CtrlThrottleRangeErr(thrust_power));
+                } else if thrust_power > 0.0 {
                     // Thrust arc
                     let thrust_inertial = ctrl.direction(&osc_sc);
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
-                        return Err(NyxError::InvalidThrusterCtrlNorm(thrust_inertial.norm()));
+                        return Err(NyxError::CtrlNotAUnitVector(thrust_inertial.norm()));
                     }
-
                     // Compute the thrust in Newtons and Isp
-                    let mut total_thrust = 0.0;
-                    let mut fuel_usage = 0.0;
-
-                    total_thrust += thrust_power * thruster.thrust;
-                    fuel_usage += thrust_power * thruster.thrust / (thruster.isp * STD_GRAVITY);
-                    total_thrust *= 1e-3; // Convert m/s^-2 to km/s^-2
+                    let total_thrust = (thrust_power * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
                     (
                         thrust_inertial * total_thrust,
                         if self.decrement_mass {
+                            let fuel_usage =
+                                thrust_power * thruster.thrust / (thruster.isp * STD_GRAVITY);
                             -fuel_usage
                         } else {
                             0.0
@@ -132,11 +128,11 @@ impl<'a> Dynamics for Spacecraft<'a> {
                 }
             };
             // Add the fuel mass to the total mass, minus the change in fuel
-            total_mass += ctx.fuel_mass + fuel_rate;
+            total_mass += ctx.fuel_mass_kg + fuel_rate;
             for i in 0..3 {
-                d_x[i + 3] += thrust_force[i] / (ctx.dry_mass + state[U7::dim() - 1]);
+                d_x[i + 3] += thrust_force[i] / (ctx.dry_mass_kg + state[U43::dim() - 1]);
             }
-            d_x[U7::dim() - 1] += fuel_rate;
+            d_x[U43::dim() - 1] += fuel_rate;
         }
 
         // Compute additional force models as needed.
@@ -174,7 +170,7 @@ impl<'a> Dynamics for Spacecraft<'a> {
         }
 
         // Call the EOMs
-        let total_mass = ctx.dry_mass;
+        let total_mass = ctx.dry_mass_kg;
         let radius = state_vec.fixed_rows::<U3>(0).into_owned();
 
         // Recreate the osculating state.

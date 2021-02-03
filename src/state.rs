@@ -1,4 +1,4 @@
-use crate::celestia::{Frame, GNCMode, Orbit, SpacecraftState};
+use crate::celestia::{Frame, GuidanceMode, Orbit, SpacecraftState};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{
     DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, VectorN, U42, U43, U6, U7,
@@ -192,10 +192,10 @@ impl State for SpacecraftState {
     fn zeros() -> Self {
         Self {
             orbit: Orbit::zeros(),
-            dry_mass: 0.0,
-            fuel_mass: 0.0,
+            dry_mass_kg: 0.0,
+            fuel_mass_kg: 0.0,
             thruster: None,
-            mode: GNCMode::Coast,
+            mode: GuidanceMode::Coast,
         }
     }
 
@@ -204,7 +204,7 @@ impl State for SpacecraftState {
         Ok(VectorN::<f64, U43>::from_iterator(
             orb_vec
                 .iter()
-                .chain(Vector1::new(self.fuel_mass).iter())
+                .chain(Vector1::new(self.fuel_mass_kg).iter())
                 .cloned(),
         ))
     }
@@ -213,7 +213,7 @@ impl State for SpacecraftState {
         self.set_epoch(epoch);
         let orbit_vec = vector.fixed_rows::<U42>(0).into_owned();
         self.orbit.set(epoch, &orbit_vec)?;
-        self.fuel_mass = vector[U43::dim() - 1];
+        self.fuel_mass_kg = vector[U43::dim() - 1];
         Ok(())
     }
 
@@ -251,7 +251,7 @@ impl Add<VectorN<f64, U7>> for SpacecraftState {
         me.orbit.vx += other[3];
         me.orbit.vy += other[4];
         me.orbit.vz += other[5];
-        me.fuel_mass += other[6];
+        me.fuel_mass_kg += other[6];
 
         me
     }

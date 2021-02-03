@@ -1,18 +1,16 @@
 extern crate nyx_space as nyx;
 
-use self::nyx::celestia::{Bodies, Cosm, Frame, Orbit};
+use self::nyx::celestia::{Bodies, Cosm, Frame, GuidanceMode, Orbit, SpacecraftState};
 use self::nyx::dimensions::Vector3;
-use self::nyx::dynamics::orbital::OrbitalDynamics;
-use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
-use self::nyx::dynamics::spacecraft::Spacecraft;
-use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr};
-use self::nyx::dynamics::Dynamics;
+use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr, Thruster};
+use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
 use self::nyx::propagators::{PropOpts, Propagator};
-use self::nyx::time::Epoch;
+use self::nyx::time::{Epoch, TimeUnit};
 use self::nyx::utils::rss_errors;
+use std::sync::Arc;
 
 #[test]
-fn transfer_schedule_no_depl() {
+fn val_transfer_schedule_no_depl() {
     /*
         NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
         components of a spacecraft before defining the spacecraft itself.
@@ -26,16 +24,61 @@ fn transfer_schedule_no_depl() {
     cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
+    // Build the initial spacecraft state
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
-
     let orbit = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
     );
 
-    let prop_time = 3000.0;
+    // Define the thruster
+    let monoprop = Thruster {
+        thrust: 10.0,
+        isp: 300.0,
+    };
+    let dry_mass = 1e3;
+    let fuel_mass = 756.0;
+    let sc_state = SpacecraftState::with_thruster(
+        orbit,
+        dry_mass,
+        fuel_mass,
+        monoprop,
+        GuidanceMode::Custom(0),
+    );
+
+    let prop_time = 50.0 * TimeUnit::Minute;
 
     let end_time = start_time + prop_time;
 
+    // Define the dynamics
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, &cosm);
+
+    // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
+
+    // Define the maneuver and its schedule
+    let mnvr0 = Mnvr {
+        start: Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
+        end: end_time,
+        thrust_lvl: 1.0, // Full thrust
+        vector: Vector3::new(1.0, 0.0, 0.0),
+    };
+
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
+
+    // Wrap the control in an automatic reference counter (required)
+    let ctrl = Arc::new(schedule);
+    // And create the spacecraft with that controller
+    let mut sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    // Disable fuel mass decrement, turned on by default
+    sc.decrement_mass = false;
+    // Setup a propagator, and propagate for that duration
+    // NOTE: We specify the use an RK89 to match the GMAT setup.
+    let final_state = Propagator::rk89(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+        .with(sc_state)
+        .for_duration(prop_time)
+        .unwrap();
+
+    // Compute the errors
     let rslt = Orbit::cartesian(
         4_172.396_780_515_64f64,
         436.944_560_056_202_8,
@@ -47,43 +90,12 @@ fn transfer_schedule_no_depl() {
         eme2k,
     );
 
-    // Define the dynamics
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(orbit.frame, &bodies, &cosm);
-
-    // Define the thruster
-    let monoprop = vec![Thruster {
-        thrust: 10.0,
-        isp: 300.0,
-    }];
-
-    // Define the maneuver and its schedule
-    let mnvr0 = Mnvr {
-        start: Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
-        end: end_time,
-        thrust_lvl: 1.0, // Full thrust
-        vector: Vector3::new(1.0, 0.0, 0.0),
-    };
-
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
-    let dry_mass = 1e3;
-    let fuel_mass = 756.0;
-
-    let prop_subsys = Propulsion::new(Box::new(schedule), monoprop, false);
-
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-
-    // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let mut prop = Propagator::rk89(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.for_duration(prop_time).unwrap();
-
-    // Compute the errors
     let (err_r, err_v) = rss_errors(
-        &prop.dynamics.orbital_dyn.state_vector(),
+        &final_state.orbit.to_cartesian_vec(),
         &rslt.to_cartesian_vec(),
     );
     println!("Absolute errors");
-    let delta = prop.dynamics.orbital_dyn.state_vector() - rslt.to_cartesian_vec();
+    let delta = final_state.orbit.to_cartesian_vec() - rslt.to_cartesian_vec();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -105,18 +117,13 @@ fn transfer_schedule_no_depl() {
 
     // Ensure that there was no change in fuel mass since tank depletion was off
     assert!(
-        (prop.dynamics.fuel_mass - fuel_mass).abs() < std::f64::EPSILON,
+        (final_state.fuel_mass_kg - fuel_mass).abs() < std::f64::EPSILON,
         "incorrect fuel mass"
     );
 }
 
 #[test]
-fn transfer_schedule_depl() {
-    /*
-        NOTE: Due to how lifetime of variables work in Rust, we need to define all of the
-        components of a spacecraft before defining the spacecraft itself.
-    */
-
+fn val_transfer_schedule_depl() {
     let mut cosm = Cosm::de438();
     // Modify GMs to match GMAT's
     cosm.frame_mut_gm("EME2000", 398_600.441_5);
@@ -125,16 +132,59 @@ fn transfer_schedule_depl() {
     cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
     let eme2k = cosm.frame("EME2000");
 
+    // Build the initial spacecraft state
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
-
     let orbit = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
     );
 
-    let prop_time = 3000.0;
+    // Define the thruster
+    let monoprop = Thruster {
+        thrust: 10.0,
+        isp: 300.0,
+    };
+    let dry_mass = 1e3;
+    let fuel_mass = 756.0;
+    let sc_state = SpacecraftState::with_thruster(
+        orbit,
+        dry_mass,
+        fuel_mass,
+        monoprop,
+        GuidanceMode::Custom(0),
+    );
+
+    let prop_time = 50.0 * TimeUnit::Minute;
 
     let end_time = start_time + prop_time;
 
+    // Define the dynamics
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, &cosm);
+
+    // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
+
+    // Define the maneuver and its schedule
+    let mnvr0 = Mnvr {
+        start: Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
+        end: end_time,
+        thrust_lvl: 1.0, // Full thrust
+        vector: Vector3::new(1.0, 0.0, 0.0),
+    };
+
+    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
+
+    // Wrap the control in an automatic reference counter (required)
+    let ctrl = Arc::new(schedule);
+    // And create the spacecraft with that controller
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    // Setup a propagator, and propagate for that duration
+    // NOTE: We specify the use an RK89 to match the GMAT setup.
+    let final_state = Propagator::rk89(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+        .with(sc_state)
+        .for_duration(prop_time)
+        .unwrap();
+
+    // Compute the errors
     let rslt = Orbit::cartesian(
         4_172.433_936_615_18,
         436.936_159_720_413,
@@ -146,42 +196,14 @@ fn transfer_schedule_depl() {
         eme2k,
     );
 
-    // Define the dynamics
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let dynamics = OrbitalDynamics::point_masses(orbit, &bodies, &cosm);
+    let rslt_fuel_mass = 745.802_837_870_161;
 
-    // Define the thruster
-    let monoprop = vec![Thruster {
-        thrust: 10.0,
-        isp: 300.0,
-    }];
-
-    // Define the maneuver and its schedule
-    let mnvr0 = Mnvr {
-        start: Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
-        end: end_time,
-        thrust_lvl: 1.0, // Full thrust
-        vector: Vector3::new(1.0, 0.0, 0.0),
-    };
-
-    let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
-    let dry_mass = 1e3;
-    let fuel_mass = 756.0;
-
-    let prop_subsys = Propulsion::new(Box::new(schedule), monoprop, true);
-
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-
-    let mut prop = Propagator::rk89(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.for_duration(prop_time).unwrap();
-
-    // Compute the errors
     let (err_r, err_v) = rss_errors(
-        &prop.dynamics.orbital_dyn.state_vector(),
+        &final_state.orbit.to_cartesian_vec(),
         &rslt.to_cartesian_vec(),
     );
     println!("Absolute errors");
-    let delta = prop.dynamics.orbital_dyn.state_vector() - rslt.to_cartesian_vec();
+    let delta = final_state.orbit.to_cartesian_vec() - rslt.to_cartesian_vec();
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
@@ -200,8 +222,8 @@ fn transfer_schedule_depl() {
         err_v < 1e-13,
         format!("finite burn velocity wrong: {:.5e}", err_v)
     );
-    assert!(
-        ((prop.dynamics.fuel_mass - 745.802_837_870_161).abs()) < 2e-10,
-        "incorrect fuel mass"
-    );
+
+    let delta_fuel_mass = (final_state.fuel_mass_kg - rslt_fuel_mass).abs();
+    println!("Absolute fuel mass error: {:.0e} kg", delta_fuel_mass);
+    assert!(delta_fuel_mass < 2e-10, "incorrect fuel mass");
 }

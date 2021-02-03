@@ -216,14 +216,16 @@ impl<'a> Event for SCEvent<'a> {
 
     fn eval(&self, state: &Self::StateType) -> f64 {
         match self.kind {
-            EventKind::Fuel(mass) => state.fuel_mass - mass,
+            EventKind::Fuel(mass) => state.fuel_mass_kg - mass,
             _ => self.orbital.as_ref().unwrap().eval(&state.orbit),
         }
     }
 
     fn eval_crossing(&self, prev_state: &Self::StateType, next_state: &Self::StateType) -> bool {
         match self.kind {
-            EventKind::Fuel(mass) => prev_state.fuel_mass <= mass && next_state.fuel_mass > mass,
+            EventKind::Fuel(mass) => {
+                prev_state.fuel_mass_kg <= mass && next_state.fuel_mass_kg > mass
+            }
             _ => self
                 .orbital
                 .as_ref()

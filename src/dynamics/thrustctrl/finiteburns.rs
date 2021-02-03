@@ -1,5 +1,5 @@
 use super::ThrustControl;
-use crate::celestia::{Frame, GNCMode, SpacecraftState};
+use crate::celestia::{Frame, GuidanceMode, SpacecraftState};
 use crate::dimensions::Vector3;
 use crate::state::TimeTagged;
 use crate::time::{Epoch, TimeUnit};
@@ -54,9 +54,8 @@ impl ThrustControl for FiniteBurns {
     fn direction(&self, osc: &SpacecraftState) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
-
         match osc.mode {
-            GNCMode::Custom(mnvr_no) => {
+            GuidanceMode::Custom(mnvr_no) => {
                 let next_mnvr = self.mnvrs[mnvr_no as usize];
                 if next_mnvr.start <= osc.epoch() {
                     if matches!(self.frame, Frame::Inertial) {
@@ -74,7 +73,7 @@ impl ThrustControl for FiniteBurns {
 
     fn throttle(&self, osc: &SpacecraftState) -> f64 {
         match osc.mode {
-            GNCMode::Custom(mnvr_no) => {
+            GuidanceMode::Custom(mnvr_no) => {
                 let next_mnvr = self.mnvrs[mnvr_no as usize];
                 if next_mnvr.start <= osc.epoch() {
                     next_mnvr.thrust_lvl
@@ -89,27 +88,27 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn next(&self, sc: &SpacecraftState) -> GNCMode {
+    fn next(&self, sc: &SpacecraftState) -> GuidanceMode {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
         match sc.mode {
-            GNCMode::Custom(mnvr_no) => {
+            GuidanceMode::Custom(mnvr_no) => {
                 if (mnvr_no as usize) < self.mnvrs.len() {
                     let cur_mnvr = self.mnvrs[mnvr_no as usize];
                     if sc.epoch() >= cur_mnvr.end {
-                        GNCMode::Custom(mnvr_no + 1)
+                        GuidanceMode::Custom(mnvr_no + 1)
                     } else {
                         // Stay on the current maneuver
-                        GNCMode::Custom(mnvr_no)
+                        GuidanceMode::Custom(mnvr_no)
                     }
                 } else {
                     // We're done with all the maneuvers, so we can coast now
-                    GNCMode::Coast
+                    GuidanceMode::Coast
                 }
             }
             _ => {
                 // If we haven't started the maneuvers yet, let's get ready to do so by switching to the mode
                 // which will start the first maneuver
-                GNCMode::Custom(0)
+                GuidanceMode::Custom(0)
             }
         }
     }

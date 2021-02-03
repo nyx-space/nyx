@@ -37,7 +37,11 @@ pub enum NyxError {
     /// When there is a controller but there isn't any thruster available
     CtrlExistsButNoThrusterAvail,
     /// The control vector returned by a controller must be a unit vector. Use the throttle() function to specify the amount.
-    InvalidThrusterCtrlNorm(f64),
+    CtrlNotAUnitVector(f64),
+    /// The control throttle range must be between 0.0 and 1.0 (both included) as it represents a percentage.
+    CtrlThrottleRangeErr(f64),
+    /// An objective based analysis or control was attempted, but no objective was defined.
+    NoObjectiveDefined,
     /// Some custom error for new dynamics
     CustomError(String),
 }
