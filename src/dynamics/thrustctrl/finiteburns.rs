@@ -3,6 +3,7 @@ use crate::celestia::{Frame, GuidanceMode, SpacecraftState};
 use crate::dimensions::Vector3;
 use crate::state::TimeTagged;
 use crate::time::{Epoch, TimeUnit};
+use std::sync::Arc;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
 /// It may be used with a maneuver scheduler.
@@ -41,12 +42,12 @@ pub struct FiniteBurns {
 
 impl FiniteBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
-    pub fn from_mnvrs(mnvrs: Vec<Mnvr>, frame: Frame) -> Self {
+    pub fn from_mnvrs(mnvrs: Vec<Mnvr>, frame: Frame) -> Arc<Self> {
         assert!(
             matches!(frame, Frame::Inertial | Frame::VNC),
             "Maneuvers must be either in the inertial frame or in a body frame"
         );
-        Self { mnvrs, frame }
+        Arc::new(Self { mnvrs, frame })
     }
 }
 

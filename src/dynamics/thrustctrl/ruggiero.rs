@@ -3,6 +3,7 @@ use super::{
     ThrustControl, Vector3,
 };
 use std::f64::consts::FRAC_PI_2 as half_pi;
+use std::sync::Arc;
 
 /// Ruggiero defines the closed loop control law from IEPC 2011-102
 #[derive(Copy, Clone, Debug)]
@@ -15,15 +16,17 @@ pub struct Ruggiero {
 /// The Ruggiero is a locally optimal control of a state for specific osculating elements.
 /// WARNING: Objectives must be in degrees!
 impl Ruggiero {
-    pub fn new(objectives: Vec<Achieve>, initial: Orbit) -> Self {
+    /// Creates a new Ruggiero locally optimal control as an Arc
+    /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
+    pub fn new(objectives: Vec<Achieve>, initial: Orbit) -> Arc<Self> {
         let mut objs: [Option<Achieve>; 5] = [None, None, None, None, None];
         for i in 0..objectives.len() {
             objs[i] = Some(objectives[i]);
         }
-        Self {
+        Arc::new(Self {
             objectives: objs,
             init_state: initial,
-        }
+        })
     }
 
     fn weighting(init: f64, target: f64, osc: f64, tol: f64) -> f64 {
@@ -255,7 +258,9 @@ fn ruggiero_weight() {
         start_time,
         eme2k,
     );
-    let osc_sc = SpacecraftState::new(osc, 1.0, 0.0);
+    let mut osc_sc = SpacecraftState::new(osc, 1.0, 0.0);
+    // Must set the guidance mode to thrusting otherwise the direction will be set to zero.
+    osc_sc.mode = GuidanceMode::Thrust;
 
     let expected = Vector3::new(
         -0.017_279_636_133_108_3,
@@ -267,7 +272,7 @@ fn ruggiero_weight() {
 
     println!("{}", expected - got);
     assert!(
-        (expected - got).norm() < 1e-12,
+        dbg!(expected - got).norm() < 1e-12,
         "incorrect direction computed"
     );
 }

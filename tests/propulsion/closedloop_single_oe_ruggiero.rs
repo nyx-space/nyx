@@ -1,14 +1,12 @@
-extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::hifitime::{Epoch, TimeUnit};
 use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
 use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use std::sync::Arc;
+use self::nyx::time::{Epoch, TimeUnit};
 
 #[test]
 fn rugg_sma() {
@@ -36,22 +34,22 @@ fn rugg_sma() {
         tol: 1.0,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
-    let final_state = prop.for_duration(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_sma] {:o}", final_state.orbit);
     println!("[rugg_sma] fuel usage: {:.3} kg", fuel_usage);
@@ -89,21 +87,22 @@ fn rugg_sma_decr() {
         tol: 1.0,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma_decr] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
+
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_sma_decr] {:o}", final_state.orbit);
     println!("[rugg_sma_decr] fuel usage: {:.3} kg", fuel_usage);
@@ -143,21 +142,22 @@ fn rugg_inc() {
         tol: 5e-3,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
+
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_inc] {:o}", final_state.orbit);
     println!("[rugg_inc] fuel usage: {:.3} kg", fuel_usage);
@@ -197,21 +197,22 @@ fn rugg_inc_decr() {
         tol: 5e-3,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc_decr] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
+
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_inc_decr] {:o}", final_state.orbit);
     println!("[rugg_inc_decr] fuel usage: {:.3} kg", fuel_usage);
@@ -251,21 +252,22 @@ fn rugg_ecc() {
         tol: 5e-5,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
+
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_ecc] {:o}", final_state.orbit);
     println!("[rugg_ecc] fuel usage: {:.3} kg", fuel_usage);
@@ -305,21 +307,22 @@ fn rugg_ecc_decr() {
         tol: 5e-5,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc_decr] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
+
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_ecc_decr] {:o}", final_state.orbit);
     println!("[rugg_ecc_decr] fuel usage: {:.3} kg", fuel_usage);
@@ -361,21 +364,22 @@ fn rugg_aop() {
         tol: 5e-3,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
+
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_aop] {:o}", final_state.orbit);
     println!("[rugg_aop] fuel usage: {:.3} kg", fuel_usage);
@@ -416,21 +420,22 @@ fn rugg_aop_decr() {
         tol: 5e-3,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop_decr] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
-    let mut prop = setup.with(sc_state);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
+
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_aop_decr] {:o}", final_state.orbit);
     println!("[rugg_aop_decr] fuel usage: {:.3} kg", fuel_usage);
@@ -473,15 +478,14 @@ fn rugg_raan() {
     let tracker =
         EventTrackers::from_event(SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(5.0))));
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
-    let ctrl = Arc::new(ruggiero);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
         SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_raan] {:o}", orbit);
 
     let setup =

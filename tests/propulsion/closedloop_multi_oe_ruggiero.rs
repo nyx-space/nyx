@@ -1,16 +1,12 @@
-extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::nyx::celestia::{Cosm, Orbit};
-use self::nyx::dynamics::orbital::OrbitalDynamics;
-use self::nyx::dynamics::propulsion::{Propulsion, Thruster};
-use self::nyx::dynamics::spacecraft::{Spacecraft, SpacecraftState};
-use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero};
-use self::nyx::dynamics::Dynamics;
+use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
+use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
+use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
 use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use self::nyx::time::{Epoch, TimeUnit};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
 /// The Ruggiero control law takes quite some longer to converge than the QLaw.
@@ -27,16 +23,16 @@ fn qlaw_as_ruggiero_case_a() {
 
     let orbit = Orbit::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
-    let prop_time = 39.91 * SECONDS_PER_DAY;
+    let prop_time = 39.91 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
-    let lowt = vec![Thruster {
+    let lowt = Thruster {
         thrust: 1.0,
         isp: 3100.0,
-    }];
+    };
 
     // Define the objectives
     let objectives = vec![
@@ -56,29 +52,31 @@ fn qlaw_as_ruggiero_case_a() {
         SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(0.01))),
     ]);
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
 
-    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
+    let sc_state =
+        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-    println!("{:o}", orbit);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_a] {:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
+    let setup =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    let mut prop = setup.with(sc_state);
     prop.event_trackers = tracker;
-    prop.for_duration(prop_time).unwrap();
-    println!("{}", prop.event_trackers);
-    let final_state = prop.dynamics.orbital_dyn.state();
-    let fuel_usage = fuel_mass - sc.fuel_mass;
-    println!("{:o}", final_state);
-    println!("fuel usage: {:.3} kg", fuel_usage);
+    let final_state = prop.for_duration(prop_time).unwrap();
+    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    println!("[qlaw_as_ruggiero_case_a] {:o}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_a] fuel usage: {:.3} kg", fuel_usage);
+    println!("[qlaw_as_ruggiero_case_a] {}", prop.event_trackers);
 
-    match sc.prop.unwrap().ctrl.achieved(&final_state) {
-        Ok(val) => assert!(val, "objective not achieved"),
-        Err(e) => panic!("{:?}", e),
-    };
+    assert!(
+        sc.ctrl_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
 
     assert!((fuel_usage - 93.449).abs() < 1.0);
 }
@@ -93,16 +91,16 @@ fn qlaw_as_ruggiero_case_b() {
 
     let orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 160.0 * SECONDS_PER_DAY;
+    let prop_time = 160.0 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
-    let lowt = vec![Thruster {
+    let lowt = Thruster {
         thrust: 0.350,
         isp: 2000.0,
-    }];
+    };
 
     // Define the objectives
     let objectives = vec![
@@ -120,28 +118,31 @@ fn qlaw_as_ruggiero_case_b() {
         },
     ];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
 
-    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
+    let sc_state =
+        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-    println!("{:o}", orbit);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_b] {:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
-    let final_state = prop.dynamics.orbital_dyn.state();
-    let fuel_usage = fuel_mass - sc.fuel_mass;
-    println!("{:o}", final_state);
-    println!("fuel usage: {:.3} kg", fuel_usage);
+    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    println!("[qlaw_as_ruggiero_case_b] {:o}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_b] fuel usage: {:.3} kg", fuel_usage);
 
-    match sc.prop.unwrap().ctrl.achieved(&final_state) {
-        Ok(val) => assert!(val, "objective not achieved"),
-        Err(e) => panic!("{:?}", e),
-    };
+    assert!(
+        sc.ctrl_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
 
     assert!((fuel_usage - 223.515).abs() < 1.0);
 }
@@ -156,16 +157,16 @@ fn qlaw_as_ruggiero_case_c() {
 
     let orbit = Orbit::keplerian(9222.7, 0.2, 0.573, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 3.0 * SECONDS_PER_DAY;
+    let prop_time = 3.0 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
-    let lowt = vec![Thruster {
+    let lowt = Thruster {
         thrust: 9.3,
         isp: 3100.0,
-    }];
+    };
 
     // Define the objectives
     let objectives = vec![
@@ -179,29 +180,31 @@ fn qlaw_as_ruggiero_case_c() {
         },
     ];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 299.9;
     let dry_mass = 0.1;
 
-    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
+    let sc_state =
+        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-    println!("{:o}", orbit);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_c] {:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
-    let final_state = prop.dynamics.orbital_dyn.state();
-    let fuel_usage = fuel_mass - sc.fuel_mass;
-    println!("{:o}", final_state);
-    println!("fuel usage: {:.3} kg", fuel_usage);
+    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    println!("[qlaw_as_ruggiero_case_c] {:o}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_c] fuel usage: {:.3} kg", fuel_usage);
 
-    match sc.prop.unwrap().ctrl.achieved(&final_state) {
-        Ok(val) => assert!(val, "objective not achieved"),
-        Err(e) => panic!("{:?}", e),
-    };
-
+    assert!(
+        sc.ctrl_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
     assert!((fuel_usage - 41.742).abs() < 1.0);
 }
 
@@ -217,16 +220,16 @@ fn qlaw_as_ruggiero_case_d() {
 
     let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 113.0 * SECONDS_PER_DAY;
+    let prop_time = 113.0 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
-    let lowt = vec![Thruster {
+    let lowt = Thruster {
         thrust: 89e-3,
         isp: 1650.0,
-    }];
+    };
 
     // Define the objectives
     let objectives = vec![
@@ -248,28 +251,31 @@ fn qlaw_as_ruggiero_case_d() {
         },
     ];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
+    let sc_state =
+        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-    println!("{:o}", orbit);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_d] {:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
-    let final_state = prop.dynamics.orbital_dyn.state();
-    let fuel_usage = fuel_mass - sc.fuel_mass;
-    println!("{:o}", final_state);
-    println!("fuel usage: {:.3} kg", fuel_usage);
+    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    println!("[qlaw_as_ruggiero_case_d] {:o}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_d] fuel usage: {:.3} kg", fuel_usage);
 
-    match sc.prop.unwrap().ctrl.achieved(&final_state) {
-        Ok(val) => assert!(val, "objective not achieved"),
-        Err(e) => panic!("{:?}", e),
-    };
+    assert!(
+        sc.ctrl_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
 
     assert!((fuel_usage - 23.0).abs() < 1.0);
 }
@@ -286,16 +292,16 @@ fn qlaw_as_ruggiero_case_e() {
 
     let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 400.0 * SECONDS_PER_DAY;
+    let prop_time = 400.0 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
-    let lowt = vec![Thruster {
+    let lowt = Thruster {
         thrust: 89e-3,
         isp: 1650.0,
-    }];
+    };
 
     // Define the objectives
     let objectives = vec![
@@ -321,28 +327,31 @@ fn qlaw_as_ruggiero_case_e() {
         },
     ];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
 
-    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
+    let sc_state =
+        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-    println!("{:o}", orbit);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_e] {:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
-    let final_state = prop.dynamics.orbital_dyn.state();
-    let fuel_usage = fuel_mass - sc.fuel_mass;
-    println!("{:o}", final_state);
-    println!("fuel usage: {:.3} kg", fuel_usage);
+    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    println!("[qlaw_as_ruggiero_case_e] {:o}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_e] fuel usage: {:.3} kg", fuel_usage);
 
-    match sc.prop.unwrap().ctrl.achieved(&final_state) {
-        Ok(val) => assert!(val, "objective not achieved"),
-        Err(e) => panic!("{:?}", e),
-    };
+    assert!(
+        sc.ctrl_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
 
     assert!((fuel_usage - 23.0).abs() < 1.0);
 }
@@ -368,16 +377,16 @@ fn qlaw_as_ruggiero_case_f() {
 
     let orbit = Orbit::keplerian(15378.0, 0.01, 98.7, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 30.0 * SECONDS_PER_DAY;
+    let prop_time = 30.0 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
-    let lowt = vec![Thruster {
+    let lowt = Thruster {
         thrust: 89e-3,
         isp: 1650.0,
-    }];
+    };
 
     // Define the objectives
     let objectives = vec![Achieve::Ecc {
@@ -385,15 +394,16 @@ fn qlaw_as_ruggiero_case_f() {
         tol: 1e-5,
     }];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
+    let sc_state =
+        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-    println!("{:o}", orbit);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    println!("[qlaw_as_ruggiero_case_f] {:o}", orbit);
 
     let (tx, rx): (Sender<SpacecraftState>, Receiver<SpacecraftState>) = mpsc::channel();
 
@@ -407,19 +417,20 @@ fn qlaw_as_ruggiero_case_f() {
         }
     });
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
+    let setup =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    let mut prop = setup.with(sc_state);
     prop.tx_chan = Some(tx);
-    prop.for_duration(prop_time).unwrap();
+    let final_state = prop.for_duration(prop_time).unwrap();
 
-    let final_state = prop.dynamics.orbital_dyn.state();
-    let fuel_usage = fuel_mass - sc.fuel_mass;
-    println!("{:o}", final_state);
-    println!("fuel usage: {:.3} kg", fuel_usage);
+    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    println!("[qlaw_as_ruggiero_case_f] {:o}", final_state.orbit);
+    println!("[qlaw_as_ruggiero_case_f] fuel usage: {:.3} kg", fuel_usage);
 
-    match sc.prop.unwrap().ctrl.achieved(&final_state) {
-        Ok(val) => assert!(val, "objective not achieved"),
-        Err(e) => panic!("{:?}", e),
-    };
+    assert!(
+        sc.ctrl_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
 
     assert!((fuel_usage - 10.378).abs() < 1.0);
 }
@@ -434,16 +445,16 @@ fn ruggiero_iepc_2011_102() {
 
     let orbit = Orbit::keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 105.0 * SECONDS_PER_DAY;
+    let prop_time = 105.0 * TimeUnit::Day;
 
     // Define the dynamics
-    let dynamics = OrbitalDynamics::two_body(orbit);
+    let orbital_dyn = OrbitalDynamics::two_body();
 
     // Define the thruster
-    let lowt = vec![Thruster {
+    let lowt = Thruster {
         thrust: 89e-3,
         isp: 1650.0,
-    }];
+    };
 
     // Define the objectives
     let objectives = vec![
@@ -461,28 +472,31 @@ fn ruggiero_iepc_2011_102() {
         },
     ];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
 
-    let prop_subsys = Propulsion::new(Box::new(ruggiero), lowt, true);
+    let sc_state =
+        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let mut sc = Spacecraft::with_prop(dynamics, prop_subsys, dry_mass, fuel_mass);
-    println!("{:o}", orbit);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    println!("[ruggiero_iepc_2011_102] {:o}", orbit);
 
-    let mut prop = Propagator::new::<RK4Fixed>(&mut sc, PropOpts::with_fixed_step(10.0));
-    prop.for_duration(prop_time).unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
-    let final_state = prop.dynamics.orbital_dyn.state();
-    let fuel_usage = fuel_mass - sc.fuel_mass;
-    println!("{:o}", final_state);
-    println!("fuel usage: {:.3} kg", fuel_usage);
+    let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
+    println!("[ruggiero_iepc_2011_102] {:o}", final_state.orbit);
+    println!("[ruggiero_iepc_2011_102] fuel usage: {:.3} kg", fuel_usage);
 
-    match sc.prop.unwrap().ctrl.achieved(&final_state) {
-        Ok(val) => assert!(val, "objective not achieved"),
-        Err(e) => panic!("{:?}", e),
-    };
+    assert!(
+        sc.ctrl_achieved(&final_state).unwrap(),
+        "objective not achieved"
+    );
 
     // WARNING: Paper claims this can be done with only 49kg of fuel.
     assert!((fuel_usage - 49.0).abs() < 1.0);

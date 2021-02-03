@@ -7,7 +7,6 @@ use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
 use self::nyx::propagators::{PropOpts, Propagator};
 use self::nyx::time::{Epoch, TimeUnit};
 use self::nyx::utils::rss_errors;
-use std::sync::Arc;
 
 #[test]
 fn val_transfer_schedule_no_depl() {
@@ -65,10 +64,8 @@ fn val_transfer_schedule_no_depl() {
 
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
 
-    // Wrap the control in an automatic reference counter (required)
-    let ctrl = Arc::new(schedule);
     // And create the spacecraft with that controller
-    let mut sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let mut sc = Spacecraft::with_ctrl(orbital_dyn, schedule);
     // Disable fuel mass decrement, turned on by default
     sc.decrement_mass = false;
     // Setup a propagator, and propagate for that duration
@@ -173,10 +170,8 @@ fn val_transfer_schedule_depl() {
 
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
 
-    // Wrap the control in an automatic reference counter (required)
-    let ctrl = Arc::new(schedule);
     // And create the spacecraft with that controller
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ctrl);
+    let sc = Spacecraft::with_ctrl(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let final_state = Propagator::rk89(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
