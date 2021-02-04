@@ -6,8 +6,8 @@ use self::nyx::celestia::Orbit;
 use self::nyx::od::ui::{Estimate, Filter, KfEstimate, NyxError, KF};
 use self::nyx::State;
 
-// mod measurements;
-// mod multi_body;
+mod measurements;
+mod multi_body;
 // mod robust;
 // mod spacecraft;
 mod two_body;
