@@ -7,6 +7,7 @@ use crate::errors::NyxError;
 use crate::io::gravity::GravityPotentialStor;
 use crate::TimeTagged;
 use std::cmp::min;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Harmonics<'a, S>
@@ -33,7 +34,7 @@ where
     S: GravityPotentialStor,
 {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: S, cosm: &'a Cosm) -> Self {
+    pub fn from_stor(compute_frame: Frame, stor: S, cosm: &'a Cosm) -> Arc<Self> {
         assert!(
             compute_frame.is_geoid(),
             "harmonics only work around geoids"
@@ -129,7 +130,7 @@ where
             }
         }
 
-        Self {
+        Arc::new(Self {
             cosm,
             compute_frame,
             stor,
@@ -143,7 +144,7 @@ where
             c_nm_h,
             vr01_h,
             vr11_h,
-        }
+        })
     }
 }
 

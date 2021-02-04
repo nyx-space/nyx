@@ -1,3 +1,2 @@
-// TODO: Reenable and fix these tests
-// mod orbit_determination;
+mod orbit_determination;
 mod propulsion;

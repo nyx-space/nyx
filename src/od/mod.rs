@@ -23,9 +23,6 @@ pub mod residual;
 /// Provides some helper for filtering.
 pub mod ui;
 
-// / Provides the Square Root Information Filter
-// pub mod srif;
-
 /// Provides all state noise compensation functionality
 pub mod snc;
 

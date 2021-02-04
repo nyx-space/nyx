@@ -8,7 +8,6 @@ use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
 use nyx::utils::{rss_errors, rss_state_errors};
 use nyx::TimeTagged;
-use std::sync::Arc;
 
 #[allow(clippy::identity_op)]
 #[test]
@@ -791,7 +790,7 @@ fn val_earth_sph_harmonics_j2() {
     );
 
     let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(Arc::new(harmonics));
+    dynamics.add_model(harmonics);
 
     let prop_state = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default())
         .with(state)
@@ -854,7 +853,7 @@ fn val_earth_sph_harmonics_12x12() {
     );
 
     let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(Arc::new(harmonics));
+    dynamics.add_model(harmonics);
 
     let prop_state = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9))
         .with(state)
@@ -917,7 +916,7 @@ fn val_earth_sph_harmonics_70x70() {
     );
 
     let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(Arc::new(harmonics));
+    dynamics.add_model(harmonics);
 
     let prop_rslt = Propagator::default(&dynamics)
         .with(state)
@@ -980,7 +979,7 @@ fn val_earth_sph_harmonics_70x70_partials() {
     );
 
     let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(Arc::new(harmonics));
+    dynamics.add_model(harmonics);
 
     let prop_rslt = Propagator::default(&dynamics)
         .with(state)
@@ -1036,7 +1035,7 @@ fn hf_prop() {
     let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
-    dynamics.add_model(Arc::new(harmonics));
+    dynamics.add_model(harmonics);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));
     let rslt = setup

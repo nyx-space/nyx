@@ -3,6 +3,7 @@ use super::ForceModel;
 use crate::celestia::{Cosm, Frame, SpacecraftState};
 use crate::dimensions::{Matrix3, Vector3, U7};
 use crate::errors::NyxError;
+use std::sync::Arc;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
 #[derive(Clone, Copy, Debug)]
@@ -64,8 +65,8 @@ pub struct Drag<'a> {
 
 impl<'a> Drag<'a> {
     /// Common exponential drag model for the Earth
-    pub fn earth_exp(sc_area: f64, cd: f64, cosm: &'a Cosm) -> Self {
-        Self {
+    pub fn earth_exp(sc_area: f64, cd: f64, cosm: &'a Cosm) -> Arc<Self> {
+        Arc::new(Self {
             density: AtmDensity::Exponential {
                 rho0: 3.614e-13,
                 r0: 700_000.0,
@@ -75,12 +76,12 @@ impl<'a> Drag<'a> {
             cd,
             drag_frame: cosm.frame("IAU Earth"),
             cosm,
-        }
+        })
     }
 
     /// Drag model which uses the standard atmosphere 1976 model for atmospheric density
-    pub fn std_atm1976(sc_area: f64, cd: f64, cosm: &'a Cosm) -> Self {
-        Self {
+    pub fn std_atm1976(sc_area: f64, cd: f64, cosm: &'a Cosm) -> Arc<Self> {
+        Arc::new(Self {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
             },
@@ -88,7 +89,7 @@ impl<'a> Drag<'a> {
             cd,
             drag_frame: cosm.frame("IAU Earth"),
             cosm,
-        }
+        })
     }
 }
 

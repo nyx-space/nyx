@@ -1,10 +1,10 @@
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
-// use super::AutoDiff;
 use super::ForceModel;
 use crate::celestia::eclipse::{EclipseLocator, EclipseState};
 use crate::celestia::{Cosm, Frame, LTCorr, SpacecraftState, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
 use crate::errors::NyxError;
+use std::sync::Arc;
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
@@ -20,7 +20,7 @@ pub struct SolarPressure<'a> {
 
 impl<'a> SolarPressure<'a> {
     /// Will use Cr = 1.8, Phi = 1367.0
-    pub fn default(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: &'a Cosm) -> Self {
+    pub fn default_raw(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: &'a Cosm) -> Self {
         let e_loc = EclipseLocator {
             light_source: cosm.frame("Sun J2000"),
             shadow_bodies,
@@ -33,6 +33,10 @@ impl<'a> SolarPressure<'a> {
             phi: 1367.0,
             e_loc,
         }
+    }
+
+    pub fn default(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: &'a Cosm) -> Arc<Self> {
+        Arc::new(Self::default_raw(sc_area, shadow_bodies, cosm))
     }
 }
 

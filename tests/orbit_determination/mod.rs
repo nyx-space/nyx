@@ -1,19 +1,18 @@
 extern crate csv;
-extern crate hifitime;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::nyx::celestia::Orbit;
 use self::nyx::od::ui::{Estimate, Filter, KfEstimate, NyxError, KF};
+use self::nyx::State;
 
-mod measurements;
-mod multi_body;
-mod robust;
-mod spacecraft;
-mod srif;
+// mod measurements;
+// mod multi_body;
+// mod robust;
+// mod spacecraft;
 mod two_body;
 
-use self::na::{Matrix2, Matrix2x6, Matrix6, Vector2};
+use self::nyx::dimensions::{Matrix2, Matrix2x6, Matrix6, Vector2};
 use std::f64::EPSILON;
 
 macro_rules! f64_nil {
@@ -46,8 +45,8 @@ fn csv_serialize_empty_estimate() {
 fn filter_errors() {
     let initial_estimate = KfEstimate::zeros(Orbit::zeros());
     let measurement_noise = Matrix2::zeros();
-    let real_obs = Vector2::zeros();
-    let computed_obs = Vector2::zeros();
+    let real_obs = &Vector2::zeros();
+    let computed_obs = &Vector2::zeros();
     let sensitivity = Matrix2x6::zeros();
     let stm = Matrix6::zeros();
 

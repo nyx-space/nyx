@@ -218,7 +218,9 @@ where
                                 }
                                 Some(amdl) => {
                                     for smdl in amdl.srp.values() {
-                                        let mut srp = SolarPressure::default(
+                                        // Note that an Arc is immutable, but we want to specify everything
+                                        // so we create the SRP without the wrapper
+                                        let mut srp = SolarPressure::default_raw(
                                             smdl.sc_area,
                                             vec![cosm.frame("EME2000"), cosm.frame("Luna")],
                                             &cosm,
@@ -251,7 +253,7 @@ where
                                     let compute_frame = cosm.frame(hmdl.frame.as_str());
 
                                     let hh = Harmonics::from_stor(compute_frame, in_mem, &cosm);
-                                    sc_dyn_flagged.orbital_dyn.add_model(Arc::new(hh));
+                                    sc_dyn_flagged.orbital_dyn.add_model(hh);
                                 }
                             }
                         }

@@ -7,7 +7,6 @@ use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnit};
 use nyx::utils::rss_errors;
 
-use std::sync::Arc;
 #[test]
 fn srp_earth() {
     let mut cosm = Cosm::de438();
@@ -30,7 +29,7 @@ fn srp_earth() {
 
     let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc_dyn.add_model(Arc::new(srp));
+    sc_dyn.add_model(srp);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
@@ -82,9 +81,9 @@ fn exp_drag_earth() {
 
     let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc_dyn.add_model(Arc::new(srp));
+    sc_dyn.add_model(srp);
     // Add the drag model to the spacecraft
-    sc_dyn.add_model(Arc::new(drag));
+    sc_dyn.add_model(drag);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
@@ -121,9 +120,9 @@ fn std_atm_drag_earth() {
 
     let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc_dyn.add_model(Arc::new(srp));
+    sc_dyn.add_model(srp);
     // Add the drag model to the spacecraft
-    sc_dyn.add_model(Arc::new(drag));
+    sc_dyn.add_model(drag);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
@@ -182,9 +181,9 @@ fn std_atm_drag_earth_low() {
 
     let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
     // Add the SRP model to the spacecraft
-    sc_dyn.add_model(Arc::new(srp));
+    sc_dyn.add_model(srp);
     // Add the drag model to the spacecraft
-    sc_dyn.add_model(Arc::new(drag));
+    sc_dyn.add_model(drag);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);

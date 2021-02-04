@@ -15,9 +15,9 @@ pub trait TimeTagged {
     /// Set the Epoch
     fn set_epoch(&mut self, epoch: Epoch);
 
-    /// Adds a duration to this time tagged item
-    fn add_duration(&mut self, other: Duration) {
-        self.set_epoch(self.epoch() + other);
+    /// Shift this epoch by a duration (can be negative)
+    fn shift_by(&mut self, duration: Duration) {
+        self.set_epoch(self.epoch() + duration);
     }
 }
 

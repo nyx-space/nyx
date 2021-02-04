@@ -1,6 +1,3 @@
-extern crate hifitime;
-extern crate nalgebra as na;
-
 extern crate nyx_space as nyx;
 
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};

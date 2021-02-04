@@ -1,17 +1,15 @@
 extern crate csv;
-extern crate hifitime;
-extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{bodies, Cosm, Orbit};
-use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, PointMasses};
-use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
+use self::nyx::celestia::{Bodies, Cosm, Orbit};
+use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
+use self::nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
+use self::nyx::dynamics::sph_harmonics::Harmonics;
 use self::nyx::io::gravity::*;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use self::nyx::time::{Epoch, TimeUnit};
 use self::nyx::utils::rss_state_errors;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -41,8 +39,8 @@ fn robust_test_ekf_two_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -68,8 +66,8 @@ fn robust_test_ekf_two_body() {
 
     // Generate the truth data on one thread.
     thread::spawn(move || {
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let orbital_dyn = OrbitalDynamics::two_body();
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -205,8 +203,8 @@ fn robust_test_ekf_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -233,9 +231,9 @@ fn robust_test_ekf_multi_body() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -258,7 +256,7 @@ fn robust_test_ekf_multi_body() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut tb_estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
     let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e2;
@@ -376,8 +374,8 @@ fn robust_test_ekf_harmonics() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -408,16 +406,16 @@ fn robust_test_ekf_harmonics() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::two_body();
         let earth_sph_harm =
             HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
         let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
         dynamics.add_model(Box::new(harmonics));
         dynamics.add_model(Box::new(PointMasses::new(eme2k, &bodies, &cosm)));
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -439,7 +437,7 @@ fn robust_test_ekf_harmonics() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
 
     let mut estimator = OrbitalDynamicsStm::two_body(initial_state);
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
@@ -557,8 +555,8 @@ fn robust_test_ekf_realistic() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -585,8 +583,8 @@ fn robust_test_ekf_realistic() {
             bodies::JUPITER_BARYCENTER,
             bodies::SATURN_BARYCENTER,
         ];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -608,7 +606,7 @@ fn robust_test_ekf_realistic() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut tb_estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
     let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e2;
@@ -710,8 +708,8 @@ fn robust_test_ckf_smoother_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -738,9 +736,9 @@ fn robust_test_ckf_smoother_multi_body() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -761,7 +759,7 @@ fn robust_test_ckf_smoother_multi_body() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut tb_estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
     let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e2;
@@ -975,8 +973,8 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -1003,9 +1001,9 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -1026,7 +1024,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut tb_estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
     let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e2;
@@ -1248,8 +1246,8 @@ fn robust_test_ckf_iteration_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -1276,9 +1274,9 @@ fn robust_test_ckf_iteration_multi_body() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -1299,7 +1297,7 @@ fn robust_test_ckf_iteration_multi_body() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut tb_estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
     let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, opts);
     let covar_radius = 1.0e2;

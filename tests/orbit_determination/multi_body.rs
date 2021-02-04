@@ -1,15 +1,13 @@
 extern crate csv;
-extern crate hifitime;
-extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{bodies, Cosm, Orbit};
-use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
+use self::nyx::celestia::{Bodies, Cosm, Orbit};
+use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
+use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use self::nyx::time::{Epoch, TimeUnit};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -35,8 +33,8 @@ fn multi_body_ckf_perfect_stations() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -51,9 +49,9 @@ fn multi_body_ckf_perfect_stations() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -72,8 +70,8 @@ fn multi_body_ckf_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, opts);
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
@@ -165,8 +163,8 @@ fn multi_body_ckf_covar_map() {
     let all_stations = vec![dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -181,9 +179,9 @@ fn multi_body_ckf_covar_map() {
     // Generate the truth data on one thread.
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-        let mut dynamics = OrbitalDynamics::point_masses(initial_state, &bodies, &cosm);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, opts);
+        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+        let mut prop = Propagator::new::<RK4Fixed>(&orbital_dyn, opts).with(initial_state);
         prop.tx_chan = Some(truth_tx);
         prop.for_duration(prop_time).unwrap();
     });
@@ -202,8 +200,8 @@ fn multi_body_ckf_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![bodies::EARTH_MOON, bodies::SUN, bodies::JUPITER_BARYCENTER];
-    let mut estimator = OrbitalDynamicsStm::point_masses(initial_state, &bodies, &cosm);
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
 
     let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, opts);
     let covar_radius = 1.0e-3_f64.powi(2);

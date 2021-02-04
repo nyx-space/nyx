@@ -444,6 +444,34 @@ impl Orbit {
         }
     }
 
+    /// Mutates this orbit to change the SMA
+    pub fn set_sma(&mut self, new_sma_km: f64) {
+        let me = Self::keplerian(
+            self.sma() + new_sma_km,
+            self.ecc(),
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta(),
+            self.dt,
+            self.frame,
+        );
+
+        self.x = me.x;
+        self.y = me.y;
+        self.z = me.z;
+        self.vx = me.vx;
+        self.vy = me.vy;
+        self.vz = me.vz;
+    }
+
+    /// Returns a copy of the state with a new SMA
+    pub fn with_sma(self, new_sma_km: f64) -> Self {
+        let mut me = self;
+        me.set_sma(new_sma_km);
+        me
+    }
+
     /// Returns the period in seconds
     pub fn period(&self) -> Duration {
         match self.frame {
@@ -471,6 +499,34 @@ impl Orbit {
         self.evec().norm()
     }
 
+    /// Mutates this orbit to change the ECC
+    pub fn set_ecc(&mut self, new_ecc: f64) {
+        let me = Self::keplerian(
+            self.sma(),
+            self.ecc() + new_ecc,
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta(),
+            self.dt,
+            self.frame,
+        );
+
+        self.x = me.x;
+        self.y = me.y;
+        self.z = me.z;
+        self.vx = me.vx;
+        self.vy = me.vy;
+        self.vz = me.vz;
+    }
+
+    /// Returns a copy of the state with a new ECC
+    pub fn with_ecc(self, new_ecc: f64) -> Self {
+        let mut me = self;
+        me.set_ecc(new_ecc);
+        me
+    }
+
     /// Returns the inclination in degrees
     pub fn inc(&self) -> f64 {
         match self.frame {
@@ -479,6 +535,34 @@ impl Orbit {
             }
             _ => panic!("inclination not defined in this frame"),
         }
+    }
+
+    /// Mutates this orbit to change the INC
+    pub fn set_inc(&mut self, new_inc: f64) {
+        let me = Self::keplerian(
+            self.sma(),
+            self.ecc(),
+            self.inc() + new_inc,
+            self.raan(),
+            self.aop(),
+            self.ta(),
+            self.dt,
+            self.frame,
+        );
+
+        self.x = me.x;
+        self.y = me.y;
+        self.z = me.z;
+        self.vx = me.vx;
+        self.vy = me.vy;
+        self.vz = me.vz;
+    }
+
+    /// Returns a copy of the state with a new INC
+    pub fn with_inc(self, new_inc: f64) -> Self {
+        let mut me = self;
+        me.set_inc(new_inc);
+        me
     }
 
     /// Returns the argument of periapsis in degrees
@@ -500,6 +584,34 @@ impl Orbit {
         }
     }
 
+    /// Mutates this orbit to change the AOP
+    pub fn set_aop(&mut self, new_aop: f64) {
+        let me = Self::keplerian(
+            self.sma(),
+            self.ecc(),
+            self.inc(),
+            self.raan(),
+            self.aop() + new_aop,
+            self.ta(),
+            self.dt,
+            self.frame,
+        );
+
+        self.x = me.x;
+        self.y = me.y;
+        self.z = me.z;
+        self.vx = me.vx;
+        self.vy = me.vy;
+        self.vz = me.vz;
+    }
+
+    /// Returns a copy of the state with a new SMA
+    pub fn with_aop(self, new_aop: f64) -> Self {
+        let mut me = self;
+        me.set_aop(new_aop);
+        me
+    }
+
     /// Returns the right ascension of ther ascending node in degrees
     pub fn raan(&self) -> f64 {
         match self.frame {
@@ -517,6 +629,34 @@ impl Orbit {
             }
             _ => panic!("RAAN not defined in this frame"),
         }
+    }
+
+    /// Mutates this orbit to change the RAAN
+    pub fn set_raan(&mut self, new_raan: f64) {
+        let me = Self::keplerian(
+            self.sma(),
+            self.ecc(),
+            self.inc(),
+            self.raan() + new_raan,
+            self.aop(),
+            self.ta(),
+            self.dt,
+            self.frame,
+        );
+
+        self.x = me.x;
+        self.y = me.y;
+        self.z = me.z;
+        self.vx = me.vx;
+        self.vy = me.vy;
+        self.vz = me.vz;
+    }
+
+    /// Returns a copy of the state with a new RAAN
+    pub fn with_raan(self, new_raan: f64) -> Self {
+        let mut me = self;
+        me.set_raan(new_raan);
+        me
     }
 
     /// Returns the true anomaly in degrees between 0 and 360.0
@@ -554,6 +694,34 @@ impl Orbit {
             }
             _ => panic!("true anomaly not defined in this frame"),
         }
+    }
+
+    /// Mutates this orbit to change the TA
+    pub fn set_ta(&mut self, new_ta: f64) {
+        let me = Self::keplerian(
+            self.sma(),
+            self.ecc(),
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta() + new_ta,
+            self.dt,
+            self.frame,
+        );
+
+        self.x = me.x;
+        self.y = me.y;
+        self.z = me.z;
+        self.vx = me.vx;
+        self.vy = me.vy;
+        self.vz = me.vz;
+    }
+
+    /// Returns a copy of the state with a new TA
+    pub fn with_ta(self, new_ta: f64) -> Self {
+        let mut me = self;
+        me.set_ta(new_ta);
+        me
     }
 
     /// Returns the true longitude in degrees
