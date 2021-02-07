@@ -205,6 +205,14 @@ fn gmat_val_leo_day_adaptive() {
             1e-8,
             "first forward two body prop failed",
         );
+
+        println!("==> Dormand45 adaptive");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[0].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
+
         prop.for_duration(-prop_time).unwrap();
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(prop_time).unwrap();
@@ -228,6 +236,12 @@ fn gmat_val_leo_day_adaptive() {
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
         assert_orbit_eq_or_abs(&prop.state, &all_rslts[1], 1e-8, "two body prop failed");
+        println!("==> Verner56 adaptive");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[1].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -250,6 +264,12 @@ fn gmat_val_leo_day_adaptive() {
             all_rslts[2].to_cartesian_vec(),
             "two body prop failed"
         );
+        println!("==> Dormand78 adaptive");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[2].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -272,6 +292,12 @@ fn gmat_val_leo_day_adaptive() {
             all_rslts[3].to_cartesian_vec(),
             "two body prop failed"
         );
+        println!("==> RK89 adaptive");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[3].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
         let prev_details = prop.latest_details();
         if prev_details.error > accuracy {
             assert_eq!(
@@ -386,6 +412,12 @@ fn gmat_val_leo_day_fixed() {
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
         assert_orbit_eq_or_rel(&prop.state, &all_rslts[1], 1e-7, "two body prop failed");
+        println!("==> Verner56");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[1].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
     }
 
     {
@@ -396,6 +428,12 @@ fn gmat_val_leo_day_fixed() {
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[2], "two body prop failed");
+        println!("==> Dormand45");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[2].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
     }
 
     {
@@ -406,6 +444,12 @@ fn gmat_val_leo_day_fixed() {
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[3], "two body prop failed");
+        println!("==> Dormand78");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[3].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
     }
 
     {
@@ -416,5 +460,11 @@ fn gmat_val_leo_day_fixed() {
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[4], "two body prop failed");
+        println!("==> RK89");
+        let delta = prop.state.to_cartesian_vec() - all_rslts[4].to_cartesian_vec();
+        for i in 0..6 {
+            print!("{:.0e}\t", delta[i].abs());
+        }
+        println!();
     }
 }

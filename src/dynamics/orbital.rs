@@ -24,7 +24,7 @@ impl<'a> OrbitalDynamics<'a> {
         // Create the point masses
         let pts = PointMasses::new(integr_frame, bodies, cosm);
         Self {
-            accel_models: vec![Arc::new(pts)],
+            accel_models: vec![pts],
         }
     }
 
@@ -165,8 +165,13 @@ pub struct PointMasses<'a> {
 
 impl<'a> PointMasses<'a> {
     /// Initializes the multibody point mass dynamics with the provided list of bodies
-    pub fn new(propagation_frame: Frame, body_names: &[Bodies], cosm: &'a Cosm) -> Self {
-        Self::with_correction(propagation_frame, body_names, cosm, LTCorr::None)
+    pub fn new(propagation_frame: Frame, body_names: &[Bodies], cosm: &'a Cosm) -> Arc<Self> {
+        Arc::new(Self::with_correction(
+            propagation_frame,
+            body_names,
+            cosm,
+            LTCorr::None,
+        ))
     }
 
     /// Initializes the multibody point mass dynamics with the provided list of bodies, and accounting for some light time correction

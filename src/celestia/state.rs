@@ -974,6 +974,13 @@ impl Orbit {
         self.stm = Some(Matrix6::identity());
     }
 
+    /// Copies the current state but sets the STM to identity
+    pub fn with_stm(self) -> Self {
+        let mut me = self;
+        me.enable_stm();
+        me
+    }
+
     /// Sets the STM of this state of identity
     pub fn stm_identity(&mut self) {
         self.stm = Some(Matrix6::identity());
