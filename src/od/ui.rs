@@ -45,20 +45,14 @@ impl fmt::Display for SmoothingArc {
 /// An orbit determination process. Note that everything passed to this structure is moved.
 pub struct ODProcess<
     'a,
-    // D: Dynamics<StateSize = Msr::StateSize>,
     D: Dynamics,
     E: ErrorCtrl,
     Msr: Measurement<StateSize = <S as State>::Size>,
     N: MeasurementDevice<S, Msr>,
-    // Msr: Measurement<StateSize = <D::StateType as State>::Size>,
-    // N: MeasurementDevice<D::StateType, Msr>,
     T: EkfTrigger,
     A: DimName,
     S: EstimateFrom<D::StateType>,
     K: Filter<S, A, Msr::MeasurementSize>,
-    // S: D::StateType,
-    // K: Filter<<D::StateType as State>::Size, A, Msr::MeasurementSize, D::StateType>,
-    // MsrIn,
 > where
     D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
@@ -92,7 +86,6 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
-    init_estimate: K::Estimate,
     init_state: D::StateType,
     _marker: PhantomData<A>,
 }
@@ -103,15 +96,10 @@ impl<
         E: ErrorCtrl,
         Msr: Measurement<StateSize = <S as State>::Size>,
         N: MeasurementDevice<S, Msr>,
-        // Msr: Measurement<StateSize = <D::StateType as State>::Size>,
-        // N: MeasurementDevice<D::StateType, Msr>,
         T: EkfTrigger,
         A: DimName,
         S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,
-        // S: State<<D::StateType as State>::Size>,
-        // K: Filter<<D::StateType as State>::Size, A, Msr::MeasurementSize, D::StateType>,
-        // MsrIn,
     > ODProcess<'a, D, E, Msr, N, T, A, S, K>
 where
     D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
@@ -144,7 +132,6 @@ where
         trigger: T,
     ) -> Self {
         let init_state = prop.state();
-        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -155,7 +142,6 @@ where
             estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: trigger,
-            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -163,7 +149,6 @@ where
 
     pub fn default_ekf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
         let init_state = prop.state();
-        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -174,7 +159,6 @@ where
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
-            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -312,11 +296,7 @@ where
         let num_msrs = measurements.len();
 
         let prop_time = measurements[num_msrs - 1].epoch() - self.kf.previous_estimate().epoch();
-        info!(
-            "Navigation propagating for a total of {} seconds (~ {:.3} days)",
-            prop_time,
-            prop_time / 86_400.0
-        );
+        info!("Navigation propagating for a total of {}", prop_time);
 
         // Push the initial estimate
         let prev = self.kf.previous_estimate().clone();
@@ -334,10 +314,17 @@ where
             let next_msr_epoch = msr.epoch();
 
             let delta_t = next_msr_epoch - prev_dt;
+            // if self.kf.is_extended() {
+            //     println!(
+            //         "Restarting propagator for step of {} with state {}",
+            //         delta_t, self.prop.state
+            //     );
+            // }
             self.prop.for_duration(delta_t)?;
 
             while let Ok(prop_state) = rx.try_recv() {
                 let nominal_state = S::extract(&prop_state);
+
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 // let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
                 let dt = nominal_state.epoch();
@@ -356,12 +343,8 @@ where
                     debug!("time update {}", dt.as_gregorian_tai_str());
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
-                            if self.kf.is_extended() {
-                                // self.prop.state
-                                // self.prop.dynamics.set_estimated_state(
-                                //     self.prop.dynamics.estimated_state() + est.state_deviation(),
-                                // );
-                            }
+                            // State deviation is always zero for an EKF time update
+                            // therefore we don't do anything different for an extended filter
                             self.estimates.push(est);
                         }
                         Err(e) => return Err(e),
@@ -391,6 +374,16 @@ where
                                             msr_cnt,
                                             dt.as_gregorian_tai_str()
                                         );
+                                        // println!(
+                                        //     "covar     {} {}\t{}\t{}\t{}\t{}\t{}\t",
+                                        //     est.epoch(),
+                                        //     est.covar()[(0, 0)],
+                                        //     est.covar()[(1, 1)],
+                                        //     est.covar()[(2, 2)],
+                                        //     est.covar()[(3, 3)],
+                                        //     est.covar()[(4, 4)],
+                                        //     est.covar()[(5, 5)],
+                                        // );
 
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
@@ -400,6 +393,16 @@ where
                                             && !self.kf.is_extended()
                                         {
                                             self.kf.set_extended(true);
+                                            // println!(
+                                            //     "Adding {}\t{}\t{}\t{}\t{}\t{}\t to {}",
+                                            //     est.state_deviation()[0],
+                                            //     est.state_deviation()[1],
+                                            //     est.state_deviation()[2],
+                                            //     est.state_deviation()[3],
+                                            //     est.state_deviation()[4],
+                                            //     est.state_deviation()[5],
+                                            //     self.prop.state(),
+                                            // );
                                             if !est.within_3sigma() {
                                                 warn!(
                                                     "EKF enabled @ {} but filter DIVERGING",
@@ -411,18 +414,11 @@ where
                                                     dt.as_gregorian_tai_str()
                                                 );
                                             }
+                                            // panic!();
                                         }
                                         if self.kf.is_extended() {
-                                            // self.prop.state =
-                                            //     self.prop.state.add(est.state_deviation());
                                             self.prop.state =
                                                 self.prop.state + est.state_deviation();
-                                            // self.prop.dynamics.set_estimated_state(
-                                            //     self.prop
-                                            //         .dynamics
-                                            //         .extract_estimated_state(&nominal_state)
-                                            //         + est.state_deviation(),
-                                            // );
                                         }
                                         self.estimates.push(est);
                                         self.residuals.push(res);
@@ -547,7 +543,6 @@ where
         num_expected_msr: usize,
     ) -> Self {
         let init_state = prop.state();
-        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -558,7 +553,6 @@ where
             estimates,
             residuals: Vec::with_capacity(num_expected_msr),
             ekf_trigger: CkfTrigger {},
-            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }
@@ -566,7 +560,6 @@ where
 
     pub fn default_ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
         let init_state = prop.state();
-        let init_estimate = kf.previous_estimate().clone();
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -577,7 +570,6 @@ where
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},
-            init_estimate,
             init_state,
             _marker: PhantomData::<A>,
         }

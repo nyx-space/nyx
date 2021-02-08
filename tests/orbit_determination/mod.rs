@@ -8,7 +8,7 @@ use self::nyx::State;
 
 mod measurements;
 mod multi_body;
-// mod robust;
+mod robust;
 mod spacecraft;
 mod two_body;
 

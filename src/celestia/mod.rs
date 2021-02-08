@@ -8,29 +8,40 @@ use std::time::Instant;
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
 use crate::errors::NyxError;
-use crate::time::{Epoch, SECONDS_PER_DAY};
+use crate::time::{Epoch, TimeUnit, SECONDS_PER_DAY};
 
 impl XbEpoch {
+    /// Returns the epoch as a raw f64, allows for speed ups if you know what is the stored time system
+    pub fn as_raw(&self) -> f64 {
+        f64::from(self.days) + self.seconds / SECONDS_PER_DAY
+    }
+
     pub fn to_epoch(&self) -> Epoch {
-        let days = f64::from(self.days) + self.seconds / SECONDS_PER_DAY;
+        // let days = f64::from(self.days) + self.seconds / SECONDS_PER_DAY;
+        let epoch_delta = self.days * TimeUnit::Day + self.seconds * TimeUnit::Second;
+        // TODO: Try to build this from Decimal directly?
         match self.ts {
             0 => {
                 unimplemented!("TAI")
             }
             1 => match self.repr {
-                5 => Epoch::from_jde_et(days),
+                5 => Epoch::from_jde_et(epoch_delta.in_unit_f64(TimeUnit::Day)),
                 _ => unimplemented!("ET"),
             },
             2 => match self.repr {
-                0 => Epoch::from_tt_seconds(days * SECONDS_PER_DAY),
+                0 => Epoch::from_tt_seconds(epoch_delta.in_seconds()),
                 _ => unimplemented!("TT"),
             },
             3 => {
                 unimplemented!("UTC")
             }
             4 => match self.repr {
-                2 => Epoch::from_tdb_seconds(days * SECONDS_PER_DAY),
-                5 => Epoch::from_jde_tdb(days),
+                2 => Epoch::from_tdb_seconds(epoch_delta.in_seconds()),
+                5 => {
+                    Epoch::from_jde_tdb(epoch_delta.in_unit_f64(TimeUnit::Day))
+                    // Epoch::from_jde_tdb(days)
+                    // Epoch::from_tdb_seconds(epoch_delta.in_seconds())
+                }
                 _ => unimplemented!("TDB"),
             },
             _ => unimplemented!(),

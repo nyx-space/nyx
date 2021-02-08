@@ -579,7 +579,7 @@ impl Cosm {
             .ok_or_else(|| NyxError::NoInterpolationData(ephem.name.clone()))?;
 
         // the DE file epochs are all in ET mod julian
-        let start_mod_julian = ephem.start_epoch.as_ref().unwrap().to_epoch();
+        let start_mod_julian_f64 = ephem.start_epoch.as_ref().unwrap().as_raw();
         let coefficient_count: usize = interp.position_degree as usize;
         if coefficient_count <= 2 {
             // Cf. https://gitlab.com/chrisrabotin/nyx/-/issues/131
@@ -600,7 +600,9 @@ impl Cosm {
 
         let interval_length: f64 = exb_states.window_duration;
 
-        let delta_jde = (epoch - start_mod_julian).in_unit_f64(TimeUnit::Day);
+        let epoch_jde = epoch.as_jde_tdb_days();
+        let delta_jde = epoch_jde - start_mod_julian_f64;
+
         let index_f = (delta_jde / interval_length).floor();
         let mut offset = delta_jde - index_f * interval_length;
         let mut index = index_f as usize;
@@ -1491,9 +1493,9 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-JAN-2000 12:00:00.0000 TAI'
         // Pos: -5.681756320398799e+02  6.146783778323857e+03  2.259012130187828e+03
         // Vel: -4.610834400780483e+00 -2.190121576903486e+00  6.246541569551255e+00
-        assert!((state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
-        assert!((state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
-        assert!((state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
+        assert!(dbg!(state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
+        assert!(dbg!(state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
+        assert!(dbg!(state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
         // TODO: Fix the velocity computation
 
         // Case 2
@@ -1541,6 +1543,21 @@ mod tests {
         assert!(dbg!(state_ecef.x - -1_424.497_118_292_03).abs() < 1e0);
         assert!(dbg!(state_ecef.y - -3_137.502_417_055_381).abs() < 1e-1);
         assert!(dbg!(state_ecef.z - 6_890.998_090_503_171).abs() < 1e-1);
+
+        // Ground station example
+        let dt = Epoch::from_gregorian_tai_hms(2020, 1, 1, 0, 0, 20);
+        let gs = Orbit::cartesian(
+            -4461.153491497329,
+            2682.445251105359,
+            -3674.3793821716713,
+            -0.19560699645796042,
+            -0.32531244947129817,
+            0.0,
+            dt,
+            earth_iau,
+        );
+        let gs_eme = cosm.frame_chg(&gs, eme2k);
+        println!("{}\n{}", gs, gs_eme);
     }
 
     #[test]
