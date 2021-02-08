@@ -77,7 +77,7 @@ impl Xb {
 
         match Self::decode(&*input_xb_buf) {
             Ok(xb) => {
-                info!("Loaded XB in {} seconds.", decode_start.elapsed().as_secs());
+                info!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
                 Ok(xb)
             }
             Err(e) => Err(NyxError::LoadingError(format!(

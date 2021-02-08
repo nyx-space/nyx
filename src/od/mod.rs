@@ -26,65 +26,12 @@ pub mod ui;
 /// Provides all state noise compensation functionality
 pub mod snc;
 
-// / A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-// /
-// / This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
-// pub trait Estimable<N>
-// where
-//     Self: Dynamics + Sized,
-// {
-//     /// Defines the state size of the estimated state
-//     type LinStateSize: DimName;
-//     /// Returns the estimated state
-//     fn extract_estimated_state(
-//         &self,
-//         prop_state: &Self::StateType,
-//     ) -> VectorN<f64, Self::LinStateSize>
-//     where
-//         DefaultAllocator: Allocator<f64, Self::LinStateSize>;
-
-//     /// Returns the estimated state
-//     fn estimated_state(&self) -> VectorN<f64, Self::LinStateSize>
-//     where
-//         DefaultAllocator: Allocator<f64, Self::LinStateSize>,
-//     {
-//         self.extract_estimated_state(&self.state())
-//     }
-
-//     /// Sets the estimated state
-//     fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>)
-//     where
-//         DefaultAllocator: Allocator<f64, Self::LinStateSize>;
-
-//     /// Defines the gradient of the equations of motion for these dynamics.
-//     fn stm(&self) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
-//     where
-//         DefaultAllocator: Allocator<f64, Self::LinStateSize>
-//             + Allocator<f64, Self::LinStateSize, Self::LinStateSize>,
-//     {
-//         self.extract_stm(&self.state())
-//     }
-
-//     /// Converts the Dynamics' state type to a measurement to be ingested in a filter
-//     fn to_measurement(&self, prop_state: &Self::StateType) -> N;
-
-//     /// Extracts the STM from the dynamics state
-//     fn extract_stm(
-//         &self,
-//         prop_state: &Self::StateType,
-//     ) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
-//     where
-//         DefaultAllocator: Allocator<f64, Self::LinStateSize>
-//             + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
-// }
-
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
 pub trait Filter<T, A, M>
 where
     A: DimName,
     M: DimName,
     T: State,
-    // T: EstimateFrom<O>,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>

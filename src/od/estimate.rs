@@ -14,7 +14,7 @@ use std::fmt;
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
 pub trait Estimate<T: State>
 where
-    Self: Clone + PartialEq + Sized,
+    Self: Clone + PartialEq + Sized + fmt::Display,
     DefaultAllocator:
         Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {
@@ -112,8 +112,10 @@ where
 #[derive(Debug, Clone, PartialEq)]
 pub struct KfEstimate<T: State>
 where
-    DefaultAllocator:
-        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// The estimated state
     pub nominal_state: T,
@@ -135,8 +137,10 @@ where
 
 impl<T: State> KfEstimate<T>
 where
-    DefaultAllocator:
-        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     pub fn from_covar(
         nominal_state: T,
@@ -157,8 +161,10 @@ where
 
 impl<T: State> Estimate<T> for KfEstimate<T>
 where
-    DefaultAllocator:
-        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn zeros(nominal_state: T) -> Self {
         Self {
@@ -384,8 +390,10 @@ where
 
 impl<T: State> Estimate<T> for IfEstimate<T>
 where
-    DefaultAllocator:
-        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn zeros(nominal_state: T) -> Self {
         let mut info_state = VectorN::<f64, <T as State>::Size>::zeros();

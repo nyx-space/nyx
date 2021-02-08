@@ -64,8 +64,6 @@ fn robust_test_ekf_two_body() {
         initial_state - initial_state_dev
     );
 
-    // Generate the truth data on one thread.
-
     let orbital_dyn = OrbitalDynamics::two_body();
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
@@ -74,14 +72,11 @@ fn robust_test_ekf_two_body() {
     let mut truth_states = Vec::with_capacity(10_000);
     truth_states.push(initial_state);
     // Receive the states on the main thread, and populate the measurement channel.
-    'outer: while let Ok(rx_state) = truth_rx.try_recv() {
+    while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
-                // if measurements.len() > 105 {
-                //     break 'outer;
-                // }
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -185,6 +180,9 @@ fn robust_test_ekf_two_body() {
 #[allow(clippy::identity_op)]
 #[test]
 fn robust_test_ekf_multi_body() {
+    // We seed both propagators with the same initial state, but we let a large state deviation in the filter.
+    // This does _not_ impact the prefits, but it impacts the state deviation and therefore the state estimate.
+    // As such, it checks that the filter can return to a nominal state.
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -223,7 +221,6 @@ fn robust_test_ekf_multi_body() {
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
-    initial_state_dev.enable_stm();
 
     let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
     println!(
@@ -233,9 +230,6 @@ fn robust_test_ekf_multi_body() {
         initial_state - initial_state_dev
     );
 
-    // Generate the truth data on one thread.
-
-    let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
@@ -263,7 +257,7 @@ fn robust_test_ekf_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -354,8 +348,8 @@ fn robust_test_ekf_multi_body() {
 }
 
 #[allow(clippy::identity_op)]
-#[test]
 #[ignore]
+#[test]
 fn robust_test_ekf_harmonics() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
@@ -364,9 +358,9 @@ fn robust_test_ekf_harmonics() {
     let cosm = Cosm::de438();
 
     // Define the ground stations.
-    let ekf_num_meas = 50000;
+    let ekf_num_meas = 500;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * TimeUnit::Hour;
+    let ekf_disable_time = 1 * TimeUnit::Minute;
     let elevation_mask = 0.0;
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
@@ -393,10 +387,9 @@ fn robust_test_ekf_harmonics() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 0.00;
-    initial_state_dev.y -= 0.00;
-    initial_state_dev.z += 0.00;
-    initial_state_dev.enable_stm();
+    initial_state_dev.x += 0.5;
+    initial_state_dev.y -= 0.5;
+    initial_state_dev.z += 0.5;
 
     let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
     println!(
@@ -409,9 +402,6 @@ fn robust_test_ekf_harmonics() {
     let hh_deg = 20;
     let hh_ord = 20;
 
-    // Generate the truth data on one thread.
-
-    let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut orbital_dyn = OrbitalDynamics::two_body();
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
@@ -451,7 +441,7 @@ fn robust_test_ekf_harmonics() {
     estimator.add_model(PointMasses::new(eme2k, &bodies, &cosm));
 
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -470,7 +460,7 @@ fn robust_test_ekf_harmonics() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    let sigma_q = 1e-6_f64.powi(2);
+    let sigma_q = 1e-5_f64.powi(2);
     let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
@@ -537,7 +527,6 @@ fn robust_test_ekf_harmonics() {
 
 #[allow(clippy::identity_op)]
 #[test]
-#[ignore]
 fn robust_test_ekf_realistic() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
@@ -577,13 +566,9 @@ fn robust_test_ekf_realistic() {
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
-    initial_state_dev.enable_stm();
 
     println!("Initial state dev:\n{}", initial_state - initial_state_dev);
 
-    // Generate the truth data on one thread.
-
-    let cosm = Cosm::de438();
     let bodies = vec![
         Bodies::Luna,
         Bodies::Sun,
@@ -616,7 +601,7 @@ fn robust_test_ekf_realistic() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -732,7 +717,6 @@ fn robust_test_ckf_smoother_multi_body() {
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
-    initial_state_dev.enable_stm();
 
     let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
     println!(
@@ -742,9 +726,6 @@ fn robust_test_ckf_smoother_multi_body() {
         initial_state - initial_state_dev
     );
 
-    // Generate the truth data on one thread.
-
-    let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
@@ -771,7 +752,7 @@ fn robust_test_ckf_smoother_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -999,7 +980,6 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
-    initial_state_dev.enable_stm();
 
     let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
     println!(
@@ -1009,9 +989,6 @@ fn robust_test_ekf_snc_smoother_multi_body() {
         initial_state - initial_state_dev
     );
 
-    // Generate the truth data on one thread.
-
-    let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
@@ -1038,7 +1015,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -1243,7 +1220,6 @@ fn robust_test_ckf_iteration_multi_body() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::thread;
 
     let cosm = Cosm::de438();
 
@@ -1275,7 +1251,6 @@ fn robust_test_ckf_iteration_multi_body() {
     initial_state_dev.x += 9.5;
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
-    initial_state_dev.enable_stm();
 
     let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
     println!(
@@ -1285,16 +1260,12 @@ fn robust_test_ckf_iteration_multi_body() {
         initial_state - initial_state_dev
     );
 
-    // Generate the truth data on one thread.
-    thread::spawn(move || {
-        let cosm = Cosm::de438();
-        let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-        let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
-        let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
-        let mut prop = truth_setup.with(initial_state);
-        prop.tx_chan = Some(truth_tx);
-        prop.for_duration(prop_time).unwrap();
-    });
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let mut prop = truth_setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    prop.for_duration(prop_time).unwrap();
 
     let mut truth_states = Vec::with_capacity(10_000);
     // Receive the states on the main thread, and populate the measurement channel.
@@ -1316,7 +1287,7 @@ fn robust_test_ckf_iteration_multi_body() {
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
     // XXX: Previouslt, this used a state deviation for the initial estimate but not in the dynamics. Sounds wrong.
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
-    let prop_est = setup.with(initial_state_dev);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(

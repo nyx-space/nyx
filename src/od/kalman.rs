@@ -27,7 +27,9 @@ where
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
         + Allocator<f64, <T as State>::Size, A>
-        + Allocator<f64, A, <T as State>::Size>,
+        + Allocator<f64, A, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// The previous estimate used in the KF computations.
     pub prev_estimate: KfEstimate<T>,
@@ -61,7 +63,9 @@ where
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
         + Allocator<f64, <T as State>::Size, A>
-        + Allocator<f64, A, <T as State>::Size>,
+        + Allocator<f64, A, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
     pub fn new(
@@ -147,7 +151,9 @@ where
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, U3, U3>
         + Allocator<f64, <T as State>::Size, U3>
-        + Allocator<f64, U3, <T as State>::Size>,
+        + Allocator<f64, U3, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// Initializes this KF without SNC
     pub fn no_snc(initial_estimate: KfEstimate<T>, measurement_noise: MatrixMN<f64, M, M>) -> Self {
@@ -183,7 +189,9 @@ where
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
         + Allocator<f64, <T as State>::Size, A>
-        + Allocator<f64, A, <T as State>::Size>,
+        + Allocator<f64, A, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     type Estimate = KfEstimate<T>;
 
@@ -305,16 +313,6 @@ where
         }
 
         let h_tilde_t = &self.h_tilde.transpose();
-        // println!(
-        //     "h_tilde    {} {}\t{}\t{}\t{}\t{}\t{}\t",
-        //     nominal_state.epoch().as_gregorian_tai_str(),
-        //     self.h_tilde[(0, 0)],
-        //     self.h_tilde[(0, 1)],
-        //     self.h_tilde[(0, 2)],
-        //     self.h_tilde[(0, 3)],
-        //     self.h_tilde[(0, 4)],
-        //     self.h_tilde[(0, 5)],
-        // );
         let mut invertible_part = &self.h_tilde * &covar_bar * h_tilde_t + &self.measurement_noise;
         if !invertible_part.try_inverse_mut() {
             return Err(NyxError::SingularKalmanGain);
@@ -324,7 +322,6 @@ where
 
         // Compute observation deviation (usually marked as y_i)
         let prefit = real_obs - computed_obs;
-        // let prefit_c = prefit.clone();
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
@@ -349,35 +346,6 @@ where
             - &gain * &self.h_tilde;
         let covar = &first_term * &covar_bar * &first_term.transpose()
             + &gain * &self.measurement_noise * &gain.transpose();
-
-        // println!(
-        //     "{} => gain {}\tcovar_bar {}\tinvertible {}\tcovar {}\t prefits {}\t{}",
-        //     nominal_state.epoch().as_gregorian_tai_str(),
-        //     gain.norm(),
-        //     covar_bar.norm(),
-        //     invertible_part.norm(),
-        //     covar.norm(),
-        //     prefit_c[0],
-        //     prefit_c[1]
-        // );
-
-        // let mut die = false;
-        // for i in 0..6 {
-        //     if covar[(i, i)] < 0.0 {
-        //         die = true;
-        //     }
-        // }
-
-        // if die {
-        //     println!("covar bar");
-        //     for i in 0..6 {
-        //         for j in 0..6 {
-        //             print!("{}\t", covar_bar[(i, j)]);
-        //         }
-        //         println!();
-        //     }
-        //     panic!();
-        // }
 
         // And wrap up
         let estimate = KfEstimate {

@@ -35,7 +35,7 @@ impl fmt::Display for SmoothingArc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             SmoothingArc::All => write!(f, "all estimates smoothed"),
-            SmoothingArc::Epoch(e) => write!(f, "{}", e.as_gregorian_tai_str()),
+            SmoothingArc::Epoch(e) => write!(f, "{}", e),
             SmoothingArc::TimeGap(g) => write!(f, "time gap of {}", g),
             SmoothingArc::Prediction => write!(f, "first prediction"),
         }
@@ -340,7 +340,7 @@ where
                         arc_warned = true;
                     }
                     // No measurement can be used here, let's just do a time update
-                    debug!("time update {}", dt.as_gregorian_tai_str());
+                    debug!("time update {}", dt);
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update
@@ -360,7 +360,7 @@ where
                                 // Switch back from extended if necessary
                                 if self.kf.is_extended() && self.ekf_trigger.disable_ekf(dt) {
                                     self.kf.set_extended(false);
-                                    info!("EKF disabled @ {}", dt.as_gregorian_tai_str());
+                                    info!("EKF disabled @ {}", dt);
                                 }
 
                                 match self.kf.measurement_update(
@@ -369,22 +369,7 @@ where
                                     &computed_meas.observation(),
                                 ) {
                                     Ok((est, res)) => {
-                                        debug!(
-                                            "msr update msr #{} {}",
-                                            msr_cnt,
-                                            dt.as_gregorian_tai_str()
-                                        );
-                                        // println!(
-                                        //     "covar     {} {}\t{}\t{}\t{}\t{}\t{}\t",
-                                        //     est.epoch(),
-                                        //     est.covar()[(0, 0)],
-                                        //     est.covar()[(1, 1)],
-                                        //     est.covar()[(2, 2)],
-                                        //     est.covar()[(3, 3)],
-                                        //     est.covar()[(4, 4)],
-                                        //     est.covar()[(5, 5)],
-                                        // );
-
+                                        debug!("msr update msr #{} {}", msr_cnt, dt);
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the
@@ -393,28 +378,11 @@ where
                                             && !self.kf.is_extended()
                                         {
                                             self.kf.set_extended(true);
-                                            // println!(
-                                            //     "Adding {}\t{}\t{}\t{}\t{}\t{}\t to {}",
-                                            //     est.state_deviation()[0],
-                                            //     est.state_deviation()[1],
-                                            //     est.state_deviation()[2],
-                                            //     est.state_deviation()[3],
-                                            //     est.state_deviation()[4],
-                                            //     est.state_deviation()[5],
-                                            //     self.prop.state(),
-                                            // );
                                             if !est.within_3sigma() {
-                                                warn!(
-                                                    "EKF enabled @ {} but filter DIVERGING",
-                                                    dt.as_gregorian_tai_str()
-                                                );
+                                                warn!("EKF enabled @ {} but filter DIVERGING", dt);
                                             } else {
-                                                info!(
-                                                    "EKF enabled @ {}",
-                                                    dt.as_gregorian_tai_str()
-                                                );
+                                                info!("EKF enabled @ {}", dt);
                                             }
-                                            // panic!();
                                         }
                                         if self.kf.is_extended() {
                                             self.prop.state =
