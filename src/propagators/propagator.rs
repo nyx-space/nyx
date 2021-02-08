@@ -10,6 +10,7 @@ use crate::{State, TimeTagged};
 use std::f64;
 use std::f64::EPSILON;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
@@ -20,7 +21,7 @@ where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
-    pub dynamics: &'a D, // Stores the dynamics used. *Must* use this to get the latest values
+    pub dynamics: Arc<&'a D>, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     order: u8,             // Order of the integrator
     stages: usize,         // Number of stages, i.e. how many times the derivatives will be called
@@ -37,7 +38,7 @@ where
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(dynamics: &'a D, opts: PropOpts<E>) -> Self {
         Self {
-            dynamics,
+            dynamics: Arc::new(dynamics),
             opts,
             stages: T::stages(),
             order: T::order(),
@@ -71,7 +72,7 @@ where
         }
         PropInstance {
             state,
-            prop: &self,
+            prop: Arc::new(self),
             tx_chan: None,
             event_trackers: EventTrackers::none(),
             prevent_tx: false,
@@ -111,7 +112,7 @@ where
     /// The state of this propagator instance
     pub state: D::StateType,
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, D, E>,
+    pub prop: Arc<&'a Propagator<'a, D, E>>,
     /// An output channel for all of the states computed by this propagator instance
     pub tx_chan: Option<Sender<D::StateType>>,
     /// An event tracking instance

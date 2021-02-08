@@ -42,13 +42,7 @@ use rand_distr::{Distribution, Normal};
 //     );
 //     orbital_dyn.add_model(harmonics);
 
-//     let setup = Propagator::default(
-//         &(OrbitalDynamics::point_masses(
-//             state.frame,
-//             &vec![Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
-//             &cosm,
-//         )),
-//     );
+//     let setup = Propagator::default(&orbital_dyn);
 
 //     let mut threads = vec![];
 //     let mut final_states: Vec<Orbit> = vec![];
