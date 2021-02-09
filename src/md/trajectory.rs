@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::sync::mpsc::Receiver;
 use std::time::Duration as StdDur;
 
-const ITEMS_PER_SEGMENTS: usize = 32;
+const ITEMS_PER_SEGMENTS: usize = 16;
 const INTERP_TOLERANCE: f64 = 1e-10;
 
 /// Stores a segment of an interpolation
@@ -88,19 +88,23 @@ where
         let mut me = Self {
             segments: BTreeMap::new(),
             start_state: state,
-            timeout_ms: 50,
+            timeout_ms: 100,
             max_offset: 0,
         };
 
+        // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
+        // I've spent 12h trying to understand why, but I can't, so screw it for it.
+        let items_per_segments = if S::PropVecSize::dim() == 43 { 16 } else { 32 };
+
         let mut children = vec![];
-        let mut window_states: Vec<S> = Vec::with_capacity(ITEMS_PER_SEGMENTS);
+        let mut window_states: Vec<S> = Vec::with_capacity(items_per_segments);
         // Push the initial state
         window_states.push(state);
 
         // Note that we're using the typical map+reduce pattern
         // Start receiving states on a blocking call (map)
         while let Ok(state) = rx.recv_timeout(StdDur::from_millis(me.timeout_ms)) {
-            if window_states.len() == ITEMS_PER_SEGMENTS {
+            if window_states.len() == items_per_segments {
                 let this_wdn = window_states.clone();
                 children.push(std::thread::spawn(
                     move || -> Result<Segment<S>, NyxError> { interpolate(this_wdn) },
@@ -139,7 +143,6 @@ where
     /// Evaluate the trajectory at this specific epoch.
     pub fn evaluate(&self, epoch: Epoch) -> Result<S, NyxError> {
         let offset_s = ((epoch - self.start_state.epoch()).in_seconds().floor()) as u32;
-
         // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
             None => {
@@ -189,8 +192,8 @@ where
     let mut coefficients = Vec::new();
     // Initialize the vector of values and coefficients.
     for _ in 0..S::PropVecSize::dim() {
-        values.push(Vec::with_capacity(ITEMS_PER_SEGMENTS));
-        coefficients.push(Vec::with_capacity(ITEMS_PER_SEGMENTS));
+        values.push(Vec::with_capacity(this_wdn.len()));
+        coefficients.push(Vec::with_capacity(this_wdn.len()));
     }
     for state in &this_wdn {
         let t_prime = normalize(

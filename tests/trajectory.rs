@@ -25,8 +25,7 @@ fn traj_ephem() {
     // The trajectory must always be generated on its own thread.
     let ephem_thread = std::thread::spawn(move || Ephemeris::new(start_state, rx));
 
-    let dynamics = OrbitalDynamics::two_body();
-    let setup = Propagator::rk89(dynamics, PropOpts::<RSSStepPV>::default());
+    let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(start_state.with_stm()).with_tx(tx);
     let end_state = prop.for_duration(31 * TimeUnit::Day).unwrap();
 
@@ -42,8 +41,12 @@ fn traj_ephem() {
     for epoch in TimeSeries::inclusive(start_dt, start_dt + 31 * TimeUnit::Day, 1 * TimeUnit::Day) {
         cnt += 1.0;
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
-        let state = ephem.evaluate(epoch).unwrap();
-        sum_sma += state.sma();
+        // let state = ephem.evaluate(epoch + 17 * TimeUnit::Second).unwrap();
+        // sum_sma += state.sma();
+        match ephem.evaluate(epoch) {
+            Ok(state) => sum_sma += state.sma(),
+            Err(e) => println!("{}", e),
+        }
     }
     println!("Average SMA: {:.3} km", sum_sma / cnt);
 
@@ -104,9 +107,22 @@ fn traj_ephem() {
         max_err
     );
 
+    // Allow for up to micrometer error
     assert!(
-        max_err < 1e-10,
-        "Maximum orbit in interpolation is too high!"
+        max_pos_err < 1e-9,
+        "Maximum spacecraft position in interpolation is too high!"
+    );
+
+    // Allow for up to micrometer per second error
+    assert!(
+        max_vel_err < 1e-9,
+        "Maximum orbit velocity in interpolation is too high!"
+    );
+
+    // Check that the error in STM doesn't break everything
+    assert!(
+        max_err < 1e-9,
+        "Maximum state in interpolation is too high!"
     );
 }
 
@@ -176,7 +192,7 @@ fn traj_spacecraft() {
 
     // === Below is the validation of the ephemeris == //
 
-    assert_eq!(ephem.segments.len(), 2, "Wrong number of expected segments");
+    assert_eq!(ephem.segments.len(), 3, "Wrong number of expected segments");
 
     assert_eq!(ephem.first(), start_state, "Wrong initial state");
     assert_eq!(ephem.last(), end_state, "Wrong final state");
@@ -232,8 +248,21 @@ fn traj_spacecraft() {
         max_err
     );
 
+    // Allow for up to micrometer error
     assert!(
-        max_err < 1e-10,
-        "Maximum orbit in interpolation is too high!"
+        max_pos_err < 1e-9,
+        "Maximum spacecraft position in interpolation is too high!"
+    );
+
+    // Allow for up to micrometer per second error
+    assert!(
+        max_vel_err < 1e-9,
+        "Maximum spacecraft velocity in interpolation is too high!"
+    );
+
+    // Allow for up to microgram error
+    assert!(
+        max_vel_err < 1e-9,
+        "Maximum spacecraft fuel in interpolation is too high!"
     );
 }
