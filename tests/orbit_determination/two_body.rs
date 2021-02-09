@@ -174,7 +174,6 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
 
@@ -331,7 +330,6 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
 
@@ -439,7 +437,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
 
@@ -652,12 +649,9 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-
-    let mut orbital_dyn = OrbitalDynamics::two_body();
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
-    orbital_dyn.add_model(harmonics);
+    let orbital_dyn = OrbitalDynamics::with_model(harmonics);
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
@@ -769,8 +763,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
-
-    // Generate the truth data on one thread.
 
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);

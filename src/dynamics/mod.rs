@@ -27,10 +27,6 @@ pub use self::orbital::*;
 pub mod spacecraft;
 pub use self::spacecraft::*;
 
-// Defines what a propulsion subsystem must implement, with some common propulsion systems.
-// TODO: Remove propulsion.rs
-// pub mod propulsion;
-
 /// Defines a few examples of thrust controllers.
 pub mod thrustctrl;
 

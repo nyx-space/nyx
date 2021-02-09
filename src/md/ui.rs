@@ -65,7 +65,7 @@ where
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
                 #[allow(unused_assignments)]
-                let mut sc_dyn_flagged;
+                let mut sc_dyn: Spacecraft;
                 let init_sc;
 
                 // Validate the output
@@ -178,7 +178,7 @@ where
                         bodies.remove(pos);
                     }
 
-                    let sc_dyn = Spacecraft::new(OrbitalDynamics::point_masses(
+                    sc_dyn = Spacecraft::new(OrbitalDynamics::point_masses(
                         init_state.frame,
                         &bodies,
                         cosm.clone(),
@@ -189,10 +189,8 @@ where
                         spacecraft.dry_mass,
                         spacecraft.fuel_mass.unwrap_or(0.0),
                     );
-
-                    sc_dyn_flagged = sc_dyn;
                 } else {
-                    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
+                    sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
 
                     init_sc = SpacecraftState::new(
                         init_state,
@@ -235,8 +233,6 @@ where
                             }
                         }
                     }
-
-                    sc_dyn_flagged = sc_dyn;
                 }
 
                 // Add the acceleration models if applicable
@@ -256,7 +252,7 @@ where
 
                                     let hh =
                                         Harmonics::from_stor(*compute_frame, in_mem, cosm.clone());
-                                    sc_dyn_flagged.orbital_dyn.add_model(hh);
+                                    sc_dyn.orbital_dyn.add_model(hh);
                                 }
                             }
                         }
@@ -291,7 +287,7 @@ where
 
                 Ok((
                     Self {
-                        sc_dyn: sc_dyn_flagged,
+                        sc_dyn: sc_dyn,
                         init_state: init_sc,
                         formatter: None,
                         prop_time,
@@ -334,9 +330,9 @@ where
         let (tx, rx) = channel();
         prop.tx_chan = Some(tx);
 
-        let mut initial_state = Some(prop.state());
+        let mut initial_state = Some(prop.state);
 
-        info!("Initial state: {}", prop.state());
+        info!("Initial state: {}", prop.state);
         let start = Instant::now();
 
         // Run
@@ -363,7 +359,7 @@ where
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
-            prop.state(),
+            prop.state,
             (Instant::now() - start).as_secs_f64()
         );
 

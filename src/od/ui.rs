@@ -131,7 +131,7 @@ where
         num_expected_msr: usize,
         trigger: T,
     ) -> Self {
-        let init_state = prop.state();
+        let init_state = prop.state;
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -148,7 +148,7 @@ where
     }
 
     pub fn default_ekf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
-        let init_state = prop.state();
+        let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -510,7 +510,7 @@ where
         simultaneous_msr: bool,
         num_expected_msr: usize,
     ) -> Self {
-        let init_state = prop.state();
+        let init_state = prop.state;
         let mut estimates = Vec::with_capacity(num_expected_msr + 1);
         estimates.push(kf.previous_estimate().clone());
         Self {
@@ -527,7 +527,7 @@ where
     }
 
     pub fn default_ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
-        let init_state = prop.state();
+        let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {

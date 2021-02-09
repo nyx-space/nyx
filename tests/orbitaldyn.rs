@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 
 use nyx::celestia::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
 use nyx::dimensions::{Matrix6, Vector6, U3};
-use nyx::dynamics::{Dynamics, OrbitalDynamics};
+use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
@@ -757,8 +757,7 @@ fn val_earth_sph_harmonics_j2() {
         6.139_616_747_276_084,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(harmonics);
+    let dynamics = OrbitalDynamics::with_model(harmonics);
 
     let prop_state = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default())
         .with(state)
@@ -818,8 +817,7 @@ fn val_earth_sph_harmonics_12x12() {
         6.138_852_391_455_04,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(harmonics);
+    let dynamics = OrbitalDynamics::with_model(harmonics);
 
     let prop_state = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9))
         .with(state)
@@ -879,8 +877,7 @@ fn val_earth_sph_harmonics_70x70() {
         6.138_865_498_487_843,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(harmonics);
+    let dynamics = OrbitalDynamics::with_model(harmonics);
 
     let prop_rslt = Propagator::default(&dynamics)
         .with(state)
@@ -940,8 +937,7 @@ fn val_earth_sph_harmonics_70x70_partials() {
         6.138_865_498_487_843,
     );
 
-    let mut dynamics = OrbitalDynamics::two_body();
-    dynamics.add_model(harmonics);
+    let dynamics = OrbitalDynamics::with_model(harmonics);
 
     let prop_rslt = Propagator::default(&dynamics)
         .with(state)
@@ -994,8 +990,7 @@ fn hf_prop() {
 
     let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let mut dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
-    dynamics.add_model(harmonics);
+    let dynamics = OrbitalDynamics::new(vec![PointMasses::new(eme2k, &bodies, cosm), harmonics]);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));
     let rslt = setup

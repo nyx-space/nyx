@@ -19,7 +19,6 @@ impl XbEpoch {
     pub fn to_epoch(&self) -> Epoch {
         // let days = f64::from(self.days) + self.seconds / SECONDS_PER_DAY;
         let epoch_delta = self.days * TimeUnit::Day + self.seconds * TimeUnit::Second;
-        // TODO: Try to build this from Decimal directly?
         match self.ts {
             0 => {
                 unimplemented!("TAI")
@@ -37,11 +36,7 @@ impl XbEpoch {
             }
             4 => match self.repr {
                 2 => Epoch::from_tdb_seconds(epoch_delta.in_seconds()),
-                5 => {
-                    Epoch::from_jde_tdb(epoch_delta.in_unit_f64(TimeUnit::Day))
-                    // Epoch::from_jde_tdb(days)
-                    // Epoch::from_tdb_seconds(epoch_delta.in_seconds())
-                }
+                5 => Epoch::from_jde_tdb(epoch_delta.in_unit_f64(TimeUnit::Day)),
                 _ => unimplemented!("TDB"),
             },
             _ => unimplemented!(),

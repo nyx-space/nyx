@@ -388,7 +388,7 @@ impl RangeMsr {
         (fx, pmat)
     }
 
-    pub fn new(_: Epoch, tx: Orbit, rx: Orbit, visible: bool) -> RangeMsr {
+    pub fn new(tx: Orbit, rx: Orbit, visible: bool) -> RangeMsr {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
@@ -484,7 +484,7 @@ impl DopplerMsr {
         (fx, pmat)
     }
 
-    pub fn new(_: Epoch, tx: Orbit, rx: Orbit, visible: bool) -> DopplerMsr {
+    pub fn new(tx: Orbit, rx: Orbit, visible: bool) -> DopplerMsr {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 

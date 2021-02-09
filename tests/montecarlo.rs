@@ -29,7 +29,7 @@ use rand_distr::{Distribution, Normal};
 //     let iau_earth = cosm.frame("IAU Earth");
 
 //     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-//     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+//     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
 
 //     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
 //     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
@@ -38,7 +38,7 @@ use rand_distr::{Distribution, Normal};
 //     let mut orbital_dyn = OrbitalDynamics::point_masses(
 //         state.frame,
 //         &vec![Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
-//         &cosm,
+//         cosm,
 //     );
 //     orbital_dyn.add_model(harmonics);
 

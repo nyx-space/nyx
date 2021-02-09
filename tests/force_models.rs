@@ -26,9 +26,8 @@ fn srp_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
-    // Add the SRP model to the spacecraft
-    sc_dyn.add_model(srp);
+    // Create a spacecraft with SRP model
+    let sc_dyn = Spacecraft::with_model(OrbitalDynamics::two_body(), srp);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
@@ -77,11 +76,8 @@ fn exp_drag_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
-    // Add the SRP model to the spacecraft
-    sc_dyn.add_model(srp);
-    // Add the drag model to the spacecraft
-    sc_dyn.add_model(drag);
+    // Build a spacecraft with SRP and Drag enabled.
+    let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
@@ -90,7 +86,7 @@ fn exp_drag_earth() {
     let mut prop = setup.with(sc);
     prop.for_duration(prop_time).unwrap();
 
-    let final_state = prop.state();
+    let final_state = prop.state;
     println!("{}", final_state);
     println!("{}", final_state.orbit);
 }
@@ -115,11 +111,8 @@ fn std_atm_drag_earth() {
 
     let dry_mass = 300.0;
 
-    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
-    // Add the SRP model to the spacecraft
-    sc_dyn.add_model(srp);
-    // Add the drag model to the spacecraft
-    sc_dyn.add_model(drag);
+    // Build a spacecraft with SRP and Drag enabled.
+    let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
@@ -128,7 +121,7 @@ fn std_atm_drag_earth() {
     let mut prop = setup.with(sc);
     prop.for_duration(prop_time).unwrap();
 
-    let final_state = prop.state();
+    let final_state = prop.state;
     println!("{}", final_state);
     println!("{}", final_state.orbit);
 
@@ -175,11 +168,8 @@ fn std_atm_drag_earth_low() {
 
     let dry_mass = 300.0;
 
-    let mut sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
-    // Add the SRP model to the spacecraft
-    sc_dyn.add_model(srp);
-    // Add the drag model to the spacecraft
-    sc_dyn.add_model(drag);
+    // Build a spacecraft with SRP and Drag enabled.
+    let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
@@ -188,7 +178,7 @@ fn std_atm_drag_earth_low() {
     let mut prop = setup.with(sc);
     prop.for_duration(prop_time).unwrap();
 
-    let final_state = prop.state();
+    let final_state = prop.state;
     println!("{}", final_state);
     println!("{}", final_state.orbit);
 

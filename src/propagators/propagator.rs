@@ -154,14 +154,7 @@ where
         self.state.as_vector().unwrap()
     }
 
-    /// A shortcut to dynamics.state()
-    /// TODO: Rremove this
-    pub fn state(&self) -> D::StateType {
-        self.state
-    }
-
     /// This method propagates the provided Dynamics for the provided duration.
-    /// TODO: Rename this to `for` such that we have `prop.with(state).for_duration(5 * TimeUnit::Hour)`.
     pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {

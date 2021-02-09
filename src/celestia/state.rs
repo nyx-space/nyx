@@ -1211,10 +1211,6 @@ pub enum GuidanceMode {
 }
 
 /// A spacecraft state
-/// TODO: Remove the propulsion from spaceraft. Add the thruster itself (a single thruster).
-/// TODO: Then add the thrust control to the spacecraft Dynamics. Find a way to store the results of
-/// TODO: those (the set_state) somewhere... I don't know where. This is needed to keep track of which
-/// TODO: objectives have been met.
 #[derive(Clone, Copy, Debug)]
 pub struct SpacecraftState {
     pub orbit: Orbit,

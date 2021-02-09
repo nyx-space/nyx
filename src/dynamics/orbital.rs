@@ -22,24 +22,26 @@ impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
     pub fn point_masses(integr_frame: Frame, bodies: &[Bodies], cosm: Arc<Cosm>) -> Self {
         // Create the point masses
-        let pts = PointMasses::new(integr_frame, bodies, cosm);
-        Self {
-            accel_models: vec![pts],
-        }
+        Self::new(vec![PointMasses::new(integr_frame, bodies, cosm)])
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
     pub fn two_body() -> Self {
-        Self {
-            accel_models: Vec::new(),
-        }
+        Self::new(vec![])
     }
 
     /// Initialize orbital dynamics with a list of acceleration models
-    pub fn new(_: Orbit, accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
+    pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
         Self { accel_models }
     }
 
+    /// Initialize new orbital mechanics with the provided model.
+    /// **Note:** Orbital dynamics _always_ include two body dynamics, these cannot be turned off.
+    pub fn with_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Self {
+        Self::new(vec![accel_model])
+    }
+
+    /// Add a model to the currently defined orbital dynamics
     pub fn add_model(&mut self, accel_model: Arc<dyn AccelModel + Sync + 'a>) {
         self.accel_models.push(accel_model);
     }

@@ -314,19 +314,19 @@ impl<'a> OdpScenario<'a> {
         let (tx, rx) = channel();
         truth_prop.tx_chan = Some(tx);
 
-        let mut initial_state = Some(truth_prop.state());
+        let mut initial_state = Some(truth_prop.state);
 
         // Generate the measurements
         info!("Generating measurements over {} ", prop_time);
 
         let start = Instant::now();
-        info!("Initial state: {}", truth_prop.state());
+        info!("Initial state: {}", truth_prop.state);
 
         truth_prop.for_duration(prop_time)?;
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
-            truth_prop.state(),
+            truth_prop.state,
             (Instant::now() - start).as_secs_f64()
         );
 

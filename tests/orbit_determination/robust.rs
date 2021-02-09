@@ -348,7 +348,6 @@ fn robust_test_ekf_multi_body() {
 }
 
 #[allow(clippy::identity_op)]
-#[ignore]
 #[test]
 fn robust_test_ekf_harmonics() {
     if pretty_env_logger::try_init().is_err() {
@@ -358,7 +357,7 @@ fn robust_test_ekf_harmonics() {
     let cosm = Cosm::de438();
 
     // Define the ground stations.
-    let ekf_num_meas = 500;
+    let ekf_num_meas = 5000;
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 1 * TimeUnit::Minute;
     let elevation_mask = 0.0;
@@ -387,9 +386,9 @@ fn robust_test_ekf_harmonics() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 0.5;
-    initial_state_dev.y -= 0.5;
-    initial_state_dev.z += 0.5;
+    initial_state_dev.x += 9.5;
+    initial_state_dev.y -= 9.5;
+    initial_state_dev.z += 9.5;
 
     let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
     println!(
@@ -403,13 +402,10 @@ fn robust_test_ekf_harmonics() {
     let hh_ord = 20;
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let mut orbital_dyn = OrbitalDynamics::two_body();
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
-    orbital_dyn.add_model(harmonics);
-    orbital_dyn.add_model(PointMasses::new(eme2k, &bodies, cosm.clone()));
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
+    let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(eme2k, &bodies, cosm)]);
+
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -432,15 +428,8 @@ fn robust_test_ekf_harmonics() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
 
-    let mut estimator = OrbitalDynamics::two_body();
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
-    estimator.add_model(harmonics);
-    estimator.add_model(PointMasses::new(eme2k, &bodies, cosm));
-
-    let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
+    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;

@@ -26,6 +26,7 @@ pub struct Spacecraft<'a> {
 
 impl<'a> Spacecraft<'a> {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
+    /// By default, the mass of the vehicle will be decremented as propellant is consummed.
     pub fn with_ctrl(orbital_dyn: OrbitalDynamics<'a>, ctrl: Arc<dyn ThrustControl + 'a>) -> Self {
         Self {
             orbital_dyn,
@@ -44,6 +45,26 @@ impl<'a> Spacecraft<'a> {
             force_models: Vec::new(),
             decrement_mass: true,
         }
+    }
+
+    /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
+    pub fn with_model(
+        orbital_dyn: OrbitalDynamics<'a>,
+        force_model: Arc<dyn ForceModel + 'a>,
+    ) -> Self {
+        let mut me = Self::new(orbital_dyn);
+        me.add_model(force_model);
+        me
+    }
+
+    /// Initialize new spacecraft dynamics with a vector of force models.
+    pub fn with_models(
+        orbital_dyn: OrbitalDynamics<'a>,
+        force_models: Vec<Arc<dyn ForceModel + 'a>>,
+    ) -> Self {
+        let mut me = Self::new(orbital_dyn);
+        me.force_models = force_models;
+        me
     }
 
     pub fn add_model(&mut self, force_model: Arc<dyn ForceModel + 'a>) {
@@ -205,50 +226,3 @@ impl<'a> Dynamics for Spacecraft<'a> {
         Ok((d_x, grad))
     }
 }
-
-// impl<'a> Spacecraft<'a, OrbitalDynamicsStm<'a>> {
-//     /// Initialize a Spacecraft with a set of orbital dynamics, with SRP enabled, and the STM computation
-//     pub fn with_stm(orbital_dyn: OrbitalDynamicsStm<'a>, dry_mass: f64) -> Self {
-//         // Set the dry mass of the propulsion system
-//         Self {
-//             orbital_dyn,
-//             prop: None,
-//             force_models: Vec::new(),
-//             dry_mass,
-//             fuel_mass: 0.0,
-//         }
-//     }
-
-//     pub fn add_model(&mut self, force_model: Box<dyn ForceModel<CtxType = SpacecraftState> + 'a>) {
-//         self.force_models.push(force_model);
-//     }
-// }
-
-// impl<'a> Estimable<SpacecraftState> for Spacecraft<'a, OrbitalDynamicsStm<'a>> {
-//     type LinStateSize = U6;
-
-//     fn to_measurement(&self, prop_state: &Self::StateType) -> SpacecraftState {
-//         *prop_state
-//     }
-
-//     fn extract_stm(&self, prop_state: &Self::StateType) -> Matrix6<f64> {
-//         prop_state.stm.unwrap()
-//     }
-
-//     fn extract_estimated_state(
-//         &self,
-//         prop_state: &Self::StateType,
-//     ) -> VectorN<f64, Self::LinStateSize> {
-//         prop_state.orbit.to_cartesian_vec()
-//     }
-
-//     /// Returns the estimated state
-//     fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>) {
-//         self.orbital_dyn.state.x = new_state[0];
-//         self.orbital_dyn.state.y = new_state[1];
-//         self.orbital_dyn.state.z = new_state[2];
-//         self.orbital_dyn.state.vx = new_state[3];
-//         self.orbital_dyn.state.vy = new_state[4];
-//         self.orbital_dyn.state.vz = new_state[5];
-//     }
-// }
