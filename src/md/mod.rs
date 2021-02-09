@@ -1,9 +1,15 @@
+extern crate bacon_sci;
 extern crate csv;
 
 use crate::io::formatter::StateFormatter;
-use crate::SpacecraftState;
+use crate::{Orbit, SpacecraftState};
 use std::fs::File;
 pub mod ui;
+
+pub mod trajectory;
+
+pub type ScTraj = trajectory::Traj<SpacecraftState>;
+pub type Ephemeris = trajectory::Traj<Orbit>;
 
 /// A Mission Design handler
 pub trait MdHdlr<StateType: Copy>: Send + Sync {

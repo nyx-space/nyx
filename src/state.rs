@@ -23,8 +23,8 @@ pub trait TimeTagged {
 
 /// A trait for generate propagation and estimation state.
 /// The first parameter is the size of the state, the second is the size of the propagated state including STM and extra items.
-/// + Add<VectorN<f64, Self::Size>, Output = Self>
-pub trait State: TimeTagged + Copy + Clone + PartialEq + fmt::Display + fmt::LowerExp
+pub trait State:
+    TimeTagged + Copy + Clone + PartialEq + fmt::Display + fmt::LowerExp + Send + Sync
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::Size>,

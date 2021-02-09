@@ -140,11 +140,10 @@ where
         self.fixed_step = fixed;
     }
 
-    /// Returns the time of the propagation
-    ///
-    /// WARNING: Do not use the dynamics to get the time, it will be the initial value!
-    pub fn time(&self) -> f64 {
-        self.state.epoch().as_tai_seconds()
+    /// Set the output channel of the propagator. For example use this to generate an interpolated trajectory.
+    pub fn with_tx(mut self, tx: Sender<D::StateType>) -> Self {
+        self.tx_chan = Some(tx);
+        self
     }
 
     /// Returns the state of the propagation
@@ -302,7 +301,6 @@ where
                 flag = false;
             }
             // Propagate until time s
-            // self.for_duration(s - self.dynamics.time())?;
             self.for_duration(s * TimeUnit::Second)?;
             let ys = self.event_trackers.events[0].eval(&self.state);
             d = c;
@@ -342,7 +340,6 @@ where
         // Now that we have the time at which the condition is matched, let's propagate until then
         self.prevent_tx = false;
         let elapsed_time = -(closest_t * TimeUnit::Second);
-        // self.for_duration(self.state.time() - closest_t)?;
         self.for_duration(elapsed_time)?;
 
         Ok(self.state)

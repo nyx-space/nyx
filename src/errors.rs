@@ -32,6 +32,7 @@ pub enum NyxError {
     ObjectNotFound(String),
     NoInterpolationData(String),
     InvalidInterpolationData(String),
+    OutOfInterpolationWindow(String),
     NoStateData(String),
     DisjointFrameOrientations(String, String),
     /// When there is a controller but there isn't any thruster available

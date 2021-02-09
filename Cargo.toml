@@ -1,6 +1,6 @@
 [package]
 name = "nyx-space"
-version = "0.1.0-beta1"
+version = "0.1.0-beta2"
 edition = "2018"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
@@ -41,9 +41,10 @@ regex = "1.1"
 pretty_env_logger = "0.3"
 dialoguer = "0.7"
 glob = "0.3"
-rayon = "1.4"
+rayon = "1.5"
 lazy_static = "1.4.0"
 approx = "0.4"
+bacon-sci = {git = "https://github.com/aftix/bacon", rev="9bae9bf39b33d24bba8e21b6ed2dfab09e3b2ce6"}
 
 [profile.dev]
 opt-level = 0

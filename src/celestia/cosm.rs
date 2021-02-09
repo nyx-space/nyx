@@ -686,10 +686,6 @@ impl Cosm {
 
         // Get the Geoid associated with the ephemeris frame
         let storage_geoid = self.frame_from_ephem_path(path);
-        // let ref_frame_id = ephem.ref_frame.as_ref().unwrap().number;
-        // let ref_frame_exb_id = ref_frame_id % 100_000;
-        // let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
-
         Ok(Orbit::cartesian(
             x,
             y,
