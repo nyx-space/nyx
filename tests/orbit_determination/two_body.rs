@@ -30,11 +30,11 @@ fn od_tb_ekf_fixed_step_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -153,11 +153,11 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -219,13 +219,7 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(
-        prop_est,
-        ckf,
-        all_stations.clone(),
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -316,11 +310,11 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let range_noise = 0.1;
     let range_rate_noise = 0.001;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -385,13 +379,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(
-        prop_est,
-        ckf,
-        all_stations.clone(),
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -430,11 +418,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -556,11 +544,11 @@ fn od_tb_ckf_map_covar() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -642,11 +630,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -668,7 +656,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
 
     let mut orbital_dyn = OrbitalDynamics::two_body();
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
     orbital_dyn.add_model(harmonics);
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
 
@@ -761,11 +749,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.

@@ -17,8 +17,7 @@ fn state_def_() {
 
 #[test]
 fn state_def_circ_inc() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -110,8 +109,7 @@ fn state_def_circ_inc() {
 
 #[test]
 fn state_def_elliptical() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -189,8 +187,7 @@ fn state_def_elliptical() {
 
 #[test]
 fn state_def_circ_eq() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -266,8 +263,7 @@ fn state_def_circ_eq() {
 
 #[test]
 fn state_def_reciprocity() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_mjd_tai(21_545.0);
@@ -338,8 +334,7 @@ fn state_def_reciprocity() {
 
 #[test]
 fn geodetic_vallado() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     dbg!(eme2k.semi_major_radius());

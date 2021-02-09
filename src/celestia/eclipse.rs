@@ -1,6 +1,7 @@
 use super::{Cosm, Frame, LTCorr, Orbit};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::fmt;
+use std::sync::Arc;
 
 /// Stores the eclipse state
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -79,14 +80,14 @@ impl fmt::Display for EclipseState {
 }
 
 #[derive(Clone)]
-pub struct EclipseLocator<'a> {
+pub struct EclipseLocator {
     pub light_source: Frame,
     pub shadow_bodies: Vec<Frame>,
-    pub cosm: &'a Cosm,
+    pub cosm: Arc<Cosm>,
     pub correction: LTCorr,
 }
 
-impl<'a> EclipseLocator<'a> {
+impl EclipseLocator {
     /// Compute the visibility/eclipse between an observer and an observed state
     pub fn compute(&self, observer: &Orbit) -> EclipseState {
         let mut state = EclipseState::Visibilis;
@@ -95,7 +96,7 @@ impl<'a> EclipseLocator<'a> {
                 observer,
                 self.light_source,
                 *eclipsing_body,
-                self.cosm,
+                &self.cosm,
                 self.correction,
             );
             if this_state > state {

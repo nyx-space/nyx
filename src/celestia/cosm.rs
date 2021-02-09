@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::fmt;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::str::FromStr;
+use std::sync::Arc;
 
 #[derive(RustEmbed)]
 #[folder = "data/embed/"]
@@ -111,9 +112,42 @@ impl Cosm {
         Self::try_from_xb(Xb::from_buffer(&de438_buf)?)
     }
 
-    /// Load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
-    pub fn de438() -> Self {
-        Self::try_de438().expect("could not load embedded de438s EXB file")
+    /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn de438() -> Arc<Self> {
+        Arc::new(Self::try_de438().expect("could not load embedded de438s XB file"))
+    }
+
+    /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn de438_raw() -> Self {
+        Self::try_de438().expect("could not load embedded de438s XB file")
+    }
+
+    /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn de438_gmat() -> Arc<Self> {
+        let mut cosm = Self::try_de438().expect("could not load embedded de438s XB file");
+        // Set all of the GMs and their body fixed frames too
+        cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+        cosm.frame_mut_gm("IAU Sun", 132_712_440_017.99);
+        cosm.frame_mut_gm("Mercury Barycenter J2000", 22_032.080_486_418);
+        // No IAU mercury
+        cosm.frame_mut_gm("Venus Barycenter J2000", 324_858.598_826_46);
+        cosm.frame_mut_gm("IAU Venus", 324_858.598_826_46);
+        cosm.frame_mut_gm("EME2000", 398_600.441_5);
+        cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
+        cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+        cosm.frame_mut_gm("IAU Moon", 4_902.800_582_147_8);
+        cosm.frame_mut_gm("Mars Barycenter J2000", 42_828.314258067);
+        cosm.frame_mut_gm("IAU Mars", 42_828.314258067);
+        cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+        cosm.frame_mut_gm("IAU Jupiter", 126_712_767.857_80);
+        cosm.frame_mut_gm("Saturn Barycenter J2000", 37_940_626.061_137);
+        cosm.frame_mut_gm("IAU Saturn", 37_940_626.061_137);
+        cosm.frame_mut_gm("Uranus Barycenter J2000", 5_794_549.007_071_9);
+        cosm.frame_mut_gm("IAU Uranus", 5_794_549.007_071_9);
+        cosm.frame_mut_gm("Neptune Barycenter J2000", 6_836_534.063_879_3);
+        cosm.frame_mut_gm("IAU Neptune", 6_836_534.063_879_3);
+
+        Arc::new(cosm)
     }
 
     /// Attempts to build a Cosm from the XB files and the embedded IAU frames
@@ -555,7 +589,7 @@ impl Cosm {
         }
     }
 
-    /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
+    /// Returns the celestial state as computed from a de4xx.{FXB,XB} file in the original frame
     pub fn raw_celestial_state(&self, path: &[usize], epoch: Epoch) -> Result<Orbit, NyxError> {
         if path.is_empty() {
             // This is the solar system barycenter, so we just return a state of zeros
@@ -668,7 +702,7 @@ impl Cosm {
         ))
     }
 
-    /// Attempts to return the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
+    /// Attempts to return the state of the celestial object of XB ID `exb_id` (the target) at time `jde` `as_seen_from`
     ///
     /// The light time correction is based on SPICE's implementation: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkezr_c.html .
     /// Aberration computation is a conversion of the stelab function in SPICE, available here
@@ -755,7 +789,7 @@ impl Cosm {
         }
     }
 
-    /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`, or panics
+    /// Returns the state of the celestial object of XB ID `exb_id` (the target) at time `jde` `as_seen_from`, or panics
     pub fn celestial_state(
         &self,
         target_ephem: &[usize],

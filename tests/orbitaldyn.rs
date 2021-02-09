@@ -83,10 +83,7 @@ fn val_halo_earth_moon_dynamics() {
     */
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -115,7 +112,7 @@ fn val_halo_earth_moon_dynamics() {
     );
 
     let bodies = vec![Bodies::Luna];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
@@ -153,10 +150,7 @@ fn val_halo_earth_moon_dynamics_adaptive() {
     */
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -182,7 +176,7 @@ fn val_halo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::default());
     let mut prop = setup.with(halo_rcvr);
@@ -220,10 +214,7 @@ fn val_llo_earth_moon_dynamics_adaptive() {
     */
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -250,7 +241,7 @@ fn val_llo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::default());
     let mut prop = setup.with(llo_xmtr);
@@ -288,12 +279,7 @@ fn val_halo_multi_body_dynamics() {
     */
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
-    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -320,7 +306,7 @@ fn val_halo_multi_body_dynamics() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
@@ -359,12 +345,7 @@ fn val_halo_multi_body_dynamics_adaptive() {
 
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
-    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -391,7 +372,7 @@ fn val_halo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(halo_rcvr);
@@ -430,12 +411,7 @@ fn val_llo_multi_body_dynamics_adaptive() {
 
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
-    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 2, 7);
@@ -462,7 +438,7 @@ fn val_llo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(llo_xmtr);
@@ -501,12 +477,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon() {
 
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
-    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -526,7 +497,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(leo);
@@ -565,11 +536,7 @@ fn val_leo_multi_body_dynamics_adaptive() {
 
     let prop_time = 1 * TimeUnit::Day;
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
@@ -589,7 +556,7 @@ fn val_leo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::default(&dynamics);
     let mut prop = setup.with(leo);
@@ -720,7 +687,7 @@ fn multi_body_dynamics_dual() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
@@ -746,18 +713,19 @@ fn val_earth_sph_harmonics_j2() {
     // NOTE: GMAT and Monte are within about 0.1 meters of difference in position. Hence, we're checking we're in the same bracket.
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
+    use std::sync::Arc;
 
     let monte_earth_gm = 3.986_004_328_969_392e5;
     let monte_earth_j2 = -0.000_484_169_325_971;
 
-    let mut cosm = Cosm::de438();
+    let mut cosm = Cosm::de438_raw();
     cosm.frame_mut_gm("EME2000", monte_earth_gm);
     cosm.frame_mut_gm("IAU Earth", monte_earth_gm);
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
     let earth_sph_harm = HarmonicsMem::from_j2(monte_earth_j2);
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, Arc::new(cosm));
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -828,14 +796,12 @@ fn val_earth_sph_harmonics_12x12() {
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 12, 12, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -891,14 +857,12 @@ fn val_earth_sph_harmonics_70x70() {
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -954,14 +918,12 @@ fn val_earth_sph_harmonics_70x70_partials() {
     use nyx::dynamics::Harmonics;
     use nyx::io::gravity::*;
 
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -1018,14 +980,12 @@ fn hf_prop() {
     use nyx::dynamics::sph_harmonics::Harmonics;
     use nyx::io::gravity::*;
 
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 21, 21, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
 
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
@@ -1034,7 +994,7 @@ fn hf_prop() {
 
     let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let mut dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, &cosm);
+    let mut dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
     dynamics.add_model(harmonics);
 
     let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));

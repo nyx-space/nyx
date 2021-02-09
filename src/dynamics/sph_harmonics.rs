@@ -10,11 +10,11 @@ use std::cmp::min;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct Harmonics<'a, S>
+pub struct Harmonics<S>
 where
     S: GravityPotentialStor,
 {
-    cosm: &'a Cosm,
+    cosm: Arc<Cosm>,
     compute_frame: Frame,
     stor: S,
     a_nm: DMatrix<f64>,
@@ -29,12 +29,12 @@ where
     vr11_h: DMatrix<Hyperdual<f64, U7>>,
 }
 
-impl<'a, S> Harmonics<'a, S>
+impl<S> Harmonics<S>
 where
     S: GravityPotentialStor,
 {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: S, cosm: &'a Cosm) -> Arc<Self> {
+    pub fn from_stor(compute_frame: Frame, stor: S, cosm: Arc<Cosm>) -> Arc<Self> {
         assert!(
             compute_frame.is_geoid(),
             "harmonics only work around geoids"
@@ -148,7 +148,7 @@ where
     }
 }
 
-impl<'a, S: GravityPotentialStor + Send> AccelModel for Harmonics<'a, S> {
+impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self

@@ -45,7 +45,7 @@ impl Heuristic for LambertHeuristic {
         // Propagate for the TOF
         let cosm = Cosm::de438();
         let bodies = vec![Bodies::Luna, Bodies::SSB, Bodies::JupiterBarycenter];
-        let dynamics = OrbitalDynamics::point_masses(start.frame, &bodies, &cosm);
+        let dynamics = OrbitalDynamics::point_masses(start.frame, &bodies, cosm);
 
         // Create the channel to receive all of the details.
         let (tx, rx) = channel();

@@ -15,12 +15,7 @@ fn val_transfer_schedule_no_depl() {
         components of a spacecraft before defining the spacecraft itself.
     */
 
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
-    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     // Build the initial spacecraft state
@@ -50,7 +45,7 @@ fn val_transfer_schedule_no_depl() {
 
     // Define the dynamics
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, cosm);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -121,12 +116,7 @@ fn val_transfer_schedule_no_depl() {
 
 #[test]
 fn val_transfer_schedule_depl() {
-    let mut cosm = Cosm::de438();
-    // Modify GMs to match GMAT's
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
-    cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
-    cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-    cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     // Build the initial spacecraft state
@@ -156,7 +146,7 @@ fn val_transfer_schedule_depl() {
 
     // Define the dynamics
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, cosm);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 

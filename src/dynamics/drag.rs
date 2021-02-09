@@ -19,7 +19,7 @@ pub enum AtmDensity {
 /// This is a **bad** assumption and **should not** be used for high fidelity simulations.
 /// This will be resolved after https://gitlab.com/chrisrabotin/nyx/issues/93 is implemented.
 #[derive(Clone)]
-pub struct ConstantDrag<'a> {
+pub struct ConstantDrag {
     /// in m^2
     pub sc_area: f64,
     /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere).
@@ -29,10 +29,10 @@ pub struct ConstantDrag<'a> {
     /// Geoid causing the drag
     pub drag_frame: Frame,
     /// a Cosm reference is needed to convert to the state around the correct planet
-    pub cosm: &'a Cosm,
+    pub cosm: Arc<Cosm>,
 }
 
-impl<'a> ForceModel for ConstantDrag<'a> {
+impl ForceModel for ConstantDrag {
     fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
@@ -50,7 +50,7 @@ impl<'a> ForceModel for ConstantDrag<'a> {
 
 /// `Drag` implements all three drag models.
 #[derive(Clone)]
-pub struct Drag<'a> {
+pub struct Drag {
     /// Density computation method
     pub density: AtmDensity,
     /// in m^2
@@ -60,12 +60,12 @@ pub struct Drag<'a> {
     /// Frame to compute the drag in
     pub drag_frame: Frame,
     /// a Cosm reference is needed to convert to the state around the correct planet
-    pub cosm: &'a Cosm,
+    pub cosm: Arc<Cosm>,
 }
 
-impl<'a> Drag<'a> {
+impl Drag {
     /// Common exponential drag model for the Earth
-    pub fn earth_exp(sc_area: f64, cd: f64, cosm: &'a Cosm) -> Arc<Self> {
+    pub fn earth_exp(sc_area: f64, cd: f64, cosm: Arc<Cosm>) -> Arc<Self> {
         Arc::new(Self {
             density: AtmDensity::Exponential {
                 rho0: 3.614e-13,
@@ -80,7 +80,7 @@ impl<'a> Drag<'a> {
     }
 
     /// Drag model which uses the standard atmosphere 1976 model for atmospheric density
-    pub fn std_atm1976(sc_area: f64, cd: f64, cosm: &'a Cosm) -> Arc<Self> {
+    pub fn std_atm1976(sc_area: f64, cd: f64, cosm: Arc<Cosm>) -> Arc<Self> {
         Arc::new(Self {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
@@ -93,7 +93,7 @@ impl<'a> Drag<'a> {
     }
 }
 
-impl<'a> ForceModel for Drag<'a> {
+impl ForceModel for Drag {
     fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         match self.density {

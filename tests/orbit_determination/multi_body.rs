@@ -26,11 +26,11 @@ fn multi_body_ckf_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -50,7 +50,7 @@ fn multi_body_ckf_perfect_stations() {
     // Generate the truth data on one thread.
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -160,7 +160,7 @@ fn multi_body_ckf_covar_map() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss13_goldstone];
 
     // Define the propagator information.
@@ -180,7 +180,7 @@ fn multi_body_ckf_covar_map() {
     // Generate the truth data on one thread.
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);

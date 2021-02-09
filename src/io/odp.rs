@@ -16,6 +16,7 @@ use crate::time::{Duration, TimeUnit};
 use crate::Orbit;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::time::Instant;
 
 pub struct OdpScenario<'a> {
@@ -24,8 +25,8 @@ pub struct OdpScenario<'a> {
     ekf_msr_trigger: usize,
     ekf_disable_time: Duration,
     kf: KF<Orbit, U3, U2>,
-    stations: Vec<GroundStation<'a>>,
-    formatter: Option<NavSolutionFormatter<'a>>,
+    stations: Vec<GroundStation>,
+    formatter: Option<NavSolutionFormatter>,
 }
 
 impl<'a> OdpScenario<'a> {
@@ -33,7 +34,7 @@ impl<'a> OdpScenario<'a> {
     pub fn try_from_scenario(
         scenario: &ScenarioSerde,
         seq_name: String,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Result<Self, ParsingError> {
         if scenario.odp.is_none() {
             return Err(ParsingError::UseMdInstead);
@@ -78,19 +79,19 @@ impl<'a> OdpScenario<'a> {
                                             s.elevation,
                                             s.range_noise,
                                             s.range_rate_noise,
-                                            cosm,
+                                            cosm.clone(),
                                         ),
                                         "dss34" => GroundStation::dss34_canberra(
                                             s.elevation,
                                             s.range_noise,
                                             s.range_rate_noise,
-                                            cosm,
+                                            cosm.clone(),
                                         ),
                                         "dss65" => GroundStation::dss65_madrid(
                                             s.elevation,
                                             s.range_noise,
                                             s.range_rate_noise,
-                                            cosm,
+                                            cosm.clone(),
                                         ),
                                         _ => {
                                             return Err(ParsingError::OD(format!(
@@ -110,7 +111,7 @@ impl<'a> OdpScenario<'a> {
                                         s.range_noise,
                                         s.range_rate_noise,
                                         iau_earth,
-                                        cosm,
+                                        cosm.clone(),
                                     )
                                 };
                                 stations.push(gs);
@@ -122,7 +123,7 @@ impl<'a> OdpScenario<'a> {
                         scenario,
                         msr.propagator.as_ref().unwrap().to_string(),
                         StmStateFlag::Without(()),
-                        cosm,
+                        cosm.clone(),
                     )?
                     .0;
 
@@ -244,7 +245,7 @@ impl<'a> OdpScenario<'a> {
                         scenario,
                         odp_seq.navigation_prop.to_string(),
                         StmStateFlag::With(()),
-                        cosm,
+                        cosm.clone(),
                     )?
                     .0;
 
@@ -257,7 +258,7 @@ impl<'a> OdpScenario<'a> {
                                     output
                                 )))
                             }
-                            Some(output) => Some(output.to_nav_sol_formatter(&cosm)),
+                            Some(output) => Some(output.to_nav_sol_formatter(cosm)),
                         },
                         None => None,
                     };

@@ -122,7 +122,7 @@ fn nrho_apo() {
     let condition = StopCondition::new(apo_event, 2 * TimeUnit::Day, 1e-1);
 
     let bodies = vec![Bodies::Earth, Bodies::Sun];
-    let dynamics = OrbitalDynamics::point_masses(luna, &bodies, &cosm);
+    let dynamics = OrbitalDynamics::point_masses(luna, &bodies, cosm.clone());
 
     let setup = Propagator::rk89(
         &dynamics,

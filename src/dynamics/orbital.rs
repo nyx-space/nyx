@@ -20,7 +20,7 @@ pub struct OrbitalDynamics<'a> {
 
 impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(integr_frame: Frame, bodies: &[Bodies], cosm: &'a Cosm) -> Self {
+    pub fn point_masses(integr_frame: Frame, bodies: &[Bodies], cosm: Arc<Cosm>) -> Self {
         // Create the point masses
         let pts = PointMasses::new(integr_frame, bodies, cosm);
         Self {
@@ -153,19 +153,19 @@ pub struct ThirdBodyRef {
 }
 
 /// PointMasses model
-pub struct PointMasses<'a> {
+pub struct PointMasses {
     /// The propagation frame
     pub frame: Frame,
     pub bodies: Vec<ThirdBodyRef>,
     /// Optional point to a Cosm, needed if extra point masses are needed
-    pub cosm: &'a Cosm,
+    pub cosm: Arc<Cosm>,
     /// Light-time correction computation if extra point masses are needed
     pub correction: LTCorr,
 }
 
-impl<'a> PointMasses<'a> {
+impl PointMasses {
     /// Initializes the multibody point mass dynamics with the provided list of bodies
-    pub fn new(propagation_frame: Frame, body_names: &[Bodies], cosm: &'a Cosm) -> Arc<Self> {
+    pub fn new(propagation_frame: Frame, body_names: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
         Arc::new(Self::with_correction(
             propagation_frame,
             body_names,
@@ -178,7 +178,7 @@ impl<'a> PointMasses<'a> {
     pub fn with_correction(
         propagation_frame: Frame,
         bodies: &[Bodies],
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
         correction: LTCorr,
     ) -> Self {
         let mut refs = Vec::new();
@@ -202,7 +202,7 @@ impl<'a> PointMasses<'a> {
     pub fn specific(
         propagation_frame: Frame,
         bodies: &[String],
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
         correction: LTCorr,
     ) -> Self {
         let mut refs = Vec::new();
@@ -224,7 +224,7 @@ impl<'a> PointMasses<'a> {
     }
 }
 
-impl<'a> AccelModel for PointMasses<'a> {
+impl AccelModel for PointMasses {
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
         let mut d_x = Vector3::zeros();
         // Get all of the position vectors between the center body and the third bodies

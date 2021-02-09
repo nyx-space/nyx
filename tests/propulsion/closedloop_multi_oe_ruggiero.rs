@@ -15,7 +15,7 @@ use self::nyx::time::{Epoch, TimeUnit};
 fn qlaw_as_ruggiero_case_a() {
     // Source: AAS-2004-5089
 
-    let mut cosm = Cosm::de438();
+    let mut cosm = Cosm::de438_raw();
     cosm.frame_mut_gm("EME2000", 398_600.433);
     let eme2k = cosm.frame("EME2000");
 

@@ -31,9 +31,9 @@ fn robust_test_ekf_two_body() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -197,9 +197,9 @@ fn robust_test_ekf_multi_body() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -231,7 +231,7 @@ fn robust_test_ekf_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -255,7 +255,7 @@ fn robust_test_ekf_multi_body() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
@@ -365,9 +365,9 @@ fn robust_test_ekf_harmonics() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -405,11 +405,11 @@ fn robust_test_ekf_harmonics() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let mut orbital_dyn = OrbitalDynamics::two_body();
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
     orbital_dyn.add_model(harmonics);
-    orbital_dyn.add_model(PointMasses::new(eme2k, &bodies, &cosm));
+    orbital_dyn.add_model(PointMasses::new(eme2k, &bodies, cosm.clone()));
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -436,9 +436,9 @@ fn robust_test_ekf_harmonics() {
 
     let mut estimator = OrbitalDynamics::two_body();
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
     estimator.add_model(harmonics);
-    estimator.add_model(PointMasses::new(eme2k, &bodies, &cosm));
+    estimator.add_model(PointMasses::new(eme2k, &bodies, cosm));
 
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
@@ -542,9 +542,9 @@ fn robust_test_ekf_realistic() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -575,7 +575,7 @@ fn robust_test_ekf_realistic() {
         Bodies::JupiterBarycenter,
         Bodies::SaturnBarycenter,
     ];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -599,7 +599,7 @@ fn robust_test_ekf_realistic() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
@@ -693,9 +693,9 @@ fn robust_test_ckf_smoother_multi_body() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -727,7 +727,7 @@ fn robust_test_ckf_smoother_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -750,7 +750,7 @@ fn robust_test_ckf_smoother_multi_body() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
@@ -956,9 +956,9 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -990,7 +990,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -1013,7 +1013,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
@@ -1227,9 +1227,9 @@ fn robust_test_ckf_iteration_multi_body() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -1261,7 +1261,7 @@ fn robust_test_ckf_iteration_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -1284,7 +1284,7 @@ fn robust_test_ckf_iteration_multi_body() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     // XXX: Previouslt, this used a state deviation for the initial estimate but not in the dynamics. Sounds wrong.
     let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());

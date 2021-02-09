@@ -27,11 +27,11 @@ fn sc_ckf_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -54,13 +54,9 @@ fn sc_ckf_perfect_stations() {
     // Generate the truth data on one thread.
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, &cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let mut sc_dynamics = Spacecraft::new(orbital_dyn);
-    sc_dynamics.add_model(SolarPressure::default(
-        sc_area,
-        vec![cosm.frame("EME2000")],
-        &cosm,
-    ));
+    sc_dynamics.add_model(SolarPressure::default(sc_area, vec![eme2k], cosm.clone()));
 
     let sc_init_state = SpacecraftState::new(initial_state, sc_dry_mass, 0.0);
 
@@ -114,7 +110,7 @@ fn sc_ckf_perfect_stations() {
     odp.process_measurements(&measurements).unwrap();
 
     // Initialize the formatter
-    let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), &cosm);
+    let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     wtr.serialize(&estimate_fmtr.headers)

@@ -16,10 +16,11 @@ use crate::dimensions::{
 use crate::time::Epoch;
 use crate::utils::{r2, r3};
 use crate::SpacecraftState;
+use std::sync::Arc;
 
 /// GroundStation defines a Two Way ranging equipment.
 #[derive(Debug, Clone)]
-pub struct GroundStation<'a> {
+pub struct GroundStation {
     pub name: String,
     /// in degrees
     pub elevation_mask: f64,
@@ -31,12 +32,12 @@ pub struct GroundStation<'a> {
     pub height: f64,
     /// Frame in which this station is defined
     pub frame: Frame,
-    pub cosm: &'a Cosm,
+    pub cosm: Arc<Cosm>,
     range_noise: Normal<f64>,
     range_rate_noise: Normal<f64>,
 }
 
-impl<'a> GroundStation<'a> {
+impl GroundStation {
     /// Initializes a new Two Way ranging equipment from the noise values.
     pub fn from_noise_values(
         name: String,
@@ -47,7 +48,7 @@ impl<'a> GroundStation<'a> {
         range_noise: f64,
         range_rate_noise: f64,
         frame: Frame,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self {
             name,
@@ -66,7 +67,7 @@ impl<'a> GroundStation<'a> {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self::from_noise_values(
             "Madrid".to_string(),
@@ -85,7 +86,7 @@ impl<'a> GroundStation<'a> {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self::from_noise_values(
             "Canberra".to_string(),
@@ -104,7 +105,7 @@ impl<'a> GroundStation<'a> {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self::from_noise_values(
             "Goldstone".to_string(),
@@ -119,7 +120,7 @@ impl<'a> GroundStation<'a> {
         )
     }
 }
-impl<'a> MeasurementDevice<Orbit, StdMeasurement> for GroundStation<'a> {
+impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
         use std::f64::consts::PI;
@@ -147,7 +148,7 @@ impl<'a> MeasurementDevice<Orbit, StdMeasurement> for GroundStation<'a> {
     }
 }
 
-impl<'a> MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation<'a> {
+impl MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, sc_rx: &SpacecraftState) -> Option<StdMeasurement> {
         let rx = &sc_rx.orbit;

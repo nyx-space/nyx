@@ -8,23 +8,23 @@ use std::sync::Arc;
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
-pub struct SolarPressure<'a> {
+pub struct SolarPressure {
     /// in m^2
     pub sc_area: f64,
     /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back).
     pub cr: f64,
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,
-    pub e_loc: EclipseLocator<'a>,
+    pub e_loc: EclipseLocator,
 }
 
-impl<'a> SolarPressure<'a> {
+impl<'a> SolarPressure {
     /// Will use Cr = 1.8, Phi = 1367.0
-    pub fn default_raw(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: &'a Cosm) -> Self {
+    pub fn default_raw(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Self {
         let e_loc = EclipseLocator {
             light_source: cosm.frame("Sun J2000"),
             shadow_bodies,
-            cosm: &cosm,
+            cosm,
             correction: LTCorr::None,
         };
         Self {
@@ -35,12 +35,12 @@ impl<'a> SolarPressure<'a> {
         }
     }
 
-    pub fn default(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: &'a Cosm) -> Arc<Self> {
+    pub fn default(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Arc<Self> {
         Arc::new(Self::default_raw(sc_area, shadow_bodies, cosm))
     }
 }
 
-impl<'a> ForceModel for SolarPressure<'a> {
+impl ForceModel for SolarPressure {
     fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
         let osc = &ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft

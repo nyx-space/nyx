@@ -11,6 +11,7 @@ use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct OutputSerde {
@@ -20,14 +21,14 @@ pub struct OutputSerde {
 }
 
 impl OutputSerde {
-    pub fn to_state_formatter<'a>(&self, cosm: &'a Cosm) -> StateFormatter<'a> {
+    pub fn to_state_formatter(&self, cosm: Arc<Cosm>) -> StateFormatter {
         match &self.headers {
             Some(hdr) => StateFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm),
             None => StateFormatter::default(self.filename.clone(), cosm),
         }
     }
 
-    pub fn to_nav_sol_formatter<'a>(&self, cosm: &'a Cosm) -> NavSolutionFormatter<'a> {
+    pub fn to_nav_sol_formatter(&self, cosm: Arc<Cosm>) -> NavSolutionFormatter {
         match &self.headers {
             Some(hdr) => {
                 NavSolutionFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm)
@@ -640,14 +641,14 @@ impl Serialize for NavSolutionHeader {
 
 /// A formatter for states
 #[derive(Clone)]
-pub struct StateFormatter<'a> {
+pub struct StateFormatter {
     pub filename: String,
     pub headers: Vec<StateHeader>,
     frames: HashMap<String, Frame>,
-    cosm: &'a Cosm,
+    cosm: Arc<Cosm>,
 }
 
-impl<'a> StateFormatter<'a> {
+impl StateFormatter {
     /// ```
     /// extern crate nyx_space as nyx;
     /// use nyx::io::formatter::StateFormatter;
@@ -656,9 +657,9 @@ impl<'a> StateFormatter<'a> {
     /// let cosm = Cosm::de438();
     /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
     /// let hdrs = vec!["AoL".to_string(), "ea:eme2000".to_string()];
-    /// StateFormatter::from_headers(hdrs, "nope".to_string(), &cosm);
+    /// StateFormatter::from_headers(hdrs, "nope".to_string(), cosm);
     /// ```
-    pub fn from_headers(headers: Vec<String>, filename: String, cosm: &'a Cosm) -> Self {
+    pub fn from_headers(headers: Vec<String>, filename: String, cosm: Arc<Cosm>) -> Self {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(20);
         // Rebuild the header tokens
@@ -739,7 +740,7 @@ impl<'a> StateFormatter<'a> {
     }
 
     /// Default headers are [Epoch (GregorianTai), X, Y, Z, VX, VY, VZ], where position is in km and velocity in km/s.
-    pub fn default(filename: String, cosm: &'a Cosm) -> Self {
+    pub fn default(filename: String, cosm: Arc<Cosm>) -> Self {
         Self {
             filename,
             headers: vec![
@@ -882,14 +883,14 @@ impl<'a> StateFormatter<'a> {
 }
 
 /// A formatter for navigation solution
-pub struct NavSolutionFormatter<'a> {
+pub struct NavSolutionFormatter {
     pub filename: String,
     pub headers: Vec<NavSolutionHeader>,
-    pub estimated_headers: StateFormatter<'a>,
-    pub nominal_headers: StateFormatter<'a>,
+    pub estimated_headers: StateFormatter,
+    pub nominal_headers: StateFormatter,
 }
 
-impl<'a> NavSolutionFormatter<'a> {
+impl NavSolutionFormatter {
     /// ```
     /// extern crate nyx_space as nyx;
     /// use nyx::io::formatter::NavSolutionFormatter;
@@ -898,9 +899,9 @@ impl<'a> NavSolutionFormatter<'a> {
     /// let cosm = Cosm::de438();
     /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
     /// let hdrs = vec!["estimate:AoL".to_string(), "nominal:ea:eme2000".to_string(), "delta_x".to_string()];
-    /// NavSolutionFormatter::from_headers(hdrs, "nope".to_string(), &cosm);
+    /// NavSolutionFormatter::from_headers(hdrs, "nope".to_string(), cosm);
     /// ```
-    pub fn from_headers(headers: Vec<String>, filename: String, cosm: &'a Cosm) -> Self {
+    pub fn from_headers(headers: Vec<String>, filename: String, cosm: Arc<Cosm>) -> Self {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(40);
         let mut est_hdrs = Vec::with_capacity(20);
@@ -1020,19 +1021,19 @@ impl<'a> NavSolutionFormatter<'a> {
                 filename: "file_should_not_exist".to_owned(),
                 headers: nom_hdrs,
                 frames: frames.clone(),
-                cosm: &cosm,
+                cosm: cosm.clone(),
             },
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
                 frames,
-                cosm: &cosm,
+                cosm,
             },
         }
     }
 
     /// Default headers are [Epoch (GregorianTai), X, Y, Z, VX, VY, VZ], where position is in km and velocity in km/s.
-    pub fn default(filename: String, cosm: &'a Cosm) -> Self {
+    pub fn default(filename: String, cosm: Arc<Cosm>) -> Self {
         let est_hdrs = vec![
             StateHeader::X { frame: None },
             StateHeader::Y { frame: None },
@@ -1063,13 +1064,13 @@ impl<'a> NavSolutionFormatter<'a> {
                 filename: "file_should_not_exist".to_owned(),
                 headers: Vec::new(),
                 frames: HashMap::new(),
-                cosm: &cosm,
+                cosm: cosm.clone(),
             },
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
                 frames: HashMap::new(),
-                cosm: &cosm,
+                cosm,
             },
         }
     }

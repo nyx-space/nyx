@@ -24,7 +24,7 @@ fn nil_measurement() {
         0.0,
         0.0,
         eme2k,
-        &cosm,
+        cosm,
     );
 
     let at_station = Orbit::from_geodesic(lat, long, height, dt, eme2k);

@@ -123,8 +123,7 @@ fn gmat_val_leo_day_adaptive() {
     // NOTE: In this test we only use the propagators which also exist in GMAT.
     // Refer to `regress_leo_day_adaptive` for the additional propagators.
 
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let prop_time = 1 * TimeUnit::Day;
@@ -312,8 +311,7 @@ fn gmat_val_leo_day_adaptive() {
 #[allow(clippy::identity_op)]
 #[test]
 fn gmat_val_leo_day_fixed() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let prop_time = 1 * TimeUnit::Day;

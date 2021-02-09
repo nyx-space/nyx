@@ -10,13 +10,13 @@ pub trait MdHdlr<StateType: Copy>: Send + Sync {
     fn handle(&mut self, state: &StateType);
 }
 
-pub struct OrbitStateOutput<'a> {
+pub struct OrbitStateOutput {
     csv_out: csv::Writer<File>,
-    fmtr: StateFormatter<'a>,
+    fmtr: StateFormatter,
 }
 
-impl<'a> OrbitStateOutput<'a> {
-    pub fn new(fmtr: StateFormatter<'a>) -> Self {
+impl OrbitStateOutput {
+    pub fn new(fmtr: StateFormatter) -> Self {
         let mut wtr = csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
         wtr.serialize(&fmtr.headers)
             .expect("could not write headers");
@@ -26,7 +26,7 @@ impl<'a> OrbitStateOutput<'a> {
     }
 }
 
-impl<'a> MdHdlr<SpacecraftState> for OrbitStateOutput<'a> {
+impl MdHdlr<SpacecraftState> for OrbitStateOutput {
     fn handle(&mut self, state: &SpacecraftState) {
         self.csv_out
             .serialize(self.fmtr.fmt(&state.orbit))

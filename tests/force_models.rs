@@ -9,8 +9,7 @@ use nyx::utils::rss_errors;
 
 #[test]
 fn srp_earth() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
@@ -23,7 +22,7 @@ fn srp_earth() {
 
     let shadow_bodies = vec![eme2k];
 
-    let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
+    let srp = SolarPressure::default(1.0, shadow_bodies, cosm);
 
     let dry_mass = 300.0;
 
@@ -60,8 +59,7 @@ fn srp_earth() {
 
 #[test]
 fn exp_drag_earth() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
@@ -74,8 +72,8 @@ fn exp_drag_earth() {
 
     let shadow_bodies = vec![eme2k];
 
-    let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
-    let drag = Drag::earth_exp(1.0, 2.0, &cosm);
+    let srp = SolarPressure::default(1.0, shadow_bodies, cosm.clone());
+    let drag = Drag::earth_exp(1.0, 2.0, cosm);
 
     let dry_mass = 300.0;
 
@@ -99,8 +97,7 @@ fn exp_drag_earth() {
 
 #[test]
 fn std_atm_drag_earth() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
@@ -113,8 +110,8 @@ fn std_atm_drag_earth() {
 
     let shadow_bodies = vec![eme2k];
 
-    let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
-    let drag = Drag::std_atm1976(1.0, 2.0, &cosm);
+    let srp = SolarPressure::default(1.0, shadow_bodies, cosm.clone());
+    let drag = Drag::std_atm1976(1.0, 2.0, cosm);
 
     let dry_mass = 300.0;
 
@@ -151,8 +148,7 @@ fn std_atm_drag_earth() {
 
 #[test]
 fn std_atm_drag_earth_low() {
-    let mut cosm = Cosm::de438();
-    cosm.frame_mut_gm("EME2000", 398_600.441_5);
+    let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
     let dt = Epoch::from_gregorian_tai_at_midnight(2000, 1, 1);
@@ -174,8 +170,8 @@ fn std_atm_drag_earth_low() {
 
     let shadow_bodies = vec![eme2k];
 
-    let srp = SolarPressure::default(1.0, shadow_bodies, &cosm);
-    let drag = Drag::std_atm1976(1.0, 2.0, &cosm);
+    let srp = SolarPressure::default(1.0, shadow_bodies, cosm.clone());
+    let drag = Drag::std_atm1976(1.0, 2.0, cosm);
 
     let dry_mass = 300.0;
 

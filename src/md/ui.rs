@@ -44,7 +44,7 @@ where
 {
     pub sc_dyn: Spacecraft<'a>,
     pub init_state: SpacecraftState,
-    pub formatter: Option<StateFormatter<'a>>,
+    pub formatter: Option<StateFormatter>,
     pub prop_time: Option<Duration>,
     pub prop_event: Option<ConditionSerde>,
     pub prop_tol: f64,
@@ -59,8 +59,8 @@ where
         scen: &ScenarioSerde,
         prop_name: String,
         stm_flag: StmStateFlag,
-        cosm: &'a Cosm,
-    ) -> Result<(Self, Option<StateFormatter<'a>>), ParsingError> {
+        cosm: Arc<Cosm>,
+    ) -> Result<(Self, Option<StateFormatter>), ParsingError> {
         match scen.propagator.get(&prop_name.to_lowercase()) {
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
@@ -77,7 +77,7 @@ where
                                 prop_name, output
                             )))
                         }
-                        Some(out) => Some(out.to_state_formatter(cosm)),
+                        Some(out) => Some(out.to_state_formatter(cosm.clone())),
                     }
                 } else {
                     None
@@ -133,8 +133,8 @@ where
                                             )))
                                         }
                                         Some(base) => {
-                                            let state_frame = cosm.frame(base.frame.as_str());
-                                            base.as_state(state_frame)?
+                                            let state_frame = &cosm.frame(base.frame.as_str());
+                                            base.as_state(*state_frame)?
                                         }
                                     };
                                     delta_state.as_state(inherited)?
@@ -148,8 +148,8 @@ where
                         }
                     }
                     Some(init_state_sd) => {
-                        let state_frame = cosm.frame(init_state_sd.frame.as_str());
-                        let mut init = init_state_sd.as_state(state_frame)?;
+                        let state_frame = &cosm.frame(init_state_sd.frame.as_str());
+                        let mut init = init_state_sd.as_state(*state_frame)?;
                         if stm_flag.with() {
                             // Specify that we want to compute the STM.
                             init.enable_stm();
@@ -181,7 +181,7 @@ where
                     let sc_dyn = Spacecraft::new(OrbitalDynamics::point_masses(
                         init_state.frame,
                         &bodies,
-                        cosm,
+                        cosm.clone(),
                     ));
 
                     init_sc = SpacecraftState::new(
@@ -217,13 +217,15 @@ where
                                     )))
                                 }
                                 Some(amdl) => {
+                                    let eme2k = &cosm.frame("EME2000");
+                                    let luna = &cosm.frame("Luna");
                                     for smdl in amdl.srp.values() {
                                         // Note that an Arc is immutable, but we want to specify everything
                                         // so we create the SRP without the wrapper
                                         let mut srp = SolarPressure::default_raw(
                                             smdl.sc_area,
-                                            vec![cosm.frame("EME2000"), cosm.frame("Luna")],
-                                            &cosm,
+                                            vec![*eme2k, *luna],
+                                            cosm.clone(),
                                         );
                                         srp.phi = smdl.phi;
                                         srp.cr = smdl.cr;
@@ -250,9 +252,10 @@ where
                             Some(amdl) => {
                                 for hmdl in amdl.harmonics.values() {
                                     let in_mem = hmdl.load();
-                                    let compute_frame = cosm.frame(hmdl.frame.as_str());
+                                    let compute_frame = &cosm.frame(hmdl.frame.as_str());
 
-                                    let hh = Harmonics::from_stor(compute_frame, in_mem, &cosm);
+                                    let hh =
+                                        Harmonics::from_stor(*compute_frame, in_mem, cosm.clone());
                                     sc_dyn_flagged.orbital_dyn.add_model(hh);
                                 }
                             }
