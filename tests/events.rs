@@ -29,7 +29,7 @@ fn event_tracker_true_anomaly() {
 
     let dynamics = OrbitalDynamics::two_body();
     let setup = Propagator::rk89(
-        &dynamics,
+        dynamics,
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
     let mut prop = setup.with(state);

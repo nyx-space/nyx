@@ -49,7 +49,7 @@ impl Heuristic for LambertHeuristic {
 
         // Create the channel to receive all of the details.
         let (tx, rx) = channel();
-        let prop_setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-3));
+        let prop_setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-3));
         let mut prop = prop_setup.with(start_tf);
         prop.tx_chan = Some(tx);
         prop.for_duration(self.tof)?;

@@ -32,7 +32,7 @@ fn srp_earth() {
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
 
-    let setup = Propagator::default(&sc_dyn);
+    let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
     let final_state = prop.for_duration(prop_time).unwrap();
 
@@ -82,7 +82,7 @@ fn exp_drag_earth() {
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
 
-    let setup = Propagator::default(&sc_dyn);
+    let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
     prop.for_duration(prop_time).unwrap();
 
@@ -117,7 +117,7 @@ fn std_atm_drag_earth() {
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
 
-    let setup = Propagator::default(&sc_dyn);
+    let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
     prop.for_duration(prop_time).unwrap();
 
@@ -174,7 +174,7 @@ fn std_atm_drag_earth_low() {
 
     let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
 
-    let setup = Propagator::default(&sc_dyn);
+    let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
     prop.for_duration(prop_time).unwrap();
 

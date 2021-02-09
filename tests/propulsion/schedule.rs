@@ -60,12 +60,11 @@ fn val_transfer_schedule_no_depl() {
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
 
     // And create the spacecraft with that controller
-    let mut sc = Spacecraft::with_ctrl(orbital_dyn, schedule);
-    // Disable fuel mass decrement, turned on by default
-    sc.decrement_mass = false;
+    // Disable fuel mass decrement
+    let sc = Spacecraft::with_ctrl_no_decr(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let final_state = Propagator::rk89(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+    let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
         .with(sc_state)
         .for_duration(prop_time)
         .unwrap();
@@ -164,7 +163,7 @@ fn val_transfer_schedule_depl() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let final_state = Propagator::rk89(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
+    let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
         .with(sc_state)
         .for_duration(prop_time)
         .unwrap();

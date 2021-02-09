@@ -60,7 +60,7 @@ fn regress_leo_day_adaptive() {
 
     {
         let setup = Propagator::new::<RK2Fixed>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_fixed_step(1.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
@@ -82,7 +82,7 @@ fn regress_leo_day_adaptive() {
 
     {
         let setup = Propagator::new::<CashKarp45>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
@@ -100,7 +100,7 @@ fn regress_leo_day_adaptive() {
 
     {
         let setup = Propagator::new::<Fehlberg45>(
-            &dynamics,
+            dynamics,
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
@@ -183,7 +183,7 @@ fn gmat_val_leo_day_adaptive() {
 
     {
         let setup = Propagator::new::<Dormand45>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
@@ -229,7 +229,7 @@ fn gmat_val_leo_day_adaptive() {
 
     {
         let setup = Propagator::new::<Verner56>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
@@ -253,7 +253,7 @@ fn gmat_val_leo_day_adaptive() {
 
     {
         let setup = Propagator::new::<Dormand78>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
@@ -281,7 +281,7 @@ fn gmat_val_leo_day_adaptive() {
 
     {
         let setup = Propagator::new::<RK89>(
-            &dynamics,
+            dynamics,
             PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
         );
         let mut prop = setup.with(init);
@@ -378,7 +378,7 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let setup = Propagator::new::<RK4Fixed>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_fixed_step(1.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
@@ -404,7 +404,7 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let setup = Propagator::new::<Verner56>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
@@ -420,7 +420,7 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let setup = Propagator::new::<Dormand45>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
@@ -436,7 +436,7 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let setup = Propagator::new::<Dormand78>(
-            &dynamics,
+            dynamics.clone(),
             PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
         );
         let mut prop = setup.with(init);
@@ -451,10 +451,8 @@ fn gmat_val_leo_day_fixed() {
     }
 
     {
-        let setup = Propagator::new::<RK89>(
-            &dynamics,
-            PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-        );
+        let setup =
+            Propagator::new::<RK89>(dynamics, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[4], "two body prop failed");

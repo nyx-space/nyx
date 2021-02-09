@@ -65,7 +65,7 @@ fn robust_test_ekf_two_body() {
     );
 
     let orbital_dyn = OrbitalDynamics::two_body();
-    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -88,7 +88,7 @@ fn robust_test_ekf_two_body() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let estimator = OrbitalDynamics::two_body();
-    let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
+    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state_dev);
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
@@ -232,7 +232,7 @@ fn robust_test_ekf_multi_body() {
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
-    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -256,7 +256,7 @@ fn robust_test_ekf_multi_body() {
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
-    let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
+    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
@@ -406,7 +406,7 @@ fn robust_test_ekf_harmonics() {
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
     let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(eme2k, &bodies, cosm)]);
 
-    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn.clone(), opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -429,7 +429,7 @@ fn robust_test_ekf_harmonics() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
 
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
@@ -565,7 +565,7 @@ fn robust_test_ekf_realistic() {
         Bodies::SaturnBarycenter,
     ];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
-    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -589,7 +589,7 @@ fn robust_test_ekf_realistic() {
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
-    let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
+    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
@@ -717,7 +717,7 @@ fn robust_test_ckf_smoother_multi_body() {
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
-    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -740,7 +740,7 @@ fn robust_test_ckf_smoother_multi_body() {
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
-    let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
+    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
@@ -980,7 +980,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
-    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -1003,7 +1003,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     // the measurements, and the same time step.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
-    let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
+    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;
@@ -1251,7 +1251,7 @@ fn robust_test_ckf_iteration_multi_body() {
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
-    let truth_setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -1275,7 +1275,7 @@ fn robust_test_ckf_iteration_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
     // XXX: Previouslt, this used a state deviation for the initial estimate but not in the dynamics. Sounds wrong.
-    let setup = Propagator::new::<RK4Fixed>(&estimator, opts);
+    let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
     let covar_velocity = 1.0e1;

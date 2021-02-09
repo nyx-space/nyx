@@ -23,26 +23,12 @@ use std::str::FromStr;
 use std::sync::{mpsc::channel, Arc};
 use std::time::Instant;
 
-pub enum StmState<N, M> {
-    Without(N),
-    With(M),
-    Unknown,
-}
-
-impl<N, M> StmState<N, M> {
-    pub fn with(&self) -> bool {
-        matches!(self, StmState::With(_))
-    }
-}
-
-pub type StmStateFlag = StmState<(), ()>;
-
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics
 pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    pub sc_dyn: Spacecraft<'a>,
+    pub sc_dyn: Arc<Spacecraft<'a>>,
     pub init_state: SpacecraftState,
     pub formatter: Option<StateFormatter>,
     pub prop_time: Option<Duration>,
@@ -58,7 +44,7 @@ where
     pub fn try_from_scenario(
         scen: &ScenarioSerde,
         prop_name: String,
-        stm_flag: StmStateFlag,
+        stm_flag: bool,
         cosm: Arc<Cosm>,
     ) -> Result<(Self, Option<StateFormatter>), ParsingError> {
         match scen.propagator.get(&prop_name.to_lowercase()) {
@@ -150,7 +136,7 @@ where
                     Some(init_state_sd) => {
                         let state_frame = &cosm.frame(init_state_sd.frame.as_str());
                         let mut init = init_state_sd.as_state(*state_frame)?;
-                        if stm_flag.with() {
+                        if stm_flag {
                             // Specify that we want to compute the STM.
                             init.enable_stm();
                         }
@@ -178,7 +164,7 @@ where
                         bodies.remove(pos);
                     }
 
-                    sc_dyn = Spacecraft::new(OrbitalDynamics::point_masses(
+                    sc_dyn = Spacecraft::new_raw(OrbitalDynamics::point_masses(
                         init_state.frame,
                         &bodies,
                         cosm.clone(),
@@ -190,7 +176,7 @@ where
                         spacecraft.fuel_mass.unwrap_or(0.0),
                     );
                 } else {
-                    sc_dyn = Spacecraft::new(OrbitalDynamics::two_body());
+                    sc_dyn = Spacecraft::new_raw(OrbitalDynamics::two_body());
 
                     init_sc = SpacecraftState::new(
                         init_state,
@@ -237,6 +223,8 @@ where
 
                 // Add the acceleration models if applicable
                 if let Some(accel_models) = &dynamics.accel_models {
+                    // In this case, we'll need to recreate the orbital dynamics because it's behind an immutable Arc.
+                    let mut orbital_dyn = OrbitalDynamics::new_raw(vec![]);
                     for mdl in accel_models {
                         match scen.accel_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
                             None => {
@@ -252,11 +240,13 @@ where
 
                                     let hh =
                                         Harmonics::from_stor(*compute_frame, in_mem, cosm.clone());
-                                    sc_dyn.orbital_dyn.add_model(hh);
+                                    orbital_dyn.add_model(hh);
                                 }
                             }
                         }
                     }
+                    // And set these into the spacecraft dynamics
+                    sc_dyn.orbital_dyn = Arc::new(orbital_dyn);
                 }
 
                 // Validate the stopping condition
@@ -287,7 +277,7 @@ where
 
                 Ok((
                     Self {
-                        sc_dyn: sc_dyn,
+                        sc_dyn: Arc::new(sc_dyn),
                         init_state: init_sc,
                         formatter: None,
                         prop_time,
@@ -322,7 +312,7 @@ where
         let maybe_prop_event = self.prop_event.clone();
 
         // Build the propagator
-        let mut prop_setup = Propagator::default(&self.sc_dyn);
+        let mut prop_setup = Propagator::default(self.sc_dyn.clone());
         prop_setup.set_tolerance(self.prop_tol);
         let mut prop = prop_setup.with(self.init_state);
         // let mut prop = self.propagator();

@@ -53,7 +53,7 @@ fn od_tb_ekf_fixed_step_perfect_stations() {
 
     // We're sharing both the propagator and the dynamics.
     let orbital_dyn = OrbitalDynamics::two_body();
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -175,7 +175,7 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let orbital_dyn = OrbitalDynamics::two_body();
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -331,7 +331,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let orbital_dyn = OrbitalDynamics::two_body();
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -438,7 +438,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let orbital_dyn = OrbitalDynamics::two_body();
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -564,7 +564,7 @@ fn od_tb_ckf_map_covar() {
     init_est_state.enable_stm();
     let tb_estimator = OrbitalDynamics::two_body();
 
-    let setup = Propagator::new::<RK4Fixed>(&tb_estimator, PropOpts::with_fixed_step(step_size));
+    let setup = Propagator::new::<RK4Fixed>(tb_estimator, PropOpts::with_fixed_step(step_size));
     let prop_est = setup.with(init_est_state);
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
@@ -652,7 +652,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
     let orbital_dyn = OrbitalDynamics::with_model(harmonics);
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -765,7 +765,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let orbital_dyn = OrbitalDynamics::two_body();
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();

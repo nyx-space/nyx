@@ -16,7 +16,7 @@ use lazy_static::lazy_static;
 use log::{error, info};
 use nyx::celestia::{Cosm, Xb};
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
-use nyx::md::ui::{MDProcess, StmStateFlag};
+use nyx::md::ui::MDProcess;
 use nyx::md::MdHdlr;
 use nyx::md::OrbitStateOutput;
 use nyx::SpacecraftState;
@@ -148,7 +148,7 @@ fn main() -> Result<(), ParsingError> {
                         match MDProcess::try_from_scenario(
                             &scenario,
                             seq_name.to_string(),
-                            StmStateFlag::Without(()),
+                            false,
                             (*COSM).clone(),
                         ) {
                             Ok((mut md, maybe_fmtr)) => {

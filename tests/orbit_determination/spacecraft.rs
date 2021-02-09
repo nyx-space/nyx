@@ -62,7 +62,7 @@ fn sc_ckf_perfect_stations() {
 
     let sc_init_state = SpacecraftState::new(initial_state, sc_dry_mass, 0.0);
 
-    let setup = Propagator::new::<RK4Fixed>(&sc_dynamics, opts);
+    let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
     let mut prop = setup.with(sc_init_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();

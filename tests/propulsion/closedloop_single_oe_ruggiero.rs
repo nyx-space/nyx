@@ -44,11 +44,13 @@ fn rugg_sma() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_sma] {:o}", final_state.orbit);
@@ -97,11 +99,13 @@ fn rugg_sma_decr() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma_decr] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_sma_decr] {:o}", final_state.orbit);
@@ -152,11 +156,13 @@ fn rugg_inc() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_inc] {:o}", final_state.orbit);
@@ -207,11 +213,13 @@ fn rugg_inc_decr() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc_decr] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_inc_decr] {:o}", final_state.orbit);
@@ -262,11 +270,13 @@ fn rugg_ecc() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_ecc] {:o}", final_state.orbit);
@@ -317,11 +327,13 @@ fn rugg_ecc_decr() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc_decr] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_ecc_decr] {:o}", final_state.orbit);
@@ -374,11 +386,13 @@ fn rugg_aop() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_aop] {:o}", final_state.orbit);
@@ -430,11 +444,13 @@ fn rugg_aop_decr() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop_decr] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_aop_decr] {:o}", final_state.orbit);
@@ -488,8 +504,10 @@ fn rugg_raan() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_raan] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    let setup = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    );
     let mut prop = setup.with(sc_state);
     prop.event_trackers = tracker;
     let final_state = prop.for_duration(prop_time).unwrap();

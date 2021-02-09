@@ -63,8 +63,10 @@ fn qlaw_as_ruggiero_case_a() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:o}", orbit);
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    let setup = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    );
     let mut prop = setup.with(sc_state);
     prop.event_trackers = tracker;
     let final_state = prop.for_duration(prop_time).unwrap();
@@ -129,11 +131,13 @@ fn qlaw_as_ruggiero_case_b() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_b] {:o}", final_state.orbit);
@@ -191,11 +195,13 @@ fn qlaw_as_ruggiero_case_c() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_c] {:o}", final_state.orbit);
@@ -262,11 +268,13 @@ fn qlaw_as_ruggiero_case_d() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_d] {:o}", final_state.orbit);
@@ -338,11 +346,13 @@ fn qlaw_as_ruggiero_case_e() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_e] {:o}", final_state.orbit);
@@ -417,8 +427,10 @@ fn qlaw_as_ruggiero_case_f() {
         }
     });
 
-    let setup =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    let setup = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    );
     let mut prop = setup.with(sc_state);
     prop.tx_chan = Some(tx);
     let final_state = prop.for_duration(prop_time).unwrap();
@@ -483,11 +495,13 @@ fn ruggiero_iepc_2011_102() {
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:o}", orbit);
 
-    let final_state =
-        Propagator::new::<RK4Fixed>(&sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-            .with(sc_state)
-            .for_duration(prop_time)
-            .unwrap();
+    let final_state = Propagator::new::<RK4Fixed>(
+        sc.clone(),
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    )
+    .with(sc_state)
+    .for_duration(prop_time)
+    .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[ruggiero_iepc_2011_102] {:o}", final_state.orbit);

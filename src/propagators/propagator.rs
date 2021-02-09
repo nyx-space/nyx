@@ -21,7 +21,7 @@ where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
-    pub dynamics: Arc<&'a D>, // Stores the dynamics used. *Must* use this to get the latest values
+    pub dynamics: Arc<D>, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     order: u8,             // Order of the integrator
     stages: usize,         // Number of stages, i.e. how many times the derivatives will be called
@@ -36,9 +36,9 @@ where
         + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: &'a D, opts: PropOpts<E>) -> Self {
+    pub fn new<T: RK>(dynamics: Arc<D>, opts: PropOpts<E>) -> Self {
         Self {
-            dynamics: Arc::new(dynamics),
+            dynamics,
             opts,
             stages: T::stages(),
             order: T::order(),
@@ -58,7 +58,7 @@ where
     }
 
     /// An RK89 propagator (the default) with custom propagator options.
-    pub fn rk89(dynamics: &'a D, opts: PropOpts<E>) -> Self {
+    pub fn rk89(dynamics: Arc<D>, opts: PropOpts<E>) -> Self {
         Self::new::<RK89>(dynamics, opts)
     }
 
@@ -95,7 +95,7 @@ where
         + Allocator<f64, <D::StateType as State>::PropVecSize>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
-    pub fn default(dynamics: &'a D) -> Self {
+    pub fn default(dynamics: Arc<D>) -> Self {
         Self::new::<RK89>(dynamics, PropOpts::default())
     }
 }

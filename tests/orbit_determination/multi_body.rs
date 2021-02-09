@@ -51,7 +51,7 @@ fn multi_body_ckf_perfect_stations() {
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
@@ -181,7 +181,7 @@ fn multi_body_ckf_covar_map() {
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
-    let setup = Propagator::new::<RK4Fixed>(&orbital_dyn, opts);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();

@@ -29,7 +29,7 @@ fn stop_cond_3rd_apo() {
     let dynamics = OrbitalDynamics::two_body();
 
     let setup = Propagator::rk89(
-        &dynamics,
+        dynamics,
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
 
@@ -72,7 +72,7 @@ fn stop_cond_3rd_peri() {
     let dynamics = OrbitalDynamics::two_body();
 
     let setup = Propagator::rk89(
-        &dynamics,
+        dynamics,
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
 
@@ -125,7 +125,7 @@ fn nrho_apo() {
     let dynamics = OrbitalDynamics::point_masses(luna, &bodies, cosm.clone());
 
     let setup = Propagator::rk89(
-        &dynamics,
+        dynamics,
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
 

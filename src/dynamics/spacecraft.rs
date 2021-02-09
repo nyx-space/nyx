@@ -18,7 +18,7 @@ const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edi
 
 #[derive(Clone)]
 pub struct Spacecraft<'a> {
-    pub orbital_dyn: OrbitalDynamics<'a>,
+    pub orbital_dyn: Arc<OrbitalDynamics<'a>>,
     pub force_models: Vec<Arc<dyn ForceModel + 'a>>,
     pub ctrl: Option<Arc<dyn ThrustControl + 'a>>,
     pub decrement_mass: bool,
@@ -27,17 +27,39 @@ pub struct Spacecraft<'a> {
 impl<'a> Spacecraft<'a> {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// By default, the mass of the vehicle will be decremented as propellant is consummed.
-    pub fn with_ctrl(orbital_dyn: OrbitalDynamics<'a>, ctrl: Arc<dyn ThrustControl + 'a>) -> Self {
-        Self {
+    pub fn with_ctrl(
+        orbital_dyn: Arc<OrbitalDynamics<'a>>,
+        ctrl: Arc<dyn ThrustControl + 'a>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
             orbital_dyn,
             ctrl: Some(ctrl),
             force_models: Vec::new(),
             decrement_mass: true,
-        }
+        })
+    }
+
+    /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
+    /// Will _not_ decrement the fuel mass as propellant is consummed.
+    pub fn with_ctrl_no_decr(
+        orbital_dyn: Arc<OrbitalDynamics<'a>>,
+        ctrl: Arc<dyn ThrustControl + 'a>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            orbital_dyn,
+            ctrl: Some(ctrl),
+            force_models: Vec::new(),
+            decrement_mass: false,
+        })
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
-    pub fn new(orbital_dyn: OrbitalDynamics<'a>) -> Self {
+    pub fn new(orbital_dyn: Arc<OrbitalDynamics<'a>>) -> Arc<Self> {
+        Arc::new(Self::new_raw(orbital_dyn))
+    }
+
+    /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
+    pub fn new_raw(orbital_dyn: Arc<OrbitalDynamics<'a>>) -> Self {
         // Set the dry mass of the propulsion system
         Self {
             orbital_dyn,
@@ -49,22 +71,22 @@ impl<'a> Spacecraft<'a> {
 
     /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
     pub fn with_model(
-        orbital_dyn: OrbitalDynamics<'a>,
+        orbital_dyn: Arc<OrbitalDynamics<'a>>,
         force_model: Arc<dyn ForceModel + 'a>,
-    ) -> Self {
-        let mut me = Self::new(orbital_dyn);
+    ) -> Arc<Self> {
+        let mut me = Self::new_raw(orbital_dyn);
         me.add_model(force_model);
-        me
+        Arc::new(me)
     }
 
     /// Initialize new spacecraft dynamics with a vector of force models.
     pub fn with_models(
-        orbital_dyn: OrbitalDynamics<'a>,
+        orbital_dyn: Arc<OrbitalDynamics<'a>>,
         force_models: Vec<Arc<dyn ForceModel + 'a>>,
-    ) -> Self {
-        let mut me = Self::new(orbital_dyn);
+    ) -> Arc<Self> {
+        let mut me = Self::new_raw(orbital_dyn);
         me.force_models = force_models;
-        me
+        Arc::new(me)
     }
 
     pub fn add_model(&mut self, force_model: Arc<dyn ForceModel + 'a>) {

@@ -34,7 +34,7 @@ fn val_two_body_dynamics() {
     );
 
     let dynamics = OrbitalDynamics::two_body();
-    let setup = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default());
+    let setup = Propagator::rk89(dynamics, PropOpts::<RSSStepPV>::default());
     let mut prop = setup.with(state);
     prop.for_duration(prop_time).unwrap();
     assert_orbit_eq_or_abs(&prop.state, &rslt, 2e-9, "two body prop failed");
@@ -114,7 +114,7 @@ fn val_halo_earth_moon_dynamics() {
     let bodies = vec![Bodies::Luna];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_state_errors(&prop.state, &rslt);
@@ -178,7 +178,7 @@ fn val_halo_earth_moon_dynamics_adaptive() {
     let bodies = vec![Bodies::Luna];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::rk89(&dynamics, PropOpts::default());
+    let setup = Propagator::rk89(dynamics, PropOpts::default());
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -243,7 +243,7 @@ fn val_llo_earth_moon_dynamics_adaptive() {
     let bodies = vec![Bodies::Luna];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::rk89(&dynamics, PropOpts::default());
+    let setup = Propagator::rk89(dynamics, PropOpts::default());
     let mut prop = setup.with(llo_xmtr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -308,7 +308,7 @@ fn val_halo_multi_body_dynamics() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -374,7 +374,7 @@ fn val_halo_multi_body_dynamics_adaptive() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::default(&dynamics);
+    let setup = Propagator::default(dynamics);
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -440,7 +440,7 @@ fn val_llo_multi_body_dynamics_adaptive() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::default(&dynamics);
+    let setup = Propagator::default(dynamics);
     let mut prop = setup.with(llo_xmtr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -499,7 +499,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::default(&dynamics);
+    let setup = Propagator::default(dynamics);
     let mut prop = setup.with(leo);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -558,7 +558,7 @@ fn val_leo_multi_body_dynamics_adaptive() {
     let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::default(&dynamics);
+    let setup = Propagator::default(dynamics);
     let mut prop = setup.with(leo);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -647,7 +647,7 @@ fn two_body_dual() {
 
     let prop_time = 1 * TimeUnit::Day;
 
-    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(init);
     let final_state = prop.for_duration(prop_time).unwrap();
 
@@ -689,7 +689,7 @@ fn multi_body_dynamics_dual() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
 
-    let setup = Propagator::rk89(&dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
     let final_state = prop.for_duration(prop_time).unwrap();
 
@@ -759,7 +759,7 @@ fn val_earth_sph_harmonics_j2() {
 
     let dynamics = OrbitalDynamics::with_model(harmonics);
 
-    let prop_state = Propagator::rk89(&dynamics, PropOpts::<RSSStepPV>::default())
+    let prop_state = Propagator::rk89(dynamics, PropOpts::<RSSStepPV>::default())
         .with(state)
         .for_duration(1 * TimeUnit::Day)
         .unwrap();
@@ -819,7 +819,7 @@ fn val_earth_sph_harmonics_12x12() {
 
     let dynamics = OrbitalDynamics::with_model(harmonics);
 
-    let prop_state = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9))
+    let prop_state = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9))
         .with(state)
         .for_duration(1 * TimeUnit::Day)
         .unwrap();
@@ -879,7 +879,7 @@ fn val_earth_sph_harmonics_70x70() {
 
     let dynamics = OrbitalDynamics::with_model(harmonics);
 
-    let prop_rslt = Propagator::default(&dynamics)
+    let prop_rslt = Propagator::default(dynamics)
         .with(state)
         .for_duration(1 * TimeUnit::Day)
         .unwrap();
@@ -939,7 +939,7 @@ fn val_earth_sph_harmonics_70x70_partials() {
 
     let dynamics = OrbitalDynamics::with_model(harmonics);
 
-    let prop_rslt = Propagator::default(&dynamics)
+    let prop_rslt = Propagator::default(dynamics)
         .with(state)
         .for_duration(1 * TimeUnit::Day)
         .unwrap();
@@ -992,7 +992,7 @@ fn hf_prop() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::new(vec![PointMasses::new(eme2k, &bodies, cosm), harmonics]);
 
-    let setup = Propagator::rk89(&dynamics, PropOpts::with_tolerance(1e-9));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
     let rslt = setup
         .with(state)
         .for_duration(30.0 * TimeUnit::Day)

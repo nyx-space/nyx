@@ -6,7 +6,7 @@ use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
-use crate::md::ui::{MDProcess, StmStateFlag};
+use crate::md::ui::MDProcess;
 use crate::od::ranging::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
@@ -122,7 +122,7 @@ impl<'a> OdpScenario<'a> {
                     let md = MDProcess::try_from_scenario(
                         scenario,
                         msr.propagator.as_ref().unwrap().to_string(),
-                        StmStateFlag::Without(()),
+                        false,
                         cosm.clone(),
                     )?
                     .0;
@@ -244,7 +244,7 @@ impl<'a> OdpScenario<'a> {
                     let estimator = MDProcess::try_from_scenario(
                         scenario,
                         odp_seq.navigation_prop.to_string(),
-                        StmStateFlag::With(()),
+                        true,
                         cosm.clone(),
                     )?
                     .0;
@@ -303,7 +303,7 @@ impl<'a> OdpScenario<'a> {
             None => None,
         };
 
-        let mut prop_setup = Propagator::default(&self.truth.sc_dyn);
+        let mut prop_setup = Propagator::default(self.truth.sc_dyn);
         prop_setup.set_tolerance(self.truth.prop_tol);
         let mut truth_prop = prop_setup.with(self.truth.init_state);
 
@@ -366,7 +366,7 @@ impl<'a> OdpScenario<'a> {
         // Build the ODP
         // let mut nav = self.nav.propagator();
 
-        let mut prop_setup = Propagator::default(&self.nav.sc_dyn);
+        let mut prop_setup = Propagator::default(self.nav.sc_dyn);
         prop_setup.set_tolerance(self.nav.prop_tol);
         let mut nav = prop_setup.with(self.nav.init_state);
 
