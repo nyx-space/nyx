@@ -60,7 +60,7 @@ where
 
         let t_prime = normalize(
             dur_into_window.in_seconds(),
-            -1.0,
+            0.0,
             self.duration.in_seconds(),
         );
 
@@ -97,8 +97,8 @@ where
         // Push the initial state
         window_states.push(state);
 
-        // Start receiving states on a blocking call
         // Note that we're using the typical map+reduce pattern
+        // Start receiving states on a blocking call (map)
         while let Ok(state) = rx.recv_timeout(StdDur::from_millis(me.timeout_ms)) {
             if window_states.len() == ITEMS_PER_SEGMENTS {
                 let this_wdn = window_states.clone();
@@ -166,12 +166,12 @@ where
     }
 }
 
-// Normalize, usually between -1.0 and 1.0
+// Normalize between -1.0 and 1.0
 fn normalize(x: f64, min_x: f64, max_x: f64) -> f64 {
     2.0 * (x - min_x) / (max_x - min_x) - 1.0
 }
 
-// Denormalize, usually between -1.0 and 1.0
+// Denormalize between -1.0 and 1.0
 fn _denormalize(xp: f64, min_x: f64, max_x: f64) -> f64 {
     (max_x - min_x) * (xp + 1.0) / 2.0 + min_x
 }
@@ -195,7 +195,7 @@ where
     for state in &this_wdn {
         let t_prime = normalize(
             (state.epoch() - start_win_epoch).in_seconds(),
-            -1.0,
+            0.0,
             window_duration.in_seconds(),
         );
         ts.push(t_prime);

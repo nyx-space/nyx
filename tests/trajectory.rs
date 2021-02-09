@@ -121,8 +121,8 @@ fn traj_spacecraft() {
     let eme2k = cosm.frame("EME2000");
 
     // Build the initial orbit
-    let sma = eme2k.equatorial_radius() + 900.0;
     let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
+    let sma = eme2k.equatorial_radius() + 900.0;
     let orbit = Orbit::keplerian(sma, 5e-5, 5e-3, 0.0, 178.0, 0.0, start_dt, eme2k);
 
     // Define the objectives and the control law
@@ -205,7 +205,6 @@ fn traj_spacecraft() {
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.evaluate(prop_state.epoch()).unwrap();
-        println!("{}", eval_state);
 
         let pos_err = (eval_state.orbit.radius() - prop_state.orbit.radius()).norm();
         if pos_err > max_pos_err {
@@ -226,7 +225,7 @@ fn traj_spacecraft() {
     }
 
     println!(
-        "[traj_ephem] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfuel: {:.2e} g\t\tfull state: {:.2e} (no unit)",
+        "[traj_spacecraft] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfuel: {:.2e} g\t\tfull state: {:.2e} (no unit)",
         max_pos_err * 1e3,
         max_vel_err * 1e3,
         max_fuel_err * 1e3,
