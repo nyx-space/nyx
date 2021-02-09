@@ -70,9 +70,7 @@ fn multi_body_ckf_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -200,10 +198,7 @@ fn multi_body_ckf_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3_f64.powi(2);
     let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(

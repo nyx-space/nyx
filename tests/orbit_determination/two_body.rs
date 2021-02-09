@@ -74,9 +74,7 @@ fn od_tb_ekf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -196,9 +194,7 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -351,9 +347,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -459,9 +453,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -560,12 +552,12 @@ fn od_tb_ckf_map_covar() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let tb_estimator = OrbitalDynamics::two_body();
 
-    let setup = Propagator::new::<RK4Fixed>(tb_estimator, PropOpts::with_fixed_step(step_size));
-    let prop_est = setup.with(init_est_state);
+    let setup = Propagator::new::<RK4Fixed>(
+        OrbitalDynamics::two_body(),
+        PropOpts::with_fixed_step(step_size),
+    );
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -673,9 +665,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -785,9 +775,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut init_est_state = initial_state;
-    init_est_state.enable_stm();
-    let prop_est = setup.with(init_est_state);
+    let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
     let covar_radius = 1.0e-3;
