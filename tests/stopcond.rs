@@ -4,46 +4,60 @@ extern crate nyx_space as nyx;
 
 use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::md::Ephemeris;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
+use std::sync::mpsc::channel;
 
-#[ignore]
 #[test]
 fn stop_cond_3rd_apo() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
+
+    // Create a trajectory
+    let (tx, rx) = channel();
+    let ephem_thread = std::thread::spawn(move || Ephemeris::new(state, rx));
 
     let period = state.period();
 
     // Track how many times we've passed by that TA again
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
-    let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
-
-    let dynamics = OrbitalDynamics::two_body();
+    // let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
 
     let setup = Propagator::rk89(
-        dynamics,
+        OrbitalDynamics::two_body(),
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
+    let mut prop = setup.with(state).with_tx(tx);
+    // Propagate for at four orbital periods so we know we've passed the third one
+    prop.for_duration(4 * period).unwrap();
 
-    let mut prop = setup.with(state);
+    // Grab the ephemeris
+    let ephem = ephem_thread.join().unwrap().unwrap();
+    // And search it
+    let orbit = ephem
+        .find(
+            start_dt + 2 * period,
+            start_dt + 3 * period,
+            apo_event,
+            100 * TimeUnit::Millisecond,
+            0.1,
+        )
+        .expect("condition should have been found");
 
-    let rslt = prop.until_event(condition);
+    // let rslt = prop.until_event(condition);
 
-    // Check how many times we have found that event
-    println!("{}", prop.event_trackers);
-    let orbit = rslt.expect("condition should have been found");
     println!("{:o}", orbit);
     // Confirm that this is the third apoapse event which is found
     assert!(
-        orbit.dt - dt < 3.0 * period && orbit.dt - dt >= 2.0 * period,
+        orbit.dt - start_dt < 3.0 * period && orbit.dt - start_dt >= 2.0 * period,
         "converged on the wrong apoapse"
     );
     assert!(

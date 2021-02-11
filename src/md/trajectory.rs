@@ -3,13 +3,13 @@ use super::bacon_sci::polynomial::Polynomial;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
-use crate::time::{Duration, Epoch};
+use crate::propagators::events::Event;
+use crate::time::{Duration, Epoch, TimeUnit};
 use crate::State;
 use std::collections::BTreeMap;
 use std::sync::mpsc::Receiver;
 use std::time::Duration as StdDur;
 
-const ITEMS_PER_SEGMENTS: usize = 16;
 const INTERP_TOLERANCE: f64 = 1e-10;
 
 /// Stores a segment of an interpolation
@@ -52,6 +52,7 @@ where
             )));
         } else if dur_into_window.in_seconds() < 0.0 {
             // We should not be in this window, but in the next one
+            println!("Oh no: {}", dur_into_window.in_seconds());
             return Err(NyxError::InvalidInterpolationData(format!(
                 "Bug: should be in next window: {}",
                 dur_into_window
@@ -166,6 +167,130 @@ where
     /// Returns the last state in this ephemeris
     pub fn last(&self) -> S {
         self.segments[&self.max_offset].end_state
+    }
+
+    /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval.
+    pub fn find(
+        &self,
+        start: Epoch,
+        end: Epoch,
+        event: Box<dyn Event<StateType = S>>,
+        epsilon: Duration,
+        epsilon_eval: f64,
+    ) -> Result<S, NyxError> {
+        use std::f64::EPSILON;
+        let xa_e = start;
+        let xb_e = end;
+        // let (xa_e, xb_e) = self.event_trackers.found_bounds[0][condition.trigger - 1];
+        let mut xa = 0.0;
+        let mut xb = (xb_e - xa_e).in_seconds();
+        // Evaluate the event at both bounds
+        let mut ya = event.eval(&self.evaluate(xa_e)?);
+        let mut yb = event.eval(&self.evaluate(xb_e)?);
+        dbg!(ya, yb);
+        // The Brent solver, from the roots crate (sadly could not directly integrate it here)
+        // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
+
+        // Helper lambdas, for f64s only
+        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() <= epsilon.in_seconds();
+        let arrange = |a: f64, ya: f64, b: f64, yb: f64| {
+            if ya.abs() > yb.abs() {
+                dbg!(a, ya, b, yb)
+            } else {
+                dbg!(b, yb, a, ya)
+            }
+        };
+
+        let (mut c, mut yc, mut d) = (xa, ya, xa);
+        let mut flag = true;
+        let mut iter = 0;
+        let closest_t;
+        loop {
+            if ya.abs() < epsilon_eval.abs() {
+                closest_t = xa;
+                break;
+            }
+            if yb.abs() < epsilon_eval.abs() {
+                closest_t = xb;
+                break;
+            }
+            if has_converged(xa, xb) {
+                closest_t = c;
+                break;
+            }
+            let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
+                xa * yb * yc / ((ya - yb) * (ya - yc))
+                    + xb * ya * yc / ((yb - ya) * (yb - yc))
+                    + c * ya * yb / ((yc - ya) * (yc - yb))
+            } else {
+                xb - yb * (xb - xa) / (yb - ya)
+            };
+            let cond1 = (s - xb) * (s - (3.0 * xa + xb) / 4.0) > 0.0;
+            let cond2 = flag && (s - xb).abs() >= (xb - c).abs() / 2.0;
+            let cond3 = !flag && (s - xb).abs() >= (c - d).abs() / 2.0;
+            let cond4 = flag && has_converged(xb, c);
+            let cond5 = !flag && has_converged(c, d);
+            if cond1 || cond2 || cond3 || cond4 || cond5 {
+                s = (xa + xb) / 2.0;
+                flag = true;
+            } else {
+                flag = false;
+            }
+            // Propagate until time s
+            // self.for_duration(s * TimeUnit::Second)?;
+            // let ys = self.event_trackers.events[0].eval(&self.state);
+            println!("240 Fetching state at time {}", xa_e + s * TimeUnit::Second);
+            let ys = event.eval(&self.evaluate(xa_e + s * TimeUnit::Second)?);
+            d = c;
+            c = xb;
+            yc = yb;
+            if ya * ys < 0.0 {
+                // Root bracketed between a and s
+                // Propagate until time xa
+                // self.for_duration(xa * TimeUnit::Second)?;
+                // let ya_p = self.event_trackers.events[0].eval(&self.state);
+                println!(
+                    "250 Fetching state at time {}",
+                    xa_e + xa * TimeUnit::Second
+                );
+                let ya_p = event.eval(&self.evaluate(xa_e + xa * TimeUnit::Second)?);
+                let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
+                {
+                    xa = _a;
+                    ya = _ya;
+                    xb = _b;
+                    yb = _yb;
+                }
+            } else {
+                // Root bracketed between s and b
+                // Propagate until time xb
+                // self.for_duration(xb * TimeUnit::Second)?;
+                // let yb_p = self.event_trackers.events[0].eval(&self.state);
+                println!(
+                    "264 Fetching state at time {}",
+                    xa_e + xb * TimeUnit::Second
+                );
+                let yb_p = event.eval(&self.evaluate(xa_e + xb * TimeUnit::Second)?);
+                let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
+                {
+                    xa = _a;
+                    ya = _ya;
+                    xb = _b;
+                    yb = _yb;
+                }
+            }
+            iter += 1;
+            if iter >= 50 {
+                // condition.max_iter
+                return Err(NyxError::MaxIterReached(iter));
+            }
+        }
+
+        // Now that we have the time at which the condition is matched, let's propagate until then
+        let converged_time = xa_e - (closest_t * TimeUnit::Second);
+        println!("{}", closest_t);
+
+        self.evaluate(converged_time)
     }
 }
 
