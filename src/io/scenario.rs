@@ -23,7 +23,7 @@ use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::celestia::{Frame, Orbit};
-use crate::propagators::events::{EventKind, OrbitalEvent, SCEvent, StopCondition};
+use crate::propagators::event_trackers::{EventKind, OrbitalEvent, SCEvent, StopCondition};
 use crate::time::{Duration, Epoch};
 use crate::SpacecraftState;
 use std::collections::HashMap;

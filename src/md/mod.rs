@@ -26,6 +26,8 @@ pub mod ui;
 
 pub mod trajectory;
 
+pub mod events;
+
 pub type ScTraj = trajectory::Traj<SpacecraftState>;
 pub type Ephemeris = trajectory::Traj<Orbit>;
 
