@@ -48,21 +48,6 @@ pub struct FrameSerde {
 }
 
 impl FrameSerde {
-    pub fn to_frame(&self) -> Frame {
-        Frame::Geoid {
-            axb_id: self.orientation,
-            exb_id: self.center,
-            gm: self.gm,
-            parent_axb_id: self.parent_orientation,
-            parent_exb_id: self.parent_center,
-            flattening: self.flattening,
-            equatorial_radius: self.equatorial_radius,
-            semi_major_radius: self.semi_major_radius,
-            ephem_path: [None, None, None],
-            frame_path: [None, None, None],
-        }
-    }
-
     pub fn update_from(&mut self, src: &Frame) {
         if self.gm < 0.0 {
             self.gm = src.gm();
@@ -76,25 +61,11 @@ impl FrameSerde {
         if self.semi_major_radius < 0.0 {
             self.semi_major_radius = src.semi_major_radius();
         }
-        if let Some(p_axb) = self.parent_orientation {
-            if p_axb == -1 {
-                self.parent_orientation = src.parent_axb_id();
-            }
-        }
-        if let Some(p_exb) = self.parent_center {
-            if p_exb == -1 {
-                self.parent_center = src.parent_exb_id();
-            }
-        }
     }
 
     pub fn as_frame(&self) -> Frame {
         Frame::Geoid {
-            axb_id: self.orientation,
-            exb_id: self.center,
             gm: self.gm,
-            parent_axb_id: self.parent_orientation,
-            parent_exb_id: self.parent_center,
             flattening: self.flattening,
             equatorial_radius: self.equatorial_radius,
             semi_major_radius: self.semi_major_radius,

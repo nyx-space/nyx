@@ -288,7 +288,6 @@ fn ruggiero_weight() {
 
     let got = ruggiero.direction(&osc_sc);
 
-    println!("{}", expected - got);
     assert!(
         dbg!(expected - got).norm() < 1e-12,
         "incorrect direction computed"

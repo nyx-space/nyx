@@ -175,11 +175,7 @@ impl Cosm {
             frame_root: FrameTree {
                 name: "SSB J2000".to_string(),
                 frame: Frame::Celestial {
-                    axb_id: 0,
-                    exb_id: 0,
                     gm: SS_MASS * SUN_GM,
-                    parent_axb_id: None,
-                    parent_exb_id: None,
                     ephem_path: [None, None, None],
                     frame_path: [None, None, None],
                 },
@@ -286,10 +282,6 @@ impl Cosm {
                         flattening,
                         equatorial_radius,
                         semi_major_radius,
-                        axb_id: 0,
-                        exb_id: 0,
-                        parent_axb_id: None,
-                        parent_exb_id: None,
                         ephem_path,
                         frame_path: [Some(pos), None, None],
                     },
@@ -308,10 +300,6 @@ impl Cosm {
                             // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
                             equatorial_radius: 696_342.0,
                             semi_major_radius: 696_342.0,
-                            axb_id: 0,
-                            exb_id: 0,
-                            parent_axb_id: None,
-                            parent_exb_id: None,
                             ephem_path,
                             frame_path: [Some(pos), None, None],
                         },

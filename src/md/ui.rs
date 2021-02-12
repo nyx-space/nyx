@@ -177,7 +177,7 @@ where
                     // Remove bodies which are part of the state
                     if let Some(pos) = bodies
                         .iter()
-                        .position(|x| x.exb_id() == init_state.frame.exb_id())
+                        .position(|x| x.ephem_path() == init_state.frame.ephem_path())
                     {
                         bodies.remove(pos);
                     }

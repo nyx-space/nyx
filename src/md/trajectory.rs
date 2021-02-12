@@ -22,15 +22,17 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
 use crate::propagators::events::Event;
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::State;
 use std::collections::BTreeMap;
+use std::iter::Iterator;
 use std::sync::mpsc::Receiver;
 use std::time::Duration as StdDur;
 
 const INTERP_TOLERANCE: f64 = 1e-10;
 
 /// Stores a segment of an interpolation
+#[derive(Clone)]
 pub struct Segment<S: State>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
@@ -42,17 +44,27 @@ where
 }
 
 /// Store a trajectory of any State.
+#[derive(Clone)]
 pub struct Traj<S: State>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {
     /// Segments are organized as a binary tree map whose index is the
     /// number of seconds since the start of this ephemeris rounded down
-    pub segments: BTreeMap<u32, Segment<S>>,
+    pub segments: BTreeMap<i32, Segment<S>>,
     /// Timeout is used to stop listening to new state (default is 50ms, should work well in release and debug mode).
     pub timeout_ms: u64,
     start_state: S,
-    max_offset: u32,
+    max_offset: i32,
+}
+
+pub struct TrajIterator<S: State + 'static>
+where
+    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+{
+    pub time_series: TimeSeries,
+    /// A shared pointer to the original trajectory.
+    pub traj: Traj<S>,
 }
 
 impl<S: State> Segment<S>
@@ -152,7 +164,7 @@ where
         // Compute the number of seconds since start of trajectory
         let offset_s = ((segment.start_epoch - self.start_state.epoch())
             .in_seconds()
-            .floor()) as u32;
+            .floor()) as i32;
         self.segments.insert(offset_s, segment);
         if offset_s > self.max_offset {
             self.max_offset = offset_s;
@@ -161,7 +173,7 @@ where
 
     /// Evaluate the trajectory at this specific epoch.
     pub fn evaluate(&self, epoch: Epoch) -> Result<S, NyxError> {
-        let offset_s = ((epoch - self.start_state.epoch()).in_seconds().floor()) as u32;
+        let offset_s = ((epoch - self.start_state.epoch()).in_seconds().floor()) as i32;
         // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
             None => {
@@ -185,6 +197,14 @@ where
     /// Returns the last state in this ephemeris
     pub fn last(&self) -> S {
         self.segments[&self.max_offset].end_state
+    }
+
+    /// Creates an iterator through the trajectory by the provided step size
+    pub fn every(self, step: Duration) -> TrajIterator<S> {
+        TrajIterator {
+            time_series: TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step),
+            traj: self,
+        }
     }
 
     /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval.
@@ -309,6 +329,23 @@ where
         println!("{}", closest_t);
 
         self.evaluate(converged_time)
+    }
+}
+
+impl<S: State + 'static> Iterator for TrajIterator<S>
+where
+    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+{
+    type Item = S;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.time_series.next() {
+            Some(next_epoch) => match self.traj.evaluate(next_epoch) {
+                Ok(item) => Some(item),
+                _ => None,
+            },
+            None => None,
+        }
     }
 }
 

@@ -93,11 +93,7 @@ impl State for Orbit {
     /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
     fn zeros() -> Self {
         let frame = Frame::Celestial {
-            axb_id: 0,
-            exb_id: 0,
-            gm: 159.0,
-            parent_axb_id: None,
-            parent_exb_id: None,
+            gm: 1.0,
             ephem_path: [None, None, None],
             frame_path: [None, None, None],
         };
@@ -305,11 +301,7 @@ fn test_set_state() {
 
     let state = VectorN::<f64, U42>::from_iterator(new_vec);
     let dummy_frame = Frame::Celestial {
-        axb_id: 0,
-        exb_id: 399,
         gm: 398600.4415,
-        parent_axb_id: None,
-        parent_exb_id: None,
         ephem_path: [None, None, None],
         frame_path: [None, None, None],
     };
