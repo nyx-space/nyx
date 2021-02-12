@@ -17,7 +17,7 @@
 */
 
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
-use super::events::{EventTrackers, StopCondition};
+use super::event_trackers::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};

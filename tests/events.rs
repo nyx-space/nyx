@@ -5,7 +5,7 @@ fn event_tracker_true_anomaly() {
     use nyx::celestia::{Cosm, Orbit};
     use nyx::dynamics::orbital::OrbitalDynamics;
     use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent};
+    use nyx::propagators::event_trackers::{EventKind, EventTrackers, OrbitalEvent};
     use nyx::propagators::*;
     use nyx::time::{Epoch, J2000_OFFSET};
 

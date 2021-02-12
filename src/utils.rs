@@ -68,12 +68,17 @@ pub fn between_0_360(angle: f64) -> f64 {
 
 /// Returns the provided angle bounded between -180.0 and +180.0
 pub fn between_pm_180(angle: f64) -> f64 {
+    between_pm_x(angle, 180.0)
+}
+
+/// Returns the provided angle bounded between -x and +x
+pub fn between_pm_x(angle: f64, x: f64) -> f64 {
     let mut bounded = angle;
-    while bounded > 180.0 {
-        bounded -= 360.0;
+    while bounded > x {
+        bounded -= 2.0 * x;
     }
-    while bounded < -180.0 {
-        bounded += 360.0;
+    while bounded < -x {
+        bounded += 2.0 * x;
     }
     bounded
 }

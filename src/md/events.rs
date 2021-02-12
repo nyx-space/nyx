@@ -17,7 +17,7 @@
 */
 
 use crate::celestia::{Cosm, Frame, Orbit};
-use crate::utils::between_pm_180;
+use crate::utils::{between_pm_180, between_pm_x};
 use crate::SpacecraftState;
 use std::fmt;
 
@@ -93,11 +93,20 @@ impl<'a> Event for OrbitalEvent<'a> {
             EventKind::Inc(inc) => state.inc() - inc,
             EventKind::Raan(raan) => state.raan() - raan,
             EventKind::Aop(aop) => state.aop() - aop,
-            EventKind::TA(angle) => state.ta() - angle,
+            EventKind::TA(angle) => {
+                if between_pm_x(state.ta(), angle) > 0.0 {
+                    state.ta() - angle
+                } else {
+                    state.ta() + 2.0 * angle
+                }
+            }
             EventKind::Periapse => between_pm_180(state.ta()),
             EventKind::Apoapse => {
-                // We use the sign change in flight path angle to determine that we have crossed the apoapse
-                between_pm_180(state.ta()) - 180.0
+                if between_pm_180(state.ta()) > 0.0 {
+                    state.ta() - 180.0
+                } else {
+                    state.ta() + 360.0
+                }
             }
             _ => panic!("event {:?} not supported", self.kind),
         }

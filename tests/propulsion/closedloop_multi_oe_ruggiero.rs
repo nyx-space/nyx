@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
-use self::nyx::propagators::events::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
+use self::nyx::propagators::event_trackers::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
 

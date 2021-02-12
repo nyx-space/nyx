@@ -22,7 +22,7 @@ use std::fmt;
 pub mod error_ctrl;
 pub use self::error_ctrl::*;
 
-pub mod events;
+pub mod event_trackers;
 
 // Re-Export
 mod rk;

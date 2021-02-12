@@ -6,7 +6,7 @@ use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::md::Ephemeris;
 use nyx::propagators::error_ctrl::RSSStepPV;
-use nyx::propagators::events::{EventKind, OrbitalEvent, StopCondition};
+use nyx::propagators::event_trackers::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
 use std::sync::mpsc::channel;
@@ -31,10 +31,7 @@ fn stop_cond_3rd_apo() {
     let apo_event = OrbitalEvent::new(EventKind::Apoapse);
     // let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
 
-    let setup = Propagator::rk89(
-        OrbitalDynamics::two_body(),
-        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
-    );
+    let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state).with_tx(tx);
     // Propagate for at four orbital periods so we know we've passed the third one
     prop.for_duration(4 * period).unwrap();
@@ -47,7 +44,7 @@ fn stop_cond_3rd_apo() {
             start_dt + 2 * period,
             start_dt + 3 * period,
             apo_event,
-            100 * TimeUnit::Millisecond,
+            TimeUnit::Millisecond,
             0.1,
         )
         .expect("condition should have been found");
