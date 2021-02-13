@@ -238,8 +238,8 @@ where
         let xb_e = end;
 
         // Search in seconds (convert to epoch just in time)
-        let mut a = 0.0;
-        let mut b = (xb_e - xa_e).in_seconds();
+        let mut xa = 0.0;
+        let mut xb = (xb_e - xa_e).in_seconds();
         // Evaluate the event at both bounds
         let mut ya = event.eval(&self.evaluate(xa_e)?);
         let mut yb = event.eval(&self.evaluate(xb_e)?);
@@ -253,67 +253,90 @@ where
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
 
-        let (mut c, mut yc, mut d) = (a, ya, a);
+        let (mut xc, mut yc, mut xd) = (xa, ya, xa);
         let mut flag = true;
 
         for _ in 0..max_iter {
             if ya.abs() < epsilon_eval.abs() {
-                return Ok(self.evaluate(xa_e + a * TimeUnit::Second)?);
+                return Ok(self.evaluate(xa_e + xa * TimeUnit::Second)?);
             }
             if yb.abs() < epsilon_eval.abs() {
-                return Ok(self.evaluate(xa_e + b * TimeUnit::Second)?);
+                return Ok(self.evaluate(xa_e + xb * TimeUnit::Second)?);
             }
-            if has_converged(a, b) {
-                return Ok(self.evaluate(xa_e + a * TimeUnit::Second)?);
+            if has_converged(xa, xb) {
+                return Ok(self.evaluate(xa_e + xa * TimeUnit::Second)?);
             }
             let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
-                a * yb * yc / ((ya - yb) * (ya - yc))
-                    + b * ya * yc / ((yb - ya) * (yb - yc))
-                    + c * ya * yb / ((yc - ya) * (yc - yb))
+                xa * yb * yc / ((ya - yb) * (ya - yc))
+                    + xb * ya * yc / ((yb - ya) * (yb - yc))
+                    + xc * ya * yb / ((yc - ya) * (yc - yb))
             } else {
-                b - yb * (b - a) / (yb - ya)
+                xb - yb * (xb - xa) / (yb - ya)
             };
-            let cond1 = (s - b) * (s - (3.0 * a + b) / 4.0) > 0.0;
-            let cond2 = flag && (s - b).abs() >= (b - c).abs() / 2.0;
-            let cond3 = !flag && (s - b).abs() >= (c - d).abs() / 2.0;
-            let cond4 = flag && has_converged(b, c);
-            let cond5 = !flag && has_converged(c, d);
+            let cond1 = (s - xb) * (s - (3.0 * xa + xb) / 4.0) > 0.0;
+            let cond2 = flag && (s - xb).abs() >= (xb - xc).abs() / 2.0;
+            let cond3 = !flag && (s - xb).abs() >= (xc - xd).abs() / 2.0;
+            let cond4 = flag && has_converged(xb, xc);
+            let cond5 = !flag && has_converged(xc, xd);
             if cond1 || cond2 || cond3 || cond4 || cond5 {
-                s = (a + b) / 2.0;
+                s = (xa + xb) / 2.0;
                 flag = true;
             } else {
                 flag = false;
             }
             let next_try = self.evaluate(xa_e + s * TimeUnit::Second)?;
             let ys = event.eval(&next_try);
-            d = c;
-            c = b;
+            xd = xc;
+            xc = xb;
             yc = yb;
             if ya * ys < 0.0 {
                 // Root bracketed between a and s
-                let next_try = self.evaluate(xa_e + a * TimeUnit::Second)?;
+                let next_try = self.evaluate(xa_e + xa * TimeUnit::Second)?;
                 let ya_p = event.eval(&next_try);
-                let (_a, _ya, _b, _yb) = arrange(a, ya_p, s, ys);
+                let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
-                    a = _a;
+                    xa = _a;
                     ya = _ya;
-                    b = _b;
+                    xb = _b;
                     yb = _yb;
                 }
             } else {
                 // Root bracketed between s and b
-                let next_try = self.evaluate(xa_e + b * TimeUnit::Second)?;
+                let next_try = self.evaluate(xa_e + xb * TimeUnit::Second)?;
                 let yb_p = event.eval(&next_try);
-                let (_a, _ya, _b, _yb) = arrange(s, ys, b, yb_p);
+                let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {
-                    a = _a;
+                    xa = _a;
                     ya = _ya;
-                    b = _b;
+                    xb = _b;
                     yb = _yb;
                 }
             }
         }
         Err(NyxError::MaxIterReached(max_iter))
+    }
+
+    /// Find the minimum and maximum of the provided event through the trajectory
+    #[allow(clippy::identity_op)]
+    pub fn find_minmax(&self, event: Box<dyn Event<StateType = S>>, precision: TimeUnit) -> (S, S) {
+        let step: Duration = 1 * precision;
+        let mut min_val = std::f64::INFINITY;
+        let mut max_val = std::f64::NEG_INFINITY;
+        let mut min_state = S::zeros();
+        let mut max_state = S::zeros();
+        let self_c = self.clone();
+        for state in self_c.every(step) {
+            let this_eval = event.eval(&state);
+            if this_eval < min_val {
+                min_val = this_eval;
+                min_state = state;
+            }
+            if this_eval > max_val {
+                max_val = this_eval;
+                max_state = state;
+            }
+        }
+        (min_state, max_state)
     }
 }
 
