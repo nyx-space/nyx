@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::time::Epoch;
 use std::error::Error;
 use std::fmt;
 
@@ -32,7 +33,7 @@ pub enum NyxError {
     /// Maximum iterations reached, value corresponds to the number of iterations used
     MaxIterReached(usize),
     /// Event not in braket
-    EventNotInEpochBraket(f64, f64),
+    EventNotInEpochBraket(Epoch, Epoch),
     /// The STM was not updated prior to requesting a filter update
     StateTransitionMatrixNotUpdated,
     /// The operation was expecting the state to have an STM, but it isn't present.

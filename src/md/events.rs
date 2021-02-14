@@ -37,7 +37,7 @@ fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
 }
 
 /// A trait to specify how a specific event must be evaluated.
-pub trait EventEvaluator<S: State>: fmt::Display
+pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
 where
     DefaultAllocator: Allocator<f64, S::Size>,
 {
@@ -113,7 +113,7 @@ impl Event {
             value,
             epoch_precision: TimeUnit::Millisecond,
             value_precision: 1e-3,
-            in_frame: None,
+            in_frame: Some((target_frame, cosm)),
         }
     }
 
@@ -128,7 +128,7 @@ impl Event {
             value: 0.0,
             epoch_precision: TimeUnit::Millisecond,
             value_precision: 0.0,
-            in_frame: None,
+            in_frame: Some((target_frame, cosm)),
         }
     }
 }
@@ -264,8 +264,8 @@ impl EventEvaluator<Orbit> for Event {
 
     fn eval(&self, state: &Orbit) -> f64 {
         // Transform the state if needed
-        let state = if let Some((frame, cosm)) = self.in_frame {
-            cosm.frame_chg(state, frame)
+        let state = if let Some((frame, cosm)) = &self.in_frame {
+            cosm.frame_chg(state, *frame)
         } else {
             *state
         };
@@ -317,6 +317,7 @@ impl EventEvaluator<SpacecraftState> for Event {
         }
     }
 
+    #[allow(clippy::identity_op)]
     fn epoch_precision(&self) -> Duration {
         1 * self.epoch_precision
     }

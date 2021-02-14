@@ -347,7 +347,7 @@ where
         // Run
         match maybe_prop_event {
             Some(prop_event) => {
-                let event = prop_event.to_condition(initial_state.unwrap().orbit.dt);
+                let event = prop_event.to_condition();
                 let max_duration = match Duration::from_str(prop_event.search_until.as_str()) {
                     Ok(d) => d,
                     Err(_) => match Epoch::from_str(prop_event.search_until.as_str()) {
@@ -358,14 +358,7 @@ where
                         }
                     },
                 };
-                let rslt = prop.until_event(
-                    max_duration,
-                    event,
-                    match prop_event.hits {
-                        Some(trigger) => trigger,
-                        None => 0,
-                    },
-                );
+                let rslt = prop.until_event(max_duration, &event, prop_event.hits.unwrap_or(0));
                 if rslt.is_err() {
                     panic!("{:?}", rslt.err());
                 }

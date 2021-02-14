@@ -20,7 +20,8 @@ gitlab = { repository = "chrisrabotin/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.24"
 log = "0.4"
-hifitime = "2.2.3"
+# hifitime = "2.2.3"
+hifitime = {path = "../hifitime"}
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"
@@ -45,6 +46,7 @@ rayon = "1.5"
 lazy_static = "1.4.0"
 approx = "0.4"
 bacon-sci = {git = "https://github.com/aftix/bacon", rev="9bae9bf39b33d24bba8e21b6ed2dfab09e3b2ce6"}
+crossbeam = "0.8"
 
 [profile.dev]
 opt-level = 0

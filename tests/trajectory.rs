@@ -3,7 +3,6 @@ extern crate nyx_space as nyx;
 use nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
 use nyx::dynamics::thrustctrl::{Achieve, Ruggiero, ThrustControl, Thruster};
 use nyx::dynamics::{OrbitalDynamics, Spacecraft};
-use nyx::md::{Ephemeris, ScTraj};
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, TimeUnit};
 use nyx::{State, TimeTagged};
@@ -13,7 +12,6 @@ use std::sync::mpsc::channel;
 #[test]
 fn traj_ephem() {
     // Test that we can correctly interpolate a spacecraft orbit
-    let (tx, rx) = channel();
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
@@ -22,17 +20,10 @@ fn traj_ephem() {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
-    // The trajectory must always be generated on its own thread.
-    let ephem_thread = std::thread::spawn(move || Ephemeris::new(start_state, rx));
-
     let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(start_state.with_stm()).with_tx(tx);
-    let end_state = prop.for_duration(31 * TimeUnit::Day).unwrap();
-
-    // Retrieve the ephemeris by unwrapping it twice:
-    // + The first is to unwrap the thread (i.e. assume the thread has not failed)
-    // + The second assumes that the generation of the ephemeris didn't fail.
-    let ephem = ephem_thread.join().unwrap().unwrap();
+    let mut prop = setup.with(start_state.with_stm());
+    // The trajectory must always be generated on its own thread, no need to worry about it ;-)
+    let (end_state, ephem) = prop.for_duration_with_traj(31 * TimeUnit::Day).unwrap();
 
     // Example of iterating through the trajectory.
     // Note how we receive a fully blown Orbit, so we can manipulate it exactly like a normal state.
@@ -132,7 +123,6 @@ fn traj_spacecraft() {
     // Test the interpolation of a spaceraft trajectory and of its fuel. Includes a demo of checking what the guidance mode _should_ be provided the state.
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
     // This is based on the Ruggiero AOP correction
-    let (tx, rx) = channel();
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
@@ -162,18 +152,10 @@ fn traj_spacecraft() {
 
     let sc_dynamics = Spacecraft::with_ctrl(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
 
-    // The trajectory must always be generated on its own thread.
-    let traj_thread = std::thread::spawn(move || ScTraj::new(start_state, rx));
-
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * TimeUnit::Minute + 10 * TimeUnit::Second;
-    let mut prop = setup.with(start_state).with_tx(tx);
-    let end_state = prop.for_duration(prop_time).unwrap();
-
-    // Retrieve the trajectory by unwrapping it twice:
-    // + The first is to unwrap the thread (i.e. assume the thread has not failed)
-    // + The second assumes that the generation of the ephemeris didn't fail.
-    let traj = traj_thread.join().unwrap().unwrap();
+    let mut prop = setup.with(start_state);
+    let (end_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Example of iterating through the spaceraft trajectory and checking what the guidance mode is at each time.
     let mut prev_mode = GuidanceMode::Coast;
@@ -291,7 +273,6 @@ fn traj_spacecraft() {
 fn traj_ephem_backward() {
     // BROKEN: cf. https://gitlab.com/chrisrabotin/nyx/-/issues/190
     // Test that we can correctly interpolate a spacecraft orbit
-    let (tx, rx) = channel();
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
@@ -300,17 +281,9 @@ fn traj_ephem_backward() {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
-    // The trajectory must always be generated on its own thread.
-    let ephem_thread = std::thread::spawn(move || Ephemeris::new(start_state, rx));
-
     let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(start_state.with_stm()).with_tx(tx);
-    let end_state = prop.for_duration(-31 * TimeUnit::Day).unwrap();
-
-    // Retrieve the ephemeris by unwrapping it twice:
-    // + The first is to unwrap the thread (i.e. assume the thread has not failed)
-    // + The second assumes that the generation of the ephemeris didn't fail.
-    let ephem = ephem_thread.join().unwrap().unwrap();
+    let mut prop = setup.with(start_state.with_stm());
+    let (end_state, ephem) = prop.for_duration_with_traj(-31 * TimeUnit::Day).unwrap();
 
     // Example of iterating through the trajectory.
     // Note how we receive a fully blown Orbit, so we can manipulate it exactly like a normal state.

@@ -18,6 +18,8 @@
 
 use super::bacon_sci::interp::lagrange;
 use super::bacon_sci::polynomial::Polynomial;
+use super::crossbeam::thread;
+use super::rayon::prelude::*;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
@@ -26,7 +28,7 @@ use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::State;
 use std::collections::BTreeMap;
 use std::iter::Iterator;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration as StdDur;
 
 const INTERP_TOLERANCE: f64 = 1e-10;
@@ -58,7 +60,7 @@ where
     max_offset: i32,
 }
 
-pub struct TrajIterator<S: State + 'static>
+pub struct TrajIterator<S: State>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {
@@ -80,9 +82,9 @@ where
                 "Requested trajectory at time {} but that is past the final interpolation window by {}",
                 epoch, dur_into_window
             )));
-        } else if dur_into_window.in_seconds() < 0.0 {
+        } else if dur_into_window.in_seconds() < -1.0 {
             // We should not be in this window, but in the next one
-            println!("Oh no: {}", dur_into_window.in_seconds());
+            // We allow for a delta of one second because of the rounding of the indexing.
             return Err(NyxError::InvalidInterpolationData(format!(
                 "Bug: should be in next window: {}",
                 dur_into_window
@@ -108,58 +110,61 @@ where
     }
 }
 
-impl<S: State + 'static> Traj<S>
+impl<S: State> Traj<S>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {
     /// Creates a new trajectory with the provided starting state (used as a template) and a receiving channel.
     /// The trajectories are always generated on a separate thread.
     pub fn new(state: S, rx: Receiver<S>) -> Result<Self, NyxError> {
-        // Initialize the interpolator
-        let mut me = Self {
-            segments: BTreeMap::new(),
-            start_state: state,
-            timeout_ms: 100,
-            max_offset: 0,
-        };
+        thread::scope(|s| {
+            // Initialize the interpolator
+            let mut me = Self {
+                segments: BTreeMap::new(),
+                start_state: state,
+                timeout_ms: 100,
+                max_offset: 0,
+            };
 
-        // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
-        // I've spent 12h trying to understand why, but I can't, so screw it for it.
-        let items_per_segments = if S::PropVecSize::dim() == 43 { 16 } else { 32 };
+            // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
+            // I've spent 12h trying to understand why, but I can't, so screw it for it.
+            let items_per_segments = if S::PropVecSize::dim() == 43 { 16 } else { 32 };
 
-        let mut children = vec![];
-        let mut window_states: Vec<S> = Vec::with_capacity(items_per_segments);
-        // Push the initial state
-        window_states.push(state);
-
-        // Note that we're using the typical map+reduce pattern
-        // Start receiving states on a blocking call (map)
-        while let Ok(state) = rx.recv_timeout(StdDur::from_millis(me.timeout_ms)) {
-            if window_states.len() == items_per_segments {
-                let this_wdn = window_states.clone();
-                children.push(std::thread::spawn(
-                    move || -> Result<Segment<S>, NyxError> { interpolate(this_wdn) },
-                ));
-                // Copy the last state as the first state of the next window
-                let last_wdn_state = window_states[items_per_segments - 1];
-                window_states.clear();
-                window_states.push(last_wdn_state);
-            }
+            let mut children = vec![];
+            let mut window_states: Vec<S> = Vec::with_capacity(items_per_segments);
+            // Push the initial state
             window_states.push(state);
-        }
-        // And interpolate the remaining states too, even if the buffer is not full!
-        children.push(std::thread::spawn(
-            move || -> Result<Segment<S>, NyxError> { interpolate(window_states) },
-        ));
 
-        // Reduce
-        for child in children {
-            // collect each child thread's return-value
-            let segment = child.join().unwrap()?;
-            me.append_segment(segment);
-        }
+            // Note that we're using the typical map+reduce pattern
+            // Start receiving states on a blocking call (map)
+            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(me.timeout_ms)) {
+                if window_states.len() == items_per_segments {
+                    let this_wdn = window_states.clone();
+                    children.push(
+                        s.spawn(move |_| -> Result<Segment<S>, NyxError> { interpolate(this_wdn) }),
+                    );
+                    // Copy the last state as the first state of the next window
+                    let last_wdn_state = window_states[items_per_segments - 1];
+                    window_states.clear();
+                    window_states.push(last_wdn_state);
+                }
+                window_states.push(state);
+            }
+            // And interpolate the remaining states too, even if the buffer is not full!
+            children.push(
+                s.spawn(move |_| -> Result<Segment<S>, NyxError> { interpolate(window_states) }),
+            );
 
-        Ok(me)
+            // Reduce
+            for child in children {
+                // collect each child thread's return-value
+                let segment = child.join().unwrap()?;
+                me.append_segment(segment);
+            }
+
+            Ok(me)
+        })
+        .unwrap()
     }
 
     fn append_segment(&mut self, segment: Segment<S>) {
@@ -212,7 +217,7 @@ where
 
     /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval.
     #[allow(clippy::identity_op)]
-    pub fn find_bracketed<E>(&self, start: Epoch, end: Epoch, event: E) -> Result<S, NyxError>
+    pub fn find_bracketed<E>(&self, start: Epoch, end: Epoch, event: &E) -> Result<S, NyxError>
     where
         E: EventEvaluator<S>,
     {
@@ -260,7 +265,8 @@ where
                 return Ok(self.evaluate(xa_e + xb * TimeUnit::Second)?);
             }
             if has_converged(xa, xb) {
-                return Ok(self.evaluate(xa_e + xa * TimeUnit::Second)?);
+                // The event isn't in the bracket
+                return Err(NyxError::EventNotInEpochBraket(start, end));
             }
             let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
                 xa * yb * yc / ((ya - yb) * (ya - yc))
@@ -312,27 +318,44 @@ where
         Err(NyxError::MaxIterReached(max_iter))
     }
 
-    /// Find all requested events
-    pub fn find_all<E>(&self, event: E) -> Result<Vec<S>, NyxError>
+    /// Find (usually) all of the states where the event happens.
+    /// WARNING: The initial search step is 1% of the duration of the trajectory duration!
+    /// For example, if the trajectory is 100 days long, then we split the trajectory into 100 chunks of 1 day and see whether
+    /// the event is in there. If the event happens twice or more times within 1% of the trajectory duration, only the _one_ of
+    /// such events will be found.
+    pub fn find_all<E>(&self, event: &E) -> Result<Vec<S>, NyxError>
     where
         E: EventEvaluator<S>,
     {
-        let mut events = Vec::new();
-        let mut start_epoch = self.first().epoch();
-        let mut end_epoch = self.last().epoch();
-        let mut event_state;
-        let mut event_count = 1;
-        loop {
-            event_state = self.find_bracketed(start_epoch, end_epoch, event)?;
-            info!("Found {} #{}: {}", event, event_count, event_state);
-            events.push(event_state);
-            // Update the start and end epochs to move to the next matching event
-            start_epoch = event_state.epoch() + event.epoch_precision(); // Start one "precision" later
-            if start_epoch > end_epoch {
-                break;
-            }
+        let start_epoch = self.first().epoch();
+        let end_epoch = self.last().epoch();
+        let heuristic = (end_epoch - start_epoch) / 100;
+        info!(
+            "Searching for {} with initial heuristic of {}",
+            event, heuristic
+        );
+
+        let (sender, receiver) = channel();
+
+        let epochs: Vec<Epoch> = TimeSeries::inclusive(start_epoch, end_epoch, heuristic).collect();
+        epochs.into_par_iter().for_each_with(sender, |s, epoch| {
+            if let Ok(event_state) = self.find_bracketed(epoch, epoch + heuristic, event) {
+                s.send(event_state).unwrap()
+            };
+        });
+
+        let mut states: Vec<_> = receiver.iter().collect();
+
+        if states.is_empty() {
+            return Err(NyxError::EventNotInEpochBraket(start_epoch, end_epoch));
         }
-        Ok(events)
+        // Remove duplicates and reorder
+        states.sort_by(|s1, s2| s1.epoch().partial_cmp(&s2.epoch()).unwrap());
+        states.dedup();
+        for (cnt, event_state) in states.iter().enumerate() {
+            info!("{} #{}: {}", event, cnt + 1, event_state);
+        }
+        Ok(states)
     }
 
     /// Find the minimum and maximum of the provided event through the trajectory
@@ -363,7 +386,7 @@ where
     }
 }
 
-impl<S: State + 'static> Iterator for TrajIterator<S>
+impl<S: State> Iterator for TrajIterator<S>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {
@@ -390,7 +413,7 @@ fn _denormalize(xp: f64, min_x: f64, max_x: f64) -> f64 {
     (max_x - min_x) * (xp + 1.0) / 2.0 + min_x
 }
 
-fn interpolate<S: State + 'static>(this_wdn: Vec<S>) -> Result<Segment<S>, NyxError>
+fn interpolate<S: State>(this_wdn: Vec<S>) -> Result<Segment<S>, NyxError>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {

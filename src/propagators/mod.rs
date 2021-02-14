@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+extern crate crossbeam;
 use std::fmt;
 
 /// Provides different methods for controlling the error computation of the integrator.

@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
-use self::nyx::propagators::event_trackers::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
+use self::nyx::md::events::{Event, StateParameter};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
 
@@ -46,11 +46,11 @@ fn qlaw_as_ruggiero_case_a() {
         },
     ];
 
-    // Track these events
-    let tracker = EventTrackers::from_events(vec![
-        SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(42000.0))),
-        SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(0.01))),
-    ]);
+    // Events we will search later
+    let events = vec![
+        Event::new(StateParameter::SMA, 42_000.0),
+        Event::new(StateParameter::Eccentricity, 0.01),
+    ];
 
     let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
@@ -68,12 +68,14 @@ fn qlaw_as_ruggiero_case_a() {
         PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
     );
     let mut prop = setup.with(sc_state);
-    prop.event_trackers = tracker;
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_a] {:o}", final_state.orbit);
     println!("[qlaw_as_ruggiero_case_a] fuel usage: {:.3} kg", fuel_usage);
-    println!("[qlaw_as_ruggiero_case_a] {}", prop.event_trackers);
+    // Find all of the events
+    for e in &events {
+        println!("[qlaw_as_ruggiero_case_a] {} => {:?}", e, traj.find_all(e));
+    }
 
     assert!(
         sc.ctrl_achieved(&final_state).unwrap(),

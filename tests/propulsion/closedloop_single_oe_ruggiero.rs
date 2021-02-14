@@ -4,7 +4,6 @@ extern crate nyx_space as nyx;
 use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
-use self::nyx::propagators::event_trackers::{EventKind, EventTrackers, OrbitalEvent, SCEvent};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
 
@@ -465,6 +464,7 @@ fn rugg_aop_decr() {
 
 #[test]
 fn rugg_raan() {
+    use self::nyx::md::events::{Event, StateParameter};
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
@@ -491,9 +491,6 @@ fn rugg_raan() {
         tol: 5e-3,
     }];
 
-    let tracker =
-        EventTrackers::from_event(SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(5.0))));
-
     let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
 
     let fuel_mass = 67.0;
@@ -509,11 +506,11 @@ fn rugg_raan() {
         PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
     );
     let mut prop = setup.with(sc_state);
-    prop.event_trackers = tracker;
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_raan] {:o}", final_state.orbit);
-    println!("[rugg_raan] {}", prop.event_trackers);
+    let event = Event::new(StateParameter::RAAN, 5.0);
+    println!("[rugg_raan] {} => {:?}", event, traj.find_all(&event));
     println!("[rugg_raan] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(

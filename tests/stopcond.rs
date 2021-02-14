@@ -4,12 +4,10 @@ extern crate nyx_space as nyx;
 
 use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::md::Ephemeris;
+use nyx::md::events::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSStepPV;
-use nyx::propagators::event_trackers::{EventKind, OrbitalEvent, StopCondition};
 use nyx::propagators::{PropOpts, Propagator};
-use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
-use std::sync::mpsc::channel;
+use nyx::time::{Epoch, J2000_OFFSET};
 
 #[test]
 fn stop_cond_3rd_apo() {
@@ -21,44 +19,29 @@ fn stop_cond_3rd_apo() {
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
-    // Create a trajectory
-    let (tx, rx) = channel();
-    let ephem_thread = std::thread::spawn(move || Ephemeris::new(state, rx));
-
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let apo_event = OrbitalEvent::new(EventKind::Apoapse);
-    // let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
+    let apo_event = Event::new(StateParameter::Apoapsis, 0.0);
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(state).with_tx(tx);
-    // Propagate for at four orbital periods so we know we've passed the third one
-    prop.for_duration(4 * period).unwrap();
+    let mut prop = setup.with(state);
+    // Propagate for at five orbital periods so we know we've passed the third one
+    // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
+    let (third_apo, _) = prop.until_event(5 * period, &apo_event, 2).unwrap();
 
-    // Grab the ephemeris
-    let ephem = ephem_thread.join().unwrap().unwrap();
-    // And search it
-    let orbit = ephem
-        .find(
-            start_dt + 2 * period,
-            start_dt + 3 * period,
-            apo_event,
-            TimeUnit::Millisecond,
-            0.1,
-        )
-        .expect("condition should have been found");
-
-    // let rslt = prop.until_event(condition);
-
-    println!("{:o}", orbit);
+    println!("{}\t{}", start_dt + 2.0 * period, start_dt + 3.0 * period);
     // Confirm that this is the third apoapse event which is found
     assert!(
-        orbit.dt - start_dt < 3.0 * period && orbit.dt - start_dt >= 2.0 * period,
+        (start_dt + 2.0 * period..start_dt + 3.0 * period).contains(&third_apo.dt),
         "converged on the wrong apoapse"
     );
     assert!(
-        (180.0 - orbit.ta()).abs() < 1e-3,
+        third_apo.dt - start_dt < 3.0 * period && third_apo.dt - start_dt >= 2.0 * period,
+        "converged on the wrong apoapse"
+    );
+    assert!(
+        (180.0 - third_apo.ta()).abs() < 1e-3,
         "converged, yet convergence critera not met"
     );
 }
@@ -69,39 +52,30 @@ fn stop_cond_3rd_peri() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
     );
 
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let apo_event = OrbitalEvent::new(EventKind::Periapse);
-    let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
+    let peri_event = Event::new(StateParameter::Periapsis, 0.0);
+    // let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
 
-    let dynamics = OrbitalDynamics::two_body();
-
-    let setup = Propagator::rk89(
-        dynamics,
-        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
-    );
-
+    let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
+    // Propagate for at four orbital periods so we know we've passed the third one
+    let (third_peri, _) = prop.until_event(5 * period, &peri_event, 3).unwrap();
 
-    let rslt = prop.until_event(condition);
-
-    // Check how many times we have found that event
-    println!("{}", prop.event_trackers);
-    let orbit = rslt.expect("condition should have been found");
-    println!("{:o}", orbit);
+    println!("{:o}", third_peri);
     // Confirm that this is the third apoapse event which is found
     assert!(
-        orbit.dt - dt < 3.0 * period && orbit.dt - dt >= 2.0 * period,
+        third_peri.dt - start_dt < 3.0 * period && third_peri.dt - start_dt >= 2.0 * period,
         "converged on the wrong apoapse"
     );
     assert!(
-        orbit.ta().abs() < 1e-1 || (360.0 - orbit.ta().abs() < 1e-1),
+        third_peri.ta().abs() < 1e-1 || (360.0 - third_peri.ta().abs() < 1e-1),
         "converged, yet convergence critera not met"
     );
 }
@@ -127,10 +101,7 @@ fn nrho_apo() {
 
     let state_luna = cosm.frame_chg(&state, luna);
 
-    // Track how many times we've passed by that TA again
-    // let apo_event = OrbitalEvent::in_frame(EventKind::Apoapse, luna, &cosm);
-    let apo_event = OrbitalEvent::new(EventKind::Apoapse);
-    let condition = StopCondition::new(apo_event, 2 * TimeUnit::Day, 1e-1);
+    let apo_event = Event::in_frame(StateParameter::Apoapsis, 0.0, luna, cosm.clone());
 
     let bodies = vec![Bodies::Earth, Bodies::Sun];
     let dynamics = OrbitalDynamics::point_masses(luna, &bodies, cosm.clone());
@@ -140,12 +111,12 @@ fn nrho_apo() {
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
     );
 
-    let mut prop = setup.with(state_luna);
+    let mut prop = setup.with(state);
 
-    let rslt = prop.until_event(condition);
+    let (orbit, _) = prop
+        .until_event(5 * state_luna.period(), &apo_event, 0)
+        .unwrap();
 
-    // Check how many times we have found that event
-    let orbit = rslt.expect("condition should have been found");
     println!("Luna: {:o}", orbit);
     assert!((orbit.ta() - 180.0).abs() < 0.1);
     let rslt_eme = cosm.frame_chg(&orbit, eme2k);

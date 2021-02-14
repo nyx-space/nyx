@@ -17,7 +17,9 @@
 */
 
 extern crate bacon_sci;
+extern crate crossbeam;
 extern crate csv;
+extern crate rayon;
 
 use crate::io::formatter::StateFormatter;
 use crate::{Orbit, SpacecraftState};

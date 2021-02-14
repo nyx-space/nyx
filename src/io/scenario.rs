@@ -448,7 +448,7 @@ pub struct ConditionSerde {
 }
 
 impl ConditionSerde {
-    pub fn to_condition(&self, init_dt: Epoch) -> Event {
+    pub fn to_condition(&self) -> Event {
         let parameter = StateParameter::from_str(self.kind.as_str()).unwrap();
 
         Event::new(parameter, self.value.unwrap())

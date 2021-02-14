@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::crossbeam::thread;
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
@@ -221,27 +222,43 @@ where
         }
     }
 
+    /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
+    /// Returns the end state and the trajectory.
+    /// Known bug #190: Cannot generate a valid trajectory when propagating backward
+    pub fn for_duration_with_traj(
+        &mut self,
+        duration: Duration,
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+        thread::scope(|s| {
+            let (tx, rx) = channel();
+            self.tx_chan = Some(tx);
+            let start_state = self.state;
+            // The trajectory must always be generated on its own thread.
+            let traj_thread = s.spawn(move |_| Traj::new(start_state, rx));
+            let end_state = self.for_duration(duration)?;
+
+            let traj = traj_thread.join().unwrap_or_else(|_| {
+                Err(NyxError::NoInterpolationData(
+                    "Could not generate trajectory".to_string(),
+                ))
+            })?;
+
+            Ok((end_state, traj))
+        })
+        .unwrap()
+    }
+
     /// Propagate until a specific event is found `trigger` times.
     /// Returns the state found and the trajectory until `max_duration`
     pub fn until_event<F: EventEvaluator<D::StateType>>(
         &mut self,
         max_duration: Duration,
-        event: F,
+        event: &F,
         trigger: usize,
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
         info!("Searching for {}", event);
-        let (tx, rx) = channel();
-        let start_state = self.state;
-        // The trajectory must always be generated on its own thread.
-        let traj_thread = std::thread::spawn(move || Traj::new(start_state, rx));
-        let end_state = self.for_duration(max_duration)?;
 
-        let traj = traj_thread.join().unwrap_or_else(|_| {
-            Err(NyxError::NoInterpolationData(
-                "Could not generate trajectory".to_string(),
-            ))
-        })?;
-
+        let (_, traj) = self.for_duration_with_traj(max_duration)?;
         // Now, find the requested event
         let events = traj.find_all(event)?;
         match events.get(trigger) {
