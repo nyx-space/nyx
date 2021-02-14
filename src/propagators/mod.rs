@@ -22,8 +22,6 @@ use std::fmt;
 pub mod error_ctrl;
 pub use self::error_ctrl::*;
 
-pub mod event_trackers;
-
 // Re-Export
 mod rk;
 pub use self::rk::*;

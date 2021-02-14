@@ -34,7 +34,8 @@ use crate::io::quantity::ParsingError;
 use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
 use crate::propagators::Propagator;
-use crate::time::{Duration, Epoch, SECONDS_PER_DAY};
+use crate::state::TimeTagged;
+use crate::time::{Duration, Epoch};
 use crate::SpacecraftState;
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -346,9 +347,25 @@ where
         // Run
         match maybe_prop_event {
             Some(prop_event) => {
-                let stop_cond = prop_event.to_condition(initial_state.unwrap().orbit.dt);
-                info!("Propagating until event {:?}", stop_cond.event);
-                let rslt = prop.until_event(stop_cond);
+                let event = prop_event.to_condition(initial_state.unwrap().orbit.dt);
+                let max_duration = match Duration::from_str(prop_event.search_until.as_str()) {
+                    Ok(d) => d,
+                    Err(_) => match Epoch::from_str(prop_event.search_until.as_str()) {
+                        Err(e) => return Err(NyxError::LoadingError(format!("{}", e))),
+                        Ok(epoch) => {
+                            let delta_t: Duration = epoch - prop.state.epoch();
+                            delta_t
+                        }
+                    },
+                };
+                let rslt = prop.until_event(
+                    max_duration,
+                    event,
+                    match prop_event.hits {
+                        Some(trigger) => trigger,
+                        None => 0,
+                    },
+                );
                 if rslt.is_err() {
                     panic!("{:?}", rslt.err());
                 }
@@ -356,11 +373,6 @@ where
             None => {
                 // Elapsed seconds propagation
                 let prop_time = maybe_prop_time.unwrap();
-                info!(
-                    "Propagating for {} seconds (~ {:.3} days)",
-                    prop_time,
-                    prop_time / SECONDS_PER_DAY
-                );
                 prop.for_duration(prop_time)?;
             }
         }

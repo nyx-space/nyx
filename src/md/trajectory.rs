@@ -21,7 +21,7 @@ use super::bacon_sci::polynomial::Polynomial;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
-use crate::md::events::Event;
+use crate::md::events::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::State;
 use std::collections::BTreeMap;
@@ -212,20 +212,16 @@ where
 
     /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval.
     #[allow(clippy::identity_op)]
-    pub fn find(
-        &self,
-        start: Epoch,
-        end: Epoch,
-        event: Box<dyn Event<StateType = S>>,
-        precision: TimeUnit,
-        epsilon_eval: f64,
-    ) -> Result<S, NyxError> {
+    pub fn find_bracketed<E>(&self, start: Epoch, end: Epoch, event: E) -> Result<S, NyxError>
+    where
+        E: EventEvaluator<S>,
+    {
         use std::f64::EPSILON;
         let max_iter = 50;
 
         // Helper lambdas, for f64s only
-        let precision_as_dur: Duration = 1 * precision;
-        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() <= precision_as_dur.in_seconds();
+        let has_converged =
+            |x1: f64, x2: f64| (x1 - x2).abs() <= event.epoch_precision().in_seconds();
         let arrange = |a: f64, ya: f64, b: f64, yb: f64| {
             if ya.abs() > yb.abs() {
                 (a, ya, b, yb)
@@ -245,9 +241,9 @@ where
         let mut yb = event.eval(&self.evaluate(xb_e)?);
 
         // Check if we're already at the root
-        if ya.abs() <= epsilon_eval.abs() {
+        if ya.abs() <= event.value_precision().abs() {
             return Ok(self.evaluate(xa_e)?);
-        } else if yb.abs() <= epsilon_eval.abs() {
+        } else if yb.abs() <= event.value_precision().abs() {
             return Ok(self.evaluate(xb_e)?);
         }
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
@@ -257,10 +253,10 @@ where
         let mut flag = true;
 
         for _ in 0..max_iter {
-            if ya.abs() < epsilon_eval.abs() {
+            if ya.abs() < event.value_precision().abs() {
                 return Ok(self.evaluate(xa_e + xa * TimeUnit::Second)?);
             }
-            if yb.abs() < epsilon_eval.abs() {
+            if yb.abs() < event.value_precision().abs() {
                 return Ok(self.evaluate(xa_e + xb * TimeUnit::Second)?);
             }
             if has_converged(xa, xb) {
@@ -316,16 +312,43 @@ where
         Err(NyxError::MaxIterReached(max_iter))
     }
 
+    /// Find all requested events
+    pub fn find_all<E>(&self, event: E) -> Result<Vec<S>, NyxError>
+    where
+        E: EventEvaluator<S>,
+    {
+        let mut events = Vec::new();
+        let mut start_epoch = self.first().epoch();
+        let mut end_epoch = self.last().epoch();
+        let mut event_state;
+        let mut event_count = 1;
+        loop {
+            event_state = self.find_bracketed(start_epoch, end_epoch, event)?;
+            info!("Found {} #{}: {}", event, event_count, event_state);
+            events.push(event_state);
+            // Update the start and end epochs to move to the next matching event
+            start_epoch = event_state.epoch() + event.epoch_precision(); // Start one "precision" later
+            if start_epoch > end_epoch {
+                break;
+            }
+        }
+        Ok(events)
+    }
+
     /// Find the minimum and maximum of the provided event through the trajectory
     #[allow(clippy::identity_op)]
-    pub fn find_minmax(&self, event: Box<dyn Event<StateType = S>>, precision: TimeUnit) -> (S, S) {
+    pub fn find_minmax<E>(&self, event: E, precision: TimeUnit) -> Result<(S, S), NyxError>
+    where
+        E: EventEvaluator<S>,
+    {
         let step: Duration = 1 * precision;
         let mut min_val = std::f64::INFINITY;
         let mut max_val = std::f64::NEG_INFINITY;
         let mut min_state = S::zeros();
         let mut max_state = S::zeros();
-        let self_c = self.clone();
-        for state in self_c.every(step) {
+        // We're manually iterating through the trajectory to avoid cloning it
+        for epoch in TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step) {
+            let state = self.evaluate(epoch)?;
             let this_eval = event.eval(&state);
             if this_eval < min_val {
                 min_val = this_eval;
@@ -336,7 +359,7 @@ where
                 max_state = state;
             }
         }
-        (min_state, max_state)
+        Ok((min_state, max_state))
     }
 }
 

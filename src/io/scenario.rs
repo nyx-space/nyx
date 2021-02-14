@@ -23,9 +23,8 @@ use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::celestia::{Frame, Orbit};
-use crate::propagators::event_trackers::{EventKind, OrbitalEvent, SCEvent, StopCondition};
+use crate::md::events::{Event, StateParameter};
 use crate::time::{Duration, Epoch};
-use crate::SpacecraftState;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -446,36 +445,13 @@ pub struct ConditionSerde {
     pub value: Option<f64>,
     pub search_until: String,
     pub hits: Option<usize>,
-    pub tolerance: Option<f64>,
 }
 
 impl ConditionSerde {
-    pub fn to_condition(&self, init_dt: Epoch) -> StopCondition<SpacecraftState> {
-        let event = match self.kind.to_lowercase().as_str() {
-            "apoapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Apoapse)),
-            "periapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Periapse)),
-            "sma" => SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(self.value.unwrap()))),
-            "ecc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(self.value.unwrap()))),
-            "inc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Inc(self.value.unwrap()))),
-            "raan" => SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(self.value.unwrap()))),
-            "ta" => SCEvent::orbital(OrbitalEvent::new(EventKind::TA(self.value.unwrap()))),
-            _ => unimplemented!(),
-        };
+    pub fn to_condition(&self, init_dt: Epoch) -> Event {
+        let parameter = StateParameter::from_str(self.kind.as_str()).unwrap();
 
-        let search_until = Epoch::from_str(&self.search_until).unwrap();
-        match self.hits {
-            Some(hits) => StopCondition::after_hits(
-                event,
-                hits,
-                search_until - init_dt,
-                self.tolerance.unwrap_or(1e-6),
-            ),
-            None => StopCondition::new(
-                event,
-                search_until - init_dt,
-                self.tolerance.unwrap_or(1e-6),
-            ),
-        }
+        Event::new(parameter, self.value.unwrap())
     }
 }
 

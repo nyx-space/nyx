@@ -17,17 +17,17 @@
 */
 
 use super::error_ctrl::{ErrorCtrl, RSSStepPV};
-use super::event_trackers::{EventTrackers, StopCondition};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
+use crate::md::events::EventEvaluator;
+use crate::md::trajectory::Traj;
 use crate::time::{Duration, TimeUnit};
 use crate::{State, TimeTagged};
 use std::f64;
-use std::f64::EPSILON;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
@@ -92,7 +92,6 @@ where
             state,
             prop: Arc::new(self),
             tx_chan: None,
-            event_trackers: EventTrackers::none(),
             prevent_tx: false,
             details: IntegrationDetails {
                 step: self.opts.init_step,
@@ -133,8 +132,6 @@ where
     pub prop: Arc<&'a Propagator<'a, D, E>>,
     /// An output channel for all of the states computed by this propagator instance
     pub tx_chan: Option<Sender<D::StateType>>,
-    /// An event tracking instance
-    pub event_trackers: EventTrackers<D::StateType>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
     prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
@@ -173,6 +170,7 @@ where
 
     /// This method propagates the provided Dynamics for the provided duration.
     pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
+        info!("Propagating for {}", duration);
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
@@ -194,9 +192,6 @@ where
                 let (t, state_vec) = self.derive()?;
                 self.state.set(self.state.epoch() + t, &state_vec)?;
                 self.state = self.prop.dynamics.finally(self.state)?;
-                // Evaluate the event trackers
-                self.event_trackers
-                    .eval_and_save(dt, self.state.epoch(), &self.state);
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
                 if !self.prevent_tx {
@@ -215,9 +210,6 @@ where
 
                 self.state.set(self.state.epoch() + t, &state_vec)?;
                 self.state = self.prop.dynamics.finally(self.state)?;
-                // Evaluate the event trackers
-                self.event_trackers
-                    .eval_and_save(dt, self.state.epoch(), &self.state);
                 if !self.prevent_tx {
                     if let Some(ref chan) = self.tx_chan {
                         if let Err(e) = chan.send(self.state) {
@@ -229,138 +221,33 @@ where
         }
     }
 
-    pub fn until_event(
+    /// Propagate until a specific event is found `trigger` times.
+    /// Returns the state found and the trajectory until `max_duration`
+    pub fn until_event<F: EventEvaluator<D::StateType>>(
         &mut self,
-        condition: StopCondition<D::StateType>,
-    ) -> Result<D::StateType, NyxError> {
-        let init_state = self.state;
-        self.prevent_tx = true;
-        // Rewrite the event tracker
-        if !self.event_trackers.events.is_empty() {
-            warn!("Rewriting event tracker with the StopCondition");
+        max_duration: Duration,
+        event: F,
+        trigger: usize,
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+        info!("Searching for {}", event);
+        let (tx, rx) = channel();
+        let start_state = self.state;
+        // The trajectory must always be generated on its own thread.
+        let traj_thread = std::thread::spawn(move || Traj::new(start_state, rx));
+        let end_state = self.for_duration(max_duration)?;
+
+        let traj = traj_thread.join().unwrap_or_else(|_| {
+            Err(NyxError::NoInterpolationData(
+                "Could not generate trajectory".to_string(),
+            ))
+        })?;
+
+        // Now, find the requested event
+        let events = traj.find_all(event)?;
+        match events.get(trigger) {
+            Some(event_state) => Ok((*event_state, traj)),
+            None => Err(NyxError::UnsufficientTriggers(trigger, events.len())),
         }
-
-        self.event_trackers = EventTrackers::from_event(condition.event);
-        self.for_duration(condition.max_prop_time)?;
-        // Check if the event has been triggered
-        if self.event_trackers.found_bounds[0].len() < condition.trigger {
-            if condition.trigger == 1 {
-                // Event was never triggered
-                return Err(NyxError::ConditionNeverTriggered);
-            } else {
-                // Event not triggered enough times
-                return Err(NyxError::UnsufficientTriggers(
-                    condition.trigger,
-                    self.event_trackers.found_bounds[0].len(),
-                ));
-            }
-        }
-
-        let (xa_e, xb_e) = self.event_trackers.found_bounds[0][condition.trigger - 1];
-        let mut xa = xa_e.as_tai_seconds();
-        let mut xb = xb_e.as_tai_seconds();
-        // Reinitialize the dynamics and start the search
-        self.state = init_state;
-        self.event_trackers.reset();
-        let initial_epoch = self.state.epoch();
-        // Compute the initial values of the condition at those bounds.
-        self.for_duration(xa_e - initial_epoch)?;
-        let mut ya = self.event_trackers.events[0].eval(&self.state);
-        // And prop until next bound
-        self.for_duration((xb - xa) * TimeUnit::Second)?;
-        let mut yb = self.event_trackers.events[0].eval(&self.state);
-        // The Brent solver, from the roots crate (sadly could not directly integrate it here)
-        // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
-
-        // Helper lambdas, for f64s only
-        let eps = condition.epsilon;
-        let has_converged = |x1: f64, x2: f64| (x1 - x2).abs() <= eps.in_seconds();
-        let arrange = |a: f64, ya: f64, b: f64, yb: f64| {
-            if ya.abs() > yb.abs() {
-                (a, ya, b, yb)
-            } else {
-                (b, yb, a, ya)
-            }
-        };
-
-        let (mut c, mut yc, mut d) = (xa, ya, xa);
-        let mut flag = true;
-        let mut iter = 0;
-        let closest_t;
-        loop {
-            if ya.abs() < condition.epsilon_eval.abs() {
-                closest_t = xa;
-                break;
-            }
-            if yb.abs() < condition.epsilon_eval.abs() {
-                closest_t = xb;
-                break;
-            }
-            if has_converged(xa, xb) {
-                closest_t = c;
-                break;
-            }
-            let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
-                xa * yb * yc / ((ya - yb) * (ya - yc))
-                    + xb * ya * yc / ((yb - ya) * (yb - yc))
-                    + c * ya * yb / ((yc - ya) * (yc - yb))
-            } else {
-                xb - yb * (xb - xa) / (yb - ya)
-            };
-            let cond1 = (s - xb) * (s - (3.0 * xa + xb) / 4.0) > 0.0;
-            let cond2 = flag && (s - xb).abs() >= (xb - c).abs() / 2.0;
-            let cond3 = !flag && (s - xb).abs() >= (c - d).abs() / 2.0;
-            let cond4 = flag && has_converged(xb, c);
-            let cond5 = !flag && has_converged(c, d);
-            if cond1 || cond2 || cond3 || cond4 || cond5 {
-                s = (xa + xb) / 2.0;
-                flag = true;
-            } else {
-                flag = false;
-            }
-            // Propagate until time s
-            self.for_duration(s * TimeUnit::Second)?;
-            let ys = self.event_trackers.events[0].eval(&self.state);
-            d = c;
-            c = xb;
-            yc = yb;
-            if ya * ys < 0.0 {
-                // Root bracketed between a and s
-                // Propagate until time xa
-                self.for_duration(xa * TimeUnit::Second)?;
-                let ya_p = self.event_trackers.events[0].eval(&self.state);
-                let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
-                {
-                    xa = _a;
-                    ya = _ya;
-                    xb = _b;
-                    yb = _yb;
-                }
-            } else {
-                // Root bracketed between s and b
-                // Propagate until time xb
-                self.for_duration(xb * TimeUnit::Second)?;
-                let yb_p = self.event_trackers.events[0].eval(&self.state);
-                let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
-                {
-                    xa = _a;
-                    ya = _ya;
-                    xb = _b;
-                    yb = _yb;
-                }
-            }
-            iter += 1;
-            if iter >= condition.max_iter {
-                return Err(NyxError::MaxIterReached(iter));
-            }
-        }
-
-        // Now that we have the time at which the condition is matched, let's propagate until then
-        self.prevent_tx = false;
-        let elapsed_time = -(closest_t * TimeUnit::Second);
-        self.for_duration(elapsed_time)?;
-
-        Ok(self.state)
     }
 
     /// This method integrates whichever function is provided as `d_xdt`. Everything passed to this function is in **seconds**.
