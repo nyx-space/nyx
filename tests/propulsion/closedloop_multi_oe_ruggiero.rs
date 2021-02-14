@@ -48,8 +48,8 @@ fn qlaw_as_ruggiero_case_a() {
 
     // Events we will search later
     let events = vec![
-        Event::new(StateParameter::SMA, 42_000.0),
-        Event::new(StateParameter::Eccentricity, 0.01),
+        Event::new(StateParameter::SMA(42_000.0)),
+        Event::new(StateParameter::Eccentricity(0.01)),
     ];
 
     let ruggiero_ctrl = Ruggiero::new(objectives, orbit);

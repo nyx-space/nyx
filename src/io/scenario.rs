@@ -441,17 +441,17 @@ pub struct ScenarioSerde {
 
 #[derive(Clone, Deserialize)]
 pub struct ConditionSerde {
-    pub kind: String,
-    pub value: Option<f64>,
+    /// Pattern must be `event_name = event_value`, e.g. `TA = 159`
+    pub event: String,
     pub search_until: String,
     pub hits: Option<usize>,
 }
 
 impl ConditionSerde {
     pub fn to_condition(&self) -> Event {
-        let parameter = StateParameter::from_str(self.kind.as_str()).unwrap();
+        let parameter = StateParameter::from_str(self.event.as_str()).unwrap();
 
-        Event::new(parameter, self.value.unwrap())
+        Event::new(parameter)
     }
 }
 

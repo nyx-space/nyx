@@ -22,7 +22,7 @@ fn stop_cond_3rd_apo() {
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let apo_event = Event::new(StateParameter::Apoapsis, 0.0);
+    let apo_event = Event::new(StateParameter::Apoapsis);
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
@@ -60,7 +60,7 @@ fn stop_cond_3rd_peri() {
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let peri_event = Event::new(StateParameter::Periapsis, 0.0);
+    let peri_event = Event::new(StateParameter::Periapsis);
     // let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
@@ -82,7 +82,7 @@ fn stop_cond_3rd_peri() {
 
 #[ignore]
 #[test]
-fn nrho_apo() {
+fn stop_cond_nrho_apo() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
     let luna = cosm.frame("Luna");
@@ -100,8 +100,9 @@ fn nrho_apo() {
     );
 
     let state_luna = cosm.frame_chg(&state, luna);
+    println!("{}", 5 * state_luna.period());
 
-    let apo_event = Event::in_frame(StateParameter::Apoapsis, 0.0, luna, cosm.clone());
+    let apo_event = Event::in_frame(StateParameter::Apoapsis, luna, cosm.clone());
 
     let bodies = vec![Bodies::Earth, Bodies::Sun];
     let dynamics = OrbitalDynamics::point_masses(luna, &bodies, cosm.clone());

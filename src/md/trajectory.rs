@@ -60,13 +60,13 @@ where
     max_offset: i32,
 }
 
-pub struct TrajIterator<S: State>
+pub struct TrajIterator<'a, S: State>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {
     pub time_series: TimeSeries,
     /// A shared pointer to the original trajectory.
-    pub traj: Traj<S>,
+    pub traj: &'a Traj<S>,
 }
 
 impl<S: State> Segment<S>
@@ -208,10 +208,10 @@ where
     }
 
     /// Creates an iterator through the trajectory by the provided step size
-    pub fn every(self, step: Duration) -> TrajIterator<S> {
+    pub fn every(&self, step: Duration) -> TrajIterator<S> {
         TrajIterator {
             time_series: TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step),
-            traj: self,
+            traj: &self,
         }
     }
 
@@ -330,7 +330,7 @@ where
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
         let heuristic = (end_epoch - start_epoch) / 100;
-        info!(
+        println!(
             "Searching for {} with initial heuristic of {}",
             event, heuristic
         );
@@ -386,7 +386,7 @@ where
     }
 }
 
-impl<S: State> Iterator for TrajIterator<S>
+impl<S: State> Iterator for TrajIterator<'_, S>
 where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {

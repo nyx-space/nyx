@@ -45,7 +45,7 @@ fn traj_ephem() {
 
     assert_eq!(
         ephem.segments.len(),
-        1010,
+        1042,
         "Wrong number of expected segments"
     );
 
@@ -63,7 +63,7 @@ fn traj_ephem() {
 
     let (tx, rx) = channel();
     std::thread::spawn(move || {
-        let mut prop = setup.with(start_state).with_tx(tx);
+        let mut prop = setup.with(start_state.with_stm()).with_tx(tx);
         prop.for_duration(31 * TimeUnit::Day).unwrap();
     });
 
@@ -72,7 +72,8 @@ fn traj_ephem() {
 
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
-    let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
+    let mut max_err =
+        (eval_state.as_vector().unwrap() - start_state.with_stm().as_vector().unwrap()).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.evaluate(prop_state.dt).unwrap();
@@ -164,8 +165,8 @@ fn traj_spacecraft() {
     // Note that we can iterate over this trajectory
     // Note: _Because_ we need to use the trajectory below, we'll be cloning the trajectory
     // If you don't need the trajectory after you've iterated over it, don't clone it (rustc will tell you that).
-    let traj_c = traj.clone();
-    for sc_state in traj_c.every(1 * TimeUnit::Day) {
+
+    for sc_state in traj.every(1 * TimeUnit::Day) {
         // We need to evaluate the mode of this state because the trajectory does not store discrete information
         let mode_then = ruggiero_ctrl.next(&sc_state);
         if mode_then != prev_mode {

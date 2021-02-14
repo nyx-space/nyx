@@ -509,7 +509,7 @@ fn rugg_raan() {
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[rugg_raan] {:o}", final_state.orbit);
-    let event = Event::new(StateParameter::RAAN, 5.0);
+    let event = Event::new(StateParameter::RAAN(5.0));
     println!("[rugg_raan] {} => {:?}", event, traj.find_all(&event));
     println!("[rugg_raan] fuel usage: {:.3} kg", fuel_usage);
 
