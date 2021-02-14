@@ -145,9 +145,9 @@ impl fmt::Display for Frame {
                     "{} {}",
                     Bodies::try_from(self.ephem_path()).unwrap().name(),
                     match self.frame_path().len() {
-                        0 => "J2000".to_string(),
-                        1 => "IAU Fixed".to_string(),
-                        2 => "IAU Poles Fixed".to_string(),
+                        0 | 1 => "J2000".to_string(),
+                        2 => "IAU Fixed".to_string(),
+                        3 => "IAU Poles Fixed".to_string(),
                         _ => "Custom".to_string(),
                     }
                 )

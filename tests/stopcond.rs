@@ -8,6 +8,7 @@ use nyx::md::events::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, J2000_OFFSET};
+use nyx::TimeTagged;
 
 #[test]
 fn stop_cond_3rd_apo() {
@@ -84,6 +85,7 @@ fn stop_cond_3rd_peri() {
 
 #[test]
 fn stop_cond_nrho_apo() {
+    use std::time::Instant;
     // The following test technically works, but the transformation of thousands of states
     // into another frame is quite slow...
     let cosm = Cosm::de438();
@@ -103,7 +105,10 @@ fn stop_cond_nrho_apo() {
     );
 
     let state_luna = cosm.frame_chg(&state, luna);
-    println!("{}", 2 * state_luna.period());
+    println!(
+        "Start state (dynamics: Earth, Moon, Sun gravity):\n{}",
+        state_luna
+    );
 
     let apo_event = Event::in_frame(StateParameter::Apoapsis, luna, cosm.clone());
 
@@ -120,22 +125,36 @@ fn stop_cond_nrho_apo() {
     // NOTE: Here, we will propagate for the maximum duration in the original frame
     // Then convert that trajectory into the other frame, and perform the search there.
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
-    let (orbit, traj) = prop
-        .for_duration_with_traj(2 * state_luna.period())
-        .unwrap();
+    let prop_time = 4 * state_luna.period();
+    let start = Instant::now();
+    let (orbit, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
-    println!("{:o}", orbit);
+    let end_prop = Instant::now();
+    println!(
+        "Propagated for {} in {} ms:\n{:o}",
+        prop_time,
+        (end_prop - start).as_millis(),
+        orbit,
+    );
 
     // Convert this trajectory into the Luna frame
-    let traj_luna = traj.to_frame(luna, cosm.clone()).unwrap();
+    let traj_luna = traj.to_frame(luna, cosm).unwrap();
+    let end_conv = Instant::now();
+    println!(
+        "Converted EME2000 trajectory into Moon J2000 in {} ms",
+        (end_conv - end_prop).as_millis()
+    );
 
-    // Now, find the requested event
+    // Now, find all of the requested events
     let events = traj_luna.find_all(&apo_event).unwrap();
-    println!("{:?}", events);
-
-    assert!((orbit.ta() - 180.0).abs() < 0.1);
-    let rslt_eme = cosm.frame_chg(&orbit, eme2k);
-    println!("EME2k: {}", rslt_eme);
-    let delta_t = orbit.dt - dt;
-    println!("Found {} days after", delta_t);
+    println!(
+        "Found all {} events in {} ms",
+        apo_event,
+        (Instant::now() - end_conv).as_millis()
+    );
+    for event_state in &events {
+        let delta_t = event_state.epoch() - dt;
+        println!("{} after start:\n{:o}", delta_t, event_state);
+        assert!((event_state.ta() - 180.0).abs() < 0.1);
+    }
 }
