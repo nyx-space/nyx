@@ -20,15 +20,17 @@ use super::bacon_sci::interp::lagrange;
 use super::bacon_sci::polynomial::Polynomial;
 use super::crossbeam::thread;
 use super::rayon::prelude::*;
+use crate::celestia::{Cosm, Frame, Orbit, SpacecraftState};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
 use crate::md::events::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
-use crate::State;
+use crate::{State, TimeTagged};
 use std::collections::BTreeMap;
 use std::iter::Iterator;
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::Arc;
 use std::time::Duration as StdDur;
 
 const INTERP_TOLERANCE: f64 = 1e-10;
@@ -266,7 +268,10 @@ where
             }
             if has_converged(xa, xb) {
                 // The event isn't in the bracket
-                return Err(NyxError::EventNotInEpochBraket(start, end));
+                return Err(NyxError::EventNotInEpochBraket(
+                    start.to_string(),
+                    end.to_string(),
+                ));
             }
             let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
                 xa * yb * yc / ((ya - yb) * (ya - yc))
@@ -330,7 +335,7 @@ where
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
         let heuristic = (end_epoch - start_epoch) / 100;
-        println!(
+        info!(
             "Searching for {} with initial heuristic of {}",
             event, heuristic
         );
@@ -347,7 +352,10 @@ where
         let mut states: Vec<_> = receiver.iter().collect();
 
         if states.is_empty() {
-            return Err(NyxError::EventNotInEpochBraket(start_epoch, end_epoch));
+            return Err(NyxError::EventNotInEpochBraket(
+                start_epoch.to_string(),
+                end_epoch.to_string(),
+            ));
         }
         // Remove duplicates and reorder
         states.sort_by(|s1, s2| s1.epoch().partial_cmp(&s2.epoch()).unwrap());
@@ -369,10 +377,20 @@ where
         let mut max_val = std::f64::NEG_INFINITY;
         let mut min_state = S::zeros();
         let mut max_state = S::zeros();
-        // We're manually iterating through the trajectory to avoid cloning it
-        for epoch in TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step) {
-            let state = self.evaluate(epoch)?;
+
+        let (sender, receiver) = channel();
+
+        let epochs: Vec<Epoch> =
+            TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step).collect();
+        println!("search over {}", epochs.len());
+        epochs.into_par_iter().for_each_with(sender, |s, epoch| {
+            let state = self.evaluate(epoch).unwrap();
             let this_eval = event.eval(&state);
+            s.send((this_eval, state)).unwrap();
+        });
+
+        let evald_states: Vec<_> = receiver.iter().collect();
+        for (this_eval, state) in evald_states {
             if this_eval < min_val {
                 min_val = this_eval;
                 min_state = state;
@@ -382,7 +400,94 @@ where
                 max_state = state;
             }
         }
+
         Ok((min_state, max_state))
+    }
+}
+
+impl Traj<Orbit> {
+    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
+    /// This is super slow.
+    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
+        thread::scope(|s| {
+            let (tx, rx) = channel();
+
+            let start_state = cosm.frame_chg(&self.first(), new_frame);
+            // The trajectory must always be generated on its own thread.
+            let traj_thread = s.spawn(move |_| Self::new(start_state, rx));
+            // And start sampling, converting, and flushing into the new trajectory.
+
+            // Nyquist–Shannon sampling theorem
+            let sample_rate = 1.0 / (((32 * 2 + 1) * self.segments.len()) as f64);
+            let step = sample_rate * (self.last().epoch() - self.first().epoch());
+
+            for state in self.every(step) {
+                let converted_state = cosm.frame_chg(&state, new_frame);
+                tx.send(converted_state).unwrap();
+            }
+
+            let traj = traj_thread.join().unwrap_or_else(|_| {
+                Err(NyxError::NoInterpolationData(
+                    "Could not generate trajectory".to_string(),
+                ))
+            })?;
+
+            Ok(traj)
+        })
+        .unwrap()
+    }
+}
+
+impl Traj<SpacecraftState> {
+    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
+    /// This is super slow.
+    pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
+        thread::scope(|s| {
+            let (tx, rx) = channel();
+
+            let mut start_state = self.first();
+            let start_orbit = cosm.frame_chg(&start_state.orbit, new_frame);
+            // Update the orbit component and the frame
+            start_state.orbit.x = start_orbit.x;
+            start_state.orbit.y = start_orbit.y;
+            start_state.orbit.z = start_orbit.z;
+            start_state.orbit.vx = start_orbit.vx;
+            start_state.orbit.vy = start_orbit.vy;
+            start_state.orbit.vz = start_orbit.vz;
+            start_state.orbit.frame = start_orbit.frame;
+
+            // The trajectory must always be generated on its own thread.
+            let traj_thread = s.spawn(move |_| Self::new(start_state, rx));
+            // And start sampling, converting, and flushing into the new trajectory.
+
+            // Nyquist–Shannon sampling theorem
+            let sample_rate = 1.0 / (((16 * 2 + 1) * self.segments.len()) as f64);
+            let step = sample_rate * (self.last().epoch() - self.first().epoch());
+
+            for state in self.every(step) {
+                let converted_orbit = cosm.frame_chg(&state.orbit, new_frame);
+                let mut converted_state = state;
+                // Update the orbit component and the frame
+                converted_state.orbit.x = converted_orbit.x;
+                converted_state.orbit.y = converted_orbit.y;
+                converted_state.orbit.z = converted_orbit.z;
+                converted_state.orbit.vx = converted_orbit.vx;
+                converted_state.orbit.vy = converted_orbit.vy;
+                converted_state.orbit.vz = converted_orbit.vz;
+                converted_state.orbit.frame = converted_orbit.frame;
+
+                tx.send(converted_state).unwrap();
+            }
+
+            let traj = traj_thread.join().unwrap_or_else(|_| {
+                Err(NyxError::NoInterpolationData(
+                    "Could not generate trajectory".to_string(),
+                ))
+            })?;
+
+            Ok(traj)
+        })
+        .unwrap()
     }
 }
 

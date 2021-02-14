@@ -29,15 +29,9 @@ fn traj_ephem() {
     // Note how we receive a fully blown Orbit, so we can manipulate it exactly like a normal state.
     let mut sum_sma = 0.0;
     let mut cnt = 0.0;
-    for epoch in TimeSeries::inclusive(start_dt, start_dt + 31 * TimeUnit::Day, 1 * TimeUnit::Day) {
+    for state in ephem.every(1 * TimeUnit::Day) {
         cnt += 1.0;
-        // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
-        // let state = ephem.evaluate(epoch + 17 * TimeUnit::Second).unwrap();
-        // sum_sma += state.sma();
-        match ephem.evaluate(epoch) {
-            Ok(state) => sum_sma += state.sma(),
-            Err(e) => println!("{}", e),
-        }
+        sum_sma += state.sma()
     }
     println!("Average SMA: {:.3} km", sum_sma / cnt);
 
@@ -113,7 +107,59 @@ fn traj_ephem() {
 
     // Check that the error in STM doesn't break everything
     assert!(
-        max_err < 1e-9,
+        max_err < 1e-4,
+        "Maximum state in interpolation is too high!"
+    );
+
+    // And let's convert into another frame and back to check the error
+    let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
+    // And convert back, to see the error this leads to
+    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
+
+    let conv_state = ephem_back_to_earth.evaluate(start_dt).unwrap();
+    let mut max_pos_err = (eval_state.radius() - conv_state.radius()).norm();
+    let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
+    let mut max_err =
+        (eval_state.as_vector().unwrap() - conv_state.with_stm().as_vector().unwrap()).norm();
+
+    for conv_state in ephem_back_to_earth.every(5 * TimeUnit::Minute) {
+        let eval_state = ephem.evaluate(conv_state.dt).unwrap();
+
+        let pos_err = (eval_state.radius() - conv_state.radius()).norm();
+        if pos_err > max_pos_err {
+            max_pos_err = pos_err;
+        }
+        let vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
+        if vel_err > max_vel_err {
+            max_vel_err = vel_err;
+        }
+        let err = (eval_state.as_vector().unwrap() - conv_state.as_vector().unwrap()).norm();
+        if err > max_err {
+            max_err = err;
+        }
+    }
+    println!(
+        "[traj_ephem] Maximum interpolation error after double conversion: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfull state: {:.2e} (no unit)",
+        max_pos_err * 1e3,
+        max_vel_err * 1e3,
+        max_err
+    );
+
+    // Allow for up to micrometer error
+    assert!(
+        max_pos_err < 1e-9,
+        "Maximum spacecraft position in interpolation is too high!"
+    );
+
+    // Allow for up to micrometer per second error
+    assert!(
+        max_vel_err < 1e-9,
+        "Maximum orbit velocity in interpolation is too high!"
+    );
+
+    // Check that the error in STM doesn't break everything
+    assert!(
+        max_err < 1e-4,
         "Maximum state in interpolation is too high!"
     );
 }
@@ -265,6 +311,45 @@ fn traj_spacecraft() {
     assert!(
         max_vel_err < 1e-9,
         "Maximum spacecraft fuel in interpolation is too high!"
+    );
+
+    // And let's convert into another frame and back to check the error
+    let ephem_luna = traj.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
+    // And convert back, to see the error this leads to
+    let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
+
+    let conv_state = ephem_back_to_earth.evaluate(start_dt).unwrap();
+    let mut max_pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
+    let mut max_vel_err = (eval_state.orbit.velocity() - conv_state.orbit.velocity()).norm();
+
+    for conv_state in ephem_back_to_earth.every(5 * TimeUnit::Minute) {
+        let eval_state = traj.evaluate(conv_state.epoch()).unwrap();
+
+        let pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
+        if pos_err > max_pos_err {
+            max_pos_err = pos_err;
+        }
+        let vel_err = (eval_state.orbit.velocity() - conv_state.orbit.velocity()).norm();
+        if vel_err > max_vel_err {
+            max_vel_err = vel_err;
+        }
+    }
+    println!(
+        "[traj_ephem] Maximum interpolation error after double conversion: pos: {:.2e} m\t\tvel: {:.2e} m/s",
+        max_pos_err * 1e3,
+        max_vel_err * 1e3,
+    );
+
+    // Allow for up to micrometer error
+    assert!(
+        max_pos_err < 1e-9,
+        "Maximum spacecraft position in interpolation is too high!"
+    );
+
+    // Allow for up to micrometer per second error
+    assert!(
+        max_vel_err < 1e-9,
+        "Maximum orbit velocity in interpolation is too high!"
     );
 }
 

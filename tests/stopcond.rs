@@ -46,7 +46,6 @@ fn stop_cond_3rd_apo() {
     );
 }
 
-#[ignore]
 #[test]
 fn stop_cond_3rd_peri() {
     let cosm = Cosm::de438();
@@ -66,12 +65,15 @@ fn stop_cond_3rd_peri() {
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
     // Propagate for at four orbital periods so we know we've passed the third one
-    let (third_peri, _) = prop.until_event(5 * period, &peri_event, 3).unwrap();
+    // NOTE: We're fetching the 3rd item because the initial state is actually at periapse,
+    // which the event finder will find.
+    let (third_peri, _) = prop.until_event(5 * period, &peri_event, 4).unwrap();
 
     println!("{:o}", third_peri);
-    // Confirm that this is the third apoapse event which is found
+    // Confirm that this is the third periapse event which is found
+    // Again, the initial state is at periapse, so we don't check a N number of orbit forward.
     assert!(
-        third_peri.dt - start_dt < 3.0 * period && third_peri.dt - start_dt >= 2.0 * period,
+        (start_dt + 1.9 * period..start_dt + 2.9 * period).contains(&third_peri.dt),
         "converged on the wrong apoapse"
     );
     assert!(
@@ -80,9 +82,10 @@ fn stop_cond_3rd_peri() {
     );
 }
 
-#[ignore]
 #[test]
 fn stop_cond_nrho_apo() {
+    // The following test technically works, but the transformation of thousands of states
+    // into another frame is quite slow...
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
     let luna = cosm.frame("Luna");
@@ -100,7 +103,7 @@ fn stop_cond_nrho_apo() {
     );
 
     let state_luna = cosm.frame_chg(&state, luna);
-    println!("{}", 5 * state_luna.period());
+    println!("{}", 2 * state_luna.period());
 
     let apo_event = Event::in_frame(StateParameter::Apoapsis, luna, cosm.clone());
 
@@ -109,19 +112,30 @@ fn stop_cond_nrho_apo() {
 
     let setup = Propagator::rk89(
         dynamics,
-        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
+        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-6, RSSStepPV {}),
     );
 
     let mut prop = setup.with(state);
 
-    let (orbit, _) = prop
-        .until_event(5 * state_luna.period(), &apo_event, 0)
+    // NOTE: Here, we will propagate for the maximum duration in the original frame
+    // Then convert that trajectory into the other frame, and perform the search there.
+    // We can only do that for spacecraft and orbit trajectories since those have a frame.
+    let (orbit, traj) = prop
+        .for_duration_with_traj(2 * state_luna.period())
         .unwrap();
 
-    println!("Luna: {:o}", orbit);
+    println!("{:o}", orbit);
+
+    // Convert this trajectory into the Luna frame
+    let traj_luna = traj.to_frame(luna, cosm.clone()).unwrap();
+
+    // Now, find the requested event
+    let events = traj_luna.find_all(&apo_event).unwrap();
+    println!("{:?}", events);
+
     assert!((orbit.ta() - 180.0).abs() < 0.1);
     let rslt_eme = cosm.frame_chg(&orbit, eme2k);
     println!("EME2k: {}", rslt_eme);
     let delta_t = orbit.dt - dt;
-    println!("Found {}days after", delta_t);
+    println!("Found {} days after", delta_t);
 }

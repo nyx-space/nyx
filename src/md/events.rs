@@ -275,7 +275,11 @@ impl EventEvaluator<Orbit> for Event {
     fn eval(&self, state: &Orbit) -> f64 {
         // Transform the state if needed
         let state = if let Some((frame, cosm)) = &self.in_frame {
-            cosm.frame_chg(state, *frame)
+            if state.frame == *frame {
+                *state
+            } else {
+                cosm.frame_chg(state, *frame)
+            }
         } else {
             *state
         };
@@ -298,7 +302,7 @@ impl EventEvaluator<Orbit> for Event {
             StateParameter::HZ(value) => state.hz() - value,
             StateParameter::Inclination(value) => angled_value(state.inc(), value),
             StateParameter::MeanAnomaly(value) => angled_value(state.ma(), value),
-            StateParameter::Periapsis => angled_value(state.ta(), 0.0),
+            StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
             StateParameter::PeriapsisRadius(value) => state.periapsis() - value,
             StateParameter::Period(value) => state.period().in_seconds() - value,
             StateParameter::RAAN(value) => angled_value(state.raan(), value),
