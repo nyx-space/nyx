@@ -77,6 +77,17 @@ pub fn assert_orbit_eq_or_rel<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg
     }
 }
 
+/// Defines the kind of state transition matrix stored in the orbit.
+#[derive(Copy, Clone, Debug)]
+pub enum StmKind {
+    /// For navigation (default): Corresponds to the linearization between the previous step of the propagator and the new step ($\Phi_k$)
+    Step,
+    /// For trajectory optimization: Corresponds to the linearization between from the first state until the current state ($\Phi_{k\to0}$)
+    Traj,
+    /// For propagation: no STM is set
+    Unset,
+}
+
 /// Orbit defines an orbital state
 ///
 /// Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/StateConversionUtil.cpp).
@@ -103,6 +114,7 @@ pub struct Orbit {
     pub frame: Frame,
     /// Optionally stores an STM
     pub stm: Option<Matrix6<f64>>,
+    pub stm_kind: StmKind,
 }
 
 impl Orbit {
@@ -129,6 +141,7 @@ impl Orbit {
             dt,
             frame,
             stm: None,
+            stm_kind: StmKind::Unset,
         }
     }
 
@@ -162,6 +175,7 @@ impl Orbit {
             dt,
             frame,
             stm: None,
+            stm_kind: StmKind::Unset,
         }
     }
 
@@ -180,6 +194,7 @@ impl Orbit {
             dt,
             frame,
             stm: None,
+            stm_kind: StmKind::Unset,
         }
     }
 
@@ -341,6 +356,7 @@ impl Orbit {
                     dt,
                     frame,
                     stm: None,
+                    stm_kind: StmKind::Unset,
                 }
             }
             _ => panic!("Frame is not Celestial or Geoid in kind"),
@@ -987,9 +1003,16 @@ impl Orbit {
         self.vz = new_v[2];
     }
 
-    /// Sets the STM of this state of identity, which also enables computation of the STM
+    /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.stm = Some(Matrix6::identity());
+        self.stm_kind = StmKind::Step;
+    }
+
+    /// Sets the STM of this state of identity, which also enables computation of the STM for trajectory optimization
+    pub fn enable_traj_stm(&mut self) {
+        self.stm = Some(Matrix6::identity());
+        self.stm_kind = StmKind::Traj;
     }
 
     /// Copies the current state but sets the STM to identity
@@ -1051,6 +1074,7 @@ impl Add for Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
+            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1070,6 +1094,7 @@ impl Sub for Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
+            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1089,6 +1114,7 @@ impl Neg for Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
+            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1108,6 +1134,7 @@ impl Add for &Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
+            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1127,6 +1154,7 @@ impl Sub for &Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
+            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1146,6 +1174,7 @@ impl Neg for &Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
+            stm_kind: self.stm_kind,
         }
     }
 }

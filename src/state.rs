@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::celestia::{Frame, GuidanceMode, Orbit, SpacecraftState};
+use crate::celestia::{Frame, GuidanceMode, Orbit, SpacecraftState, StmKind};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{
     DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, VectorN, U42, U43, U6, U7,
@@ -108,6 +108,7 @@ impl State for Orbit {
             dt: Epoch::from_tai_seconds(0.0),
             frame,
             stm: Some(Matrix6::identity()),
+            stm_kind: StmKind::Step,
         }
     }
 
@@ -140,24 +141,23 @@ impl State for Orbit {
         self.vy = vector[4];
         self.vz = vector[5];
         // And update the STM if applicable
-        if let Some(mut stm_prev) = self.stm {
-            let mut stm_k_to_0 = Matrix6::zeros();
-            let mut stm_idx = 6;
-            for i in 0..6 {
-                for j in 0..6 {
-                    stm_k_to_0[(i, j)] = vector[(stm_idx, 0)];
-                    stm_idx += 1;
-                }
-            }
+        match self.stm_kind {
+            StmKind::Step => {
+                let mut stm_prev = self.stm.unwrap();
+                let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
 
-            // let mut stm_prev = self.state.stm();
-            if !stm_prev.try_inverse_mut() {
-                error!("STM not invertible: {}", stm_prev);
-                return Err(NyxError::SingularStateTransitionMatrix);
+                if !stm_prev.try_inverse_mut() {
+                    error!("STM not invertible: {}", stm_prev);
+                    return Err(NyxError::SingularStateTransitionMatrix);
+                }
+                self.stm = Some(stm_k_to_0 * stm_prev);
             }
-            self.stm = Some(stm_k_to_0 * stm_prev);
-            // self.state.stm = Some(stm_k_to_0);
-        }
+            StmKind::Traj => {
+                let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
+                self.stm = Some(stm_k_to_0)
+            }
+            StmKind::Unset => {}
+        };
         Ok(())
     }
 

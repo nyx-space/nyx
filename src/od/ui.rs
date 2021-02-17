@@ -344,7 +344,6 @@ where
                 let nominal_state = S::extract(&prop_state);
 
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
-                // let meas_input = self.prop.dynamics.to_measurement(&nominal_state);
                 let dt = nominal_state.epoch();
 
                 // Update the STM of the KF (needed between each measurement or time update)
@@ -461,18 +460,12 @@ where
         while let Ok(prop_state) = rx.try_recv() {
             let nominal_state = S::extract(&prop_state);
             // Update the STM of the KF (needed between each measurement or time update)
-            // let stm = self.prop.dynamics.extract_stm(&nominal_state);
             self.kf.update_stm(nominal_state.stm()?);
-            info!("final time update {:?}", nominal_state.epoch());
+            info!("final time update {}", nominal_state.epoch());
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
                     if self.kf.is_extended() {
-                        // self.prop.state = self.prop.state.add(est.state_deviation());
-                        // let est_state = est.state_deviation().clone();
                         self.prop.state = self.prop.state + est.state_deviation();
-                        // self.prop.dynamics.set_estimated_state(
-                        //     self.prop.dynamics.extract_estimated_state(&nominal_state) + est_state,
-                        // );
                     }
                     self.estimates.push(est);
                 }
@@ -486,18 +479,13 @@ where
 
 impl<
         'a,
-        // D: Dynamics<StateSize = Msr::StateSize>,
         D: Dynamics,
         E: ErrorCtrl,
         Msr: Measurement<StateSize = <S as State>::Size>,
         N: MeasurementDevice<S, Msr>,
-        // Msr: Measurement<StateSize = <D::StateType as State>::Size>,
-        // N: MeasurementDevice<D::StateType, Msr>,
         A: DimName,
         S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,
-        // K: Filter<<D::StateType as State>::Size, A, Msr::MeasurementSize, D::StateType>,
-        // MsrIn,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, S, K>
 where
     D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
