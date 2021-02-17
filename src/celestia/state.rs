@@ -987,7 +987,7 @@ impl Orbit {
         self.vz = new_v[2];
     }
 
-    /// Sets the STM of this state of identity, which enables computation of the STM
+    /// Sets the STM of this state of identity, which also enables computation of the STM
     pub fn enable_stm(&mut self) {
         self.stm = Some(Matrix6::identity());
     }

@@ -822,7 +822,7 @@ impl Cosm {
         let new_frame_path = to.frame_path();
 
         // Let's get the translation path between both both states.
-        let f_common_path = self.find_common_root(&new_frame_path, &state_frame_path)?;
+        let f_common_path = self.find_common_root(&new_frame_path, &state_frame_path);
 
         let get_dcm = |path: &[usize]| -> &FrameTree {
             // This is absolutely terrible, and there must be a better way to do it, but it's late.
@@ -878,7 +878,7 @@ impl Cosm {
         let state_ephem_path = state.frame.ephem_path();
 
         // Let's get the translation path between both both states.
-        let e_common_path = self.find_common_root(&new_ephem_path, &state_ephem_path)?;
+        let e_common_path = self.find_common_root(&new_ephem_path, &state_ephem_path);
 
         // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
         let mut new_state = if state.rmag() > 0.0 {
@@ -949,11 +949,11 @@ impl Cosm {
     }
 
     /// Returns the conversion path from the target ephemeris or frame `from` as seen from `to`.
-    fn find_common_root(&self, from: &[usize], to: &[usize]) -> Result<Vec<usize>, NyxError> {
+    fn find_common_root(&self, from: &[usize], to: &[usize]) -> std::vec::Vec<usize> {
         let mut common_root = Vec::with_capacity(3); // Unlikely to be more than 3 items
         if from.is_empty() || to.is_empty() {
             // It will necessarily be the root of the ephemeris
-            Ok(common_root)
+            common_root
         } else {
             if from.len() < to.len() {
                 // Iterate through the items in from
@@ -976,7 +976,7 @@ impl Cosm {
                     }
                 }
             }
-            Ok(common_root)
+            common_root
         }
     }
 }
@@ -1000,7 +1000,6 @@ mod tests {
 
         assert_eq!(
             cosm.find_common_root(Bodies::Earth.ephem_path(), Bodies::Earth.ephem_path())
-                .unwrap()
                 .len(),
             2,
             "Conversions within Earth does not require any translation"
@@ -1121,9 +1120,7 @@ mod tests {
 
         let cosm = Cosm::de438();
 
-        let ven2ear = cosm
-            .find_common_root(Bodies::Venus.ephem_path(), Bodies::Luna.ephem_path())
-            .unwrap();
+        let ven2ear = cosm.find_common_root(Bodies::Venus.ephem_path(), Bodies::Luna.ephem_path());
         assert_eq!(
             ven2ear.len(),
             0,
