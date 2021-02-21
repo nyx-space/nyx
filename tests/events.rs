@@ -57,14 +57,10 @@ fn event_tracker_true_anomaly() {
         }
     }
 
-    let found_events = traj.find_all(&e_loc).unwrap();
+    let umbra_event_loc = e_loc.to_umbra_event();
+    let umbra_events = traj.find_all(&umbra_event_loc).unwrap();
 
-    // let found_events = traj.find_bracketed(
-    //     Epoch::from_gregorian_tai(2020, 1, 1, 12, 28, 10, 0),
-    //     Epoch::from_gregorian_tai(2020, 1, 1, 12, 33, 10, 0),
-    //     &e_loc,
-    // );
-    let pretty = found_events
+    let pretty = umbra_events
         .iter()
         .map(|orbit| {
             format!(
@@ -84,5 +80,30 @@ fn event_tracker_true_anomaly() {
             )
         })
         .collect::<String>();
-    println!("[eclipses] {} =>\n{}", e_loc, pretty);
+    println!("[eclipses] {} =>\n{}", umbra_event_loc, pretty);
+
+    let penumbra_event_loc = e_loc.to_penumbra_event();
+    let penumbra_events = traj.find_all(&penumbra_event_loc).unwrap();
+
+    let pretty = penumbra_events
+        .iter()
+        .map(|orbit| {
+            format!(
+                "{:o}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+                orbit,
+                &e_loc.compute(orbit),
+                &e_loc.compute(
+                    &traj
+                        .evaluate(orbit.epoch() - 10 * TimeUnit::Second)
+                        .unwrap()
+                ),
+                &e_loc.compute(
+                    &traj
+                        .evaluate(orbit.epoch() + 10 * TimeUnit::Second)
+                        .unwrap()
+                )
+            )
+        })
+        .collect::<String>();
+    println!("[eclipses] {} =>\n{}", penumbra_event_loc, pretty);
 }

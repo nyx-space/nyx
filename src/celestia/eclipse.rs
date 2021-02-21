@@ -16,10 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use super::{Cosm, Frame, LTCorr, Orbit};
+pub use super::{Cosm, Frame, LTCorr, Orbit, SpacecraftState};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnit};
-use crate::utils::normalize;
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::fmt;
 use std::sync::Arc;
@@ -117,7 +116,7 @@ impl fmt::Display for EclipseLocator {
             .collect::<String>();
         write!(
             f,
-            "Eclipse locator: light-source: {}\tshadows casted by: {} (light time corr.: {:?})",
+            "light-source: {}\tshadows casted by: {} (light time corr.: {:?})",
             self.light_source, shadow_bodies, self.correction
         )
     }
@@ -141,12 +140,37 @@ impl EclipseLocator {
         }
         state
     }
+
+    /// Creates an umbra event from this eclipse locator
+    pub fn to_umbra_event(&self) -> UmbraEvent {
+        UmbraEvent {
+            e_loc: self.clone(),
+        }
+    }
+
+    /// Creates a penumbra event from this eclipse locator
+    pub fn to_penumbra_event(&self) -> PenumbraEvent {
+        PenumbraEvent {
+            e_loc: self.clone(),
+        }
+    }
 }
 
-impl EventEvaluator<Orbit> for EclipseLocator {
+/// An event to find the darkest eclipse state (more than 98% shadow)
+pub struct UmbraEvent {
+    e_loc: EclipseLocator,
+}
+
+impl fmt::Display for UmbraEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "umbra event {}", self.e_loc)
+    }
+}
+
+impl EventEvaluator<Orbit> for UmbraEvent {
     // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
     fn eval(&self, observer: &Orbit) -> f64 {
-        match self.compute(observer) {
+        match self.e_loc.compute(observer) {
             EclipseState::Umbra => 0.0,
             EclipseState::Visibilis => 1.0,
             EclipseState::Penumbra(val) => val,
@@ -158,6 +182,75 @@ impl EventEvaluator<Orbit> for EclipseLocator {
         0.1 * TimeUnit::Second
     }
     /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
+    fn value_precision(&self) -> f64 {
+        0.02
+    }
+}
+
+impl EventEvaluator<SpacecraftState> for UmbraEvent {
+    // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
+    fn eval(&self, sc: &SpacecraftState) -> f64 {
+        match self.e_loc.compute(&sc.orbit) {
+            EclipseState::Umbra => 0.0,
+            EclipseState::Visibilis => 1.0,
+            EclipseState::Penumbra(val) => val,
+        }
+    }
+
+    /// Stop searching when the time has converged to less than 0.1 seconds
+    fn epoch_precision(&self) -> Duration {
+        0.1 * TimeUnit::Second
+    }
+    /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
+    fn value_precision(&self) -> f64 {
+        0.02
+    }
+}
+
+/// An event to find the start of a penumbra
+pub struct PenumbraEvent {
+    e_loc: EclipseLocator,
+}
+
+impl fmt::Display for PenumbraEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "penumbra event {}", self.e_loc)
+    }
+}
+
+impl EventEvaluator<Orbit> for PenumbraEvent {
+    fn eval(&self, observer: &Orbit) -> f64 {
+        match self.e_loc.compute(observer) {
+            EclipseState::Umbra => 0.0,
+            EclipseState::Visibilis => 1.0,
+            EclipseState::Penumbra(val) => val - 1.0,
+        }
+    }
+
+    /// Stop searching when the time has converged to less than 0.1 seconds
+    fn epoch_precision(&self) -> Duration {
+        0.1 * TimeUnit::Second
+    }
+    /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
+    fn value_precision(&self) -> f64 {
+        0.02
+    }
+}
+
+impl EventEvaluator<SpacecraftState> for PenumbraEvent {
+    fn eval(&self, sc: &SpacecraftState) -> f64 {
+        match self.e_loc.compute(&sc.orbit) {
+            EclipseState::Umbra => 0.0,
+            EclipseState::Visibilis => 1.0,
+            EclipseState::Penumbra(val) => val - 1.0,
+        }
+    }
+
+    /// Stop searching when the time has converged to less than 0.1 seconds
+    fn epoch_precision(&self) -> Duration {
+        0.1 * TimeUnit::Second
+    }
+    /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
     fn value_precision(&self) -> f64 {
         0.02
     }
