@@ -25,7 +25,7 @@ use std::time::Instant;
 
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
-use crate::errors::NyxError;
+pub use crate::errors::NyxError;
 use crate::time::{Epoch, TimeUnit, SECONDS_PER_DAY};
 
 impl XbEpoch {
@@ -35,7 +35,6 @@ impl XbEpoch {
     }
 
     pub fn to_epoch(&self) -> Epoch {
-        // let days = f64::from(self.days) + self.seconds / SECONDS_PER_DAY;
         let epoch_delta = self.days * TimeUnit::Day + self.seconds * TimeUnit::Second;
         match self.ts {
             0 => {
@@ -251,26 +250,6 @@ impl Bodies {
             Self::SaturnBarycenter => "Saturn Barycenter".to_string(),
             Self::UranusBarycenter => "Uranus Barycenter".to_string(),
             Self::NeptuneBarycenter => "Neptune Barycenter".to_string(),
-        }
-    }
-
-    /// Returns the EXB center ID of this celestial object
-    pub fn exb_id(&self) -> i32 {
-        match *self {
-            Self::SSB => 0,
-            Self::Sun => 10,
-            Self::MercuryBarycenter => 1,
-            Self::Mercury => 1,
-            Self::VenusBarycenter => 2,
-            Self::Venus => 2,
-            Self::EarthBarycenter => 3,
-            Self::Earth => 399,
-            Self::Luna => 301,
-            Self::MarsBarycenter => 4,
-            Self::JupiterBarycenter => 5,
-            Self::SaturnBarycenter => 6,
-            Self::UranusBarycenter => 7,
-            Self::NeptuneBarycenter => 8,
         }
     }
 }

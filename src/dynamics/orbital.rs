@@ -255,7 +255,6 @@ impl AccelModel for PointMasses {
         let mut d_x = Vector3::zeros();
         // Get all of the position vectors between the center body and the third bodies
         for third_body in &self.bodies {
-            // let third_body = self.cosm.frame_by_exb_id(*exb_id);
             // Orbit of j-th body as seen from primary body
             let st_ij =
                 self.cosm

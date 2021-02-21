@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{Cosm, Frame, LTCorr, Orbit};
+pub use super::{Cosm, Frame, LTCorr, Orbit};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnit};
 use crate::utils::normalize;
@@ -147,9 +147,9 @@ impl EventEvaluator<Orbit> for EclipseLocator {
     // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
     fn eval(&self, observer: &Orbit) -> f64 {
         match self.compute(observer) {
-            EclipseState::Umbra => -1.0,
+            EclipseState::Umbra => 0.0,
             EclipseState::Visibilis => 1.0,
-            EclipseState::Penumbra(val) => normalize(val, 0.0, 1.0),
+            EclipseState::Penumbra(val) => val,
         }
     }
 
@@ -157,9 +157,9 @@ impl EventEvaluator<Orbit> for EclipseLocator {
     fn epoch_precision(&self) -> Duration {
         0.1 * TimeUnit::Second
     }
-    /// Finds the start/end of an eclipse within 0.1% of penumbra
+    /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
     fn value_precision(&self) -> f64 {
-        0.1
+        0.02
     }
 }
 

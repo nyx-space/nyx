@@ -704,7 +704,7 @@ impl Cosm {
         ))
     }
 
-    /// Attempts to return the state of the celestial object of XB ID `exb_id` (the target) at time `jde` `as_seen_from`
+    /// Attempts to return the state of the celestial object at the provided time
     ///
     /// The light time correction is based on SPICE's implementation: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkezr_c.html .
     /// Aberration computation is a conversion of the stelab function in SPICE, available here
@@ -719,7 +719,6 @@ impl Cosm {
         let target_frame = self.frame_from_ephem_path(target_ephem);
         match correction {
             LTCorr::None => {
-                // let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
                 let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
@@ -791,7 +790,7 @@ impl Cosm {
         }
     }
 
-    /// Returns the state of the celestial object of XB ID `exb_id` (the target) at time `jde` `as_seen_from`, or panics
+    /// Returns the state of the celestial object at the provided time
     pub fn celestial_state(
         &self,
         target_ephem: &[usize],

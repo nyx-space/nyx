@@ -2,19 +2,14 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn event_tracker_true_anomaly() {
-    use nyx::celestia::eclipse::EclipseLocator;
-    use nyx::celestia::{Cosm, LTCorr, Orbit};
-    use nyx::dynamics::orbital::OrbitalDynamics;
-    use nyx::md::{Event, EventEvaluator, StateParameter};
-    use nyx::propagators::error_ctrl::RSSStepPV;
-    use nyx::propagators::*;
-    use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
-    use nyx::TimeTagged;
+    use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
+    use nyx::md::ui::*;
+    use nyx::md::EventEvaluator; // Only needed because we're manually calling e.eval
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let dt = Epoch::from_gregorian_tai_at_noon(2020, 1, 1);
     let state = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
     );
@@ -30,10 +25,7 @@ fn event_tracker_true_anomaly() {
     let events = vec![peri_event, apo_event, ta_event0, ta_event1];
 
     let dynamics = OrbitalDynamics::two_body();
-    let setup = Propagator::rk89(
-        dynamics,
-        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-9, RSSStepPV {}),
-    );
+    let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
     let mut prop = setup.with(state);
     let (_, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
@@ -56,17 +48,22 @@ fn event_tracker_true_anomaly() {
     };
 
     // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.
+    let mut e_state = EclipseState::Umbra;
     for state in traj.every(10 * TimeUnit::Second) {
-        println!("{:o}\t{}", state, e_loc.compute(&state));
+        let new_e_state = e_loc.compute(&state);
+        if e_state != new_e_state {
+            println!("{:o}\t{}", state, new_e_state);
+            e_state = new_e_state;
+        }
     }
 
-    // let found_events = traj.find_all(&e_loc).unwrap();
+    let found_events = traj.find_all(&e_loc).unwrap();
 
-    let found_events = traj.find_bracketed(
-        Epoch::from_gregorian_tai(2002, 1, 1, 12, 28, 10, 0),
-        Epoch::from_gregorian_tai(2002, 1, 1, 12, 30, 10, 0),
-        &e_loc,
-    );
+    // let found_events = traj.find_bracketed(
+    //     Epoch::from_gregorian_tai(2020, 1, 1, 12, 28, 10, 0),
+    //     Epoch::from_gregorian_tai(2020, 1, 1, 12, 33, 10, 0),
+    //     &e_loc,
+    // );
     let pretty = found_events
         .iter()
         .map(|orbit| {

@@ -47,8 +47,8 @@ const LOG_VAR: &str = "NYX_LOG";
 
 lazy_static! {
     static ref COSM: Arc<Cosm> = {
-        let de438_buf: Cow<'static, [u8]> = EmbeddedAsset::get("de438s-00-50.exb")
-            .expect("Could not find de438s-00-55.exb as asset");
+        let de438_buf: Cow<'static, [u8]> =
+            EmbeddedAsset::get("de438s-00-50.xb").expect("Could not find de438s-00-55.xb as asset");
         let xb = Xb::from_buffer(&de438_buf).unwrap();
         let cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
         Arc::new(cosm)
