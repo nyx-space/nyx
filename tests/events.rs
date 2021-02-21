@@ -2,12 +2,14 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn event_tracker_true_anomaly() {
-    use nyx::celestia::{Cosm, Orbit};
+    use nyx::celestia::eclipse::EclipseLocator;
+    use nyx::celestia::{Cosm, LTCorr, Orbit};
     use nyx::dynamics::orbital::OrbitalDynamics;
-    use nyx::md::events::{Event, StateParameter};
+    use nyx::md::{Event, EventEvaluator, StateParameter};
     use nyx::propagators::error_ctrl::RSSStepPV;
     use nyx::propagators::*;
-    use nyx::time::{Epoch, J2000_OFFSET};
+    use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
+    use nyx::TimeTagged;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -37,6 +39,53 @@ fn event_tracker_true_anomaly() {
 
     // Find all of the events
     for e in &events {
-        println!("[ta_tracker] {} => {:?}", e, traj.find_all(e));
+        let found_events = traj.find_all(e).unwrap();
+        let pretty = found_events
+            .iter()
+            .map(|orbit| format!("{:o}\tevent value: {}\n", orbit, e.eval(orbit)))
+            .collect::<String>();
+        println!("[ta_tracker] {} =>\n{}", e, pretty);
     }
+
+    // Find all eclipses?!
+    let e_loc = EclipseLocator {
+        light_source: cosm.frame("Sun J2000"),
+        shadow_bodies: vec![cosm.frame("EME2000")],
+        cosm,
+        correction: LTCorr::None,
+    };
+
+    // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.
+    for state in traj.every(10 * TimeUnit::Second) {
+        println!("{:o}\t{}", state, e_loc.compute(&state));
+    }
+
+    // let found_events = traj.find_all(&e_loc).unwrap();
+
+    let found_events = traj.find_bracketed(
+        Epoch::from_gregorian_tai(2002, 1, 1, 12, 28, 10, 0),
+        Epoch::from_gregorian_tai(2002, 1, 1, 12, 30, 10, 0),
+        &e_loc,
+    );
+    let pretty = found_events
+        .iter()
+        .map(|orbit| {
+            format!(
+                "{:o}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+                orbit,
+                &e_loc.compute(orbit),
+                &e_loc.compute(
+                    &traj
+                        .evaluate(orbit.epoch() - 10 * TimeUnit::Second)
+                        .unwrap()
+                ),
+                &e_loc.compute(
+                    &traj
+                        .evaluate(orbit.epoch() + 10 * TimeUnit::Second)
+                        .unwrap()
+                )
+            )
+        })
+        .collect::<String>();
+    println!("[eclipses] {} =>\n{}", e_loc, pretty);
 }

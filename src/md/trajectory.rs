@@ -26,6 +26,7 @@ use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
 use crate::md::events::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
+use crate::utils::normalize;
 use crate::{State, TimeTagged};
 use std::collections::BTreeMap;
 use std::iter::Iterator;
@@ -506,16 +507,6 @@ where
             None => None,
         }
     }
-}
-
-// Normalize between -1.0 and 1.0
-fn normalize(x: f64, min_x: f64, max_x: f64) -> f64 {
-    2.0 * (x - min_x) / (max_x - min_x) - 1.0
-}
-
-// Denormalize between -1.0 and 1.0
-fn _denormalize(xp: f64, min_x: f64, max_x: f64) -> f64 {
-    (max_x - min_x) * (xp + 1.0) / 2.0 + min_x
 }
 
 fn interpolate<S: State>(this_wdn: Vec<S>) -> Result<Segment<S>, NyxError>

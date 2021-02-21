@@ -965,6 +965,22 @@ impl Orbit {
         }
     }
 
+    /// Returns the right ascension of this orbit in degrees
+    pub fn right_ascension(&self) -> f64 {
+        (self.y.atan2(self.x)).to_degrees()
+    }
+
+    /// Returns the declination of this orbit in degrees
+    pub fn declination(&self) -> f64 {
+        (self.z / self.rmag()).asin().to_degrees()
+    }
+
+    /// Returns the semi minor axis in km
+    pub fn semi_minor_axis(&self) -> f64 {
+        let c = self.sma() * self.ecc();
+        (c.powi(2) - self.sma().powi(2)).sqrt()
+    }
+
     /// Returns the direct cosine rotation matrix to convert to this inertial state.
     pub fn dcm_to_inertial(&self, from: Frame) -> Matrix3<f64> {
         match from {

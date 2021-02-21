@@ -158,6 +158,16 @@ pub fn rss_state_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
     rss_errors(&prop_err.to_cartesian_vec(), &cur_state.to_cartesian_vec())
 }
 
+// Normalize between -1.0 and 1.0
+pub fn normalize(x: f64, min_x: f64, max_x: f64) -> f64 {
+    2.0 * (x - min_x) / (max_x - min_x) - 1.0
+}
+
+// Denormalize between -1.0 and 1.0
+pub fn denormalize(xp: f64, min_x: f64, max_x: f64) -> f64 {
+    (max_x - min_x) * (xp + 1.0) / 2.0 + min_x
+}
+
 // Source: https://stackoverflow.com/questions/38406793/why-is-capitalizing-the-first-letter-of-a-string-so-convoluted-in-rust
 pub fn capitalize(s: &str) -> String {
     let mut c = s.chars();

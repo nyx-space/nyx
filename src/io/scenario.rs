@@ -23,7 +23,7 @@ use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::celestia::{Frame, Orbit};
-use crate::md::events::{Event, StateParameter};
+use crate::md::{Event, StateParameter};
 use crate::time::{Duration, Epoch};
 use std::collections::HashMap;
 use std::str::FromStr;

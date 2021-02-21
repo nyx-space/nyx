@@ -16,16 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::StateParameter;
 use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::DefaultAllocator;
-use crate::errors::NyxError;
 use crate::time::{Duration, TimeUnit};
 use crate::utils::between_pm_x;
-use crate::SpacecraftState;
-use crate::State;
+use crate::{SpacecraftState, State};
 use std::fmt;
-use std::str::FromStr;
 use std::sync::Arc;
 
 fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
@@ -120,148 +118,6 @@ impl Event {
     }
 }
 
-/// Allowed headers, with an optional frame.
-#[allow(non_camel_case_types)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum StateParameter {
-    /// Argument of Latitude (deg)
-    AoL(f64),
-    /// Argument of Periapse (deg)
-    AoP(f64),
-    /// Apoapsis, shortcut for TA == 180.0
-    Apoapsis,
-    /// Radius of apoapsis (km)
-    ApoapsisRadius(f64),
-    /// Eccentric anomaly (deg)
-    EccentricAnomaly(f64),
-    /// Eccentricity (no unit)
-    Eccentricity(f64),
-    /// Specific energy
-    Energy(f64),
-    /// fuel mass in kilograms
-    FuelMass(f64),
-    /// Geodetic height (km)
-    GeodeticHeight(f64),
-    /// Geodetic latitude (deg)
-    GeodeticLatitude(f64),
-    /// Geodetic longitude (deg)
-    GeodeticLongitude(f64),
-    /// Orbital momentum
-    Hmag(f64),
-    /// X component of the orbital momentum vector
-    HX(f64),
-    /// Y component of the orbital momentum vector
-    HY(f64),
-    /// Z component of the orbital momentum vector
-    HZ(f64),
-    /// Inclination (deg)
-    Inclination(f64),
-    /// Mean anomaly (deg)
-    MeanAnomaly(f64),
-    /// Periapsis, shortcut for TA == 0.0
-    Periapsis,
-    /// Radius of periapse (km)
-    PeriapsisRadius(f64),
-    /// Orbital period (s)
-    Period(f64),
-    /// Right ascension of the ascending node (deg)
-    RAAN(f64),
-    /// Norm of the radius vector
-    Rmag(f64),
-    /// Semi parameter (km)
-    SemiParameter(f64),
-    /// Semi major axis (km)
-    SMA(f64),
-    /// True anomaly
-    TrueAnomaly(f64),
-    /// True longitude
-    TrueLongitude(f64),
-    /// Norm of the velocity vector (km/s)
-    Vmag(f64),
-    /// X component of the radius (km)
-    X(f64),
-    /// Y component of the radius (km)
-    Y(f64),
-    /// Z component of the radius (km)
-    Z(f64),
-    /// X component of the velocity (km/s)
-    VX(f64),
-    /// Y component of the velocity (km/s)
-    VY(f64),
-    /// Z component of the velocity (km/s)
-    VZ(f64),
-    /// Allows creating new custom events by matching on the value of the field
-    Custom(usize, f64),
-}
-
-impl FromStr for StateParameter {
-    type Err = NyxError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let rplt = s.to_lowercase().replace("=", "");
-        let parts: Vec<&str> = rplt.split(' ').collect();
-        if parts.len() == 1 {
-            match parts[0].trim() {
-                "apoapsis" => Ok(Self::Apoapsis),
-                "periapsis" => Ok(Self::Periapsis),
-                _ => Err(NyxError::LoadingError(format!(
-                    "Unknown event state parameter without value: {}",
-                    s
-                ))),
-            }
-        } else if parts.len() == 2 {
-            // let value: f64 = parts[1].trim().parse().unwrap();
-            match parts[1].trim().parse::<f64>() {
-                Ok(value) => match parts[0].trim() {
-                    "aol" => Ok(Self::AoL(value)),
-                    "aop" => Ok(Self::AoP(value)),
-                    "apoapsisradius" => Ok(Self::ApoapsisRadius(value)),
-                    "eccentricanomaly" => Ok(Self::EccentricAnomaly(value)),
-                    "eccentricity" => Ok(Self::Eccentricity(value)),
-                    "energy" => Ok(Self::Energy(value)),
-                    "fuelmass" => Ok(Self::FuelMass(value)),
-                    "geodeticheight" => Ok(Self::GeodeticHeight(value)),
-                    "geodeticlatitude" => Ok(Self::GeodeticLatitude(value)),
-                    "geodeticlongitude" => Ok(Self::GeodeticLongitude(value)),
-                    "hmag" => Ok(Self::Hmag(value)),
-                    "hx" => Ok(Self::HX(value)),
-                    "hy" => Ok(Self::HY(value)),
-                    "hz" => Ok(Self::HZ(value)),
-                    "inclination" => Ok(Self::Inclination(value)),
-                    "meananomaly" => Ok(Self::MeanAnomaly(value)),
-                    "periapsisradius" => Ok(Self::PeriapsisRadius(value)),
-                    "period" => Ok(Self::Period(value)),
-                    "raan" => Ok(Self::RAAN(value)),
-                    "rmag" => Ok(Self::Rmag(value)),
-                    "semiparameter" => Ok(Self::SemiParameter(value)),
-                    "sma" => Ok(Self::SMA(value)),
-                    "trueanomaly" => Ok(Self::TrueAnomaly(value)),
-                    "truelongitude" => Ok(Self::TrueLongitude(value)),
-                    "vmag" => Ok(Self::Vmag(value)),
-                    "x" => Ok(Self::X(value)),
-                    "y" => Ok(Self::Y(value)),
-                    "z" => Ok(Self::Z(value)),
-                    "vx" => Ok(Self::VX(value)),
-                    "vy" => Ok(Self::VY(value)),
-                    "vz" => Ok(Self::VZ(value)),
-                    _ => Err(NyxError::LoadingError(format!(
-                        "Unknown event state parameter: {}",
-                        s
-                    ))),
-                },
-                Err(_) => Err(NyxError::LoadingError(format!(
-                    "Could not parse value in event: {}",
-                    s
-                ))),
-            }
-        } else {
-            Err(NyxError::LoadingError(format!(
-                "Could not parse event: {}",
-                s
-            )))
-        }
-    }
-}
-
 impl EventEvaluator<Orbit> for Event {
     #[allow(clippy::identity_op)]
     fn epoch_precision(&self) -> Duration {
@@ -289,6 +145,7 @@ impl EventEvaluator<Orbit> for Event {
             StateParameter::AoL(value) => angled_value(state.aol(), value),
             StateParameter::AoP(value) => angled_value(state.aop(), value),
             StateParameter::Apoapsis => angled_value(state.ta(), 180.0),
+            StateParameter::Declination(value) => angled_value(state.declination(), value),
             StateParameter::ApoapsisRadius(value) => state.apoapsis() - value,
             StateParameter::EccentricAnomaly(value) => angled_value(state.ea(), value),
             StateParameter::Eccentricity(value) => state.ecc() - value,
@@ -305,9 +162,11 @@ impl EventEvaluator<Orbit> for Event {
             StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
             StateParameter::PeriapsisRadius(value) => state.periapsis() - value,
             StateParameter::Period(value) => state.period().in_seconds() - value,
+            StateParameter::RightAscension(value) => angled_value(state.right_ascension(), value),
             StateParameter::RAAN(value) => angled_value(state.raan(), value),
             StateParameter::Rmag(value) => state.rmag() - value,
             StateParameter::SemiParameter(value) => state.semi_parameter() - value,
+            StateParameter::SemiMinorAxis(value) => state.semi_minor_axis() - value,
             StateParameter::SMA(value) => state.sma() - value,
             StateParameter::TrueAnomaly(value) => angled_value(state.ta(), value),
             StateParameter::TrueLongitude(value) => angled_value(state.tlong(), value),
@@ -341,140 +200,5 @@ impl EventEvaluator<SpacecraftState> for Event {
     }
 }
 
-// /// Built-in events, will likely be expanded as development continues.
-// #[derive(Clone, Copy, Debug)]
-// pub enum EventKind {
-//     Sma(f64),
-//     Ecc(f64),
-//     Inc(f64),
-//     Raan(f64),
-//     Aop(f64),
-//     TA(f64),
-//     Periapse,
-//     Apoapse,
-//     Fuel(f64),
-// }
-
-// impl fmt::Display for EventKind {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "{:?}", self)
-//     }
-// }
-
-// /// An orbital event, in the same frame or in another frame.
-// #[derive(Debug)]
-// pub struct OrbitalEvent {
-//     pub kind: EventKind,
-//     pub tgt: Option<Frame>,
-//     pub cosm: Option<Arc<Cosm>>,
-// }
-
-// impl OrbitalEvent {
-//     pub fn new(kind: EventKind) -> Box<Self> {
-//         Box::new(OrbitalEvent {
-//             kind,
-//             tgt: None,
-//             cosm: None,
-//         })
-//     }
-//     pub fn in_frame(kind: EventKind, tgt: Frame, cosm: Arc<Cosm>) -> Box<Self> {
-//         Box::new(OrbitalEvent {
-//             kind,
-//             tgt: Some(tgt),
-//             cosm: Some(cosm),
-//         })
-//     }
-// }
-
-// impl Event<Orbit> for OrbitalEvent {
-//     fn eval(&self, state: &Orbit) -> f64 {
-//         let state = match self.tgt {
-//             Some(tgt) => self.cosm.unwrap().frame_chg(state, tgt),
-//             None => *state,
-//         };
-
-//         match self.kind {
-//             EventKind::Sma(sma) => state.sma() - sma,
-//             EventKind::Ecc(ecc) => state.ecc() - ecc,
-//             EventKind::Inc(inc) => state.inc() - inc,
-//             EventKind::Raan(raan) => state.raan() - raan,
-//             EventKind::Aop(aop) => state.aop() - aop,
-//             EventKind::TA(angle) => {
-//                 if between_pm_x(state.ta(), angle) > 0.0 {
-//                     state.ta() - angle
-//                 } else {
-//                     state.ta() + 2.0 * angle
-//                 }
-//             }
-//             EventKind::Periapse => between_pm_180(state.ta()),
-//             EventKind::Apoapse => {
-//                 if between_pm_180(state.ta()) > 0.0 {
-//                     state.ta() - 180.0
-//                 } else {
-//                     state.ta() + 360.0
-//                 }
-//             }
-//             _ => panic!("event {:?} not supported", self.kind),
-//         }
-//     }
-
-//     fn eval_crossing(&self, prev_state: &Orbit, next_state: &Orbit) -> bool {
-//         let prev_val = self.eval(prev_state);
-//         let next_val = self.eval(next_state);
-//         match self.kind {
-//             // XXX: Should this condition be applied to all angles?
-//             EventKind::Periapse => prev_val < 0.0 && next_val >= 0.0,
-//             EventKind::Apoapse => prev_val > 0.0 && next_val <= 0.0,
-//             _ => prev_val * next_val <= 0.0,
-//         }
-//     }
-// }
-
-// #[derive(Debug)]
-// pub struct SCEvent {
-//     pub kind: EventKind,
-//     pub orbital: Option<Box<OrbitalEvent>>,
-// }
-
-// impl SCEvent {
-//     pub fn fuel_mass(mass: f64) -> Box<Self> {
-//         Box::new(Self {
-//             kind: EventKind::Fuel(mass),
-//             orbital: None,
-//         })
-//     }
-//     pub fn orbital(event: Box<OrbitalEvent>) -> Box<Self> {
-//         Box::new(Self {
-//             kind: event.kind,
-//             orbital: Some(event),
-//         })
-//     }
-// }
-
-// impl Event<SpacecraftState> for SCEvent {
-//     fn eval(&self, state: &SpacecraftState) -> f64 {
-//         match self.kind {
-//             EventKind::Fuel(mass) => state.fuel_mass_kg - mass,
-//             _ => self.orbital.as_ref().unwrap().eval(&state.orbit),
-//         }
-//     }
-
-//     fn eval_crossing(&self, prev_state: &SpacecraftState, next_state: &SpacecraftState) -> bool {
-//         match self.kind {
-//             EventKind::Fuel(mass) => {
-//                 prev_state.fuel_mass_kg <= mass && next_state.fuel_mass_kg > mass
-//             }
-//             _ => self
-//                 .orbital
-//                 .as_ref()
-//                 .unwrap()
-//                 .eval_crossing(&prev_state.orbit, &next_state.orbit),
-//         }
-//     }
-// }
-
-// #[test]
-// fn demo() {
-//     let event = Event::new(StateParameter::TA, value: f64);
-//     traj.find_minmax(StateParameter::TA, TimeUnit::Second);
-// }
+#[derive(Clone, Debug)]
+pub struct EclipseEvent {}

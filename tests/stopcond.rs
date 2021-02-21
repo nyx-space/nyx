@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::md::events::{Event, StateParameter};
+use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, J2000_OFFSET};

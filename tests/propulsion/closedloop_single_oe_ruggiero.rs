@@ -464,7 +464,7 @@ fn rugg_aop_decr() {
 
 #[test]
 fn rugg_raan() {
-    use self::nyx::md::events::{Event, StateParameter};
+    use self::nyx::md::{Event, StateParameter};
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 

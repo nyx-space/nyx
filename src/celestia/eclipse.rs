@@ -17,6 +17,9 @@
 */
 
 use super::{Cosm, Frame, LTCorr, Orbit};
+use crate::md::EventEvaluator;
+use crate::time::{Duration, TimeUnit};
+use crate::utils::normalize;
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::fmt;
 use std::sync::Arc;
@@ -92,7 +95,7 @@ impl fmt::Display for EclipseState {
         match *self {
             Self::Umbra => write!(f, "Umbra"),
             Self::Visibilis => write!(f, "Visibilis"),
-            Self::Penumbra(v) => write!(f, "Penumbra {}%", v * 100.0),
+            Self::Penumbra(v) => write!(f, "Penumbra {:.2}%", v * 100.0),
         }
     }
 }
@@ -103,6 +106,21 @@ pub struct EclipseLocator {
     pub shadow_bodies: Vec<Frame>,
     pub cosm: Arc<Cosm>,
     pub correction: LTCorr,
+}
+
+impl fmt::Display for EclipseLocator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let shadow_bodies = self
+            .shadow_bodies
+            .iter()
+            .map(|b| format!("{} ", b))
+            .collect::<String>();
+        write!(
+            f,
+            "Eclipse locator: light-source: {}\tshadows casted by: {} (light time corr.: {:?})",
+            self.light_source, shadow_bodies, self.correction
+        )
+    }
 }
 
 impl EclipseLocator {
@@ -122,6 +140,26 @@ impl EclipseLocator {
             }
         }
         state
+    }
+}
+
+impl EventEvaluator<Orbit> for EclipseLocator {
+    // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
+    fn eval(&self, observer: &Orbit) -> f64 {
+        match self.compute(observer) {
+            EclipseState::Umbra => -1.0,
+            EclipseState::Visibilis => 1.0,
+            EclipseState::Penumbra(val) => normalize(val, 0.0, 1.0),
+        }
+    }
+
+    /// Stop searching when the time has converged to less than 0.1 seconds
+    fn epoch_precision(&self) -> Duration {
+        0.1 * TimeUnit::Second
+    }
+    /// Finds the start/end of an eclipse within 0.1% of penumbra
+    fn value_precision(&self) -> f64 {
+        0.1
     }
 }
 
