@@ -244,7 +244,49 @@ where
             return Err(NyxError::StateTransitionMatrixNotUpdated);
         }
 
-        let covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        // Try to apply an SNC, if applicable
+        for (i, snc) in self.process_noise.iter().enumerate().rev() {
+            if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
+                // Check if we're using another SNC than the one before
+                if self.prev_used_snc != i {
+                    info!("Switched to {}-th {}", i, snc);
+                    self.prev_used_snc = i;
+                }
+
+                // Let's compute the Gamma matrix, an approximation of the time integral
+                // which assumes that the acceleration is constant between these two measurements.
+                let mut gamma = MatrixMN::<f64, <T as State>::Size, A>::zeros();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).in_seconds();
+                for blk in 0..A::dim() / 3 {
+                    for i in 0..3 {
+                        let idx_i = i + A::dim() * blk;
+                        let idx_j = i + 3 * blk;
+                        let idx_k = i + 3 + A::dim() * blk;
+                        // For first block
+                        // (0, 0) (1, 1) (2, 2) <=> \Delta t^2/2
+                        // (3, 0) (4, 1) (5, 2) <=> \Delta t
+                        // Second block
+                        // (6, 3) (7, 4) (8, 5) <=> \Delta t^2/2
+                        // (9, 3) (10, 4) (11, 5) <=> \Delta t
+                        // * \Delta t^2/2
+                        // (i, i) when blk = 0
+                        // (i + A::dim() * blk, i + 3) when blk = 1
+                        // (i + A::dim() * blk, i + 3 * blk)
+                        // * \Delta t
+                        // (i + 3, i) when blk = 0
+                        // (i + 3, i + 9) when blk = 1 (and I think i + 12 + 3)
+                        // (i + 3 + A::dim() * blk, i + 3 * blk)
+                        gamma[(idx_i, idx_j)] = delta_t.powi(2) / 2.0;
+                        gamma[(idx_k, idx_j)] = delta_t;
+                    }
+                }
+                // Let's add the process noise
+                covar_bar += &gamma * snc_matrix * &gamma.transpose();
+                // And break so we don't add any more process noise
+                break;
+            }
+        }
 
         let state_bar = if self.ekf {
             VectorN::<f64, <T as State>::Size>::zeros()
