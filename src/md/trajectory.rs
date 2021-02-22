@@ -35,7 +35,6 @@ use std::sync::Arc;
 use std::time::Duration as StdDur;
 
 const INTERP_TOLERANCE: f64 = 1e-10;
-const ITEMS_PER_SEGMENTS: usize = 12;
 
 /// Stores a segment of an interpolation
 #[derive(Clone)]
@@ -130,21 +129,25 @@ where
                 max_offset: 0,
             };
 
+            // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
+            // I've spent 12h trying to understand why, but I can't, so screw it for it.
+            let items_per_segments = if S::PropVecSize::dim() == 43 { 16 } else { 32 };
+
             let mut children = vec![];
-            let mut window_states: Vec<S> = Vec::with_capacity(ITEMS_PER_SEGMENTS);
+            let mut window_states: Vec<S> = Vec::with_capacity(items_per_segments);
             // Push the initial state
             window_states.push(state);
 
             // Note that we're using the typical map+reduce pattern
             // Start receiving states on a blocking call (map)
             while let Ok(state) = rx.recv_timeout(StdDur::from_millis(me.timeout_ms)) {
-                if window_states.len() == ITEMS_PER_SEGMENTS {
+                if window_states.len() == items_per_segments {
                     let this_wdn = window_states.clone();
                     children.push(
                         s.spawn(move |_| -> Result<Segment<S>, NyxError> { interpolate(this_wdn) }),
                     );
                     // Copy the last state as the first state of the next window
-                    let last_wdn_state = window_states[ITEMS_PER_SEGMENTS - 1];
+                    let last_wdn_state = window_states[items_per_segments - 1];
                     window_states.clear();
                     window_states.push(last_wdn_state);
                 }
