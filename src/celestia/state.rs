@@ -376,15 +376,39 @@ impl Orbit {
         }
     }
 
-    /// Creates a new Orbit from the geodetic latitude (φ), longitude (λ) and height with respect to Earth's ellipsoid.
+    /// Creates a new Orbit from the geodetic latitude (φ), longitude (λ) and height with respect to the ellipsoid of the frame.
     ///
     /// **Units:** degrees, degrees, km
-    /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of Earth.
+    /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of body.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
+    /// **WARNING:** This uses the rotational rates known to Nyx. For other objects, use `from_altlatlong` for other celestial bodies.
     pub fn from_geodesic(
         latitude: f64,
         longitude: f64,
         height: f64,
+        dt: Epoch,
+        frame: Frame,
+    ) -> Self {
+        Self::from_altlatlong(
+            latitude,
+            longitude,
+            height,
+            frame.angular_velocity(),
+            dt,
+            frame,
+        )
+    }
+
+    /// Creates a new Orbit from the latitude (φ), longitude (λ) and height with respect to the frame's ellipsoid.
+    ///
+    /// **Units:** degrees, degrees, km, rad/s
+    /// NOTE: This computation differs from the spherical coordinates because we consider the flattening of body.
+    /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
+    pub fn from_altlatlong(
+        latitude: f64,
+        longitude: f64,
+        height: f64,
+        angular_velocity: f64,
         dt: Epoch,
         frame: Frame,
     ) -> Self {
@@ -398,14 +422,14 @@ impl Orbit {
                 let (sin_long, cos_long) = longitude.to_radians().sin_cos();
                 let (sin_lat, cos_lat) = latitude.to_radians().sin_cos();
                 // page 144
-                let c_earth = semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
-                let s_earth = (semi_major_radius * (1.0 - flattening).powi(2))
+                let c_body = semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
+                let s_body = (semi_major_radius * (1.0 - flattening).powi(2))
                     / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
-                let ri = (c_earth + height) * cos_lat * cos_long;
-                let rj = (c_earth + height) * cos_lat * sin_long;
-                let rk = (s_earth + height) * sin_lat;
+                let ri = (c_body + height) * cos_lat * cos_long;
+                let rj = (c_body + height) * cos_lat * sin_long;
+                let rk = (s_body + height) * sin_lat;
                 let radius = Vector3::new(ri, rj, rk);
-                let velocity = Vector3::new(0.0, 0.0, 7.292_115_146_706_4e-5).cross(&radius);
+                let velocity = Vector3::new(0.0, 0.0, angular_velocity).cross(&radius);
                 Orbit::cartesian(
                     radius[0],
                     radius[1],

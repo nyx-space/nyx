@@ -23,8 +23,10 @@ use crate::time::Epoch;
 */
 // pub use celestia::xb::Identifier as XbId;
 use super::Bodies;
+use crate::time::{Duration, TimeUnit};
 use std::cmp::PartialEq;
 use std::convert::TryFrom;
+use std::f64::consts::PI;
 use std::fmt;
 
 #[allow(non_snake_case)]
@@ -131,6 +133,40 @@ impl Frame {
                 semi_major_radius, ..
             } => *semi_major_radius,
             _ => panic!("Frame is not Geoid in kind"),
+        }
+    }
+
+    /// Returns the angular velocity for _some_ planets and moons
+    /// Source for Earth: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016 (confirmed by https://hpiers.obspm.fr/eop-pc/models/constants.html)
+    /// Source for everything else: https://en.wikipedia.org/w/index.php?title=Day&oldid=1008298887
+    #[allow(clippy::identity_op)]
+    pub fn angular_velocity(&self) -> f64 {
+        let period_to_mean_motion = |dur: Duration| -> f64 { 2.0 * PI / dur.in_seconds() };
+        match Bodies::try_from(self.ephem_path()).unwrap() {
+            Bodies::MercuryBarycenter | Bodies::Mercury => period_to_mean_motion(
+                58 * TimeUnit::Day + 15 * TimeUnit::Hour + 30 * TimeUnit::Minute,
+            ),
+            Bodies::VenusBarycenter | Bodies::Venus => period_to_mean_motion(243 * TimeUnit::Day),
+            Bodies::Earth => 7.292_115_146_706_4e-5,
+            Bodies::Luna => period_to_mean_motion(
+                27 * TimeUnit::Day + 7 * TimeUnit::Hour + 12 * TimeUnit::Minute,
+            ),
+            Bodies::MarsBarycenter => {
+                period_to_mean_motion(1 * TimeUnit::Day + 37 * TimeUnit::Minute)
+            }
+            Bodies::JupiterBarycenter => {
+                period_to_mean_motion(9 * TimeUnit::Hour + 56 * TimeUnit::Minute)
+            }
+            Bodies::SaturnBarycenter => {
+                period_to_mean_motion(10 * TimeUnit::Hour + 30 * TimeUnit::Minute)
+            }
+            Bodies::UranusBarycenter => {
+                period_to_mean_motion(17 * TimeUnit::Hour + 14 * TimeUnit::Minute)
+            }
+            Bodies::NeptuneBarycenter => {
+                period_to_mean_motion(16 * TimeUnit::Hour + 6 * TimeUnit::Minute)
+            }
+            _ => unimplemented!(),
         }
     }
 }

@@ -203,5 +203,6 @@ impl EventEvaluator<SpacecraftState> for Event {
     }
 }
 
+/// Computes the elevation between a body fixed point and something else.
 #[derive(Clone, Debug)]
-pub struct EclipseEvent {}
+pub struct ElevationEvent {}

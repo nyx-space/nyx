@@ -81,6 +81,21 @@ impl GroundStation {
         }
     }
 
+    /// Initializes a point on the surface of a celestial object.
+    /// This is meant for analysis, not for spacecraft navigation.
+    pub fn from_point(
+        name: String,
+        latitude: f64,
+        longitude: f64,
+        height: f64,
+        frame: Frame,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        Self::from_noise_values(
+            name, 0.0, latitude, longitude, height, 0.0, 0.0, frame, cosm,
+        )
+    }
+
     pub fn dss65_madrid(
         elevation_mask: f64,
         range_noise: f64,
@@ -137,10 +152,10 @@ impl GroundStation {
             cosm,
         )
     }
-}
-impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
-    /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
+
+    /// Computes the elevation of the provided object seen from this ground station.
+    /// Also returns the ground station's orbit in the frame of the spacecraft
+    pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit) {
         use std::f64::consts::PI;
         // Convert the station to the state's frame
         let dt = rx.dt;
@@ -155,10 +170,21 @@ impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
         let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
             * r3(self.longitude.to_radians())
             * rho_tx_frame;
-        let elevation = (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees();
+
+        // Return elevation in degrees and tx
+        (
+            (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees(),
+            tx,
+        )
+    }
+}
+impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
+    /// Perform a measurement from the ground station to the receiver (rx).
+    fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
+        let (elevation, tx) = self.elevation_of(rx);
 
         Some(StdMeasurement::new(
-            dt,
+            rx.dt,
             tx,
             *rx,
             elevation >= self.elevation_mask,

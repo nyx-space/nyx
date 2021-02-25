@@ -5,6 +5,7 @@ fn event_tracker_true_anomaly() {
     use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
     use nyx::md::ui::*;
     use nyx::md::EventEvaluator; // Only needed because we're manually calling e.eval
+    use nyx::od::ranging::GroundStation;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -39,23 +40,51 @@ fn event_tracker_true_anomaly() {
         println!("[ta_tracker] {} =>\n{}", e, pretty);
     }
 
-    // Find all eclipses?!
+    // Find all eclipses!
     let e_loc = EclipseLocator {
         light_source: cosm.frame("Sun J2000"),
         shadow_bodies: vec![cosm.frame("EME2000")],
-        cosm,
+        cosm: cosm.clone(),
         correction: LTCorr::None,
     };
 
     // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.
     let mut e_state = EclipseState::Umbra;
+    // Also see what is the max elevation of this spacecraft over the Grand Canyon
+    let gc = GroundStation::from_point(
+        "Grand Canyon".to_string(),
+        36.0544,
+        112.1402,
+        0.0,
+        cosm.frame("IAU Earth"),
+        cosm.clone(),
+    );
+    let mut min_el = std::f64::INFINITY;
+    let mut max_el = std::f64::NEG_INFINITY;
+    let mut min_dt = dt;
+    let mut max_dt = dt;
     for state in traj.every(10 * TimeUnit::Second) {
         let new_e_state = e_loc.compute(&state);
         if e_state != new_e_state {
             println!("{:o}\t{}", state, new_e_state);
             e_state = new_e_state;
         }
+
+        // Compute the elevation
+        let (elevation, _) = gc.elevation_of(&state);
+        if elevation > max_el {
+            max_el = elevation;
+            max_dt = state.epoch();
+        }
+
+        if elevation < min_el {
+            min_el = elevation;
+            min_dt = state.epoch();
+        }
     }
+
+    println!("Min elevation {} degrees @ {}", min_el, min_dt);
+    println!("Max elevation {} degrees @ {}", max_el, max_dt);
 
     let umbra_event_loc = e_loc.to_umbra_event();
     let umbra_events = traj.find_all(&umbra_event_loc).unwrap();
