@@ -146,14 +146,16 @@ impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
         let dt = rx.dt;
         let station_state =
             Orbit::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
+        // Convert the station into the rx frame.
         let tx = self.cosm.frame_chg(&station_state, rx.frame);
         // Let's start by computing the range and range rate
-        let rho_ecef = rx.radius() - tx.radius();
+        let rho_tx_frame = rx.radius() - tx.radius();
 
         // Convert to SEZ to compute elevation
-        let rho_sez =
-            r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
-        let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
+        let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
+            * r3(self.longitude.to_radians())
+            * rho_tx_frame;
+        let elevation = (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees();
 
         Some(StdMeasurement::new(
             dt,
@@ -184,13 +186,13 @@ impl MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation {
                 );
                 let tx = self.cosm.frame_chg(&station_state, rx.frame);
                 // Let's start by computing the range and range rate
-                let rho_ecef = rx.radius() - tx.radius();
+                let rho_tx_frame = rx.radius() - tx.radius();
 
                 // Convert to SEZ to compute elevation
                 let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
                     * r3(self.longitude.to_radians())
-                    * rho_ecef;
-                let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
+                    * rho_tx_frame;
+                let elevation = (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees();
 
                 Some(StdMeasurement::new(
                     dt,

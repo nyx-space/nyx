@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::md::{Event, StateParameter};
+use nyx::md::Event;
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, J2000_OFFSET};
@@ -23,7 +23,7 @@ fn stop_cond_3rd_apo() {
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let apo_event = Event::without_value(StateParameter::Apoapsis);
+    let apo_event = Event::apoapsis(); // Special event shortcut!
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
@@ -60,7 +60,7 @@ fn stop_cond_3rd_peri() {
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let peri_event = Event::without_value(StateParameter::Periapsis);
+    let peri_event = Event::periapsis(); // Special event shortcut!
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
@@ -135,7 +135,8 @@ fn stop_cond_nrho_apo() {
     );
 
     // Create the event
-    let apo_event = Event::without_value(StateParameter::Apoapsis);
+    let apo_event = Event::apoapsis(); // Special event shortcut!
+
     // Convert this trajectory into the Luna frame
     let traj_luna = traj.to_frame(luna, cosm).unwrap();
     let end_conv = Instant::now();

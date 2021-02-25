@@ -91,9 +91,14 @@ impl Event {
         }
     }
 
-    /// Match an event which does not have a value. Shortcut for `Event::new(parameter, 0.0)`.
-    pub fn without_value(parameter: StateParameter) -> Self {
-        Self::new(parameter, 0.0)
+    /// Match the periapasis i.e. True Anomaly == 0
+    pub fn periapsis() -> Self {
+        Self::new(StateParameter::Periapsis, 0.0)
+    }
+
+    /// Match the apoapasis i.e. True Anomaly == 180
+    pub fn apoapsis() -> Self {
+        Self::new(StateParameter::Apoapsis, 180.0)
     }
 
     /// Match a specific event in another frame, using the default epoch precision and value.
@@ -111,15 +116,6 @@ impl Event {
             value_precision: 1e-3,
             in_frame: Some((target_frame, cosm)),
         }
-    }
-
-    /// Match a specific event in another frame, using the default epoch precision and value.
-    pub fn without_value_in_frame(
-        parameter: StateParameter,
-        target_frame: Frame,
-        cosm: Arc<Cosm>,
-    ) -> Self {
-        Self::in_frame(parameter, 0.0, target_frame, cosm)
     }
 }
 

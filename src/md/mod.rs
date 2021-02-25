@@ -68,7 +68,7 @@ impl MdHdlr<SpacecraftState> for OrbitStateOutput {
 
 /// Common state parameters
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StateParameter {
     /// Argument of Latitude (deg)
     AoL,
@@ -80,6 +80,8 @@ pub enum StateParameter {
     ApoapsisRadius,
     /// Declination (deg)
     Declination,
+    /// The epoch of the state
+    Epoch,
     /// Eccentric anomaly (deg)
     EccentricAnomaly,
     /// Eccentricity (no unit)
@@ -157,30 +159,30 @@ impl FromStr for StateParameter {
             "aol" => Ok(Self::AoL),
             "aop" => Ok(Self::AoP),
             "declin" => Ok(Self::Declination),
-            "apoapsisradius" => Ok(Self::ApoapsisRadius),
-            "eccentricanomaly" => Ok(Self::EccentricAnomaly),
-            "eccentricity" => Ok(Self::Eccentricity),
+            "apoapsis_radius" => Ok(Self::ApoapsisRadius),
+            "ea" => Ok(Self::EccentricAnomaly),
+            "ecc" => Ok(Self::Eccentricity),
             "energy" => Ok(Self::Energy),
-            "fuelmass" => Ok(Self::FuelMass),
-            "geodeticheight" => Ok(Self::GeodeticHeight),
-            "geodeticlatitude" => Ok(Self::GeodeticLatitude),
-            "geodeticlongitude" => Ok(Self::GeodeticLongitude),
+            "fuel_mass" => Ok(Self::FuelMass),
+            "geodetic_height" => Ok(Self::GeodeticHeight),
+            "geodetic_latitude" => Ok(Self::GeodeticLatitude),
+            "geodetic_longitude" => Ok(Self::GeodeticLongitude),
             "hmag" => Ok(Self::Hmag),
             "hx" => Ok(Self::HX),
             "hy" => Ok(Self::HY),
             "hz" => Ok(Self::HZ),
-            "inclination" => Ok(Self::Inclination),
-            "meananomaly" => Ok(Self::MeanAnomaly),
-            "periapsisradius" => Ok(Self::PeriapsisRadius),
+            "inc" => Ok(Self::Inclination),
+            "ma" => Ok(Self::MeanAnomaly),
+            "periapsis_radius" => Ok(Self::PeriapsisRadius),
             "period" => Ok(Self::Period),
             "right_asc" => Ok(Self::RightAscension),
             "raan" => Ok(Self::RAAN),
             "rmag" => Ok(Self::Rmag),
-            "semiparameter" => Ok(Self::SemiParameter),
-            "semiminor" => Ok(Self::SemiMinorAxis),
+            "semi_parameter" => Ok(Self::SemiParameter),
+            "semi_minor" => Ok(Self::SemiMinorAxis),
             "sma" => Ok(Self::SMA),
-            "trueanomaly" => Ok(Self::TrueAnomaly),
-            "truelongitude" => Ok(Self::TrueLongitude),
+            "ta" => Ok(Self::TrueAnomaly),
+            "tlong" => Ok(Self::TrueLongitude),
             "vmag" => Ok(Self::Vmag),
             "x" => Ok(Self::X),
             "y" => Ok(Self::Y),
@@ -189,7 +191,7 @@ impl FromStr for StateParameter {
             "vy" => Ok(Self::VY),
             "vz" => Ok(Self::VZ),
             _ => Err(NyxError::LoadingError(format!(
-                "Unknown event state parameter: {}",
+                "Unknown state parameter: {}",
                 s
             ))),
         }

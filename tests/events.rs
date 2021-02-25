@@ -17,8 +17,8 @@ fn event_tracker_true_anomaly() {
     let prop_time = state.period();
 
     // Track how many times we've passed by that TA again
-    let peri_event = Event::without_value(StateParameter::Periapsis);
-    let apo_event = Event::without_value(StateParameter::Apoapsis);
+    let peri_event = Event::periapsis(); // Special event shortcut!
+    let apo_event = Event::apoapsis(); // Special event shortcut!
     let ta_event0 = Event::new(StateParameter::TrueAnomaly, 35.1);
     let ta_event1 = Event::new(StateParameter::TrueAnomaly, 235.1);
 
