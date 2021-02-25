@@ -449,9 +449,25 @@ pub struct ConditionSerde {
 
 impl ConditionSerde {
     pub fn to_condition(&self) -> Event {
-        let parameter = StateParameter::from_str(self.event.as_str()).unwrap();
+        let rplt = self.event.replace("=", "");
+        let parts: Vec<&str> = rplt.split(' ').collect();
+        let parameter = StateParameter::from_str(parts[0]).unwrap();
+        let value = if parts.len() == 2 {
+            match parts[1].trim().parse::<f64>() {
+                Ok(val) => val,
+                Err(e) => {
+                    warn!(
+                        "Could not understand value `{}` in parameter: {}",
+                        parts[1], e
+                    );
+                    0.0
+                }
+            }
+        } else {
+            0.0
+        };
 
-        Event::new(parameter)
+        Event::new(parameter, value)
     }
 }
 

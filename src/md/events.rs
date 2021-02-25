@@ -51,11 +51,18 @@ where
     fn value_precision(&self) -> f64;
 }
 
+/// Defines a state parameter event finder
 #[derive(Clone, Debug)]
 pub struct Event {
+    /// The state parameter
     pub parameter: StateParameter,
+    /// The desired self.desired_value, must be in the same units as the state parameter
+    pub desired_value: f64,
+    /// The time precision after which the solver will report that it cannot find any more precise
     pub epoch_precision: TimeUnit,
+    /// The precision on the desired value
     pub value_precision: f64,
+    /// An optional frame in which to search this -- it IS recommended to convert the whole trajectory instead of searching in a given frame!
     pub in_frame: Option<(Frame, Arc<Cosm>)>,
 }
 
@@ -74,47 +81,45 @@ impl Event {
     /// By default, the time precision is 1 millisecond and the value precision is 1e-3 of whatever
     /// unit is the default for that parameter. For example, a radius event will seek the requested
     /// value at the meter level, and an angle event will seek it at the thousands of a degree.
-    pub fn new(parameter: StateParameter) -> Self {
+    pub fn new(parameter: StateParameter, desired_value: f64) -> Self {
         Self {
             parameter,
+            desired_value,
             epoch_precision: TimeUnit::Millisecond,
             value_precision: 1e-3,
             in_frame: None,
         }
     }
 
-    /// Allows only reporting the current value
-    pub fn status(parameter: StateParameter) -> Self {
+    /// Match an event which does not have a value. Shortcut for `Event::new(parameter, 0.0)`.
+    pub fn without_value(parameter: StateParameter) -> Self {
+        Self::new(parameter, 0.0)
+    }
+
+    /// Match a specific event in another frame, using the default epoch precision and value.
+    pub fn in_frame(
+        parameter: StateParameter,
+        desired_value: f64,
+        target_frame: Frame,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        warn!("Searching for an event in another frame is slow: you should instead convert the trajectory into that other frame");
         Self {
             parameter,
+            desired_value,
             epoch_precision: TimeUnit::Millisecond,
-            value_precision: 0.0,
-            in_frame: None,
+            value_precision: 1e-3,
+            in_frame: Some((target_frame, cosm)),
         }
     }
 
     /// Match a specific event in another frame, using the default epoch precision and value.
-    pub fn in_frame(parameter: StateParameter, target_frame: Frame, cosm: Arc<Cosm>) -> Self {
-        Self {
-            parameter,
-            epoch_precision: TimeUnit::Millisecond,
-            value_precision: 1e-3,
-            in_frame: Some((target_frame, cosm)),
-        }
-    }
-
-    /// Report the status in a specific frame
-    pub fn status_in_frame(
+    pub fn without_value_in_frame(
         parameter: StateParameter,
         target_frame: Frame,
         cosm: Arc<Cosm>,
     ) -> Self {
-        Self {
-            parameter,
-            epoch_precision: TimeUnit::Millisecond,
-            value_precision: 0.0,
-            in_frame: Some((target_frame, cosm)),
-        }
+        Self::in_frame(parameter, 0.0, target_frame, cosm)
     }
 }
 
@@ -142,41 +147,43 @@ impl EventEvaluator<Orbit> for Event {
 
         // Return the parameter centered around the desired value
         match self.parameter {
-            StateParameter::AoL(value) => angled_value(state.aol(), value),
-            StateParameter::AoP(value) => angled_value(state.aop(), value),
+            StateParameter::AoL => angled_value(state.aol(), self.desired_value),
+            StateParameter::AoP => angled_value(state.aop(), self.desired_value),
             StateParameter::Apoapsis => angled_value(state.ta(), 180.0),
-            StateParameter::Declination(value) => angled_value(state.declination(), value),
-            StateParameter::ApoapsisRadius(value) => state.apoapsis() - value,
-            StateParameter::EccentricAnomaly(value) => angled_value(state.ea(), value),
-            StateParameter::Eccentricity(value) => state.ecc() - value,
-            StateParameter::Energy(value) => state.energy() - value,
-            StateParameter::GeodeticHeight(value) => state.geodetic_height() - value,
-            StateParameter::GeodeticLatitude(value) => state.geodetic_latitude() - value,
-            StateParameter::GeodeticLongitude(value) => state.geodetic_longitude() - value,
-            StateParameter::Hmag(value) => state.hmag() - value,
-            StateParameter::HX(value) => state.hx() - value,
-            StateParameter::HY(value) => state.hy() - value,
-            StateParameter::HZ(value) => state.hz() - value,
-            StateParameter::Inclination(value) => angled_value(state.inc(), value),
-            StateParameter::MeanAnomaly(value) => angled_value(state.ma(), value),
+            StateParameter::Declination => angled_value(state.declination(), self.desired_value),
+            StateParameter::ApoapsisRadius => state.apoapsis() - self.desired_value,
+            StateParameter::EccentricAnomaly => angled_value(state.ea(), self.desired_value),
+            StateParameter::Eccentricity => state.ecc() - self.desired_value,
+            StateParameter::Energy => state.energy() - self.desired_value,
+            StateParameter::GeodeticHeight => state.geodetic_height() - self.desired_value,
+            StateParameter::GeodeticLatitude => state.geodetic_latitude() - self.desired_value,
+            StateParameter::GeodeticLongitude => state.geodetic_longitude() - self.desired_value,
+            StateParameter::Hmag => state.hmag() - self.desired_value,
+            StateParameter::HX => state.hx() - self.desired_value,
+            StateParameter::HY => state.hy() - self.desired_value,
+            StateParameter::HZ => state.hz() - self.desired_value,
+            StateParameter::Inclination => angled_value(state.inc(), self.desired_value),
+            StateParameter::MeanAnomaly => angled_value(state.ma(), self.desired_value),
             StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
-            StateParameter::PeriapsisRadius(value) => state.periapsis() - value,
-            StateParameter::Period(value) => state.period().in_seconds() - value,
-            StateParameter::RightAscension(value) => angled_value(state.right_ascension(), value),
-            StateParameter::RAAN(value) => angled_value(state.raan(), value),
-            StateParameter::Rmag(value) => state.rmag() - value,
-            StateParameter::SemiParameter(value) => state.semi_parameter() - value,
-            StateParameter::SemiMinorAxis(value) => state.semi_minor_axis() - value,
-            StateParameter::SMA(value) => state.sma() - value,
-            StateParameter::TrueAnomaly(value) => angled_value(state.ta(), value),
-            StateParameter::TrueLongitude(value) => angled_value(state.tlong(), value),
-            StateParameter::Vmag(value) => state.vmag() - value,
-            StateParameter::X(value) => state.x - value,
-            StateParameter::Y(value) => state.y - value,
-            StateParameter::Z(value) => state.z - value,
-            StateParameter::VX(value) => state.vx - value,
-            StateParameter::VY(value) => state.vy - value,
-            StateParameter::VZ(value) => state.vz - value,
+            StateParameter::PeriapsisRadius => state.periapsis() - self.desired_value,
+            StateParameter::Period => state.period().in_seconds() - self.desired_value,
+            StateParameter::RightAscension => {
+                angled_value(state.right_ascension(), self.desired_value)
+            }
+            StateParameter::RAAN => angled_value(state.raan(), self.desired_value),
+            StateParameter::Rmag => state.rmag() - self.desired_value,
+            StateParameter::SemiParameter => state.semi_parameter() - self.desired_value,
+            StateParameter::SemiMinorAxis => state.semi_minor_axis() - self.desired_value,
+            StateParameter::SMA => state.sma() - self.desired_value,
+            StateParameter::TrueAnomaly => angled_value(state.ta(), self.desired_value),
+            StateParameter::TrueLongitude => angled_value(state.tlong(), self.desired_value),
+            StateParameter::Vmag => state.vmag() - self.desired_value,
+            StateParameter::X => state.x - self.desired_value,
+            StateParameter::Y => state.y - self.desired_value,
+            StateParameter::Z => state.z - self.desired_value,
+            StateParameter::VX => state.vx - self.desired_value,
+            StateParameter::VY => state.vy - self.desired_value,
+            StateParameter::VZ => state.vz - self.desired_value,
             _ => unimplemented!(),
         }
     }
@@ -185,7 +192,7 @@ impl EventEvaluator<Orbit> for Event {
 impl EventEvaluator<SpacecraftState> for Event {
     fn eval(&self, state: &SpacecraftState) -> f64 {
         match self.parameter {
-            StateParameter::FuelMass(value) => state.fuel_mass_kg - value,
+            StateParameter::FuelMass => state.fuel_mass_kg - self.desired_value,
             _ => self.eval(&state.orbit),
         }
     }

@@ -285,10 +285,7 @@ where
         condition: SmoothingArc,
     ) -> Result<(), NyxError> {
         // First, smooth the estimates
-        let smoothed = match self.smooth(condition) {
-            Ok(smoothed) => smoothed,
-            Err(e) => return Err(e),
-        };
+        let smoothed = self.smooth(condition)?;
         // Reset the propagator
         self.prop.state = self.init_state;
         // Empty the estimates and add the first smoothed estimate as the initial estimate

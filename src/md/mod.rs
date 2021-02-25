@@ -71,147 +71,127 @@ impl MdHdlr<SpacecraftState> for OrbitStateOutput {
 #[derive(Clone, Debug, PartialEq)]
 pub enum StateParameter {
     /// Argument of Latitude (deg)
-    AoL(f64),
+    AoL,
     /// Argument of Periapse (deg)
-    AoP(f64),
+    AoP,
     /// Apoapsis, shortcut for TA == 180.0
     Apoapsis,
     /// Radius of apoapsis (km)
-    ApoapsisRadius(f64),
+    ApoapsisRadius,
     /// Declination (deg)
-    Declination(f64),
+    Declination,
     /// Eccentric anomaly (deg)
-    EccentricAnomaly(f64),
+    EccentricAnomaly,
     /// Eccentricity (no unit)
-    Eccentricity(f64),
+    Eccentricity,
     /// Specific energy
-    Energy(f64),
+    Energy,
     /// fuel mass in kilograms
-    FuelMass(f64),
+    FuelMass,
     /// Geodetic height (km)
-    GeodeticHeight(f64),
+    GeodeticHeight,
     /// Geodetic latitude (deg)
-    GeodeticLatitude(f64),
+    GeodeticLatitude,
     /// Geodetic longitude (deg)
-    GeodeticLongitude(f64),
+    GeodeticLongitude,
     /// Orbital momentum
-    Hmag(f64),
+    Hmag,
     /// X component of the orbital momentum vector
-    HX(f64),
+    HX,
     /// Y component of the orbital momentum vector
-    HY(f64),
+    HY,
     /// Z component of the orbital momentum vector
-    HZ(f64),
+    HZ,
     /// Inclination (deg)
-    Inclination(f64),
+    Inclination,
     /// Mean anomaly (deg)
-    MeanAnomaly(f64),
+    MeanAnomaly,
     /// Periapsis, shortcut for TA == 0.0
     Periapsis,
     /// Radius of periapse (km)
-    PeriapsisRadius(f64),
+    PeriapsisRadius,
     /// Orbital period (s)
-    Period(f64),
+    Period,
     /// Right ascension (deg)
-    RightAscension(f64),
+    RightAscension,
     /// Right ascension of the ascending node (deg)
-    RAAN(f64),
+    RAAN,
     /// Norm of the radius vector
-    Rmag(f64),
+    Rmag,
     /// Semi parameter (km)
-    SemiParameter(f64),
+    SemiParameter,
     /// Semi major axis (km)
-    SMA(f64),
+    SMA,
     /// Semi minor axis (km)
-    SemiMinorAxis(f64),
+    SemiMinorAxis,
     /// True anomaly
-    TrueAnomaly(f64),
+    TrueAnomaly,
     /// True longitude
-    TrueLongitude(f64),
+    TrueLongitude,
     /// Norm of the velocity vector (km/s)
-    Vmag(f64),
+    Vmag,
     /// X component of the radius (km)
-    X(f64),
+    X,
     /// Y component of the radius (km)
-    Y(f64),
+    Y,
     /// Z component of the radius (km)
-    Z(f64),
+    Z,
     /// X component of the velocity (km/s)
-    VX(f64),
+    VX,
     /// Y component of the velocity (km/s)
-    VY(f64),
+    VY,
     /// Z component of the velocity (km/s)
-    VZ(f64),
+    VZ,
     /// Allows creating new custom events by matching on the value of the field
-    Custom(usize, f64),
+    Custom { mapping: usize },
 }
 
 impl FromStr for StateParameter {
     type Err = NyxError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let rplt = s.to_lowercase().replace("=", "");
-        let parts: Vec<&str> = rplt.split(' ').collect();
-        if parts.len() == 1 {
-            match parts[0].trim() {
-                "apoapsis" => Ok(Self::Apoapsis),
-                "periapsis" => Ok(Self::Periapsis),
-                _ => Err(NyxError::LoadingError(format!(
-                    "Unknown event state parameter without value: {}",
-                    s
-                ))),
-            }
-        } else if parts.len() == 2 {
-            match parts[1].trim().parse::<f64>() {
-                Ok(value) => match parts[0].trim() {
-                    "aol" => Ok(Self::AoL(value)),
-                    "aop" => Ok(Self::AoP(value)),
-                    "declin" => Ok(Self::Declination(value)),
-                    "apoapsisradius" => Ok(Self::ApoapsisRadius(value)),
-                    "eccentricanomaly" => Ok(Self::EccentricAnomaly(value)),
-                    "eccentricity" => Ok(Self::Eccentricity(value)),
-                    "energy" => Ok(Self::Energy(value)),
-                    "fuelmass" => Ok(Self::FuelMass(value)),
-                    "geodeticheight" => Ok(Self::GeodeticHeight(value)),
-                    "geodeticlatitude" => Ok(Self::GeodeticLatitude(value)),
-                    "geodeticlongitude" => Ok(Self::GeodeticLongitude(value)),
-                    "hmag" => Ok(Self::Hmag(value)),
-                    "hx" => Ok(Self::HX(value)),
-                    "hy" => Ok(Self::HY(value)),
-                    "hz" => Ok(Self::HZ(value)),
-                    "inclination" => Ok(Self::Inclination(value)),
-                    "meananomaly" => Ok(Self::MeanAnomaly(value)),
-                    "periapsisradius" => Ok(Self::PeriapsisRadius(value)),
-                    "period" => Ok(Self::Period(value)),
-                    "right_asc" => Ok(Self::RightAscension(value)),
-                    "raan" => Ok(Self::RAAN(value)),
-                    "rmag" => Ok(Self::Rmag(value)),
-                    "semiparameter" => Ok(Self::SemiParameter(value)),
-                    "semiminor" => Ok(Self::SemiMinorAxis(value)),
-                    "sma" => Ok(Self::SMA(value)),
-                    "trueanomaly" => Ok(Self::TrueAnomaly(value)),
-                    "truelongitude" => Ok(Self::TrueLongitude(value)),
-                    "vmag" => Ok(Self::Vmag(value)),
-                    "x" => Ok(Self::X(value)),
-                    "y" => Ok(Self::Y(value)),
-                    "z" => Ok(Self::Z(value)),
-                    "vx" => Ok(Self::VX(value)),
-                    "vy" => Ok(Self::VY(value)),
-                    "vz" => Ok(Self::VZ(value)),
-                    _ => Err(NyxError::LoadingError(format!(
-                        "Unknown event state parameter: {}",
-                        s
-                    ))),
-                },
-                Err(_) => Err(NyxError::LoadingError(format!(
-                    "Could not parse value in event: {}",
-                    s
-                ))),
-            }
-        } else {
-            Err(NyxError::LoadingError(format!(
-                "Could not parse event: {}",
+        let keyword = s.trim().to_lowercase();
+
+        match keyword.as_str() {
+            "apoapsis" => Ok(Self::Apoapsis),
+            "periapsis" => Ok(Self::Periapsis),
+            "aol" => Ok(Self::AoL),
+            "aop" => Ok(Self::AoP),
+            "declin" => Ok(Self::Declination),
+            "apoapsisradius" => Ok(Self::ApoapsisRadius),
+            "eccentricanomaly" => Ok(Self::EccentricAnomaly),
+            "eccentricity" => Ok(Self::Eccentricity),
+            "energy" => Ok(Self::Energy),
+            "fuelmass" => Ok(Self::FuelMass),
+            "geodeticheight" => Ok(Self::GeodeticHeight),
+            "geodeticlatitude" => Ok(Self::GeodeticLatitude),
+            "geodeticlongitude" => Ok(Self::GeodeticLongitude),
+            "hmag" => Ok(Self::Hmag),
+            "hx" => Ok(Self::HX),
+            "hy" => Ok(Self::HY),
+            "hz" => Ok(Self::HZ),
+            "inclination" => Ok(Self::Inclination),
+            "meananomaly" => Ok(Self::MeanAnomaly),
+            "periapsisradius" => Ok(Self::PeriapsisRadius),
+            "period" => Ok(Self::Period),
+            "right_asc" => Ok(Self::RightAscension),
+            "raan" => Ok(Self::RAAN),
+            "rmag" => Ok(Self::Rmag),
+            "semiparameter" => Ok(Self::SemiParameter),
+            "semiminor" => Ok(Self::SemiMinorAxis),
+            "sma" => Ok(Self::SMA),
+            "trueanomaly" => Ok(Self::TrueAnomaly),
+            "truelongitude" => Ok(Self::TrueLongitude),
+            "vmag" => Ok(Self::Vmag),
+            "x" => Ok(Self::X),
+            "y" => Ok(Self::Y),
+            "z" => Ok(Self::Z),
+            "vx" => Ok(Self::VX),
+            "vy" => Ok(Self::VY),
+            "vz" => Ok(Self::VZ),
+            _ => Err(NyxError::LoadingError(format!(
+                "Unknown event state parameter: {}",
                 s
-            )))
+            ))),
         }
     }
 }

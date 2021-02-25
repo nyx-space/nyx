@@ -17,10 +17,10 @@ fn event_tracker_true_anomaly() {
     let prop_time = state.period();
 
     // Track how many times we've passed by that TA again
-    let peri_event = Event::new(StateParameter::Periapsis);
-    let apo_event = Event::new(StateParameter::Apoapsis);
-    let ta_event0 = Event::new(StateParameter::TrueAnomaly(35.1));
-    let ta_event1 = Event::new(StateParameter::TrueAnomaly(235.1));
+    let peri_event = Event::without_value(StateParameter::Periapsis);
+    let apo_event = Event::without_value(StateParameter::Apoapsis);
+    let ta_event0 = Event::new(StateParameter::TrueAnomaly, 35.1);
+    let ta_event1 = Event::new(StateParameter::TrueAnomaly, 235.1);
 
     let events = vec![peri_event, apo_event, ta_event0, ta_event1];
 

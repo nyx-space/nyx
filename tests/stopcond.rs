@@ -23,7 +23,7 @@ fn stop_cond_3rd_apo() {
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let apo_event = Event::new(StateParameter::Apoapsis);
+    let apo_event = Event::without_value(StateParameter::Apoapsis);
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
@@ -60,8 +60,7 @@ fn stop_cond_3rd_peri() {
     let period = state.period();
 
     // Track how many times we've passed by that TA again
-    let peri_event = Event::new(StateParameter::Periapsis);
-    // let condition = StopCondition::after_hits(apo_event, 3, 4.0 * period, 1e-10);
+    let peri_event = Event::without_value(StateParameter::Periapsis);
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
@@ -110,8 +109,6 @@ fn stop_cond_nrho_apo() {
         state_luna
     );
 
-    let apo_event = Event::in_frame(StateParameter::Apoapsis, luna, cosm.clone());
-
     let bodies = vec![Bodies::Earth, Bodies::Sun];
     let dynamics = OrbitalDynamics::point_masses(luna, &bodies, cosm.clone());
 
@@ -137,6 +134,8 @@ fn stop_cond_nrho_apo() {
         orbit,
     );
 
+    // Create the event
+    let apo_event = Event::without_value(StateParameter::Apoapsis);
     // Convert this trajectory into the Luna frame
     let traj_luna = traj.to_frame(luna, cosm).unwrap();
     let end_conv = Instant::now();
