@@ -22,7 +22,7 @@ extern crate rayon;
 use self::rayon::prelude::*;
 use super::MdHdlr;
 pub use super::{Event, StateParameter};
-pub use crate::celestia::{Bodies, Cosm, Orbit};
+pub use crate::celestia::{Bodies, Cosm, LTCorr, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::{Dynamics, NyxError};
