@@ -34,6 +34,7 @@ use crate::dimensions::{
 use crate::time::Epoch;
 use crate::utils::{r2, r3};
 use crate::SpacecraftState;
+use std::fmt;
 use std::sync::Arc;
 
 /// GroundStation defines a Two Way ranging equipment.
@@ -234,6 +235,21 @@ impl MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation {
                 None
             }
         }
+    }
+}
+
+impl fmt::Display for GroundStation {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {} (lat.: {:.2} deg    long.: {:.2} deg    alt.: {:.2} m)",
+            self.frame,
+            self.name,
+            self.latitude,
+            self.longitude,
+            self.height * 1e3,
+        )
     }
 }
 

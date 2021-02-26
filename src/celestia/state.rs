@@ -363,6 +363,29 @@ impl Orbit {
         }
     }
 
+    /// Creates a new Orbit from the provided semi-major axis altitude in kilometers
+    pub fn keplerian_alt(
+        sma_altitude: f64,
+        ecc: f64,
+        inc: f64,
+        raan: f64,
+        aop: f64,
+        ta: f64,
+        dt: Epoch,
+        frame: Frame,
+    ) -> Self {
+        Self::keplerian(
+            sma_altitude + frame.equatorial_radius(),
+            ecc,
+            inc,
+            raan,
+            aop,
+            ta,
+            dt,
+            frame,
+        )
+    }
+
     /// Creates a new Orbit around the provided frame from the borrowed state vector
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
