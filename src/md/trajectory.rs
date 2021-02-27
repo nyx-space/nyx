@@ -24,7 +24,8 @@ use crate::celestia::{Cosm, Frame, Orbit, SpacecraftState};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
-use crate::md::events::EventEvaluator;
+use crate::io::formatter::StateFormatter;
+use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput, StateParameter};
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::utils::normalize;
 use crate::{State, TimeTagged};
@@ -441,6 +442,59 @@ impl Traj<Orbit> {
             Ok(traj)
         })
         .unwrap()
+    }
+
+    /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
+    pub fn to_csv_with_step(
+        &self,
+        filename: &str,
+        step: Duration,
+        cosm: Arc<Cosm>,
+    ) -> Result<(), NyxError> {
+        let fmtr = StateFormatter::default(filename.to_string(), cosm);
+        let mut out = OrbitStateOutput::new(fmtr)?;
+        for state in self.every(step) {
+            out.handle(&state);
+        }
+        Ok(())
+    }
+
+    /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
+    #[allow(clippy::identity_op)]
+    pub fn to_csv(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
+        self.to_csv_with_step(filename, 1 * TimeUnit::Minute, cosm)
+    }
+
+    /// Exports this trajectory to the provided filename in CSV format with the default headers and the geodetic latitude and longitude, one state per minute
+    #[allow(clippy::identity_op)]
+    pub fn to_csv_with_groundtrack(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
+        let mut fmtr = StateFormatter::default(filename.to_string(), cosm);
+        fmtr.headers
+            .push(From::from(StateParameter::GeodeticLongitude));
+        fmtr.headers
+            .push(From::from(StateParameter::GeodeticLatitude));
+
+        let mut out = OrbitStateOutput::new(fmtr)?;
+        for state in self.every(1 * TimeUnit::Minute) {
+            out.handle(&state);
+        }
+        Ok(())
+    }
+
+    /// Exports this trajectory to the provided filename in CSV format with the provided headers and the provided step
+    pub fn to_csv_custom(
+        &self,
+        filename: &str,
+        headers: Vec<&str>,
+        step: Duration,
+        cosm: Arc<Cosm>,
+    ) -> Result<(), NyxError> {
+        let fmtr = StateFormatter::from_headers(headers, filename.to_string(), cosm);
+        let mut out = OrbitStateOutput::new(fmtr)?;
+        for state in self.every(step) {
+            out.handle(&state);
+        }
+        Ok(())
     }
 }
 

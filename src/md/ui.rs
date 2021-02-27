@@ -21,7 +21,7 @@ extern crate rayon;
 
 use self::rayon::prelude::*;
 use super::MdHdlr;
-pub use super::{Event, StateParameter};
+pub use super::{trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
 pub use crate::celestia::{Bodies, Cosm, LTCorr, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
@@ -37,7 +37,7 @@ pub use crate::SpacecraftState;
 pub use crate::{State, TimeTagged};
 use std::convert::TryFrom;
 use std::str::FromStr;
-use std::sync::{mpsc::channel, Arc};
+use std::sync::Arc;
 use std::time::Instant;
 
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics
@@ -308,18 +308,12 @@ where
         }
     }
 
-    // #[inline]
-    // pub fn propagator(&'a self) -> PropInstance<'a, Spacecraft<'a>, RSSStepPV> {
-    //     let mut p = Propagator::default(&self.sc_dyn);
-    //     p.set_tolerance(self.prop_tol);
-    //     p.with(self.init_state)
-    // }
-
     pub fn execute(mut self) -> Result<(), NyxError> {
         self.execute_with(vec![])
     }
 
     /// Execute the MD with the provided handlers. Note that you must initialize your own CSV output if that's desired.
+    #[allow(clippy::identity_op)]
     pub fn execute_with(
         &mut self,
         mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>>,
@@ -332,10 +326,6 @@ where
         let mut prop_setup = Propagator::default(self.sc_dyn.clone());
         prop_setup.set_tolerance(self.prop_tol);
         let mut prop = prop_setup.with(self.init_state);
-        // let mut prop = self.propagator();
-        // Set up the channels
-        let (tx, rx) = channel();
-        prop.tx_chan = Some(tx);
 
         let mut initial_state = Some(prop.state);
 
@@ -343,7 +333,7 @@ where
         let start = Instant::now();
 
         // Run
-        match maybe_prop_event {
+        let traj = match maybe_prop_event {
             Some(prop_event) => {
                 let event = prop_event.to_condition();
                 let max_duration = match Duration::from_str(prop_event.search_until.as_str()) {
@@ -356,17 +346,17 @@ where
                         }
                     },
                 };
-                let rslt = prop.until_event(max_duration, &event, prop_event.hits.unwrap_or(0));
-                if rslt.is_err() {
-                    panic!("{:?}", rslt.err());
-                }
+                let (_, traj) =
+                    prop.until_event(max_duration, &event, prop_event.hits.unwrap_or(0))?;
+                traj
             }
             None => {
                 // Elapsed seconds propagation
                 let prop_time = maybe_prop_time.unwrap();
-                prop.for_duration(prop_time)?;
+                let (_, traj) = prop.for_duration_with_traj(prop_time)?;
+                traj
             }
-        }
+        };
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
@@ -374,20 +364,30 @@ where
             (Instant::now() - start).as_secs_f64()
         );
 
-        while let Ok(prop_state) = rx.try_recv() {
-            // Provide to the handler
-            hdlrs.par_iter_mut().for_each(|hdlr| {
-                // let mut hdlr = hdlr_am.lock().unwrap();
-                if let Some(first_state) = initial_state {
-                    hdlr.handle(&first_state);
+        if !hdlrs.is_empty() {
+            // Let's write the state every minute
+            let hdlr_start = Instant::now();
+            let mut cnt = 0;
+            for prop_state in traj.every(1 * TimeUnit::Minute) {
+                cnt += 1;
+                // Provide to the handler
+                hdlrs.par_iter_mut().for_each(|hdlr| {
+                    if let Some(first_state) = initial_state {
+                        hdlr.handle(&first_state);
+                    }
+                    hdlr.handle(&prop_state);
+                });
+                // We've used the initial state (if it was there)
+                if initial_state.is_some() {
+                    initial_state = None;
                 }
-                hdlr.handle(&prop_state);
-            });
-
-            // We've used the initial state (if it was there)
-            if initial_state.is_some() {
-                initial_state = None;
             }
+
+            info!(
+                "Processed {} states in {:.3} seconds",
+                cnt,
+                (Instant::now() - hdlr_start).as_secs_f64()
+            );
         }
 
         Ok(())

@@ -63,6 +63,8 @@ pub enum NyxError {
     CtrlThrottleRangeErr(f64),
     /// An objective based analysis or control was attempted, but no objective was defined.
     NoObjectiveDefined,
+    /// Error when exporting data
+    ExportError(String),
     /// Some custom error for new dynamics
     CustomError(String),
 }

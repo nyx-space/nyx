@@ -42,7 +42,11 @@ pub struct OutputSerde {
 impl OutputSerde {
     pub fn to_state_formatter(&self, cosm: Arc<Cosm>) -> StateFormatter {
         match &self.headers {
-            Some(hdr) => StateFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm),
+            Some(hdr) => StateFormatter::from_headers(
+                hdr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+                self.filename.clone(),
+                cosm,
+            ),
             None => StateFormatter::default(self.filename.clone(), cosm),
         }
     }
@@ -85,7 +89,39 @@ impl From<StateParameter> for StateHeader {
 impl fmt::Display for StateHeader {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, fh: &mut fmt::Formatter) -> fmt::Result {
-        write!(fh, "{:?}", self.param)?;
+        let fmtd = match self.param {
+            StateParameter::X
+            | StateParameter::Y
+            | StateParameter::Z
+            | StateParameter::ApoapsisRadius
+            | StateParameter::PeriapsisRadius
+            | StateParameter::GeodeticHeight
+            | StateParameter::SemiMinorAxis
+            | StateParameter::SemiParameter
+            | StateParameter::SMA
+            | StateParameter::Rmag => {
+                format!("{:?} (km)", self.param)
+            }
+            StateParameter::VX | StateParameter::VY | StateParameter::VZ | StateParameter::Vmag => {
+                format!("{:?} (km/s)", self.param)
+            }
+            StateParameter::AoL
+            | StateParameter::AoP
+            | StateParameter::Declination
+            | StateParameter::EccentricAnomaly
+            | StateParameter::GeodeticLatitude
+            | StateParameter::GeodeticLongitude
+            | StateParameter::Inclination
+            | StateParameter::MeanAnomaly
+            | StateParameter::RightAscension
+            | StateParameter::RAAN
+            | StateParameter::TrueAnomaly
+            | StateParameter::TrueLongitude => {
+                format!("{:?} (deg)", self.param)
+            }
+            _ => format!("{:?}", self.param),
+        };
+        write!(fh, "{}", fmtd)?;
         if let Some(frame) = &self.frame_name {
             write!(fh, ":{}", frame)?;
         } else if let Some(epoch_fmt) = self.epoch_fmt {
@@ -392,14 +428,14 @@ impl StateFormatter {
     /// let hdrs = vec!["AoL".to_string(), "ea:eme2000".to_string()];
     /// StateFormatter::from_headers(hdrs, "nope".to_string(), cosm);
     /// ```
-    pub fn from_headers(headers: Vec<String>, filename: String, cosm: Arc<Cosm>) -> Self {
+    pub fn from_headers(headers: Vec<&str>, filename: String, cosm: Arc<Cosm>) -> Self {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(20);
         // Rebuild the header tokens
         for hdr in &headers {
             let splt: Vec<&str> = hdr.split(':').collect();
 
-            match splt[0] {
+            match splt[0].to_lowercase().as_str() {
                 "epoch" => {
                     let epoch_fmt = if splt.len() == 2 {
                         EpochFormat::from_str(splt[1]).unwrap()
@@ -488,41 +524,41 @@ impl StateFormatter {
 
             formatted.push(match hdr.param {
                 StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(state.dt),
-                StateParameter::AoL => format!("{:.16e}", state.aol()),
-                StateParameter::AoP => format!("{:.16e}", state.aop()),
-                StateParameter::Apoapsis => format!("{:.16e}", state.ta()),
-                StateParameter::Declination => format!("{:.16e}", state.declination()),
-                StateParameter::ApoapsisRadius => format!("{:.16e}", state.apoapsis()),
-                StateParameter::EccentricAnomaly => format!("{:.16e}", state.ea()),
-                StateParameter::Eccentricity => format!("{:.16e}", state.ecc()),
-                StateParameter::Energy => format!("{:.16e}", state.energy()),
-                StateParameter::GeodeticHeight => format!("{:.16e}", state.geodetic_height()),
-                StateParameter::GeodeticLatitude => format!("{:.16e}", state.geodetic_latitude()),
-                StateParameter::GeodeticLongitude => format!("{:.16e}", state.geodetic_longitude()),
-                StateParameter::Hmag => format!("{:.16e}", state.hmag()),
-                StateParameter::HX => format!("{:.16e}", state.hx()),
-                StateParameter::HY => format!("{:.16e}", state.hy()),
-                StateParameter::HZ => format!("{:.16e}", state.hz()),
-                StateParameter::Inclination => format!("{:.16e}", state.inc()),
-                StateParameter::MeanAnomaly => format!("{:.16e}", state.ma()),
-                StateParameter::Periapsis => format!("{:.16e}", state.ta()),
-                StateParameter::PeriapsisRadius => format!("{:.16e}", state.periapsis()),
-                StateParameter::Period => format!("{:.16e}", state.period().in_seconds()),
-                StateParameter::RightAscension => format!("{:.16e}", state.right_ascension()),
-                StateParameter::RAAN => format!("{:.16e}", state.raan()),
-                StateParameter::Rmag => format!("{:.16e}", state.rmag()),
-                StateParameter::SemiParameter => format!("{:.16e}", state.semi_parameter()),
-                StateParameter::SemiMinorAxis => format!("{:.16e}", state.semi_minor_axis()),
-                StateParameter::SMA => format!("{:.16e}", state.sma()),
-                StateParameter::TrueAnomaly => format!("{:.16e}", state.ta()),
-                StateParameter::TrueLongitude => format!("{:.16e}", state.tlong()),
-                StateParameter::Vmag => format!("{:.16e}", state.vmag()),
-                StateParameter::X => format!("{:.16e}", state.x),
-                StateParameter::Y => format!("{:.16e}", state.y),
-                StateParameter::Z => format!("{:.16e}", state.z),
-                StateParameter::VX => format!("{:.16e}", state.vx),
-                StateParameter::VY => format!("{:.16e}", state.vy),
-                StateParameter::VZ => format!("{:.16e}", state.vz),
+                StateParameter::AoL => format!("{:.16}", state.aol()),
+                StateParameter::AoP => format!("{:.16}", state.aop()),
+                StateParameter::Apoapsis => format!("{:.16}", state.ta()),
+                StateParameter::Declination => format!("{:.16}", state.declination()),
+                StateParameter::ApoapsisRadius => format!("{:.16}", state.apoapsis()),
+                StateParameter::EccentricAnomaly => format!("{:.16}", state.ea()),
+                StateParameter::Eccentricity => format!("{:.16}", state.ecc()),
+                StateParameter::Energy => format!("{:.16}", state.energy()),
+                StateParameter::GeodeticHeight => format!("{:.16}", state.geodetic_height()),
+                StateParameter::GeodeticLatitude => format!("{:.16}", state.geodetic_latitude()),
+                StateParameter::GeodeticLongitude => format!("{:.16}", state.geodetic_longitude()),
+                StateParameter::Hmag => format!("{:.16}", state.hmag()),
+                StateParameter::HX => format!("{:.16}", state.hx()),
+                StateParameter::HY => format!("{:.16}", state.hy()),
+                StateParameter::HZ => format!("{:.16}", state.hz()),
+                StateParameter::Inclination => format!("{:.16}", state.inc()),
+                StateParameter::MeanAnomaly => format!("{:.16}", state.ma()),
+                StateParameter::Periapsis => format!("{:.16}", state.ta()),
+                StateParameter::PeriapsisRadius => format!("{:.16}", state.periapsis()),
+                StateParameter::Period => format!("{:.16}", state.period().in_seconds()),
+                StateParameter::RightAscension => format!("{:.16}", state.right_ascension()),
+                StateParameter::RAAN => format!("{:.16}", state.raan()),
+                StateParameter::Rmag => format!("{:.16}", state.rmag()),
+                StateParameter::SemiParameter => format!("{:.16}", state.semi_parameter()),
+                StateParameter::SemiMinorAxis => format!("{:.16}", state.semi_minor_axis()),
+                StateParameter::SMA => format!("{:.16}", state.sma()),
+                StateParameter::TrueAnomaly => format!("{:.16}", state.ta()),
+                StateParameter::TrueLongitude => format!("{:.16}", state.tlong()),
+                StateParameter::Vmag => format!("{:.16}", state.vmag()),
+                StateParameter::X => format!("{:.16}", state.x),
+                StateParameter::Y => format!("{:.16}", state.y),
+                StateParameter::Z => format!("{:.16}", state.z),
+                StateParameter::VX => format!("{:.16}", state.vx),
+                StateParameter::VY => format!("{:.16}", state.vy),
+                StateParameter::VZ => format!("{:.16}", state.vz),
                 StateParameter::FuelMass => {
                     unimplemented!("No fuel for an orbit, only for spacecraft!")
                 }

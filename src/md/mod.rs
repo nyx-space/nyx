@@ -48,13 +48,17 @@ pub struct OrbitStateOutput {
 }
 
 impl OrbitStateOutput {
-    pub fn new(fmtr: StateFormatter) -> Self {
-        let mut wtr = csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
-        wtr.serialize(&fmtr.headers)
-            .expect("could not write headers");
-        info!("Saving output to {}", fmtr.filename);
+    pub fn new(fmtr: StateFormatter) -> Result<Self, NyxError> {
+        match csv::Writer::from_path(fmtr.filename.clone()) {
+            Ok(mut wtr) => {
+                wtr.serialize(&fmtr.headers)
+                    .expect("could not write headers");
+                info!("Saving output to {}", fmtr.filename);
 
-        Self { csv_out: wtr, fmtr }
+                Ok(Self { csv_out: wtr, fmtr })
+            }
+            Err(e) => Err(NyxError::ExportError(e.to_string())),
+        }
     }
 }
 
@@ -62,6 +66,14 @@ impl MdHdlr<SpacecraftState> for OrbitStateOutput {
     fn handle(&mut self, state: &SpacecraftState) {
         self.csv_out
             .serialize(self.fmtr.fmt(&state.orbit))
+            .expect("could not format state");
+    }
+}
+
+impl MdHdlr<Orbit> for OrbitStateOutput {
+    fn handle(&mut self, state: &Orbit) {
+        self.csv_out
+            .serialize(self.fmtr.fmt(&state))
             .expect("could not format state");
     }
 }
