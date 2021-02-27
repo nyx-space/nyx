@@ -528,7 +528,7 @@ impl Orbit {
     /// Mutates this orbit to change the SMA
     pub fn set_sma(&mut self, new_sma_km: f64) {
         let me = Self::keplerian(
-            self.sma() + new_sma_km,
+            new_sma_km,
             self.ecc(),
             self.inc(),
             self.raan(),
@@ -550,6 +550,13 @@ impl Orbit {
     pub fn with_sma(self, new_sma_km: f64) -> Self {
         let mut me = self;
         me.set_sma(new_sma_km);
+        me
+    }
+
+    /// Returns a copy of the state with a provided SMA added to the current one
+    pub fn add_sma(self, delta_sma: f64) -> Self {
+        let mut me = self;
+        me.set_sma(me.sma() + delta_sma);
         me
     }
 
@@ -584,7 +591,7 @@ impl Orbit {
     pub fn set_ecc(&mut self, new_ecc: f64) {
         let me = Self::keplerian(
             self.sma(),
-            self.ecc() + new_ecc,
+            new_ecc,
             self.inc(),
             self.raan(),
             self.aop(),
@@ -608,6 +615,13 @@ impl Orbit {
         me
     }
 
+    /// Returns a copy of the state with a provided ECC added to the current one
+    pub fn add_ecc(self, delta_ecc: f64) -> Self {
+        let mut me = self;
+        me.set_ecc(me.ecc() + delta_ecc);
+        me
+    }
+
     /// Returns the inclination in degrees
     pub fn inc(&self) -> f64 {
         match self.frame {
@@ -623,7 +637,7 @@ impl Orbit {
         let me = Self::keplerian(
             self.sma(),
             self.ecc(),
-            self.inc() + new_inc,
+            new_inc,
             self.raan(),
             self.aop(),
             self.ta(),
@@ -643,6 +657,13 @@ impl Orbit {
     pub fn with_inc(self, new_inc: f64) -> Self {
         let mut me = self;
         me.set_inc(new_inc);
+        me
+    }
+
+    /// Returns a copy of the state with a provided INC added to the current one
+    pub fn add_inc(self, delta_inc: f64) -> Self {
+        let mut me = self;
+        me.set_inc(me.inc() + delta_inc);
         me
     }
 
@@ -672,7 +693,7 @@ impl Orbit {
             self.ecc(),
             self.inc(),
             self.raan(),
-            self.aop() + new_aop,
+            new_aop,
             self.ta(),
             self.dt,
             self.frame,
@@ -686,10 +707,17 @@ impl Orbit {
         self.vz = me.vz;
     }
 
-    /// Returns a copy of the state with a new SMA
+    /// Returns a copy of the state with a new AOP
     pub fn with_aop(self, new_aop: f64) -> Self {
         let mut me = self;
         me.set_aop(new_aop);
+        me
+    }
+
+    /// Returns a copy of the state with a provided AOP added to the current one
+    pub fn add_aop(self, delta_aop: f64) -> Self {
+        let mut me = self;
+        me.set_aop(me.aop() + delta_aop);
         me
     }
 
@@ -718,7 +746,7 @@ impl Orbit {
             self.sma(),
             self.ecc(),
             self.inc(),
-            self.raan() + new_raan,
+            new_raan,
             self.aop(),
             self.ta(),
             self.dt,
@@ -737,6 +765,13 @@ impl Orbit {
     pub fn with_raan(self, new_raan: f64) -> Self {
         let mut me = self;
         me.set_raan(new_raan);
+        me
+    }
+
+    /// Returns a copy of the state with a provided RAAN added to the current one
+    pub fn add_raan(self, delta_raan: f64) -> Self {
+        let mut me = self;
+        me.set_raan(me.raan() + delta_raan);
         me
     }
 
@@ -785,7 +820,7 @@ impl Orbit {
             self.inc(),
             self.raan(),
             self.aop(),
-            self.ta() + new_ta,
+            new_ta,
             self.dt,
             self.frame,
         );
@@ -802,6 +837,13 @@ impl Orbit {
     pub fn with_ta(self, new_ta: f64) -> Self {
         let mut me = self;
         me.set_ta(new_ta);
+        me
+    }
+
+    /// Returns a copy of the state with a provided TA added to the current one
+    pub fn add_ta(self, delta_ta: f64) -> Self {
+        let mut me = self;
+        me.set_ta(me.ta() + delta_ta);
         me
     }
 
