@@ -332,7 +332,7 @@ where
                 {
                     if self.details.attempts >= self.prop.opts.attempts {
                         warn!(
-                            "maximum number of attempts reached ({})",
+                            "Could not further decrease step size: maximum number of attempts reached ({})",
                             self.details.attempts
                         );
                     }

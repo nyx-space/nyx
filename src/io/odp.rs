@@ -382,11 +382,12 @@ impl<'a> OdpScenario<'a> {
         );
 
         // Build the ODP
-        // let mut nav = self.nav.propagator();
-
         let mut prop_setup = Propagator::default(self.nav.sc_dyn);
         prop_setup.set_tolerance(self.nav.prop_tol);
-        let mut nav = prop_setup.with(self.nav.init_state);
+        // Make sure to set the STM
+        let mut init_state = self.nav.init_state;
+        init_state.orbit.stm_identity();
+        let mut nav = prop_setup.with(init_state);
 
         nav.set_step(10.0 * TimeUnit::Second, true);
 

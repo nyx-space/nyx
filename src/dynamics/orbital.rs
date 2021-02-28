@@ -24,7 +24,6 @@ use crate::dimensions::{
     DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
 };
 use crate::{State, TimeTagged};
-// use od::Estimable;
 use std::f64;
 use std::sync::Arc;
 
@@ -234,10 +233,10 @@ impl PointMasses {
         let mut refs = Vec::new();
         // Check that these celestial bodies exist and build their references
         for body in bodies {
-            let path = cosm.xb.ephemeris_find_path(body.to_string()).unwrap();
+            let body_frame = cosm.frame(body);
             refs.push(ThirdBodyRef {
-                ephem: path.to_vec(),
-                gm: cosm.frame_from_ephem_path(&path).gm(),
+                ephem: body_frame.ephem_path(),
+                gm: body_frame.gm(),
             });
         }
 

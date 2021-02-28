@@ -329,12 +329,6 @@ where
             let next_msr_epoch = msr.epoch();
 
             let delta_t = next_msr_epoch - prev_dt;
-            // if self.kf.is_extended() {
-            //     println!(
-            //         "Restarting propagator for step of {} with state {}",
-            //         delta_t, self.prop.state
-            //     );
-            // }
             self.prop.for_duration(delta_t)?;
 
             while let Ok(prop_state) = rx.try_recv() {
@@ -344,7 +338,7 @@ where
                 let dt = nominal_state.epoch();
 
                 // Update the STM of the KF (needed between each measurement or time update)
-                let stm = nominal_state.stm().unwrap();
+                let stm = nominal_state.stm()?;
                 self.kf.update_stm(stm);
 
                 // Check if we should do a time update or a measurement update

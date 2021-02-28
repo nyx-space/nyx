@@ -172,7 +172,8 @@ fn main() -> Result<(), ParsingError> {
                             Ok((mut md, maybe_fmtr)) => {
                                 let mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>> = Vec::new();
                                 if let Some(fmtr) = maybe_fmtr {
-                                    let out = Box::new(OrbitStateOutput::new(fmtr.clone()));
+                                    let out =
+                                        Box::new(OrbitStateOutput::new(fmtr.clone()).unwrap());
                                     hdlrs.push(out);
                                 }
 

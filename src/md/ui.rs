@@ -169,7 +169,7 @@ where
                         match Bodies::try_from(obj.to_string()) {
                             Ok(b) => bodies.push(b),
                             Err(e) => {
-                                return Err(ParsingError::LoadingError(format!("{:?}", e)));
+                                return Err(ParsingError::LoadingError(format!("Snif {:?}", e)));
                             }
                         }
                     }

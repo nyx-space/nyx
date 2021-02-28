@@ -47,5 +47,5 @@ output = "my_csv"
 tolerance = 1e-9
 
 [conditions.apo]
-kind = "apoapse"
+event = "apoapsis"
 search_until = "2013-03-18T14:00:00.0 UTC"

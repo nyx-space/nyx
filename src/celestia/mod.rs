@@ -259,18 +259,18 @@ impl TryFrom<String> for Bodies {
 
     fn try_from(name: String) -> Result<Self, Self::Error> {
         match name.to_lowercase().as_str() {
-            "Solar System Barycenter" => Ok(Self::SSB),
-            "Sun" => Ok(Self::Sun),
-            "Mercury" => Ok(Self::Mercury),
-            "Venus" => Ok(Self::Venus),
-            "Earth Moon Barycenter" => Ok(Self::EarthBarycenter),
-            "Earth" => Ok(Self::Earth),
-            "Moon" => Ok(Self::Luna),
-            "Mars" => Ok(Self::MarsBarycenter),
-            "Jupiter Barycenter" => Ok(Self::JupiterBarycenter),
-            "Saturn Barycenter" => Ok(Self::SaturnBarycenter),
-            "Uranus Barycenter" => Ok(Self::UranusBarycenter),
-            "Neptune Barycenter" => Ok(Self::NeptuneBarycenter),
+            "solar system barycenter" | "ssb" => Ok(Self::SSB),
+            "sun" => Ok(Self::Sun),
+            "mercury" => Ok(Self::Mercury),
+            "venus" => Ok(Self::Venus),
+            "earth moon barycenter" => Ok(Self::EarthBarycenter),
+            "earth" => Ok(Self::Earth),
+            "moon" | "luna" => Ok(Self::Luna),
+            "mars" | "mars barycenter" => Ok(Self::MarsBarycenter),
+            "jupiter" | "jupiter barycenter" => Ok(Self::JupiterBarycenter),
+            "saturn" | "saturn barycenter" => Ok(Self::SaturnBarycenter),
+            "uranus" | "uranus barycenter" => Ok(Self::UranusBarycenter),
+            "neptune" | "neptune barycenter" => Ok(Self::NeptuneBarycenter),
             _ => Err(NyxError::ObjectNotFound(name)),
         }
     }
