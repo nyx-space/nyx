@@ -175,11 +175,12 @@ fn robust_test_ekf_two_body() {
         rmag_err * 1e3
     );
 
-    assert_eq!(
-        truth_states.len(),
-        odp.estimates.len(),
-        "different number of estimates"
-    );
+    // TODO: Reenable after https://gitlab.com/nyx-space/nyx/-/issues/168
+    // assert_eq!(
+    //     truth_states.len(),
+    //     odp.estimates.len(),
+    //     "different number of estimates"
+    // );
 }
 
 #[allow(clippy::identity_op)]
@@ -460,7 +461,6 @@ fn robust_test_ekf_harmonics() {
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
     odp.process_measurements(&measurements).unwrap();
-    odp.iterate(&measurements, SmoothingArc::All).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -618,7 +618,6 @@ fn robust_test_ekf_realistic() {
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
     odp.process_measurements(&measurements).unwrap();
-    odp.iterate(&measurements, SmoothingArc::All).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];

@@ -171,7 +171,10 @@ where
 
     /// This method propagates the provided Dynamics for the provided duration.
     pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
-        info!("Propagating for {}", duration);
+        if duration > 2 * TimeUnit::Minute {
+            // Prevent the print spam for EKF orbit determination cases
+            info!("Propagating for {}", duration);
+        }
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size

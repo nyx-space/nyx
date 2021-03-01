@@ -289,7 +289,7 @@ where
         // Reset the propagator
         self.prop.state = self.init_state;
         // Empty the estimates and add the first smoothed estimate as the initial estimate
-        self.estimates = Vec::new();
+        self.estimates = Vec::with_capacity(measurements.len());
         self.estimates.push(smoothed[0].clone());
         self.kf.set_previous_estimate(&smoothed[0]);
         // And re-run the filter
