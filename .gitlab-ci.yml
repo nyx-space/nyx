@@ -4,7 +4,7 @@ stages:
 
 unit-tests:
   image: rust:1-slim
-  env:
+  variables:
     RUST_BACKTRACE: full
   stage: test
   script:
@@ -14,7 +14,7 @@ unit-tests:
     
 integration-tests:
   image: rust:1-slim
-  env:
+  variables:
     RUST_BACKTRACE: full
   stage: test
   script:
