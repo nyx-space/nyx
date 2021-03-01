@@ -3,13 +3,13 @@ extern crate rand;
 extern crate rand_distr;
 extern crate rayon;
 
-use crate::nyx::TimeTagged;
 use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::Harmonics;
 use nyx::dynamics::{OrbitalDynamics, PointMasses};
 use nyx::io::gravity::*;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit};
+use nyx::TimeTagged;
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;
