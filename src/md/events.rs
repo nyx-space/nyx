@@ -86,7 +86,7 @@ impl Event {
             parameter,
             desired_value,
             epoch_precision: TimeUnit::Millisecond,
-            value_precision: 1e-3,
+            value_precision: parameter.default_event_precision(),
             in_frame: None,
         }
     }

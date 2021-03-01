@@ -160,6 +160,57 @@ pub enum StateParameter {
     Custom { mapping: usize },
 }
 
+impl StateParameter {
+    /// Returns the default event finding precision in the unit of that parameter
+    pub fn default_event_precision(self) -> f64 {
+        match self {
+            Self::Eccentricity => 1e-5,
+            // Non anomaly angles
+            Self::AoL
+            | Self::AoP
+            | Self::Declination
+            | Self::GeodeticLatitude
+            | Self::GeodeticLongitude
+            | Self::Inclination
+            | Self::RightAscension
+            | Self::RAAN
+            | Self::TrueLongitude => 1e-1,
+
+            // Anomaly angles
+            Self::Apoapsis
+            | Self::Periapsis
+            | Self::MeanAnomaly
+            | Self::EccentricAnomaly
+            | Self::TrueAnomaly => 1e-3,
+
+            // Distances
+            Self::ApoapsisRadius
+            | Self::GeodeticHeight
+            | Self::Hmag
+            | Self::HX
+            | Self::HY
+            | Self::HZ
+            | Self::PeriapsisRadius
+            | Self::Rmag
+            | Self::SemiParameter
+            | Self::SMA
+            | Self::SemiMinorAxis
+            | Self::X
+            | Self::Y
+            | Self::Z => 1e-3,
+
+            // Velocities
+            Self::VX | Self::VY | Self::VZ | Self::Vmag => 1e-3,
+
+            // Special
+            Self::Energy => 1e-3,
+            Self::FuelMass => 1e-3,
+            Self::Period => 1e-1,
+            _ => unimplemented!(),
+        }
+    }
+}
+
 impl FromStr for StateParameter {
     type Err = NyxError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {

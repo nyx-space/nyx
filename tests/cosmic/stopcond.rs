@@ -4,7 +4,7 @@ extern crate nyx_space as nyx;
 
 use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::md::Event;
+use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, J2000_OFFSET};
@@ -157,4 +157,62 @@ fn stop_cond_nrho_apo() {
         println!("{} after start:\n{:o}", delta_t, event_state);
         assert!((event_state.ta() - 180.0).abs() < 0.1);
     }
+}
+
+#[test]
+fn line_of_nodes() {
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
+    );
+
+    let period = state.period();
+
+    let lon_event = Event::new(StateParameter::GeodeticLongitude, 0.0);
+
+    let setup = Propagator::default(OrbitalDynamics::two_body());
+    let mut prop = setup.with(state);
+    let (lon_state, _) = prop.until_event(3 * period, &lon_event, 0).unwrap();
+    println!(
+        "{:o} => longitude = {} degrees",
+        lon_state,
+        lon_state.geodetic_longitude()
+    );
+
+    assert!(
+        lon_state.geodetic_longitude().abs() < lon_event.value_precision,
+        "converged, yet convergence critera not met"
+    );
+}
+
+#[test]
+fn latitude() {
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let state = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
+    );
+
+    let period = state.period();
+
+    let lat_event = Event::new(StateParameter::GeodeticLatitude, 2.0);
+
+    let setup = Propagator::default(OrbitalDynamics::two_body());
+    let mut prop = setup.with(state);
+    let (lon_state, _) = prop.until_event(3 * period, &lat_event, 0).unwrap();
+    println!(
+        "{:o} => latitude = {} degrees",
+        lon_state,
+        lon_state.geodetic_latitude()
+    );
+
+    assert!(
+        (2.0 - lon_state.geodetic_latitude()).abs() < lat_event.value_precision,
+        "converged, yet convergence critera not met"
+    );
 }

@@ -335,6 +335,7 @@ where
     /// For example, if the trajectory is 100 days long, then we split the trajectory into 100 chunks of 1 day and see whether
     /// the event is in there. If the event happens twice or more times within 1% of the trajectory duration, only the _one_ of
     /// such events will be found.
+    #[allow(clippy::identity_op)]
     pub fn find_all<E>(&self, event: &E) -> Result<Vec<S>, NyxError>
     where
         E: EventEvaluator<S>,
@@ -359,10 +360,67 @@ where
         let mut states: Vec<_> = receiver.iter().collect();
 
         if states.is_empty() {
-            return Err(NyxError::EventNotInEpochBraket(
-                start_epoch.to_string(),
-                end_epoch.to_string(),
-            ));
+            // Crap, we didn't find the event.
+            // Let's find the min and max of this event throughout the trajectory, and search around there.
+            match self.find_minmax(event, TimeUnit::Second) {
+                Ok((min_event, max_event)) => {
+                    let lower_min_epoch =
+                        if min_event.epoch() - 1 * TimeUnit::Millisecond < self.first().epoch() {
+                            self.first().epoch()
+                        } else {
+                            min_event.epoch() - 1 * TimeUnit::Millisecond
+                        };
+
+                    let lower_max_epoch =
+                        if min_event.epoch() + 1 * TimeUnit::Millisecond > self.last().epoch() {
+                            self.last().epoch()
+                        } else {
+                            min_event.epoch() + 1 * TimeUnit::Millisecond
+                        };
+
+                    let upper_min_epoch =
+                        if max_event.epoch() - 1 * TimeUnit::Millisecond < self.first().epoch() {
+                            self.first().epoch()
+                        } else {
+                            max_event.epoch() - 1 * TimeUnit::Millisecond
+                        };
+
+                    let upper_max_epoch =
+                        if max_event.epoch() + 1 * TimeUnit::Millisecond > self.last().epoch() {
+                            self.last().epoch()
+                        } else {
+                            max_event.epoch() + 1 * TimeUnit::Millisecond
+                        };
+
+                    // Search around the min event
+                    if let Ok(event_state) =
+                        self.find_bracketed(lower_min_epoch, lower_max_epoch, event)
+                    {
+                        states.push(event_state);
+                    };
+
+                    // Search around the max event
+                    if let Ok(event_state) =
+                        self.find_bracketed(upper_min_epoch, upper_max_epoch, event)
+                    {
+                        states.push(event_state);
+                    };
+
+                    // If there still isn't any match, report that the event was not found
+                    if states.is_empty() {
+                        return Err(NyxError::EventNotInEpochBraket(
+                            start_epoch.to_string(),
+                            end_epoch.to_string(),
+                        ));
+                    }
+                }
+                Err(_) => {
+                    return Err(NyxError::EventNotInEpochBraket(
+                        start_epoch.to_string(),
+                        end_epoch.to_string(),
+                    ))
+                }
+            };
         }
         // Remove duplicates and reorder
         states.sort_by(|s1, s2| s1.epoch().partial_cmp(&s2.epoch()).unwrap());
@@ -375,7 +433,7 @@ where
 
     /// Find the minimum and maximum of the provided event through the trajectory
     #[allow(clippy::identity_op)]
-    pub fn find_minmax<E>(&self, event: E, precision: TimeUnit) -> Result<(S, S), NyxError>
+    pub fn find_minmax<E>(&self, event: &E, precision: TimeUnit) -> Result<(S, S), NyxError>
     where
         E: EventEvaluator<S>,
     {
@@ -389,7 +447,7 @@ where
 
         let epochs: Vec<Epoch> =
             TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step).collect();
-        println!("search over {}", epochs.len());
+
         epochs.into_par_iter().for_each_with(sender, |s, epoch| {
             let state = self.evaluate(epoch).unwrap();
             let this_eval = event.eval(&state);
