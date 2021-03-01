@@ -375,3 +375,64 @@ fn geodetic_vallado() {
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height_val, "height");
 }
+
+#[test]
+fn with_init() {
+    use nyx::utils::{between_0_360, between_pm_180};
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+    let dt = Epoch::from_gregorian_tai_at_midnight(2021, 3, 4);
+    let kep = Orbit::keplerian(
+        8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
+    );
+    for sma_incr in 100..1000 {
+        let new_sma = kep.sma() + f64::from(sma_incr);
+        f64_eq!(kep.with_sma(new_sma).sma(), new_sma, "wrong sma");
+    }
+    for ecc_incr in 0..100 {
+        let new_ecc = kep.ecc() + f64::from(ecc_incr) / 100.0;
+        let new_state = kep.with_ecc(new_ecc);
+        f64_eq!(
+            new_state.ecc(),
+            new_ecc,
+            format!("wrong ecc: got {}\twanted {}", new_state.inc(), new_ecc)
+        );
+    }
+    for angle_incr in 0..360 {
+        let new_aop = between_0_360(kep.aop() + f64::from(angle_incr));
+        let new_state = kep.add_aop(f64::from(angle_incr));
+        f64_eq!(
+            new_state.aop(),
+            new_aop,
+            format!("wrong aop: got {}\twanted {}", new_state.aop(), new_aop)
+        );
+    }
+    for angle_incr in 0..360 {
+        let new_raan = between_0_360(kep.raan() + f64::from(angle_incr));
+        let new_state = kep.add_raan(f64::from(angle_incr));
+        f64_eq!(
+            new_state.raan(),
+            new_raan,
+            format!("wrong raan: got {}\twanted {}", new_state.raan(), new_raan)
+        );
+    }
+    for angle_incr in 0..360 {
+        let new_ta = between_0_360(kep.ta() + f64::from(angle_incr));
+        let new_state = kep.with_ta(new_ta);
+        f64_eq!(
+            new_state.ta(),
+            new_ta,
+            format!("wrong ta: got {}\twanted {}", new_state.aop(), new_ta)
+        );
+    }
+    for angle_incr in 0..360 {
+        // NOTE: Inclination is bounded between 0 and 180, hence the slightly different logic here.
+        let new_inc = between_pm_180(kep.inc() + f64::from(angle_incr)).abs();
+        let new_state = kep.add_inc(f64::from(angle_incr));
+        f64_eq!(
+            new_state.inc(),
+            new_inc,
+            format!("wrong inc: got {}\twanted {}", new_state.inc(), new_inc)
+        );
+    }
+}
