@@ -1,12 +1,7 @@
-stages:
-  - test
-  - scenario
-
 unit-tests:
   image: rust:1-slim
   variables:
     RUST_BACKTRACE: full
-  stage: test
   script:
     - rustup component add rustfmt
     - cargo fmt -- --check
@@ -16,7 +11,6 @@ integration-tests:
   image: rust:1-slim
   variables:
     RUST_BACKTRACE: full
-  stage: test
   script:
     - cargo test cosmic --release
     - cargo test mission_design --release
@@ -25,25 +19,13 @@ integration-tests:
     - cargo test propagation --release
     - cargo test propulsion --release -j4 # Only on 4 CPUs otherwise the stack is totally used up
 
-scenario-distance-unit:
+scenario-tests:
   image: rust:1-slim
-  stage: scenario
   script:
     - cargo run --release -- data/simple-scenario.toml --all
     # Check that when we do a unit conversion it's correct
     # NOTE: We don't do that with km output because the unit conversion leads to some rounding issues
     - diff ./data/scenario-run-cm.csv ./data/scenario-run-m.csv
-
-scenario-od:
-  image: rust:1-slim
-  stage: scenario
-  script:
     - cargo run --release -- data/simple-od-scenario.toml
     - cargo run --release -- "data/od_validation/*" -a
-
-scenario-iss:
-  image: rust:1-slim
-  stage: scenario
-  script:
     - cargo run --release -- data/iss-example.toml -s iss_cond
-

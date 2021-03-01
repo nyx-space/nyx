@@ -126,6 +126,7 @@ fn robust_test_ekf_two_body() {
     );
 
     odp.process_measurements(&measurements).unwrap();
+    odp.iterate(&measurements, SmoothingArc::All).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -287,6 +288,7 @@ fn robust_test_ekf_multi_body() {
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
     odp.process_measurements(&measurements).unwrap();
+    odp.iterate(&measurements, SmoothingArc::All).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -616,6 +618,7 @@ fn robust_test_ekf_realistic() {
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
     odp.process_measurements(&measurements).unwrap();
+    odp.iterate(&measurements, SmoothingArc::All).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
