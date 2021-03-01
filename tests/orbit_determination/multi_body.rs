@@ -38,26 +38,21 @@ fn multi_body_ckf_perfect_stations() {
     let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
-
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    // Generate the truth data.
+    let (_, truth_traj) = Propagator::default(orbital_dyn.clone())
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
+    for rx_state in truth_traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
@@ -67,6 +62,7 @@ fn multi_body_ckf_perfect_stations() {
         }
     }
 
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.

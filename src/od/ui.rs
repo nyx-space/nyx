@@ -69,7 +69,7 @@ pub struct ODProcess<
     N: MeasurementDevice<S, Msr>,
     T: EkfTrigger,
     A: DimName,
-    S: EstimateFrom<D::StateType>,
+    S: EstimateFrom<D::StateType> + Copy,
     K: Filter<S, A, Msr::MeasurementSize>,
 > where
     D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
@@ -116,7 +116,7 @@ impl<
         N: MeasurementDevice<S, Msr>,
         T: EkfTrigger,
         A: DimName,
-        S: EstimateFrom<D::StateType>,
+        S: EstimateFrom<D::StateType> + Copy,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, N, T, A, S, K>
 where
@@ -475,7 +475,7 @@ impl<
         Msr: Measurement<StateSize = <S as State>::Size>,
         N: MeasurementDevice<S, Msr>,
         A: DimName,
-        S: EstimateFrom<D::StateType>,
+        S: EstimateFrom<D::StateType> + Copy,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, S, K>
 where
@@ -542,7 +542,7 @@ where
 }
 /// A trait detailing when to switch to from a CKF to an EKF
 pub trait EkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
+    fn enable_ekf<T: State + Copy, E>(&mut self, est: &E) -> bool
     where
         E: Estimate<T>,
         DefaultAllocator: Allocator<f64, <T as State>::Size>
@@ -560,7 +560,7 @@ pub trait EkfTrigger {
 pub struct CkfTrigger;
 
 impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, _est: &E) -> bool
+    fn enable_ekf<T: State + Copy, E>(&mut self, _est: &E) -> bool
     where
         E: Estimate<T>,
         DefaultAllocator: Allocator<f64, <T as State>::Size>
@@ -594,7 +594,7 @@ impl StdEkfTrigger {
 }
 
 impl EkfTrigger for StdEkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
+    fn enable_ekf<T: State + Copy, E>(&mut self, est: &E) -> bool
     where
         E: Estimate<T>,
         DefaultAllocator: Allocator<f64, <T as State>::Size>
