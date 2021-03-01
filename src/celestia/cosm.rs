@@ -423,7 +423,7 @@ impl Cosm {
                     // Grab the inherited frame again so we know how to place it in the frame tree
                     if let Some(src_frame_name) = &definition.inherit {
                         debug!("Loaded frame {}", frame_name);
-                        let src_frame = self.try_frame(src_frame_name.as_str()).unwrap();
+                        let src_frame = self.try_frame(src_frame_name.as_str())?;
                         let mut fpath = src_frame.frame_path();
                         // And find the correct children
                         let children = match fpath.len() {
@@ -736,9 +736,7 @@ impl Cosm {
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
                     let lt_dt = datetime - lt * TimeUnit::Second;
-                    tgt = self
-                        .try_celestial_state(target_ephem, lt_dt, ssb2k, LTCorr::None)
-                        .unwrap();
+                    tgt = self.try_celestial_state(target_ephem, lt_dt, ssb2k, LTCorr::None)?;
                 }
                 // Compute the correct state
                 let mut state = Orbit::cartesian(

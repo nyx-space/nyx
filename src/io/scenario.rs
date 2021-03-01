@@ -313,15 +313,15 @@ pub struct Harmonics {
 }
 
 impl Harmonics {
-    pub fn load(&self) -> HarmonicsMem {
+    pub fn load(&self) -> Result<HarmonicsMem, ParsingError> {
         let gunzipped = self.file.contains("gz");
         let order = self.order.unwrap_or(0);
         if self.file.contains("cof") {
-            HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped).unwrap()
+            HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped)
         } else if self.file.contains("sha") {
-            HarmonicsMem::from_shadr(self.file.as_str(), self.degree, order, gunzipped).unwrap()
+            HarmonicsMem::from_shadr(self.file.as_str(), self.degree, order, gunzipped)
         } else if self.file.contains("EGM") {
-            HarmonicsMem::from_egm(self.file.as_str(), self.degree, order, gunzipped).unwrap()
+            HarmonicsMem::from_egm(self.file.as_str(), self.degree, order, gunzipped)
         } else {
             panic!("could not guess file format from name");
         }

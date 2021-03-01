@@ -25,7 +25,7 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::od::estimate::NavSolution;
-use crate::State;
+use crate::{NyxError, State};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
@@ -40,14 +40,14 @@ pub struct OutputSerde {
 }
 
 impl OutputSerde {
-    pub fn to_state_formatter(&self, cosm: Arc<Cosm>) -> StateFormatter {
+    pub fn to_state_formatter(&self, cosm: Arc<Cosm>) -> Result<StateFormatter, NyxError> {
         match &self.headers {
             Some(hdr) => StateFormatter::from_headers(
                 hdr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
                 self.filename.clone(),
                 cosm,
             ),
-            None => StateFormatter::default(self.filename.clone(), cosm),
+            None => Ok(StateFormatter::default(self.filename.clone(), cosm)),
         }
     }
 
@@ -425,10 +425,14 @@ impl StateFormatter {
     ///
     /// let cosm = Cosm::de438();
     /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
-    /// let hdrs = vec!["AoL".to_string(), "ea:eme2000".to_string()];
+    /// let hdrs = vec!["AoL", "ea:eme2000"];
     /// StateFormatter::from_headers(hdrs, "nope".to_string(), cosm);
     /// ```
-    pub fn from_headers(headers: Vec<&str>, filename: String, cosm: Arc<Cosm>) -> Self {
+    pub fn from_headers(
+        headers: Vec<&str>,
+        filename: String,
+        cosm: Arc<Cosm>,
+    ) -> Result<Self, NyxError> {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(20);
         // Rebuild the header tokens
@@ -438,7 +442,15 @@ impl StateFormatter {
             match splt[0].to_lowercase().as_str() {
                 "epoch" => {
                     let epoch_fmt = if splt.len() == 2 {
-                        EpochFormat::from_str(splt[1]).unwrap()
+                        match EpochFormat::from_str(splt[1]) {
+                            Ok(e) => e,
+                            Err(_) => {
+                                return Err(NyxError::LoadingError(format!(
+                                    "Unknown epoch format {}",
+                                    splt[1]
+                                )))
+                            }
+                        }
                     } else {
                         EpochFormat::GregorianUtc
                     };
@@ -458,8 +470,10 @@ impl StateFormatter {
                         None
                     };
 
-                    let param = StateParameter::from_str(splt[0].to_lowercase().as_str())
-                        .expect("Unknown paramater");
+                    let param = match StateParameter::from_str(splt[0].to_lowercase().as_str()) {
+                        Ok(param) => param,
+                        Err(e) => return Err(NyxError::LoadingError(e.to_string())),
+                    };
 
                     let hdr = StateHeader {
                         param,
@@ -480,12 +494,12 @@ impl StateFormatter {
             }
         }
 
-        Self {
+        Ok(Self {
             filename,
             headers: hdrs,
             frames,
             cosm,
-        }
+        })
     }
 
     /// Default headers are [Epoch (GregorianTai), X, Y, Z, VX, VY, VZ], where position is in km and velocity in km/s.

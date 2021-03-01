@@ -80,7 +80,10 @@ where
                                 prop_name, output
                             )))
                         }
-                        Some(out) => Some(out.to_state_formatter(cosm.clone())),
+                        Some(out) => match out.to_state_formatter(cosm.clone()) {
+                            Ok(fmrt) => Some(fmrt),
+                            Err(ne) => return Err(ParsingError::LoadingError(ne.to_string())),
+                        },
                     }
                 } else {
                     None
@@ -252,7 +255,7 @@ where
                             }
                             Some(amdl) => {
                                 for hmdl in amdl.harmonics.values() {
-                                    let in_mem = hmdl.load();
+                                    let in_mem = hmdl.load()?;
                                     let compute_frame = &cosm.frame(hmdl.frame.as_str());
 
                                     let hh =

@@ -489,7 +489,7 @@ impl Traj<Orbit> {
         step: Duration,
         cosm: Arc<Cosm>,
     ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::from_headers(headers, filename.to_string(), cosm);
+        let fmtr = StateFormatter::from_headers(headers, filename.to_string(), cosm)?;
         let mut out = OrbitStateOutput::new(fmtr)?;
         for state in self.every(step) {
             out.handle(&state);

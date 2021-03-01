@@ -69,9 +69,32 @@ impl<'a> OdpScenario<'a> {
         } else if scenario.stations.is_none() {
             return Err(ParsingError::OD("missing `stations` section".to_string()));
         }
-        let all_measurements = scenario.measurements.as_ref().unwrap();
-        let all_estimates = scenario.estimate.as_ref().unwrap();
-        let all_stations = scenario.stations.as_ref().unwrap();
+        let all_measurements = match scenario.measurements.as_ref() {
+            Some(msr) => msr,
+            None => {
+                return Err(ParsingError::LoadingError(
+                    "no measurements provided".to_string(),
+                ))
+            }
+        };
+
+        let all_estimates = match scenario.estimate.as_ref() {
+            Some(est) => est,
+            None => {
+                return Err(ParsingError::LoadingError(
+                    "no estimates provided".to_string(),
+                ))
+            }
+        };
+
+        let all_stations = match scenario.stations.as_ref() {
+            Some(st) => st,
+            None => {
+                return Err(ParsingError::LoadingError(
+                    "no stations provided".to_string(),
+                ))
+            }
+        };
 
         if let Some(odp_seq) = odp.get(&seq_name.to_lowercase()) {
             // Get the measurement generation
