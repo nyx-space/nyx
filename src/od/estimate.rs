@@ -29,7 +29,7 @@ use std::cmp::PartialEq;
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.
-pub trait Estimate<T: State + Copy>
+pub trait Estimate<T: State>
 where
     Self: Clone + PartialEq + Sized + fmt::Display,
     DefaultAllocator:
@@ -120,7 +120,7 @@ where
 
 /// Kalman filter Estimate
 #[derive(Debug, Clone, PartialEq)]
-pub struct KfEstimate<T: State + Copy>
+pub struct KfEstimate<T: State>
 where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
@@ -145,7 +145,7 @@ where
     pub covar_fmt: CovarFormat,
 }
 
-impl<T: State + Copy> KfEstimate<T>
+impl<T: State> KfEstimate<T>
 where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
@@ -169,7 +169,7 @@ where
     }
 }
 
-impl<T: State + Copy> Estimate<T> for KfEstimate<T>
+impl<T: State> Estimate<T> for KfEstimate<T>
 where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
@@ -225,7 +225,7 @@ where
     }
 }
 
-impl<T: State + Copy> fmt::Display for KfEstimate<T>
+impl<T: State> fmt::Display for KfEstimate<T>
 where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
@@ -255,7 +255,7 @@ where
     }
 }
 
-impl<T: State + Copy> fmt::LowerExp for KfEstimate<T>
+impl<T: State> fmt::LowerExp for KfEstimate<T>
 where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
@@ -271,7 +271,7 @@ where
     }
 }
 
-impl<T: State + Copy> Serialize for KfEstimate<T>
+impl<T: State> Serialize for KfEstimate<T>
 where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
@@ -327,7 +327,7 @@ where
 /// A trait to store a navigation solution, can be used in conjunction with KfEstimate
 pub trait NavSolution<T>: Estimate<Orbit>
 where
-    T: State + Copy,
+    T: State,
     DefaultAllocator:
         Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
 {

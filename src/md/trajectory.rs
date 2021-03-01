@@ -125,7 +125,7 @@ where
             // Initialize the interpolator
             let mut me = Self {
                 segments: BTreeMap::new(),
-                start_state: state.clone(),
+                start_state: state,
                 timeout_ms: 100,
                 max_offset: 0,
             };
@@ -148,7 +148,7 @@ where
                         s.spawn(move |_| -> Result<Segment<S>, NyxError> { interpolate(this_wdn) }),
                     );
                     // Copy the last state as the first state of the next window
-                    let last_wdn_state = window_states[items_per_segments - 1].clone();
+                    let last_wdn_state = window_states[items_per_segments - 1];
                     window_states.clear();
                     window_states.push(last_wdn_state);
                 }
@@ -190,25 +190,25 @@ where
         match self.segments.range(..=offset_s).rev().next() {
             None => {
                 // Let's see if this corresponds to the max offset value
-                let last_item = self.segments[&self.max_offset].end_state.clone();
+                let last_item = self.segments[&self.max_offset].end_state;
                 if last_item.epoch() == epoch {
                     Ok(last_item)
                 } else {
                     Err(NyxError::NoInterpolationData(format!("{}", epoch)))
                 }
             }
-            Some((_, segment)) => segment.evaluate(self.start_state.clone(), epoch),
+            Some((_, segment)) => segment.evaluate(self.start_state, epoch),
         }
     }
 
     /// Returns the first state in this ephemeris
     pub fn first(&self) -> S {
-        self.start_state.clone()
+        self.start_state
     }
 
     /// Returns the last state in this ephemeris
     pub fn last(&self) -> S {
-        self.segments[&self.max_offset].end_state.clone()
+        self.segments[&self.max_offset].end_state
     }
 
     /// Creates an iterator through the trajectory by the provided step size
@@ -458,11 +458,11 @@ where
         for (this_eval, state) in evald_states {
             if this_eval < min_val {
                 min_val = this_eval;
-                min_state = state.clone();
+                min_state = state;
             }
             if this_eval > max_val {
                 max_val = this_eval;
-                max_state = state.clone();
+                max_state = state;
             }
         }
 
@@ -671,6 +671,6 @@ where
         start_epoch: start_win_epoch,
         duration: window_duration,
         coefficients,
-        end_state: this_wdn[this_wdn.len() - 1].clone(),
+        end_state: this_wdn[this_wdn.len() - 1],
     })
 }

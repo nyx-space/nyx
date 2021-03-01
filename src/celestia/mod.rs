@@ -305,9 +305,9 @@ impl TryFrom<Vec<usize>> for Bodies {
     }
 }
 
-// Re-Export state
-mod state;
-pub use self::state::*;
+// Re-Export orbit
+mod orbit;
+pub use self::orbit::*;
 
 // Re-Export frames
 mod frames;

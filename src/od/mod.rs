@@ -49,7 +49,7 @@ pub trait Filter<T, A, M>
 where
     A: DimName,
     M: DimName,
-    T: State + Copy,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
@@ -140,7 +140,7 @@ where
     fn measure(&self, input: &MsrIn) -> Option<Msr>;
 }
 
-pub trait EstimateFrom<O: State + Copy>
+pub trait EstimateFrom<O: State>
 where
     Self: State,
     DefaultAllocator: Allocator<f64, <O as State>::Size>

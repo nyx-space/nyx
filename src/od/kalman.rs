@@ -36,7 +36,7 @@ pub struct KF<T, A, M>
 where
     A: DimName,
     M: DimName,
-    T: State + Copy,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
@@ -71,7 +71,7 @@ impl<T, A, M> KF<T, A, M>
 where
     A: DimName,
     M: DimName,
-    T: State + Copy,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
@@ -160,7 +160,7 @@ where
 impl<T, M> KF<T, U3, M>
 where
     M: DimName,
-    T: State + Copy,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
         + Allocator<f64, M, M>
@@ -197,7 +197,7 @@ impl<T, A, M> Filter<T, A, M> for KF<T, A, M>
 where
     A: DimName,
     M: DimName,
-    T: State + Copy,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>

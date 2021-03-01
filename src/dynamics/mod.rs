@@ -79,7 +79,7 @@ where
     // type PropVecSize: DimName;
     /// The state of the associated hyperdual state, almost always StateType + U1
     type HyperdualSize: DimName;
-    type StateType: State + Copy;
+    type StateType: State;
 
     /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
     /// The time delta_t is in **seconds** PAST the context epoch. The state vector is the state which
