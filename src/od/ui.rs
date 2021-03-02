@@ -18,6 +18,7 @@
 
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName};
+use crate::md::trajectory::Traj;
 
 pub use super::estimate::*;
 pub use super::kalman::*;
@@ -69,7 +70,7 @@ pub struct ODProcess<
     N: MeasurementDevice<S, Msr>,
     T: EkfTrigger,
     A: DimName,
-    S: EstimateFrom<D::StateType> + Copy,
+    S: EstimateFrom<D::StateType>,
     K: Filter<S, A, Msr::MeasurementSize>,
 > where
     D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
@@ -116,7 +117,7 @@ impl<
         N: MeasurementDevice<S, Msr>,
         T: EkfTrigger,
         A: DimName,
-        S: EstimateFrom<D::StateType> + Copy,
+        S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, N, T, A, S, K>
 where
@@ -466,6 +467,25 @@ where
 
         Ok(())
     }
+
+    /// Builds the navigation trajectory for the estimated state only (no covariance until https://gitlab.com/nyx-space/nyx/-/issues/199!)
+    pub fn to_nav_traj(&self) -> Result<Traj<S>, NyxError>
+    where
+        DefaultAllocator: Allocator<f64, <S as State>::PropVecSize>,
+    {
+        if self.estimates.is_empty() {
+            Err(NyxError::NoStateData(
+                "No navigation trajectory to generate: run the OD process first".to_string(),
+            ))
+        } else {
+            let (tx, rx) = channel();
+            let start_state = self.estimates[0].state();
+            for estimate in &self.estimates {
+                tx.send(estimate.state()).unwrap();
+            }
+            Traj::new(start_state, rx)
+        }
+    }
 }
 
 impl<
@@ -475,7 +495,7 @@ impl<
         Msr: Measurement<StateSize = <S as State>::Size>,
         N: MeasurementDevice<S, Msr>,
         A: DimName,
-        S: EstimateFrom<D::StateType> + Copy,
+        S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, S, K>
 where

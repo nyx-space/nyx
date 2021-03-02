@@ -73,10 +73,6 @@ pub trait Dynamics: Clone
 where
     DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>,
 {
-    /// Defines the state size for these dynamics.
-    // type StateSize: DimName;
-    /// Defines the size of the vector to be propagated, equalto StateSize if no STM will ever be computed.
-    // type PropVecSize: DimName;
     /// The state of the associated hyperdual state, almost always StateType + U1
     type HyperdualSize: DimName;
     type StateType: State;

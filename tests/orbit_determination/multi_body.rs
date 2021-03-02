@@ -2,12 +2,12 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use self::nyx::celestia::{Bodies, Cosm, Orbit};
-use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::dynamics::orbital::OrbitalDynamics;
+use self::nyx::md::ui::*;
 use self::nyx::od::ui::*;
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, TimeUnit};
+
+// Extra testing imports
+use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
+use self::nyx::propagators::RK4Fixed;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -267,4 +267,12 @@ fn multi_body_ckf_covar_map() {
 
     assert!(est.state_deviation().norm() < 5e-5);
     assert!(est.covar.norm() < 1e-4);
+
+    // Test that we can generate a navigation trajectory and search it
+    let nav_traj = odp.to_nav_traj().unwrap();
+    let aop_event = Event::apoapsis();
+    for found_event in nav_traj.find_all(&aop_event).unwrap() {
+        println!("{:o}", found_event);
+        assert!((found_event.ta() - 180.0).abs() < 1e-2);
+    }
 }
