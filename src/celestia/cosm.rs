@@ -1413,7 +1413,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_cosm_lt_corr() {
         let cosm = Cosm::de438();
 
@@ -1432,7 +1431,7 @@ mod tests {
         // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
         // However, in writing this test, I also checked the computed light time, which matches SPICE to 2.999058779096231e-10 seconds.
         assert!(dbg!(out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-3);
-        assert!(dbg!(out_state.y - -5.814_057_247_686_307e7).abs() < 1e-3);
+        assert!(dbg!(out_state.y - -5.814_057_247_686_307e7).abs() < 1e-2);
         assert!(dbg!(out_state.z - -2.493_960_187_215_911_6e7).abs() < 1e-3);
         assert!(dbg!(out_state.vx - -3.460_563_654_257_750_7).abs() < 1e-7);
         assert!(dbg!(out_state.vy - -3.698_207_386_702_523_5e1).abs() < 1e-7);
@@ -1440,7 +1439,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_cosm_aberration_corr() {
         let cosm = Cosm::de438();
 
@@ -1456,7 +1454,7 @@ mod tests {
         );
 
         assert!(dbg!(out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
-        assert!(dbg!(out_state.y - -5.812_356_237_533_56e7).abs() < 1e-3);
+        assert!(dbg!(out_state.y - -5.812_356_237_533_56e7).abs() < 1e-2);
         assert!(dbg!(out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
         // Reenable this test after #96 is implemented.
         dbg!(out_state.vx - -3.463_585_965_206_417);

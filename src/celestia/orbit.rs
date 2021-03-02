@@ -225,7 +225,7 @@ impl Orbit {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
-    /// Returns the distancein kilometers between this state and another state.
+    /// Returns the distance in kilometers between this state and another state.
     /// Will **panic** is the frames are different
     pub fn distance_to(&self, other: &Orbit) -> f64 {
         assert_eq!(
