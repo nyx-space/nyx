@@ -6,6 +6,7 @@ use nyx::time::{Epoch, TimeUnit};
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
+        println!("{}: {:.2e}", $msg, ($x - $val).abs());
         assert!(($x - $val).abs() < 1e-10, $msg)
     };
 }

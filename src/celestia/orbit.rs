@@ -1056,12 +1056,12 @@ impl Orbit {
 
     /// Returns the right ascension of this orbit in degrees
     pub fn right_ascension(&self) -> f64 {
-        (self.y.atan2(self.x)).to_degrees()
+        between_0_360((self.y.atan2(self.x)).to_degrees())
     }
 
     /// Returns the declination of this orbit in degrees
     pub fn declination(&self) -> f64 {
-        (self.z / self.rmag()).asin().to_degrees()
+        between_pm_180((self.z / self.rmag()).asin().to_degrees())
     }
 
     /// Returns the semi minor axis in km
