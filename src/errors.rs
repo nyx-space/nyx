@@ -65,6 +65,8 @@ pub enum NyxError {
     NoObjectiveDefined,
     /// Error when exporting data
     ExportError(String),
+    /// Some B plane error
+    BPlaneError(String),
     /// Some custom error for new dynamics
     CustomError(String),
 }

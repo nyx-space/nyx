@@ -24,11 +24,11 @@ use self::approx::{abs_diff_eq, relative_eq};
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
-use super::Frame;
+use super::{BPlane, Frame};
 use crate::dynamics::thrustctrl::Thruster;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3};
-use crate::TimeTagged;
+use crate::{NyxError, TimeTagged};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
@@ -1064,10 +1064,73 @@ impl Orbit {
         between_pm_180((self.z / self.rmag()).asin().to_degrees())
     }
 
-    /// Returns the semi minor axis in km
+    /// Returns the semi minor axis in km, includes code for a hyperbolic orbit
     pub fn semi_minor_axis(&self) -> f64 {
-        let c = self.sma() * self.ecc();
-        (c.powi(2) - self.sma().powi(2)).sqrt()
+        if self.ecc() <= 1.0 {
+            ((self.sma() * self.ecc()).powi(2) - self.sma().powi(2)).sqrt()
+        } else {
+            self.hmag().powi(2) / (self.frame.gm() * (self.ecc().powi(2) - 1.0).sqrt())
+        }
+    }
+
+    /// Returns the velocity declination of this orbit in degrees
+    pub fn velocity_declination(&self) -> f64 {
+        between_pm_180((self.vz / self.vmag()).asin().to_degrees())
+    }
+
+    pub fn b_plane(&self) -> Result<BPlane, NyxError> {
+        if self.ecc() <= 1.0 {
+            Err(NyxError::BPlaneError(
+                "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            ))
+        } else {
+            let e_hat = self.evec() / self.ecc();
+            let h_hat = self.hvec() / self.hmag();
+            let n_hat = h_hat.cross(&e_hat);
+
+            let s_hat = e_hat / self.ecc() + (1.0 - (1.0 / self.ecc()).powi(2)).sqrt() * n_hat;
+
+            let b_vec = self.semi_minor_axis()
+                * ((1.0 - (1.0 / self.ecc()).powi(2)).sqrt() * e_hat - (1.0 / self.ecc() * n_hat));
+            let t_hat = 1.0 / (s_hat[0].powi(2) + s_hat[1].powi(2)).sqrt()
+                * Vector3::new(s_hat[1], -s_hat[0], 0.0);
+            let r_hat = s_hat.cross(&t_hat);
+
+            Ok(BPlane {
+                b_r: b_vec.dot(&r_hat),
+                b_t: b_vec.dot(&t_hat),
+            })
+        }
+    }
+
+    /// Returns the $C_3$ of this orbit
+    pub fn c3(&self) -> f64 {
+        -self.frame.gm() / self.sma()
+    }
+
+    /// Returns the radius of periapse in kilometers for the provided turn angle of this hyperbolic orbit.
+    pub fn vinf_periapsis(&self, turn_angle_degrees: f64) -> Result<f64, NyxError> {
+        if self.ecc() <= 1.0 {
+            Err(NyxError::BPlaneError(
+                "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            ))
+        } else {
+            let cos_rho = (0.5 * (PI - turn_angle_degrees.to_radians())).cos();
+
+            Ok((1.0 / cos_rho - 1.0) * self.frame.gm() / self.vmag().powi(2))
+        }
+    }
+
+    /// Returns the turn angle in degrees for the provided radius of periapse passage of this hyperbolic orbit
+    pub fn vinf_turn_angle(&self, periapsis_km: f64) -> Result<f64, NyxError> {
+        if self.ecc() <= 1.0 {
+            Err(NyxError::BPlaneError(
+                "Orbit is not hyperbolic. Convert to target object first".to_string(),
+            ))
+        } else {
+            let rho = (1.0 / (1.0 + self.vmag().powi(2) * (periapsis_km / self.frame.gm()))).acos();
+            Ok((PI - 2.0 * rho).to_degrees())
+        }
     }
 
     /// Returns the direct cosine rotation matrix to convert to this inertial state.

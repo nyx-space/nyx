@@ -28,6 +28,7 @@ use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::{Dynamics, NyxError};
 pub use crate::dynamics::{Harmonics, OrbitalDynamics, SolarPressure, Spacecraft};
 use crate::io::formatter::*;
+pub use crate::io::gravity::HarmonicsMem;
 use crate::io::quantity::ParsingError;
 use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;

@@ -46,6 +46,8 @@ pub mod formatter;
 
 pub mod quantity;
 
+pub mod traj;
+
 #[derive(Debug)]
 pub enum ParsingError {
     MD(String),

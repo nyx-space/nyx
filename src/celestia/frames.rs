@@ -24,6 +24,7 @@ use crate::time::Epoch;
 // pub use celestia::xb::Identifier as XbId;
 use super::Bodies;
 use crate::time::{Duration, TimeUnit};
+use crate::utils::between_0_360;
 use std::cmp::PartialEq;
 use std::convert::TryFrom;
 use std::f64::consts::PI;
@@ -190,5 +191,26 @@ impl fmt::Display for Frame {
             }
             othframe => write!(f, "{:?}", othframe),
         }
+    }
+}
+
+/// Stores a B-Plane
+#[derive(Debug)]
+pub struct BPlane {
+    /// The $B_T$ component, in kilometers
+    pub b_t: f64,
+    /// The $B_R$ component, in kilometers
+    pub b_r: f64,
+}
+
+impl BPlane {
+    /// Returns the B plane angle in degrees between 0 and 360
+    pub fn angle(&self) -> f64 {
+        between_0_360(self.b_r.atan2(self.b_t).to_degrees())
+    }
+
+    /// Returns the B plane vector magnitude, in kilometers
+    pub fn mag(&self) -> f64 {
+        (self.b_t.powi(2) + self.b_r.powi(2)).sqrt()
     }
 }

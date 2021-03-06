@@ -25,15 +25,17 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
-use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput, StateParameter};
+use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::utils::normalize;
 use crate::{State, TimeTagged};
 use std::collections::BTreeMap;
+use std::fmt;
 use std::iter::Iterator;
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::time::Duration as StdDur;
+use std::time::Instant;
 
 const INTERP_TOLERANCE: f64 = 1e-10;
 
@@ -62,6 +64,8 @@ where
     pub timeout_ms: u64,
     start_state: S,
     max_offset: i32,
+    /// Store the items per segment to convert to another frame.
+    items_per_segments: usize,
 }
 
 pub struct TrajIterator<'a, S: State>
@@ -121,6 +125,17 @@ where
     /// Creates a new trajectory with the provided starting state (used as a template) and a receiving channel.
     /// The trajectories are always generated on a separate thread.
     pub fn new(state: S, rx: Receiver<S>) -> Result<Self, NyxError> {
+        // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
+        // I've spent 12h trying to understand why, but I can't, so screw it for it.
+        Self::new_bucket_as(state, if S::PropVecSize::dim() == 43 { 16 } else { 32 }, rx)
+    }
+
+    /// Creates a new trajectory but specifies the number of items per segment
+    pub fn new_bucket_as(
+        state: S,
+        items_per_segments: usize,
+        rx: Receiver<S>,
+    ) -> Result<Self, NyxError> {
         thread::scope(|s| {
             // Initialize the interpolator
             let mut me = Self {
@@ -128,11 +143,8 @@ where
                 start_state: state,
                 timeout_ms: 100,
                 max_offset: 0,
+                items_per_segments,
             };
-
-            // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
-            // I've spent 12h trying to understand why, but I can't, so screw it for it.
-            let items_per_segments = if S::PropVecSize::dim() == 43 { 16 } else { 32 };
 
             let mut children = vec![];
             let mut window_states: Vec<S> = Vec::with_capacity(items_per_segments);
@@ -185,8 +197,8 @@ where
     /// Evaluate the trajectory at this specific epoch.
     pub fn evaluate(&self, epoch: Epoch) -> Result<S, NyxError> {
         let offset_s = ((epoch - self.start_state.epoch()).in_seconds().floor()) as i32;
-        // Retrieve that segment
 
+        // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
             None => {
                 // Let's see if this corresponds to the max offset value
@@ -475,6 +487,7 @@ impl Traj<Orbit> {
     /// This is super slow.
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
         thread::scope(|s| {
+            let start_time = Instant::now();
             let (tx, rx) = channel();
 
             let start_state = cosm.frame_chg(&self.first(), new_frame);
@@ -483,7 +496,8 @@ impl Traj<Orbit> {
             // And start sampling, converting, and flushing into the new trajectory.
 
             // Nyquist–Shannon sampling theorem
-            let sample_rate = 1.0 / (((32 * 2 + 1) * self.segments.len()) as f64);
+            let sample_rate =
+                1.0 / (((self.items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
 
             for state in self.every(step) {
@@ -496,6 +510,13 @@ impl Traj<Orbit> {
                     "Could not generate trajectory".to_string(),
                 ))
             })?;
+
+            info!(
+                "Converted trajectory from {} to {} in {} ms",
+                self.first().frame,
+                new_frame,
+                (Instant::now() - start_time).as_millis()
+            );
 
             Ok(traj)
         })
@@ -523,17 +544,30 @@ impl Traj<Orbit> {
         self.to_csv_with_step(filename, 1 * TimeUnit::Minute, cosm)
     }
 
-    /// Exports this trajectory to the provided filename in CSV format with the default headers and the geodetic latitude and longitude, one state per minute
+    /// Exports this trajectory to the provided filename in CSV format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
+    /// Must provide a body fixed frame to correctly compute the latitude and longitude.
     #[allow(clippy::identity_op)]
-    pub fn to_csv_with_groundtrack(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        let mut fmtr = StateFormatter::default(filename.to_string(), cosm);
-        fmtr.headers
-            .push(From::from(StateParameter::GeodeticLongitude));
-        fmtr.headers
-            .push(From::from(StateParameter::GeodeticLatitude));
-
+    pub fn to_groundtrack_csv(
+        &self,
+        filename: &str,
+        body_fixed_frame: Frame,
+        cosm: Arc<Cosm>,
+    ) -> Result<(), NyxError> {
+        let fmtr = StateFormatter::from_headers(
+            vec![
+                "epoch",
+                "geodetic_latitude",
+                "geodetic_longitude",
+                "geodetic_height",
+            ],
+            filename.to_string(),
+            cosm.clone(),
+        )?;
         let mut out = OrbitStateOutput::new(fmtr)?;
-        for state in self.every(1 * TimeUnit::Minute) {
+        for state in self
+            .to_frame(body_fixed_frame, cosm)?
+            .every(1 * TimeUnit::Minute)
+        {
             out.handle(&state);
         }
         Ok(())
@@ -623,6 +657,21 @@ where
             },
             None => None,
         }
+    }
+}
+
+impl<S: State> fmt::Display for Traj<S>
+where
+    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Trajectory from {} to {} ({} segments)",
+            self.first().epoch(),
+            self.last().epoch(),
+            self.segments.len()
+        )
     }
 }
 
