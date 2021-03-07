@@ -27,34 +27,33 @@ use std::sync::Arc;
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
 #[derive(Clone)]
 pub struct SolarPressure {
-    /// in m^2
-    pub sc_area: f64,
-    /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back).
-    pub cr: f64,
     /// solar flux at 1 AU, in W/m^2
     pub phi: f64,
     pub e_loc: EclipseLocator,
 }
 
 impl<'a> SolarPressure {
-    /// Will use Cr = 1.8, Phi = 1367.0
-    pub fn default_raw(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Self {
+    /// Will set the solar flux at 1 AU to: Phi = 1367.0
+    pub fn default_raw(shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Self {
         let e_loc = EclipseLocator {
             light_source: cosm.frame("Sun J2000"),
             shadow_bodies,
             cosm,
             correction: LTCorr::None,
         };
-        Self {
-            sc_area,
-            cr: 1.8,
-            phi: 1367.0,
-            e_loc,
-        }
+        Self { phi: 1367.0, e_loc }
     }
 
-    pub fn default(sc_area: f64, shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Arc<Self> {
-        Arc::new(Self::default_raw(sc_area, shadow_bodies, cosm))
+    /// Accounts for the shadowing of only one body and will set the solar flux at 1 AU to: Phi = 1367.0
+    pub fn default(shadow_body: Frame, cosm: Arc<Cosm>) -> Arc<Self> {
+        Arc::new(Self::default_raw(vec![shadow_body], cosm))
+    }
+
+    /// Must provide the flux in W/m^2
+    pub fn with_flux(flux_w_m2: f64, shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Arc<Self> {
+        let mut me = Self::default_raw(shadow_bodies, cosm);
+        me.phi = flux_w_m2;
+        Arc::new(me)
     }
 }
 
@@ -81,7 +80,7 @@ impl ForceModel for SolarPressure {
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        Ok(-1e-3 * self.cr * self.sc_area * flux_pressure * r_sun_unit)
+        Ok(-1e-3 * ctx.cr * ctx.srp_area_m2 * flux_pressure * r_sun_unit)
     }
 
     fn dual_eom(
@@ -116,7 +115,7 @@ impl ForceModel for SolarPressure {
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         let dual_force_scalar =
-            Hyperdual::<f64, U7>::from_real(-1e-3 * self.cr * self.sc_area) * flux_pressure;
+            Hyperdual::<f64, U7>::from_real(-1e-3 * ctx.cr * ctx.srp_area_m2) * flux_pressure;
         let mut dual_force: Vector3<Hyperdual<f64, U7>> = Vector3::zeros();
         dual_force[0] = dual_force_scalar * r_sun_unit[0];
         dual_force[1] = dual_force_scalar * r_sun_unit[1];

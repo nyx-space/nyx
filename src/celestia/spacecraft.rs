@@ -30,14 +30,22 @@ pub enum GuidanceMode {
 /// A spacecraft state
 #[derive(Clone, Copy, Debug)]
 pub struct Spacecraft {
+    /// Initial orbit the vehicle is in
     pub orbit: Orbit,
+    /// Dry mass, i.e. mass without fuel, in kg
     pub dry_mass_kg: f64,
+    /// Fuel mass (if fuel mass is negative, thrusting will fail, unless configured to break laws of physics)
     pub fuel_mass_kg: f64,
+    /// in m^2
     pub srp_area_m2: f64,
+    /// in m^2
     pub drag_area_m2: f64,
+    /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back).
     pub cr: f64,
+    /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere).
     pub cd: f64,
     pub thruster: Option<Thruster>,
+    /// Guidance mode determines whether the thruster should fire or not
     pub mode: GuidanceMode,
 }
 

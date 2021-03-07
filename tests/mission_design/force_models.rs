@@ -20,9 +20,7 @@ fn srp_earth() {
 
     // Define the dynamics
 
-    let shadow_bodies = vec![eme2k];
-
-    let srp = SolarPressure::default(1.0, shadow_bodies, cosm);
+    let srp = SolarPressure::default(eme2k, cosm);
 
     let dry_mass = 300.0;
 
@@ -69,10 +67,8 @@ fn exp_drag_earth() {
 
     // Define the dynamics
 
-    let shadow_bodies = vec![eme2k];
-
-    let srp = SolarPressure::default(1.0, shadow_bodies, cosm.clone());
-    let drag = Drag::earth_exp(1.0, 2.0, cosm);
+    let srp = SolarPressure::default(eme2k, cosm.clone());
+    let drag = Drag::earth_exp(cosm);
 
     let dry_mass = 300.0;
 
@@ -104,10 +100,8 @@ fn std_atm_drag_earth() {
 
     // Define the dynamics
 
-    let shadow_bodies = vec![eme2k];
-
-    let srp = SolarPressure::default(1.0, shadow_bodies, cosm.clone());
-    let drag = Drag::std_atm1976(1.0, 2.0, cosm);
+    let srp = SolarPressure::default(eme2k, cosm.clone());
+    let drag = Drag::std_atm1976(cosm);
 
     let dry_mass = 300.0;
 
@@ -161,10 +155,8 @@ fn std_atm_drag_earth_low() {
 
     // Define the dynamics
 
-    let shadow_bodies = vec![eme2k];
-
-    let srp = SolarPressure::default(1.0, shadow_bodies, cosm.clone());
-    let drag = Drag::std_atm1976(1.0, 2.0, cosm);
+    let srp = SolarPressure::default(eme2k, cosm.clone());
+    let drag = Drag::std_atm1976(cosm);
 
     let dry_mass = 300.0;
 

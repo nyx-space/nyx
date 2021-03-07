@@ -236,12 +236,10 @@ where
                                         // Note that an Arc is immutable, but we want to specify everything
                                         // so we create the SRP without the wrapper
                                         let mut srp = SolarPressure::default_raw(
-                                            smdl.sc_area,
                                             vec![*eme2k, *luna],
                                             cosm.clone(),
                                         );
                                         srp.phi = smdl.phi;
-                                        srp.cr = smdl.cr;
                                         sc_dyn.add_model(Arc::new(srp));
                                     }
                                 }

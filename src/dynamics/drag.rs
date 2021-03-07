@@ -38,10 +38,6 @@ pub enum AtmDensity {
 /// This will be resolved after https://gitlab.com/chrisrabotin/nyx/issues/93 is implemented.
 #[derive(Clone)]
 pub struct ConstantDrag {
-    /// in m^2
-    pub sc_area: f64,
-    /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere).
-    pub cd: f64,
     /// atmospheric density in kg/m^3
     pub rho: f64,
     /// Geoid causing the drag
@@ -54,7 +50,7 @@ impl ForceModel for ConstantDrag {
     fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
-        Ok(-0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity)
+        Ok(-0.5 * self.rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
     }
 
     fn dual_eom(
@@ -71,10 +67,6 @@ impl ForceModel for ConstantDrag {
 pub struct Drag {
     /// Density computation method
     pub density: AtmDensity,
-    /// in m^2
-    pub sc_area: f64,
-    /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere).
-    pub cd: f64,
     /// Frame to compute the drag in
     pub drag_frame: Frame,
     /// a Cosm reference is needed to convert to the state around the correct planet
@@ -83,28 +75,24 @@ pub struct Drag {
 
 impl Drag {
     /// Common exponential drag model for the Earth
-    pub fn earth_exp(sc_area: f64, cd: f64, cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn earth_exp(cosm: Arc<Cosm>) -> Arc<Self> {
         Arc::new(Self {
             density: AtmDensity::Exponential {
                 rho0: 3.614e-13,
                 r0: 700_000.0,
                 ref_alt_m: 88_667.0,
             },
-            sc_area,
-            cd,
             drag_frame: cosm.frame("IAU Earth"),
             cosm,
         })
     }
 
     /// Drag model which uses the standard atmosphere 1976 model for atmospheric density
-    pub fn std_atm1976(sc_area: f64, cd: f64, cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn std_atm1976(cosm: Arc<Cosm>) -> Arc<Self> {
         Arc::new(Self {
             density: AtmDensity::StdAtm {
                 max_alt_m: 1_000_000.0,
             },
-            sc_area,
-            cd,
             drag_frame: cosm.frame("IAU Earth"),
             cosm,
         })
@@ -113,12 +101,14 @@ impl Drag {
 
 impl ForceModel for Drag {
     fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
+        let integration_frame = ctx.orbit.frame;
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc.velocity();
-                Ok(-0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity)
+                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
             }
+
             AtmDensity::Exponential {
                 rho0,
                 r0,
@@ -128,14 +118,12 @@ impl ForceModel for Drag {
                     * (-(osc.rmag() - (r0 + self.drag_frame.equatorial_radius())) / ref_alt_m)
                         .exp();
 
-                let velocity_eme2k = self
-                    .cosm
-                    .frame_chg(&osc, self.cosm.frame("EME2000"))
-                    .velocity();
+                let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
-                let velocity = velocity_eme2k - osc.velocity();
-                Ok(-0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity)
+                let velocity = velocity_integr_frame - osc.velocity();
+                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
             }
+
             AtmDensity::StdAtm { max_alt_m } => {
                 let altitude_km = osc.rmag() - self.drag_frame.equatorial_radius();
                 let rho = if altitude_km > max_alt_m / 1_000.0 {
@@ -156,13 +144,10 @@ impl ForceModel for Drag {
                     10.0_f64.powf(logdensity)
                 };
 
-                let velocity_eme2k = self
-                    .cosm
-                    .frame_chg(&osc, self.cosm.frame("EME2000"))
-                    .velocity();
+                let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
-                let velocity = velocity_eme2k - osc.velocity();
-                Ok(-0.5 * rho * self.cd * self.sc_area * velocity.norm() * velocity)
+                let velocity = velocity_integr_frame - osc.velocity();
+                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
             }
         }
     }
