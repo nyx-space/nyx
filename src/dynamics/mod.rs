@@ -19,7 +19,7 @@
 extern crate hyperdual;
 
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
-use crate::celestia::{Orbit, SpacecraftState};
+use crate::celestia::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, Matrix3, MatrixN, Vector3, VectorN, U7};
 use crate::State;
@@ -155,14 +155,14 @@ where
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
 pub trait ForceModel: Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError>;
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError>;
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
     fn dual_eom(
         &self,
         radius: &Vector3<Hyperdual<f64, U7>>,
-        osc_ctx: &SpacecraftState,
+        osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
 

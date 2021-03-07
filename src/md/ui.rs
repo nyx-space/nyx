@@ -26,7 +26,7 @@ pub use crate::celestia::{Bodies, Cosm, LTCorr, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::{Dynamics, NyxError};
-pub use crate::dynamics::{Harmonics, OrbitalDynamics, SolarPressure, Spacecraft};
+pub use crate::dynamics::{Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use crate::io::formatter::*;
 pub use crate::io::gravity::HarmonicsMem;
 use crate::io::quantity::ParsingError;
@@ -34,7 +34,7 @@ use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
 pub use crate::propagators::{PropOpts, Propagator};
 pub use crate::time::{Duration, Epoch, TimeUnit};
-pub use crate::SpacecraftState;
+pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -46,8 +46,8 @@ pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    pub sc_dyn: Arc<Spacecraft<'a>>,
-    pub init_state: SpacecraftState,
+    pub sc_dyn: Arc<SpacecraftDynamics<'a>>,
+    pub init_state: Spacecraft,
     pub formatter: Option<StateFormatter>,
     pub prop_time: Option<Duration>,
     pub prop_event: Option<ConditionSerde>,
@@ -69,7 +69,7 @@ where
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
                 #[allow(unused_assignments)]
-                let mut sc_dyn: Spacecraft;
+                let mut sc_dyn: SpacecraftDynamics;
                 let init_sc;
 
                 // Validate the output
@@ -185,13 +185,13 @@ where
                         bodies.remove(pos);
                     }
 
-                    sc_dyn = Spacecraft::new_raw(OrbitalDynamics::point_masses(
+                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::point_masses(
                         init_state.frame,
                         &bodies,
                         cosm.clone(),
                     ));
 
-                    init_sc = SpacecraftState::new(
+                    init_sc = Spacecraft::new(
                         init_state,
                         spacecraft.dry_mass,
                         spacecraft.fuel_mass.unwrap_or(0.0),
@@ -201,9 +201,9 @@ where
                         0.0,
                     );
                 } else {
-                    sc_dyn = Spacecraft::new_raw(OrbitalDynamics::two_body());
+                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::two_body());
 
-                    init_sc = SpacecraftState::new(
+                    init_sc = Spacecraft::new(
                         init_state,
                         spacecraft.dry_mass,
                         spacecraft.fuel_mass.unwrap_or(0.0),
@@ -328,7 +328,7 @@ where
     #[allow(clippy::identity_op)]
     pub fn execute_with(
         &mut self,
-        mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>>,
+        mut hdlrs: Vec<Box<dyn MdHdlr<Spacecraft>>>,
     ) -> Result<(), NyxError> {
         // Get the prop time before the mutable ref of the propagator
         let maybe_prop_time = self.prop_time;

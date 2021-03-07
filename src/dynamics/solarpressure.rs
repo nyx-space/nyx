@@ -19,7 +19,7 @@
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
 use super::ForceModel;
 use crate::celestia::eclipse::{EclipseLocator, EclipseState};
-use crate::celestia::{Cosm, Frame, LTCorr, SpacecraftState, AU, SPEED_OF_LIGHT};
+use crate::celestia::{Cosm, Frame, LTCorr, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
 use crate::errors::NyxError;
 use std::sync::Arc;
@@ -59,7 +59,7 @@ impl<'a> SolarPressure {
 }
 
 impl ForceModel for SolarPressure {
-    fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = &ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
@@ -87,7 +87,7 @@ impl ForceModel for SolarPressure {
     fn dual_eom(
         &self,
         _radius: &Vector3<Hyperdual<f64, U7>>,
-        ctx: &SpacecraftState,
+        ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         let osc = ctx.orbit;
 

@@ -22,7 +22,7 @@ use super::{Dynamics, ForceModel};
 use crate::dimensions::{DimName, MatrixN, Vector1, Vector3, VectorN, U3, U4, U42, U43, U6, U7};
 use crate::dynamics::Hyperdual;
 // use crate::od::Estimable;
-use crate::celestia::SpacecraftState;
+use crate::celestia::Spacecraft;
 use crate::errors::NyxError;
 use crate::state::State;
 use crate::time::TimeUnit;
@@ -35,14 +35,14 @@ const NORM_ERR: f64 = 1e-12;
 const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edition
 
 #[derive(Clone)]
-pub struct Spacecraft<'a> {
+pub struct SpacecraftDynamics<'a> {
     pub orbital_dyn: Arc<OrbitalDynamics<'a>>,
     pub force_models: Vec<Arc<dyn ForceModel + 'a>>,
     pub ctrl: Option<Arc<dyn ThrustControl + 'a>>,
     pub decrement_mass: bool,
 }
 
-impl<'a> Spacecraft<'a> {
+impl<'a> SpacecraftDynamics<'a> {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// By default, the mass of the vehicle will be decremented as propellant is consummed.
     pub fn with_ctrl(
@@ -112,7 +112,7 @@ impl<'a> Spacecraft<'a> {
     }
 
     /// A shortcut to spacecraft.ctrl if the control is defined
-    pub fn ctrl_achieved(&self, state: &SpacecraftState) -> Result<bool, NyxError> {
+    pub fn ctrl_achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         match &self.ctrl {
             Some(ctrl) => ctrl.achieved(state),
             None => Err(NyxError::NoObjectiveDefined),
@@ -120,9 +120,9 @@ impl<'a> Spacecraft<'a> {
     }
 }
 
-impl<'a> Dynamics for Spacecraft<'a> {
+impl<'a> Dynamics for SpacecraftDynamics<'a> {
     type HyperdualSize = U7; // This implies that we are NOT computing the STM with the mass
-    type StateType = SpacecraftState;
+    type StateType = Spacecraft;
 
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         if next_state.fuel_mass_kg < 0.0 {
@@ -144,7 +144,7 @@ impl<'a> Dynamics for Spacecraft<'a> {
         &self,
         delta_t: f64,
         state: &VectorN<f64, U43>,
-        ctx: &SpacecraftState,
+        ctx: &Spacecraft,
     ) -> Result<VectorN<f64, U43>, NyxError> {
         // Compute the orbital dynamics
         let orbital_dyn_vec = state.fixed_rows::<U42>(0).into_owned();

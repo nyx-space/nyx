@@ -1,9 +1,9 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
+use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
-use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
+use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::{Event, StateParameter};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
@@ -58,9 +58,9 @@ fn qlaw_as_ruggiero_case_a() {
     let fuel_mass = 299.0;
 
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:o}", orbit);
 
     let setup = Propagator::new::<RK4Fixed>(
@@ -128,9 +128,9 @@ fn qlaw_as_ruggiero_case_b() {
     let dry_mass = 0.1;
 
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -192,9 +192,9 @@ fn qlaw_as_ruggiero_case_c() {
     let dry_mass = 0.1;
 
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -265,9 +265,9 @@ fn qlaw_as_ruggiero_case_d() {
     let dry_mass = 300.0;
 
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -343,9 +343,9 @@ fn qlaw_as_ruggiero_case_e() {
     let dry_mass = 0.1;
 
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -412,12 +412,12 @@ fn qlaw_as_ruggiero_case_f() {
     let dry_mass = 300.0;
 
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_f] {:o}", orbit);
 
-    let (tx, rx): (Sender<SpacecraftState>, Receiver<SpacecraftState>) = mpsc::channel();
+    let (tx, rx): (Sender<Spacecraft>, Receiver<Spacecraft>) = mpsc::channel();
 
     // Set up the writing channel
     thread::spawn(move || {
@@ -492,9 +492,9 @@ fn ruggiero_iepc_2011_102() {
     let dry_mass = 300.0;
 
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(

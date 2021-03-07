@@ -24,7 +24,7 @@ use crate::celestia::Orbit;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
 use crate::hifitime::Epoch;
-use crate::SpacecraftState;
+use crate::Spacecraft;
 use std::cmp::PartialEq;
 use std::fmt;
 
@@ -345,12 +345,12 @@ impl NavSolution<Orbit> for KfEstimate<Orbit> {
     }
 }
 
-impl EstimateFrom<SpacecraftState> for Orbit {
-    fn extract(from: &SpacecraftState) -> Self {
+impl EstimateFrom<Spacecraft> for Orbit {
+    fn extract(from: &Spacecraft) -> Self {
         from.orbit
     }
 
-    fn add_dev(to: &SpacecraftState, dev: VectorN<f64, Self::Size>) -> SpacecraftState {
+    fn add_dev(to: &Spacecraft, dev: VectorN<f64, Self::Size>) -> Spacecraft {
         *to + dev
     }
 }

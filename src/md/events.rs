@@ -22,7 +22,7 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::DefaultAllocator;
 use crate::time::{Duration, TimeUnit};
 use crate::utils::between_pm_x;
-use crate::{SpacecraftState, State};
+use crate::{Spacecraft, State};
 use std::fmt;
 use std::sync::Arc;
 
@@ -185,8 +185,8 @@ impl EventEvaluator<Orbit> for Event {
     }
 }
 
-impl EventEvaluator<SpacecraftState> for Event {
-    fn eval(&self, state: &SpacecraftState) -> f64 {
+impl EventEvaluator<Spacecraft> for Event {
+    fn eval(&self, state: &Spacecraft) -> f64 {
         match self.parameter {
             StateParameter::FuelMass => state.fuel_mass_kg - self.desired_value,
             _ => self.eval(&state.orbit),

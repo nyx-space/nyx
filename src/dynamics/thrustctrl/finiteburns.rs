@@ -17,7 +17,7 @@
 */
 
 use super::ThrustControl;
-use crate::celestia::{Frame, GuidanceMode, SpacecraftState};
+use crate::celestia::{Frame, GuidanceMode, Spacecraft};
 use crate::dimensions::Vector3;
 use crate::state::TimeTagged;
 use crate::time::{Epoch, TimeUnit};
@@ -70,7 +70,7 @@ impl FiniteBurns {
 }
 
 impl ThrustControl for FiniteBurns {
-    fn direction(&self, osc: &SpacecraftState) -> Vector3<f64> {
+    fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
         match osc.mode {
@@ -90,7 +90,7 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn throttle(&self, osc: &SpacecraftState) -> f64 {
+    fn throttle(&self, osc: &Spacecraft) -> f64 {
         match osc.mode {
             GuidanceMode::Custom(mnvr_no) => {
                 let next_mnvr = self.mnvrs[mnvr_no as usize];
@@ -107,7 +107,7 @@ impl ThrustControl for FiniteBurns {
         }
     }
 
-    fn next(&self, sc: &SpacecraftState) -> GuidanceMode {
+    fn next(&self, sc: &Spacecraft) -> GuidanceMode {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
         match sc.mode {
             GuidanceMode::Custom(mnvr_no) => {

@@ -29,7 +29,7 @@ pub enum GuidanceMode {
 
 /// A spacecraft state
 #[derive(Clone, Copy, Debug)]
-pub struct SpacecraftState {
+pub struct Spacecraft {
     pub orbit: Orbit,
     pub dry_mass_kg: f64,
     pub fuel_mass_kg: f64,
@@ -41,7 +41,7 @@ pub struct SpacecraftState {
     pub mode: GuidanceMode,
 }
 
-impl SpacecraftState {
+impl Spacecraft {
     /// Initialize a spacecraft state from all of its parameters
     pub fn new(
         orbit: Orbit,
@@ -175,8 +175,8 @@ impl SpacecraftState {
     }
 }
 
-impl PartialEq for SpacecraftState {
-    fn eq(&self, other: &SpacecraftState) -> bool {
+impl PartialEq for Spacecraft {
+    fn eq(&self, other: &Spacecraft) -> bool {
         let mass_tol = 1e-6; // milligram
         self.orbit == other.orbit
             && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
@@ -184,7 +184,7 @@ impl PartialEq for SpacecraftState {
     }
 }
 
-impl fmt::Display for SpacecraftState {
+impl fmt::Display for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -195,7 +195,7 @@ impl fmt::Display for SpacecraftState {
     }
 }
 
-impl fmt::LowerExp for SpacecraftState {
+impl fmt::LowerExp for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

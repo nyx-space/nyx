@@ -20,7 +20,7 @@ use super::bacon_sci::interp::lagrange;
 use super::bacon_sci::polynomial::Polynomial;
 use super::crossbeam::thread;
 use super::rayon::prelude::*;
-use crate::celestia::{Cosm, Frame, Orbit, SpacecraftState};
+use crate::celestia::{Cosm, Frame, Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, VectorN};
 use crate::errors::NyxError;
@@ -590,7 +590,7 @@ impl Traj<Orbit> {
     }
 }
 
-impl Traj<SpacecraftState> {
+impl Traj<Spacecraft> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     /// This is super slow.
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {

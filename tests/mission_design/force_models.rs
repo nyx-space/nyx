@@ -1,8 +1,8 @@
 extern crate nyx_space as nyx;
 
-use nyx::celestia::{Cosm, Orbit, SpacecraftState};
+use nyx::celestia::{Cosm, Orbit, Spacecraft};
 use nyx::dimensions::Vector6;
-use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, Spacecraft};
+use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnit};
 use nyx::utils::rss_errors;
@@ -27,10 +27,10 @@ fn srp_earth() {
     let dry_mass = 300.0;
 
     // Create a spacecraft with SRP model
-    let sc_dyn = Spacecraft::with_model(OrbitalDynamics::two_body(), srp);
+    let sc_dyn = SpacecraftDynamics::with_model(OrbitalDynamics::two_body(), srp);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0);
+    let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
@@ -77,10 +77,10 @@ fn exp_drag_earth() {
     let dry_mass = 300.0;
 
     // Build a spacecraft with SRP and Drag enabled.
-    let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
+    let sc_dyn = SpacecraftDynamics::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
+    let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
@@ -112,10 +112,10 @@ fn std_atm_drag_earth() {
     let dry_mass = 300.0;
 
     // Build a spacecraft with SRP and Drag enabled.
-    let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
+    let sc_dyn = SpacecraftDynamics::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
+    let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
@@ -169,10 +169,10 @@ fn std_atm_drag_earth_low() {
     let dry_mass = 300.0;
 
     // Build a spacecraft with SRP and Drag enabled.
-    let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
+    let sc_dyn = SpacecraftDynamics::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
+    let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);

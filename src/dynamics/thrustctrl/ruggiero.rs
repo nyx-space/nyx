@@ -17,7 +17,7 @@
 */
 
 use super::{
-    unit_vector_from_angles, Achieve, Frame, GuidanceMode, NyxError, Orbit, SpacecraftState,
+    unit_vector_from_angles, Achieve, Frame, GuidanceMode, NyxError, Orbit, Spacecraft,
     ThrustControl, Vector3,
 };
 use std::f64::consts::FRAC_PI_2 as half_pi;
@@ -66,7 +66,7 @@ impl Ruggiero {
 
 impl ThrustControl for Ruggiero {
     /// Returns whether the control law has achieved all goals
-    fn achieved(&self, state: &SpacecraftState) -> Result<bool, NyxError> {
+    fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         for maybe_obj in &self.objectives {
             if let Some(obj) = maybe_obj {
                 if !obj.achieved(&state.orbit) {
@@ -77,7 +77,7 @@ impl ThrustControl for Ruggiero {
         Ok(true)
     }
 
-    fn direction(&self, sc: &SpacecraftState) -> Vector3<f64> {
+    fn direction(&self, sc: &Spacecraft) -> Vector3<f64> {
         if sc.mode == GuidanceMode::Coast {
             Vector3::zeros()
         } else if sc.mode == GuidanceMode::Thrust {
@@ -174,7 +174,7 @@ impl ThrustControl for Ruggiero {
     }
 
     // Either thrust full power or not at all
-    fn throttle(&self, sc: &SpacecraftState) -> f64 {
+    fn throttle(&self, sc: &Spacecraft) -> f64 {
         if sc.mode == GuidanceMode::Coast {
             0.0
         } else if sc.mode == GuidanceMode::Thrust {
@@ -227,7 +227,7 @@ impl ThrustControl for Ruggiero {
     }
 
     /// Update the state for the next iteration
-    fn next(&self, sc: &SpacecraftState) -> GuidanceMode {
+    fn next(&self, sc: &Spacecraft) -> GuidanceMode {
         if self.throttle(sc) > 0.0 {
             if sc.mode == GuidanceMode::Coast {
                 info!("enabling control: {:o}", sc.orbit);
@@ -277,7 +277,7 @@ fn ruggiero_weight() {
         eme2k,
     );
 
-    let mut osc_sc = SpacecraftState::new(osc, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    let mut osc_sc = Spacecraft::new(osc, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     // Must set the guidance mode to thrusting otherwise the direction will be set to zero.
     osc_sc.mode = GuidanceMode::Thrust;
 

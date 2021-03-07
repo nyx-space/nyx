@@ -23,7 +23,7 @@ extern crate rayon;
 
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
-use crate::{Orbit, SpacecraftState};
+use crate::{Orbit, Spacecraft};
 use std::fs::File;
 use std::str::FromStr;
 
@@ -34,7 +34,7 @@ pub mod trajectory;
 mod events;
 pub use events::{Event, EventEvaluator};
 
-pub type ScTraj = trajectory::Traj<SpacecraftState>;
+pub type ScTraj = trajectory::Traj<Spacecraft>;
 pub type Ephemeris = trajectory::Traj<Orbit>;
 
 /// A Mission Design handler
@@ -62,8 +62,8 @@ impl OrbitStateOutput {
     }
 }
 
-impl MdHdlr<SpacecraftState> for OrbitStateOutput {
-    fn handle(&mut self, state: &SpacecraftState) {
+impl MdHdlr<Spacecraft> for OrbitStateOutput {
+    fn handle(&mut self, state: &Spacecraft) {
         self.csv_out
             .serialize(self.fmtr.fmt(&state.orbit))
             .expect("could not format state");

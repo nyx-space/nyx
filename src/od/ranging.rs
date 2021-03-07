@@ -33,7 +33,7 @@ use crate::dimensions::{
 };
 use crate::time::Epoch;
 use crate::utils::{r2, r3};
-use crate::SpacecraftState;
+use crate::Spacecraft;
 use std::fmt;
 use std::sync::Arc;
 
@@ -195,9 +195,9 @@ impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     }
 }
 
-impl MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation {
+impl MeasurementDevice<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, sc_rx: &SpacecraftState) -> Option<StdMeasurement> {
+    fn measure(&self, sc_rx: &Spacecraft) -> Option<StdMeasurement> {
         let rx = &sc_rx.orbit;
         match rx.frame {
             Frame::Geoid { .. } => {

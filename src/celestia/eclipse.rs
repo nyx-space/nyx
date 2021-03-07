@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use super::{Cosm, Frame, LTCorr, Orbit, SpacecraftState};
+pub use super::{Cosm, Frame, LTCorr, Orbit, Spacecraft};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnit};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
@@ -187,9 +187,9 @@ impl EventEvaluator<Orbit> for UmbraEvent {
     }
 }
 
-impl EventEvaluator<SpacecraftState> for UmbraEvent {
+impl EventEvaluator<Spacecraft> for UmbraEvent {
     // Evaluation of the event, returns 0.0 for umbra, 1.0 for visibility and some value in between for penumbra
-    fn eval(&self, sc: &SpacecraftState) -> f64 {
+    fn eval(&self, sc: &Spacecraft) -> f64 {
         match self.e_loc.compute(&sc.orbit) {
             EclipseState::Umbra => 0.0,
             EclipseState::Visibilis => 1.0,
@@ -237,8 +237,8 @@ impl EventEvaluator<Orbit> for PenumbraEvent {
     }
 }
 
-impl EventEvaluator<SpacecraftState> for PenumbraEvent {
-    fn eval(&self, sc: &SpacecraftState) -> f64 {
+impl EventEvaluator<Spacecraft> for PenumbraEvent {
+    fn eval(&self, sc: &Spacecraft) -> f64 {
         match self.e_loc.compute(&sc.orbit) {
             EclipseState::Umbra => 0.0,
             EclipseState::Visibilis => 1.0,

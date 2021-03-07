@@ -18,7 +18,7 @@
 
 use super::hyperdual::Hyperdual;
 use super::ForceModel;
-use crate::celestia::{Cosm, Frame, SpacecraftState};
+use crate::celestia::{Cosm, Frame, Spacecraft};
 use crate::dimensions::{Matrix3, Vector3, U7};
 use crate::errors::NyxError;
 use std::sync::Arc;
@@ -51,7 +51,7 @@ pub struct ConstantDrag {
 }
 
 impl ForceModel for ConstantDrag {
-    fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
         Ok(-0.5 * self.rho * self.cd * self.sc_area * velocity.norm() * velocity)
@@ -60,7 +60,7 @@ impl ForceModel for ConstantDrag {
     fn dual_eom(
         &self,
         _radius: &Vector3<Hyperdual<f64, U7>>,
-        _osc_ctx: &SpacecraftState,
+        _osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }
@@ -112,7 +112,7 @@ impl Drag {
 }
 
 impl ForceModel for Drag {
-    fn eom(&self, ctx: &SpacecraftState) -> Result<Vector3<f64>, NyxError> {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         match self.density {
             AtmDensity::Constant(rho) => {
@@ -170,7 +170,7 @@ impl ForceModel for Drag {
     fn dual_eom(
         &self,
         _radius: &Vector3<Hyperdual<f64, U7>>,
-        _osc_ctx: &SpacecraftState,
+        _osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }

@@ -37,7 +37,7 @@ use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
 use nyx::md::ui::MDProcess;
 use nyx::md::MdHdlr;
 use nyx::md::OrbitStateOutput;
-use nyx::SpacecraftState;
+use nyx::Spacecraft;
 use rust_embed::RustEmbed;
 use std::borrow::Cow;
 use std::env::{set_var, var};
@@ -170,7 +170,7 @@ fn main() -> Result<(), ParsingError> {
                             (*COSM).clone(),
                         ) {
                             Ok((mut md, maybe_fmtr)) => {
-                                let mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>> = Vec::new();
+                                let mut hdlrs: Vec<Box<dyn MdHdlr<Spacecraft>>> = Vec::new();
                                 if let Some(fmtr) = maybe_fmtr {
                                     let out =
                                         Box::new(OrbitStateOutput::new(fmtr.clone()).unwrap());

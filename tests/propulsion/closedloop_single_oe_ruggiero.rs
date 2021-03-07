@@ -1,9 +1,9 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, SpacecraftState};
+use self::nyx::celestia::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
-use self::nyx::dynamics::{OrbitalDynamics, Spacecraft};
+use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
 
@@ -38,9 +38,9 @@ fn rugg_sma() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -93,9 +93,9 @@ fn rugg_sma_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma_decr] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -150,9 +150,9 @@ fn rugg_inc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -207,9 +207,9 @@ fn rugg_inc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc_decr] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -264,9 +264,9 @@ fn rugg_ecc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -321,9 +321,9 @@ fn rugg_ecc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc_decr] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -380,9 +380,9 @@ fn rugg_aop() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -438,9 +438,9 @@ fn rugg_aop_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop_decr] {:o}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -496,9 +496,9 @@ fn rugg_raan() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_raan] {:o}", orbit);
 
     let setup = Propagator::new::<RK4Fixed>(

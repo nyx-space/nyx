@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::celestia::{Frame, GuidanceMode, Orbit, SpacecraftState};
+use crate::celestia::{Frame, GuidanceMode, Orbit, Spacecraft};
 use crate::dimensions::Vector3;
 use crate::errors::NyxError;
 
@@ -38,17 +38,17 @@ pub struct Thruster {
 /// tie the DeltaVctrl to a MissionArc.
 pub trait ThrustControl: Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, state: &SpacecraftState) -> Vector3<f64>;
+    fn direction(&self, state: &Spacecraft) -> Vector3<f64>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, state: &SpacecraftState) -> f64;
+    fn throttle(&self, state: &Spacecraft) -> f64;
 
     /// Prepares the controller for the next maneuver by returning the next guidance mode.
-    fn next(&self, state: &SpacecraftState) -> GuidanceMode;
+    fn next(&self, state: &Spacecraft) -> GuidanceMode;
 
     /// Returns whether this thrust control has been achieved, if it has an objective
-    fn achieved(&self, _state: &SpacecraftState) -> Result<bool, NyxError> {
+    fn achieved(&self, _state: &Spacecraft) -> Result<bool, NyxError> {
         Err(NyxError::NoObjectiveDefined)
     }
 }

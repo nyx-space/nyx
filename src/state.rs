@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::celestia::{Frame, GuidanceMode, Orbit, SpacecraftState, StmKind};
+use crate::celestia::{Frame, GuidanceMode, Orbit, Spacecraft, StmKind};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{
     DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, VectorN, U42, U43, U6, U7,
@@ -190,7 +190,7 @@ impl Add<VectorN<f64, U6>> for Orbit {
     }
 }
 
-impl TimeTagged for SpacecraftState {
+impl TimeTagged for Spacecraft {
     fn epoch(&self) -> Epoch {
         self.orbit.dt
     }
@@ -200,7 +200,7 @@ impl TimeTagged for SpacecraftState {
     }
 }
 
-impl State for SpacecraftState {
+impl State for Spacecraft {
     type Size = U7;
     type PropVecSize = U43;
     fn zeros() -> Self {
@@ -257,7 +257,7 @@ impl State for SpacecraftState {
     }
 }
 
-impl Add<VectorN<f64, U7>> for SpacecraftState {
+impl Add<VectorN<f64, U7>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
@@ -275,7 +275,7 @@ impl Add<VectorN<f64, U7>> for SpacecraftState {
     }
 }
 
-impl Add<VectorN<f64, U6>> for SpacecraftState {
+impl Add<VectorN<f64, U6>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
