@@ -25,7 +25,6 @@ use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::{BPlane, Frame};
-use crate::dynamics::thrustctrl::Thruster;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3};
 use crate::{NyxError, TimeTagged};
@@ -1414,82 +1413,6 @@ impl fmt::Octal for Orbit {
             self.raan(),
             self.aop(),
             self.ta()
-        )
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum GuidanceMode {
-    Coast,
-    Thrust,
-    Custom(u8),
-}
-
-/// A spacecraft state
-#[derive(Clone, Copy, Debug)]
-pub struct SpacecraftState {
-    pub orbit: Orbit,
-    pub dry_mass_kg: f64,
-    pub fuel_mass_kg: f64,
-    pub thruster: Option<Thruster>,
-    pub mode: GuidanceMode,
-}
-
-impl SpacecraftState {
-    pub fn new(orbit: Orbit, dry_mass_kg: f64, fuel_mass_kg: f64) -> Self {
-        Self {
-            orbit,
-            dry_mass_kg,
-            fuel_mass_kg,
-            thruster: None,
-            mode: GuidanceMode::Coast,
-        }
-    }
-
-    pub fn with_thruster(
-        orbit: Orbit,
-        dry_mass_kg: f64,
-        fuel_mass_kg: f64,
-        thruster: Thruster,
-        init_mode: GuidanceMode,
-    ) -> Self {
-        Self {
-            orbit,
-            dry_mass_kg,
-            fuel_mass_kg,
-            thruster: Some(thruster),
-            mode: init_mode,
-        }
-    }
-}
-
-impl PartialEq for SpacecraftState {
-    fn eq(&self, other: &SpacecraftState) -> bool {
-        let mass_tol = 1e-6; // milligram
-        self.orbit == other.orbit
-            && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
-            && (self.fuel_mass_kg - other.fuel_mass_kg).abs() < mass_tol
-    }
-}
-
-impl fmt::Display for SpacecraftState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:o}\t{} kg",
-            self.orbit,
-            self.dry_mass_kg + self.fuel_mass_kg
-        )
-    }
-}
-
-impl fmt::LowerExp for SpacecraftState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:o}\t{:e} kg",
-            self.orbit,
-            self.dry_mass_kg + self.fuel_mass_kg
         )
     }
 }

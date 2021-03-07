@@ -60,7 +60,7 @@ fn sc_ckf_perfect_stations() {
         SolarPressure::default(sc_area, vec![eme2k], cosm.clone()),
     );
 
-    let sc_init_state = SpacecraftState::new(initial_state, sc_dry_mass, 0.0);
+    let sc_init_state = SpacecraftState::from_srp_defaults(initial_state, sc_dry_mass, sc_area);
 
     let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
     let mut prop = setup.with(sc_init_state);
@@ -84,7 +84,7 @@ fn sc_ckf_perfect_stations() {
     // the measurements, and the same time step.
     let mut initial_state_est = initial_state;
     initial_state_est.enable_stm();
-    let sc_init_est = SpacecraftState::new(initial_state_est, sc_dry_mass, 0.0);
+    let sc_init_est = SpacecraftState::from_srp_defaults(initial_state_est, sc_dry_mass, sc_area);
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est);
     let covar_radius = 1.0e-3_f64.powi(2);

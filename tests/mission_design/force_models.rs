@@ -30,7 +30,7 @@ fn srp_earth() {
     let sc_dyn = Spacecraft::with_model(OrbitalDynamics::two_body(), srp);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
+    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
@@ -80,7 +80,7 @@ fn exp_drag_earth() {
     let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
+    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
@@ -115,7 +115,7 @@ fn std_atm_drag_earth() {
     let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
+    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);
@@ -172,7 +172,7 @@ fn std_atm_drag_earth_low() {
     let sc_dyn = Spacecraft::with_models(OrbitalDynamics::two_body(), vec![srp, drag]);
     println!("{:o}", orbit);
 
-    let sc = SpacecraftState::new(orbit, dry_mass, 0.0);
+    let sc = SpacecraftState::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
     let setup = Propagator::default(sc_dyn);
     let mut prop = setup.with(sc);

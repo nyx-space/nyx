@@ -208,6 +208,10 @@ impl State for SpacecraftState {
             orbit: Orbit::zeros(),
             dry_mass_kg: 0.0,
             fuel_mass_kg: 0.0,
+            srp_area_m2: 0.0,
+            drag_area_m2: 0.0,
+            cr: 0.0,
+            cd: 0.0,
             thruster: None,
             mode: GuidanceMode::Coast,
         }

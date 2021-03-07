@@ -31,7 +31,7 @@ fn val_transfer_schedule_no_depl() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = SpacecraftState::with_thruster(
+    let sc_state = SpacecraftState::from_thruster(
         orbit,
         dry_mass,
         fuel_mass,
@@ -131,7 +131,7 @@ fn val_transfer_schedule_depl() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = SpacecraftState::with_thruster(
+    let sc_state = SpacecraftState::from_thruster(
         orbit,
         dry_mass,
         fuel_mass,

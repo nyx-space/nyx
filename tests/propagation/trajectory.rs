@@ -189,7 +189,7 @@ fn traj_spacecraft() {
         isp: 1650.0,
     };
     let start_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc_dynamics = Spacecraft::with_ctrl(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
 

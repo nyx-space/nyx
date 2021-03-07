@@ -58,7 +58,7 @@ fn qlaw_as_ruggiero_case_a() {
     let fuel_mass = 299.0;
 
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:o}", orbit);
@@ -128,7 +128,7 @@ fn qlaw_as_ruggiero_case_b() {
     let dry_mass = 0.1;
 
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:o}", orbit);
@@ -192,7 +192,7 @@ fn qlaw_as_ruggiero_case_c() {
     let dry_mass = 0.1;
 
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:o}", orbit);
@@ -265,7 +265,7 @@ fn qlaw_as_ruggiero_case_d() {
     let dry_mass = 300.0;
 
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:o}", orbit);
@@ -343,7 +343,7 @@ fn qlaw_as_ruggiero_case_e() {
     let dry_mass = 0.1;
 
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:o}", orbit);
@@ -412,7 +412,7 @@ fn qlaw_as_ruggiero_case_f() {
     let dry_mass = 300.0;
 
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_f] {:o}", orbit);
@@ -492,7 +492,7 @@ fn ruggiero_iepc_2011_102() {
     let dry_mass = 300.0;
 
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:o}", orbit);

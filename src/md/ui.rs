@@ -195,6 +195,10 @@ where
                         init_state,
                         spacecraft.dry_mass,
                         spacecraft.fuel_mass.unwrap_or(0.0),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
                     );
                 } else {
                     sc_dyn = Spacecraft::new_raw(OrbitalDynamics::two_body());
@@ -203,6 +207,10 @@ where
                         init_state,
                         spacecraft.dry_mass,
                         spacecraft.fuel_mass.unwrap_or(0.0),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
                     );
 
                     // Add the force models

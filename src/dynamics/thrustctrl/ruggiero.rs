@@ -276,7 +276,8 @@ fn ruggiero_weight() {
         start_time,
         eme2k,
     );
-    let mut osc_sc = SpacecraftState::new(osc, 1.0, 0.0);
+
+    let mut osc_sc = SpacecraftState::new(osc, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     // Must set the guidance mode to thrusting otherwise the direction will be set to zero.
     osc_sc.mode = GuidanceMode::Thrust;
 

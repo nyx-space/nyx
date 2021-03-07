@@ -38,7 +38,7 @@ fn rugg_sma() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma] {:o}", orbit);
@@ -93,7 +93,7 @@ fn rugg_sma_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma_decr] {:o}", orbit);
@@ -150,7 +150,7 @@ fn rugg_inc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc] {:o}", orbit);
@@ -207,7 +207,7 @@ fn rugg_inc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc_decr] {:o}", orbit);
@@ -264,7 +264,7 @@ fn rugg_ecc() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc] {:o}", orbit);
@@ -321,7 +321,7 @@ fn rugg_ecc_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc_decr] {:o}", orbit);
@@ -380,7 +380,7 @@ fn rugg_aop() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop] {:o}", orbit);
@@ -438,7 +438,7 @@ fn rugg_aop_decr() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop_decr] {:o}", orbit);
@@ -496,7 +496,7 @@ fn rugg_raan() {
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     let sc_state =
-        SpacecraftState::with_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
+        SpacecraftState::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc = Spacecraft::with_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_raan] {:o}", orbit);
