@@ -16,16 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-/*
-use super::rotations::*;
-use crate::na::Matrix3;
-use crate::time::Epoch;
-*/
-// pub use celestia::xb::Identifier as XbId;
 use super::Bodies;
-use crate::dimensions::Matrix3;
-use crate::time::{Duration, Epoch, TimeUnit};
-use crate::utils::between_0_360;
+use crate::time::{Duration, TimeUnit};
 use std::cmp::PartialEq;
 use std::convert::TryFrom;
 use std::f64::consts::PI;
@@ -191,49 +183,5 @@ impl fmt::Display for Frame {
             }
             othframe => write!(f, "{:?}", othframe),
         }
-    }
-}
-
-/// Stores a B-Plane
-#[derive(Copy, Clone, Debug)]
-pub struct BPlane {
-    /// The $B_T$ component, in kilometers
-    pub b_t: f64,
-    /// The $B_R$ component, in kilometers
-    pub b_r: f64,
-    /// The Linearized Time of Flight
-    pub ltof: Duration,
-    /// The B-Plane rotation matrix
-    pub str_dcm: Matrix3<f64>,
-    /// The frame in which this B Plane was computed
-    pub frame: Frame,
-    /// The time of computation
-    pub epoch: Epoch,
-}
-
-impl BPlane {
-    /// Returns the B plane angle in degrees between 0 and 360
-    pub fn angle(&self) -> f64 {
-        between_0_360(self.b_r.atan2(self.b_t).to_degrees())
-    }
-
-    /// Returns the B plane vector magnitude, in kilometers
-    pub fn mag(&self) -> f64 {
-        (self.b_t.powi(2) + self.b_r.powi(2)).sqrt()
-    }
-
-    /// Returns the DCM to convert to the B Plane from the inertial frame
-    pub fn inertial_to_bplane(&self) -> Matrix3<f64> {
-        self.str_dcm
-    }
-}
-
-impl fmt::Display for BPlane {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "[{}] {} B-Plane: B∙R = {:.3} km\tB∙T = {:.3} km",
-            self.frame, self.epoch, self.b_r, self.b_t
-        )
     }
 }

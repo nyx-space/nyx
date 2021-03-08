@@ -309,6 +309,9 @@ impl TryFrom<Vec<usize>> for Bodies {
 mod orbit;
 pub use self::orbit::*;
 
+mod bplane;
+pub use self::bplane::*;
+
 // Re-Export spacecraft
 mod spacecraft;
 pub use self::spacecraft::*;
