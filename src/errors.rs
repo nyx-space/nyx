@@ -66,8 +66,8 @@ pub enum NyxError {
     NoObjectiveDefined,
     /// Error when exporting data
     ExportError(String),
-    /// Some B plane error
-    BPlaneError(String),
+    /// This computation requires the orbit to be hyperbolic
+    NotHyperbolic(String),
     /// Some custom error for new dynamics
     CustomError(String),
 }

@@ -1079,7 +1079,7 @@ impl Orbit {
 
     pub fn b_plane(&self) -> Result<BPlane, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::BPlaneError(
+            Err(NyxError::NotHyperbolic(
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
             ))
         } else {
@@ -1095,9 +1095,27 @@ impl Orbit {
                 * Vector3::new(s_hat[1], -s_hat[0], 0.0);
             let r_hat = s_hat.cross(&t_hat);
 
+            // Build the rotation matrix from inertial to B Plane
+            let str_rot = Matrix3::new(
+                s_hat[0], s_hat[1], s_hat[2], t_hat[0], t_hat[1], t_hat[2], r_hat[0], r_hat[1],
+                r_hat[2],
+            );
+
+            // Compute the LTOF in seconds
+            let f = (1.0
+                + (self.vmag().powi(2) / self.frame.gm())
+                    * (self.semi_parameter() / (1.0 + self.ecc() * self.ta().to_radians().cos())))
+            .acosh();
+
+            let ltof = (self.frame.gm() / self.vmag().powi(3)) * (f.sinh() - f);
+
             Ok(BPlane {
                 b_r: b_vec.dot(&r_hat),
                 b_t: b_vec.dot(&t_hat),
+                ltof: ltof * TimeUnit::Second,
+                str_dcm: str_rot,
+                frame: self.frame,
+                epoch: self.dt,
             })
         }
     }
@@ -1110,7 +1128,7 @@ impl Orbit {
     /// Returns the radius of periapse in kilometers for the provided turn angle of this hyperbolic orbit.
     pub fn vinf_periapsis(&self, turn_angle_degrees: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::BPlaneError(
+            Err(NyxError::NotHyperbolic(
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
             ))
         } else {
@@ -1123,12 +1141,25 @@ impl Orbit {
     /// Returns the turn angle in degrees for the provided radius of periapse passage of this hyperbolic orbit
     pub fn vinf_turn_angle(&self, periapsis_km: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
-            Err(NyxError::BPlaneError(
+            Err(NyxError::NotHyperbolic(
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
             ))
         } else {
             let rho = (1.0 / (1.0 + self.vmag().powi(2) * (periapsis_km / self.frame.gm()))).acos();
-            Ok((PI - 2.0 * rho).to_degrees())
+            Ok(between_0_360((PI - 2.0 * rho).to_degrees()))
+        }
+    }
+
+    /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
+    pub fn hyperbolic_anomaly(&self) -> Result<f64, NyxError> {
+        if self.ecc() <= 1.0 {
+            Err(NyxError::NotHyperbolic(
+                "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
+            ))
+        } else {
+            let (sin_ta, cos_ta) = self.ta().to_radians().sin_cos();
+            let sinh_h = (sin_ta * (self.ecc().powi(2) - 1.0).sqrt()) / (1.0 + self.ecc() * cos_ta);
+            Ok(between_0_360(sinh_h.asinh().to_degrees()))
         }
     }
 
@@ -1157,6 +1188,7 @@ impl Orbit {
     }
 
     /// Rotate this state provided a direct cosine matrix
+    /// **Bug:** This does not account for the transport theorem!
     pub fn apply_dcm(&mut self, dcm: Matrix3<f64>) {
         let new_r = dcm * self.radius();
         let new_v = dcm * self.velocity();
@@ -1370,14 +1402,7 @@ impl fmt::Display for Orbit {
         write!(
             f,
             "[{}] {}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
-            self.frame,
-            self.dt.as_gregorian_tai_str(),
-            self.x,
-            self.y,
-            self.z,
-            self.vx,
-            self.vy,
-            self.vz
+            self.frame, self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
         )
     }
 }
@@ -1387,14 +1412,7 @@ impl fmt::LowerExp for Orbit {
         write!(
             f,
             "[{}] {}\tposition = [{:e}, {:e}, {:e}] km\tvelocity = [{:e}, {:e}, {:e}] km/s",
-            self.frame,
-            self.dt.as_gregorian_tai_str(),
-            self.x,
-            self.y,
-            self.z,
-            self.vx,
-            self.vy,
-            self.vz
+            self.frame, self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
         )
     }
 }
@@ -1406,7 +1424,7 @@ impl fmt::Octal for Orbit {
             f,
             "[{}] {}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
             self.frame,
-            self.dt.as_gregorian_tai_str(),
+            self.dt,
             self.sma(),
             self.ecc(),
             self.inc(),

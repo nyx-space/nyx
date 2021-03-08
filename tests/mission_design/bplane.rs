@@ -147,7 +147,7 @@ fn val_b_plane_gmat() {
         );
 
         let b_plane = state.b_plane().unwrap();
-        println!("{:?}", b_plane);
+        println!("{}", b_plane);
         assert!(
             dbg!(b_plane.b_r - data.b_r).abs() < 5e-1,
             "invalid b dot R at {}",
