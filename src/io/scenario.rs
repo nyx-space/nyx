@@ -25,6 +25,7 @@ use super::ParsingError;
 use crate::celestia::{Frame, Orbit};
 use crate::md::{Event, StateParameter};
 use crate::time::{Duration, Epoch};
+use crate::NyxError;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -313,7 +314,7 @@ pub struct Harmonics {
 }
 
 impl Harmonics {
-    pub fn load(&self) -> Result<HarmonicsMem, ParsingError> {
+    pub fn load(&self) -> Result<HarmonicsMem, NyxError> {
         let gunzipped = self.file.contains("gz");
         let order = self.order.unwrap_or(0);
         if self.file.contains("cof") {

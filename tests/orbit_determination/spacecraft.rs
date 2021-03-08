@@ -56,7 +56,7 @@ fn sc_ckf_perfect_stations() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
     let sc_dynamics =
-        SpacecraftDynamics::with_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));
+        SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));
 
     let sc_init_state = Spacecraft::from_srp_defaults(initial_state, sc_dry_mass, sc_area);
 

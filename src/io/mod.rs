@@ -58,8 +58,6 @@ pub enum ParsingError {
     CovarFormat,
     FileNotFound(String),
     FileNotUTF8(String),
-    FileUnreadable(String),
-    HarmonicsFile(String),
     SequenceNotFound(String),
     LoadingError(String),
     PropagatorNotFound(String),

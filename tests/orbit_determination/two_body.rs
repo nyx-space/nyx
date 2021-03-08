@@ -643,7 +643,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
-    let orbital_dyn = OrbitalDynamics::with_model(harmonics);
+    let orbital_dyn = OrbitalDynamics::from_model(harmonics);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);

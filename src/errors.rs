@@ -49,6 +49,7 @@ pub enum NyxError {
     /// Returns this error if the partials for this model are not defined, thereby preventing the computation of the STM
     PartialsUndefined,
     LoadingError(String),
+    FileUnreadable(String),
     ObjectNotFound(String),
     NoInterpolationData(String),
     InvalidInterpolationData(String),

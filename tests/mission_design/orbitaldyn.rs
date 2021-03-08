@@ -757,7 +757,7 @@ fn val_earth_sph_harmonics_j2() {
         6.139_616_747_276_084,
     );
 
-    let dynamics = OrbitalDynamics::with_model(harmonics);
+    let dynamics = OrbitalDynamics::from_model(harmonics);
 
     let prop_state = Propagator::rk89(dynamics, PropOpts::<RSSStepPV>::default())
         .with(state)
@@ -817,7 +817,7 @@ fn val_earth_sph_harmonics_12x12() {
         6.138_852_391_455_04,
     );
 
-    let dynamics = OrbitalDynamics::with_model(harmonics);
+    let dynamics = OrbitalDynamics::from_model(harmonics);
 
     let prop_state = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9))
         .with(state)
@@ -877,7 +877,7 @@ fn val_earth_sph_harmonics_70x70() {
         6.138_865_498_487_843,
     );
 
-    let dynamics = OrbitalDynamics::with_model(harmonics);
+    let dynamics = OrbitalDynamics::from_model(harmonics);
 
     let prop_rslt = Propagator::default(dynamics)
         .with(state)
@@ -937,7 +937,7 @@ fn val_earth_sph_harmonics_70x70_partials() {
         6.138_865_498_487_843,
     );
 
-    let dynamics = OrbitalDynamics::with_model(harmonics);
+    let dynamics = OrbitalDynamics::from_model(harmonics);
 
     let prop_rslt = Propagator::default(dynamics)
         .with(state)

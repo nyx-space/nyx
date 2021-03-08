@@ -87,7 +87,7 @@ impl<'a> SpacecraftDynamics<'a> {
     }
 
     /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
-    pub fn with_model(
+    pub fn from_model(
         orbital_dyn: Arc<OrbitalDynamics<'a>>,
         force_model: Arc<dyn ForceModel + 'a>,
     ) -> Arc<Self> {
@@ -97,7 +97,7 @@ impl<'a> SpacecraftDynamics<'a> {
     }
 
     /// Initialize new spacecraft dynamics with a vector of force models.
-    pub fn with_models(
+    pub fn from_models(
         orbital_dyn: Arc<OrbitalDynamics<'a>>,
         force_models: Vec<Arc<dyn ForceModel + 'a>>,
     ) -> Arc<Self> {
@@ -106,8 +106,16 @@ impl<'a> SpacecraftDynamics<'a> {
         Arc::new(me)
     }
 
+    /// Add a model to the currently defined spacecraft dynamics
     pub fn add_model(&mut self, force_model: Arc<dyn ForceModel + 'a>) {
         self.force_models.push(force_model);
+    }
+
+    /// Clone these dynamics and add a model to the currently defined orbital dynamics
+    pub fn with_model(self, force_model: Arc<dyn ForceModel + 'a>) -> Arc<Self> {
+        let mut me = self.clone();
+        me.add_model(force_model);
+        Arc::new(me)
     }
 
     /// A shortcut to spacecraft.ctrl if the control is defined

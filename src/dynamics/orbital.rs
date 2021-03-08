@@ -60,13 +60,20 @@ impl<'a> OrbitalDynamics<'a> {
 
     /// Initialize new orbital mechanics with the provided model.
     /// **Note:** Orbital dynamics _always_ include two body dynamics, these cannot be turned off.
-    pub fn with_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Arc<Self> {
+    pub fn from_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Arc<Self> {
         Self::new(vec![accel_model])
     }
 
     /// Add a model to the currently defined orbital dynamics
     pub fn add_model(&mut self, accel_model: Arc<dyn AccelModel + Sync + 'a>) {
         self.accel_models.push(accel_model);
+    }
+
+    /// Clone these dynamics and add a model to the currently defined orbital dynamics
+    pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Arc<Self> {
+        let mut me = self.clone();
+        me.add_model(accel_model);
+        Arc::new(me)
     }
 }
 

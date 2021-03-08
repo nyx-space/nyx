@@ -25,8 +25,10 @@ pub use super::{trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
 pub use crate::celestia::{Bodies, Cosm, LTCorr, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
+pub use crate::dynamics::{
+    Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
+};
 pub use crate::dynamics::{Dynamics, NyxError};
-pub use crate::dynamics::{Harmonics, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use crate::io::formatter::*;
 pub use crate::io::gravity::HarmonicsMem;
 use crate::io::quantity::ParsingError;
@@ -262,7 +264,7 @@ where
                             }
                             Some(amdl) => {
                                 for hmdl in amdl.harmonics.values() {
-                                    let in_mem = hmdl.load()?;
+                                    let in_mem = hmdl.load().unwrap();
                                     let compute_frame = &cosm.frame(hmdl.frame.as_str());
 
                                     let hh =
