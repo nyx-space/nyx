@@ -149,12 +149,12 @@ fn val_b_plane_gmat() {
         let b_plane = state.b_plane().unwrap();
         println!("{}", b_plane);
         assert!(
-            dbg!(b_plane.b_r - data.b_r).abs() < 5e-1,
+            dbg!(b_plane.b_dot_r() - data.b_r).abs() < 5e-1,
             "invalid b dot R at {}",
             data.epoch
         );
         assert!(
-            dbg!(b_plane.b_t - data.b_t).abs() < 5e-1,
+            dbg!(b_plane.b_dot_t() - data.b_t).abs() < 5e-1,
             "invalid b dot T at {}",
             data.epoch
         );

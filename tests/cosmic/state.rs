@@ -456,8 +456,8 @@ fn b_plane_davis() {
     );
 
     let bp = orbit.b_plane().unwrap();
-    assert!((bp.b_t - 45892.323790).abs() < 1e-5, "incorrect B_T");
-    assert!((bp.b_r - 10606.210428).abs() < 1e-5, "incorrect B_R");
+    assert!((bp.b_dot_t() - 45892.323790).abs() < 1e-5, "incorrect B_T");
+    assert!((bp.b_dot_r() - 10606.210428).abs() < 1e-5, "incorrect B_R");
     println!("{} km/s\t{:?}", orbit.vmag(), orbit.b_plane().unwrap());
 
     // Check reciprocity between the gravity assist functions.

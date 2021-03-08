@@ -18,11 +18,10 @@
 
 extern crate approx;
 extern crate hifitime;
-extern crate hyperdual;
 extern crate serde;
 
-use self::hyperdual::linalg::norm;
-use self::hyperdual::{Float, Hyperdual};
+use super::hyperdual::linalg::norm;
+use super::hyperdual::{Float, Hyperdual};
 use super::na::{Vector3, U7};
 use super::{Frame, Orbit};
 use crate::time::Epoch;

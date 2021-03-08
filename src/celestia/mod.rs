@@ -16,8 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate prost;
+
 use std::convert::TryFrom;
 use std::fs::File;
 use std::io::Read;
