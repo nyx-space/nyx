@@ -1148,6 +1148,20 @@ impl Orbit {
         }
     }
 
+    /// Apply the provided delta-v (in km/s)
+    pub fn apply_dv(&mut self, dv: Vector3<f64>) {
+        self.vx += dv[0];
+        self.vy += dv[1];
+        self.vz += dv[2];
+    }
+
+    /// Copies this orbit after applying the provided delta-v (in km/s)
+    pub fn with_dv(self, dv: Vector3<f64>) -> Self {
+        let mut me = self;
+        me.apply_dv(dv);
+        me
+    }
+
     /// Rotate this state provided a direct cosine matrix
     /// **Bug:** This does not account for the transport theorem!
     pub fn apply_dcm(&mut self, dcm: Matrix3<f64>) {

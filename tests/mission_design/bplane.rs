@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::celestia::{Bodies, Cosm, Orbit};
+use nyx::celestia::{achieve_b_plane, BPlaneTarget, Bodies, Cosm, Orbit};
 use nyx::dynamics::OrbitalDynamics;
 use nyx::md::Event;
 use nyx::propagators::Propagator;
@@ -141,32 +141,79 @@ fn val_b_plane_gmat() {
         let state = cosm.frame_chg(&eme2k_state, luna);
         println!("{}\n{:o}", state, state);
         assert!(
-            dbg!(eme2k_state.c3() - data.c3).abs() < 5e-6,
+            (eme2k_state.c3() - data.c3).abs() < 5e-6,
             "invalid c3 at {}",
             data.epoch
         );
 
         let b_plane = state.b_plane().unwrap();
-        println!("{}", b_plane);
         assert!(
-            dbg!(b_plane.b_dot_r() - data.b_r).abs() < 5e-1,
+            (b_plane.b_dot_r() - data.b_r).abs() < 5e-1,
             "invalid b dot R at {}",
             data.epoch
         );
         assert!(
-            dbg!(b_plane.b_dot_t() - data.b_t).abs() < 5e-1,
+            (b_plane.b_dot_t() - data.b_t).abs() < 5e-1,
             "invalid b dot T at {}",
             data.epoch
         );
         assert!(
-            dbg!(b_plane.angle() - data.b_angle).abs() < 5e-4,
+            (b_plane.angle() - data.b_angle).abs() < 5e-4,
             "invalid b vector angle at {}",
             data.epoch
         );
         assert!(
-            dbg!(b_plane.mag() - data.b_mag).abs() < 5e-1,
+            (b_plane.mag() - data.b_mag).abs() < 5e-1,
             "invalid b vector angle at {}",
             data.epoch
         );
     }
+
+    // Check some stuff for the first b plane
+    let eme2k_state = traj.evaluate(datum[0].epoch).unwrap();
+    let state = cosm.frame_chg(&eme2k_state, luna);
+    let b_plane = state.b_plane().unwrap();
+    println!("{}\n{}", b_plane, b_plane.jacobian());
+    println!("bt\n{}", b_plane.b_t);
+    println!("br\n{}", b_plane.b_r);
+    println!("ltof\n{}", b_plane.ltof_s);
+}
+
+#[test]
+fn b_plane_davis() {
+    // This is a simple test from Dr. Davis' IMD class at CU Boulder.
+    let cosm = Cosm::de438_gmat();
+
+    // Hyperbolic orbit
+    let orbit = Orbit::cartesian(
+        546507.344255845,
+        -527978.380486028,
+        531109.066836708,
+        -4.9220589268733,
+        5.36316523097915,
+        -5.22166308425181,
+        Epoch::from_gregorian_utc_at_midnight(2016, 1, 1),
+        cosm.frame("EME2000"),
+    );
+
+    let bp = orbit.b_plane().unwrap();
+    assert!((bp.b_dot_t() - 45892.323790).abs() < 1e-5, "incorrect B_T");
+    assert!((bp.b_dot_r() - 10606.210428).abs() < 1e-5, "incorrect B_R");
+    println!("{} km/s\n{}", orbit.vmag(), bp);
+
+    // Check reciprocity between the gravity assist functions.
+    let phi = orbit.vinf_turn_angle(300.0).unwrap();
+    let rp = orbit.vinf_periapsis(phi).unwrap();
+
+    assert!(
+        (300.0 - rp).abs() < 1e-10,
+        "turn angle to rp reciprocity failed"
+    );
+
+    // And the targeting a specific B Plane
+    let tgt = BPlaneTarget::from_b_plane(13135.7982982557, 5022.26511510685);
+
+    let delta_v = achieve_b_plane(orbit, tgt).unwrap();
+
+    println!("{}", delta_v);
 }

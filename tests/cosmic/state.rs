@@ -437,32 +437,3 @@ fn with_init() {
         );
     }
 }
-
-#[test]
-fn b_plane_davis() {
-    // This is a simple test from Dr. Davis' IMD class at CU Boulder.
-    let cosm = Cosm::de438_gmat();
-
-    // Hyperbolic orbit
-    let orbit = Orbit::cartesian(
-        546507.344255845,
-        -527978.380486028,
-        531109.066836708,
-        -4.9220589268733,
-        5.36316523097915,
-        -5.22166308425181,
-        Epoch::from_gregorian_utc_at_midnight(2016, 1, 1),
-        cosm.frame("EME2000"),
-    );
-
-    let bp = orbit.b_plane().unwrap();
-    assert!((bp.b_dot_t() - 45892.323790).abs() < 1e-5, "incorrect B_T");
-    assert!((bp.b_dot_r() - 10606.210428).abs() < 1e-5, "incorrect B_R");
-    println!("{} km/s\t{:?}", orbit.vmag(), orbit.b_plane().unwrap());
-
-    // Check reciprocity between the gravity assist functions.
-    let phi = orbit.vinf_turn_angle(300.0).unwrap();
-    let rp = orbit.vinf_periapsis(phi).unwrap();
-
-    f64_eq!(300.0, rp, "turn angle to rp reciprocity failed");
-}
