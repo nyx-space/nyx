@@ -309,6 +309,11 @@ impl TryFrom<Vec<usize>> for Bodies {
 mod orbit;
 pub use self::orbit::*;
 
+// Re-Export OrbitDual
+mod orbitdual;
+pub use self::orbitdual::*;
+
+// Re-Export B Plane
 mod bplane;
 pub use self::bplane::*;
 

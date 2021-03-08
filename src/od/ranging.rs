@@ -253,19 +253,6 @@ impl fmt::Display for GroundStation {
     }
 }
 
-/*
-/// Computes the (approximate) Greenwich Apparent Sideral Time as per IAU2000.
-///
-/// NOTE: This is an approximation valid to within 0.9 seconds in absolute value.
-/// In fact, hifitime does not support UT1, but according to the [IERS](https://www.iers.org/IERS/EN/Science/EarthRotation/UTC.html;jsessionid=A6E88EB4CF0FC2E1A3C10D807F51B829.live2?nn=12932)
-/// UTC with leap seconds is always within 0.9 seconds to UT1, and hifitime inherently supports leap seconds.
-/// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-fn gast(at: Epoch) -> f64 {
-    use std::f64::consts::PI;
-    let tu = at.as_mjd_tai_days() - 51_544.5;
-    2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_6 * tu)
-}
-*/
 /// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {

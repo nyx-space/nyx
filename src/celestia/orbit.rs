@@ -184,12 +184,12 @@ impl Orbit {
     /// and as such it has the same unit requirements.
     pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
         Orbit {
-            x: state[(0, 0)],
-            y: state[(1, 0)],
-            z: state[(2, 0)],
-            vx: state[(3, 0)],
-            vy: state[(4, 0)],
-            vz: state[(5, 0)],
+            x: state[0],
+            y: state[1],
+            z: state[2],
+            vx: state[3],
+            vy: state[4],
+            vz: state[5],
             dt,
             frame,
             stm: None,
@@ -212,7 +212,7 @@ impl Orbit {
         Vector3::new(self.x, self.y, self.z)
     }
 
-    /// Returns the radius vector of this Orbit in [km, km, km]
+    /// Returns the velocity vector of this Orbit in [km/s, km/s, km/s]
     pub fn velocity(&self) -> Vector3<f64> {
         Vector3::new(self.vx, self.vy, self.vz)
     }
@@ -625,7 +625,7 @@ impl Orbit {
     pub fn inc(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                (self.hvec()[(2, 0)] / self.hmag()).acos().to_degrees()
+                (self.hvec()[2] / self.hmag()).acos().to_degrees()
             }
             _ => panic!("inclination not defined in this frame"),
         }
@@ -675,7 +675,7 @@ impl Orbit {
                 if aop.is_nan() {
                     error!("AoP is NaN");
                     0.0
-                } else if self.evec()[(2, 0)] < 0.0 {
+                } else if self.evec()[2] < 0.0 {
                     (2.0 * PI - aop).to_degrees()
                 } else {
                     aop.to_degrees()
@@ -725,11 +725,11 @@ impl Orbit {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
-                let raan = (n[(0, 0)] / n.norm()).acos();
+                let raan = (n[0] / n.norm()).acos();
                 if raan.is_nan() {
                     warn!("RAAN is NaN");
                     0.0
-                } else if n[(1, 0)] < 0.0 {
+                } else if n[1] < 0.0 {
                     (2.0 * PI - raan).to_degrees()
                 } else {
                     raan.to_degrees()
