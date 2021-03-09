@@ -146,6 +146,7 @@ impl EventEvaluator<Orbit> for Event {
             StateParameter::AoL => angled_value(state.aol(), self.desired_value),
             StateParameter::AoP => angled_value(state.aop(), self.desired_value),
             StateParameter::Apoapsis => angled_value(state.ta(), 180.0),
+            StateParameter::C3 => state.c3() - self.desired_value,
             StateParameter::Declination => angled_value(state.declination(), self.desired_value),
             StateParameter::ApoapsisRadius => state.apoapsis() - self.desired_value,
             StateParameter::EccentricAnomaly => angled_value(state.ea(), self.desired_value),
@@ -154,10 +155,14 @@ impl EventEvaluator<Orbit> for Event {
             StateParameter::GeodeticHeight => state.geodetic_height() - self.desired_value,
             StateParameter::GeodeticLatitude => state.geodetic_latitude() - self.desired_value,
             StateParameter::GeodeticLongitude => state.geodetic_longitude() - self.desired_value,
+            StateParameter::FlightPathAngle => angled_value(state.fpa(), self.desired_value),
             StateParameter::Hmag => state.hmag() - self.desired_value,
             StateParameter::HX => state.hx() - self.desired_value,
             StateParameter::HY => state.hy() - self.desired_value,
             StateParameter::HZ => state.hz() - self.desired_value,
+            StateParameter::HyperbolicAnomaly => {
+                angled_value(state.hyperbolic_anomaly().unwrap(), self.desired_value)
+            }
             StateParameter::Inclination => angled_value(state.inc(), self.desired_value),
             StateParameter::MeanAnomaly => angled_value(state.ma(), self.desired_value),
             StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
@@ -173,6 +178,9 @@ impl EventEvaluator<Orbit> for Event {
             StateParameter::SMA => state.sma() - self.desired_value,
             StateParameter::TrueAnomaly => angled_value(state.ta(), self.desired_value),
             StateParameter::TrueLongitude => angled_value(state.tlong(), self.desired_value),
+            StateParameter::VelocityDeclination => {
+                angled_value(state.velocity_declination(), self.desired_value)
+            }
             StateParameter::Vmag => state.vmag() - self.desired_value,
             StateParameter::X => state.x - self.desired_value,
             StateParameter::Y => state.y - self.desired_value,

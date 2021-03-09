@@ -59,35 +59,38 @@ impl BPlane {
             let one = Hyperdual::from(1.0);
             let zero = Hyperdual::from(0.0);
 
-            let e_hat = orbit.evec() / orbit.ecc();
-            let h_hat = orbit.hvec() / orbit.hmag();
+            let e_hat = orbit.evec() / orbit.ecc().dual;
+            let h_hat = orbit.hvec() / orbit.hmag().dual;
             let n_hat = h_hat.cross(&e_hat);
 
-            // The reals implementation (which was initially validation) was:
-            // let s = e_hat / orbit.ecc() + (one - (one / orbit.ecc()).powi(2)).sqrt() * n_hat;
-            // let s_hat = s / s.norm(); // Just to make sure to renormalize everything
+            // The reals implementation (which was initially validated) was:
+            // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
+            // let s_hat = s / s.norm();
 
             let s = Vector3::new(
-                e_hat[0] / orbit.ecc() + (one - (one / orbit.ecc()).powi(2)).sqrt() * n_hat[0],
-                e_hat[1] / orbit.ecc() + (one - (one / orbit.ecc()).powi(2)).sqrt() * n_hat[1],
-                e_hat[2] / orbit.ecc() + (one - (one / orbit.ecc()).powi(2)).sqrt() * n_hat[2],
+                e_hat[0] / orbit.ecc().dual
+                    + (one - (one / orbit.ecc().dual).powi(2)).sqrt() * n_hat[0],
+                e_hat[1] / orbit.ecc().dual
+                    + (one - (one / orbit.ecc().dual).powi(2)).sqrt() * n_hat[1],
+                e_hat[2] / orbit.ecc().dual
+                    + (one - (one / orbit.ecc().dual).powi(2)).sqrt() * n_hat[2],
             );
             let s_hat = s / norm(&s); // Just to make sure to renormalize everything
 
-            // The reals implementation (which was initially validation) was:
+            // The reals implementation (which was initially validated) was:
             // let b_vec = orbit.semi_minor_axis()
-            //     * ((one - (one / orbit.ecc()).powi(2)).sqrt() * e_hat
-            //         - (one / orbit.ecc() * n_hat));
+            //     * ((1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * e_hat
+            //         - (1.0 / orbit.ecc() * n_hat));
             let b_vec = Vector3::new(
-                orbit.semi_minor_axis()
-                    * ((one - (one / orbit.ecc()).powi(2)).sqrt() * e_hat[0]
-                        - (one / orbit.ecc() * n_hat[0])),
-                orbit.semi_minor_axis()
-                    * ((one - (one / orbit.ecc()).powi(2)).sqrt() * e_hat[1]
-                        - (one / orbit.ecc() * n_hat[1])),
-                orbit.semi_minor_axis()
-                    * ((one - (one / orbit.ecc()).powi(2)).sqrt() * e_hat[2]
-                        - (one / orbit.ecc() * n_hat[2])),
+                orbit.semi_minor_axis().dual
+                    * ((one - (one / orbit.ecc().dual).powi(2)).sqrt() * e_hat[0]
+                        - (one / orbit.ecc().dual * n_hat[0])),
+                orbit.semi_minor_axis().dual
+                    * ((one - (one / orbit.ecc().dual).powi(2)).sqrt() * e_hat[1]
+                        - (one / orbit.ecc().dual * n_hat[1])),
+                orbit.semi_minor_axis().dual
+                    * ((one - (one / orbit.ecc().dual).powi(2)).sqrt() * e_hat[2]
+                        - (one / orbit.ecc().dual * n_hat[2])),
             );
             let t = s_hat.cross(&Vector3::new(zero, zero, one));
             let t_hat = t / norm(&t);
@@ -106,19 +109,10 @@ impl BPlane {
                 r_hat[2].real(),
             );
 
-            // Compute the LTOF in seconds
-            let f = (one
-                + (orbit.vmag().powi(2) / Hyperdual::from(orbit.frame.gm()))
-                    * (orbit.semi_parameter()
-                        / (one + orbit.ecc() * orbit.ta().to_radians().cos())))
-            .acosh();
-
-            let ltof = (Hyperdual::from(orbit.frame.gm()) / orbit.vmag().powi(3)) * (f.sinh() - f);
-
             Ok(BPlane {
                 b_r: b_vec.dot(&r_hat),
                 b_t: b_vec.dot(&t_hat),
-                ltof_s: ltof,
+                ltof_s: b_vec.dot(&s_hat) / orbit.vmag().dual,
                 str_dcm: str_rot,
                 frame: orbit.frame,
                 epoch: orbit.dt,
@@ -345,7 +339,7 @@ pub fn achieve_b_plane(orbit: Orbit, target: BPlaneTarget) -> Result<Vector3<f64
                 total_dv[1] += dv[1];
                 total_dv[2] += dv[2];
 
-                println!("dv = [{:.4}\t{:.4}]", dv[0], dv[1]);
+                println!("dv = [{:.4}\t{:.4}\t{:.4}]", dv[0], dv[1], dv[2]);
 
                 // Rebuild a new orbit
                 real_orbit.vx += dv[0];

@@ -90,6 +90,8 @@ pub enum StateParameter {
     Apoapsis,
     /// Radius of apoapsis (km)
     ApoapsisRadius,
+    /// C_3 in (km/s)^2
+    C3,
     /// Declination (deg)
     Declination,
     /// The epoch of the state
@@ -100,6 +102,8 @@ pub enum StateParameter {
     Eccentricity,
     /// Specific energy
     Energy,
+    /// Flight path angle (deg)
+    FlightPathAngle,
     /// fuel mass in kilograms
     FuelMass,
     /// Geodetic height (km)
@@ -116,6 +120,8 @@ pub enum StateParameter {
     HY,
     /// Z component of the orbital momentum vector
     HZ,
+    /// Hyperbolic anomaly (deg), only valid for hyperbolic orbits
+    HyperbolicAnomaly,
     /// Inclination (deg)
     Inclination,
     /// Mean anomaly (deg)
@@ -142,6 +148,8 @@ pub enum StateParameter {
     TrueAnomaly,
     /// True longitude
     TrueLongitude,
+    /// Velocity declination (deg)
+    VelocityDeclination,
     /// Norm of the velocity vector (km/s)
     Vmag,
     /// X component of the radius (km)
@@ -171,16 +179,19 @@ impl StateParameter {
             | Self::Declination
             | Self::GeodeticLatitude
             | Self::GeodeticLongitude
+            | Self::FlightPathAngle
             | Self::Inclination
             | Self::RightAscension
             | Self::RAAN
-            | Self::TrueLongitude => 1e-1,
+            | Self::TrueLongitude
+            | Self::VelocityDeclination => 1e-1,
 
             // Anomaly angles
             Self::Apoapsis
             | Self::Periapsis
             | Self::MeanAnomaly
             | Self::EccentricAnomaly
+            | Self::HyperbolicAnomaly
             | Self::TrueAnomaly => 1e-3,
 
             // Distances
@@ -200,7 +211,7 @@ impl StateParameter {
             | Self::Z => 1e-3,
 
             // Velocities
-            Self::VX | Self::VY | Self::VZ | Self::Vmag => 1e-3,
+            Self::C3 | Self::VX | Self::VY | Self::VZ | Self::Vmag => 1e-3,
 
             // Special
             Self::Energy => 1e-3,
@@ -221,15 +232,18 @@ impl FromStr for StateParameter {
             "periapsis" => Ok(Self::Periapsis),
             "aol" => Ok(Self::AoL),
             "aop" => Ok(Self::AoP),
+            "c3" => Ok(Self::C3),
             "declin" => Ok(Self::Declination),
             "apoapsis_radius" => Ok(Self::ApoapsisRadius),
             "ea" => Ok(Self::EccentricAnomaly),
             "ecc" => Ok(Self::Eccentricity),
             "energy" => Ok(Self::Energy),
+            "fpa" => Ok(Self::FlightPathAngle),
             "fuel_mass" => Ok(Self::FuelMass),
             "geodetic_height" => Ok(Self::GeodeticHeight),
             "geodetic_latitude" => Ok(Self::GeodeticLatitude),
             "geodetic_longitude" => Ok(Self::GeodeticLongitude),
+            "ha" => Ok(Self::HyperbolicAnomaly),
             "hmag" => Ok(Self::Hmag),
             "hx" => Ok(Self::HX),
             "hy" => Ok(Self::HY),
@@ -246,6 +260,7 @@ impl FromStr for StateParameter {
             "sma" => Ok(Self::SMA),
             "ta" => Ok(Self::TrueAnomaly),
             "tlong" => Ok(Self::TrueLongitude),
+            "vdeclin" => Ok(Self::VelocityDeclination),
             "vmag" => Ok(Self::Vmag),
             "x" => Ok(Self::X),
             "y" => Ok(Self::Y),

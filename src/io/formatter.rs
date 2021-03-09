@@ -541,6 +541,7 @@ impl StateFormatter {
                 StateParameter::AoL => format!("{:.16}", state.aol()),
                 StateParameter::AoP => format!("{:.16}", state.aop()),
                 StateParameter::Apoapsis => format!("{:.16}", state.ta()),
+                StateParameter::C3 => format!("{:.16}", state.c3()),
                 StateParameter::Declination => format!("{:.16}", state.declination()),
                 StateParameter::ApoapsisRadius => format!("{:.16}", state.apoapsis()),
                 StateParameter::EccentricAnomaly => format!("{:.16}", state.ea()),
@@ -549,10 +550,14 @@ impl StateFormatter {
                 StateParameter::GeodeticHeight => format!("{:.16}", state.geodetic_height()),
                 StateParameter::GeodeticLatitude => format!("{:.16}", state.geodetic_latitude()),
                 StateParameter::GeodeticLongitude => format!("{:.16}", state.geodetic_longitude()),
+                StateParameter::FlightPathAngle => format!("{:.16}", state.fpa()),
                 StateParameter::Hmag => format!("{:.16}", state.hmag()),
                 StateParameter::HX => format!("{:.16}", state.hx()),
                 StateParameter::HY => format!("{:.16}", state.hy()),
                 StateParameter::HZ => format!("{:.16}", state.hz()),
+                StateParameter::HyperbolicAnomaly => {
+                    format!("{:.16}", state.hyperbolic_anomaly().unwrap())
+                }
                 StateParameter::Inclination => format!("{:.16}", state.inc()),
                 StateParameter::MeanAnomaly => format!("{:.16}", state.ma()),
                 StateParameter::Periapsis => format!("{:.16}", state.ta()),
@@ -566,6 +571,9 @@ impl StateFormatter {
                 StateParameter::SMA => format!("{:.16}", state.sma()),
                 StateParameter::TrueAnomaly => format!("{:.16}", state.ta()),
                 StateParameter::TrueLongitude => format!("{:.16}", state.tlong()),
+                StateParameter::VelocityDeclination => {
+                    format!("{:.16}", state.velocity_declination())
+                }
                 StateParameter::Vmag => format!("{:.16}", state.vmag()),
                 StateParameter::X => format!("{:.16}", state.x),
                 StateParameter::Y => format!("{:.16}", state.y),
