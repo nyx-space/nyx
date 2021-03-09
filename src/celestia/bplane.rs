@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, Hyperdual};
 use super::{Frame, Orbit, OrbitDual};
-use crate::dimensions::{Matrix2, Matrix3, Vector2, Vector3, U7};
+use crate::dimensions::{Matrix2, Matrix3, Vector2, Vector3, U2, U7};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::between_0_360;
@@ -147,9 +147,9 @@ impl BPlane {
         self.str_dcm
     }
 
-    /// Returns the **inverted** Jacobian of the B plane (BT, BR, LTOF) with respect to the velocity
+    /// Returns the Jacobian of the B plane (BT, BR, LTOF) with respect to the velocity
     pub fn jacobian(&self) -> Matrix3<f64> {
-        let mut jac = Matrix3::new(
+        Matrix3::new(
             self.b_t[4],
             self.b_t[5],
             self.b_t[6],
@@ -159,27 +159,34 @@ impl BPlane {
             self.ltof_s[4],
             self.ltof_s[5],
             self.ltof_s[6],
-        );
-
-        jac.try_inverse_mut();
-        jac
+        )
     }
 
-    /// Returns the **inverted** Jacobian of the B plane (BT, BR) with respect to two of the velocity components
+    /// Returns the Jacobian of the B plane (BT, BR) with respect to two of the velocity components
     pub fn jacobian2(&self, invariant: StateParameter) -> Result<Matrix2<f64>, NyxError> {
-        let mut jac = match invariant {
-            StateParameter::VX => Matrix2::new(self.b_t[5], self.b_t[6], self.b_r[5], self.b_r[6]),
-            StateParameter::VY => Matrix2::new(self.b_t[4], self.b_t[6], self.b_r[4], self.b_r[6]),
-            StateParameter::VZ => Matrix2::new(self.b_t[4], self.b_t[5], self.b_r[4], self.b_r[5]),
-            _ => {
-                return Err(NyxError::CustomError(
-                    "B Plane jacobian invariant must be either VX, VY or VZ".to_string(),
-                ))
-            }
-        };
-
-        jac.try_inverse_mut();
-        Ok(jac)
+        match invariant {
+            StateParameter::VX => Ok(Matrix2::new(
+                self.b_t[5],
+                self.b_t[6],
+                self.b_r[5],
+                self.b_r[6],
+            )),
+            StateParameter::VY => Ok(Matrix2::new(
+                self.b_t[4],
+                self.b_t[6],
+                self.b_r[4],
+                self.b_r[6],
+            )),
+            StateParameter::VZ => Ok(Matrix2::new(
+                self.b_t[4],
+                self.b_t[5],
+                self.b_r[4],
+                self.b_r[5],
+            )),
+            _ => Err(NyxError::CustomError(
+                "B Plane jacobian invariant must be either VX, VY or VZ".to_string(),
+            )),
+        }
     }
 }
 
@@ -187,12 +194,11 @@ impl fmt::Display for BPlane {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[{}] {} B-Plane: B∙R = {:.3} km\tB∙T = {:.3} km\tLTOF = {}",
+            "[{}] {} B-Plane: B∙R = {:.3} km\tB∙T = {:.3} km",
             self.frame,
             self.epoch,
             self.b_dot_r(),
             self.b_dot_t(),
-            self.ltof()
         )
     }
 }
@@ -217,7 +223,7 @@ pub struct BPlaneTarget {
 impl BPlaneTarget {
     /// Initializes a new B Plane target with only the targets and the default tolerances.
     /// Default tolerances are 1 millimeter in positions and 1 second in LTOF
-    pub fn from_targets(b_t_km: f64, b_r_km: f64, ltof: Duration) -> Self {
+    pub fn from_targets(b_r_km: f64, b_t_km: f64, ltof: Duration) -> Self {
         let tol_ltof: Duration = 6.0 * TimeUnit::Hour;
         Self {
             b_t_km,
@@ -231,7 +237,7 @@ impl BPlaneTarget {
 
     /// Initializes a new B Plane target with only the B Plane targets (not LTOF constraint) and the default tolerances.
     /// Default tolerances are 1 millimeter in positions. Here, the LTOF tolerance is set to 100 days.
-    pub fn from_b_plane(b_t_km: f64, b_r_km: f64) -> Self {
+    pub fn from_b_plane(b_r_km: f64, b_t_km: f64) -> Self {
         let ltof_tol: Duration = 100 * TimeUnit::Day;
         Self {
             b_t_km,
@@ -252,13 +258,11 @@ impl fmt::Display for BPlaneTarget {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "B-Plane target: B∙R = {:.3} km (+/- {:.1} m)\tB∙T = {:.3} km (+/- {:.1} m)\tLTOF = {} (+/- {})",
+            "B-Plane target: B∙R = {:.3} km (+/- {:.1} m)\tB∙T = {:.3} km (+/- {:.1} m)",
             self.b_r_km,
             self.tol_b_r_km * 1e-3,
             self.b_t_km,
             self.tol_b_t_km * 1e-3,
-            self.ltof_s * TimeUnit::Second,
-            self.tol_ltof_s * TimeUnit::Second
         )
     }
 }
@@ -267,31 +271,22 @@ impl fmt::Display for BPlaneTarget {
 /// If no LTOF target is set, this method will fix VX, VY and VZ successively and use the minimum of those as a seed for the LTOF variation finding.
 /// If the 3x3 search is worse than any of the 2x2s, then a 2x2 will be returned.
 /// This uses the hyperdual formulation of the Jacobian and will also vary the linearize time of flight (LTOF).
-pub fn achieve_b_plane(orbit: Orbit, target: BPlaneTarget) -> Result<Vector3<f64>, NyxError> {
-    let mut min_total_dv = Vector3::new(std::f64::INFINITY, std::f64::INFINITY, std::f64::INFINITY);
-    let mut min_ltof_s = target.ltof_s;
+pub fn achieve_b_plane(
+    orbit: Orbit,
+    target: BPlaneTarget,
+) -> Result<(Vector3<f64>, BPlane), NyxError> {
+    let mut total_dv = Vector3::zeros();
+    let mut attempt_no = 0;
+    let max_iter = 10;
 
-    let mut target = target;
-    // Search kind is 3 if we're searching with LTOF, 0 if VX invariant, 1 if VY invariance, 2 is VZ invariant.
-    let search_kind = if target.ltof_target_set() { 3 } else { 0 };
+    let mut real_orbit = orbit;
+    let mut prev_b_plane_err = std::f64::INFINITY;
 
-    for cur_search in search_kind..=3 {
-        let mut total_dv = Vector3::zeros();
-        let mut attempt_no = 0;
-        let max_iter = 10;
-        let mut real_orbit = orbit;
-        let mut ltof_s = std::f64::INFINITY;
-        // If the error is not going down, we'll raise an error
-        let mut prev_b_plane_err = std::f64::INFINITY;
+    if !target.ltof_target_set() {
+        // If no LTOF is targeted, we'll solve this with a least squared approach.
         loop {
             if attempt_no > max_iter {
-                if search_kind == 3 {
-                    // We were searching with LTOF from the start, and that failed
-                    return Err(NyxError::MaxIterReached(max_iter));
-                } else {
-                    // Let's just ignore this problem and continue
-                    break;
-                }
+                return Err(NyxError::MaxIterReached(max_iter));
             }
 
             // Build current B Plane
@@ -300,117 +295,84 @@ pub fn achieve_b_plane(orbit: Orbit, target: BPlaneTarget) -> Result<Vector3<f64
             // Check convergence
             let br_err = target.b_r_km - b_plane.b_dot_r();
             let bt_err = target.b_t_km - b_plane.b_dot_t();
-            let ltof_err = if cur_search == 3 {
-                target.ltof_s - b_plane.ltof_s.real()
-            } else {
-                0.0
-            };
+
+            if br_err.abs() < target.tol_b_r_km && bt_err.abs() < target.tol_b_t_km {
+                return Ok((total_dv, b_plane));
+            }
+
+            // Build the error vector
+            let b_plane_err = Vector2::new(bt_err, br_err);
+
+            if b_plane_err.norm() >= prev_b_plane_err {
+                // If the error is not going down, we'll raise an error
+                return Err(NyxError::CorrectionIneffective(
+                    format!("Delta-V correction is ineffective are reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm())
+                ));
+            }
+            prev_b_plane_err = b_plane_err.norm();
+
+            // Grab the first two rows of the Jacobian (discard the rest).
+            let full_jac = b_plane.jacobian();
+            let jac = full_jac.fixed_rows::<U2>(0);
+            // Solve the Least Squares / compute the delta-v
+            let dv = jac.transpose() * (jac * jac.transpose()).try_inverse().unwrap() * b_plane_err;
+
+            total_dv[0] += dv[0];
+            total_dv[1] += dv[1];
+            total_dv[2] += dv[2];
+
+            // Rebuild a new orbit
+            real_orbit.vx += dv[0];
+            real_orbit.vy += dv[1];
+            real_orbit.vz += dv[2];
+
+            attempt_no += 1;
+        }
+    } else {
+        // The LTOF targeting seems to break often, but it's still implemented
+        loop {
+            if attempt_no > max_iter {
+                return Err(NyxError::MaxIterReached(max_iter));
+            }
+
+            // Build current B Plane
+            let b_plane = BPlane::new(real_orbit)?;
+
+            // Check convergence
+            let br_err = target.b_r_km - b_plane.b_dot_r();
+            let bt_err = target.b_t_km - b_plane.b_dot_t();
+            let ltof_err = target.ltof_s - b_plane.ltof_s.real();
 
             if br_err.abs() < target.tol_b_r_km
                 && bt_err.abs() < target.tol_b_t_km
                 && ltof_err.abs() < target.tol_ltof_s
             {
-                ltof_s = b_plane.ltof_s.real();
-                break;
+                return Ok((total_dv, b_plane));
             }
 
-            if cur_search == 3 {
-                // Build the error vector
-                let b_plane_err = Vector3::new(bt_err, br_err, ltof_err);
-                if b_plane_err.norm() >= prev_b_plane_err {
-                    if search_kind == 3 {
-                        return Err(NyxError::CorrectionIneffective(
-                            "LTOF enabled correction is failing. Try to not set an LTOF target"
-                                .to_string(),
-                        ));
-                    } else {
-                        break;
-                    }
-                }
-                prev_b_plane_err = b_plane_err.norm();
+            // Build the error vector
+            let b_plane_err = Vector3::new(bt_err, br_err, ltof_err);
 
-                println!("b_plane_err = {}", b_plane_err.norm());
-                println!("{}", b_plane.jacobian());
-
-                // Compute the delta-v
-                let dv = b_plane.jacobian() * b_plane_err;
-
-                total_dv[0] += dv[0];
-                total_dv[1] += dv[1];
-                total_dv[2] += dv[2];
-
-                println!("dv = [{:.4}\t{:.4}\t{:.4}]", dv[0], dv[1], dv[2]);
-
-                // Rebuild a new orbit
-                real_orbit.vx += dv[0];
-                real_orbit.vy += dv[1];
-                real_orbit.vz += dv[2];
-            } else {
-                // Sequential search
-                let param = match cur_search {
-                    0 => StateParameter::VX,
-                    1 => StateParameter::VY,
-                    2 => StateParameter::VZ,
-                    _ => unreachable!(),
-                };
-                println!("{:?}", param);
-                // Build the error vector
-                let b_plane_err = Vector2::new(bt_err, br_err);
-                println!("b_plane_err = {}", b_plane_err.norm());
-                println!("{}", b_plane.jacobian2(param)?);
-
-                // Compute the delta-v
-                let dv = b_plane.jacobian2(param)? * b_plane_err;
-
-                // And apply appropriately
-                match param {
-                    StateParameter::VX => {
-                        total_dv[1] += dv[0];
-                        total_dv[2] += dv[1];
-
-                        // Rebuild a new orbit
-                        real_orbit.vy += dv[0];
-                        real_orbit.vz += dv[1];
-                    }
-                    StateParameter::VY => {
-                        total_dv[0] += dv[0];
-                        total_dv[2] += dv[1];
-
-                        // Rebuild a new orbit
-                        real_orbit.vx += dv[0];
-                        real_orbit.vz += dv[1];
-                    }
-                    StateParameter::VZ => {
-                        total_dv[0] += dv[0];
-                        total_dv[1] += dv[1];
-
-                        // Rebuild a new orbit
-                        real_orbit.vx += dv[0];
-                        real_orbit.vy += dv[1];
-                    }
-                    _ => unreachable!(),
-                };
+            if b_plane_err.norm() >= prev_b_plane_err {
+                return Err(NyxError::CorrectionIneffective(
+                    format!("LTOF enabled correction is failing. Try to not set an LTOF target. Delta-V correction is ineffective are reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm()),
+                ));
             }
+            prev_b_plane_err = b_plane_err.norm();
+
+            // Compute the delta-v
+            let dv = b_plane.jacobian() * b_plane_err;
+
+            total_dv[0] += dv[0];
+            total_dv[1] += dv[1];
+            total_dv[2] += dv[2];
+
+            // Rebuild a new orbit
+            real_orbit.vx += dv[0];
+            real_orbit.vy += dv[1];
+            real_orbit.vz += dv[2];
 
             attempt_no += 1;
         }
-
-        // Update the min dv
-        if total_dv.norm() < min_total_dv.norm() {
-            min_total_dv = total_dv;
-            min_ltof_s = ltof_s;
-
-            println!(
-                "==> NEW = {:.3} km/s\t LTOF={}",
-                min_total_dv.norm(),
-                min_ltof_s * TimeUnit::Second
-            );
-        }
-
-        // If this is the last 2x2 search, let's update the target with the best LTOF so far.
-        if cur_search == 2 {
-            target.ltof_s = min_ltof_s;
-        }
     }
-    Ok(min_total_dv)
 }

@@ -147,7 +147,7 @@ impl OrbitDual {
     }
 
     /// Returns the orbital momentum vector
-    pub fn hvec(&self) -> Vector3<Hyperdual<f64, U7>> {
+    pub(crate) fn hvec(&self) -> Vector3<Hyperdual<f64, U7>> {
         self.radius().cross(&self.velocity())
     }
 
