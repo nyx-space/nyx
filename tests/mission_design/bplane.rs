@@ -211,9 +211,12 @@ fn b_plane_davis() {
     );
 
     // And the targeting a specific B Plane
-    let tgt = BPlaneTarget::from_b_plane(13135.7982982557, 5022.26511510685);
+    // let tgt = BPlaneTarget::from_b_plane(13135.7982982557, 5022.26511510685);
+    let tgt = BPlaneTarget::from_targets(13135.7982982557, 5022.26511510685, 0 * TimeUnit::Day);
 
     let delta_v = achieve_b_plane(orbit, tgt).unwrap();
-
     println!("{}", delta_v);
+
+    assert!((delta_v[0] - -0.2999968090618421).abs() < 1e-9);
+    assert!((delta_v[1] - -0.14159765332771798).abs() < 1e-9);
 }

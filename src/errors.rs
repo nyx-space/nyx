@@ -68,6 +68,8 @@ pub enum NyxError {
     ExportError(String),
     /// This computation requires the orbit to be hyperbolic
     NotHyperbolic(String),
+    /// Raised if a differential corrector is not decreasing the error
+    CorrectionIneffective(String),
     /// Some custom error for new dynamics
     CustomError(String),
 }
