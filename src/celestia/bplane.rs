@@ -194,11 +194,12 @@ impl fmt::Display for BPlane {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[{}] {} B-Plane: B∙R = {:.3} km\tB∙T = {:.3} km",
+            "[{}] {} B-Plane: B∙R = {:.3} km\tB∙T = {:.3} km\tAngle = {:.3} deg",
             self.frame,
             self.epoch,
             self.b_dot_r(),
             self.b_dot_t(),
+            self.angle()
         )
     }
 }

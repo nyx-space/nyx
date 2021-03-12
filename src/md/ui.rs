@@ -22,7 +22,7 @@ extern crate rayon;
 use self::rayon::prelude::*;
 use super::MdHdlr;
 pub use super::{trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
-pub use crate::celestia::{Bodies, Cosm, LTCorr, Orbit};
+pub use crate::celestia::{BPlane, Bodies, Cosm, LTCorr, Orbit, OrbitDual};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::{
@@ -142,7 +142,8 @@ where
                                             )))
                                         }
                                         Some(base) => {
-                                            let state_frame = &cosm.frame(base.frame.as_str());
+                                            let state_frame =
+                                                &cosm.frame(base.frame.as_ref().unwrap().as_str());
                                             base.as_state(*state_frame)?
                                         }
                                     };
@@ -157,7 +158,8 @@ where
                         }
                     }
                     Some(init_state_sd) => {
-                        let state_frame = &cosm.frame(init_state_sd.frame.as_str());
+                        let state_frame =
+                            &cosm.frame(init_state_sd.frame.as_ref().unwrap().as_str());
                         let mut init = init_state_sd.as_state(*state_frame)?;
                         if stm_flag {
                             // Specify that we want to compute the STM.

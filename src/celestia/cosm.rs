@@ -47,7 +47,7 @@ struct EmbeddedAsset;
 
 /// Mass of the solar system from https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
 pub const SS_MASS: f64 = 1.0014;
-/// Mass of the Sun
+/// GM of the Sun in km^3/s^2
 pub const SUN_GM: f64 = 132_712_440_041.939_38;
 
 /// Enable or not light time correction for the computation of the celestial states
@@ -106,14 +106,24 @@ pub struct Cosm {
 
 impl fmt::Debug for Cosm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
             "Cosm with `{}` as ephemerides root",
             match &self.xb.ephemeris_root {
                 Some(r) => r.name.clone(),
                 None => "NONE".to_string(),
             }
-        )
+        )?;
+        for frame in self.frames_get() {
+            writeln!(f, "\t{:?}", frame)?;
+        }
+        write!(f, "")
+    }
+}
+
+impl fmt::Display for Cosm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -507,7 +517,7 @@ impl Cosm {
             String::from("Moon J2000")
         } else if name == "earth moon barycenter" {
             String::from("Earth Barycenter J2000")
-        } else if name == "ssb" {
+        } else if name == "ssb" || name == "ssb j2000" {
             String::from("SSB J2000")
         } else {
             let splt: Vec<_> = name.split(' ').collect();
@@ -573,6 +583,20 @@ impl Cosm {
         let mut names = Vec::new();
         Self::frame_names(&mut names, &self.frame_root);
         names
+    }
+
+    fn frames(mut frames: &mut Vec<Frame>, f: &FrameTree) {
+        frames.push(f.frame);
+        for child in &f.children {
+            Self::frames(&mut frames, child);
+        }
+    }
+
+    /// Returns all of the frames defined in this Cosm
+    pub fn frames_get(&self) -> Vec<Frame> {
+        let mut frames = Vec::new();
+        Self::frames(&mut frames, &self.frame_root);
+        frames
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!

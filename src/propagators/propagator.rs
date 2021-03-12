@@ -25,7 +25,7 @@ use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::md::trajectory::Traj;
 use crate::md::EventEvaluator;
-use crate::time::{Duration, TimeUnit};
+use crate::time::{Duration, Epoch, TimeUnit};
 use crate::{State, TimeTagged};
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
@@ -225,6 +225,12 @@ where
         }
     }
 
+    /// Propagates the provided Dynamics until the provided epoch. Returns the end state.
+    pub fn until_epoch(&mut self, end_time: Epoch) -> Result<D::StateType, NyxError> {
+        let duration: Duration = end_time - self.state.epoch();
+        self.for_duration(duration)
+    }
+
     /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
     /// Returns the end state and the trajectory.
     /// Known bug #190: Cannot generate a valid trajectory when propagating backward
@@ -249,6 +255,17 @@ where
             Ok((end_state, traj))
         })
         .unwrap()
+    }
+
+    /// Propagates the provided Dynamics until the provided epoch and generate the trajectory of these dynamics on its own thread.
+    /// Returns the end state and the trajectory.
+    /// Known bug #190: Cannot generate a valid trajectory when propagating backward
+    pub fn until_epoch_with_traj(
+        &mut self,
+        end_time: Epoch,
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+        let duration: Duration = end_time - self.state.epoch();
+        self.for_duration_with_traj(duration)
     }
 
     /// Propagate until a specific event is found `trigger` times.

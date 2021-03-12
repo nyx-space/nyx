@@ -31,7 +31,7 @@ use std::str::FromStr;
 
 #[derive(Deserialize)]
 pub struct StateSerde {
-    pub frame: String,
+    pub frame: Option<String>,
     pub epoch: String,
     pub x: Option<f64>,
     pub y: Option<f64>,

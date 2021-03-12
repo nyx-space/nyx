@@ -192,7 +192,8 @@ impl<'a> OdpScenario<'a> {
                     }
 
                     let est_init_state_serde = &scenario.state[&est_serde.state.to_lowercase()];
-                    let state_frame = cosm.frame(est_init_state_serde.frame.as_str());
+                    let state_frame =
+                        cosm.frame(est_init_state_serde.frame.as_ref().unwrap().as_str());
                     let est_init_state = est_init_state_serde.as_state(state_frame)?;
 
                     // Build the covariance

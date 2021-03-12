@@ -61,29 +61,29 @@ struct EmbeddedAsset;
 
 fn main() -> Result<(), ParsingError> {
     let app = App::new("nyx")
-        .version("0.0.20")
-        .author(
-            "\tChris Rabotin <rabotin@advancedspace.com>\n\tSai Chikine <sai.chikine@advancespace.com>",
-        )
+        .version("1.0.0-alpha.2")
+        .author("Chris Rabotin <chris.rabotin@pm.me>")
         .about("Mission design, orbit determination and Monte-Carlo tool.")
         .arg(
             Arg::with_name("SCENARIO")
                 .help("Sets the scenario file or path to use")
                 .required(true)
                 .index(1),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("sequence")
                 .short("s")
                 .long("seq")
                 .takes_value(true)
                 .value_name("sequence name")
-                .help("Specify which sequence to run, program will fail if sequence is not found")
-        ).arg(
+                .help("Specify which sequence to run, program will fail if sequence is not found"),
+        )
+        .arg(
             Arg::with_name("all")
                 .short("a")
                 .long("all")
                 .takes_value(false)
-                .help("Execute all sequences in order")
+                .help("Execute all sequences in order"),
         );
 
     let matches = app.get_matches();

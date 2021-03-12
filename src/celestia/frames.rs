@@ -24,7 +24,7 @@ use std::f64::consts::PI;
 use std::fmt;
 
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Frame {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)
     Celestial {
@@ -179,6 +179,28 @@ impl fmt::Display for Frame {
                         3 => "IAU Poles Fixed".to_string(),
                         _ => "Custom".to_string(),
                     }
+                )
+            }
+            othframe => write!(f, "{:?}", othframe),
+        }
+    }
+}
+
+impl fmt::Debug for Frame {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
+                write!(
+                    f,
+                    "{} {} (μ = {:.06} km^3/s^2)",
+                    Bodies::try_from(self.ephem_path()).unwrap().name(),
+                    match self.frame_path().len() {
+                        0 | 1 => "J2000".to_string(),
+                        2 => "IAU Fixed".to_string(),
+                        3 => "IAU Poles Fixed".to_string(),
+                        _ => "Custom".to_string(),
+                    },
+                    self.gm()
                 )
             }
             othframe => write!(f, "{:?}", othframe),

@@ -21,7 +21,10 @@ extern crate csv;
 use self::crossbeam::thread;
 use crate::io::scenario::StateSerde;
 use crate::md::Ephemeris;
-use crate::{celestia::Cosm, NyxError};
+use crate::{
+    celestia::{Cosm, Frame},
+    NyxError,
+};
 use std::sync::{mpsc::channel, Arc};
 
 /// Imports a trajectory from a CSV. This is experimental and is subject to change between minor versions.
@@ -30,7 +33,11 @@ use std::sync::{mpsc::channel, Arc};
 /// The Epoch should be formatted in the ISO standard and include the time system (UTC, TAI, TT, etc.)
 /// You may also specify `unit_position` and `unit_velocity` in an extra column for every item
 /// **Caveats:** only the frame of the first item is considered. Also, this is super slow!
-pub fn traj_from_csv(filename: &str, cosm: Arc<Cosm>) -> Result<Ephemeris, NyxError> {
+pub fn traj_from_csv(
+    filename: &str,
+    default_frame: Option<Frame>,
+    cosm: Arc<Cosm>,
+) -> Result<Ephemeris, NyxError> {
     // Build the CSV reader and iterate over each record.
     match csv::Reader::from_path(filename) {
         Ok(mut rdr) => {
@@ -44,23 +51,27 @@ pub fn traj_from_csv(filename: &str, cosm: Arc<Cosm>) -> Result<Ephemeris, NyxEr
                 match first_result {
                     Ok(record) => {
                         // Compute the frame
-                        this_frame = cosm.try_frame(&record.frame)?;
+                        this_frame = match &record.frame {
+                            Some(f) => cosm.try_frame(&f)?,
+                            None => default_frame.unwrap(),
+                        };
                         match record.as_state(this_frame) {
                             Ok(state) => {
                                 traj_thread =
                                     s.spawn(move |_| Ephemeris::new_bucket_as(state, 8, rx));
                             }
-                            Err(_) => {
-                                return Err(NyxError::LoadingError(
-                                    "Could not parse state".to_string(),
-                                ))
+                            Err(e) => {
+                                return Err(NyxError::LoadingError(format!(
+                                    "Could not parse first state: {:?}",
+                                    e
+                                )))
                             }
                         };
                     }
                     Err(e) => return Err(NyxError::LoadingError(e.to_string())),
                 }
 
-                for result in rdr.deserialize() {
+                for (lno, result) in rdr.deserialize().enumerate() {
                     let maybe_result: Result<StateSerde, _> = result;
                     match maybe_result {
                         Ok(record) => {
@@ -72,10 +83,12 @@ pub fn traj_from_csv(filename: &str, cosm: Arc<Cosm>) -> Result<Ephemeris, NyxEr
                                     }
                                     tx.send(state).unwrap()
                                 }
-                                Err(_) => {
-                                    return Err(NyxError::LoadingError(
-                                        "Could not parse state".to_string(),
-                                    ))
+                                Err(e) => {
+                                    return Err(NyxError::LoadingError(format!(
+                                        "Could not parse state on line {}: {:?}",
+                                        lno + 2,
+                                        e
+                                    )))
                                 }
                             };
                         }

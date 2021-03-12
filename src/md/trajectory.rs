@@ -538,10 +538,47 @@ impl Traj<Orbit> {
         Ok(())
     }
 
+    /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
+    pub fn to_csv_between_with_step(
+        &self,
+        filename: &str,
+        start: Option<Epoch>,
+        end: Option<Epoch>,
+        step: Duration,
+        cosm: Arc<Cosm>,
+    ) -> Result<(), NyxError> {
+        let fmtr = StateFormatter::default(filename.to_string(), cosm);
+        let mut out = OrbitStateOutput::new(fmtr)?;
+        let start = match start {
+            Some(s) => s,
+            None => self.first().epoch(),
+        };
+        let end = match end {
+            Some(e) => e,
+            None => self.last().epoch(),
+        };
+        for state in self.every_between(step, start, end) {
+            out.handle(&state);
+        }
+        Ok(())
+    }
+
     /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
     #[allow(clippy::identity_op)]
     pub fn to_csv(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
         self.to_csv_with_step(filename, 1 * TimeUnit::Minute, cosm)
+    }
+
+    /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
+    #[allow(clippy::identity_op)]
+    pub fn to_csv_between(
+        &self,
+        filename: &str,
+        start: Option<Epoch>,
+        end: Option<Epoch>,
+        cosm: Arc<Cosm>,
+    ) -> Result<(), NyxError> {
+        self.to_csv_between_with_step(filename, start, end, 1 * TimeUnit::Minute, cosm)
     }
 
     /// Exports this trajectory to the provided filename in CSV format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.

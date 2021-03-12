@@ -212,6 +212,7 @@ pub enum Bodies {
     SaturnBarycenter,
     UranusBarycenter,
     NeptuneBarycenter,
+    PlutoBarycenter,
 }
 
 impl Bodies {
@@ -232,6 +233,7 @@ impl Bodies {
             Self::SaturnBarycenter => &[6],
             Self::UranusBarycenter => &[7],
             Self::NeptuneBarycenter => &[8],
+            Self::PlutoBarycenter => &[9],
         }
     }
 
@@ -252,6 +254,7 @@ impl Bodies {
             Self::SaturnBarycenter => "Saturn Barycenter".to_string(),
             Self::UranusBarycenter => "Uranus Barycenter".to_string(),
             Self::NeptuneBarycenter => "Neptune Barycenter".to_string(),
+            Self::PlutoBarycenter => "Pluto Barycenter".to_string(),
         }
     }
 }
@@ -273,6 +276,7 @@ impl TryFrom<String> for Bodies {
             "saturn" | "saturn barycenter" => Ok(Self::SaturnBarycenter),
             "uranus" | "uranus barycenter" => Ok(Self::UranusBarycenter),
             "neptune" | "neptune barycenter" => Ok(Self::NeptuneBarycenter),
+            "pluto" | "pluto barycenter" => Ok(Self::PlutoBarycenter),
             _ => Err(NyxError::ObjectNotFound(name)),
         }
     }
@@ -294,6 +298,7 @@ impl TryFrom<Vec<usize>> for Bodies {
                 6 => Ok(Self::SaturnBarycenter),
                 7 => Ok(Self::UranusBarycenter),
                 8 => Ok(Self::NeptuneBarycenter),
+                9 => Ok(Self::PlutoBarycenter),
                 _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
             },
             2 if ephem_path[0] == 3 => match ephem_path[1] {
