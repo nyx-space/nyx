@@ -345,7 +345,7 @@ pub mod eclipse;
 /// Speed of light in meters per second
 pub const SPEED_OF_LIGHT: f64 = 299_792_458.0;
 /// Speed of light in kilometers per second
-pub const SPEED_OF_LIGHT_KMS: f64 = 299_792.458;
+pub const SPEED_OF_LIGHT_KMS: f64 = SPEED_OF_LIGHT / 1000.0;
 
 /// Astronomical unit, in kilometers, according to the [IAU](https://www.iau.org/public/themes/measuring/).
 pub const AU: f64 = 149_597_870.700;

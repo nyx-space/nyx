@@ -32,6 +32,17 @@ pub enum EclipseState {
     Visibilis,
 }
 
+impl EclipseState {
+    /// Returns the eclipse state as an f64: 1.0 total visibility, 0.0 total umbra.
+    pub fn as_f64(self) -> f64 {
+        match self {
+            Self::Umbra => 0.0,
+            Self::Visibilis => 1.0,
+            Self::Penumbra(val) => dbg!(val),
+        }
+    }
+}
+
 impl Eq for EclipseState {}
 
 impl Ord for EclipseState {
@@ -357,6 +368,110 @@ pub fn eclipse_state(
     let nominal_area = std::f64::consts::PI * ls_radius.powi(2);
     // And return the percentage (between 0 and 1) of the eclipse.
     EclipseState::Penumbra((nominal_area - shadow_area) / nominal_area)
+}
+
+/// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
+/// This algorithm is from GMAT's "PercentShadow"
+pub fn eclipse_state_gmat(
+    observer: &Orbit,
+    light_source: Frame,
+    eclipsing_body: Frame,
+    cosm: &Cosm,
+    correction: LTCorr,
+) -> EclipseState {
+    // If the light source's radius is zero, just call the line of sight algorithm
+
+    assert!(light_source.is_geoid() || light_source.is_celestial());
+    assert!(eclipsing_body.is_geoid());
+
+    if light_source.equatorial_radius() < std::f64::EPSILON {
+        let observed = cosm.celestial_state(
+            &light_source.ephem_path(),
+            observer.dt,
+            observer.frame,
+            correction,
+        );
+        return line_of_sight(observer, &observed, eclipsing_body, &cosm);
+    }
+
+    // All of the computations happen with the observer as the center.
+    // `eb` stands for eclipsing body; `ls` stands for light source.
+
+    // Vector of the eclipsing body from the spacecraft's central body
+    let r_b = -cosm
+        .celestial_state(
+            &eclipsing_body.ephem_path(),
+            observer.dt,
+            observer.frame,
+            correction,
+        )
+        .radius();
+
+    // Vector of occulting body to the spacecraft
+    let s = if observer.frame == eclipsing_body {
+        observer.radius()
+    } else {
+        observer.radius() - r_b
+    };
+
+    // Vector from occulting/eclipsing body to the light source
+    let r_eb_ls = -cosm
+        .celestial_state(
+            &light_source.ephem_path(),
+            observer.dt,
+            eclipsing_body,
+            correction,
+        )
+        .radius();
+
+    // Vector from spacecraft central body to the light source
+    let r_ls = -cosm
+        .celestial_state(
+            &light_source.ephem_path(),
+            observer.dt,
+            observer.frame,
+            correction,
+        )
+        .radius();
+    let s_ls = if observer.frame == eclipsing_body {
+        r_eb_ls
+    } else {
+        r_eb_ls - r_b
+    };
+
+    // Compute the apparent angle of the light source as seen from the spaceraft
+    let r_prime_ls =
+        (light_source.equatorial_radius() / (r_eb_ls - observer.radius()).norm()).asin();
+
+    // Compute the apparent angle of the eclipsing body as seen from the spaceraft
+    let r_prime_rb = (eclipsing_body.equatorial_radius() / (observer.radius() - r_b).norm()).asin();
+
+    // Compute the apparent separation (it's a 1x1 vector)
+    let d_prime = ((s.transpose() * r_ls) / (s.norm() * r_ls.norm()))[0].acos();
+
+    if d_prime > (r_prime_ls + r_prime_rb) {
+        EclipseState::Visibilis
+    } else if d_prime < (r_prime_rb - r_prime_ls) {
+        EclipseState::Umbra
+    } else {
+        // In penumbra, let's calculate the percentage.
+
+        if (r_prime_ls - r_prime_rb).abs() < d_prime && d_prime > r_prime_rb + r_prime_ls {
+            // Let's caculate the area overlap
+            // First let's calculate the half cord c1
+            let c1 = (d_prime.powi(2) + r_prime_ls.powi(2) - r_prime_rb.powi(2)) / (2.0 * d_prime);
+            // And the other part
+            let c2 = (r_prime_ls.powi(2) - c1.powi(2)).sqrt();
+
+            let a = r_prime_ls.powi(2) * (c1 / r_prime_ls).acos()
+                + r_prime_rb.powi(2) * ((d_prime - c1) / r_prime_rb).acos();
+
+            EclipseState::Penumbra(100.0 * a / (std::f64::consts::PI * r_prime_ls.powi(2)))
+        } else {
+            // Annular eclipse
+            EclipseState::Penumbra(100.0 * (r_prime_rb.powi(2) / r_prime_ls.powi(2)))
+        }
+    }
 }
 
 // Compute the area of the circular segment of radius r and chord length d

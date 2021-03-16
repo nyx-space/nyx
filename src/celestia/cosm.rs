@@ -812,7 +812,7 @@ impl Cosm {
         }
     }
 
-    /// Returns the state of the celestial object at the provided time
+    /// Returns the state of the celestial object (target ephem) as seen in the requested frame at the provided time
     pub fn celestial_state(
         &self,
         target_ephem: &[usize],

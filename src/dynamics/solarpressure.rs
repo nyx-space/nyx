@@ -18,8 +18,10 @@
 
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
 use super::ForceModel;
-use crate::celestia::eclipse::{EclipseLocator, EclipseState};
-use crate::celestia::{Cosm, Frame, LTCorr, Spacecraft, AU, SPEED_OF_LIGHT};
+use crate::celestia::eclipse::EclipseLocator;
+use crate::celestia::{
+    Bodies, Cosm, Frame, LTCorr, Spacecraft, AU, SPEED_OF_LIGHT, SPEED_OF_LIGHT_KMS,
+};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
 use crate::errors::NyxError;
 use std::sync::Arc;
@@ -67,20 +69,15 @@ impl ForceModel for SolarPressure {
             .frame_chg(osc, self.e_loc.light_source)
             .radius();
         let r_sun_unit = r_sun / r_sun.norm();
-
         // Compute the shaddowing factor.
-        let k = match self.e_loc.compute(osc) {
-            EclipseState::Umbra => 0.0,
-            EclipseState::Visibilis => 1.0,
-            EclipseState::Penumbra(val) => val,
-        };
+        let k = self.e_loc.compute(osc).as_f64();
 
         let r_sun_au = r_sun.norm() / AU;
         // in N/(m^2)
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        Ok(-1e-3 * ctx.cr * ctx.srp_area_m2 * flux_pressure * r_sun_unit)
+        Ok(1e-3 * ctx.cr * ctx.srp_area_m2 * flux_pressure * r_sun_unit)
     }
 
     fn dual_eom(
@@ -88,24 +85,20 @@ impl ForceModel for SolarPressure {
         _radius: &Vector3<Hyperdual<f64, U7>>,
         ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
-        let osc = ctx.orbit;
+        let osc = &ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
             .e_loc
             .cosm
-            .frame_chg(&osc, self.e_loc.light_source)
+            .frame_chg(osc, self.e_loc.light_source)
             .radius();
 
         let r_sun_d: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
         // Compute the shaddowing factor.
-        let k = match self.e_loc.compute(&osc) {
-            EclipseState::Umbra => 0.0,
-            EclipseState::Visibilis => 1.0,
-            EclipseState::Penumbra(val) => val,
-        };
+        let k = self.e_loc.compute(osc).as_f64();
 
         let inv_r_sun_au = Hyperdual::<f64, U7>::from_real(1.0) / (norm(&r_sun_d) / AU);
         let inv_r_sun_au_p2 = inv_r_sun_au * inv_r_sun_au;
@@ -115,7 +108,7 @@ impl ForceModel for SolarPressure {
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         let dual_force_scalar =
-            Hyperdual::<f64, U7>::from_real(-1e-3 * ctx.cr * ctx.srp_area_m2) * flux_pressure;
+            Hyperdual::<f64, U7>::from_real(1e-3 * ctx.cr * ctx.srp_area_m2) * flux_pressure;
         let mut dual_force: Vector3<Hyperdual<f64, U7>> = Vector3::zeros();
         dual_force[0] = dual_force_scalar * r_sun_unit[0];
         dual_force[1] = dual_force_scalar * r_sun_unit[1];

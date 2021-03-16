@@ -13,7 +13,7 @@ and portability to all platforms supported by [Rust](https://forge.rust-lang.org
 [docsrs]: https://docs.rs/nyx-space/
 
 # License
-The [LICENSE](https://nyxspace.com/license/) is strictly enforced.
+The [AGPLv3 LICENSE](https://nyxspace.com/license/) is strictly enforced.
 
 # Features
 Unless specified otherwise in the documentation of specific functions, all vectors and matrices are [statically allocated](https://discourse.nphysics.org/t/statically-typed-matrices-whose-size-is-a-multiple-or-another-one/460/4).
