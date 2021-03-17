@@ -19,9 +19,7 @@
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
 use super::ForceModel;
 use crate::celestia::eclipse::EclipseLocator;
-use crate::celestia::{
-    Bodies, Cosm, Frame, LTCorr, Spacecraft, AU, SPEED_OF_LIGHT, SPEED_OF_LIGHT_KMS,
-};
+use crate::celestia::{Cosm, Frame, LTCorr, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
 use crate::errors::NyxError;
 use std::sync::Arc;

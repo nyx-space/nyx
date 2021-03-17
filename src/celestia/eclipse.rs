@@ -38,7 +38,7 @@ impl EclipseState {
         match self {
             Self::Umbra => 0.0,
             Self::Visibilis => 1.0,
-            Self::Penumbra(val) => dbg!(val),
+            Self::Penumbra(val) => val,
         }
     }
 }
@@ -291,186 +291,56 @@ pub fn eclipse_state(
     }
     // All of the computations happen with the observer as the center.
     // `eb` stands for eclipsing body; `ls` stands for light source.
-    // Vector from spacecraft to EB
-    let r_eb = -cosm.frame_chg(observer, eclipsing_body).radius();
-    let r_eb_unit = r_eb / r_eb.norm();
-    // Vector from EB to LS
-    let r_eb_ls = cosm
-        .celestial_state(
-            &light_source.ephem_path(),
-            observer.dt,
-            eclipsing_body,
-            correction,
-        )
-        .radius();
-    let r_eb_ls_unit = r_eb_ls / r_eb_ls.norm();
-    // Compute the angle between those vectors. If that angle is less than 90 degrees, then the light source
-    // is in front of the eclipsing body, so we're visible.
-    let beta2 = r_eb_unit.dot(&r_eb_ls_unit).acos();
-    if beta2 <= std::f64::consts::FRAC_PI_2 {
-        return EclipseState::Visibilis;
-    }
-    // Get the state of the light source with respect to the spacecraft
-    let r_ls = r_eb + r_eb_ls;
-    let r_ls_unit = r_ls / r_ls.norm();
-    // Compute beta3, the angle between the spacecraft and the eclipsing body, and between the spacecraft and the light source.
-    // We need this to project the radius of the light source onto the plane centered at the eclipsing geoid, and normal to
-    // the direction to the spacecraft.
-    let cos_beta3 = r_ls_unit.dot(&r_eb_unit);
-    // Now compute r_ls_p, the vector from the eclipsing body to the center of the projected light source onto the plane.
-    let r_ls_p = (r_eb.norm() / cos_beta3) * r_ls_unit;
-    // Now let's compute the pseudo radius of the light source near the plane.
-    // This is the pseudo radius because we're building a right triangle between the intersection point of r_ls with the plane,
-    // the normal from r_ls at that point until intersection with r_eb_ls.
-    let beta1 = (-r_ls_unit).dot(&-r_eb_ls_unit).acos();
-    // We can now compute the gamma angle
-    let gamma = std::f64::consts::FRAC_PI_2 - beta2 - beta1;
-    // Applying Thales theorem, we can compute the pseudo radius of the light source
-    let pseudo_ls_radius = r_ls_p.norm() * light_source.equatorial_radius() / r_ls.norm();
-    // And then project that onto the plane to compute the actual project radius of the light source onto the plane
-    let ls_radius = pseudo_ls_radius / gamma.cos();
-    // Compute the radius from the center of the eclipsing geoid to the intersection point
-    let r_plane_ls = r_ls_p - r_eb;
-    // Note that the eclipsing geoid's circle is centered at zero, so the norm of r_plane_ls is also the distance
-    // between the center of the eclipsing body's shadow and the center of the light source's shadow.
-    let d_plane_ls = r_plane_ls.norm();
+    // Get the radius vector of the spacecraft to the eclipsing body
+    let r_eb = cosm.frame_chg(observer, eclipsing_body).radius();
 
-    let eb_radius = eclipsing_body.equatorial_radius();
+    // Get the radius vector of the light source to the spacecraft
+    let r_ls = -cosm.frame_chg(observer, light_source).radius();
 
-    if d_plane_ls - ls_radius > eb_radius {
+    // Compute the apparent radii of the light source and eclipsing body
+    let r_ls_prime = (light_source.equatorial_radius() / r_ls.norm()).asin();
+    let r_eb_prime = (eclipsing_body.equatorial_radius() / r_eb.norm()).asin();
+
+    // Compute the apparent separation of both circles
+    let d_prime = (-(r_ls.dot(&r_eb)) / (r_eb.norm() * r_ls.norm())).acos();
+
+    if d_prime - r_ls_prime > r_eb_prime {
         // If the closest point where the projected light source's circle _starts_ is further
         // away than the furthest point where the eclipsing body's shadow can reach, then the light
         // source is totally visible.
-        return EclipseState::Visibilis;
-    } else if eb_radius > d_plane_ls + ls_radius {
+        EclipseState::Visibilis
+    } else if r_eb_prime > d_prime + r_ls_prime {
         // The light source is fully hidden by the eclipsing body, hence we're in total eclipse.
         // Note that because we test for the beta2 angle earlier, we know that the light source is behind the plane
         // from the vantage point of the spacecraft.
-        return EclipseState::Umbra;
-    }
-
-    // If we have reached this point, we're in penumbra.
-    // Both circles, which represent the light source projected onto the plane and the eclipsing geoid,
-    // now overlap creating an asymmetrial lens.
-    // The following math comes from http://mathworld.wolfram.com/Circle-CircleIntersection.html
-    // and https://stackoverflow.com/questions/3349125/circle-circle-intersection-points .
-
-    // Compute the distances between the center of the eclipsing geoid and the line crossing the intersection
-    // points of both circles.
-    let d1 = (d_plane_ls.powi(2) - ls_radius.powi(2) + eb_radius.powi(2)) / (2.0 * d_plane_ls);
-    let d2 = (d_plane_ls.powi(2) + ls_radius.powi(2) - eb_radius.powi(2)) / (2.0 * d_plane_ls);
-
-    let shadow_area = circ_seg_area(eb_radius, d1) + circ_seg_area(ls_radius, d2);
-    if shadow_area.is_nan() {
-        return EclipseState::Umbra;
-    }
-    // Compute the nominal area of the light source
-    let nominal_area = std::f64::consts::PI * ls_radius.powi(2);
-    // And return the percentage (between 0 and 1) of the eclipse.
-    EclipseState::Penumbra((nominal_area - shadow_area) / nominal_area)
-}
-
-/// Computes the umbra/visibilis/penumbra state between between two states accounting for eclipsing of the providing geoid.
-/// This algorithm is from GMAT's "PercentShadow"
-pub fn eclipse_state_gmat(
-    observer: &Orbit,
-    light_source: Frame,
-    eclipsing_body: Frame,
-    cosm: &Cosm,
-    correction: LTCorr,
-) -> EclipseState {
-    // If the light source's radius is zero, just call the line of sight algorithm
-
-    assert!(light_source.is_geoid() || light_source.is_celestial());
-    assert!(eclipsing_body.is_geoid());
-
-    if light_source.equatorial_radius() < std::f64::EPSILON {
-        let observed = cosm.celestial_state(
-            &light_source.ephem_path(),
-            observer.dt,
-            observer.frame,
-            correction,
-        );
-        return line_of_sight(observer, &observed, eclipsing_body, &cosm);
-    }
-
-    // All of the computations happen with the observer as the center.
-    // `eb` stands for eclipsing body; `ls` stands for light source.
-
-    // Vector of the eclipsing body from the spacecraft's central body
-    let r_b = -cosm
-        .celestial_state(
-            &eclipsing_body.ephem_path(),
-            observer.dt,
-            observer.frame,
-            correction,
-        )
-        .radius();
-
-    // Vector of occulting body to the spacecraft
-    let s = if observer.frame == eclipsing_body {
-        observer.radius()
-    } else {
-        observer.radius() - r_b
-    };
-
-    // Vector from occulting/eclipsing body to the light source
-    let r_eb_ls = -cosm
-        .celestial_state(
-            &light_source.ephem_path(),
-            observer.dt,
-            eclipsing_body,
-            correction,
-        )
-        .radius();
-
-    // Vector from spacecraft central body to the light source
-    let r_ls = -cosm
-        .celestial_state(
-            &light_source.ephem_path(),
-            observer.dt,
-            observer.frame,
-            correction,
-        )
-        .radius();
-    let s_ls = if observer.frame == eclipsing_body {
-        r_eb_ls
-    } else {
-        r_eb_ls - r_b
-    };
-
-    // Compute the apparent angle of the light source as seen from the spaceraft
-    let r_prime_ls =
-        (light_source.equatorial_radius() / (r_eb_ls - observer.radius()).norm()).asin();
-
-    // Compute the apparent angle of the eclipsing body as seen from the spaceraft
-    let r_prime_rb = (eclipsing_body.equatorial_radius() / (observer.radius() - r_b).norm()).asin();
-
-    // Compute the apparent separation (it's a 1x1 vector)
-    let d_prime = ((s.transpose() * r_ls) / (s.norm() * r_ls.norm()))[0].acos();
-
-    if d_prime > (r_prime_ls + r_prime_rb) {
-        EclipseState::Visibilis
-    } else if d_prime < (r_prime_rb - r_prime_ls) {
         EclipseState::Umbra
-    } else {
-        // In penumbra, let's calculate the percentage.
+    } else if (r_ls_prime - r_eb_prime).abs() < d_prime && d_prime < r_ls_prime + r_eb_prime {
+        // If we have reached this point, we're in penumbra.
+        // Both circles, which represent the light source projected onto the plane and the eclipsing geoid,
+        // now overlap creating an asymmetrial lens.
+        // The following math comes from http://mathworld.wolfram.com/Circle-CircleIntersection.html
+        // and https://stackoverflow.com/questions/3349125/circle-circle-intersection-points .
 
-        if (r_prime_ls - r_prime_rb).abs() < d_prime && d_prime > r_prime_rb + r_prime_ls {
-            // Let's caculate the area overlap
-            // First let's calculate the half cord c1
-            let c1 = (d_prime.powi(2) + r_prime_ls.powi(2) - r_prime_rb.powi(2)) / (2.0 * d_prime);
-            // And the other part
-            let c2 = (r_prime_ls.powi(2) - c1.powi(2)).sqrt();
+        // Compute the distances between the center of the eclipsing geoid and the line crossing the intersection
+        // points of both circles.
+        let d1 = (d_prime.powi(2) - r_ls_prime.powi(2) + r_eb_prime.powi(2)) / (2.0 * d_prime);
+        let d2 = (d_prime.powi(2) + r_ls_prime.powi(2) - r_eb_prime.powi(2)) / (2.0 * d_prime);
 
-            let a = r_prime_ls.powi(2) * (c1 / r_prime_ls).acos()
-                + r_prime_rb.powi(2) * ((d_prime - c1) / r_prime_rb).acos();
-
-            EclipseState::Penumbra(100.0 * a / (std::f64::consts::PI * r_prime_ls.powi(2)))
-        } else {
-            // Annular eclipse
-            EclipseState::Penumbra(100.0 * (r_prime_rb.powi(2) / r_prime_ls.powi(2)))
+        let shadow_area = circ_seg_area(r_eb_prime, d1) + circ_seg_area(r_ls_prime, d2);
+        if shadow_area.is_nan() {
+            warn!(
+                "Shadow area is NaN! Please file a bug with initial states, eclipsing bodies, etc."
+            );
+            return EclipseState::Umbra;
         }
+        // Compute the nominal area of the light source
+        let nominal_area = std::f64::consts::PI * r_ls_prime.powi(2);
+        // And return the percentage (between 0 and 1) of the eclipse.
+        EclipseState::Penumbra((nominal_area - shadow_area) / nominal_area)
+    } else {
+        // Annular eclipse.
+        // If r_eb_prime is very small, then the fraction is very small: however, we note a penumbra close to 1.0 as near full light source visibility, so let's subtract one from this.
+        EclipseState::Penumbra(1.0 - r_eb_prime.powi(2) / r_ls_prime.powi(2))
     }
 }
 

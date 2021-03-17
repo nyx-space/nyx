@@ -98,7 +98,7 @@ fn srp_earth_penumbra() {
 
     let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
-        "Error accumulated in ecc+inc MEO (with penumbras) over {} : {:e} m \t{:e} m/s",
+        "Error accumulated in circular equatorial LEO (with penumbras) over {} : {:e} m \t{:e} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
