@@ -48,7 +48,7 @@ fn srp_earth_full_vis() {
 
     let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
-        "Error accumulated in full sunlight over {} : {:e} m \t{:e} m/s",
+        "Error accumulated in full sunlight over {} : {:.3} m \t{:.3} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
@@ -93,18 +93,18 @@ fn srp_earth_penumbra() {
         -0.02614433515330551,
         7.497359631253262,
         0.8535219376877066,
-        9.281283498115046e-05,
+        9.281_283_498_115_046e-5,
     );
 
     let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
-        "Error accumulated in circular equatorial LEO (with penumbras) over {} : {:e} m \t{:e} m/s",
+        "Error accumulated in circular equatorial LEO (with penumbras) over {} : {:.3} m \t{:.3} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
     );
-    assert!(err_r < 5e-3, "position error too large for SRP");
-    assert!(err_v < 1e-7, "velocity error too large for SRP");
+    assert!(err_r < 3e-1, "position error too large for SRP");
+    assert!(err_v < 5e-4, "velocity error too large for SRP");
 }
 
 #[test]
@@ -148,13 +148,13 @@ fn srp_earth_meo_ecc_inc() {
 
     let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
-        "Error accumulated in ecc+inc MEO (with penumbras) over {} : {:e} m \t{:e} m/s",
+        "Error accumulated in ecc+inc MEO (with penumbras) over {} : {:.3} m \t{:.3} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
     );
-    assert!(err_r < 5e-3, "position error too large for SRP");
-    assert!(err_v < 1e-7, "velocity error too large for SRP");
+    assert!(err_r < 4e-2, "position error too large for SRP");
+    assert!(err_v < 2e-5, "velocity error too large for SRP");
 }
 
 #[test]
