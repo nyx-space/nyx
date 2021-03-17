@@ -297,9 +297,21 @@ pub fn eclipse_state(
     // Get the radius vector of the light source to the spacecraft
     let r_ls = -cosm.frame_chg(observer, light_source).radius();
 
-    // Compute the apparent radii of the light source and eclipsing body
-    let r_ls_prime = (light_source.equatorial_radius() / r_ls.norm()).asin();
-    let r_eb_prime = (eclipsing_body.equatorial_radius() / r_eb.norm()).asin();
+    // Compute the apparent radii of the light source and eclipsing body (preventing any NaN)
+    let r_ls_prime = if light_source.equatorial_radius() >= r_ls.norm() {
+        light_source.equatorial_radius()
+    } else {
+        (light_source.equatorial_radius() / r_ls.norm()).asin()
+    };
+    let r_eb_prime = if eclipsing_body.equatorial_radius() >= r_eb.norm() {
+        eclipsing_body.equatorial_radius()
+    } else {
+        (eclipsing_body.equatorial_radius() / r_eb.norm()).asin()
+    };
+
+    if r_eb_prime.is_nan() {
+        panic!("{} / {}", eclipsing_body.equatorial_radius(), r_eb.norm());
+    }
 
     // Compute the apparent separation of both circles
     let d_prime = (-(r_ls.dot(&r_eb)) / (r_eb.norm() * r_ls.norm())).acos();
@@ -512,35 +524,5 @@ mod tests {
             line_of_sight(&sc1, &sc2, eme2k, &cosm),
             EclipseState::Visibilis
         );
-    }
-
-    #[test]
-    fn eclipse_sun_eclipse() {
-        let cosm = Cosm::de438();
-        let sun = cosm.frame("Sun J2000");
-        let eme2k = cosm.frame("EME2000");
-
-        let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-
-        let sma = eme2k.equatorial_radius() + 300.0;
-
-        let sc1 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 25.0, dt, eme2k);
-        let sc2 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 115.0, dt, eme2k);
-        let sc3 = Orbit::keplerian(sma, 0.001, 0.1, 90.0, 75.0, 77.2, dt, eme2k);
-
-        let correction = LTCorr::None;
-
-        assert_eq!(
-            eclipse_state(&sc1, sun, eme2k, &cosm, correction),
-            EclipseState::Visibilis
-        );
-        assert_eq!(
-            eclipse_state(&sc2, sun, eme2k, &cosm, correction),
-            EclipseState::Umbra
-        );
-        match eclipse_state(&sc3, sun, eme2k, &cosm, correction) {
-            EclipseState::Penumbra(val) => assert!(val > 0.9),
-            _ => panic!("should be in penumbra"),
-        };
     }
 }
