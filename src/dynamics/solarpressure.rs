@@ -19,7 +19,7 @@
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
 use super::ForceModel;
 use crate::celestia::eclipse::EclipseLocator;
-use crate::celestia::{Cosm, Frame, LTCorr, Spacecraft, AU, SPEED_OF_LIGHT};
+use crate::celestia::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
 use crate::errors::NyxError;
 use std::sync::Arc;
@@ -39,7 +39,6 @@ impl<'a> SolarPressure {
             light_source: cosm.frame("Sun J2000"),
             shadow_bodies,
             cosm,
-            correction: LTCorr::None,
         };
         Self { phi: 1367.0, e_loc }
     }

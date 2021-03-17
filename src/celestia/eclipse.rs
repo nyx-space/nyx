@@ -115,7 +115,6 @@ pub struct EclipseLocator {
     pub light_source: Frame,
     pub shadow_bodies: Vec<Frame>,
     pub cosm: Arc<Cosm>,
-    pub correction: LTCorr,
 }
 
 impl fmt::Display for EclipseLocator {
@@ -127,8 +126,8 @@ impl fmt::Display for EclipseLocator {
             .collect::<String>();
         write!(
             f,
-            "light-source: {}\tshadows casted by: {} (light time corr.: {:?})",
-            self.light_source, shadow_bodies, self.correction
+            "light-source: {}\tshadows casted by: {})",
+            self.light_source, shadow_bodies
         )
     }
 }
@@ -138,13 +137,8 @@ impl EclipseLocator {
     pub fn compute(&self, observer: &Orbit) -> EclipseState {
         let mut state = EclipseState::Visibilis;
         for eclipsing_body in &self.shadow_bodies {
-            let this_state = eclipse_state(
-                observer,
-                self.light_source,
-                *eclipsing_body,
-                &self.cosm,
-                self.correction,
-            );
+            let this_state =
+                eclipse_state(observer, self.light_source, *eclipsing_body, &self.cosm);
             if this_state > state {
                 state = this_state;
             }
@@ -273,7 +267,6 @@ pub fn eclipse_state(
     light_source: Frame,
     eclipsing_body: Frame,
     cosm: &Cosm,
-    correction: LTCorr,
 ) -> EclipseState {
     // If the light source's radius is zero, just call the line of sight algorithm
 
@@ -285,7 +278,7 @@ pub fn eclipse_state(
             &light_source.ephem_path(),
             observer.dt,
             observer.frame,
-            correction,
+            LTCorr::None,
         );
         return line_of_sight(observer, &observed, eclipsing_body, &cosm);
     }
@@ -313,14 +306,12 @@ pub fn eclipse_state(
     let d_prime = (-(r_ls.dot(&r_eb)) / (r_eb.norm() * r_ls.norm())).acos();
 
     if d_prime - r_ls_prime > r_eb_prime {
-        // If the closest point where the projected light source's circle _starts_ is further
+        // If the closest point where the apparent radius of the light source _starts_ is further
         // away than the furthest point where the eclipsing body's shadow can reach, then the light
         // source is totally visible.
         EclipseState::Visibilis
     } else if r_eb_prime > d_prime + r_ls_prime {
         // The light source is fully hidden by the eclipsing body, hence we're in total eclipse.
-        // Note that because we test for the beta2 angle earlier, we know that the light source is behind the plane
-        // from the vantage point of the spacecraft.
         EclipseState::Umbra
     } else if (r_ls_prime - r_eb_prime).abs() < d_prime && d_prime < r_ls_prime + r_eb_prime {
         // If we have reached this point, we're in penumbra.

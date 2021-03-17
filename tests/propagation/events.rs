@@ -45,7 +45,6 @@ fn event_tracker_true_anomaly() {
         light_source: cosm.frame("Sun J2000"),
         shadow_bodies: vec![cosm.frame("EME2000")],
         cosm: cosm.clone(),
-        correction: LTCorr::None,
     };
 
     // Adding this print to confirm that the penumbra calculation continuously increases and then decreases.

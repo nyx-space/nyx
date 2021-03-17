@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::celestia::eclipse::{EclipseLocator, EclipseState};
-use nyx::celestia::{Bodies, Cosm, LTCorr, Orbit};
+use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnit};
@@ -38,7 +38,6 @@ fn leo_sun_earth_eclipses() {
         light_source: cosm.frame("Sun J2000"),
         shadow_bodies: vec![eme2k],
         cosm,
-        correction: LTCorr::None,
     };
 
     // Receive the states on the main thread.
@@ -91,7 +90,6 @@ fn geo_sun_earth_eclipses() {
         light_source: cosm.frame("Sun J2000"),
         shadow_bodies: vec![eme2k],
         cosm,
-        correction: LTCorr::None,
     };
 
     // Receive the states on the main thread.
