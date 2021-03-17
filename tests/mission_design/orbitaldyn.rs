@@ -49,7 +49,7 @@ fn val_two_body_dynamics() {
     // And now do the backprop by re-initializing a propagator to ensure correct step size
     prop.for_duration(-prop_time).unwrap();
     let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &state.to_cartesian_vec());
-    println!("RTN:  {}\nINIT: {}", prop.state, state);
+    println!("RTN:  {}\nINIT: {}\n{:o}", prop.state, state, state);
     dbg!(err_r);
     assert!(
         err_r < 1e-5,

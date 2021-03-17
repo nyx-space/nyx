@@ -153,7 +153,7 @@ fn srp_earth_meo_ecc_inc() {
         err_r * 1e3,
         err_v * 1e3
     );
-    assert!(err_r < 4e-2, "position error too large for SRP");
+    assert!(err_r < 5e-2, "position error too large for SRP");
     assert!(err_v < 2e-5, "velocity error too large for SRP");
 }
 

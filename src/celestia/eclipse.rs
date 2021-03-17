@@ -309,10 +309,6 @@ pub fn eclipse_state(
         (eclipsing_body.equatorial_radius() / r_eb.norm()).asin()
     };
 
-    if r_eb_prime.is_nan() {
-        panic!("{} / {}", eclipsing_body.equatorial_radius(), r_eb.norm());
-    }
-
     // Compute the apparent separation of both circles
     let d_prime = (-(r_ls.dot(&r_eb)) / (r_eb.norm() * r_ls.norm())).acos();
 
