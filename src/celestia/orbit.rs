@@ -26,7 +26,7 @@ use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::{BPlane, Frame};
 use crate::time::{Duration, Epoch, TimeUnit};
-use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3};
+use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
 use crate::{NyxError, TimeTagged};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
@@ -363,7 +363,7 @@ impl Orbit {
     }
 
     /// Creates a new Orbit from the provided semi-major axis altitude in kilometers
-    pub fn keplerian_alt(
+    pub fn keplerian_altitude(
         sma_altitude: f64,
         ecc: f64,
         inc: f64,
@@ -376,6 +376,45 @@ impl Orbit {
         Self::keplerian(
             sma_altitude + frame.equatorial_radius(),
             ecc,
+            inc,
+            raan,
+            aop,
+            ta,
+            dt,
+            frame,
+        )
+    }
+
+    /// Creates a new Orbit from the provided radii of apoapsis and periapsis, in kilometers
+    pub fn keplerian_apsis_radii(
+        r_a: f64,
+        r_p: f64,
+        inc: f64,
+        raan: f64,
+        aop: f64,
+        ta: f64,
+        dt: Epoch,
+        frame: Frame,
+    ) -> Self {
+        let sma = (r_a + r_p) / 2.0;
+        let ecc = r_a / sma - 1.0;
+        Self::keplerian(sma, ecc, inc, raan, aop, ta, dt, frame)
+    }
+
+    /// Creates a new Orbit from the provided altitudes of apoapsis and periapsis, in kilometers
+    pub fn keplerian_apsis_altitude(
+        a_a: f64,
+        a_p: f64,
+        inc: f64,
+        raan: f64,
+        aop: f64,
+        ta: f64,
+        dt: Epoch,
+        frame: Frame,
+    ) -> Self {
+        Self::keplerian_apsis_radii(
+            a_a + frame.equatorial_radius(),
+            a_p + frame.equatorial_radius(),
             inc,
             raan,
             aop,
@@ -846,6 +885,34 @@ impl Orbit {
         me
     }
 
+    /// Returns a copy of this state with the provided apoasis and periapse
+    pub fn with_apoapsis_periapsis(self, new_ra: f64, new_rp: f64) -> Self {
+        Self::keplerian_apsis_radii(
+            new_ra,
+            new_rp,
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta(),
+            self.dt,
+            self.frame,
+        )
+    }
+
+    /// Returns a copy of this state with the provided apoasis and periapse added to the current values
+    pub fn add_apoapsis_periapsis(self, delta_ra: f64, delta_rp: f64) -> Self {
+        Self::keplerian_apsis_radii(
+            self.apoapsis() + delta_ra,
+            self.periapsis() + delta_rp,
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta(),
+            self.dt,
+            self.frame,
+        )
+    }
+
     /// Returns the true longitude in degrees
     pub fn tlong(&self) -> f64 {
         match self.frame {
@@ -1204,6 +1271,11 @@ impl Orbit {
     /// Unwraps this STM, or panics if unset.
     pub fn stm(&self) -> Matrix6<f64> {
         self.stm.unwrap()
+    }
+
+    /// Returns the root sum square error between this state and the other, in kilometers for the position and kilometers per second in velocity
+    pub fn rss(&self, other: &Self) -> (f64, f64) {
+        rss_orbit_errors(&self, other)
     }
 }
 

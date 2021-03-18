@@ -110,7 +110,7 @@ fn stop_cond_nrho_apo() {
     );
 
     let bodies = vec![Bodies::Earth, Bodies::Sun];
-    let dynamics = OrbitalDynamics::point_masses(luna, &bodies, cosm.clone());
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm.clone());
 
     let setup = Propagator::rk89(
         dynamics,

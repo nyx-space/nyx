@@ -10,7 +10,7 @@ use self::nyx::io::gravity::*;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
-use self::nyx::utils::rss_state_errors;
+use self::nyx::utils::rss_orbit_errors;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -62,7 +62,7 @@ fn robust_test_ekf_two_body() {
     initial_state_dev.y -= 5.0;
     initial_state_dev.z += 5.0;
 
-    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
@@ -132,7 +132,7 @@ fn robust_test_ekf_two_body() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
-    let (err_p, err_v) = rss_state_errors(&est.state(), &final_truth_state);
+    let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
         final_truth_state.dt == est.epoch(),
@@ -228,7 +228,7 @@ fn robust_test_ekf_multi_body() {
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
 
-    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
@@ -237,7 +237,7 @@ fn robust_test_ekf_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -300,7 +300,7 @@ fn robust_test_ekf_multi_body() {
     // Some sanity checks to make sure that we have correctly indexed the estimates
     assert_eq!(est.epoch(), final_truth_state.dt);
 
-    let (err_p, err_v) = rss_state_errors(&est.state(), &final_truth_state);
+    let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
 
     // Some printing for debugging
     println!(
@@ -394,7 +394,7 @@ fn robust_test_ekf_harmonics() {
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
 
-    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
@@ -408,7 +408,7 @@ fn robust_test_ekf_harmonics() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
-    let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(eme2k, &bodies, cosm)]);
+    let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(&bodies, cosm)]);
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
@@ -466,7 +466,7 @@ fn robust_test_ekf_harmonics() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
-    let (err_p, err_v) = rss_state_errors(&est.state(), &final_truth_state);
+    let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
         final_truth_state.dt == est.epoch(),
@@ -566,7 +566,7 @@ fn robust_test_ekf_realistic() {
         Bodies::JupiterBarycenter,
         Bodies::SaturnBarycenter,
     ];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = truth_setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -589,7 +589,7 @@ fn robust_test_ekf_realistic() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
+    let estimator = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
@@ -708,7 +708,7 @@ fn robust_test_ckf_smoother_multi_body() {
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
 
-    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
@@ -717,7 +717,7 @@ fn robust_test_ckf_smoother_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -788,8 +788,8 @@ fn robust_test_ckf_smoother_multi_body() {
         assert_eq!(smoothed_est.epoch(), est.epoch());
         assert_eq!(est.epoch(), truth_state.dt);
 
-        let (err_p, err_v) = rss_state_errors(&est.state(), &truth_state);
-        let (err_p_sm, err_v_sm) = rss_state_errors(&smoothed_est.state(), &truth_state);
+        let (err_p, err_v) = rss_orbit_errors(&est.state(), &truth_state);
+        let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state(), &truth_state);
 
         rss_pos_avr += err_p;
         rss_vel_avr += err_v;
@@ -968,7 +968,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
 
-    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
@@ -977,7 +977,7 @@ fn robust_test_ekf_snc_smoother_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -1061,8 +1061,8 @@ fn robust_test_ekf_snc_smoother_multi_body() {
         assert_eq!(smoothed_est.epoch(), est.epoch());
         assert_eq!(est.epoch(), truth_state.dt);
 
-        let (err_p, err_v) = rss_state_errors(&est.state(), &truth_state);
-        let (err_p_sm, err_v_sm) = rss_state_errors(&smoothed_est.state(), &truth_state);
+        let (err_p, err_v) = rss_orbit_errors(&est.state(), &truth_state);
+        let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state(), &truth_state);
 
         rss_pos_avr += err_p;
         rss_vel_avr += err_v;
@@ -1236,7 +1236,7 @@ fn robust_test_ckf_iteration_multi_body() {
     initial_state_dev.y -= 9.5;
     initial_state_dev.z += 9.5;
 
-    let (err_p, err_v) = rss_state_errors(&initial_state_dev, &initial_state);
+    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
         "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
         err_p * 1e3,
@@ -1245,7 +1245,7 @@ fn robust_test_ckf_iteration_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
@@ -1318,8 +1318,8 @@ fn robust_test_ckf_iteration_multi_body() {
         assert_eq!(prior_est.epoch(), est.epoch());
         assert_eq!(est.epoch(), truth_state.dt);
 
-        let (err_p, err_v) = rss_state_errors(&prior_est.state(), &truth_state);
-        let (err_p_it, err_v_it) = rss_state_errors(&est.state(), &truth_state);
+        let (err_p, err_v) = rss_orbit_errors(&prior_est.state(), &truth_state);
+        let (err_p_it, err_v_it) = rss_orbit_errors(&est.state(), &truth_state);
 
         rss_pos_avr += err_p;
         rss_vel_avr += err_v;

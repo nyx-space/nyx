@@ -25,7 +25,7 @@ fn leo_sun_earth_eclipses() {
 
     let cosmc = cosm.clone();
     thread::spawn(move || {
-        let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosmc);
+        let dynamics = OrbitalDynamics::point_masses(&bodies, cosmc);
         let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
         let mut prop = setup.with(leo);
 
@@ -77,7 +77,7 @@ fn geo_sun_earth_eclipses() {
 
     thread::spawn(move || {
         let cosm = Cosm::de438();
-        let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+        let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
         let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
         let mut prop = setup.with(geo);
 

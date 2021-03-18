@@ -48,7 +48,7 @@ fn multi_body_ckf_perfect_stations() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     // Generate the truth data.
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
@@ -176,7 +176,7 @@ fn multi_body_ckf_covar_map() {
 
     // Generate the truth data on one thread.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);

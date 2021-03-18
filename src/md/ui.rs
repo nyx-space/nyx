@@ -190,7 +190,6 @@ where
                     }
 
                     sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::point_masses(
-                        init_state.frame,
                         &bodies,
                         cosm.clone(),
                     ));

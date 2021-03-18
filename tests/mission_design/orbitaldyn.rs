@@ -6,7 +6,7 @@ use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
 use nyx::propagators::error_ctrl::RSSStepPV;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
-use nyx::utils::{rss_errors, rss_state_errors};
+use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
 use nyx::TimeTagged;
 
 #[allow(clippy::identity_op)]
@@ -48,7 +48,8 @@ fn val_two_body_dynamics() {
 
     // And now do the backprop by re-initializing a propagator to ensure correct step size
     prop.for_duration(-prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &state.to_cartesian_vec());
+    let (err_r, err_v) =
+        rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &state.to_cartesian_vec());
     println!("RTN:  {}\nINIT: {}\n{:o}", prop.state, state, state);
     dbg!(err_r);
     assert!(
@@ -63,7 +64,8 @@ fn val_two_body_dynamics() {
     // Forward propagation again to confirm that we can do repeated calls
     prop.for_duration(prop_time).unwrap();
     assert_eq!(prop.state.epoch(), dt + prop_time);
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt.to_cartesian_vec());
+    let (err_r, err_v) =
+        rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt.to_cartesian_vec());
     assert!(
         err_r < 1e-5,
         "two body back+fwd prop failed to return to the initial state in position"
@@ -112,12 +114,12 @@ fn val_halo_earth_moon_dynamics() {
     );
 
     let bodies = vec![Bodies::Luna];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_state_errors(&prop.state, &rslt);
+    let (err_r, err_v) = rss_orbit_errors(&prop.state, &rslt);
 
     println!("==> val_halo_earth_moon_dynamics absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt.to_cartesian_vec();
@@ -176,12 +178,12 @@ fn val_halo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::rk89(dynamics, PropOpts::default());
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("==> val_halo_earth_moon_dynamics_adaptive absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt;
@@ -241,12 +243,12 @@ fn val_llo_earth_moon_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::rk89(dynamics, PropOpts::default());
     let mut prop = setup.with(llo_xmtr);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("==> val_llo_earth_moon_dynamics_adaptive absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt;
@@ -306,12 +308,12 @@ fn val_halo_multi_body_dynamics() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("==> val_halo_multi_body_dynamics absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt;
@@ -372,12 +374,12 @@ fn val_halo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::default(dynamics);
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("==> val_halo_multi_body_dynamics_adaptive absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt;
@@ -438,12 +440,12 @@ fn val_llo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::default(dynamics);
     let mut prop = setup.with(llo_xmtr);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("==> val_llo_multi_body_dynamics_adaptive absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt;
@@ -497,12 +499,12 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::default(dynamics);
     let mut prop = setup.with(leo);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("==> val_leo_multi_body_dynamics_adaptive_wo_moon absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt;
@@ -556,12 +558,12 @@ fn val_leo_multi_body_dynamics_adaptive() {
     );
 
     let bodies = vec![Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::default(dynamics);
     let mut prop = setup.with(leo);
     prop.for_duration(prop_time).unwrap();
-    let (err_r, err_v) = rss_errors(&prop.state.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
 
     println!("==> val_leo_multi_body_dynamics_adaptive absolute errors");
     let delta = prop.state.to_cartesian_vec() - rslt;
@@ -687,7 +689,7 @@ fn multi_body_dynamics_dual() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::point_masses(eme2k, &bodies, cosm);
+    let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
     let mut prop = setup.with(halo_rcvr);
@@ -773,7 +775,7 @@ fn val_earth_sph_harmonics_j2() {
     }
     println!();
 
-    let (err_r, err_v) = rss_errors(&prop_state.to_cartesian_vec(), &rslt_monte);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop_state.to_cartesian_vec(), &rslt_monte);
 
     assert!(
         err_r < 1e-1,
@@ -833,7 +835,7 @@ fn val_earth_sph_harmonics_12x12() {
     }
     println!();
 
-    let (err_r, err_v) = rss_errors(&prop_state.to_cartesian_vec(), &rslt_gmat);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop_state.to_cartesian_vec(), &rslt_gmat);
 
     assert!(
         err_r < 1e-1,
@@ -893,7 +895,7 @@ fn val_earth_sph_harmonics_70x70() {
     }
     println!();
 
-    let (err_r, err_v) = rss_errors(&prop_rslt.to_cartesian_vec(), &rslt_gmat);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.to_cartesian_vec(), &rslt_gmat);
 
     assert!(
         dbg!(err_r) < 0.2,
@@ -953,7 +955,7 @@ fn val_earth_sph_harmonics_70x70_partials() {
     }
     println!();
 
-    let (err_r, err_v) = rss_errors(&prop_rslt.to_cartesian_vec(), &rslt_gmat);
+    let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.to_cartesian_vec(), &rslt_gmat);
 
     assert!(
         dbg!(err_r) < 0.2,
@@ -990,7 +992,7 @@ fn hf_prop() {
 
     let cosm = Cosm::de438();
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let dynamics = OrbitalDynamics::new(vec![PointMasses::new(eme2k, &bodies, cosm), harmonics]);
+    let dynamics = OrbitalDynamics::new(vec![PointMasses::new(&bodies, cosm), harmonics]);
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
     let rslt = setup

@@ -20,7 +20,9 @@ extern crate num;
 
 use self::num::traits::real::Real;
 use crate::celestia::Orbit;
-use crate::dimensions::{Matrix3, Vector3, Vector6, U3};
+use crate::dimensions::{
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Vector3, Vector6, VectorN, U3,
+};
 use std::f64;
 
 /// Returns the tilde matrix from the provided Vector3.
@@ -145,17 +147,33 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     b * a.dot(&b) / b.dot(&b)
 }
 
-/// Computes the RSS state errors in position and in velocity of two state vectors [P V]
-pub fn rss_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
+/// Computes the RSS state errors in two provided vectors
+pub fn rss_errors<N: DimName>(prop_err: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+where
+    DefaultAllocator: Allocator<f64, N>,
+{
+    let mut v = 0.0;
+    for i in 0..N::dim() {
+        v += (prop_err[i] - cur_state[i]).powi(2);
+    }
+    v.sqrt()
+}
+
+/// Returns the RSS orbit errors in kilometers and kilometers per second
+pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
+    (
+        rss_errors(&prop_err.radius(), &cur_state.radius()),
+        rss_errors(&prop_err.velocity(), &cur_state.velocity()),
+    )
+}
+
+/// Computes the RSS state errors in position and in velocity of two orbit vectors [P V]
+pub fn rss_orbit_vec_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
     let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
 
     let err_velocity = (prop_err.fixed_rows::<U3>(3) - cur_state.fixed_rows::<U3>(3)).norm();
 
     (err_radius, err_velocity)
-}
-
-pub fn rss_state_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
-    rss_errors(&prop_err.to_cartesian_vec(), &cur_state.to_cartesian_vec())
 }
 
 // Normalize between -1.0 and 1.0

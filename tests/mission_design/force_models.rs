@@ -5,7 +5,7 @@ use nyx::dimensions::Vector6;
 use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnit};
-use nyx::utils::rss_errors;
+use nyx::utils::rss_orbit_vec_errors;
 
 #[test]
 fn srp_earth_full_vis() {
@@ -46,7 +46,7 @@ fn srp_earth_full_vis() {
         -8.640_729_256_514_233e-7,
     );
 
-    let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
         "Error accumulated in full sunlight over {} : {:.3} m \t{:.3} m/s",
         prop_time,
@@ -96,7 +96,7 @@ fn srp_earth_penumbra() {
         9.281_283_498_115_046e-5,
     );
 
-    let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
         "Error accumulated in circular equatorial LEO (with penumbras) over {} : {:.3} m \t{:.3} m/s",
         prop_time,
@@ -146,7 +146,7 @@ fn srp_earth_meo_ecc_inc() {
         -0.3541244448596867,
     );
 
-    let (err_r, err_v) = rss_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
+    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
         "Error accumulated in ecc+inc MEO (with penumbras) over {} : {:.3} m \t{:.3} m/s",
         prop_time,

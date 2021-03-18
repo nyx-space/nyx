@@ -4,7 +4,7 @@ use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSStatePV;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
-use nyx::utils::rss_state_errors;
+use nyx::utils::rss_orbit_errors;
 
 #[allow(clippy::identity_op)]
 #[test]
@@ -216,7 +216,7 @@ fn gmat_val_leo_day_adaptive() {
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(-prop_time).unwrap();
-        let (err_r, err_v) = rss_state_errors(&prop.state, &all_rslts[0]);
+        let (err_r, err_v) = rss_orbit_errors(&prop.state, &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"
@@ -391,7 +391,7 @@ fn gmat_val_leo_day_fixed() {
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(prop_time).unwrap();
         prop.for_duration(-prop_time).unwrap();
-        let (err_r, err_v) = rss_state_errors(&prop.state, &all_rslts[0]);
+        let (err_r, err_v) = rss_orbit_errors(&prop.state, &all_rslts[0]);
         assert!(
             err_r < 1e-5,
             "two body 2*(fwd+back) prop failed to return to the initial state in position"

@@ -6,8 +6,12 @@ use nyx::time::{Epoch, TimeUnit};
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
-        println!("{}: {:.2e}", $msg, ($x - $val).abs());
-        assert!(($x - $val).abs() < 1e-10, $msg)
+        assert!(
+            ($x - $val).abs() < 1e-10,
+            "{}: {:.2e}",
+            $msg,
+            ($x - $val).abs()
+        )
     };
 }
 
@@ -435,5 +439,12 @@ fn with_init() {
             new_inc,
             format!("wrong inc: got {}\twanted {}", new_state.inc(), new_inc)
         );
+    }
+    for apsis_delta in 100..1000 {
+        let new_ra = kep.apoapsis() + f64::from(apsis_delta);
+        let new_rp = kep.periapsis() - f64::from(apsis_delta);
+        let new_orbit = kep.with_apoapsis_periapsis(new_ra, new_rp);
+        f64_eq!(new_orbit.apoapsis(), new_ra, "wrong ra");
+        f64_eq!(new_orbit.periapsis(), new_rp, "wrong rp");
     }
 }

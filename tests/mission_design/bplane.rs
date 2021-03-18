@@ -29,7 +29,6 @@ fn val_b_plane_gmat() {
     );
     // Propagate until periapse
     let prop = Propagator::default(OrbitalDynamics::point_masses(
-        eme2k,
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm.clone(),
     ));

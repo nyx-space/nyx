@@ -6,7 +6,7 @@ use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::propagators::{PropOpts, Propagator};
 use self::nyx::time::{Epoch, TimeUnit};
-use self::nyx::utils::rss_errors;
+use self::nyx::utils::rss_orbit_vec_errors;
 
 #[test]
 fn val_transfer_schedule_no_depl() {
@@ -45,7 +45,7 @@ fn val_transfer_schedule_no_depl() {
 
     // Define the dynamics
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -81,7 +81,7 @@ fn val_transfer_schedule_no_depl() {
         eme2k,
     );
 
-    let (err_r, err_v) = rss_errors(
+    let (err_r, err_v) = rss_orbit_vec_errors(
         &final_state.orbit.to_cartesian_vec(),
         &rslt.to_cartesian_vec(),
     );
@@ -145,7 +145,7 @@ fn val_transfer_schedule_depl() {
 
     // Define the dynamics
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(orbit.frame, &bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
 
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
@@ -182,7 +182,7 @@ fn val_transfer_schedule_depl() {
 
     let rslt_fuel_mass = 745.802_837_870_161;
 
-    let (err_r, err_v) = rss_errors(
+    let (err_r, err_v) = rss_orbit_vec_errors(
         &final_state.orbit.to_cartesian_vec(),
         &rslt.to_cartesian_vec(),
     );

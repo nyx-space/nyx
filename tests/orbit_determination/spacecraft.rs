@@ -54,7 +54,7 @@ fn sc_ckf_perfect_stations() {
     // Generate the truth data on one thread.
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(initial_state.frame, &bodies, cosm.clone());
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let sc_dynamics =
         SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));
 

@@ -18,6 +18,7 @@
 
 use super::Orbit;
 use crate::dynamics::thrustctrl::Thruster;
+use crate::utils::rss_orbit_errors;
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -180,6 +181,16 @@ impl Spacecraft {
         let mut me = self;
         me.cd = cd;
         me
+    }
+
+    /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in fuel
+    pub fn rss(&self, other: &Self) -> (f64, f64, f64) {
+        let (p, v) = rss_orbit_errors(&self.orbit, &other.orbit);
+        (
+            p,
+            v,
+            (self.fuel_mass_kg - other.fuel_mass_kg).powi(2).sqrt(),
+        )
     }
 }
 

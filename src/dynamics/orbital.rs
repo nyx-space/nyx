@@ -37,9 +37,9 @@ pub struct OrbitalDynamics<'a> {
 
 impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(integr_frame: Frame, bodies: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn point_masses(bodies: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
         // Create the point masses
-        Self::new(vec![PointMasses::new(integr_frame, bodies, cosm)])
+        Self::new(vec![PointMasses::new(bodies, cosm)])
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
@@ -178,17 +178,9 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
     }
 }
 
-/// Stores the reference to the third body, including the gm to avoid having to fetch it every time
-pub struct ThirdBodyRef {
-    ephem: Vec<usize>,
-    gm: f64,
-}
-
 /// PointMasses model
 pub struct PointMasses {
-    /// The propagation frame
-    pub frame: Frame,
-    pub bodies: Vec<ThirdBodyRef>,
+    pub bodies: Vec<Frame>,
     /// Optional point to a Cosm, needed if extra point masses are needed
     pub cosm: Arc<Cosm>,
     /// Light-time correction computation if extra point masses are needed
@@ -197,33 +189,19 @@ pub struct PointMasses {
 
 impl PointMasses {
     /// Initializes the multibody point mass dynamics with the provided list of bodies
-    pub fn new(propagation_frame: Frame, body_names: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
-        Arc::new(Self::with_correction(
-            propagation_frame,
-            body_names,
-            cosm,
-            LTCorr::None,
-        ))
+    pub fn new(bodies: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
+        Arc::new(Self::with_correction(bodies, cosm, LTCorr::None))
     }
 
     /// Initializes the multibody point mass dynamics with the provided list of bodies, and accounting for some light time correction
-    pub fn with_correction(
-        propagation_frame: Frame,
-        bodies: &[Bodies],
-        cosm: Arc<Cosm>,
-        correction: LTCorr,
-    ) -> Self {
+    pub fn with_correction(bodies: &[Bodies], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
         let mut refs = Vec::new();
         // Check that these celestial bodies exist and build their references
         for body in bodies {
-            refs.push(ThirdBodyRef {
-                ephem: body.ephem_path().to_vec(),
-                gm: cosm.frame_from_ephem_path(&body.ephem_path()).gm(),
-            });
+            refs.push(cosm.frame_from_ephem_path(&body.ephem_path()));
         }
 
         Self {
-            frame: propagation_frame,
             bodies: refs,
             cosm,
             correction,
@@ -231,24 +209,14 @@ impl PointMasses {
     }
 
     /// Allows using bodies by name, defined in the non-default XB
-    pub fn specific(
-        propagation_frame: Frame,
-        bodies: &[String],
-        cosm: Arc<Cosm>,
-        correction: LTCorr,
-    ) -> Self {
+    pub fn specific(body_names: &[String], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
         let mut refs = Vec::new();
         // Check that these celestial bodies exist and build their references
-        for body in bodies {
-            let body_frame = cosm.frame(body);
-            refs.push(ThirdBodyRef {
-                ephem: body_frame.ephem_path(),
-                gm: body_frame.gm(),
-            });
+        for body in body_names {
+            refs.push(cosm.frame(body));
         }
 
         Self {
-            frame: propagation_frame,
             bodies: refs,
             cosm,
             correction,
@@ -261,16 +229,23 @@ impl AccelModel for PointMasses {
         let mut d_x = Vector3::zeros();
         // Get all of the position vectors between the center body and the third bodies
         for third_body in &self.bodies {
+            if third_body == &osc.frame {
+                // Ignore the contribution of the integration frame, that's handled by OrbitalDynamics
+                continue;
+            }
             // Orbit of j-th body as seen from primary body
-            let st_ij =
-                self.cosm
-                    .celestial_state(&third_body.ephem, osc.dt, self.frame, self.correction);
+            let st_ij = self.cosm.celestial_state(
+                &third_body.ephem_path(),
+                osc.dt,
+                osc.frame,
+                self.correction,
+            );
 
             let r_ij = st_ij.radius();
             let r_ij3 = st_ij.rmag().powi(3);
             let r_j = osc.radius() - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
-            d_x += -third_body.gm * (r_j / r_j3 + r_ij / r_ij3);
+            d_x += -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
         }
         Ok(d_x)
     }
@@ -278,7 +253,7 @@ impl AccelModel for PointMasses {
     fn dual_eom(
         &self,
         state: &VectorN<Hyperdual<f64, U7>, U3>,
-        ctx: &Orbit,
+        osc: &Orbit,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Extract data from hyperspace
         let radius = state.fixed_rows::<U3>(0).into_owned();
@@ -288,13 +263,17 @@ impl AccelModel for PointMasses {
 
         // Get all of the position vectors between the center body and the third bodies
         for third_body in &self.bodies {
-            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm);
+            if third_body == &osc.frame {
+                // Ignore the contribution of the integration frame, that's handled by OrbitalDynamics
+                continue;
+            }
+            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
 
             // Orbit of j-th body as seen from primary body
             let st_ij = self.cosm.try_celestial_state(
-                &third_body.ephem,
-                ctx.epoch(),
-                self.frame,
+                &third_body.ephem_path(),
+                osc.epoch(),
+                osc.frame,
                 self.correction,
             )?;
 

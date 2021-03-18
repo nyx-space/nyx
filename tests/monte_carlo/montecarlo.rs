@@ -39,7 +39,6 @@ fn multi_thread_monte_carlo_demo() {
 
     let orbital_dyn = OrbitalDynamics::new(vec![
         PointMasses::new(
-            state.frame,
             &[Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
             cosm,
         ),

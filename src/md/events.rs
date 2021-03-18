@@ -82,11 +82,39 @@ impl Event {
     /// unit is the default for that parameter. For example, a radius event will seek the requested
     /// value at the meter level, and an angle event will seek it at the thousands of a degree.
     pub fn new(parameter: StateParameter, desired_value: f64) -> Self {
+        Self::within_tolerance(
+            parameter,
+            desired_value,
+            parameter.default_event_precision(),
+        )
+    }
+
+    /// Match a specific event for the parameter to hit the specified value with the provided tolerance on the value
+    pub fn within_tolerance(
+        parameter: StateParameter,
+        desired_value: f64,
+        value_precision: f64,
+    ) -> Self {
+        Self::specific(
+            parameter,
+            desired_value,
+            value_precision,
+            TimeUnit::Millisecond,
+        )
+    }
+
+    /// Match a specific event for the parameter to hit the specified value with the provided tolerance on the value and time
+    pub fn specific(
+        parameter: StateParameter,
+        desired_value: f64,
+        value_precision: f64,
+        epoch_precision: TimeUnit,
+    ) -> Self {
         Self {
             parameter,
             desired_value,
-            epoch_precision: TimeUnit::Millisecond,
-            value_precision: parameter.default_event_precision(),
+            epoch_precision,
+            value_precision,
             in_frame: None,
         }
     }
