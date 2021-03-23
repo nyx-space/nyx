@@ -856,34 +856,19 @@ impl Cosm {
         };
 
         // Walk forward from the destination state
-        let transpose_backward = f_common_path.len() != new_frame_path.len()
-            && f_common_path.len() != state_frame_path.len();
+
         for i in (f_common_path.len()..new_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&new_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
-                    // transpose_backward = true;
-                    if !transpose_backward {
-                        dcm *= next_dcm.transpose();
-                        println!("t1");
-                    } else {
-                        println!("t1 prime");
-                        dcm *= next_dcm;
-                    }
+                    dcm *= next_dcm;
                 }
             }
         }
-        // Walk backward from current state up to common node
+        // Walk backward from current state up to common node (we transpose all backward rotations)
         for i in (f_common_path.len()..state_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&state_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
-                    if transpose_backward {
-                        // We just crossed the common point, so let's negate this state
-                        dcm *= next_dcm.transpose();
-                        println!("t2");
-                    } else {
-                        println!("t2 prime");
-                        dcm *= next_dcm;
-                    }
+                    dcm *= next_dcm.transpose();
                 }
             }
         }
@@ -1707,14 +1692,17 @@ mod tests {
 
         // Position rotation first
         let sp_ex = Matrix3::new(
+            // First row
             -3.58819172e-01,
-            -9.33406755e-01,
-            7.93935415e-04,
             9.33404435e-01,
-            -3.58820051e-01,
-            -2.08119539e-03,
             2.22748179e-03,
+            // Second row
+            -9.33406755e-01,
+            -3.58820051e-01,
             -5.70997090e-06,
+            // Third row
+            7.93935415e-04,
+            -2.08119539e-03,
             9.99997519e-01,
         );
 
@@ -1816,7 +1804,10 @@ mod tests {
             9.99997519e-01,
         );
 
-        println!("dcm {}\n{:.1e}", dcm, (dcm - sp_iau_earth_2_eme2k).norm());
+        assert!(
+            (dcm - sp_iau_earth_2_eme2k).norm() < 1e-8,
+            "IAU Earth -> EME2000"
+        );
 
         let sp_eme2k_2_iau_earth = Matrix6::new(
             // First row
@@ -1867,10 +1858,9 @@ mod tests {
             .try_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
             .unwrap();
 
-        println!(
-            "dcm {}\n{:.1e}",
-            dcm_return,
-            (dcm_return - sp_eme2k_2_iau_earth).norm()
+        assert!(
+            (dcm_return - sp_eme2k_2_iau_earth).norm() < 1e-8,
+            "EME2000 -> IAU Earth"
         );
 
         // IAU Earth <-> IAU Mars
@@ -1925,10 +1915,9 @@ mod tests {
             7.98288891e-01,
         );
 
-        println!(
-            "dcm {}\n{:.1e}",
-            dcm,
-            (dcm - sp_iau_mars_2_iau_earth).norm()
+        assert!(
+            (dcm - sp_iau_mars_2_iau_earth).norm() < 1e-1,
+            "IAU Mars -> IAU Earth failed"
         );
 
         // And backward
@@ -1982,10 +1971,10 @@ mod tests {
             .try_dcm_from_to(&cosm.frame("iau earth"), &cosm.frame("iau mars"), et0)
             .unwrap();
 
-        println!(
-            "dcm {}\n{:.1e}",
-            dcm_return,
-            (dcm_return - sp_iau_earth_2_iau_mars).norm()
+        // Allow for "large" error because of different IAU Mars definition
+        assert!(
+            (dcm_return - sp_iau_earth_2_iau_mars).norm() < 1e-1,
+            "IAU Earth -> IAU Mars failed"
         );
     }
 }
