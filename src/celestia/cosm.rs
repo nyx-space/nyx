@@ -860,7 +860,7 @@ impl Cosm {
         for i in (f_common_path.len()..new_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&new_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
-                    if new_frame_path.len() < state_frame_path.len() && i == f_common_path.len() {
+                    if new_frame_path.len() < state_frame_path.len() || i == f_common_path.len() {
                         dcm *= next_dcm.transpose();
                         negated_fwd = true;
                         println!("t1");
@@ -1552,9 +1552,9 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-JAN-2000 12:00:00.0000 TAI'
         // Pos: -5.681756320398799e+02  6.146783778323857e+03  2.259012130187828e+03
         // Vel: -4.610834400780483e+00 -2.190121576903486e+00  6.246541569551255e+00
-        assert!(dbg!(state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
-        assert!(dbg!(state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
-        assert!(dbg!(state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
+        assert!((state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
+        assert!((state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
+        assert!((state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
         // TODO: Fix the velocity computation
 
         // Case 2
@@ -1576,9 +1576,9 @@ mod tests {
 
         let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
         println!("{}\n{}", state_eme2k, state_ecef);
-        assert!(dbg!(state_ecef.x - 309.280_238_111_054_1).abs() < 1e-1);
-        assert!(dbg!(state_ecef.y - -3_431.791_232_988_777).abs() < 1e-1);
-        assert!(dbg!(state_ecef.z - 6_891.017_545_171_71).abs() < 1e-1);
+        assert!((state_ecef.x - 309.280_238_111_054_1).abs() < 1e-5);
+        assert!((state_ecef.y - -3_431.791_232_988_777).abs() < 1e-5);
+        assert!((state_ecef.z - 6_891.017_545_171_71).abs() < 1e-5);
 
         // Case 3
         // Earth Body Fixed state:
@@ -1599,9 +1599,9 @@ mod tests {
 
         let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
         println!("{}\n{}", state_eme2k, state_ecef);
-        assert!(dbg!(state_ecef.x - -1_424.497_118_292_03).abs() < 1e0);
-        assert!(dbg!(state_ecef.y - -3_137.502_417_055_381).abs() < 1e-1);
-        assert!(dbg!(state_ecef.z - 6_890.998_090_503_171).abs() < 1e-1);
+        assert!((state_ecef.x - -1_424.497_118_292_03).abs() < 1e-5);
+        assert!((state_ecef.y - -3_137.502_417_055_381).abs() < 1e-5);
+        assert!((state_ecef.z - 6_890.998_090_503_171).abs() < 1e-5);
 
         // Ground station example
         let dt = Epoch::from_gregorian_tai_hms(2020, 1, 1, 0, 0, 20);
@@ -1676,6 +1676,7 @@ mod tests {
         );
 
         // IAU Earth <-> EME2000
+        println!("\n=== IAU Earth <-> EME2000 ===\n");
         let dcm = cosm
             .try_frame_chg_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
             .unwrap();
