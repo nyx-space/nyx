@@ -30,17 +30,9 @@ pub struct FramesSerde {
 /// A structure specifying the format of a frame defined in TOML, or some other serialization.
 #[derive(Clone, Deserialize)]
 pub struct FrameSerde {
-    /// Refers to, or create, a unique identifier of the orientation defined by this frame.
-    orientation: i32,
-    /// Refers to, or create, a unique identifier of the center object defined by this frame.
-    center: i32,
     // Set this in the TOML to clone the negative values of this frame from another frame
     pub inherit: Option<String>,
     gm: f64,
-    /// Refers to the a unique identifier of the parent orientation of this frame (e.g. J2000 Ecliptic)
-    parent_orientation: Option<i32>,
-    /// Refers to the a unique identifier of the parent center object of this frame (e.g. Solar System Barycenter)
-    parent_center: Option<i32>,
     flattening: f64,
     equatorial_radius: f64,
     semi_major_radius: f64,
@@ -89,11 +81,7 @@ fn test_deser_frame_toml() {
     let frames: FramesSerde = toml::from_str(
         r#"
         [frames.iau_sun]
-        orientation = 10
-        center = 10
         gm = 132712440041.93938
-        parent_orientation = 0
-        parent_center = 0
         flattening = 0
         equatorial_radius = 696342.0
         semi_major_radius = 696342.0
@@ -106,12 +94,8 @@ fn test_deser_frame_toml() {
         t_prime = "1.0"  # Must be encasted in quote even if just a floating point value
 
         [frames.iau_sun2]
-        orientation = 10
-        center = 10
         inherit = "Sun J2000"
         gm = -1
-        parent_orientation = -1
-        parent_center = -1
         flattening = -1
         equatorial_radius = -1
         semi_major_radius = -1
@@ -126,11 +110,7 @@ fn test_deser_frame_toml() {
 
     let iau_sun = &frames.frames["iau_sun"];
 
-    assert_eq!(iau_sun.orientation, 10);
-    assert_eq!(iau_sun.center, 10);
     assert!((iau_sun.gm - 132_712_440_041.939_38).abs() < std::f64::EPSILON);
-    assert_eq!(iau_sun.parent_orientation.unwrap(), 0);
-    assert_eq!(iau_sun.parent_center.unwrap(), 0);
     assert!((iau_sun.equatorial_radius - 696_342.0).abs() < std::f64::EPSILON);
     assert!((iau_sun.semi_major_radius - 696_342.0).abs() < std::f64::EPSILON);
 
@@ -143,12 +123,8 @@ fn test_deser_frame_toml() {
     // And test the clonable frame
     let iau_sun = &frames.frames["iau_sun2"];
 
-    assert_eq!(iau_sun.orientation, 10);
-    assert_eq!(iau_sun.center, 10);
     assert_eq!(iau_sun.inherit.as_ref().unwrap(), "Sun J2000");
     assert!((iau_sun.gm - -1.0).abs() < std::f64::EPSILON);
-    assert_eq!(iau_sun.parent_orientation.unwrap(), -1);
-    assert_eq!(iau_sun.parent_center.unwrap(), -1);
     assert!((iau_sun.equatorial_radius - -1.0).abs() < std::f64::EPSILON);
     assert!((iau_sun.semi_major_radius - -1.0).abs() < std::f64::EPSILON);
 

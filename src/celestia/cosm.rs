@@ -855,14 +855,12 @@ impl Cosm {
             }
         };
 
-        let mut negated_fwd = false;
         // Walk forward from the destination state
         for i in (f_common_path.len()..new_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&new_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
                     if new_frame_path.len() < state_frame_path.len() || i == f_common_path.len() {
-                        dcm *= next_dcm.transpose();
-                        negated_fwd = true;
+                        dcm *= next_dcm;
                         println!("t1");
                     } else {
                         println!("t1 prime");
@@ -875,7 +873,7 @@ impl Cosm {
         for i in (f_common_path.len()..state_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&state_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
-                    if !negated_fwd || i == f_common_path.len() {
+                    if new_frame_path.len() >= state_frame_path.len() || i == f_common_path.len() {
                         // We just crossed the common point, so let's negate this state
                         dcm *= next_dcm.transpose();
                         println!("t2");
@@ -885,11 +883,6 @@ impl Cosm {
                     }
                 }
             }
-        }
-
-        if negated_fwd {
-            println!("t3");
-            dcm = dcm.transpose();
         }
 
         Ok(dcm)

@@ -1,11 +1,7 @@
 # From Archinal et al. 2015, Reports of the IAU Working Group on Cartographic Coordinates and Rotational Elements
 [frames.iau_sun]
-orientation = 10
-center = 10
 inherit = "Sun J2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -16,12 +12,8 @@ w = "84.176 + 14.18440000*d"
 angle_unit = "degrees"
 
 [frames.iau_venus]
-orientation = 200
-center = 2
 inherit = "Venus barycenter J2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -32,12 +24,8 @@ w = "160.20 - 1.4813688*d"
 angle_unit = "degrees"
 
 [frames.iau_earth]
-orientation = 300
-center = 399
 inherit = "EME2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -48,12 +36,8 @@ w = "190.147 + 360.9856235*d"
 angle_unit = "degrees"
 
 [frames.iau_mars]
-orientation = 400
-center = 4
 inherit = "Mars barycenter j2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -64,12 +48,8 @@ w = "176.049863 + 350.891982443297*d + 0.000145 * sin(129.071773 + 19140.0328244
 angle_unit = "degrees"
 
 [frames.iau_jupiter]
-orientation = 500
-center = 5
 inherit = "Jupiter barycenter j2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -86,12 +66,8 @@ Jd = "114.012305 + 6070.2476*T"
 Je = "49.511251 + 64.3000*T"
 
 [frames.iau_saturn]
-orientation = 600
-center = 6
 inherit = "Saturn barycenter j2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -102,12 +78,8 @@ w = "38.90 - 810.7939024*d"
 angle_unit = "degrees"
 
 [frames.iau_uranus]
-orientation = 700
-center = 7
 inherit = "Uranus barycenter j2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -118,12 +90,8 @@ w = "203.81 - 501.1600928*d"
 angle_unit = "degrees"
 
 [frames.iau_neptune]
-orientation = 800
-center = 8
 inherit = "Neptune barycenter j2000"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
@@ -137,12 +105,8 @@ N = "357 + 52.316*T"
 
 [frames.iau_moon]
 # Uses the Mean Earth rotation axis convention (like Monte)
-orientation = 301
-center = 301
 inherit = "Luna"
 gm = -1
-parent_orientation = 0
-parent_center = -1
 flattening = -1
 equatorial_radius = -1
 semi_major_radius = -1
