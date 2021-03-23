@@ -11,7 +11,7 @@ keywords = ["space", "mission", "design", "orbit", "estimation"]
 categories = ["science", "simulation"]
 readme = "README.md"
 license = "AGPL-3.0-or-later"
-exclude = ["tests/GMAT_scripts/*", "examples", "data/*.gz", "data/*.png", "data/od_plots/", "rustfmt.toml", "de438s.xb", "Pipfile*", ".vscode/launch.json", "*.kst", "docs/*"]
+exclude = ["tests/GMAT_scripts/*", "examples", "data/*.gz", "data/*.png", "data/od_plots/", "rustfmt.toml", "de438s.xb", "Pipfile*", ".vscode/launch.json", "*.kst", "docs/*", "*.bsp"]
 
 [badges]
 maintenance = { status = "actively-developed" }
@@ -46,6 +46,7 @@ lazy_static = "1.4.0"
 approx = "0.4"
 bacon-sci = "0.11"
 crossbeam = "0.8"
+rand_pcg = "0.3"
 
 [profile.dev]
 opt-level = 0

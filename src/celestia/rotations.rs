@@ -87,7 +87,7 @@ pub struct Euler3Axis {
 
 impl ParentRotation for Euler3Axis {
     fn dcm_to_parent(&self, _: Epoch) -> Option<Matrix3<f64>> {
-        Some(self.first.dcm() * self.second.dcm() * self.third.dcm())
+        Some(self.third.dcm() * self.second.dcm() * self.first.dcm())
     }
 }
 
@@ -169,6 +169,7 @@ impl Euler3AxisDt {
         context: HashMap<String, String>,
         unit: AngleUnit,
     ) -> Self {
+        // We initialize this backward on purpose, cf. https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/req/rotation.html#Working%20with%20RA,%20Dec%20and%20Twist
         Self::new(
             (EulerRotation::R3(0.0), alpha_right_asc),
             (EulerRotation::R1(0.0), delta_declin),
@@ -211,7 +212,7 @@ impl ParentRotation for Euler3AxisDt {
             );
         }
         let mut dcm = Matrix3::identity();
-        for (angle_no, (rot, expr)) in self.rot_order.iter().enumerate() {
+        for (angle_no, (rot, expr)) in self.rot_order.iter().rev().enumerate() {
             // Compute the correct angle
             match expr.eval_with_context(&ctx) {
                 Ok(eval_angle) => {
@@ -224,9 +225,9 @@ impl ParentRotation for Euler3AxisDt {
                     // Apply the angle transformation if needed
                     if self.is_ra_dec_w {
                         if angle_no == 1 {
-                            angle -= std::f64::consts::FRAC_PI_2;
-                        } else if angle_no == 0 {
                             angle = std::f64::consts::FRAC_PI_2 - angle;
+                        } else if angle_no == 2 {
+                            angle += std::f64::consts::FRAC_PI_2;
                         }
                     }
                     let rot_with_angl = match rot {

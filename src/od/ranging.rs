@@ -16,14 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate hyperdual;
-extern crate rand;
-extern crate rand_distr;
-
-use self::hyperdual::linalg::norm;
-use self::hyperdual::{hyperspace_from_vector, Hyperdual};
-use self::rand::thread_rng;
-use self::rand_distr::{Distribution, Normal};
+use super::hyperdual::linalg::norm;
+use super::hyperdual::{hyperspace_from_vector, Hyperdual};
+use super::rand::thread_rng;
+use super::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice, TimeTagged};

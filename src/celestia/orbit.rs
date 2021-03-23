@@ -957,6 +957,16 @@ impl Orbit {
         }
     }
 
+    /// Returns the altitude of periapsis (or perigee around Earth), in kilometers.
+    pub fn periapsis_altitude(&self) -> f64 {
+        self.periapsis() - self.frame.equatorial_radius()
+    }
+
+    /// Returns the altitude of apoapsis (or apogee around Earth), in kilometers.
+    pub fn apoapsis_altitude(&self) -> f64 {
+        self.apoapsis() - self.frame.equatorial_radius()
+    }
+
     /// Returns the eccentric anomaly in degrees
     ///
     /// This is a conversion from GMAT's StateConversionUtil::TrueToEccentricAnomaly

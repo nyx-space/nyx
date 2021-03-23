@@ -863,7 +863,9 @@ impl Cosm {
                     if new_frame_path.len() < state_frame_path.len() && i == f_common_path.len() {
                         dcm *= next_dcm.transpose();
                         negated_fwd = true;
+                        println!("t1");
                     } else {
+                        println!("t1 prime");
                         dcm *= next_dcm;
                     }
                 }
@@ -876,7 +878,9 @@ impl Cosm {
                     if !negated_fwd && i == f_common_path.len() {
                         // We just crossed the common point, so let's negate this state
                         dcm *= next_dcm.transpose();
+                        println!("t2");
                     } else {
+                        println!("t2 prime");
                         dcm *= next_dcm;
                     }
                 }
@@ -884,6 +888,7 @@ impl Cosm {
         }
 
         if negated_fwd {
+            println!("t3");
             dcm = dcm.transpose();
         }
 
@@ -1512,7 +1517,7 @@ mod tests {
         // Test an EME2k to Earth IAU rotation
 
         let eme2k = cosm.frame("EME2000");
-        let earth_iau = cosm.frame("IAU Earth"); // 2000 Model!!
+        let earth_iau = cosm.frame("IAU Earth");
         println!("{:?}\n{:?}", eme2k, earth_iau);
         let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
 
@@ -1620,5 +1625,77 @@ mod tests {
             Cosm::fix_frame_name("Mars barycenter j2000"),
             "Mars Barycenter J2000"
         );
+    }
+
+    #[test]
+    fn test_cosm_rotation_spiceypy() {
+        // These validation tests are from tests/spiceypy/rotations.py
+        use crate::dimensions::{Matrix3, Matrix6, Vector3};
+        let cosm = Cosm::de438();
+
+        let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);
+        // Moon Earth J2000
+        let out_state = cosm.celestial_state(
+            Bodies::Luna.ephem_path(),
+            et0,
+            cosm.frame("EME2000"),
+            LTCorr::None,
+        );
+        println!("{}", out_state);
+        let sp_ex = Vector3::new(341456.50984349, -123580.72487638, -87633.23833676);
+        println!(
+            "{}\n{:.3} m",
+            out_state.radius() - sp_ex,
+            (out_state.radius() - sp_ex).norm() * 1e3,
+        );
+        // Check that we are below 1 meter of error
+        assert!(
+            (out_state.radius() - sp_ex).norm() * 1e3 < 1.0,
+            "Larger than 1 meter error"
+        );
+
+        // Moon IAU Earth
+        let out_state = cosm.celestial_state(
+            Bodies::Luna.ephem_path(),
+            et0,
+            cosm.frame("IAU Earth"),
+            LTCorr::None,
+        );
+        println!("{}", out_state);
+        let sp_ex = Vector3::new(-7239.63398824, 363242.64460769, -86871.72713248);
+        println!(
+            "{}\n{:.3} m",
+            out_state.radius() - sp_ex,
+            (out_state.radius() - sp_ex).norm() * 1e3,
+        );
+
+        assert!(
+            (out_state.radius() - sp_ex).norm() * 1e3 < 1.0,
+            "Larger than 1 meter error"
+        );
+
+        let dcm = cosm
+            .try_frame_chg_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
+            .unwrap();
+
+        // Position rotation first
+        let sp_ex = Matrix3::new(
+            -3.58819172e-01,
+            -9.33406755e-01,
+            7.93935415e-04,
+            9.33404435e-01,
+            -3.58820051e-01,
+            -2.08119539e-03,
+            2.22748179e-03,
+            -5.70997090e-06,
+            9.99997519e-01,
+        );
+
+        println!("{}", (dcm - sp_ex).norm());
+
+        let dcm_return = cosm
+            .try_frame_chg_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
+            .unwrap();
+        println!("{}", (dcm.transpose() - dcm_return).norm());
     }
 }

@@ -22,7 +22,9 @@ extern crate rayon;
 use self::rayon::prelude::*;
 use super::MdHdlr;
 pub use super::{trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
-pub use crate::celestia::{BPlane, Bodies, Cosm, LTCorr, Orbit, OrbitDual};
+pub use crate::celestia::{
+    achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, LTCorr, Orbit, OrbitDual,
+};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::{
@@ -40,7 +42,7 @@ pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
 use std::convert::TryFrom;
 use std::str::FromStr;
-use std::sync::Arc;
+pub use std::sync::Arc;
 use std::time::Instant;
 
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics

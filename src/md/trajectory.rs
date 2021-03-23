@@ -702,12 +702,14 @@ where
     DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let dur = self.last().epoch() - self.first().epoch();
         write!(
             f,
-            "Trajectory from {} to {} ({} segments)",
+            "Trajectory from {} to {} ({}, or {:.3} s)",
             self.first().epoch(),
             self.last().epoch(),
-            self.segments.len()
+            dur,
+            dur.in_seconds()
         )
     }
 }

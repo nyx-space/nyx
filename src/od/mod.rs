@@ -16,6 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+extern crate hyperdual;
+extern crate rand;
+extern crate rand_distr;
 extern crate serde;
 
 use crate::dimensions::allocator::Allocator;

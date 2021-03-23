@@ -54,6 +54,9 @@ pub mod tools;
 /// Optimization module
 pub mod opti;
 
+/// Monte Carlo module
+pub mod mc;
+
 #[macro_use]
 extern crate log;
 extern crate hifitime;

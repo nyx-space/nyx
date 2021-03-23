@@ -10,6 +10,7 @@ astropy = "*"
 numpy = "*"
 pandas = "*"
 matplotlib = "*"
+spiceypy = "*"
 
 [requires]
 python_version = "3.6"

@@ -34,6 +34,8 @@ pub mod trajectory;
 mod events;
 pub use events::{Event, EventEvaluator};
 
+pub mod targeter;
+
 pub type ScTraj = trajectory::Traj<Spacecraft>;
 pub type Ephemeris = trajectory::Traj<Orbit>;
 

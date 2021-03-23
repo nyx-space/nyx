@@ -22,7 +22,7 @@ use super::{Frame, Orbit, OrbitDual};
 use crate::dimensions::{Matrix2, Matrix3, Vector2, Vector3, U2, U7};
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
-use crate::utils::between_0_360;
+use crate::utils::between_pm_180;
 use crate::NyxError;
 
 use std::convert::From;
@@ -132,9 +132,9 @@ impl BPlane {
         self.ltof_s.real() * TimeUnit::Second
     }
 
-    /// Returns the B plane angle in degrees between 0 and 360
+    /// Returns the B plane angle in degrees between -180 and 180
     pub fn angle(&self) -> f64 {
-        between_0_360(self.b_dot_r().atan2(self.b_dot_t()).to_degrees())
+        between_pm_180(self.b_dot_r().atan2(self.b_dot_t()).to_degrees())
     }
 
     /// Returns the B plane vector magnitude, in kilometers
