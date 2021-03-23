@@ -875,7 +875,7 @@ impl Cosm {
         for i in (f_common_path.len()..state_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&state_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
-                    if !negated_fwd && i == f_common_path.len() {
+                    if !negated_fwd || i == f_common_path.len() {
                         // We just crossed the common point, so let's negate this state
                         dcm *= next_dcm.transpose();
                         println!("t2");
@@ -1631,6 +1631,7 @@ mod tests {
     fn test_cosm_rotation_spiceypy() {
         // These validation tests are from tests/spiceypy/rotations.py
         use crate::dimensions::{Matrix3, Matrix6, Vector3};
+        use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
         let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);
@@ -1674,6 +1675,7 @@ mod tests {
             "Larger than 1 meter error"
         );
 
+        // IAU Earth <-> EME2000
         let dcm = cosm
             .try_frame_chg_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
             .unwrap();
@@ -1696,6 +1698,35 @@ mod tests {
         let dcm_return = cosm
             .try_frame_chg_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
             .unwrap();
-        println!("{}", (dcm.transpose() - dcm_return).norm());
+        println!("{}", (dcm.transpose() - dcm_return).norm()); // TODO: Add as test!
+
+        // IAU Earth <-> IAU Mars
+        println!("\n=== IAU Earth <-> IAU Mars ===\n");
+        let dcm = cosm
+            .try_frame_chg_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("iau mars"), et0)
+            .unwrap();
+
+        // Position rotation first
+        let sp_ex = Matrix3::new(
+            2.58117084e-01,
+            7.55715666e-01,
+            -6.01888198e-01,
+            -9.40722808e-01,
+            3.38489522e-01,
+            2.15741174e-02,
+            2.20036747e-01,
+            5.60641307e-01,
+            7.98288891e-01,
+        );
+
+        println!("{}", (dcm - sp_ex).norm());
+
+        let dcm_return = cosm
+            .try_frame_chg_dcm_from_to(&cosm.frame("iau mars"), &cosm.frame("iau_earth"), et0)
+            .unwrap();
+        assert!(
+            (dcm.transpose() - dcm_return).norm() < EPSILON,
+            "Return DCM is not the transpose of the forward"
+        );
     }
 }
