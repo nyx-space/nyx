@@ -171,7 +171,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self
             .cosm
-            .try_frame_chg_dcm_from_to(&osc.frame, &self.compute_frame, osc.dt)?;
+            .try_position_dcm_from_to(&osc.frame, &self.compute_frame, osc.dt)?;
         // Convert to the computation frame
         let mut state = *osc;
         state.apply_dcm(dcm);
@@ -270,7 +270,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm =
             self.cosm
-                .try_frame_chg_dcm_from_to(&ctx.frame, &self.compute_frame, ctx.epoch())?;
+                .try_position_dcm_from_to(&ctx.frame, &self.compute_frame, ctx.epoch())?;
         // Convert DCM to Hyperdual DCMs
         let mut dcm_d = Matrix3::<Hyperdual<f64, U7>>::zeros();
         for i in 0..3 {

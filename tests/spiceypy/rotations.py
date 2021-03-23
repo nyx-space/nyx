@@ -17,8 +17,8 @@ def sxform_val(inf, outf, et):
     print(sp.sxform(inf, outf, et))
 
 
+sxform_val('iau_earth', 'j2000', et)
 sxform_val('j2000', 'iau_earth', et)
 
-sxform_val('iau_earth', 'j2000', et)
 sxform_val('iau_earth', 'iau_mars', et)
 sxform_val('iau_mars', 'iau_earth', et)

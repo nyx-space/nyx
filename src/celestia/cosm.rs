@@ -33,7 +33,7 @@ use super::SPEED_OF_LIGHT_KMS;
 use crate::errors::NyxError;
 use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
-use crate::na::Matrix3;
+use crate::na::{Matrix3, Matrix6};
 use crate::utils::{capitalize, rotv};
 use std::collections::HashMap;
 use std::fmt;
@@ -824,8 +824,8 @@ impl Cosm {
             .unwrap()
     }
 
-    /// Return the DCM to go from the `from` frame to the `to` frame
-    pub fn try_frame_chg_dcm_from_to(
+    /// Return the position DCM (3x3) to go from the `from` frame to the `to` frame
+    pub fn try_position_dcm_from_to(
         &self,
         from: &Frame,
         to: &Frame,
@@ -856,11 +856,14 @@ impl Cosm {
         };
 
         // Walk forward from the destination state
+        let transpose_backward = f_common_path.len() != new_frame_path.len()
+            && f_common_path.len() != state_frame_path.len();
         for i in (f_common_path.len()..new_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&new_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
-                    if new_frame_path.len() < state_frame_path.len() || i == f_common_path.len() {
-                        dcm *= next_dcm;
+                    // transpose_backward = true;
+                    if !transpose_backward {
+                        dcm *= next_dcm.transpose();
                         println!("t1");
                     } else {
                         println!("t1 prime");
@@ -873,7 +876,7 @@ impl Cosm {
         for i in (f_common_path.len()..state_frame_path.len()).rev() {
             if let Some(parent_rot) = &get_dcm(&state_frame_path[0..=i]).parent_rotation {
                 if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
-                    if new_frame_path.len() >= state_frame_path.len() || i == f_common_path.len() {
+                    if transpose_backward {
                         // We just crossed the common point, so let's negate this state
                         dcm *= next_dcm.transpose();
                         println!("t2");
@@ -886,6 +889,34 @@ impl Cosm {
         }
 
         Ok(dcm)
+    }
+
+    /// Return the position and velocity DCM (6x6) to go from the `from` frame to the `to` frame
+    #[allow(clippy::identity_op)]
+    pub fn try_dcm_from_to(
+        &self,
+        from: &Frame,
+        to: &Frame,
+        dt: Epoch,
+    ) -> Result<Matrix6<f64>, NyxError> {
+        let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
+        // Compute the dRdt DCM with finite differencing
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+        let drdt = 0.5 * post_r_dcm - 0.5 * pre_r_dcm;
+
+        let mut full_dcm = Matrix6::zeros();
+        for i in 0..6 {
+            for j in 0..6 {
+                if (i < 3 && j < 3) || (i >= 3 && j >= 3) {
+                    full_dcm[(i, j)] = r_dcm[(i % 3, j % 3)];
+                } else if i >= 3 && j < 3 {
+                    full_dcm[(i, j)] = drdt[(i - 3, j)];
+                }
+            }
+        }
+
+        Ok(full_dcm)
     }
 
     /// Attempts to return the provided state in the provided frame.
@@ -958,7 +989,7 @@ impl Cosm {
         new_state.frame = new_frame;
 
         // And now let's compute the rotation path
-        new_state.apply_dcm(self.try_frame_chg_dcm_from_to(&state.frame, &new_frame, state.dt)?);
+        new_state.apply_dcm(self.try_position_dcm_from_to(&state.frame, &new_frame, state.dt)?);
         Ok(new_state)
     }
 
@@ -1152,7 +1183,7 @@ mod tests {
         assert!(
             is_diagonal(
                 &cosm
-                    .try_frame_chg_dcm_from_to(
+                    .try_position_dcm_from_to(
                         &cosm.frame("Earth Barycenter J2000"),
                         &cosm.frame("Earth Barycenter J2000"),
                         jde
@@ -1165,7 +1196,7 @@ mod tests {
         assert!(
             is_diagonal(
                 &cosm
-                    .try_frame_chg_dcm_from_to(
+                    .try_position_dcm_from_to(
                         &cosm.frame("Venus Barycenter J2000"),
                         &cosm.frame("EME2000"),
                         jde
@@ -1178,7 +1209,7 @@ mod tests {
         assert!(
             !is_diagonal(
                 &cosm
-                    .try_frame_chg_dcm_from_to(
+                    .try_position_dcm_from_to(
                         &cosm.frame("Venus Barycenter J2000"),
                         &cosm.frame("IAU Sun"),
                         jde
@@ -1191,7 +1222,7 @@ mod tests {
         assert!(
             !is_diagonal(
                 &cosm
-                    .try_frame_chg_dcm_from_to(
+                    .try_position_dcm_from_to(
                         &cosm.frame("IAU Sun"),
                         &cosm.frame("Venus Barycenter J2000"),
                         jde
@@ -1545,9 +1576,9 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-JAN-2000 12:00:00.0000 TAI'
         // Pos: -5.681756320398799e+02  6.146783778323857e+03  2.259012130187828e+03
         // Vel: -4.610834400780483e+00 -2.190121576903486e+00  6.246541569551255e+00
-        assert!((state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
-        assert!((state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
-        assert!((state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
+        assert!(dbg!(state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
+        assert!(dbg!(state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
+        assert!(dbg!(state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
         // TODO: Fix the velocity computation
 
         // Case 2
@@ -1621,9 +1652,9 @@ mod tests {
     }
 
     #[test]
-    fn test_cosm_rotation_spiceypy() {
+    fn test_cosm_rotation_spiceypy_pos_dcm() {
         // These validation tests are from tests/spiceypy/rotations.py
-        use crate::dimensions::{Matrix3, Matrix6, Vector3};
+        use crate::dimensions::{Matrix3, Vector3};
         use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
@@ -1671,7 +1702,7 @@ mod tests {
         // IAU Earth <-> EME2000
         println!("\n=== IAU Earth <-> EME2000 ===\n");
         let dcm = cosm
-            .try_frame_chg_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
+            .try_position_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
             .unwrap();
 
         // Position rotation first
@@ -1688,16 +1719,17 @@ mod tests {
         );
 
         println!("{}", (dcm - sp_ex).norm());
+        assert!((dcm - sp_ex).norm() < 1e-6, "3x3 DCM error");
 
         let dcm_return = cosm
-            .try_frame_chg_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
+            .try_position_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
             .unwrap();
         println!("{}", (dcm.transpose() - dcm_return).norm()); // TODO: Add as test!
 
         // IAU Earth <-> IAU Mars
         println!("\n=== IAU Earth <-> IAU Mars ===\n");
         let dcm = cosm
-            .try_frame_chg_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("iau mars"), et0)
+            .try_position_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("iau mars"), et0)
             .unwrap();
 
         // Position rotation first
@@ -1714,13 +1746,246 @@ mod tests {
         );
 
         println!("{}", (dcm - sp_ex).norm());
+        assert!((dcm - sp_ex).norm() < 1e-1, "3x3 DCM error"); // Error larger here because IAU Mars defined differently in SPICE than IAU
 
         let dcm_return = cosm
-            .try_frame_chg_dcm_from_to(&cosm.frame("iau mars"), &cosm.frame("iau_earth"), et0)
+            .try_position_dcm_from_to(&cosm.frame("iau mars"), &cosm.frame("iau_earth"), et0)
             .unwrap();
         assert!(
             (dcm.transpose() - dcm_return).norm() < EPSILON,
             "Return DCM is not the transpose of the forward"
+        );
+    }
+
+    #[test]
+    fn test_cosm_rotation_spiceypy_dcm() {
+        // These validation tests are from tests/spiceypy/rotations.py
+        use crate::dimensions::Matrix6;
+        let cosm = Cosm::de438();
+
+        let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);
+
+        // IAU Earth <-> EME2000
+        println!("\n=== IAU Earth <-> EME2000 ===\n");
+        let dcm = cosm
+            .try_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
+            .unwrap();
+
+        let sp_iau_earth_2_eme2k = Matrix6::new(
+            // First row
+            -3.58819172e-01,
+            9.33404435e-01,
+            2.22748179e-03,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            -9.33406755e-01,
+            -3.58820051e-01,
+            -5.70997090e-06,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            7.93935415e-04,
+            -2.08119539e-03,
+            9.99997519e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            6.80649250e-05,
+            2.61655068e-05,
+            3.08051436e-12,
+            -3.58819172e-01,
+            9.33404435e-01,
+            2.22748179e-03,
+            // Fifth row
+            -2.61655708e-05,
+            6.80650942e-05,
+            -1.57934025e-14,
+            -9.33406755e-01,
+            -3.58820051e-01,
+            -5.70997090e-06,
+            // Sixth row
+            -1.51762071e-07,
+            -5.78975647e-08,
+            -6.86189683e-15,
+            7.93935415e-04,
+            -2.08119539e-03,
+            9.99997519e-01,
+        );
+
+        println!("dcm {}\n{:.1e}", dcm, (dcm - sp_iau_earth_2_eme2k).norm());
+
+        let sp_eme2k_2_iau_earth = Matrix6::new(
+            // First row
+            -3.58819172e-01,
+            -9.33406755e-01,
+            7.93935415e-04,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            9.33404435e-01,
+            -3.58820051e-01,
+            -2.08119539e-03,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            2.22748179e-03,
+            -5.70997090e-06,
+            9.99997519e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            6.80649250e-05,
+            -2.61655708e-05,
+            -1.51762071e-07,
+            -3.58819172e-01,
+            -9.33406755e-01,
+            7.93935415e-04,
+            // Fifth row
+            2.61655068e-05,
+            6.80650942e-05,
+            -5.78975647e-08,
+            9.33404435e-01,
+            -3.58820051e-01,
+            -2.08119539e-03,
+            // Sixth row
+            3.08051436e-12,
+            -1.57934025e-14,
+            -6.86189683e-15,
+            2.22748179e-03,
+            -5.70997090e-06,
+            9.99997519e-01,
+        );
+
+        let dcm_return = cosm
+            .try_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
+            .unwrap();
+
+        println!(
+            "dcm {}\n{:.1e}",
+            dcm_return,
+            (dcm_return - sp_eme2k_2_iau_earth).norm()
+        );
+
+        // IAU Earth <-> IAU Mars
+        println!("\n=== IAU Earth <-> IAU Mars ===\n");
+        let dcm = cosm
+            .try_dcm_from_to(&cosm.frame("iau mars"), &cosm.frame("iau earth"), et0)
+            .unwrap();
+
+        // Position rotation first
+        let sp_iau_mars_2_iau_earth = Matrix6::new(
+            // First row
+            2.58117084e-01,
+            -9.40722808e-01,
+            2.20036747e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            7.55715666e-01,
+            3.38489522e-01,
+            5.60641307e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            -6.01888198e-01,
+            2.15741174e-02,
+            7.98288891e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            -1.15728287e-05,
+            6.38714373e-06,
+            4.08826103e-05,
+            2.58117084e-01,
+            -9.40722808e-01,
+            2.20036747e-01,
+            // Fifth row
+            5.17068221e-06,
+            1.50318153e-05,
+            -1.60453349e-05,
+            7.55715666e-01,
+            3.38489522e-01,
+            5.60641307e-01,
+            // Sixth row
+            1.52922212e-06,
+            4.26631500e-05,
+            1.17187529e-12,
+            -6.01888198e-01,
+            2.15741174e-02,
+            7.98288891e-01,
+        );
+
+        println!(
+            "dcm {}\n{:.1e}",
+            dcm,
+            (dcm - sp_iau_mars_2_iau_earth).norm()
+        );
+
+        // And backward
+        // Position rotation first
+        let sp_iau_earth_2_iau_mars = Matrix6::new(
+            // First row
+            2.58117084e-01,
+            7.55715666e-01,
+            -6.01888198e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            -9.40722808e-01,
+            3.38489522e-01,
+            2.15741174e-02,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            2.20036747e-01,
+            5.60641307e-01,
+            7.98288891e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            -1.15728287e-05,
+            5.17068221e-06,
+            1.52922212e-06,
+            2.58117084e-01,
+            7.55715666e-01,
+            -6.01888198e-01,
+            // Fifth row
+            6.38714373e-06,
+            1.50318153e-05,
+            4.26631500e-05,
+            -9.40722808e-01,
+            3.38489522e-01,
+            2.15741174e-02,
+            // Sixth row
+            4.08826103e-05,
+            -1.60453349e-05,
+            1.17187529e-12,
+            2.20036747e-01,
+            5.60641307e-01,
+            7.98288891e-01,
+        );
+
+        let dcm_return = cosm
+            .try_dcm_from_to(&cosm.frame("iau earth"), &cosm.frame("iau mars"), et0)
+            .unwrap();
+
+        println!(
+            "dcm {}\n{:.1e}",
+            dcm_return,
+            (dcm_return - sp_iau_earth_2_iau_mars).norm()
         );
     }
 }
