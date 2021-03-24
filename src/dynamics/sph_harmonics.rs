@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, Hyperdual};
 use crate::celestia::{Cosm, Frame, Orbit};
-use crate::dimensions::{DMatrix, Matrix3, Vector3, Vector6, U3, U7};
+use crate::dimensions::{DMatrix, Matrix3, Vector3, U7};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
 use crate::io::gravity::GravityPotentialStor;
@@ -66,8 +66,7 @@ where
 
         // Initialize the diagonal elements (not a function of the input)
         a_nm[(0, 0)] = 1.0;
-        a_nm[(1, 1)] = 3.0f64.sqrt(); // This is the same formulation as below for n=1
-        for n in 2..=degree_np2 {
+        for n in 1..=degree_np2 {
             let nf64 = n as f64;
             // Diagonal element
             a_nm[(n, n)] = (1.0 + 1.0 / (2.0 * nf64)).sqrt() * a_nm[(n - 1, n - 1)];
@@ -171,17 +170,16 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self
             .cosm
-            .try_dcm_from_to(&osc.frame, &self.compute_frame, osc.dt)?;
+            .try_position_dcm_from_to(&osc.frame, &self.compute_frame, osc.dt)?;
         // Convert to the computation frame
-        let mut state = *osc;
-        state.rotate_by(dcm);
+        let state = osc.with_position_rotated_by(dcm);
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = state.rmag();
         let s_ = state.x / r_;
         let t_ = state.y / r_;
         let u_ = state.z / r_;
-        let max_degree = self.stor.max_degree_n() as usize; // In GMAT, the order is NN
+        let max_degree = self.stor.max_degree_n() as usize; // In GMAT, the degree is NN
         let max_order = self.stor.max_order_m() as usize; // In GMAT, the order is MM
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
@@ -198,7 +196,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         for m in 0..=max_order + 1 {
             for n in (m + 2)..=max_degree + 1 {
                 let hm_idx = (n, m);
-                a_nm[(n, m)] = u_ * self.b_nm[hm_idx] * a_nm[(n - 1, m)]
+                a_nm[hm_idx] = u_ * self.b_nm[hm_idx] * a_nm[(n - 1, m)]
                     - self.c_nm[hm_idx] * a_nm[(n - 2, m)];
             }
         }
@@ -216,6 +214,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         }
 
         let rho = self.compute_frame.equatorial_radius() / r_;
+        let mut rho_np1 = self.compute_frame.gm() / r_ * rho;
         let mut a0 = 0.0;
         let mut a1 = 0.0;
         let mut a2 = 0.0;
@@ -226,19 +225,20 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
             let mut sum1 = 0.0;
             let mut sum2 = 0.0;
             let mut sum3 = 0.0;
+            rho_np1 *= rho;
 
             for m in 0..=min(n, max_order) {
                 let (c_val, s_val) = self.stor.cs_nm(n, m);
-                let d_ = c_val * r_m[m] + s_val * i_m[m];
+                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * 2.0.sqrt();
                 let e_ = if m == 0 {
                     0.0
                 } else {
-                    c_val * r_m[m - 1] + s_val * i_m[m - 1]
+                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * 2.0.sqrt()
                 };
                 let f_ = if m == 0 {
                     0.0
                 } else {
-                    s_val * r_m[m - 1] - c_val * i_m[m - 1]
+                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * 2.0.sqrt()
                 };
 
                 sum0 += (m as f64) * a_nm[(n, m)] * e_;
@@ -246,21 +246,16 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
                 sum2 += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
                 sum3 += self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
-            let rr = rho.powi(n as i32 + 1);
+            // let rr = rho.powi(n as i32 + 1);
+            let rr = rho_np1 / self.compute_frame.equatorial_radius();
             a0 += rr * sum0;
             a1 += rr * sum1;
             a2 += rr * sum2;
-            a3 += rr * sum3;
+            a3 -= rr * sum3;
         }
-        let mu_fact = self.compute_frame.gm() / (self.compute_frame.equatorial_radius() * r_);
-        a0 *= mu_fact;
-        a1 *= mu_fact;
-        a2 *= mu_fact;
-        a3 *= -mu_fact;
-        let accel = Vector6::new(0.0, 0.0, 0.0, a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
-        // Convert back to integration frame and extract the acceleration components only
-        let full_state = dcm.transpose() * accel;
-        Ok(full_state.fixed_rows::<U3>(3).into_owned())
+        let accel = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
+        // Convert back to integration frame
+        Ok(dcm.transpose() * accel)
     }
 
     fn dual_eom(
