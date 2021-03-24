@@ -1251,6 +1251,25 @@ impl Orbit {
         self.vz = new_orbit[5];
     }
 
+    /// Rotate this state provided a direct cosine matrix of position and velocity
+    pub fn with_rotation_by(&self, dcm: Matrix6<f64>) -> Self {
+        let mut me = *self;
+        me.rotate_by(dcm);
+        me
+    }
+
+    /// Rotate the position of this state provided a direct cosine matrix of position and velocity
+    /// WARNING: You only want to use this if you'll only be using the position components of the rotated state.
+    /// This does not account for the transport theorem and therefore is physically WRONG.
+    pub fn with_position_rotated_by(&self, dcm: Matrix3<f64>) -> Self {
+        let mut me = *self;
+        let new_radius = dcm * me.radius();
+        me.x = new_radius[0];
+        me.y = new_radius[1];
+        me.z = new_radius[2];
+        me
+    }
+
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.stm = Some(Matrix6::identity());
