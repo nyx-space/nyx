@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, Hyperdual};
 use crate::celestia::{Cosm, Frame, Orbit};
-use crate::dimensions::{DMatrix, Matrix3, Vector3, U7};
+use crate::dimensions::{DMatrix, Matrix3, Vector3, Vector6, U3, U7};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
 use crate::io::gravity::GravityPotentialStor;
@@ -171,10 +171,10 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm = self
             .cosm
-            .try_position_dcm_from_to(&osc.frame, &self.compute_frame, osc.dt)?;
+            .try_dcm_from_to(&osc.frame, &self.compute_frame, osc.dt)?;
         // Convert to the computation frame
         let mut state = *osc;
-        state.apply_dcm(dcm);
+        state.rotate_by(dcm);
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = state.rmag();
@@ -257,9 +257,10 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         a1 *= mu_fact;
         a2 *= mu_fact;
         a3 *= -mu_fact;
-        let accel = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
-        // Convert back to integration frame
-        Ok(dcm.transpose() * accel)
+        let accel = Vector6::new(0.0, 0.0, 0.0, a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
+        // Convert back to integration frame and extract the acceleration components only
+        let full_state = dcm.transpose() * accel;
+        Ok(full_state.fixed_rows::<U3>(3).into_owned())
     }
 
     fn dual_eom(

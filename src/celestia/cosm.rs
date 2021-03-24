@@ -974,7 +974,7 @@ impl Cosm {
         new_state.frame = new_frame;
 
         // And now let's compute the rotation path
-        new_state.apply_dcm(self.try_position_dcm_from_to(&state.frame, &new_frame, state.dt)?);
+        new_state.rotate_by(self.try_dcm_from_to(&state.frame, &new_frame, state.dt)?);
         Ok(new_state)
     }
 
@@ -1055,12 +1055,12 @@ mod tests {
 
         let out_state = cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, ssb2k, c);
         assert_eq!(out_state.frame.ephem_path(), vec![]);
-        assert!((out_state.x - -109_837_695.021_661_42).abs() < 1e-13);
-        assert!((out_state.y - 89_798_622.194_651_56).abs() < 1e-13);
-        assert!((out_state.z - 38_943_878.275_922_61).abs() < 1e-13);
-        assert!((out_state.vx - -20.400_327_981_451_596).abs() < 1e-13);
-        assert!((out_state.vy - -20.413_134_121_084_312).abs() < 1e-13);
-        assert!((out_state.vz - -8.850_448_420_104_028).abs() < 1e-13);
+        assert!((out_state.x - -109_837_695.021_661_42).abs() < EPSILON);
+        assert!((out_state.y - 89_798_622.194_651_56).abs() < EPSILON);
+        assert!((out_state.z - 38_943_878.275_922_61).abs() < EPSILON);
+        assert!(dbg!(out_state.vx - -20.400_327_981_451_596).abs() < 1e-14);
+        assert!((out_state.vy - -20.413_134_121_084_312).abs() < EPSILON);
+        assert!((out_state.vz - -8.850_448_420_104_028).abs() < EPSILON);
 
         // And the opposite transformation
         let out_state = cosm.celestial_state(Bodies::SSB.ephem_path(), jde, earth_bary2k, c);
@@ -1068,31 +1068,33 @@ mod tests {
             out_state.frame.ephem_path(),
             Bodies::EarthBarycenter.ephem_path()
         );
-        assert!((out_state.x - 109_837_695.021_661_42).abs() < 1e-13);
-        assert!((out_state.y - -89_798_622.194_651_56).abs() < 1e-13);
-        assert!((out_state.z - -38_943_878.275_922_61).abs() < 1e-13);
-        assert!((out_state.vx - 20.400_327_981_451_596).abs() < 1e-13);
-        assert!((out_state.vy - 20.413_134_121_084_312).abs() < 1e-13);
-        assert!((out_state.vz - 8.850_448_420_104_028).abs() < 1e-13);
+        assert!((out_state.x - 109_837_695.021_661_42).abs() < EPSILON);
+        assert!((out_state.y - -89_798_622.194_651_56).abs() < EPSILON);
+        assert!((out_state.z - -38_943_878.275_922_61).abs() < EPSILON);
+        assert!((out_state.vx - 20.400_327_981_451_596).abs() < 1e-14);
+        assert!((out_state.vy - 20.413_134_121_084_312).abs() < EPSILON);
+        assert!((out_state.vz - 8.850_448_420_104_028).abs() < EPSILON);
 
         let out_state =
             cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_moon2k, c);
         assert_eq!(out_state.frame.ephem_path(), Bodies::Luna.ephem_path());
-        assert!((out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
-        assert!((out_state.y - 345_462.617_249_631_9).abs() < 1e-9);
-        assert!((out_state.z - 144_380.059_413_586_45).abs() < 1e-9);
-        assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < 1e-12);
-        assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < 1e-12);
-        assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < 1e-12);
+        // Error slightly larger in X, but still at micrometer level
+        assert!(dbg!(out_state.x - 81_638.253_069_843_03).abs() < 1e-10);
+        assert!((out_state.y - 345_462.617_249_631_9).abs() < EPSILON);
+        assert!((out_state.z - 144_380.059_413_586_45).abs() < EPSILON);
+        assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < EPSILON);
+        assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < EPSILON);
+        assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < EPSILON);
         // Add the reverse test too
         let out_state = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, earth_bary2k, c);
         assert_eq!(
             out_state.frame.ephem_path(),
             Bodies::EarthBarycenter.ephem_path()
         );
-        assert!((out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
-        assert!((out_state.y - -345_462.617_249_631_9).abs() < 1e-10);
-        assert!((out_state.z - -144_380.059_413_586_45).abs() < 1e-10);
+        // Error slightly larger in X, but still at micrometer level
+        assert!(dbg!(out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
+        assert!((out_state.y - -345_462.617_249_631_9).abs() < EPSILON);
+        assert!((out_state.z - -144_380.059_413_586_45).abs() < EPSILON);
         assert!((out_state.vx - 0.960_674_300_894_127_2).abs() < EPSILON);
         assert!((out_state.vy - -0.203_736_475_764_411_6).abs() < EPSILON);
         assert!((out_state.vz - -0.183_869_552_742_917_6).abs() < EPSILON);
@@ -1218,10 +1220,6 @@ mod tests {
         );
 
         let c = LTCorr::None;
-        // Error is sometimes up to 0.6 meters!
-        // I think this is related to https://github.com/brandon-rhodes/python-jplephem/issues/33
-        let tol_pos = 7e-4; // km
-        let tol_vel = 5e-7; // km/s
 
         /*
         # Preceed all of the following python examples with
@@ -1239,12 +1237,12 @@ mod tests {
         ['2.0512621957200775e+08', '-1.3561254792308527e+08', '-6.5578399676151529e+07', '3.6051374278177832e+01', '4.8889024622170766e+01', '2.0702933800843084e+01']
         */
         // NOTE: Venus position is quite off, not sure why.
-        assert!(dbg!(ven2ear_state.x - 2.051_262_195_720_077_5e8).abs() < 7e-4);
+        assert!(dbg!(ven2ear_state.x - 2.051_262_195_720_077_5e8).abs() < 5e-4);
         assert!(dbg!(ven2ear_state.y - -1.356_125_479_230_852_7e8).abs() < 7e-4);
-        assert!(dbg!(ven2ear_state.z - -6.557_839_967_615_153e7).abs() < 7e-4);
-        assert!(dbg!(ven2ear_state.vx - 3.605_137_427_817_783e1).abs() < 10.0 * tol_vel);
-        assert!(dbg!(ven2ear_state.vy - 4.888_902_462_217_076_6e1).abs() < 10.0 * tol_vel);
-        assert!(dbg!(ven2ear_state.vz - 2.070_293_380_084_308_4e1).abs() < 10.0 * tol_vel);
+        assert!(dbg!(ven2ear_state.z - -6.557_839_967_615_153e7).abs() < 4e-4);
+        assert!(dbg!(ven2ear_state.vx - 3.605_137_427_817_783e1).abs() < 1e-8);
+        assert!(dbg!(ven2ear_state.vy - 4.888_902_462_217_076_6e1).abs() < 1e-8);
+        assert!(dbg!(ven2ear_state.vz - 2.070_293_380_084_308_4e1).abs() < 1e-8);
 
         // Check that conversion via a center frame works
         let earth_bary = cosm.frame("Earth Barycenter J2000");
@@ -1255,24 +1253,24 @@ mod tests {
         ['-8.1576591043050896e+04', '-3.4547568914480874e+05', '-1.4439185901465410e+05', '9.6071184439702662e-01', '-2.0358322542180365e-01', '-1.8380551745739407e-01']
         */
         assert_eq!(moon_from_emb.frame, earth_bary);
-        assert!(dbg!(moon_from_emb.x - -8.157_659_104_305_09e4).abs() < tol_pos);
-        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < tol_pos);
-        assert!(dbg!(moon_from_emb.z - -1.443_918_590_146_541e5).abs() < tol_pos);
-        assert!(dbg!(moon_from_emb.vx - 9.607_118_443_970_266e-1).abs() < tol_vel);
-        assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < tol_vel);
-        assert!(dbg!(moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < tol_vel);
+        assert!(dbg!(moon_from_emb.x - -8.157_659_104_305_09e4).abs() < 1e-4);
+        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < 1e-5);
+        assert!(dbg!(moon_from_emb.z - -1.443_918_590_146_541e5).abs() < 1e-5);
+        assert!(dbg!(moon_from_emb.vx - 9.607_118_443_970_266e-1).abs() < 1e-8);
+        assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < 1e-8);
+        assert!(dbg!(moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < 1e-8);
 
         let earth_from_emb = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, earth_bary, c);
         /*
         >>> ['{:.16e}'.format(x) for x in sp.spkez(399, et, "J2000", "NONE", 3)[0]]
         ['1.0033950894874154e+03', '4.2493637646888546e+03', '1.7760252107225667e+03', '-1.1816791248014408e-02', '2.5040812085717632e-03', '2.2608146685133296e-03']
         */
-        assert!((earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < tol_pos);
-        assert!((earth_from_emb.y - 4.249_363_764_688_855e3).abs() < tol_pos);
-        assert!((earth_from_emb.z - 1.776_025_210_722_566_7e3).abs() < tol_pos);
-        assert!((earth_from_emb.vx - -1.181_679_124_801_440_8e-2).abs() < tol_vel);
-        assert!((earth_from_emb.vy - 2.504_081_208_571_763e-3).abs() < tol_vel);
-        assert!((earth_from_emb.vz - 2.260_814_668_513_329_6e-3).abs() < tol_vel);
+        assert!(dbg!(earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < 1e-6);
+        assert!(dbg!(earth_from_emb.y - 4.249_363_764_688_855e3).abs() < 1e-6);
+        assert!(dbg!(earth_from_emb.z - 1.776_025_210_722_566_7e3).abs() < 1e-6);
+        assert!(dbg!(earth_from_emb.vx - -1.181_679_124_801_440_8e-2).abs() < 1e-9);
+        assert!(dbg!(earth_from_emb.vy - 2.504_081_208_571_763e-3).abs() < 1e-9);
+        assert!(dbg!(earth_from_emb.vz - 2.260_814_668_513_329_6e-3).abs() < 1e-9);
 
         let eme2k = cosm.frame("EME2000");
         let moon_from_earth = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, eme2k, c);
@@ -1285,12 +1283,12 @@ mod tests {
         >>> ['{:.16e}'.format(x) for x in sp.spkez(301, et, "J2000", "NONE", 399)[0]]
         ['-8.2579986132538310e+04', '-3.4972505290949758e+05', '-1.4616788422537665e+05', '9.7252863564504100e-01', '-2.0608730663037542e-01', '-1.8606633212590740e-01']
         */
-        assert!((moon_from_earth.x - -8.257_998_613_253_831e4).abs() < tol_pos);
-        assert!((moon_from_earth.y - -3.497_250_529_094_976e5).abs() < tol_pos);
-        assert!((moon_from_earth.z - -1.461_678_842_253_766_5e5).abs() < tol_pos);
-        assert!((moon_from_earth.vx - 9.725_286_356_450_41e-1).abs() < tol_vel);
-        assert!((moon_from_earth.vy - -2.060_873_066_303_754_2e-1).abs() < tol_vel);
-        assert!((moon_from_earth.vz - -1.860_663_321_259_074e-1).abs() < tol_vel);
+        assert!(dbg!(moon_from_earth.x - -8.257_998_613_253_831e4).abs() < 1e-4);
+        assert!(dbg!(moon_from_earth.y - -3.497_250_529_094_976e5).abs() < 1e-4);
+        assert!(dbg!(moon_from_earth.z - -1.461_678_842_253_766_5e5).abs() < 1e-4);
+        assert!(dbg!(moon_from_earth.vx - 9.725_286_356_450_41e-1).abs() < 1e-9);
+        assert!(dbg!(moon_from_earth.vy - -2.060_873_066_303_754_2e-1).abs() < 1e-9);
+        assert!(dbg!(moon_from_earth.vz - -1.860_663_321_259_074e-1).abs() < 1e-9);
 
         /*
         >>> ['{:.16e}'.format(x) for x in sp.spkez(10, et, "J2000", "NONE", 399)[0]]
@@ -1306,12 +1304,12 @@ mod tests {
         assert!(delta_state.radius().norm() < EPSILON);
         assert!(delta_state.velocity().norm() < EPSILON);
 
-        assert!(dbg!(sun2ear_state.x - 1.096_550_659_153_359_8e8).abs() < tol_pos);
-        assert!(dbg!(sun2ear_state.y - -9.057_089_103_152_503e7).abs() < tol_pos);
-        assert!(dbg!(sun2ear_state.z - -3.926_657_701_947_451e7).abs() < tol_pos);
-        assert!(dbg!(sun2ear_state.vx - 2.042_657_012_455_572_4e1).abs() < tol_vel);
-        assert!(dbg!(sun2ear_state.vy - 2.041_211_249_880_403e1).abs() < tol_vel);
-        assert!(dbg!(sun2ear_state.vz - 8.848_425_784_946_011).abs() < tol_vel);
+        assert!(dbg!(sun2ear_state.x - 1.096_550_659_153_359_8e8).abs() < 1e-3);
+        assert!(dbg!(sun2ear_state.y - -9.057_089_103_152_503e7).abs() < 1e-3);
+        assert!(dbg!(sun2ear_state.z - -3.926_657_701_947_451e7).abs() < 1e-3);
+        assert!(dbg!(sun2ear_state.vx - 2.042_657_012_455_572_4e1).abs() < 1e-9);
+        assert!(dbg!(sun2ear_state.vy - 2.041_211_249_880_403e1).abs() < 1e-9);
+        assert!(dbg!(sun2ear_state.vz - 8.848_425_784_946_011).abs() < 1e-9);
         // And check the converse
         let sun2k = cosm.frame("Sun J2000");
         let sun2ear_state = cosm.celestial_state(&sun2k.ephem_path(), jde, eme2k, c);
@@ -1442,7 +1440,7 @@ mod tests {
         println!("{}", lro_wrt_moon);
         let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
         // Note that the passing conditions are very large. JPL uses de431MX, but nyx uses de438s.
-        assert!(dbg!(lro_moon_earth_delta.rmag()) < 0.3);
+        assert!(dbg!(lro_moon_earth_delta.rmag()) < 0.25);
         assert!(dbg!(lro_moon_earth_delta.vmag()) < 1e-5);
         // And the converse
         let lro_wrt_ssb = cosm.frame_chg(&lro_wrt_moon, ssb);
@@ -1975,6 +1973,106 @@ mod tests {
         assert!(
             (dcm_return - sp_iau_earth_2_iau_mars).norm() < 1e-1,
             "IAU Earth -> IAU Mars failed"
+        );
+    }
+
+    #[test]
+    fn cosm_spice_concrete_validation() {
+        // Example from sc_query.py from an actual mission design
+        let cosm = Cosm::de438();
+        let mj2k = cosm.frame("luna");
+        let eme2k = cosm.frame("eme2000");
+
+        let et: Epoch = Epoch::from_gregorian_utc(2022, 11, 29, 6, 47, 5, 0);
+        println!("{:.6}", et.as_tdb_seconds());
+
+        let moon_state = Orbit::cartesian(
+            -274450.055,
+            197469.145,
+            120487.744,
+            7.18981408,
+            -2.46517900,
+            -1.98864578,
+            et,
+            mj2k,
+        );
+
+        let moon_into_eme2k = cosm.frame_chg(&moon_state, eme2k);
+        let sp_state_in_eme2k = Orbit::cartesian(
+            4.50272491e+03,
+            -8.84403138e+03,
+            -5.43867081e+03,
+            7.91088598e+00,
+            -1.75366723e+00,
+            -1.67218499e+00,
+            et,
+            mj2k,
+        );
+
+        println!(
+            "err: {} \t {}\nWas: {}\nIs:  {}",
+            (moon_into_eme2k - sp_state_in_eme2k).rmag(),
+            (moon_into_eme2k - sp_state_in_eme2k).vmag(),
+            moon_state,
+            moon_into_eme2k
+        );
+        // SPICE only returns data down to the meter level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).rmag() < 1e-3,
+            "error greater than expected"
+        );
+        // SPICE only returns data down to the millimeter per second level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).vmag() < 1e-6,
+            "error greater than expected"
+        );
+
+        // End of transfer
+        let et: Epoch =
+            Epoch::from_gregorian_utc(2022, 12, 4, 11, 59, 51, 0) + 884000 * TimeUnit::Microsecond;
+        println!("{:.6}", et.as_tdb_seconds());
+
+        let moon_state = Orbit::cartesian(
+            482.668990,
+            -1202.72224,
+            1766.54808,
+            0.575668933,
+            -0.975029706,
+            -1.95884493,
+            et,
+            mj2k,
+        );
+
+        let moon_into_eme2k = cosm.frame_chg(&moon_state, eme2k);
+
+        let sp_state_in_eme2k = Orbit::cartesian(
+            3.37603919e+05,
+            1.79697913e+05,
+            7.14382236e+04,
+            1.11062935e-01,
+            -1.89556775e-01,
+            -1.52151242e+00,
+            et,
+            mj2k,
+        );
+
+        println!(
+            "err: {} \t {}\nWas: {}\nIs:  {}",
+            (moon_into_eme2k - sp_state_in_eme2k).rmag(),
+            (moon_into_eme2k - sp_state_in_eme2k).vmag(),
+            moon_state,
+            moon_into_eme2k
+        );
+
+        // SPICE only returns data down to the meter level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).rmag() < 1e-3,
+            "error greater than expected"
+        );
+        // SPICE only returns data down to the millimeter per second level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).vmag() < 1e-6,
+            "error greater than expected"
         );
     }
 }

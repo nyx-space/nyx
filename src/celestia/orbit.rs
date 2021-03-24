@@ -1239,19 +1239,16 @@ impl Orbit {
         me
     }
 
-    /// Rotate this state provided a direct cosine matrix
-    /// **Bug:** This does not account for the transport theorem!
-    pub fn apply_dcm(&mut self, dcm: Matrix3<f64>) {
-        let new_r = dcm * self.radius();
-        let new_v = dcm * self.velocity();
+    /// Rotate this state provided a direct cosine matrix of position and velocity
+    pub fn rotate_by(&mut self, dcm: Matrix6<f64>) {
+        let new_orbit = dcm * self.to_cartesian_vec();
+        self.x = new_orbit[0];
+        self.y = new_orbit[1];
+        self.z = new_orbit[2];
 
-        self.x = new_r[0];
-        self.y = new_r[1];
-        self.z = new_r[2];
-
-        self.vx = new_v[0];
-        self.vy = new_v[1];
-        self.vz = new_v[2];
+        self.vx = new_orbit[3];
+        self.vy = new_orbit[4];
+        self.vz = new_orbit[5];
     }
 
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
