@@ -242,7 +242,6 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
                 sum2 += self.vr01[(n, m)] * a_nm[(n, m + 1)] * d_;
                 sum3 += self.vr11[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
-            // let rr = rho.powi(n as i32 + 1);
             let rr = rho_np1 / self.compute_frame.equatorial_radius();
             a0 += rr * sum0;
             a1 += rr * sum1;
@@ -251,6 +250,8 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         }
         let accel = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
         // Rotate this acceleration vector back into the integration frame (no center change needed, it's just a vector)
+        // As discussed with Sai, if the Earth was spinning faster, would the acceleration due to the harmonics be any different?
+        // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = self
             .cosm
             .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
