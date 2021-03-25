@@ -23,7 +23,7 @@ use crate::celestia::{Bodies, Cosm, Frame, LTCorr, Orbit};
 use crate::dimensions::{
     DimName, Matrix3, Matrix6, Vector3, Vector6, VectorN, U3, U36, U4, U42, U6, U7,
 };
-use crate::{State, TimeTagged};
+use crate::State;
 use std::f64;
 use std::sync::Arc;
 
@@ -270,22 +270,23 @@ impl AccelModel for PointMasses {
             let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
 
             // Orbit of j-th body as seen from primary body
-            let st_ij = self.cosm.try_celestial_state(
+            let st_ij = self.cosm.celestial_state(
                 &third_body.ephem_path(),
-                osc.epoch(),
+                osc.dt,
                 osc.frame,
                 self.correction,
-            )?;
+            );
 
             let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
-            let r_ij3 = norm(&r_ij).powi(3) / gm_d;
+            let r_ij3 = norm(&r_ij).powi(3) / gm_d; // Dividing the future divisor
+
             // The difference leads to the dual parts nulling themselves out, so let's fix that.
             let mut r_j = radius - r_ij; // sc as seen from 3rd body
             r_j[0][1] = 1.0;
             r_j[1][2] = 1.0;
             r_j[2][3] = 1.0;
 
-            let r_j3 = norm(&r_j).powi(3) / gm_d;
+            let r_j3 = norm(&r_j).powi(3) / gm_d; // Dividing the future divisor
             let third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
 
             let (fxp, gradp) = extract_jacobian_and_result::<_, U3, U3, _>(&third_body_acc_d);

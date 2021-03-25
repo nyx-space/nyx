@@ -100,49 +100,26 @@ where
 
         // Repeat for the hyperdual part in case we need to super the partials
         let mut a_nm_h =
-            DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, Hyperdual::from_real(0.0));
-        let mut b_nm_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from_real(0.0));
-        let mut c_nm_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from_real(0.0));
-        let mut vr01_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from_real(0.0));
-        let mut vr11_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from_real(0.0));
+            DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, Hyperdual::from(0.0));
+        let mut b_nm_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
+        let mut c_nm_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
+        let mut vr01_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
+        let mut vr11_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
 
         // initialize the diagonal elements (not a function of the input)
-        a_nm_h[(0, 0)] = Hyperdual::from_real(1.0);
+        a_nm_h[(0, 0)] = Hyperdual::from(1.0);
         for n in 1..=degree_np2 {
-            let nf64 = n as f64;
             // Diagonal element
-            a_nm_h[(n, n)] =
-                Hyperdual::from_real((1.0 + 1.0 / (2.0 * nf64)).sqrt()) * a_nm_h[(n - 1, n - 1)];
+            a_nm_h[(n, n)] = Hyperdual::from(a_nm[(n, n)]);
         }
 
         // Pre-compute the B_nm, C_nm, vr01 and vr11 storages
         for n in 0..degree_np2 {
             for m in 0..degree_np2 {
-                let nf64 = n as f64;
-                let mf64 = m as f64;
-                // Compute c_nm, which is B_nm/B_(n-1,m) in Jones' dissertation
-                c_nm_h[(n, m)] = Hyperdual::from_real(
-                    (((2.0 * nf64 + 1.0) * (nf64 + mf64 - 1.0) * (nf64 - mf64 - 1.0))
-                        / ((nf64 - mf64) * (nf64 + mf64) * (2.0 * nf64 - 3.0)))
-                        .sqrt(),
-                );
-
-                b_nm_h[(n, m)] = Hyperdual::from_real(
-                    (((2.0 * nf64 + 1.0) * (2.0 * nf64 - 1.0)) / ((nf64 + mf64) * (nf64 - mf64)))
-                        .sqrt(),
-                );
-
-                vr01_h[(n, m)] = Hyperdual::from_real(((nf64 - mf64) * (nf64 + mf64 + 1.0)).sqrt());
-                vr11_h[(n, m)] = Hyperdual::from_real(
-                    (((2.0 * nf64 + 1.0) * (nf64 + mf64 + 2.0) * (nf64 + mf64 + 1.0))
-                        / (2.0 * nf64 + 3.0))
-                        .sqrt(),
-                );
-
-                if m == 0 {
-                    vr01_h[(n, m)] /= 2.0_f64.sqrt();
-                    vr11_h[(n, m)] /= 2.0_f64.sqrt();
-                }
+                vr01_h[(n, m)] = Hyperdual::from(vr01[(n, m)]);
+                vr11_h[(n, m)] = Hyperdual::from(vr11[(n, m)]);
+                b_nm_h[(n, m)] = Hyperdual::from(b_nm[(n, m)]);
+                c_nm_h[(n, m)] = Hyperdual::from(c_nm[(n, m)]);
             }
         }
 
@@ -180,7 +157,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_nm = self.a_nm.clone();
 
-        // initialize the diagonal elements (not a function of the input)
+        // Initialize the diagonal elements (not a function of the input)
         a_nm[(1, 0)] = u_ * 3.0f64.sqrt();
         for n in 1..=max_degree + 1 {
             let nf64 = n as f64;
@@ -311,19 +288,18 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_nm = self.a_nm_h.clone();
 
-        // initialize the diagonal elements (not a function of the input)
-        a_nm[(1, 0)] = u_ * Hyperdual::<f64, U7>::from_real(3.0f64.sqrt());
+        // Initialize the diagonal elements (not a function of the input)
+        a_nm[(1, 0)] = u_ * 3.0f64.sqrt();
         for n in 1..=max_degree + 1 {
             let nf64 = n as f64;
             // Off diagonal
-            a_nm[(n + 1, n)] =
-                Hyperdual::<f64, U7>::from_real((2.0 * nf64 + 3.0).sqrt()) * u_ * a_nm[(n, n)];
+            a_nm[(n + 1, n)] = Hyperdual::from((2.0 * nf64 + 3.0).sqrt()) * u_ * a_nm[(n, n)];
         }
 
         for m in 0..=max_order + 1 {
             for n in (m + 2)..=max_degree + 1 {
                 let hm_idx = (n, m);
-                a_nm[(n, m)] = u_ * self.b_nm_h[hm_idx] * a_nm[(n - 1, m)]
+                a_nm[hm_idx] = u_ * self.b_nm_h[hm_idx] * a_nm[(n - 1, m)]
                     - self.c_nm_h[hm_idx] * a_nm[(n - 2, m)];
             }
         }
@@ -332,60 +308,61 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         let mut r_m = Vec::with_capacity(min(max_degree, max_order) + 1);
         let mut i_m = Vec::with_capacity(min(max_degree, max_order) + 1);
 
-        r_m.push(Hyperdual::<f64, U7>::from_real(1.0));
-        i_m.push(Hyperdual::<f64, U7>::from_real(0.0));
+        r_m.push(Hyperdual::<f64, U7>::from(1.0));
+        i_m.push(Hyperdual::<f64, U7>::from(0.0));
 
         for m in 1..=min(max_degree, max_order) {
             r_m.push(s_ * r_m[m - 1] - t_ * i_m[m - 1]);
             i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
         }
 
-        let eq_radius = Hyperdual::<f64, U7>::from_real(self.compute_frame.equatorial_radius());
+        let eq_radius = Hyperdual::<f64, U7>::from(self.compute_frame.equatorial_radius());
         let rho = eq_radius / r_;
-        let mut rho_np1 = Hyperdual::<f64, U7>::from_real(self.compute_frame.gm()) / r_ * rho;
+        let mut rho_np1 = Hyperdual::<f64, U7>::from(self.compute_frame.gm()) / r_ * rho;
 
-        let mut a1 = Hyperdual::<f64, U7>::from_real(0.0);
-        let mut a2 = Hyperdual::<f64, U7>::from_real(0.0);
-        let mut a3 = Hyperdual::<f64, U7>::from_real(0.0);
-        let mut a4 = Hyperdual::<f64, U7>::from_real(0.0);
+        let mut a0 = Hyperdual::<f64, U7>::from(0.0);
+        let mut a1 = Hyperdual::<f64, U7>::from(0.0);
+        let mut a2 = Hyperdual::<f64, U7>::from(0.0);
+        let mut a3 = Hyperdual::<f64, U7>::from(0.0);
+        let sqrt2 = Hyperdual::<f64, U7>::from(2.0.sqrt());
 
         for n in 1..max_degree {
-            let mut sum1 = Hyperdual::<f64, U7>::from_real(0.0);
-            let mut sum2 = Hyperdual::<f64, U7>::from_real(0.0);
-            let mut sum3 = Hyperdual::<f64, U7>::from_real(0.0);
-            let mut sum4 = Hyperdual::<f64, U7>::from_real(0.0);
+            let mut sum0 = Hyperdual::from(0.0);
+            let mut sum1 = Hyperdual::from(0.0);
+            let mut sum2 = Hyperdual::from(0.0);
+            let mut sum3 = Hyperdual::from(0.0);
             rho_np1 *= rho;
 
             for m in 0..=min(n, max_order) {
                 let (c_valf64, s_valf64) = self.stor.cs_nm(n, m);
-                let c_val = Hyperdual::<f64, U7>::from_real(c_valf64);
-                let s_val = Hyperdual::<f64, U7>::from_real(s_valf64);
-                let sqrt2 = Hyperdual::<f64, U7>::from_real(2.0).sqrt();
+                let c_val = Hyperdual::<f64, U7>::from(c_valf64);
+                let s_val = Hyperdual::<f64, U7>::from(s_valf64);
+
                 let d_ = (c_val * r_m[m] + s_val * i_m[m]) * sqrt2;
                 let e_ = if m == 0 {
-                    Hyperdual::<f64, U7>::from_real(0.0)
+                    Hyperdual::from(0.0)
                 } else {
                     (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * sqrt2
                 };
                 let f_ = if m == 0 {
-                    Hyperdual::<f64, U7>::from_real(0.0)
+                    Hyperdual::from(0.0)
                 } else {
                     (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * sqrt2
                 };
 
-                sum1 += Hyperdual::<f64, U7>::from_real(m as f64) * a_nm[(n, m)] * e_;
-                sum2 += Hyperdual::<f64, U7>::from_real(m as f64) * a_nm[(n, m)] * f_;
-                sum3 += self.vr01_h[(n, m)] * a_nm[(n, m + 1)] * d_;
-                sum4 += self.vr11_h[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
+                sum0 += Hyperdual::from(m as f64) * a_nm[(n, m)] * e_;
+                sum1 += Hyperdual::from(m as f64) * a_nm[(n, m)] * f_;
+                sum2 += self.vr01_h[(n, m)] * a_nm[(n, m + 1)] * d_;
+                sum3 += self.vr11_h[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
             let rr = rho_np1 / eq_radius;
+            a0 += rr * sum0;
             a1 += rr * sum1;
             a2 += rr * sum2;
-            a3 += rr * sum3;
-            a4 -= rr * sum4;
+            a3 -= rr * sum3;
         }
 
-        let accel = dcm_d.transpose() * Vector3::new(a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_);
+        let accel = dcm_d.transpose() * Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
         // Extract data
         let mut fx = Vector3::zeros();
         let mut grad = Matrix3::zeros();
