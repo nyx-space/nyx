@@ -23,7 +23,7 @@ use std::convert::TryFrom;
 use std::f64::consts::PI;
 use std::fmt;
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, PartialEq)]
 pub enum Frame {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)

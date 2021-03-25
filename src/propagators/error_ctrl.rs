@@ -144,6 +144,7 @@ impl ErrorCtrl for LargestState {
 /// For example, one should probably use this for position independently of using it for the velocity.
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3045]
 #[derive(Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct RSSStep;
 impl ErrorCtrl for RSSStep {
     fn estimate<N: DimName>(
@@ -174,6 +175,7 @@ impl ErrorCtrl for RSSStep {
 /// [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3004]
 #[derive(Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct RSSState;
 impl ErrorCtrl for RSSState {
     fn estimate<N: DimName>(
@@ -197,6 +199,7 @@ impl ErrorCtrl for RSSState {
 /// An RSS state error control which effectively for the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 #[derive(Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct RSSStatePV;
 impl ErrorCtrl for RSSStatePV {
     fn estimate<N: DimName>(
@@ -229,6 +232,7 @@ impl ErrorCtrl for RSSStatePV {
 /// An RSS state error control which effectively for the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 #[derive(Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct RSSStepPV;
 impl ErrorCtrl for RSSStepPV {
     fn estimate<N: DimName>(
@@ -261,6 +265,7 @@ impl ErrorCtrl for RSSStepPV {
 /// An RSS state error control which effectively for the provided vector
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 #[derive(Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct RSSStepPVStm;
 impl ErrorCtrl for RSSStepPVStm {
     fn estimate<N: DimName>(

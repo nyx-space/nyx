@@ -32,6 +32,7 @@ pub use crate::errors::NyxError;
 /// T: Type of state
 /// P: Propagated vector size
 #[derive(Debug, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct KF<T, A, M>
 where
     A: DimName,

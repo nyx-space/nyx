@@ -38,6 +38,7 @@ pub use self::propagator::*;
 use crate::time::Duration;
 
 /// The `RK` trait defines a Runge Kutta integrator.
+#[allow(clippy::upper_case_acronyms)]
 pub trait RK
 where
     Self: Sized,

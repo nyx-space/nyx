@@ -46,6 +46,7 @@ pub use std::sync::Arc;
 use std::time::Instant;
 
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics
+#[allow(clippy::upper_case_acronyms)]
 pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,

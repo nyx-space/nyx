@@ -52,6 +52,7 @@ pub const SUN_GM: f64 = 132_712_440_041.939_38;
 
 /// Enable or not light time correction for the computation of the celestial states
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum LTCorr {
     /// No correction, i.e. assumes instantaneous propagation of photons
     None,

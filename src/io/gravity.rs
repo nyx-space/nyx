@@ -102,10 +102,10 @@ impl HarmonicsMem {
         order: usize,
         gunzipped: bool,
     ) -> Result<HarmonicsMem, NyxError> {
-        Ok(Self::load(
+        Self::load(
             gunzipped, true, //SHADR has a header which we ignore
             degree, order, filepath,
-        )?)
+        )
     }
 
     pub fn from_egm(
@@ -114,7 +114,7 @@ impl HarmonicsMem {
         order: usize,
         gunzipped: bool,
     ) -> Result<HarmonicsMem, NyxError> {
-        Ok(Self::load(gunzipped, false, degree, order, filepath)?)
+        Self::load(gunzipped, false, degree, order, filepath)
     }
 
     pub fn from_cof(

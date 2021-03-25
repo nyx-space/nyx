@@ -23,10 +23,13 @@ use crate::time::{Duration, Epoch};
 
 use std::fmt;
 
+#[allow(clippy::upper_case_acronyms)]
 pub type SNC3 = SNC<U3>;
+#[allow(clippy::upper_case_acronyms)]
 pub type SNC6 = SNC<U6>;
 
 #[derive(Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct SNC<A: DimName>
 where
     DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,

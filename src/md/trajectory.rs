@@ -268,9 +268,9 @@ where
 
         // Check if we're already at the root
         if ya.abs() <= event.value_precision().abs() {
-            return Ok(self.evaluate(xa_e)?);
+            return self.evaluate(xa_e);
         } else if yb.abs() <= event.value_precision().abs() {
-            return Ok(self.evaluate(xb_e)?);
+            return self.evaluate(xb_e);
         }
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
@@ -280,10 +280,10 @@ where
 
         for _ in 0..max_iter {
             if ya.abs() < event.value_precision().abs() {
-                return Ok(self.evaluate(xa_e + xa * TimeUnit::Second)?);
+                return self.evaluate(xa_e + xa * TimeUnit::Second);
             }
             if yb.abs() < event.value_precision().abs() {
-                return Ok(self.evaluate(xa_e + xb * TimeUnit::Second)?);
+                return self.evaluate(xa_e + xb * TimeUnit::Second);
             }
             if has_converged(xa, xb) {
                 // The event isn't in the bracket

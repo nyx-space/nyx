@@ -62,6 +62,7 @@ impl fmt::Display for SmoothingArc {
 }
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
+#[allow(clippy::upper_case_acronyms)]
 pub struct ODProcess<
     'a,
     D: Dynamics,

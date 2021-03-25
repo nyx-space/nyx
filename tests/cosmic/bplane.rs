@@ -55,7 +55,7 @@ fn val_b_plane_gmat() {
         b_angle: f64,
         b_mag: f64,
         c3: f64,
-    };
+    }
 
     let datum = vec![
         GmatData {

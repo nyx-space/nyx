@@ -68,6 +68,7 @@ impl RK for CashKarp45 {
 /// `RK4Fixed` is a fixed step RK4.
 ///
 /// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
+#[allow(clippy::upper_case_acronyms)]
 pub struct RK4Fixed {}
 
 impl RK for RK4Fixed {
@@ -98,6 +99,7 @@ impl RK for RK4Fixed {
 /// `RK2Fixed` is a fixed step RK4 (or midpoint method).
 ///
 /// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
+#[allow(clippy::upper_case_acronyms)]
 pub struct RK2Fixed {}
 
 impl RK for RK2Fixed {
@@ -126,6 +128,7 @@ const SQRT6: f64 = 2.449_489_742_783_178;
 /// `RK89` is a Runge Kutta 8-9 integrator.
 ///
 /// Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
+#[allow(clippy::upper_case_acronyms)]
 pub struct RK89 {}
 
 impl RK for RK89 {

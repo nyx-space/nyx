@@ -197,6 +197,7 @@ pub mod orientations {
 
 /// Defines the default celestial bodies in the provided de438 XB.
 #[derive(Copy, Clone, Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Bodies {
     SSB,
     Sun,

@@ -48,6 +48,7 @@ pub mod quantity;
 
 pub mod traj;
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum ParsingError {
     MD(String),
