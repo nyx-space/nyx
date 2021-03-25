@@ -85,14 +85,6 @@ pub fn between_pm_x(angle: f64, x: f64) -> f64 {
     bounded
 }
 
-pub fn factorial(num: f64) -> f64 {
-    if num <= f64::EPSILON || (num - 1.0).abs() <= f64::EPSILON {
-        1.0
-    } else {
-        num * factorial(num - 1.0)
-    }
-}
-
 /// The Kronecker delta function
 pub fn kronecker<T: Real>(a: T, b: T) -> T {
     if (a - b).abs() <= T::epsilon() {

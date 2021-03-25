@@ -22,6 +22,8 @@ extern crate rand_pcg;
 extern crate rayon;
 
 pub use rand::prelude::*;
-pub use rand_distr::{Distribution, Normal};
+pub use rand_distr::{Distribution, Normal, Uniform};
 pub use rand_pcg::Pcg64Mcg;
 pub use rayon::prelude::*;
+
+pub mod helpers;

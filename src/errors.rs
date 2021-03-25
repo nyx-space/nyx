@@ -70,6 +70,8 @@ pub enum NyxError {
     NotHyperbolic(String),
     /// Raised if a differential corrector is not decreasing the error
     CorrectionIneffective(String),
+    /// When there is an error during a Monte Carlo or in the conditions starting a Monte Carlo run
+    MonteCarlo(String),
     /// Some custom error for new dynamics
     CustomError(String),
 }
