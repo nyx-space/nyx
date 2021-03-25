@@ -904,12 +904,15 @@ impl Cosm {
         Ok(full_dcm)
     }
 
-    /// Attempts to return the provided state in the provided frame.
-    pub fn try_frame_chg(&self, state: &Orbit, new_frame: Frame) -> Result<Orbit, NyxError> {
-        if state.frame == new_frame {
-            return Ok(*state);
-        }
-
+    /// Attempts to only perform a translation without rotation between two frames.
+    /// You really shouldn't be using this unless you know exactly what you're doing.
+    /// Typically, you want to use `try_frame_chg`.
+    /// **WARNING:** This will update the Frame of the Orbit to the requested one EVEN IF it doesn't rotate it.
+    pub fn try_frame_translation(
+        &self,
+        state: &Orbit,
+        new_frame: Frame,
+    ) -> Result<Orbit, NyxError> {
         let new_ephem_path = new_frame.ephem_path();
         let state_ephem_path = state.frame.ephem_path();
 
@@ -979,6 +982,16 @@ impl Cosm {
             };
         }
         new_state.frame = new_frame;
+        Ok(new_state)
+    }
+
+    /// Attempts to return the provided state in the provided frame.
+    pub fn try_frame_chg(&self, state: &Orbit, new_frame: Frame) -> Result<Orbit, NyxError> {
+        if state.frame == new_frame {
+            return Ok(*state);
+        }
+        // Let's perform the translation
+        let mut new_state = self.try_frame_translation(state, new_frame)?;
         // And now let's compute the rotation path
         new_state.rotate_by(self.try_dcm_from_to(&state.frame, &new_frame, state.dt)?);
         Ok(new_state)

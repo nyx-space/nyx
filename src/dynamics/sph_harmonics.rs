@@ -108,8 +108,7 @@ where
 
         // initialize the diagonal elements (not a function of the input)
         a_nm_h[(0, 0)] = Hyperdual::from_real(1.0);
-        a_nm_h[(1, 1)] = Hyperdual::from_real(3.0f64.sqrt()); // This is the same formulation as below for n=1
-        for n in 2..=degree_np2 {
+        for n in 1..=degree_np2 {
             let nf64 = n as f64;
             // Diagonal element
             a_nm_h[(n, n)] =
@@ -263,6 +262,21 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         radius: &Vector3<Hyperdual<f64, U7>>,
         ctx: &Orbit,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+        // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
+        // We manually do the translation and the rotation to ensure that we account for the rotation in the hyperdual formulation
+        // Translation part: copy the context and set the radius to the osculating radius
+        let mut ctx = *ctx;
+        ctx.x = radius[0].real();
+        ctx.y = radius[1].real();
+        ctx.z = radius[2].real();
+        // Only do a translation
+        let state = self.cosm.try_frame_translation(&ctx, self.compute_frame)?;
+        // And set the radius reals to that translated value (rest of hyperdual is identity so far)
+        let mut radius = *radius;
+        radius[0][0] = state.x;
+        radius[1][0] = state.y;
+        radius[2][0] = state.z;
+
         // Get the DCM to convert from the integration state to the computation frame of the harmonics
         let dcm =
             self.cosm
@@ -283,7 +297,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
             }
         }
 
-        // Convert to the computation frame
+        // And rotate into the correct frame
         let radius = dcm_d * radius;
 
         // Using the GMAT notation, with extra character for ease of highlight
@@ -328,6 +342,8 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
 
         let eq_radius = Hyperdual::<f64, U7>::from_real(self.compute_frame.equatorial_radius());
         let rho = eq_radius / r_;
+        let mut rho_np1 = Hyperdual::<f64, U7>::from_real(self.compute_frame.gm()) / r_ * rho;
+
         let mut a1 = Hyperdual::<f64, U7>::from_real(0.0);
         let mut a2 = Hyperdual::<f64, U7>::from_real(0.0);
         let mut a3 = Hyperdual::<f64, U7>::from_real(0.0);
@@ -338,21 +354,23 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
             let mut sum2 = Hyperdual::<f64, U7>::from_real(0.0);
             let mut sum3 = Hyperdual::<f64, U7>::from_real(0.0);
             let mut sum4 = Hyperdual::<f64, U7>::from_real(0.0);
+            rho_np1 *= rho;
 
             for m in 0..=min(n, max_order) {
                 let (c_valf64, s_valf64) = self.stor.cs_nm(n, m);
                 let c_val = Hyperdual::<f64, U7>::from_real(c_valf64);
                 let s_val = Hyperdual::<f64, U7>::from_real(s_valf64);
-                let d_ = c_val * r_m[m] + s_val * i_m[m];
+                let sqrt2 = Hyperdual::<f64, U7>::from_real(2.0).sqrt();
+                let d_ = (c_val * r_m[m] + s_val * i_m[m]) * sqrt2;
                 let e_ = if m == 0 {
                     Hyperdual::<f64, U7>::from_real(0.0)
                 } else {
-                    c_val * r_m[m - 1] + s_val * i_m[m - 1]
+                    (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * sqrt2
                 };
                 let f_ = if m == 0 {
                     Hyperdual::<f64, U7>::from_real(0.0)
                 } else {
-                    s_val * r_m[m - 1] - c_val * i_m[m - 1]
+                    (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * sqrt2
                 };
 
                 sum1 += Hyperdual::<f64, U7>::from_real(m as f64) * a_nm[(n, m)] * e_;
@@ -360,18 +378,13 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
                 sum3 += self.vr01_h[(n, m)] * a_nm[(n, m + 1)] * d_;
                 sum4 += self.vr11_h[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
-            let rr = rho.powi(n as i32 + 1);
+            let rr = rho_np1 / eq_radius;
             a1 += rr * sum1;
             a2 += rr * sum2;
             a3 += rr * sum3;
-            a4 += rr * sum4;
+            a4 -= rr * sum4;
         }
-        let mu_fact = Hyperdual::<f64, U7>::from_real(self.compute_frame.gm()) / (eq_radius * r_);
-        a1 *= mu_fact;
-        a2 *= mu_fact;
-        a3 *= mu_fact;
-        a4 *= -mu_fact;
-        // Convert back to integration frame
+
         let accel = dcm_d.transpose() * Vector3::new(a1 + a4 * s_, a2 + a4 * t_, a3 + a4 * u_);
         // Extract data
         let mut fx = Vector3::zeros();
