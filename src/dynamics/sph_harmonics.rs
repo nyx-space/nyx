@@ -167,12 +167,8 @@ where
 
 impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
-        // Get the DCM to convert from the integration state to the computation frame of the harmonics
-        let dcm = self
-            .cosm
-            .try_position_dcm_from_to(&osc.frame, &self.compute_frame, osc.dt)?;
-        // Convert to the computation frame
-        let state = osc.with_position_rotated_by(dcm);
+        // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
+        let state = self.cosm.frame_chg(osc, self.compute_frame);
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = state.rmag();
@@ -254,8 +250,11 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
             a3 -= rr * sum3;
         }
         let accel = Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
-        // Convert back to integration frame
-        Ok(dcm.transpose() * accel)
+        // Rotate this acceleration vector back into the integration frame (no center change needed, it's just a vector)
+        let dcm = self
+            .cosm
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
+        Ok(dcm * accel)
     }
 
     fn dual_eom(

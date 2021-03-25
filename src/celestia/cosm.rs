@@ -909,70 +909,76 @@ impl Cosm {
         if state.frame == new_frame {
             return Ok(*state);
         }
+
         let new_ephem_path = new_frame.ephem_path();
         let state_ephem_path = state.frame.ephem_path();
 
-        // Let's get the translation path between both both states.
-        let e_common_path = self.find_common_root(&new_ephem_path, &state_ephem_path);
-
         // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
         let mut new_state = if state.rmag() > 0.0 {
-            let mut new_state = *state;
-            // Walk backward from current state up to common node
-            for i in (e_common_path.len()..state_ephem_path.len()).rev() {
-                let next_state = self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
-                new_state = new_state + next_state;
-            }
-
-            // Walk forward from the destination state
-            for i in (e_common_path.len()..new_ephem_path.len()).rev() {
-                let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
-                new_state = new_state - next_state;
-            }
-
-            new_state
+            *state
+        } else if state_ephem_path.is_empty() {
+            // SSB, let's invert this
+            -*state
         } else {
-            let mut negated_fwd = false;
-
-            let mut new_state = if state_ephem_path.is_empty() {
-                // SSB, let's invert this
-                -*state
-            } else {
-                *state
-            };
-
-            // Walk forward from the destination state
-            for i in (e_common_path.len()..new_ephem_path.len()).rev() {
-                let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
-                if new_ephem_path.len() < state_ephem_path.len() && i == e_common_path.len() {
-                    // We just crossed the common point going forward, so let's add the opposite of this state
-                    new_state = new_state - next_state;
-                    negated_fwd = true;
-                } else {
-                    new_state = new_state + next_state;
-                }
-            }
-            // Walk backward from current state up to common node
-            for i in (e_common_path.len()..state_ephem_path.len()).rev() {
-                let next_state = self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
-                if !negated_fwd && i == e_common_path.len() {
-                    // We just crossed the common point (and haven't passed it going forward), so let's negate this state
-                    new_state = new_state - next_state;
-                } else {
-                    new_state = new_state + next_state;
-                }
-            }
-
-            if negated_fwd {
-                // Because we negated the state going forward, let's flip it back to its correct orientation now.
-                -new_state
-            } else {
-                new_state
-            }
+            *state
         };
 
-        new_state.frame = new_frame;
+        // If we only need a rotation, let's skip trying to find the translation
+        if new_ephem_path != state_ephem_path {
+            // Let's get the translation path between both both states.
+            let e_common_path = self.find_common_root(&new_ephem_path, &state_ephem_path);
 
+            // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
+            new_state = if state.rmag() > 0.0 {
+                // Walk backward from current state up to common node
+                for i in (e_common_path.len()..state_ephem_path.len()).rev() {
+                    let next_state =
+                        self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
+                    new_state = new_state + next_state;
+                }
+
+                // Walk forward from the destination state
+                for i in (e_common_path.len()..new_ephem_path.len()).rev() {
+                    let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
+                    new_state = new_state - next_state;
+                }
+
+                new_state
+            } else {
+                let mut negated_fwd = false;
+
+                // Walk forward from the destination state
+                for i in (e_common_path.len()..new_ephem_path.len()).rev() {
+                    let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
+                    if new_ephem_path.len() < state_ephem_path.len() && i == e_common_path.len() {
+                        // We just crossed the common point going forward, so let's add the opposite of this state
+                        new_state = new_state - next_state;
+                        negated_fwd = true;
+                    } else {
+                        new_state = new_state + next_state;
+                    }
+                }
+                // Walk backward from current state up to common node
+                for i in (e_common_path.len()..state_ephem_path.len()).rev() {
+                    let next_state =
+                        self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
+                    if !negated_fwd && i == e_common_path.len() {
+                        // We just crossed the common point (and haven't passed it going forward), so let's negate this state
+                        new_state = new_state - next_state;
+                    } else {
+                        new_state = new_state + next_state;
+                    }
+                }
+
+                if negated_fwd {
+                    // Because we negated the state going forward, let's flip it back to its correct orientation now.
+                    -new_state
+                } else {
+                    new_state
+                }
+            };
+        }
+        new_state.frame = new_frame;
         // And now let's compute the rotation path
         new_state.rotate_by(self.try_dcm_from_to(&state.frame, &new_frame, state.dt)?);
         Ok(new_state)
