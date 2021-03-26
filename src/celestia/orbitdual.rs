@@ -122,6 +122,18 @@ impl fmt::Display for OrbitPartial {
 impl OrbitDual {
     pub fn partial_for(&self, param: &StateParameter) -> Result<OrbitPartial, NyxError> {
         match param {
+            StateParameter::X => Ok(OrbitPartial {
+                dual: self.x,
+                param: StateParameter::X,
+            }),
+            StateParameter::Y => Ok(OrbitPartial {
+                dual: self.y,
+                param: StateParameter::Y,
+            }),
+            StateParameter::Z => Ok(OrbitPartial {
+                dual: self.z,
+                param: StateParameter::Z,
+            }),
             StateParameter::Rmag => Ok(self.rmag()),
             StateParameter::Vmag => Ok(self.vmag()),
             StateParameter::HX => Ok(self.hx()),

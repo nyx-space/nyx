@@ -30,7 +30,7 @@ pub struct Objective {
     /// The desired self.desired_value, must be in the same units as the state parameter
     pub desired_value: f64,
     /// The precision on the desired value
-    pub value_precision: f64,
+    pub tolerance: f64,
 }
 
 /// Defines the kind of correction to apply in the targeter
@@ -54,8 +54,6 @@ where
     pub prop: Arc<&'a Propagator<'a, D, E>>,
     /// The list of objectives of this targeter
     pub objectives: Vec<Objective>,
-    /// The list of variables
-    pub variables: Vec<StateParameter>,
     /// The kind of correction to apply to achieve the objectives
     pub corrector: Corrector,
     /// Maximum number of iterations (defaults to 25)
@@ -73,14 +71,14 @@ where
         for obj in &self.objectives {
             objmsg.push_str(&format!(
                 "{:?} = {:.3} (+/- {:.1e}) ",
-                obj.parameter, obj.desired_value, obj.value_precision
+                obj.parameter, obj.desired_value, obj.tolerance
             ));
         }
 
         write!(
             f,
-            "Targeter:\n\tVary: {:?}\n\tObjectives: {}\n\tCorrect: {:?}",
-            self.variables, objmsg, self.corrector
+            "Targeter:\n\tObjectives: {}\n\tCorrect: {:?}",
+            objmsg, self.corrector
         )
     }
 }
@@ -97,64 +95,62 @@ where
         correction_epoch: Epoch,
         achivement_epoch: Epoch,
     ) -> Result<Vector3<f64>, NyxError> {
-        if self.variables.is_empty() {
+        if self.objectives.is_empty() {
             return Err(NyxError::UnderdeterminedProblem);
-        } else if self.variables.len() > 6 {
-            return Err(NyxError::OverdeterminedProblem);
         }
 
         // Let's immediately make sure that the correction can be applied.
-        let orbit_dual = OrbitDual::from(initial_state.orbit);
+        // let orbit_dual = OrbitDual::from(initial_state.orbit);
 
-        if self.corrector == Corrector::Position {
-            if self.variables.len() > 3 {
-                return Err(NyxError::OverdeterminedProblem);
-            }
-            // Check that at least one of the parameters changes the position
-            let mut will_affect = false;
-            for variable in &self.variables {
-                let partials = orbit_dual.partial_for(variable)?;
-                if partials.wtr_x().abs() > 0.0
-                    || partials.wtr_y().abs() > 0.0
-                    || partials.wtr_z().abs() > 0.0
-                {
-                    will_affect = true;
-                } else {
-                    warn!("Variable {:?} has no effect on position", variable);
-                }
-            }
+        // if self.corrector == Corrector::Position {
+        //     if self.objectives.len() > 3 {
+        //         return Err(NyxError::OverdeterminedProblem);
+        //     }
+        //     // Check that at least one of the parameters changes the position
+        //     let mut will_affect = false;
+        //     for obj in &self.objectives {
+        //         let partials = orbit_dual.partial_for(&obj.parameter)?;
+        //         if partials.wtr_x().abs() > 0.0
+        //             || partials.wtr_y().abs() > 0.0
+        //             || partials.wtr_z().abs() > 0.0
+        //         {
+        //             will_affect = true;
+        //         } else {
+        //             warn!("Variable {:?} has no effect on position", obj.parameter);
+        //         }
+        //     }
 
-            if !will_affect {
-                return Err(NyxError::CorrectionIneffective(format!(
-                    "Correcting {:?} has no effect on position",
-                    self.variables
-                )));
-            }
-        } else if self.corrector == Corrector::Velocity {
-            if self.variables.len() > 3 {
-                return Err(NyxError::OverdeterminedProblem);
-            }
-            // Check that at least one of the parameters changes the position
-            let mut will_affect = false;
-            for variable in &self.variables {
-                let partials = orbit_dual.partial_for(variable)?;
-                if partials.wtr_vx().abs() > 0.0
-                    || partials.wtr_vy().abs() > 0.0
-                    || partials.wtr_vz().abs() > 0.0
-                {
-                    will_affect = true;
-                } else {
-                    warn!("Variable {:?} has no effect on velocity", variable);
-                }
-            }
+        //     if !will_affect {
+        //         return Err(NyxError::CorrectionIneffective(format!(
+        //             "No effect on position: {}",
+        //             self
+        //         )));
+        //     }
+        // } else if self.corrector == Corrector::Velocity {
+        //     if self.objectives.len() > 3 {
+        //         return Err(NyxError::OverdeterminedProblem);
+        //     }
+        //     // Check that at least one of the parameters changes the position
+        //     let mut will_affect = false;
+        //     for obj in &self.objectives {
+        //         let partials = orbit_dual.partial_for(&obj.parameter)?;
+        //         if partials.wtr_vx().abs() > 0.0
+        //             || partials.wtr_vy().abs() > 0.0
+        //             || partials.wtr_vz().abs() > 0.0
+        //         {
+        //             will_affect = true;
+        //         } else {
+        //             warn!("Variable {:?} has no effect on velocity", obj.parameter);
+        //         }
+        //     }
 
-            if !will_affect {
-                return Err(NyxError::CorrectionIneffective(format!(
-                    "Correcting {:?} has no effect on velocity",
-                    self.variables
-                )));
-            }
-        }
+        //     if !will_affect {
+        //         return Err(NyxError::CorrectionIneffective(format!(
+        //             "No effect on velocity: {}",
+        //             self
+        //         )));
+        //     }
+        // }
 
         // Now we know that the problem is correctly defined, so let's propagate as is to the epoch
         // where the correction should be applied.
@@ -184,7 +180,7 @@ where
 
             let phi_k_to_0 = xf.stm();
             let phi_inv = match phi_k_to_0
-                .fixed_slice::<U3, U3>(0, split_on)
+                .fixed_slice::<U3, U3>(0, 3)
                 .to_owned()
                 .try_inverse()
             {
@@ -202,18 +198,21 @@ where
 
             for obj in &self.objectives {
                 let partial = xf_dual.partial_for(&obj.parameter)?;
-                let param_err = -partial.real() + obj.desired_value;
+                let param_err = obj.desired_value - partial.real();
 
-                if param_err.abs() > obj.value_precision {
+                if param_err.abs() > obj.tolerance {
                     converged = false;
                 }
                 param_errors.push(param_err);
 
-                if self.corrector == Corrector::Position {
-                    jac_rows.push(vec![partial.wtr_x(), partial.wtr_y(), partial.wtr_z()]);
-                } else {
-                    jac_rows.push(vec![partial.wtr_vx(), partial.wtr_vy(), partial.wtr_vz()]);
-                }
+                jac_rows.push(vec![
+                    partial.wtr_x(),
+                    partial.wtr_y(),
+                    partial.wtr_z(),
+                    partial.wtr_vx(),
+                    partial.wtr_vy(),
+                    partial.wtr_vz(),
+                ]);
             }
             if converged {
                 return Ok(total_correction);
@@ -223,27 +222,40 @@ where
             let err_vector = DVector::from(param_errors);
 
             if err_vector.norm() >= prev_err_norm {
-                return Err(NyxError::CorrectionIneffective(
-                    format!("Targeting is ineffective at reducing the error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_err_norm, err_vector.norm())
-                ));
+                println!("Targeting is ineffective at reducing the error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_err_norm, err_vector.norm());
+                // return Err(NyxError::CorrectionIneffective(
+                //     format!("Targeting is ineffective at reducing the error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_err_norm, err_vector.norm())
+                // ));
+            } else {
+                println!("err = {:.3} m", err_vector.norm() * 1e3);
             }
 
             prev_err_norm = err_vector.norm();
 
             // And the Jacobian
-            let mut jacobian = DMatrix::from_element(self.objectives.len(), 3, 0.0);
+            let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
             for (i, row) in jac_rows.iter().enumerate() {
-                jacobian[(i, 0)] = row[0];
-                jacobian[(i, 1)] = row[1];
-                jacobian[(i, 2)] = row[2];
+                jac[(i, 0)] = row[0];
+                jac[(i, 1)] = row[1];
+                jac[(i, 2)] = row[2];
+                jac[(i, 3)] = row[3];
+                jac[(i, 4)] = row[4];
+                jac[(i, 5)] = row[5];
             }
 
             // Compute the correction at xf
             // XXX: Do I need to invert it??
-            let delta = jacobian * err_vector;
+            println!("{}{}", jac, err_vector);
+            let delta_pv = jac.transpose() * err_vector;
 
-            // Apply this correction back to the correction epoch using the STM
+            // Extract what can be corrected
+            let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
             let delta_next = phi_inv * delta;
+
+            println!(
+                "delta_pv{} delta {} delta_next {}\nphi{}",
+                delta_pv, delta, delta_next, phi_inv
+            );
 
             // And finally apply it to the xi
             if self.corrector == Corrector::Position {
