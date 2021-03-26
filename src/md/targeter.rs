@@ -34,16 +34,53 @@ pub struct Objective {
 }
 
 /// Defines the kind of correction to apply in the targeter
-/// Note that the targeter will error if the variables do not affect the correction desired.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Corrector {
     Position,
     Velocity,
-    All,
 }
 
-/// Defines a targeter. The targeter will use a differential corrector if the problem is fully defined.
-/// Otherwise, it will use PANOC (TODO -- might be in another setup unsure yet).
+/// Defines a targeter solution
+#[derive(Clone, Debug)]
+pub struct TargeterSolution {
+    /// The corrected spacecraft state at the correction epoch
+    pub state: Spacecraft,
+    /// The correction vector applied
+    pub correction: Vector3<f64>,
+    /// The kind of correction (position or velocity)
+    pub corrector: Corrector,
+    /// The epoch at which the objectives are achieved
+    pub achievement_epoch: Epoch,
+    /// The errors achieved
+    pub achieved_errors: Vec<f64>,
+    /// The objectives set in the targeter
+    pub achieved_objectives: Vec<Objective>,
+    /// The number of iterations required
+    pub iterations: usize,
+}
+
+impl fmt::Display for TargeterSolution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut objmsg = String::from("");
+        for (i, obj) in self.achieved_objectives.iter().enumerate() {
+            objmsg.push_str(&format!(
+                "\n\t\t{:?} = {:.3} (wanted {:.3} +/- {:.1e})",
+                obj.parameter,
+                obj.desired_value + self.achieved_errors[i],
+                obj.desired_value,
+                obj.tolerance
+            ));
+        }
+
+        write!(
+            f,
+            "Targeter solution correcting {:?} (converged in {} iterations):\n\tAchieved:{}\n\tInitial state:\n\t\t{}\n\t\t{:x}",
+            self.corrector, self.iterations, objmsg, self.state, self.state
+        )
+    }
+}
+
+/// The target is a "simple" differential corrector.
 #[derive(Clone, Debug)]
 pub struct Targeter<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl>
 where
@@ -56,7 +93,7 @@ where
     pub objectives: Vec<Objective>,
     /// The kind of correction to apply to achieve the objectives
     pub corrector: Corrector,
-    /// Maximum number of iterations (defaults to 25)
+    /// Maximum number of iterations (defaults to 50)
     pub iterations: usize,
 }
 
@@ -89,25 +126,27 @@ where
         + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, <D::StateType as State>::Size>,
 {
+    /// Differential correction using hyperdual numbers for the objectives
     pub fn try_achieve_from(
         &self,
         initial_state: Spacecraft,
         correction_epoch: Epoch,
-        achivement_epoch: Epoch,
-    ) -> Result<Vector3<f64>, NyxError> {
+        achievement_epoch: Epoch,
+    ) -> Result<TargeterSolution, NyxError> {
         if self.objectives.is_empty() {
             return Err(NyxError::UnderdeterminedProblem);
         }
 
         // Now we know that the problem is correctly defined, so let's propagate as is to the epoch
         // where the correction should be applied.
-        let mut xi = self
+        let xi_start = self
             .prop
             .with(initial_state)
             .until_epoch(correction_epoch)?;
 
+        let mut xi = xi_start;
+
         // Store the total correction in Vector3
-        // TODO: Branch for a "Both" correction
         let mut total_correction = Vector3::zeros();
 
         // STM index to split on
@@ -119,15 +158,15 @@ where
 
         let mut prev_err_norm = std::f64::INFINITY;
 
-        for _ in 0..=self.iterations {
+        for it in 0..=self.iterations {
             // Now, enable the trajectory STM for this state so we can apply the correction
             xi.enable_traj_stm();
 
-            let xf = self.prop.with(xi).until_epoch(achivement_epoch)?;
+            let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
 
             let phi_k_to_0 = xf.stm();
             let phi_inv = match phi_k_to_0
-                .fixed_slice::<U3, U3>(0, 3)
+                .fixed_slice::<U3, U3>(0, split_on)
                 .to_owned()
                 .try_inverse()
             {
@@ -161,8 +200,42 @@ where
                     partial.wtr_vz(),
                 ]);
             }
+
+            // Build debugging information
+            let mut objmsg = Vec::new();
+            for (i, obj) in self.objectives.iter().enumerate() {
+                objmsg.push(format!(
+                    "\t{:?}: error = {:.3}\t desired = {:.3} (+/- {:.1e})",
+                    obj.parameter, param_errors[i], obj.desired_value, obj.tolerance
+                ));
+            }
+
             if converged {
-                return Ok(total_correction);
+                let mut state = xi_start;
+                if self.corrector == Corrector::Position {
+                    state.orbit.x += total_correction[0];
+                    state.orbit.y += total_correction[1];
+                    state.orbit.z += total_correction[2];
+                } else {
+                    state.orbit.vx += total_correction[0];
+                    state.orbit.vy += total_correction[1];
+                    state.orbit.vz += total_correction[2];
+                }
+
+                let sol = TargeterSolution {
+                    state,
+                    correction: total_correction,
+                    corrector: self.corrector,
+                    achievement_epoch,
+                    achieved_errors: param_errors,
+                    achieved_objectives: self.objectives.clone(),
+                    iterations: it,
+                };
+                info!("Targeter -- CONVERGED in {} iterations", it);
+                for obj in &objmsg {
+                    info!("{}", obj);
+                }
+                return Ok(sol);
             }
 
             // We haven't converged yet, so let's build the error vector
@@ -180,16 +253,18 @@ where
                 jac[(i, 5)] = row[5];
             }
 
-            // Compute the correction at xf
-            // XXX: Do I need to invert it??
-            // println!("{}{}", jac, err_vector);
+            // Compute the correction at xf and map it to a state error in position and velocity space
             let delta_pv = jac.transpose() * err_vector;
 
             // Extract what can be corrected
             let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
             let delta_next = phi_inv * delta;
 
-            println!("err = {:.3} m", delta.norm() * 1e3);
+            info!("Targeter -- Iteration #{}", it);
+            for obj in &objmsg {
+                info!("{}", obj);
+            }
+            info!("Mapped {:?} error = {:.3}", self.corrector, delta.norm());
 
             // And finally apply it to the xi
             if self.corrector == Corrector::Position {
@@ -209,5 +284,45 @@ where
             "Failed after {} iterations:\nError: {}\n\n{}",
             self.iterations, prev_err_norm, self
         )))
+    }
+
+    /// Verify a targeting result
+    pub fn verify(&self, solution: TargeterSolution) -> Result<(), NyxError> {
+        if self.objectives.is_empty() {
+            return Err(NyxError::UnderdeterminedProblem);
+        }
+
+        // Propagate until achievement epoch
+        let xf = self
+            .prop
+            .with(solution.state)
+            .until_epoch(solution.achievement_epoch)?;
+
+        // Build the partials
+        let xf_dual = OrbitDual::from(xf.orbit);
+
+        let mut converged = true;
+        let mut param_errors = Vec::new();
+        for obj in &self.objectives {
+            let partial = xf_dual.partial_for(&obj.parameter)?;
+            let param_err = obj.desired_value - partial.real();
+
+            if param_err.abs() > obj.tolerance {
+                converged = false;
+            }
+            param_errors.push(param_err);
+        }
+        if converged {
+            Ok(())
+        } else {
+            let mut objmsg = String::from("");
+            for (i, obj) in self.objectives.iter().enumerate() {
+                objmsg.push_str(&format!(
+                    "{:?} = {:.3} BUT should be {:.3} (+/- {:.1e}) ",
+                    obj.parameter, param_errors[i], obj.desired_value, obj.tolerance
+                ));
+            }
+            Err(NyxError::TargetError(objmsg))
+        }
     }
 }

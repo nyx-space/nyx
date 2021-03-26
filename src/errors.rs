@@ -73,7 +73,7 @@ pub enum NyxError {
     /// When there is an error during a Monte Carlo or in the conditions starting a Monte Carlo run
     MonteCarlo(String),
     /// Raised if the variables to be adjusted lead to an over-determined of the problem for the targeter
-    OverdeterminedProblem,
+    TargetError(String),
     /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
     UnderdeterminedProblem,
     /// Some custom error for new dynamics

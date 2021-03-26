@@ -134,6 +134,18 @@ impl OrbitDual {
                 dual: self.z,
                 param: StateParameter::Z,
             }),
+            StateParameter::VX => Ok(OrbitPartial {
+                dual: self.vx,
+                param: StateParameter::VX,
+            }),
+            StateParameter::VY => Ok(OrbitPartial {
+                dual: self.vy,
+                param: StateParameter::VY,
+            }),
+            StateParameter::VZ => Ok(OrbitPartial {
+                dual: self.vz,
+                param: StateParameter::VZ,
+            }),
             StateParameter::Rmag => Ok(self.rmag()),
             StateParameter::Vmag => Ok(self.vmag()),
             StateParameter::HX => Ok(self.hx()),

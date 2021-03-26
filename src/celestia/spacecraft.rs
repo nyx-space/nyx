@@ -254,3 +254,14 @@ impl fmt::LowerExp for Spacecraft {
         )
     }
 }
+
+impl fmt::LowerHex for Spacecraft {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}\t{} kg",
+            self.orbit,
+            self.dry_mass_kg + self.fuel_mass_kg
+        )
+    }
+}
