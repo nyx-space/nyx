@@ -92,6 +92,12 @@ pub enum StateParameter {
     Apoapsis,
     /// Radius of apoapsis (km)
     ApoapsisRadius,
+    /// B-Plane B⋅R
+    BdotR,
+    /// B-Plane B⋅T
+    BdotT,
+    /// B-Plane LTOF
+    BLTOF,
     /// C_3 in (km/s)^2
     C3,
     /// Declination (deg)
@@ -221,6 +227,11 @@ impl StateParameter {
             Self::Period => 1e-1,
             _ => unimplemented!(),
         }
+    }
+
+    /// Returns whether this parameter is of the B-Plane kind
+    pub fn is_b_plane(self) -> bool {
+        self == Self::BdotR || self == Self::BdotT || self == Self::BLTOF
     }
 }
 

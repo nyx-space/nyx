@@ -94,10 +94,36 @@ impl fmt::Display for TargeterSolution {
             ));
         }
 
+        let corrmsg = if self.corrector == Corrector::Position {
+            format!(
+                "Correction: [{:.3}, {:.3}, {:.3}] km\t|Δr| = {:.3} km",
+                self.correction[0],
+                self.correction[1],
+                self.correction[2],
+                (self.correction[0].powi(2)
+                    + self.correction[1].powi(2)
+                    + self.correction[2].powi(2))
+                .sqrt()
+                    * 1e3
+            )
+        } else {
+            format!(
+                "Correction: [{:.3}, {:.3}, {:.3}] m/s\t|Δv| = {:.3} m/s",
+                self.correction[0] * 1e3,
+                self.correction[1] * 1e3,
+                self.correction[2] * 1e3,
+                (self.correction[0].powi(2)
+                    + self.correction[1].powi(2)
+                    + self.correction[2].powi(2))
+                .sqrt()
+                    * 1e3
+            )
+        };
+
         write!(
             f,
-            "Targeter solution correcting {:?} (converged in {} iterations):\n\tAchieved:{}\n\tInitial state:\n\t\t{}\n\t\t{:x}",
-            self.corrector, self.iterations, objmsg, self.state, self.state
+            "Targeter solution correcting {:?} (converged in {} iterations):\n\t{}\n\tAchieved:{}\n\tInitial state:\n\t\t{}\n\t\t{:x}",
+            self.corrector, self.iterations, corrmsg, objmsg, self.state, self.state
         )
     }
 }
@@ -181,6 +207,13 @@ where
             return Err(NyxError::UnderdeterminedProblem);
         }
 
+        let mut is_bplane_tgt = false;
+        for obj in &self.objectives {
+            if obj.parameter.is_b_plane() {
+                is_bplane_tgt = true;
+            }
+        }
+
         // Now we know that the problem is correctly defined, so let's propagate as is to the epoch
         // where the correction should be applied.
         let xi_start = self
@@ -226,8 +259,26 @@ where
             let mut jac_rows = Vec::new();
             let mut converged = true;
 
+            // Build the B-Plane once, if needed
+            let b_plane = if is_bplane_tgt {
+                Some(BPlane::from_dual(xf_dual)?)
+            } else {
+                None
+            };
+
             for obj in &self.objectives {
-                let partial = xf_dual.partial_for(&obj.parameter)?;
+                let partial = if obj.parameter.is_b_plane() {
+                    match obj.parameter {
+                        StateParameter::BdotR => b_plane.unwrap().b_r,
+                        StateParameter::BdotT => b_plane.unwrap().b_t,
+                        StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                        _ => unreachable!(),
+                    }
+                } else {
+                    xf_dual.partial_for(&obj.parameter)?
+                };
+
+                // XXX: What is going on here?!
                 let param_err = obj.desired_value - partial.real();
 
                 if param_err.abs() > obj.tolerance {
@@ -305,6 +356,10 @@ where
             // Compute the correction at xf and map it to a state error in position and velocity space
             let delta_pv = jac.transpose() * err_vector;
 
+            // Solve the Least Squares / compute the delta-v
+            // let delta_pv =
+            //     jac.transpose() * (&jac * &jac.transpose()).try_inverse().unwrap() * err_vector;
+
             // Extract what can be corrected
             let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
             let delta_next = phi_inv * delta;
@@ -356,10 +411,34 @@ where
         // Build the partials
         let xf_dual = OrbitDual::from(xf.orbit);
 
+        let mut is_bplane_tgt = false;
+        for obj in &self.objectives {
+            if obj.parameter.is_b_plane() {
+                is_bplane_tgt = true;
+            }
+        }
+
+        // Build the B-Plane once, if needed
+        let b_plane = if is_bplane_tgt {
+            Some(BPlane::from_dual(xf_dual)?)
+        } else {
+            None
+        };
+
         let mut converged = true;
         let mut param_errors = Vec::new();
         for obj in &self.objectives {
-            let partial = xf_dual.partial_for(&obj.parameter)?;
+            let partial = if obj.parameter.is_b_plane() {
+                match obj.parameter {
+                    StateParameter::BdotR => b_plane.unwrap().b_r,
+                    StateParameter::BdotT => b_plane.unwrap().b_t,
+                    StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                    _ => unreachable!(),
+                }
+            } else {
+                xf_dual.partial_for(&obj.parameter)?
+            };
+
             let param_err = obj.desired_value - partial.real();
 
             if param_err.abs() > obj.tolerance {

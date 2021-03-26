@@ -105,7 +105,7 @@ fn tgt_basic_sma() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::SMA, xf_desired.sma())];
 
-    let tgt = Targeter::delta_r(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
 
     println!("{}", tgt);
 
@@ -117,7 +117,7 @@ fn tgt_basic_sma() {
 }
 
 #[test]
-fn tgt_basic_sma_position() {
+fn tgt_position_sma() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -207,4 +207,51 @@ fn tgt_c3_ra_decl_velocity() {
         .unwrap();
 
     println!("{}", solution);
+}
+
+#[test]
+fn tgt_b_plane() {
+    use std::str::FromStr;
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
+    let cosm = Cosm::de438_gmat();
+    // Grab the frame
+    let eme2k = cosm.frame("EME2000");
+    let luna = cosm.frame("Luna");
+    // Define the epoch
+    let epoch = Epoch::from_gregorian_utc(2014, 7, 22, 11, 29, 10, 811_000);
+    // Define the initial orbit in EME2k but convert it to Moon J2000
+    let orbit = Orbit::cartesian(
+        -137380.1984338506,
+        75679.87867537055,
+        21487.63875187856,
+        -0.2324532014235503,
+        -0.4462753967758019,
+        0.08561205662877103,
+        epoch,
+        eme2k,
+    );
+    // Propagate until periapse
+    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+        cosm.clone(),
+    )));
+
+    let loi_epoch = Epoch::from_str("2014-07-22 22:48:32.066000000 TAI").unwrap();
+
+    let orbit_moon = cosm.frame_chg(&orbit, luna);
+    let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
+
+    let b_plane_tgt = BPlaneTarget::from_b_plane(104579.9942274809, 391732.3347895856);
+
+    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
+
+    let sol = tgt.try_achieve_from(spacecraft, epoch, loi_epoch).unwrap();
+
+    println!("{}", sol);
+
+    tgt.apply(sol).unwrap();
 }

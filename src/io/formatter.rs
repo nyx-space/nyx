@@ -587,6 +587,7 @@ impl StateFormatter {
                 StateParameter::Custom { .. } => {
                     unimplemented!("Cannot format custom state parameters yet")
                 }
+                _ => unimplemented!("{:?} cannot yet be formatted (yet)", hdr.param),
             });
         }
 

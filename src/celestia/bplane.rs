@@ -18,8 +18,9 @@
 
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, Hyperdual};
-use super::{Frame, Orbit, OrbitDual};
-use crate::dimensions::{Matrix2, Matrix3, Vector2, Vector3, U2, U7};
+use super::{Frame, Orbit, OrbitDual, OrbitPartial};
+use crate::dimensions::{Matrix2, Matrix3, Vector2, Vector3, U2};
+use crate::md::targeter::Objective;
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::between_pm_180;
@@ -32,11 +33,11 @@ use std::fmt;
 #[derive(Copy, Clone, Debug)]
 pub struct BPlane {
     /// The $B_T$ component, in kilometers
-    pub b_t: Hyperdual<f64, U7>,
+    pub b_t: OrbitPartial,
     /// The $B_R$ component, in kilometers
-    pub b_r: Hyperdual<f64, U7>,
+    pub b_r: OrbitPartial,
     /// The Linearized Time of Flight
-    pub ltof_s: Hyperdual<f64, U7>,
+    pub ltof_s: OrbitPartial,
     /// The B-Plane rotation matrix
     pub str_dcm: Matrix3<f64>,
     /// The frame in which this B Plane was computed
@@ -46,16 +47,13 @@ pub struct BPlane {
 }
 
 impl BPlane {
-    /// Returns a newly defined B-Plane if the orbit is hyperbolic.
-    pub fn new(orbit_real: Orbit) -> Result<Self, NyxError> {
-        if orbit_real.ecc() <= 1.0 {
+    /// Returns a newly define B-Plane if the orbit is hyperbolic and already in Dual form
+    pub fn from_dual(orbit: OrbitDual) -> Result<Self, NyxError> {
+        if orbit.ecc().real() <= 1.0 {
             Err(NyxError::NotHyperbolic(
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
             ))
         } else {
-            // Convert to OrbitDual so we can target it
-            let orbit = OrbitDual::from(orbit_real);
-
             let one = Hyperdual::from(1.0);
             let zero = Hyperdual::from(0.0);
 
@@ -110,14 +108,29 @@ impl BPlane {
             );
 
             Ok(BPlane {
-                b_r: b_vec.dot(&r_hat),
-                b_t: b_vec.dot(&t_hat),
-                ltof_s: b_vec.dot(&s_hat) / orbit.vmag().dual,
+                b_r: OrbitPartial {
+                    dual: b_vec.dot(&r_hat),
+                    param: StateParameter::BdotR,
+                },
+                b_t: OrbitPartial {
+                    dual: b_vec.dot(&t_hat),
+                    param: StateParameter::BdotR,
+                },
+                ltof_s: OrbitPartial {
+                    dual: b_vec.dot(&s_hat) / orbit.vmag().dual,
+                    param: StateParameter::BLTOF,
+                },
                 str_dcm: str_rot,
                 frame: orbit.frame,
                 epoch: orbit.dt,
             })
         }
+    }
+
+    /// Returns a newly defined B-Plane if the orbit is hyperbolic.
+    pub fn new(orbit_real: Orbit) -> Result<Self, NyxError> {
+        // Convert to OrbitDual so we can target it
+        Self::from_dual(OrbitDual::from(orbit_real))
     }
 
     pub fn b_dot_t(&self) -> f64 {
@@ -150,15 +163,15 @@ impl BPlane {
     /// Returns the Jacobian of the B plane (BT, BR, LTOF) with respect to the velocity
     pub fn jacobian(&self) -> Matrix3<f64> {
         Matrix3::new(
-            self.b_t[4],
-            self.b_t[5],
-            self.b_t[6],
-            self.b_r[4],
-            self.b_r[5],
-            self.b_r[6],
-            self.ltof_s[4],
-            self.ltof_s[5],
-            self.ltof_s[6],
+            self.b_t.wtr_vx(),
+            self.b_t.wtr_vy(),
+            self.b_t.wtr_vz(),
+            self.b_r.wtr_vx(),
+            self.b_r.wtr_vy(),
+            self.b_r.wtr_vz(),
+            self.ltof_s.wtr_vx(),
+            self.ltof_s.wtr_vy(),
+            self.ltof_s.wtr_vz(),
         )
     }
 
@@ -166,22 +179,22 @@ impl BPlane {
     pub fn jacobian2(&self, invariant: StateParameter) -> Result<Matrix2<f64>, NyxError> {
         match invariant {
             StateParameter::VX => Ok(Matrix2::new(
-                self.b_t[5],
-                self.b_t[6],
-                self.b_r[5],
-                self.b_r[6],
+                self.b_t.wtr_vy(),
+                self.b_t.wtr_vz(),
+                self.b_r.wtr_vy(),
+                self.b_r.wtr_vz(),
             )),
             StateParameter::VY => Ok(Matrix2::new(
-                self.b_t[4],
-                self.b_t[6],
-                self.b_r[4],
-                self.b_r[6],
+                self.b_t.wtr_vx(),
+                self.b_t.wtr_vz(),
+                self.b_r.wtr_vx(),
+                self.b_r.wtr_vz(),
             )),
             StateParameter::VZ => Ok(Matrix2::new(
-                self.b_t[4],
-                self.b_t[5],
-                self.b_r[4],
-                self.b_r[5],
+                self.b_t.wtr_vx(),
+                self.b_t.wtr_vy(),
+                self.b_r.wtr_vx(),
+                self.b_r.wtr_vy(),
             )),
             _ => Err(NyxError::CustomError(
                 "B Plane jacobian invariant must be either VX, VY or VZ".to_string(),
@@ -253,6 +266,31 @@ impl BPlaneTarget {
     pub fn ltof_target_set(&self) -> bool {
         self.ltof_s.abs() > 1e-10
     }
+
+    pub fn to_objectives(&self) -> Vec<Objective> {
+        let mut objs = vec![
+            Objective {
+                parameter: StateParameter::BdotR,
+                desired_value: self.b_r_km,
+                tolerance: self.tol_b_r_km * 1e3,
+            },
+            Objective {
+                parameter: StateParameter::BdotT,
+                desired_value: self.b_t_km,
+                tolerance: self.tol_b_t_km * 1e3,
+            },
+        ];
+
+        if self.ltof_s.abs() > std::f64::EPSILON {
+            objs.push(Objective {
+                parameter: StateParameter::BLTOF,
+                desired_value: self.ltof_s,
+                tolerance: self.tol_ltof_s * 1e3,
+            });
+        }
+
+        objs
+    }
 }
 
 impl fmt::Display for BPlaneTarget {
@@ -272,7 +310,7 @@ impl fmt::Display for BPlaneTarget {
 /// If no LTOF target is set, this method will fix VX, VY and VZ successively and use the minimum of those as a seed for the LTOF variation finding.
 /// If the 3x3 search is worse than any of the 2x2s, then a 2x2 will be returned.
 /// This uses the hyperdual formulation of the Jacobian and will also vary the linearize time of flight (LTOF).
-pub fn achieve_b_plane(
+pub fn try_achieve_b_plane(
     orbit: Orbit,
     target: BPlaneTarget,
 ) -> Result<(Vector3<f64>, BPlane), NyxError> {

@@ -77,6 +77,7 @@ impl From<Orbit> for OrbitDual {
 }
 
 /// A type which stores the partial of an element
+#[derive(Copy, Clone, Debug)]
 pub struct OrbitPartial {
     pub param: StateParameter,
     pub dual: Hyperdual<f64, U7>,

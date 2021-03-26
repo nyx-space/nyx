@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::celestia::{achieve_b_plane, BPlaneTarget, Bodies, Cosm, Orbit};
+use nyx::celestia::{try_achieve_b_plane, BPlaneTarget, Bodies, Cosm, Orbit};
 use nyx::dynamics::OrbitalDynamics;
 use nyx::md::Event;
 use nyx::propagators::Propagator;
@@ -210,7 +210,7 @@ fn b_plane_davis() {
     );
 
     // Without an LTOF target, this uses the least squares approach.
-    let (delta_v, achieved_b_plane) = achieve_b_plane(
+    let (delta_v, achieved_b_plane) = try_achieve_b_plane(
         orbit,
         BPlaneTarget::from_b_plane(5022.26511510685, 13135.7982982557),
     )
@@ -222,7 +222,7 @@ fn b_plane_davis() {
     assert!((delta_v[2] - 0.046145009839345504).abs() < 1e-9);
 
     // BUG: LTOF targeting will fail.
-    // let delta_v = achieve_b_plane(
+    // let delta_v = try_achieve_b_plane(
     //     orbit,
     //     BPlaneTarget::from_targets(
     //         5022.26511510685,
