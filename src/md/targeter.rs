@@ -17,7 +17,7 @@
 */
 use super::StateParameter;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector3, U3};
+use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector3, U2, U3};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use std::fmt;
@@ -241,16 +241,6 @@ where
 
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
 
-            let phi_k_to_0 = xf.stm();
-            let phi_inv = match phi_k_to_0
-                .fixed_slice::<U3, U3>(0, split_on)
-                .to_owned()
-                .try_inverse()
-            {
-                Some(inv) => inv,
-                None => return Err(NyxError::SingularStateTransitionMatrix),
-            };
-
             // Build the partials
             let xf_dual = OrbitDual::from(xf.orbit);
 
@@ -278,8 +268,7 @@ where
                     xf_dual.partial_for(&obj.parameter)?
                 };
 
-                // XXX: What is going on here?!
-                let param_err = obj.desired_value - partial.real();
+                let param_err = (obj.desired_value - partial.real());
 
                 if param_err.abs() > obj.tolerance {
                     converged = false;
@@ -342,7 +331,7 @@ where
             }
             prev_err_norm = err_vector.norm();
 
-            // And the Jacobian
+            // And the Jacobian which maps the errors to the full state at X_f
             let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
             for (i, row) in jac_rows.iter().enumerate() {
                 jac[(i, 0)] = row[0];
@@ -353,16 +342,54 @@ where
                 jac[(i, 5)] = row[5];
             }
 
+            // Let's now multiply the Jacobian of \frac{\partial Obj}{\partial X_f}
+            // to \frac{X_f}{X_0} (the STM) to map each objective to the initial state
+
+            let partials_obj_to_0 = jac * xf.stm();
+            // If the problem is not of rank 1, let's perform a least squares operation
+            // so that the overall matrix can be inverted
+            // let phi_obj_to_0 = if self.objectives.len() != 3 {
+            //     &partials_obj_to_0.transpose() * &partials_obj_to_0
+            // } else {
+            //     partials_obj_to_0
+            // };
+
+            // XXX: We're always doing least squares! Is this a problem?
+            let phi_obj_to_0 = &partials_obj_to_0.transpose() * &partials_obj_to_0;
+
+            // Now, extract the correct section which correspond
+            let phi_inv = match phi_obj_to_0
+                .fixed_slice::<U3, U3>(0, split_on)
+                .to_owned()
+                .try_inverse()
+            {
+                Some(inv) => inv,
+                None => return Err(NyxError::SingularStateTransitionMatrix),
+            };
+
+            println!("{}", partials_obj_to_0);
+
+            let relevant_partials_obj_to_0 = partials_obj_to_0
+                .generic_slice((0, split_on), (U2, U3))
+                .to_owned();
+
+            println!("{}", relevant_partials_obj_to_0);
+
             // Compute the correction at xf and map it to a state error in position and velocity space
-            let delta_pv = jac.transpose() * err_vector;
+            // let delta_pv = jac.transpose() * err_vector;
 
             // Solve the Least Squares / compute the delta-v
             // let delta_pv =
             //     jac.transpose() * (&jac * &jac.transpose()).try_inverse().unwrap() * err_vector;
 
             // Extract what can be corrected
-            let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
-            let delta_next = phi_inv * delta;
+            // let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
+            println!(
+                "relevant_partials_obj_to_0^T = {} phi_inv = {}\n err_vector={}\n",
+                relevant_partials_obj_to_0, phi_inv, err_vector
+            );
+            let delta = (relevant_partials_obj_to_0 * phi_inv).transpose() * err_vector;
+            // let delta_next = phi_inv * delta;
 
             info!("Targeter -- Iteration #{}", it);
             for obj in &objmsg {
@@ -372,16 +399,16 @@ where
 
             // And finally apply it to the xi
             if self.corrector == Corrector::Position {
-                xi.orbit.x += delta_next[0];
-                xi.orbit.y += delta_next[1];
-                xi.orbit.z += delta_next[2];
+                xi.orbit.x += delta[0];
+                xi.orbit.y += delta[1];
+                xi.orbit.z += delta[2];
             } else {
-                xi.orbit.vx += delta_next[0];
-                xi.orbit.vy += delta_next[1];
-                xi.orbit.vz += delta_next[2];
+                xi.orbit.vx += delta[0];
+                xi.orbit.vy += delta[1];
+                xi.orbit.vz += delta[2];
             }
 
-            total_correction += delta_next;
+            total_correction += delta;
         }
 
         Err(NyxError::MaxIterReached(format!(

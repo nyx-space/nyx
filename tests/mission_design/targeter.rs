@@ -54,12 +54,7 @@ fn tgt_basic_position() {
         },
     ];
 
-    let tgt = Targeter {
-        prop: Arc::new(&setup),
-        objectives,
-        corrector: Corrector::Velocity,
-        iterations: 50,
-    };
+    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
 
     println!("{}", tgt);
 
