@@ -286,17 +286,23 @@ where
         )))
     }
 
-    /// Verify a targeting result
-    pub fn verify(&self, solution: TargeterSolution) -> Result<(), NyxError> {
-        if self.objectives.is_empty() {
-            return Err(NyxError::UnderdeterminedProblem);
-        }
+    /// Apply a correction and propagate to achievement epoch. Also checks that the objectives are indeed matched
+    pub fn apply(&self, solution: TargeterSolution) -> Result<Spacecraft, NyxError> {
+        let (xf, _) = self.apply_with_traj(solution)?;
+        Ok(xf)
+    }
 
+    /// Apply a correction and propagate to achievement epoch, return the final state and trajectory.
+    /// Also checks that the objectives are indeed matched
+    pub fn apply_with_traj(
+        &self,
+        solution: TargeterSolution,
+    ) -> Result<(Spacecraft, ScTraj), NyxError> {
         // Propagate until achievement epoch
-        let xf = self
+        let (xf, traj) = self
             .prop
             .with(solution.state)
-            .until_epoch(solution.achievement_epoch)?;
+            .until_epoch_with_traj(solution.achievement_epoch)?;
 
         // Build the partials
         let xf_dual = OrbitDual::from(xf.orbit);
@@ -313,7 +319,7 @@ where
             param_errors.push(param_err);
         }
         if converged {
-            Ok(())
+            Ok((xf, traj))
         } else {
             let mut objmsg = String::from("");
             for (i, obj) in self.objectives.iter().enumerate() {
