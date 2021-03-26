@@ -33,6 +33,28 @@ pub struct Objective {
     pub tolerance: f64,
 }
 
+impl Objective {
+    /// Match a specific value for the parameter.
+    /// By default, the tolerance on the parameter is 0.1 times whatever unit is the default for that parameter.
+    /// For example, a radius event will seek the requested value at the decimeter level, and an angle event will seek it at the tenth of a degree.
+    pub fn new(parameter: StateParameter, desired_value: f64) -> Self {
+        Self::within_tolerance(
+            parameter,
+            desired_value,
+            1e2 * parameter.default_event_precision(),
+        )
+    }
+
+    /// Match a specific value for the parameter to hit the specified value with the provided tolerance on the value
+    pub fn within_tolerance(parameter: StateParameter, desired_value: f64, tolerance: f64) -> Self {
+        Self {
+            parameter,
+            desired_value,
+            tolerance,
+        }
+    }
+}
+
 /// Defines the kind of correction to apply in the targeter
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Corrector {
@@ -93,7 +115,7 @@ where
     pub objectives: Vec<Objective>,
     /// The kind of correction to apply to achieve the objectives
     pub corrector: Corrector,
-    /// Maximum number of iterations (defaults to 50)
+    /// Maximum number of iterations
     pub iterations: usize,
 }
 
@@ -126,6 +148,28 @@ where
         + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, <D::StateType as State>::Size>,
 {
+    /// Create a new Targeter which will apply an instantaneous delta-v correction.
+    /// Defaults to 100 iterations which should be sufficient for all well-defined problems
+    pub fn delta_v(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
+        Self {
+            prop,
+            objectives,
+            corrector: Corrector::Velocity,
+            iterations: 100,
+        }
+    }
+
+    /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
+    /// Defaults to 100 iterations which should be sufficient for all well-defined problems
+    pub fn delta_r(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
+        Self {
+            prop,
+            objectives,
+            corrector: Corrector::Position,
+            iterations: 100,
+        }
+    }
+
     /// Differential correction using hyperdual numbers for the objectives
     pub fn try_achieve_from(
         &self,
@@ -240,6 +284,11 @@ where
 
             // We haven't converged yet, so let's build the error vector
             let err_vector = DVector::from(param_errors);
+            if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
+                return Err(NyxError::CorrectionIneffective(
+                    "No change in objective errors".to_string(),
+                ));
+            }
             prev_err_norm = err_vector.norm();
 
             // And the Jacobian
