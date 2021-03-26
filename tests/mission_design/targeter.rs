@@ -55,7 +55,7 @@ fn tgt_basic_position() {
         prop: Arc::new(&setup),
         objectives,
         corrector: Corrector::Velocity,
-        iterations: 19,
+        iterations: 50,
     };
 
     let correction = tgt
@@ -105,7 +105,7 @@ fn tgt_basic_sma() {
         prop: Arc::new(&setup),
         objectives,
         corrector: Corrector::Velocity,
-        iterations: 5,
+        iterations: 50,
     };
 
     let correction = tgt

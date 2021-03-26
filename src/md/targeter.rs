@@ -99,59 +99,6 @@ where
             return Err(NyxError::UnderdeterminedProblem);
         }
 
-        // Let's immediately make sure that the correction can be applied.
-        // let orbit_dual = OrbitDual::from(initial_state.orbit);
-
-        // if self.corrector == Corrector::Position {
-        //     if self.objectives.len() > 3 {
-        //         return Err(NyxError::OverdeterminedProblem);
-        //     }
-        //     // Check that at least one of the parameters changes the position
-        //     let mut will_affect = false;
-        //     for obj in &self.objectives {
-        //         let partials = orbit_dual.partial_for(&obj.parameter)?;
-        //         if partials.wtr_x().abs() > 0.0
-        //             || partials.wtr_y().abs() > 0.0
-        //             || partials.wtr_z().abs() > 0.0
-        //         {
-        //             will_affect = true;
-        //         } else {
-        //             warn!("Variable {:?} has no effect on position", obj.parameter);
-        //         }
-        //     }
-
-        //     if !will_affect {
-        //         return Err(NyxError::CorrectionIneffective(format!(
-        //             "No effect on position: {}",
-        //             self
-        //         )));
-        //     }
-        // } else if self.corrector == Corrector::Velocity {
-        //     if self.objectives.len() > 3 {
-        //         return Err(NyxError::OverdeterminedProblem);
-        //     }
-        //     // Check that at least one of the parameters changes the position
-        //     let mut will_affect = false;
-        //     for obj in &self.objectives {
-        //         let partials = orbit_dual.partial_for(&obj.parameter)?;
-        //         if partials.wtr_vx().abs() > 0.0
-        //             || partials.wtr_vy().abs() > 0.0
-        //             || partials.wtr_vz().abs() > 0.0
-        //         {
-        //             will_affect = true;
-        //         } else {
-        //             warn!("Variable {:?} has no effect on velocity", obj.parameter);
-        //         }
-        //     }
-
-        //     if !will_affect {
-        //         return Err(NyxError::CorrectionIneffective(format!(
-        //             "No effect on velocity: {}",
-        //             self
-        //         )));
-        //     }
-        // }
-
         // Now we know that the problem is correctly defined, so let's propagate as is to the epoch
         // where the correction should be applied.
         let mut xi = self
@@ -220,16 +167,6 @@ where
 
             // We haven't converged yet, so let's build the error vector
             let err_vector = DVector::from(param_errors);
-
-            if err_vector.norm() >= prev_err_norm {
-                println!("Targeting is ineffective at reducing the error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_err_norm, err_vector.norm());
-                // return Err(NyxError::CorrectionIneffective(
-                //     format!("Targeting is ineffective at reducing the error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_err_norm, err_vector.norm())
-                // ));
-            } else {
-                println!("err = {:.3} m", err_vector.norm() * 1e3);
-            }
-
             prev_err_norm = err_vector.norm();
 
             // And the Jacobian
@@ -245,17 +182,14 @@ where
 
             // Compute the correction at xf
             // XXX: Do I need to invert it??
-            println!("{}{}", jac, err_vector);
+            // println!("{}{}", jac, err_vector);
             let delta_pv = jac.transpose() * err_vector;
 
             // Extract what can be corrected
             let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
             let delta_next = phi_inv * delta;
 
-            println!(
-                "delta_pv{} delta {} delta_next {}\nphi{}",
-                delta_pv, delta, delta_next, phi_inv
-            );
+            println!("err = {:.3} m", delta.norm() * 1e3);
 
             // And finally apply it to the xi
             if self.corrector == Corrector::Position {
@@ -272,8 +206,8 @@ where
         }
 
         Err(NyxError::MaxIterReached(format!(
-            "Failed after {} iterations: {}",
-            self.iterations, self
+            "Failed after {} iterations:\nError: {}\n\n{}",
+            self.iterations, prev_err_norm, self
         )))
     }
 }
