@@ -97,14 +97,8 @@ fn val_transfer_schedule_no_depl() {
         err_r, err_v,
     );
 
-    assert!(
-        err_r < 2e-10,
-        format!("finite burn position wrong: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-13,
-        format!("finite burn velocity wrong: {:.5e}", err_v)
-    );
+    assert!(err_r < 2e-10, "finite burn position wrong: {:.5e}", err_r);
+    assert!(err_v < 1e-13, "finite burn velocity wrong: {:.5e}", err_v);
 
     // Ensure that there was no change in fuel mass since tank depletion was off
     assert!(
@@ -198,14 +192,8 @@ fn val_transfer_schedule_depl() {
         err_r, err_v,
     );
 
-    assert!(
-        err_r < 2e-10,
-        format!("finite burn position wrong: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-13,
-        format!("finite burn velocity wrong: {:.5e}", err_v)
-    );
+    assert!(err_r < 2e-10, "finite burn position wrong: {:.5e}", err_r);
+    assert!(err_v < 1e-13, "finite burn velocity wrong: {:.5e}", err_v);
 
     let delta_fuel_mass = (final_state.fuel_mass_kg - rslt_fuel_mass).abs();
     println!("Absolute fuel mass error: {:.0e} kg", delta_fuel_mass);

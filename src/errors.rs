@@ -30,7 +30,7 @@ pub enum NyxError {
     /// Propagation event not hit enough times (requested, found).
     UnsufficientTriggers(usize, usize),
     /// Maximum iterations reached, value corresponds to the number of iterations used
-    MaxIterReached(usize),
+    MaxIterReached(String),
     /// Event not in braket
     EventNotInEpochBraket(String, String),
     /// The STM was not updated prior to requesting a filter update
@@ -72,6 +72,10 @@ pub enum NyxError {
     CorrectionIneffective(String),
     /// When there is an error during a Monte Carlo or in the conditions starting a Monte Carlo run
     MonteCarlo(String),
+    /// Raised if the variables to be adjusted lead to an over-determined of the problem for the targeter
+    OverdeterminedProblem,
+    /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
+    UnderdeterminedProblem,
     /// Some custom error for new dynamics
     CustomError(String),
 }

@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::Orbit;
+use super::{Orbit, StmKind};
+use crate::dimensions::Matrix6;
 use crate::dynamics::thrustctrl::Thruster;
 use crate::utils::rss_orbit_errors;
 use std::fmt;
@@ -191,6 +192,35 @@ impl Spacecraft {
             v,
             (self.fuel_mass_kg - other.fuel_mass_kg).powi(2).sqrt(),
         )
+    }
+
+    /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
+    pub fn enable_stm(&mut self) {
+        self.orbit.stm = Some(Matrix6::identity());
+        self.orbit.stm_kind = StmKind::Step;
+    }
+
+    /// Sets the STM of this state of identity, which also enables computation of the STM for trajectory optimization
+    pub fn enable_traj_stm(&mut self) {
+        self.orbit.stm = Some(Matrix6::identity());
+        self.orbit.stm_kind = StmKind::Traj;
+    }
+
+    /// Copies the current state but sets the STM to identity
+    pub fn with_stm(self) -> Self {
+        let mut me = self;
+        me.enable_stm();
+        me
+    }
+
+    /// Sets the STM of this state of identity
+    pub fn stm_identity(&mut self) {
+        self.orbit.stm = Some(Matrix6::identity());
+    }
+
+    /// Unwraps this STM, or panics if unset.
+    pub fn stm(&self) -> Matrix6<f64> {
+        self.orbit.stm.unwrap()
     }
 }
 

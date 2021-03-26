@@ -120,6 +120,40 @@ impl fmt::Display for OrbitPartial {
 }
 
 impl OrbitDual {
+    pub fn partial_for(&self, param: &StateParameter) -> Result<OrbitPartial, NyxError> {
+        match param {
+            StateParameter::Rmag => Ok(self.rmag()),
+            StateParameter::Vmag => Ok(self.vmag()),
+            StateParameter::HX => Ok(self.hx()),
+            StateParameter::HY => Ok(self.hy()),
+            StateParameter::HZ => Ok(self.hz()),
+            StateParameter::Hmag => Ok(self.hmag()),
+            StateParameter::Energy => Ok(self.energy()),
+            StateParameter::SMA => Ok(self.sma()),
+            StateParameter::Eccentricity => Ok(self.ecc()),
+            StateParameter::Inclination => Ok(self.inc()),
+            StateParameter::AoP => Ok(self.aop()),
+            StateParameter::AoL => Ok(self.aol()),
+            StateParameter::RAAN => Ok(self.raan()),
+            StateParameter::Periapsis => Ok(self.periapsis()),
+            StateParameter::Apoapsis => Ok(self.apoapsis()),
+            StateParameter::TrueLongitude => Ok(self.tlong()),
+            StateParameter::FlightPathAngle => Ok(self.fpa()),
+            StateParameter::MeanAnomaly => Ok(self.ma()),
+            StateParameter::EccentricAnomaly => Ok(self.ea()),
+            StateParameter::GeodeticHeight => Ok(self.geodetic_height()),
+            StateParameter::GeodeticLatitude => Ok(self.geodetic_latitude()),
+            StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude()),
+            StateParameter::C3 => Ok(self.c3()),
+            StateParameter::RightAscension => Ok(self.right_ascension()),
+            StateParameter::Declination => Ok(self.declination()),
+            StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly(),
+            StateParameter::SemiParameter => Ok(self.semi_parameter()),
+            StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis()),
+            _ => Err(NyxError::PartialsUndefined),
+        }
+    }
+
     /// Returns the magnitude of the radius vector in km
     pub fn rmag(&self) -> OrbitPartial {
         OrbitPartial {

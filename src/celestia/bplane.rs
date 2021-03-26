@@ -287,7 +287,10 @@ pub fn achieve_b_plane(
         // If no LTOF is targeted, we'll solve this with a least squared approach.
         loop {
             if attempt_no > max_iter {
-                return Err(NyxError::MaxIterReached(max_iter));
+                return Err(NyxError::MaxIterReached(format!(
+                    "Error norm of {} km after {} iterations",
+                    prev_b_plane_err, max_iter
+                )));
             }
 
             // Build current B Plane
@@ -307,7 +310,7 @@ pub fn achieve_b_plane(
             if b_plane_err.norm() >= prev_b_plane_err {
                 // If the error is not going down, we'll raise an error
                 return Err(NyxError::CorrectionIneffective(
-                    format!("Delta-V correction is ineffective are reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm())
+                    format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm())
                 ));
             }
             prev_b_plane_err = b_plane_err.norm();
@@ -333,7 +336,10 @@ pub fn achieve_b_plane(
         // The LTOF targeting seems to break often, but it's still implemented
         loop {
             if attempt_no > max_iter {
-                return Err(NyxError::MaxIterReached(max_iter));
+                return Err(NyxError::MaxIterReached(format!(
+                    "Error norm of {} km after {} iterations",
+                    prev_b_plane_err, max_iter
+                )));
             }
 
             // Build current B Plane

@@ -339,7 +339,10 @@ where
                 }
             }
         }
-        Err(NyxError::MaxIterReached(max_iter))
+        Err(NyxError::MaxIterReached(format!(
+            "Brent solver failed after {} iterations",
+            max_iter
+        )))
     }
 
     /// Find (usually) all of the states where the event happens.

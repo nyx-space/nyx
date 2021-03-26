@@ -133,14 +133,8 @@ fn val_halo_earth_moon_dynamics() {
         err_r, err_v, halo_rcvr, prop.state
     );
 
-    assert!(
-        err_r < 5e-5,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-9,
-        format!("multi body failed in velocity: {:.5e}", err_v)
-    );
+    assert!(err_r < 5e-5, "multi body failed in position: {:.5e}", err_r);
+    assert!(err_v < 1e-9, "multi body failed in velocity: {:.5e}", err_v);
 }
 
 #[allow(clippy::identity_op)]
@@ -197,13 +191,11 @@ fn val_halo_earth_moon_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.state
     );
 
-    assert!(
-        err_r < 1e-6,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
+    assert!(err_r < 1e-6, "multi body failed in position: {:.5e}", err_r);
     assert!(
         err_v < 1e-11,
-        format!("multi body failed in velocity: {:.5e}", err_v)
+        "multi body failed in velocity: {:.5e}",
+        err_v
     );
 }
 
@@ -262,14 +254,8 @@ fn val_llo_earth_moon_dynamics_adaptive() {
         err_r, err_v, llo_xmtr, prop.state
     );
 
-    assert!(
-        err_r < 1e-5,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-8,
-        format!("multi body failed in velocity: {:.5e}", err_v)
-    );
+    assert!(err_r < 1e-5, "multi body failed in position: {:.5e}", err_r);
+    assert!(err_v < 1e-8, "multi body failed in velocity: {:.5e}", err_v);
 }
 
 #[allow(clippy::identity_op)]
@@ -327,14 +313,8 @@ fn val_halo_multi_body_dynamics() {
         err_r, err_v, halo_rcvr, prop.state
     );
 
-    assert!(
-        err_r < 5e-5,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-9,
-        format!("multi body failed in velocity: {:.5e}", err_v)
-    );
+    assert!(err_r < 5e-5, "multi body failed in position: {:.5e}", err_r);
+    assert!(err_v < 1e-9, "multi body failed in velocity: {:.5e}", err_v);
 }
 
 #[allow(clippy::identity_op)]
@@ -393,13 +373,11 @@ fn val_halo_multi_body_dynamics_adaptive() {
         err_r, err_v, halo_rcvr, prop.state
     );
 
-    assert!(
-        err_r < 1e-6,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
+    assert!(err_r < 1e-6, "multi body failed in position: {:.5e}", err_r);
     assert!(
         err_v < 1e-11,
-        format!("multi body failed in velocity: {:.5e}", err_v)
+        "multi body failed in velocity: {:.5e}",
+        err_v
     );
 }
 
@@ -459,14 +437,8 @@ fn val_llo_multi_body_dynamics_adaptive() {
         err_r, err_v, llo_xmtr, prop.state
     );
 
-    assert!(
-        err_r < 2e-6,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-9,
-        format!("multi body failed in velocity: {:.5e}", err_v)
-    );
+    assert!(err_r < 2e-6, "multi body failed in position: {:.5e}", err_r);
+    assert!(err_v < 1e-9, "multi body failed in velocity: {:.5e}", err_v);
 }
 
 #[allow(clippy::identity_op)]
@@ -518,13 +490,11 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon() {
         err_r, err_v, leo, prop.state
     );
 
-    assert!(
-        err_r < 5e-7,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
+    assert!(err_r < 5e-7, "multi body failed in position: {:.5e}", err_r);
     assert!(
         err_v < 5e-10,
-        format!("multi body failed in velocity: {:.5e}", err_v)
+        "multi body failed in velocity: {:.5e}",
+        err_v
     );
 }
 
@@ -577,14 +547,8 @@ fn val_leo_multi_body_dynamics_adaptive() {
         err_r, err_v, leo, prop.state
     );
 
-    assert!(
-        err_r < 3e-6,
-        format!("multi body failed in position: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 3e-9,
-        format!("multi body failed in velocity: {:.5e}", err_v)
-    );
+    assert!(err_r < 3e-6, "multi body failed in position: {:.5e}", err_r);
+    assert!(err_v < 3e-9, "multi body failed in velocity: {:.5e}", err_v);
 }
 
 #[allow(clippy::identity_op)]
@@ -777,14 +741,8 @@ fn val_earth_sph_harmonics_j2() {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_state.to_cartesian_vec(), &rslt_monte);
 
-    assert!(
-        err_r < 1e-1,
-        format!("J2 failed in position: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-4,
-        format!("J2 failed in velocity: {:.5e}", err_v)
-    );
+    assert!(err_r < 1e-1, "J2 failed in position: {:.5e}", err_r);
+    assert!(err_v < 1e-4, "J2 failed in velocity: {:.5e}", err_v);
 }
 
 #[allow(clippy::identity_op)]
@@ -837,14 +795,8 @@ fn val_earth_sph_harmonics_12x12() {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_state.to_cartesian_vec(), &rslt_gmat);
 
-    assert!(
-        err_r < 1e-1,
-        format!("12x12 failed in position: {:.5e}", err_r)
-    );
-    assert!(
-        err_v < 1e-4,
-        format!("12x12 failed in velocity: {:.5e}", err_v)
-    );
+    assert!(err_r < 1e-1, "12x12 failed in position: {:.5e}", err_r);
+    assert!(err_v < 1e-4, "12x12 failed in velocity: {:.5e}", err_v);
 }
 
 #[allow(clippy::identity_op)]
@@ -897,13 +849,11 @@ fn val_earth_sph_harmonics_70x70() {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.to_cartesian_vec(), &rslt_gmat);
 
-    assert!(
-        dbg!(err_r) < 0.2,
-        format!("70x70 failed in position: {:.5e}", err_r)
-    );
+    assert!(dbg!(err_r) < 0.2, "70x70 failed in position: {:.5e}", err_r);
     assert!(
         dbg!(err_v) < 1e-3,
-        format!("70x70 failed in velocity: {:.5e}", err_v)
+        "70x70 failed in velocity: {:.5e}",
+        err_v
     );
 }
 
@@ -957,13 +907,11 @@ fn val_earth_sph_harmonics_70x70_partials() {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&prop_rslt.to_cartesian_vec(), &rslt_gmat);
 
-    assert!(
-        dbg!(err_r) < 0.2,
-        format!("12x12 failed in position: {:.5e}", err_r)
-    );
+    assert!(dbg!(err_r) < 0.2, "12x12 failed in position: {:.5e}", err_r);
     assert!(
         dbg!(err_v) < 1e-3,
-        format!("12x12 failed in velocity: {:.5e}", err_v)
+        "12x12 failed in velocity: {:.5e}",
+        err_v
     );
 }
 

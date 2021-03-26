@@ -23,7 +23,7 @@ use self::rayon::prelude::*;
 use super::MdHdlr;
 pub use super::{trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
 pub use crate::celestia::{
-    achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, LTCorr, Orbit, OrbitDual,
+    achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, GuidanceMode, LTCorr, Orbit, OrbitDual,
 };
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
