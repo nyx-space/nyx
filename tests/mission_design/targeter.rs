@@ -205,7 +205,53 @@ fn tgt_c3_ra_decl_velocity() {
 }
 
 #[test]
-fn tgt_b_plane() {
+fn tgt_b_plane_sanity() {
+    // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
+
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
+    let cosm = Cosm::de438_gmat();
+    // Grab the frame
+    let luna = cosm.frame("Luna");
+    // Define the epoch
+    let epoch = Epoch::from_gregorian_utc_at_midnight(2016, 1, 1);
+
+    // Hyperbolic orbit
+    let orbit = Orbit::cartesian(
+        546507.344255845,
+        -527978.380486028,
+        531109.066836708,
+        -4.9220589268733,
+        5.36316523097915,
+        -5.22166308425181,
+        epoch,
+        cosm.frame("EME2000"),
+    );
+    // Propagate until periapse
+    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+        cosm.clone(),
+    )));
+
+    let orbit_moon = cosm.frame_chg(&orbit, luna);
+    let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
+
+    let b_plane_tgt = BPlaneTarget::from_b_plane(5022.26511510685, 13135.7982982557);
+
+    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
+
+    let sol = tgt.try_achieve_from(spacecraft, epoch, epoch).unwrap();
+
+    println!("{}", sol);
+
+    tgt.apply(sol).unwrap();
+}
+
+#[test]
+fn tgt_b_plane_legit() {
     use std::str::FromStr;
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");

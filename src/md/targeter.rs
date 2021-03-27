@@ -181,7 +181,7 @@ where
             prop,
             objectives,
             corrector: Corrector::Velocity,
-            iterations: 100,
+            iterations: 300,
         }
     }
 
@@ -242,14 +242,16 @@ where
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
 
             let phi_k_to_0 = xf.stm();
-            let phi_inv = match phi_k_to_0
-                .fixed_slice::<U3, U3>(0, split_on)
-                .to_owned()
-                .try_inverse()
-            {
-                Some(inv) => inv,
-                None => return Err(NyxError::SingularStateTransitionMatrix),
-            };
+            println!("{}", phi_k_to_0);
+            let phi_drdv = phi_k_to_0.fixed_slice::<U3, U3>(3, split_on).to_owned();
+            // let phi_inv = match phi_k_to_0
+            //     .fixed_slice::<U3, U3>(0, split_on)
+            //     .to_owned()
+            //     .try_inverse()
+            // {
+            //     Some(inv) => inv,
+            //     None => return Err(NyxError::SingularStateTransitionMatrix),
+            // };
 
             // Build the partials
             let xf_dual = OrbitDual::from(xf.orbit);
@@ -287,9 +289,9 @@ where
                 param_errors.push(param_err);
 
                 jac_rows.push(vec![
-                    partial.wtr_x(),
-                    partial.wtr_y(),
-                    partial.wtr_z(),
+                    // partial.wtr_x(),
+                    // partial.wtr_y(),
+                    // partial.wtr_z(),
                     partial.wtr_vx(),
                     partial.wtr_vy(),
                     partial.wtr_vz(),
@@ -343,26 +345,35 @@ where
             prev_err_norm = err_vector.norm();
 
             // And the Jacobian
-            let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
+            let mut jac = DMatrix::from_element(self.objectives.len(), 3, 0.0);
             for (i, row) in jac_rows.iter().enumerate() {
                 jac[(i, 0)] = row[0];
                 jac[(i, 1)] = row[1];
                 jac[(i, 2)] = row[2];
-                jac[(i, 3)] = row[3];
-                jac[(i, 4)] = row[4];
-                jac[(i, 5)] = row[5];
+                // jac[(i, 3)] = row[3];
+                // jac[(i, 4)] = row[4];
+                // jac[(i, 5)] = row[5];
             }
 
+            println!("{}", phi_drdv);
+            let phi_obj = jac * phi_drdv;
+
+            // Compute the least squares on this Phi with the objectives
+            let phi_obj_inv = match (&phi_obj * &phi_obj.transpose()).try_inverse() {
+                Some(inv) => inv,
+                None => return Err(NyxError::SingularStateTransitionMatrix),
+            };
+
             // Compute the correction at xf and map it to a state error in position and velocity space
-            let delta_pv = jac.transpose() * err_vector;
+            let delta = &phi_obj.transpose() * phi_obj_inv * err_vector;
 
             // Solve the Least Squares / compute the delta-v
             // let delta_pv =
             //     jac.transpose() * (&jac * &jac.transpose()).try_inverse().unwrap() * err_vector;
 
             // Extract what can be corrected
-            let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
-            let delta_next = phi_inv * delta;
+            // let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
+            // let delta_next = phi_inv * &delta;
 
             info!("Targeter -- Iteration #{}", it);
             for obj in &objmsg {
@@ -372,16 +383,16 @@ where
 
             // And finally apply it to the xi
             if self.corrector == Corrector::Position {
-                xi.orbit.x += delta_next[0];
-                xi.orbit.y += delta_next[1];
-                xi.orbit.z += delta_next[2];
+                xi.orbit.x += delta[0];
+                xi.orbit.y += delta[1];
+                xi.orbit.z += delta[2];
             } else {
-                xi.orbit.vx += delta_next[0];
-                xi.orbit.vy += delta_next[1];
-                xi.orbit.vz += delta_next[2];
+                xi.orbit.vx += delta[0];
+                xi.orbit.vy += delta[1];
+                xi.orbit.vz += delta[2];
             }
 
-            total_correction += delta_next;
+            total_correction += delta;
         }
 
         Err(NyxError::MaxIterReached(format!(

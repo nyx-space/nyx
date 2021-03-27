@@ -272,12 +272,12 @@ impl BPlaneTarget {
             Objective {
                 parameter: StateParameter::BdotR,
                 desired_value: self.b_r_km,
-                tolerance: self.tol_b_r_km * 1e3,
+                tolerance: self.tol_b_r_km * 1e5,
             },
             Objective {
                 parameter: StateParameter::BdotT,
                 desired_value: self.b_t_km,
-                tolerance: self.tol_b_t_km * 1e3,
+                tolerance: self.tol_b_t_km * 1e5,
             },
         ];
 
@@ -285,7 +285,7 @@ impl BPlaneTarget {
             objs.push(Objective {
                 parameter: StateParameter::BLTOF,
                 desired_value: self.ltof_s,
-                tolerance: self.tol_ltof_s * 1e3,
+                tolerance: self.tol_ltof_s * 1e5,
             });
         }
 
