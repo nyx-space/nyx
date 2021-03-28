@@ -356,7 +356,6 @@ where
                 // jac[(i, 4)] = row[4];
                 // jac[(i, 5)] = row[5];
             }
-            println!("jac{}", jac);
 
             println!("{}", phi_drdv);
             let phi_obj = jac * phi_drdv;
@@ -369,14 +368,6 @@ where
 
             // Compute the correction at xf and map it to a state error in position and velocity space
             let delta = &phi_obj.transpose() * phi_obj_inv * err_vector;
-
-            // Solve the Least Squares / compute the delta-v
-            // let delta_pv =
-            //     jac.transpose() * (&jac * &jac.transpose()).try_inverse().unwrap() * err_vector;
-
-            // Extract what can be corrected
-            // let delta = delta_pv.fixed_rows::<U3>(0).into_owned();
-            // let delta_next = phi_inv * &delta;
 
             info!("Targeter -- Iteration #{}", it);
             for obj in &objmsg {
@@ -411,7 +402,9 @@ where
     }
 
     /// Apply a correction and propagate to achievement epoch, return the final state and trajectory.
-    /// Also checks that the objectives are indeed matched
+    /// Also checks that the objectives are indeed matched.
+    /// WARNING: This checks that the final objectives are matched with TEN TIMES the initial tolerances
+    /// XXX Check why that is the case.
     pub fn apply_with_traj(
         &self,
         solution: TargeterSolution,
@@ -455,7 +448,7 @@ where
 
             let param_err = obj.desired_value - partial.real();
 
-            if param_err.abs() > obj.tolerance {
+            if param_err.abs() > 10.0 * obj.tolerance {
                 converged = false;
             }
             param_errors.push(param_err);
