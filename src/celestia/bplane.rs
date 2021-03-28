@@ -163,12 +163,12 @@ impl BPlane {
     /// Returns the Jacobian of the B plane (BT, BR, LTOF) with respect to the velocity
     pub fn jacobian(&self) -> Matrix3<f64> {
         Matrix3::new(
-            self.b_t.wtr_vx(),
-            self.b_t.wtr_vy(),
-            self.b_t.wtr_vz(),
             self.b_r.wtr_vx(),
             self.b_r.wtr_vy(),
             self.b_r.wtr_vz(),
+            self.b_t.wtr_vx(),
+            self.b_t.wtr_vy(),
+            self.b_t.wtr_vz(),
             self.ltof_s.wtr_vx(),
             self.ltof_s.wtr_vy(),
             self.ltof_s.wtr_vz(),
@@ -343,7 +343,7 @@ pub fn try_achieve_b_plane(
             }
 
             // Build the error vector
-            let b_plane_err = Vector2::new(bt_err, br_err);
+            let b_plane_err = Vector2::new(br_err, bt_err);
 
             if b_plane_err.norm() >= prev_b_plane_err {
                 // If the error is not going down, we'll raise an error

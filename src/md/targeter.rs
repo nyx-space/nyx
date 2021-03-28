@@ -288,6 +288,8 @@ where
                 }
                 param_errors.push(param_err);
 
+                println!("{}\n{:?}\n{}", obj.desired_value, obj.parameter, partial);
+
                 jac_rows.push(vec![
                     // partial.wtr_x(),
                     // partial.wtr_y(),
@@ -354,6 +356,7 @@ where
                 // jac[(i, 4)] = row[4];
                 // jac[(i, 5)] = row[5];
             }
+            println!("jac{}", jac);
 
             println!("{}", phi_drdv);
             let phi_obj = jac * phi_drdv;

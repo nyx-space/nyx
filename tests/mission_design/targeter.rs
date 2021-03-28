@@ -214,8 +214,6 @@ fn tgt_b_plane_sanity() {
 
     // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
     let cosm = Cosm::de438_gmat();
-    // Grab the frame
-    let luna = cosm.frame("Luna");
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc_at_midnight(2016, 1, 1);
 
@@ -230,14 +228,13 @@ fn tgt_b_plane_sanity() {
         epoch,
         cosm.frame("EME2000"),
     );
-    // Propagate until periapse
+
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm.clone(),
+        cosm,
     )));
 
-    let orbit_moon = cosm.frame_chg(&orbit, luna);
-    let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
+    let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
 
     let b_plane_tgt = BPlaneTarget::from_b_plane(5022.26511510685, 13135.7982982557);
 
@@ -246,6 +243,11 @@ fn tgt_b_plane_sanity() {
     let sol = tgt.try_achieve_from(spacecraft, epoch, epoch).unwrap();
 
     println!("{}", sol);
+
+    // Note that we allow for slightly larger error than the other in-place correction
+    assert!((sol.correction[0] - -0.25386251697606466).abs() < 1e-6);
+    assert!((sol.correction[1] - -0.18774460089778605).abs() < 1e-6);
+    assert!((sol.correction[2] - 0.046145009839345504).abs() < 1e-6);
 
     tgt.apply(sol).unwrap();
 }
