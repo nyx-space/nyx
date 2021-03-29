@@ -164,6 +164,9 @@ fn tgt_position_sma() {
         .unwrap();
 
     println!("{}", solution);
+
+    // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
+    assert!((solution.correction.norm() - 7563.095e-3).abs() < 1e-6);
 }
 
 #[test]
@@ -297,7 +300,7 @@ fn tgt_b_plane_legit() {
     println!("{}", sol);
 
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
-    assert!((sol.correction.norm() - 44.267e-3).abs() < 1e-3);
+    assert!((sol.correction.norm() - 43.197e-3).abs() < 1e-6);
 
     tgt.apply(sol).unwrap();
 }
@@ -351,7 +354,62 @@ fn tgt_b_plane_with_propagation() {
     println!("{}", sol);
 
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
-    assert!((sol.correction.norm() - 225.387e-3).abs() < 1e-3);
+    assert!((sol.correction.norm() - 225.241e-3).abs() < 1e-6);
+
+    tgt.apply(sol).unwrap();
+}
+
+#[test]
+fn tgt_b_plane_remove_this() {
+    // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
+    // But perform a backward propagation to make sure that applying the linearization works.
+
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
+    let cosm = Cosm::de438_gmat();
+    // Define the epoch
+    let epoch = Epoch::from_gregorian_utc_at_midnight(2022, 11, 29);
+
+    // Hyperbolic orbit
+    let orbit = Orbit::cartesian(
+        4395.725834,
+        -8831.846344,
+        -5422.661606,
+        7.919679,
+        -1.783247,
+        -1.689868,
+        epoch,
+        cosm.frame("EME2000"),
+    );
+
+    let luna = cosm.frame("Luna");
+    let orbit_moon = cosm.frame_chg(&orbit, luna);
+
+    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+        cosm,
+    )));
+
+    let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
+
+    let b_plane_tgt = BPlaneTarget::from_b_plane(-5639.9403447, 306.550415207);
+
+    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
+
+    let tcm1_epoch = epoch + 128349.0 * TimeUnit::Second;
+    let loi_epoch = tcm1_epoch + 322559.0 * TimeUnit::Second;
+
+    let sol = tgt
+        .try_achieve_from(spacecraft, tcm1_epoch, loi_epoch)
+        .unwrap();
+
+    println!("{}", sol);
+
+    // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
+    // assert!((sol.correction.norm() - 225.387e-3).abs() < 1e-3);
 
     tgt.apply(sol).unwrap();
 }

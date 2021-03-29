@@ -272,12 +272,12 @@ impl BPlaneTarget {
             Objective {
                 parameter: StateParameter::BdotR,
                 desired_value: self.b_r_km,
-                tolerance: self.tol_b_r_km * 1e5,
+                tolerance: 1.0,
             },
             Objective {
                 parameter: StateParameter::BdotT,
                 desired_value: self.b_t_km,
-                tolerance: self.tol_b_t_km * 1e5,
+                tolerance: 1.0,
             },
         ];
 

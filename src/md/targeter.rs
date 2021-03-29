@@ -57,9 +57,13 @@ impl Objective {
 
 /// Defines the kind of correction to apply in the targeter
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Corrector {
-    Position,
-    Velocity,
+pub enum Vary {
+    PositionX,
+    PositionY,
+    PositionZ,
+    VelocityX,
+    VelocityY,
+    VelocityZ,
 }
 
 /// Defines a targeter solution
@@ -70,7 +74,7 @@ pub struct TargeterSolution {
     /// The correction vector applied
     pub correction: Vector3<f64>,
     /// The kind of correction (position or velocity)
-    pub corrector: Corrector,
+    pub variables: Vec<Vary>,
     /// The epoch at which the objectives are achieved
     pub achievement_epoch: Epoch,
     /// The errors achieved
@@ -94,7 +98,7 @@ impl fmt::Display for TargeterSolution {
             ));
         }
 
-        let corrmsg = if self.corrector == Corrector::Position {
+        let corrmsg = if self.variables == Vary::Position {
             format!(
                 "Correction: [{:.3}, {:.3}, {:.3}] km\t|Δr| = {:.3} km",
                 self.correction[0],
@@ -123,7 +127,7 @@ impl fmt::Display for TargeterSolution {
         write!(
             f,
             "Targeter solution correcting {:?} (converged in {} iterations):\n\t{}\n\tAchieved:{}\n\tInitial state:\n\t\t{}\n\t\t{:x}",
-            self.corrector, self.iterations, corrmsg, objmsg, self.state, self.state
+            self.variables, self.iterations, corrmsg, objmsg, self.state, self.state
         )
     }
 }
@@ -140,7 +144,7 @@ where
     /// The list of objectives of this targeter
     pub objectives: Vec<Objective>,
     /// The kind of correction to apply to achieve the objectives
-    pub corrector: Corrector,
+    pub variables: Vec<Vary>,
     /// Maximum number of iterations
     pub iterations: usize,
 }
@@ -163,7 +167,7 @@ where
         write!(
             f,
             "Targeter:\n\tObjectives: {}\n\tCorrect: {:?}",
-            objmsg, self.corrector
+            objmsg, self.variables
         )
     }
 }
@@ -180,7 +184,7 @@ where
         Self {
             prop,
             objectives,
-            corrector: Corrector::Velocity,
+            variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
             iterations: 300,
         }
     }
@@ -191,7 +195,7 @@ where
         Self {
             prop,
             objectives,
-            corrector: Corrector::Position,
+            variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
             iterations: 100,
         }
     }
@@ -227,7 +231,7 @@ where
         let mut total_correction = Vector3::zeros();
 
         // STM index to split on
-        let split_on = if self.corrector == Corrector::Velocity {
+        let split_on = if self.variables == Vary::Velocity {
             3
         } else {
             0
@@ -268,6 +272,9 @@ where
                 None
             };
 
+            // If we have as many objectives as variables, then we will not perform a Least Squares optimization.
+            let is_full = self.objectives.len() == self.variables.len();
+
             for obj in &self.objectives {
                 let partial = if obj.parameter.is_b_plane() {
                     match obj.parameter {
@@ -280,7 +287,6 @@ where
                     xf_dual.partial_for(&obj.parameter)?
                 };
 
-                // XXX: What is going on here?!
                 let param_err = obj.desired_value - partial.real();
 
                 if param_err.abs() > obj.tolerance {
@@ -290,14 +296,30 @@ where
 
                 println!("{}\n{:?}\n{}", obj.desired_value, obj.parameter, partial);
 
-                jac_rows.push(vec![
-                    // partial.wtr_x(),
-                    // partial.wtr_y(),
-                    // partial.wtr_z(),
-                    partial.wtr_vx(),
-                    partial.wtr_vy(),
-                    partial.wtr_vz(),
-                ]);
+                if is_full {
+                    // Only grab the partials that we need
+                    let mut tmp_row = Vec::with_capacity(self.variables.len());
+                    for var in self.variables {
+                        tmp_row.push(match var {
+                            Vary::PositionX => partial.wtr_x(),
+                            Vary::PositionY => partial.wtr_y(),
+                            Vary::PositionZ => partial.wtr_z(),
+                            Vary::VelocityX => partial.wtr_vx(),
+                            Vary::VelocityY => partial.wtr_vy(),
+                            Vary::VelocityZ => partial.wtr_vz(),
+                        });
+                    }
+                    jac_rows.push(tmp_row);
+                } else {
+                    jac_rows.push(vec![
+                        partial.wtr_x(),
+                        partial.wtr_y(),
+                        partial.wtr_z(),
+                        partial.wtr_vx(),
+                        partial.wtr_vy(),
+                        partial.wtr_vz(),
+                    ]);
+                }
             }
 
             // Build debugging information
@@ -311,20 +333,22 @@ where
 
             if converged {
                 let mut state = xi_start;
-                if self.corrector == Corrector::Position {
-                    state.orbit.x += total_correction[0];
-                    state.orbit.y += total_correction[1];
-                    state.orbit.z += total_correction[2];
-                } else {
-                    state.orbit.vx += total_correction[0];
-                    state.orbit.vy += total_correction[1];
-                    state.orbit.vz += total_correction[2];
+                // XXX: This will break is 4 or more Vary
+                for (i, var) in self.variables.iter().enumerate() {
+                    match var {
+                        Vary::PositionX => state.orbit.x += total_correction[i],
+                        Vary::PositionY => state.orbit.y += total_correction[i],
+                        Vary::PositionZ => state.orbit.z += total_correction[i],
+                        Vary::VelocityX => state.orbit.vx += total_correction[i],
+                        Vary::VelocityY => state.orbit.vy += total_correction[i],
+                        Vary::VelocityZ => state.orbit.vz += total_correction[i],
+                    }
                 }
 
                 let sol = TargeterSolution {
                     state,
                     correction: total_correction,
-                    corrector: self.corrector,
+                    variables: self.variables,
                     achievement_epoch,
                     achieved_errors: param_errors,
                     achieved_objectives: self.objectives.clone(),
@@ -347,18 +371,18 @@ where
             prev_err_norm = err_vector.norm();
 
             // And the Jacobian
-            let mut jac = DMatrix::from_element(self.objectives.len(), 3, 0.0);
+            let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
             for (i, row) in jac_rows.iter().enumerate() {
                 jac[(i, 0)] = row[0];
                 jac[(i, 1)] = row[1];
                 jac[(i, 2)] = row[2];
-                // jac[(i, 3)] = row[3];
-                // jac[(i, 4)] = row[4];
-                // jac[(i, 5)] = row[5];
+                jac[(i, 3)] = row[3];
+                jac[(i, 4)] = row[4];
+                jac[(i, 5)] = row[5];
             }
 
-            println!("{}", phi_drdv);
-            let phi_obj = jac * phi_drdv;
+            println!("{}", phi_k_to_0);
+            let phi_obj = jac * phi_k_to_0;
 
             // Compute the least squares on this Phi with the objectives
             let phi_obj_inv = match (&phi_obj * &phi_obj.transpose()).try_inverse() {
@@ -373,20 +397,26 @@ where
             for obj in &objmsg {
                 info!("{}", obj);
             }
-            info!("Mapped {:?} error = {:.3}", self.corrector, delta.norm());
+            info!("Mapped {:?} error = {:.3}", self.variables, delta.norm());
 
             // And finally apply it to the xi
-            if self.corrector == Corrector::Position {
+            if self.variables == Vary::Position {
                 xi.orbit.x += delta[0];
                 xi.orbit.y += delta[1];
                 xi.orbit.z += delta[2];
-            } else {
-                xi.orbit.vx += delta[0];
-                xi.orbit.vy += delta[1];
-                xi.orbit.vz += delta[2];
-            }
 
-            total_correction += delta;
+                total_correction[0] += delta[0];
+                total_correction[1] += delta[1];
+                total_correction[2] += delta[2];
+            } else {
+                xi.orbit.vx += delta[3];
+                xi.orbit.vy += delta[4];
+                xi.orbit.vz += delta[5];
+
+                total_correction[0] += delta[3];
+                total_correction[1] += delta[4];
+                total_correction[2] += delta[5];
+            }
         }
 
         Err(NyxError::MaxIterReached(format!(
