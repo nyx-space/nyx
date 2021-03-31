@@ -98,31 +98,45 @@ impl fmt::Display for TargeterSolution {
             ));
         }
 
-        let corrmsg = if self.variables == Vary::Position {
-            format!(
-                "Correction: [{:.3}, {:.3}, {:.3}] km\t|Δr| = {:.3} km",
-                self.correction[0],
-                self.correction[1],
-                self.correction[2],
+        let mut corrmsg = String::from("Correction:");
+        let mut is_only_position = true;
+        let mut is_only_velocity = true;
+        for (i, var) in self.variables.iter().enumerate() {
+            let unit = match var {
+                Vary::PositionX | Vary::PositionY | Vary::PositionZ => {
+                    is_only_velocity = false;
+                    "m"
+                }
+                Vary::VelocityX | Vary::VelocityY | Vary::VelocityZ => {
+                    is_only_position = false;
+                    "m/s"
+                }
+            };
+            corrmsg.push_str(&format!(
+                "\n\t\t{:?} = {:.3} {}",
+                var, self.correction[i], unit
+            ));
+        }
+
+        if is_only_position {
+            corrmsg.push_str(&format!(
+                "|Δr| = {:.3} m",
                 (self.correction[0].powi(2)
                     + self.correction[1].powi(2)
                     + self.correction[2].powi(2))
                 .sqrt()
                     * 1e3
-            )
-        } else {
-            format!(
-                "Correction: [{:.3}, {:.3}, {:.3}] m/s\t|Δv| = {:.3} m/s",
-                self.correction[0] * 1e3,
-                self.correction[1] * 1e3,
-                self.correction[2] * 1e3,
+            ));
+        } else if is_only_velocity {
+            corrmsg.push_str(&format!(
+                "|Δv| = {:.3} m/s",
                 (self.correction[0].powi(2)
                     + self.correction[1].powi(2)
                     + self.correction[2].powi(2))
                 .sqrt()
                     * 1e3
-            )
-        };
+            ));
+        }
 
         write!(
             f,
@@ -231,11 +245,11 @@ where
         let mut total_correction = Vector3::zeros();
 
         // STM index to split on
-        let split_on = if self.variables == Vary::Velocity {
-            3
-        } else {
-            0
-        };
+        // let split_on = if self.variables == Vary::Velocity {
+        //     3
+        // } else {
+        //     0
+        // };
 
         let mut prev_err_norm = std::f64::INFINITY;
 
@@ -247,7 +261,7 @@ where
 
             let phi_k_to_0 = xf.stm();
             println!("{}", phi_k_to_0);
-            let phi_drdv = phi_k_to_0.fixed_slice::<U3, U3>(3, split_on).to_owned();
+            // let phi_drdv = phi_k_to_0.fixed_slice::<U3, U3>(3, split_on).to_owned();
             // let phi_inv = match phi_k_to_0
             //     .fixed_slice::<U3, U3>(0, split_on)
             //     .to_owned()
@@ -299,7 +313,7 @@ where
                 if is_full {
                     // Only grab the partials that we need
                     let mut tmp_row = Vec::with_capacity(self.variables.len());
-                    for var in self.variables {
+                    for var in &self.variables {
                         tmp_row.push(match var {
                             Vary::PositionX => partial.wtr_x(),
                             Vary::PositionY => partial.wtr_y(),
@@ -311,6 +325,7 @@ where
                     }
                     jac_rows.push(tmp_row);
                 } else {
+                    // Else, we will try a gradient descent approach on all of the state parameters.
                     jac_rows.push(vec![
                         partial.wtr_x(),
                         partial.wtr_y(),
@@ -348,7 +363,7 @@ where
                 let sol = TargeterSolution {
                     state,
                     correction: total_correction,
-                    variables: self.variables,
+                    variables: self.variables.clone(),
                     achievement_epoch,
                     achieved_errors: param_errors,
                     achieved_objectives: self.objectives.clone(),
@@ -400,23 +415,51 @@ where
             info!("Mapped {:?} error = {:.3}", self.variables, delta.norm());
 
             // And finally apply it to the xi
-            if self.variables == Vary::Position {
-                xi.orbit.x += delta[0];
-                xi.orbit.y += delta[1];
-                xi.orbit.z += delta[2];
-
-                total_correction[0] += delta[0];
-                total_correction[1] += delta[1];
-                total_correction[2] += delta[2];
-            } else {
-                xi.orbit.vx += delta[3];
-                xi.orbit.vy += delta[4];
-                xi.orbit.vz += delta[5];
-
-                total_correction[0] += delta[3];
-                total_correction[1] += delta[4];
-                total_correction[2] += delta[5];
+            for (i, var) in self.variables.iter().enumerate() {
+                match var {
+                    Vary::PositionX => {
+                        xi.orbit.x += delta[0];
+                        total_correction[i] += delta[0];
+                    }
+                    Vary::PositionY => {
+                        xi.orbit.y += delta[1];
+                        total_correction[i] += delta[1];
+                    }
+                    Vary::PositionZ => {
+                        xi.orbit.z += delta[2];
+                        total_correction[i] += delta[2];
+                    }
+                    Vary::VelocityX => {
+                        xi.orbit.vx += delta[3];
+                        total_correction[i] += delta[3];
+                    }
+                    Vary::VelocityY => {
+                        xi.orbit.vy += delta[4];
+                        total_correction[i] += delta[4];
+                    }
+                    Vary::VelocityZ => {
+                        xi.orbit.vz += delta[5];
+                        total_correction[i] += delta[5];
+                    }
+                }
             }
+            // if self.variables == Vary::Position {
+            //     xi.orbit.x += delta[0];
+            //     xi.orbit.y += delta[1];
+            //     xi.orbit.z += delta[2];
+
+            //     total_correction[0] += delta[0];
+            //     total_correction[1] += delta[1];
+            //     total_correction[2] += delta[2];
+            // } else {
+            //     xi.orbit.vx += delta[3];
+            //     xi.orbit.vy += delta[4];
+            //     xi.orbit.vz += delta[5];
+
+            //     total_correction[0] += delta[3];
+            //     total_correction[1] += delta[4];
+            //     total_correction[2] += delta[5];
+            // }
         }
 
         Err(NyxError::MaxIterReached(format!(

@@ -153,7 +153,7 @@ fn tgt_position_sma() {
     let tgt = Targeter {
         prop: Arc::new(&setup),
         objectives,
-        corrector: Corrector::Position,
+        variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
         iterations: 50,
     };
 
