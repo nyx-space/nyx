@@ -341,7 +341,7 @@ where
             let mut objmsg = Vec::new();
             for (i, obj) in self.objectives.iter().enumerate() {
                 objmsg.push(format!(
-                    "\t{:?}: error = {:.3}\t desired = {:.3} (+/- {:.1e})",
+                    "\t{:?}: variance = {:.3}\t desired = {:.3} (+/- {:.1e})",
                     obj.parameter, param_errors[i], obj.desired_value, obj.tolerance
                 ));
             }
