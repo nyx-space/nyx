@@ -298,9 +298,9 @@ where
         let ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
+        // Convert the step size to seconds -- it's mutable because we may change it below
+        let mut step_size = self.step_size.in_seconds();
         loop {
-            // Convert the step size to seconds -- we do it here because we may change the step below!
-            let step_size = self.step_size.in_seconds();
             let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
@@ -347,7 +347,7 @@ where
                 // Compute the error estimate.
                 self.details.error = E::estimate(&error_est, &next_state, &state);
                 if self.details.error <= self.prop.opts.tolerance
-                    || self.step_size <= self.prop.opts.min_step
+                    || step_size <= self.prop.opts.min_step.in_seconds()
                     || self.details.attempts >= self.prop.opts.attempts
                 {
                     if self.details.attempts >= self.prop.opts.attempts {
@@ -365,12 +365,14 @@ where
                             * step_size
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.order));
-                        self.step_size = if proposed_step > self.prop.opts.max_step.in_seconds() {
-                            self.prop.opts.max_step
+                        step_size = if proposed_step > self.prop.opts.max_step.in_seconds() {
+                            self.prop.opts.max_step.in_seconds()
                         } else {
-                            proposed_step * TimeUnit::Second
+                            proposed_step
                         };
                     }
+                    // In all cases, let's update the step size to whatever was the adapted step size
+                    self.step_size = step_size * TimeUnit::Second;
                     return Ok((self.details.step, next_state));
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
@@ -380,11 +382,12 @@ where
                         * step_size
                         * (self.prop.opts.tolerance / self.details.error)
                             .powf(1.0 / f64::from(self.prop.order - 1));
-                    self.step_size = if proposed_step < self.prop.opts.min_step.in_seconds() {
-                        self.prop.opts.min_step
+                    step_size = if proposed_step < self.prop.opts.min_step.in_seconds() {
+                        self.prop.opts.min_step.in_seconds()
                     } else {
-                        proposed_step * TimeUnit::Second
+                        proposed_step
                     };
+                    // Note that we don't set self.step_size, that will be updated right before we return
                 }
             }
         }
