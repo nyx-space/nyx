@@ -17,7 +17,7 @@
 */
 
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, VectorN, U3};
+use crate::dimensions::{DefaultAllocator, DimName, VectorN, U1, U3};
 
 // This determines when to take into consideration the magnitude of the state_delta and
 // prevents dividing by too small of a number.
@@ -155,9 +155,6 @@ impl ErrorCtrl for RSSStep {
     where
         DefaultAllocator: Allocator<f64, N>,
     {
-        // TODO: Split up in groups of 3, and handle all non-Cartesian stuff as L1 norm
-        // Cf. https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L2980
-        // Then do the same for RSSState, and remove RSS*PV
         let mag = (candidate - cur_state).norm();
         let err = error_est.norm();
         if mag > REL_ERR_THRESH.sqrt() {
@@ -203,8 +200,8 @@ impl ErrorCtrl for RSSState {
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 #[derive(Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct RSSStatePV;
-impl ErrorCtrl for RSSStatePV {
+pub struct RSSCartesianState;
+impl ErrorCtrl for RSSCartesianState {
     fn estimate<N: DimName>(
         error_est: &VectorN<f64, N>,
         candidate: &VectorN<f64, N>,
@@ -213,21 +210,31 @@ impl ErrorCtrl for RSSStatePV {
     where
         DefaultAllocator: Allocator<f64, N>,
     {
-        let err_radius = RSSState::estimate::<U3>(
-            &error_est.fixed_rows::<U3>(0).into_owned(),
-            &candidate.fixed_rows::<U3>(0).into_owned(),
-            &cur_state.fixed_rows::<U3>(0).into_owned(),
-        );
-        let err_velocity = RSSState::estimate::<U3>(
-            &error_est.fixed_rows::<U3>(3).into_owned(),
-            &candidate.fixed_rows::<U3>(3).into_owned(),
-            &cur_state.fixed_rows::<U3>(3).into_owned(),
-        );
-
-        if err_radius > err_velocity {
-            err_radius
+        if N::dim() >= 6 {
+            let err_radius = RSSState::estimate::<U3>(
+                &error_est.fixed_rows::<U3>(0).into_owned(),
+                &candidate.fixed_rows::<U3>(0).into_owned(),
+                &cur_state.fixed_rows::<U3>(0).into_owned(),
+            );
+            let err_velocity = RSSState::estimate::<U3>(
+                &error_est.fixed_rows::<U3>(3).into_owned(),
+                &candidate.fixed_rows::<U3>(3).into_owned(),
+                &cur_state.fixed_rows::<U3>(3).into_owned(),
+            );
+            let mut remaining_err = 0.0;
+            for i in 6..N::dim() {
+                let this_err = RSSState::estimate::<U1>(
+                    &error_est.fixed_rows::<U1>(i).into_owned(),
+                    &candidate.fixed_rows::<U1>(i).into_owned(),
+                    &cur_state.fixed_rows::<U1>(i).into_owned(),
+                );
+                if this_err > remaining_err {
+                    remaining_err = this_err;
+                }
+            }
+            remaining_err.max(err_radius.max(err_velocity))
         } else {
-            err_velocity
+            RSSState::estimate(error_est, candidate, cur_state)
         }
     }
 }
@@ -236,8 +243,8 @@ impl ErrorCtrl for RSSStatePV {
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 #[derive(Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct RSSStepPV;
-impl ErrorCtrl for RSSStepPV {
+pub struct RSSCartesianStep;
+impl ErrorCtrl for RSSCartesianStep {
     fn estimate<N: DimName>(
         error_est: &VectorN<f64, N>,
         candidate: &VectorN<f64, N>,
@@ -246,21 +253,31 @@ impl ErrorCtrl for RSSStepPV {
     where
         DefaultAllocator: Allocator<f64, N>,
     {
-        let err_radius = RSSStep::estimate::<U3>(
-            &error_est.fixed_rows::<U3>(0).into_owned(),
-            &candidate.fixed_rows::<U3>(0).into_owned(),
-            &cur_state.fixed_rows::<U3>(0).into_owned(),
-        );
-        let err_velocity = RSSStep::estimate::<U3>(
-            &error_est.fixed_rows::<U3>(3).into_owned(),
-            &candidate.fixed_rows::<U3>(3).into_owned(),
-            &cur_state.fixed_rows::<U3>(3).into_owned(),
-        );
-
-        if err_radius > err_velocity {
-            err_radius
+        if N::dim() >= 6 {
+            let err_radius = RSSStep::estimate::<U3>(
+                &error_est.fixed_rows::<U3>(0).into_owned(),
+                &candidate.fixed_rows::<U3>(0).into_owned(),
+                &cur_state.fixed_rows::<U3>(0).into_owned(),
+            );
+            let err_velocity = RSSStep::estimate::<U3>(
+                &error_est.fixed_rows::<U3>(3).into_owned(),
+                &candidate.fixed_rows::<U3>(3).into_owned(),
+                &cur_state.fixed_rows::<U3>(3).into_owned(),
+            );
+            let mut remaining_err = 0.0;
+            for i in 6..N::dim() {
+                let this_err = RSSStep::estimate::<U1>(
+                    &error_est.fixed_rows::<U1>(i).into_owned(),
+                    &candidate.fixed_rows::<U1>(i).into_owned(),
+                    &cur_state.fixed_rows::<U1>(i).into_owned(),
+                );
+                if this_err > remaining_err {
+                    remaining_err = this_err;
+                }
+            }
+            remaining_err.max(err_radius.max(err_velocity))
         } else {
-            err_velocity
+            RSSStep::estimate(error_est, candidate, cur_state)
         }
     }
 }
@@ -269,8 +286,8 @@ impl ErrorCtrl for RSSStepPV {
 /// composed of two vectors of the same unit, both of size 3 (e.g. position + velocity).
 #[derive(Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct RSSStepPVStm;
-impl ErrorCtrl for RSSStepPVStm {
+pub struct RSSCartesianStepStm;
+impl ErrorCtrl for RSSCartesianStepStm {
     fn estimate<N: DimName>(
         error_est: &VectorN<f64, N>,
         candidate: &VectorN<f64, N>,

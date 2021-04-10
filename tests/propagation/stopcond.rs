@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 use nyx::celestia::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::md::{Event, StateParameter};
-use nyx::propagators::error_ctrl::RSSStepPV;
+use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, J2000_OFFSET};
 use nyx::TimeTagged;
@@ -114,7 +114,7 @@ fn stop_cond_nrho_apo() {
 
     let setup = Propagator::rk89(
         dynamics,
-        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-6, RSSStepPV {}),
+        PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-6, RSSCartesianStep {}),
     );
 
     let mut prop = setup.with(state);

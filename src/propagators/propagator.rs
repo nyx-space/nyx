@@ -17,7 +17,7 @@
 */
 
 use super::crossbeam::thread;
-use super::error_ctrl::{ErrorCtrl, RSSStepPV};
+use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, VectorN};
@@ -107,7 +107,7 @@ where
     }
 }
 
-impl<'a, D: Dynamics> Propagator<'a, D, RSSStepPV>
+impl<'a, D: Dynamics> Propagator<'a, D, RSSCartesianStep>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::PropVecSize>,
@@ -455,7 +455,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
     }
 }
 
-impl PropOpts<RSSStepPV> {
+impl PropOpts<RSSCartesianStep> {
     /// `with_fixed_step` initializes an `PropOpts` such that the integrator is used with a fixed
     ///  step size.
     pub fn with_fixed_step(step: Duration) -> Self {
@@ -466,7 +466,7 @@ impl PropOpts<RSSStepPV> {
             tolerance: 0.0,
             fixed_step: true,
             attempts: 0,
-            errctrl: RSSStepPV {},
+            errctrl: RSSCartesianStep {},
         }
     }
 
@@ -483,9 +483,9 @@ impl PropOpts<RSSStepPV> {
     }
 }
 
-impl Default for PropOpts<RSSStepPV> {
+impl Default for PropOpts<RSSCartesianStep> {
     /// `default` returns the same default options as GMAT.
-    fn default() -> PropOpts<RSSStepPV> {
+    fn default() -> PropOpts<RSSCartesianStep> {
         PropOpts {
             init_step: 60.0 * TimeUnit::Second,
             min_step: 0.001 * TimeUnit::Second,
@@ -493,7 +493,7 @@ impl Default for PropOpts<RSSStepPV> {
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
-            errctrl: RSSStepPV {},
+            errctrl: RSSCartesianStep {},
         }
     }
 }
@@ -514,7 +514,7 @@ fn test_options() {
     assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
     assert_eq!(opts.fixed_step, false);
 
-    let opts: PropOpts<RSSStepPV> = Default::default();
+    let opts: PropOpts<RSSCartesianStep> = Default::default();
     assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
     assert_eq!(opts.min_step, 0.001 * TimeUnit::Second);
     assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);

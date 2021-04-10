@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 use nyx::celestia::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
 use nyx::dimensions::{Matrix6, Vector6, U3};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
-use nyx::propagators::error_ctrl::RSSStepPV;
+use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
@@ -34,7 +34,7 @@ fn val_two_body_dynamics() {
     );
 
     let dynamics = OrbitalDynamics::two_body();
-    let setup = Propagator::rk89(dynamics, PropOpts::<RSSStepPV>::default());
+    let setup = Propagator::rk89(dynamics, PropOpts::<RSSCartesianStep>::default());
     let mut prop = setup.with(state);
     prop.for_duration(prop_time).unwrap();
     assert_orbit_eq_or_abs(&prop.state, &rslt, 2e-9, "two body prop failed");
@@ -725,7 +725,7 @@ fn val_earth_sph_harmonics_j2() {
 
     let dynamics = OrbitalDynamics::from_model(harmonics);
 
-    let prop_state = Propagator::rk89(dynamics, PropOpts::<RSSStepPV>::default())
+    let prop_state = Propagator::rk89(dynamics, PropOpts::<RSSCartesianStep>::default())
         .with(state)
         .for_duration(1 * TimeUnit::Day)
         .unwrap();

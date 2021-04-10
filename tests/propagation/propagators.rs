@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 use nyx::celestia::{assert_orbit_eq_or_abs, assert_orbit_eq_or_rel, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
-use nyx::propagators::error_ctrl::RSSStatePV;
+use nyx::propagators::error_ctrl::RSSCartesianState;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
 use nyx::utils::rss_orbit_errors;
@@ -83,7 +83,7 @@ fn regress_leo_day_adaptive() {
     {
         let setup = Propagator::new::<CashKarp45>(
             dynamics.clone(),
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -101,7 +101,7 @@ fn regress_leo_day_adaptive() {
     {
         let setup = Propagator::new::<Fehlberg45>(
             dynamics,
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -184,7 +184,7 @@ fn gmat_val_leo_day_adaptive() {
     {
         let setup = Propagator::new::<Dormand45>(
             dynamics.clone(),
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -230,7 +230,7 @@ fn gmat_val_leo_day_adaptive() {
     {
         let setup = Propagator::new::<Verner56>(
             dynamics.clone(),
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -254,7 +254,7 @@ fn gmat_val_leo_day_adaptive() {
     {
         let setup = Propagator::new::<Dormand78>(
             dynamics.clone(),
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -282,7 +282,7 @@ fn gmat_val_leo_day_adaptive() {
     {
         let setup = Propagator::new::<RK89>(
             dynamics,
-            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSStatePV {}),
+            PropOpts::with_adaptive_step(min_step, max_step, accuracy, RSSCartesianState {}),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
