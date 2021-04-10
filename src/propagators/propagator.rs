@@ -298,9 +298,9 @@ where
         let ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
-        // Convert the step size to seconds;
-        let step_size = self.step_size.in_seconds();
         loop {
+            // Convert the step size to seconds -- we do it here because we may change the step below!
+            let step_size = self.step_size.in_seconds();
             let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;

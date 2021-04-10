@@ -155,9 +155,12 @@ impl ErrorCtrl for RSSStep {
     where
         DefaultAllocator: Allocator<f64, N>,
     {
+        // TODO: Split up in groups of 3, and handle all non-Cartesian stuff as L1 norm
+        // Cf. https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L2980
+        // Then do the same for RSSState, and remove RSS*PV
         let mag = (candidate - cur_state).norm();
         let err = error_est.norm();
-        if mag > REL_ERR_THRESH {
+        if mag > REL_ERR_THRESH.sqrt() {
             err / mag
         } else {
             err
@@ -169,7 +172,7 @@ impl ErrorCtrl for RSSStep {
 ///
 /// Here is the warning from GMAT R2016a on this error controller:
 /// > This is a more stringent error control method than [`rss_step`] that is often used as the default in other software such as STK.
-/// > If you set [the] accuracy to a very small number, 1e-13 for example, and set  the error control to [`rss_step`], integrator
+/// > If you set [the] accuracy to a very small number, 1e-13 for example, and set the error control to [`rss_step`], integrator
 /// > performance will be poor, for little if any improvement in the accuracy of the orbit integration.
 /// For more best practices of these integrators (which clone those in GMAT), please refer to the
 /// [GMAT reference](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/doc/help/src/Resource_NumericalIntegrators.xml#L1292).
