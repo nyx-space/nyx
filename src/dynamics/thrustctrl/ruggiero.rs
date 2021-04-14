@@ -167,7 +167,7 @@ impl ThrustControl for Ruggiero {
                 ctrl
             };
             // Convert to inertial -- this whole control is computed in the RCN frame
-            osc.dcm_to_inertial(Frame::RCN) * ctrl
+            osc.dcm_from_traj_frame(Frame::RCN) * ctrl
         } else {
             panic!("Unsupported guidance mode {:?}", sc.mode);
         }

@@ -120,7 +120,7 @@ impl fmt::Display for TargeterSolution {
 
         if is_only_position {
             corrmsg.push_str(&format!(
-                "|Δr| = {:.3} m",
+                "\n\t\t|Δr| = {:.3} m",
                 (self.correction[0].powi(2)
                     + self.correction[1].powi(2)
                     + self.correction[2].powi(2))
@@ -129,7 +129,7 @@ impl fmt::Display for TargeterSolution {
             ));
         } else if is_only_velocity {
             corrmsg.push_str(&format!(
-                "|Δv| = {:.3} m/s",
+                "\n\t\t|Δv| = {:.3} m/s",
                 (self.correction[0].powi(2)
                     + self.correction[1].powi(2)
                     + self.correction[2].powi(2))
@@ -408,7 +408,7 @@ where
             // Compute the correction at xf and map it to a state error in position and velocity space
             let delta = &phi_obj.transpose() * phi_obj_inv * err_vector;
 
-            info!("Targeter -- Iteration #{}", it);
+            info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
             for obj in &objmsg {
                 info!("{}", obj);
             }

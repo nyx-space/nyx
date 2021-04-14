@@ -1202,7 +1202,7 @@ impl Orbit {
     }
 
     /// Returns the direct cosine rotation matrix to convert to this inertial state.
-    pub fn dcm_to_inertial(&self, from: Frame) -> Matrix3<f64> {
+    pub fn dcm_from_traj_frame(&self, from: Frame) -> Matrix3<f64> {
         match from {
             Frame::RIC => {
                 r3(-self.raan().to_radians())
@@ -1258,15 +1258,27 @@ impl Orbit {
         me
     }
 
+    /// Rotate the position and the velocity of this state provided a direct cosine matrix of position and velocity
+    /// WARNING: You only want to use this if you'll only be using the position components of the rotated state.
+    /// This does not account for the transport theorem and therefore is physically WRONG.
+    pub fn position_rotated_by(&mut self, dcm: Matrix3<f64>) {
+        let new_radius = dcm * self.radius();
+        self.x = new_radius[0];
+        self.y = new_radius[1];
+        self.z = new_radius[2];
+
+        let new_velocity = dcm * self.velocity();
+        self.vx = new_velocity[0];
+        self.vy = new_velocity[1];
+        self.vz = new_velocity[2];
+    }
+
     /// Rotate the position of this state provided a direct cosine matrix of position and velocity
     /// WARNING: You only want to use this if you'll only be using the position components of the rotated state.
     /// This does not account for the transport theorem and therefore is physically WRONG.
     pub fn with_position_rotated_by(&self, dcm: Matrix3<f64>) -> Self {
         let mut me = *self;
-        let new_radius = dcm * me.radius();
-        me.x = new_radius[0];
-        me.y = new_radius[1];
-        me.z = new_radius[2];
+        me.position_rotated_by(dcm);
         me
     }
 

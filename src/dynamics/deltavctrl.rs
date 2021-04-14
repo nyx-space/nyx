@@ -35,27 +35,27 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct InstantBurns {
+pub struct ImpulsiveBurns {
     /// Maneuvers should be provided in chronological order, first maneuver first in the list
     pub mnvrs: Vec<Mnvr>,
     pub mnvr_no: usize,
 }
 
-impl InstantBurns {
+impl ImpulsiveBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
     pub fn from_mnvrs(mnvrs: Vec<Mnvr>) -> Self {
         Self { mnvrs, mnvr_no: 0 }
     }
 }
 
-impl DeltaVctrl for InstantBurns {
+impl DeltaVctrl for ImpulsiveBurns {
     fn ctrl_vector(&self, state: &Orbit) -> Vector3<f64> {
         if self.mnvr_no >= self.mnvrs.len() {
             Vector3::zeros()
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= state.dt && next_mnvr.end >= state.dt {
-                state.dcm_to_inertial(Frame::VNC) * next_mnvr.vector
+                state.dcm_from_traj_frame(Frame::VNC) * next_mnvr.vector
             } else {
                 Vector3::zeros()
             }

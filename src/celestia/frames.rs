@@ -41,7 +41,7 @@ pub enum Frame {
         ephem_path: [Option<usize>; 3],
         frame_path: [Option<usize>; 3],
     },
-    /// Velocity, Normal, Cross
+    /// Velocity, Normal, Cross (called VNB in GMAT)
     VNC,
     /// Radial, Cross, Normal
     RCN,

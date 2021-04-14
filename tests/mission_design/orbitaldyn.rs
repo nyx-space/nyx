@@ -129,8 +129,11 @@ fn val_halo_earth_moon_dynamics() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        halo_rcvr,
+        prop.state
     );
 
     assert!(err_r < 5e-5, "multi body failed in position: {:.5e}", err_r);
@@ -187,8 +190,11 @@ fn val_halo_earth_moon_dynamics_adaptive() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        halo_rcvr,
+        prop.state
     );
 
     assert!(err_r < 1e-6, "multi body failed in position: {:.5e}", err_r);
@@ -250,8 +256,11 @@ fn val_llo_earth_moon_dynamics_adaptive() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, llo_xmtr, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        llo_xmtr,
+        prop.state
     );
 
     assert!(err_r < 1e-5, "multi body failed in position: {:.5e}", err_r);
@@ -309,8 +318,11 @@ fn val_halo_multi_body_dynamics() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        halo_rcvr,
+        prop.state
     );
 
     assert!(err_r < 5e-5, "multi body failed in position: {:.5e}", err_r);
@@ -369,8 +381,11 @@ fn val_halo_multi_body_dynamics_adaptive() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, halo_rcvr, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        halo_rcvr,
+        prop.state
     );
 
     assert!(err_r < 1e-6, "multi body failed in position: {:.5e}", err_r);
@@ -433,8 +448,11 @@ fn val_llo_multi_body_dynamics_adaptive() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, llo_xmtr, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        llo_xmtr,
+        prop.state
     );
 
     assert!(err_r < 2e-6, "multi body failed in position: {:.5e}", err_r);
@@ -486,8 +504,11 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, leo, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        leo,
+        prop.state
     );
 
     assert!(err_r < 5e-7, "multi body failed in position: {:.5e}", err_r);
@@ -543,8 +564,11 @@ fn val_leo_multi_body_dynamics_adaptive() {
     println!();
 
     println!(
-        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s\ninit\t{}\nfinal\t{}",
-        err_r, err_v, leo, prop.state
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        leo,
+        prop.state
     );
 
     assert!(err_r < 3e-6, "multi body failed in position: {:.5e}", err_r);
@@ -949,4 +973,74 @@ fn hf_prop() {
         .unwrap();
 
     println!("{}\n{:o}", rslt, rslt);
+}
+
+#[test]
+fn val_cislunar_dynamics() {
+    let prop_time = 36 * TimeUnit::Hour;
+
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+
+    // "2022 NOV 27 05:55:49"
+    let dt = Epoch::from_gregorian_utc_hms(2022, 11, 27, 5, 55, 49);
+    let state = Orbit::cartesian(
+        -7.529_485_277_404_609e2,
+        5.624_035_455_855_085e3,
+        3.278_632_833_875_311e3,
+        -7.683_161_946_015_461,
+        -0.860_670_301_418_699_3,
+        -0.085_614_035_370_280_35,
+        dt,
+        eme2k,
+    );
+
+    let rslt = Orbit::cartesian(
+        -6151.500843512164,
+        1833.914559118256,
+        1384.255278442759,
+        -2.604989451776925,
+        -6.353097736110432,
+        -3.519264757529829,
+        dt + prop_time,
+        eme2k,
+    );
+
+    let dynamics = OrbitalDynamics::point_masses(&[Bodies::Earth, Bodies::Sun, Bodies::Luna], cosm);
+    let setup = Propagator::new::<RK4Fixed>(dynamics, PropOpts::with_fixed_step_s(0.5));
+    let mut prop = setup.with(state);
+    prop.for_duration(prop_time).unwrap();
+    assert_orbit_eq_or_abs(&prop.state, &rslt, 2e-9, "two body prop failed");
+
+    println!("==> val_cislunar_dynamics absolute errors");
+    let delta = prop.state.to_cartesian_vec() - rslt.to_cartesian_vec();
+    for i in 0..3 {
+        print!("{:.0e} m\t", delta[i].abs() * 1e3);
+    }
+    for i in 3..6 {
+        print!("{:.0e} m/s\t", delta[i].abs() * 1e3);
+    }
+    println!();
+
+    let (err_r, err_v) =
+        rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt.to_cartesian_vec());
+
+    println!(
+        "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
+        err_r * 1e3,
+        err_v * 1e3,
+        state,
+        prop.state
+    );
+
+    assert!(
+        err_r < 3e-6,
+        "val_cislunar_dynamics failed in position: {:.5e}",
+        err_r
+    );
+    assert!(
+        err_v < 3e-9,
+        "val_cislunar_dynamics failed in velocity: {:.5e}",
+        err_v
+    );
 }
