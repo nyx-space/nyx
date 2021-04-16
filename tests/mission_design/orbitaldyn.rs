@@ -1022,8 +1022,7 @@ fn val_cislunar_dynamics() {
     }
     println!();
 
-    let (err_r, err_v) =
-        rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt.to_cartesian_vec());
+    let (err_r, err_v) = rss_orbit_errors(&prop.state, &rslt);
 
     println!(
         "RSS errors:\tpos = {:.5e} m\tvel = {:.5e} m/s\ninit\t{}\nfinal\t{}",
