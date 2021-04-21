@@ -283,7 +283,6 @@ where
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
 
             let phi_k_to_0 = xf.stm();
-            println!("{}", phi_k_to_0);
 
             // Build the partials
             let xf_dual = OrbitDual::from(xf.orbit);
@@ -385,42 +384,46 @@ where
             }
             prev_err_norm = err_vector.norm();
 
-            // And the Jacobian, which encompasses the full state if we don't have a fully determined problem
-            // let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
-            let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
-            for (i, row) in jac_rows.iter().enumerate() {
-                for (j, val) in row.iter().enumerate() {
-                    jac[(i, j)] = *val;
+            // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
+            // As such, it includes the STM of that variable for the whole propagation arc.
+            let mut jac = DMatrix::from_element(self.objectives.len(), self.variables.len(), 0.0);
+            for i in 0..self.objectives.len() {
+                let jac_row = &jac_rows[i];
+                for (j, var) in self.variables.iter().enumerate() {
+                    let col_no = match var {
+                        Vary::PositionX => 0,
+                        Vary::PositionY => 1,
+                        Vary::PositionZ => 2,
+                        Vary::VelocityX | Vary::VelocityV => 3,
+                        Vary::VelocityY | Vary::VelocityN => 4,
+                        Vary::VelocityZ | Vary::VelocityC => 5,
+                    };
+                    // We only ever need the diagonals of the STM I think?
+                    jac[(i, j)] = jac_row[col_no] * phi_k_to_0[(col_no, col_no)];
                 }
             }
 
-            // Build the correct STM from the variables if we don't have a fully determined problem.
-            let mut phi_k_to_0_prime = DMatrix::from_element(6, self.variables.len(), 0.0);
-            for (i, var) in self.variables.iter().enumerate() {
-                let col_no = match var {
-                    Vary::PositionX => 0,
-                    Vary::PositionY => 1,
-                    Vary::PositionZ => 2,
-                    Vary::VelocityX | Vary::VelocityV => 3,
-                    Vary::VelocityY | Vary::VelocityN => 4,
-                    Vary::VelocityZ | Vary::VelocityC => 5,
+            // Perform the pseudo-inverse if needed, else just inverse
+            let jac_inv = if self.variables.len() == self.objectives.len() {
+                match jac.try_inverse() {
+                    Some(inv) => inv,
+                    None => return Err(NyxError::SingularStateTransitionMatrix),
+                }
+            } else if self.objectives.len() < self.variables.len() {
+                let m1_inv = match (&jac * &jac.transpose()).try_inverse() {
+                    Some(inv) => inv,
+                    None => return Err(NyxError::SingularStateTransitionMatrix),
                 };
-                for j in 0..6 {
-                    phi_k_to_0_prime[(j, i)] = phi_k_to_0[(j, col_no)];
-                }
-            }
-
-            println!("{}", jac);
-            let phi_obj_prime = &jac * &phi_k_to_0_prime;
-
-            // Compute the least squares on this Phi with the objectives
-            let phi_obj_inv = match (&phi_obj_prime * &phi_obj_prime.transpose()).try_inverse() {
-                Some(inv) => inv,
-                None => return Err(NyxError::SingularStateTransitionMatrix),
+                &jac.transpose() * m1_inv
+            } else {
+                let m2_inv = match (&jac.transpose() * &jac).try_inverse() {
+                    Some(inv) => inv,
+                    None => return Err(NyxError::SingularStateTransitionMatrix),
+                };
+                m2_inv * &jac.transpose()
             };
 
-            // Compute the correction at xf and map it to a state error in position and velocity space
-            let delta = &phi_obj_prime.transpose() * phi_obj_inv * err_vector;
+            let delta = jac_inv * err_vector;
 
             info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
             for obj in &objmsg {
