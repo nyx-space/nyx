@@ -17,7 +17,7 @@
 */
 use super::StateParameter;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector3};
+use crate::dimensions::{DMatrix, DVector, DefaultAllocator};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use std::fmt;
@@ -144,20 +144,12 @@ impl fmt::Display for TargeterSolution {
         if is_only_position {
             corrmsg.push_str(&format!(
                 "\n\t\t|Δr| = {:.3} m",
-                (self.correction[0].powi(2)
-                    + self.correction[1].powi(2)
-                    + self.correction[2].powi(2))
-                .sqrt()
-                    * 1e3
+                self.correction.norm() * 1e3
             ));
         } else if is_only_velocity {
             corrmsg.push_str(&format!(
                 "\n\t\t|Δv| = {:.3} m/s",
-                (self.correction[0].powi(2)
-                    + self.correction[1].powi(2)
-                    + self.correction[2].powi(2))
-                .sqrt()
-                    * 1e3
+                self.correction.norm() * 1e3
             ));
         }
 
@@ -282,15 +274,6 @@ where
         // Store the total correction in Vector3
         let mut total_correction = DVector::from_element(self.variables.len(), 0.0);
 
-        // STM index to split on
-        // let split_on = if self.variables == Vary::Velocity {
-        //     3
-        // } else {
-        //     0
-        // };
-
-        let is_full = self.objectives.len() == self.variables.len();
-
         let mut prev_err_norm = std::f64::INFINITY;
 
         for it in 0..=self.iterations {
@@ -301,24 +284,9 @@ where
 
             let phi_k_to_0 = xf.stm();
             println!("{}", phi_k_to_0);
-            // let phi_inv = match phi_k_to_0
-            //     .fixed_slice::<U3, U3>(0, split_on)
-            //     .to_owned()
-            //     .try_inverse()
-            // {
-            //     Some(inv) => inv,
-            //     None => return Err(NyxError::SingularStateTransitionMatrix),
-            // };
 
             // Build the partials
             let xf_dual = OrbitDual::from(xf.orbit);
-
-            let dcm2vnc = xf
-                .orbit
-                .dcm_from_traj_frame(Frame::VNC)
-                .unwrap()
-                .transpose();
-            let xf_dual_vnc = OrbitDual::from(xf.orbit.with_position_rotated_by(dcm2vnc));
 
             // Build the error vector
             let mut param_errors = Vec::new();
@@ -332,13 +300,6 @@ where
                 None
             };
 
-            // Build the B-Plane once, if needed
-            // let b_plane_vnc = if is_bplane_tgt {
-            //     Some(BPlane::from_dual(xf_dual_vnc)?)
-            // } else {
-            //     None
-            // };
-
             for obj in &self.objectives {
                 let partial = if obj.parameter.is_b_plane() {
                     match obj.parameter {
@@ -350,17 +311,6 @@ where
                 } else {
                     xf_dual.partial_for(&obj.parameter)?
                 };
-
-                // let partial_vnc = if obj.parameter.is_b_plane() {
-                //     match obj.parameter {
-                //         StateParameter::BdotR => b_plane_vnc.unwrap().b_r,
-                //         StateParameter::BdotT => b_plane_vnc.unwrap().b_t,
-                //         StateParameter::BLTOF => b_plane_vnc.unwrap().ltof_s,
-                //         _ => unreachable!(),
-                //     }
-                // } else {
-                //     xf_dual_vnc.partial_for(&obj.parameter)?
-                // };
 
                 let param_err = obj.multiplicative_factor * (obj.desired_value - partial.real())
                     + obj.additive_factor;
@@ -395,7 +345,6 @@ where
             if converged {
                 let mut state = xi_start;
                 // Convert the total correction from VNC back to integration frame in case that's needed.
-                // let total_correction_from_vnc = dcm2vnc.transpose() * total_correction;
                 for (i, var) in self.variables.iter().enumerate() {
                     match var {
                         Vary::PositionX => state.orbit.x += total_correction[i],
@@ -445,9 +394,6 @@ where
                 }
             }
 
-            println!("{}", jac);
-            println!("{}", phi_k_to_0);
-
             // Build the correct STM from the variables if we don't have a fully determined problem.
             let mut phi_k_to_0_prime = DMatrix::from_element(6, self.variables.len(), 0.0);
             for (i, var) in self.variables.iter().enumerate() {
@@ -464,8 +410,8 @@ where
                 }
             }
 
+            println!("{}", jac);
             let phi_obj_prime = &jac * &phi_k_to_0_prime;
-            // let phi_obj = jac * phi_k_to_0;
 
             // Compute the least squares on this Phi with the objectives
             let phi_obj_inv = match (&phi_obj_prime * &phi_obj_prime.transpose()).try_inverse() {

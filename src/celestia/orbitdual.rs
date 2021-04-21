@@ -659,16 +659,22 @@ impl OrbitDual {
 
     /// Returns the right ascension of this orbit in degrees
     pub fn right_ascension(&self) -> OrbitPartial {
+        let one = self.y / self.y;
+        let val = self.y / self.x;
+        let dual = one / (one + val.powi(2));
         OrbitPartial {
-            dual: (self.y.atan2(self.x)).to_degrees(),
+            dual,
             param: StateParameter::RightAscension,
         }
     }
 
     /// Returns the declination of this orbit in degrees
     pub fn declination(&self) -> OrbitPartial {
+        let one = self.y / self.y;
+        let val = self.z / self.rmag().dual;
+        let dual = one / (one - val.powi(2)).sqrt();
         OrbitPartial {
-            dual: (self.z / self.rmag().dual).asin().to_degrees(),
+            dual,
             param: StateParameter::Declination,
         }
     }

@@ -184,13 +184,12 @@ fn tgt_c3_ra_decl_velocity() {
 
     // Define the objective
     let objectives = vec![
-        Objective::new(StateParameter::C3, -2.0),
-        Objective::new(StateParameter::RightAscension, 0.0),
-        Objective::new(StateParameter::Declination, 0.0),
+        Objective::within_tolerance(StateParameter::C3, -2.0, 0.5),
+        Objective::within_tolerance(StateParameter::RightAscension, 1.0, 0.1),
+        Objective::within_tolerance(StateParameter::Declination, 2.0, 0.1),
     ];
 
     let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
-
     println!("{}", tgt);
 
     let solution = tgt
@@ -273,20 +272,26 @@ fn tgt_b_plane_legit() {
         epoch,
         eme2k,
     );
-    // Propagate until periapse
+
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm.clone(),
     )));
 
-    let loi_epoch = Epoch::from_str("2014-07-22 22:48:32.066000000 TAI").unwrap();
+    let loi_epoch = Epoch::from_str("2014-07-28 22:08:02.448000000 TAI").unwrap();
 
     let orbit_moon = cosm.frame_chg(&orbit, luna);
     let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
 
-    let b_plane_tgt = BPlaneTarget::from_b_plane(104579.9942274809, 391732.3347895856);
+    // let b_plane_tgt = BPlaneTarget::from_b_plane(104579.9942274809, 391732.3347895856);
+    let b_plane_tgt = BPlaneTarget::from_b_plane(15_000.0, 4_000.6);
 
-    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
+    // let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
+    let tgt = Targeter::new(
+        Arc::new(&prop),
+        vec![Vary::VelocityX, Vary::VelocityZ],
+        b_plane_tgt.to_objectives(),
+    );
 
     let sol = tgt.try_achieve_from(spacecraft, epoch, loi_epoch).unwrap();
 
