@@ -251,7 +251,7 @@ impl BPlaneTarget {
 
     /// Initializes a new B Plane target with only the B Plane targets (not LTOF constraint) and the default tolerances.
     /// Default tolerances are 1 millimeter in positions. Here, the LTOF tolerance is set to 100 days.
-    pub fn from_b_plane(b_r_km: f64, b_t_km: f64) -> Self {
+    pub fn from_bt_br(b_t_km: f64, b_r_km: f64) -> Self {
         let ltof_tol: Duration = 100 * TimeUnit::Day;
         Self {
             b_t_km,

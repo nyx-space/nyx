@@ -121,9 +121,7 @@ GMAT MoonFull.StopIfAccuracyIsViolated = true;
 %----------------------------------------
 
 Create ImpulsiveBurn TOI;
-GMAT TOI.CoordinateSystem = Local;
-GMAT TOI.Origin = Earth;
-GMAT TOI.Axes = MJ2000Eq;
+GMAT TOI.CoordinateSystem = MoonMJ2000Eq;
 GMAT TOI.Element1 = 0.14676929889;
 GMAT TOI.Element2 = 0.046042675892;
 GMAT TOI.Element3 = 0.090223244097;
@@ -186,7 +184,7 @@ Create ReportFile ReportFile1;
 GMAT ReportFile1.SolverIterations = Current;
 GMAT ReportFile1.UpperLeft = [ 0.1458333333333333 0.03414634146341464 ];
 GMAT ReportFile1.Size = [ 0.9940476190476191 0.9634146341463414 ];
-GMAT ReportFile1.RelativeZOrder = 182;
+GMAT ReportFile1.RelativeZOrder = 198;
 GMAT ReportFile1.Maximized = true;
 GMAT ReportFile1.Filename = 'BPlane-Validation.txt';
 GMAT ReportFile1.Precision = 16;
@@ -210,7 +208,6 @@ BeginMissionSequence;
 %------------------------------
 
 Propagate 'Prop to Perigee' EarthFull(Sat) {Sat.Periapsis};
-Stop;
 
 
 %------------------------------
@@ -218,7 +215,7 @@ Stop;
 %------------------------------
 Target 'Target B-Plane' DC1 {SolveMode = Solve, ExitMode = DiscardAndContinue, ShowProgressWindow = true};
    
-   Vary 'Vary TOI.V' DC1(TOI.Element1 = -1.675, {Perturbation = 1e-005, Lower = -2., Upper = 2.0, MaxStep = .1, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
+   Vary 'Vary TOI.V' DC1(TOI.Element1 = 0.1, {Perturbation = 1e-005, Lower = -2., Upper = 2.0, MaxStep = .1, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    Vary DC1(TOI.Element2 = -0.154, {Perturbation = 0.0001, Lower = -2., Upper = 2.0, MaxStep = 0.1, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    Vary 'Vary TOI.B' DC1(TOI.Element3 = -0.298, {Perturbation = 1e-005, Lower = -2.5, Upper = 2.5, MaxStep = .1, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    

@@ -245,6 +245,7 @@ where
     }
 
     /// Differential correction using hyperdual numbers for the objectives
+    #[allow(clippy::comparison_chain)]
     pub fn try_achieve_from(
         &self,
         initial_state: Spacecraft,
@@ -259,6 +260,7 @@ where
         for obj in &self.objectives {
             if obj.parameter.is_b_plane() {
                 is_bplane_tgt = true;
+                break;
             }
         }
 
@@ -426,6 +428,8 @@ where
                 }
             }
 
+            debug!("Jacobian {}", jac);
+
             // Perform the pseudo-inverse if needed, else just inverse
             let jac_inv = if self.variables.len() == self.objectives.len() {
                 match jac.try_inverse() {
@@ -446,13 +450,16 @@ where
                 m2_inv * &jac.transpose()
             };
 
+            debug!("Inverse Jacobian {:e}", jac_inv);
+
             let delta = jac_inv * err_vector;
+
+            debug!("Correction: {:e}", delta);
 
             info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
             for obj in &objmsg {
                 info!("{}", obj);
             }
-            info!("Mapped {:?} error = {:.1e}", self.variables, delta.norm());
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {

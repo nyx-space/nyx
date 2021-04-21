@@ -212,7 +212,7 @@ fn b_plane_davis() {
     // Without an LTOF target, this uses the least squares approach.
     let (delta_v, achieved_b_plane) = try_achieve_b_plane(
         orbit,
-        BPlaneTarget::from_b_plane(5022.26511510685, 13135.7982982557),
+        BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685),
     )
     .unwrap();
     println!("DV (km/s) {} leads to {}", delta_v, achieved_b_plane);

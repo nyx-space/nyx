@@ -229,7 +229,7 @@ fn tgt_b_plane_sanity() {
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
 
-    let b_plane_tgt = BPlaneTarget::from_b_plane(5022.26511510685, 13135.7982982557);
+    let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
     let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
 
@@ -297,8 +297,8 @@ fn tgt_b_plane_legit() {
         periapse_spacecraft.orbit, periapse_spacecraft_moon.orbit
     );
 
-    // let b_plane_tgt = BPlaneTarget::from_b_plane(104579.9942274809, 391732.3347895856);
-    let b_plane_tgt = BPlaneTarget::from_b_plane(15_000.0, 4_000.6);
+    // let b_plane_tgt = BPlaneTarget::from_bt_br(391732.3347895856, 104579.9942274809);
+    let b_plane_tgt = BPlaneTarget::from_bt_br(15_000.4, 4_000.6);
 
     let tgt = Targeter::delta_v(
         Arc::new(&prop),
@@ -309,7 +309,7 @@ fn tgt_b_plane_legit() {
     let loi_epoch = tcm_epoch + 556697 * TimeUnit::Second;
 
     let sol = tgt
-        .try_achieve_from(periapse_spacecraft_moon, epoch, loi_epoch)
+        .try_achieve_from(periapse_spacecraft_moon, tcm_epoch, loi_epoch)
         .unwrap();
 
     println!("{}", sol);
@@ -357,7 +357,7 @@ fn tgt_b_plane_with_propagation() {
         .for_duration(-12 * TimeUnit::Hour)
         .unwrap();
 
-    let b_plane_tgt = BPlaneTarget::from_b_plane(5022.26511510685, 13135.7982982557);
+    let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
     let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
 
@@ -409,7 +409,7 @@ fn tgt_b_plane_remove_this() {
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
 
-    let b_plane_tgt = BPlaneTarget::from_b_plane(-5639.9403447, 306.550415207);
+    let b_plane_tgt = BPlaneTarget::from_bt_br(306.550415207, -5639.9403447);
 
     let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
 
