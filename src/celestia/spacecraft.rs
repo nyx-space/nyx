@@ -184,6 +184,12 @@ impl Spacecraft {
         me
     }
 
+    pub fn with_orbit(self, orbit: Orbit) -> Self {
+        let mut me = self;
+        me.orbit = orbit;
+        me
+    }
+
     /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in fuel
     pub fn rss(&self, other: &Self) -> (f64, f64, f64) {
         let (p, v) = rss_orbit_errors(&self.orbit, &other.orbit);

@@ -276,6 +276,27 @@ where
 
         let mut prev_err_norm = std::f64::INFINITY;
 
+        // Determine padding in debugging info
+        // For the width, we find the largest desired values and multiply it by the order of magnitude of its tolerance
+        let max_obj_val = self
+            .objectives
+            .iter()
+            .map(|obj| {
+                (obj.desired_value.abs().ceil() as i32
+                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)) as i32
+            })
+            .max()
+            .unwrap();
+
+        let max_obj_tol = self
+            .objectives
+            .iter()
+            .map(|obj| obj.tolerance.log10().abs().ceil() as usize)
+            .max()
+            .unwrap();
+
+        let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
+
         for it in 0..=self.iterations {
             // Now, enable the trajectory STM for this state so we can apply the correction
             xi.enable_traj_stm();
@@ -299,6 +320,9 @@ where
                 None
             };
 
+            // Build debugging information
+            let mut objmsg = Vec::new();
+
             for obj in &self.objectives {
                 let partial = if obj.parameter.is_b_plane() {
                     match obj.parameter {
@@ -319,6 +343,14 @@ where
                 }
                 param_errors.push(param_err);
 
+                objmsg.push(format!(
+                    "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t error = {:>width$.prec$}",
+                    obj.parameter,
+                    partial.real(),
+                    obj.desired_value,
+                    obj.desired_value - partial.real(), width=width, prec=max_obj_tol
+                ));
+
                 // Build the Jacobian with the partials of the objectives with respect to all of the final state parameters
                 // We localize the problem in the STM.
                 // TODO: VNC (how?!)
@@ -330,15 +362,6 @@ where
                     partial.wtr_vy(),
                     partial.wtr_vz(),
                 ]);
-            }
-
-            // Build debugging information
-            let mut objmsg = Vec::new();
-            for (i, obj) in self.objectives.iter().enumerate() {
-                objmsg.push(format!(
-                    "\t{:?}: variance = {:.3}\t desired = {:.3} (+/- {:.1e})",
-                    obj.parameter, param_errors[i], obj.desired_value, obj.tolerance
-                ));
             }
 
             if converged {

@@ -143,7 +143,7 @@ fn tgt_position_sma() {
         0.1,
     )];
 
-    let tgt = Targeter::delta_r(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
 
     println!("{}", tgt);
 
@@ -153,8 +153,10 @@ fn tgt_position_sma() {
 
     println!("{}", solution);
 
+    tgt.apply(solution).unwrap();
+
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
-    assert!((solution.correction.norm() - 7563.095e-3).abs() < 1e-6);
+    // assert!((solution.correction.norm() - 7563.095e-3).abs() < 1e-6);
 }
 
 #[test]
@@ -245,7 +247,6 @@ fn tgt_b_plane_sanity() {
 
 #[test]
 fn tgt_b_plane_legit() {
-    use std::str::FromStr;
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -275,22 +276,41 @@ fn tgt_b_plane_legit() {
     )));
 
     // let loi_epoch = Epoch::from_str("2014-07-28 22:08:02.448000000 TAI").unwrap();
-    let loi_epoch = epoch + 556697 * TimeUnit::Second;
+    // let loi_epoch = epoch + 556697 * TimeUnit::Second;
 
-    let orbit_moon = cosm.frame_chg(&orbit, luna);
-    let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
+    let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 1.0);
+    println!("{}", spacecraft);
+
+    // Propagate to periapsis
+    let periapse_spacecraft = prop
+        .with(spacecraft)
+        .until_event(1 * orbit.period(), &Event::periapsis(), 1)
+        .unwrap()
+        .0;
+
+    // Convert to the Moon J2000 frame
+    let orbit_moon = cosm.frame_chg(&periapse_spacecraft.orbit, luna);
+    let periapse_spacecraft_moon = spacecraft.with_orbit(orbit_moon);
+
+    println!(
+        "{}\n{}",
+        periapse_spacecraft.orbit, periapse_spacecraft_moon.orbit
+    );
 
     // let b_plane_tgt = BPlaneTarget::from_b_plane(104579.9942274809, 391732.3347895856);
     let b_plane_tgt = BPlaneTarget::from_b_plane(15_000.0, 4_000.6);
 
-    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
-    // let tgt = Targeter::new(
-    //     Arc::new(&prop),
-    //     vec![Vary::VelocityX, Vary::VelocityZ],
-    //     b_plane_tgt.to_objectives(),
-    // );
+    let tgt = Targeter::delta_v(
+        Arc::new(&prop),
+        b_plane_tgt.to_objectives_with_tolerance(3.0),
+    );
 
-    let sol = tgt.try_achieve_from(spacecraft, epoch, loi_epoch).unwrap();
+    let tcm_epoch = periapse_spacecraft.epoch();
+    let loi_epoch = tcm_epoch + 556697 * TimeUnit::Second;
+
+    let sol = tgt
+        .try_achieve_from(periapse_spacecraft_moon, epoch, loi_epoch)
+        .unwrap();
 
     println!("{}", sol);
 
