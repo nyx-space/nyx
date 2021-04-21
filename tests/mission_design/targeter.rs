@@ -37,24 +37,17 @@ fn tgt_basic_position() {
 
     // Define the objectives
     let objectives = vec![
-        Objective {
-            parameter: StateParameter::X,
-            desired_value: xf_desired.x,
-            tolerance: 0.1,
-        },
-        Objective {
-            parameter: StateParameter::Y,
-            desired_value: xf_desired.y,
-            tolerance: 0.1,
-        },
-        Objective {
-            parameter: StateParameter::Z,
-            desired_value: xf_desired.z,
-            tolerance: 0.1,
-        },
+        Objective::within_tolerance(StateParameter::X, xf_desired.x, 0.1),
+        Objective::within_tolerance(StateParameter::Y, xf_desired.y, 0.1),
+        Objective::within_tolerance(StateParameter::Z, xf_desired.z, 0.1),
     ];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    // let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::new(
+        Arc::new(&setup),
+        vec![Vary::VelocityV, Vary::VelocityC],
+        objectives,
+    );
 
     println!("{}", tgt);
 
@@ -144,11 +137,11 @@ fn tgt_position_sma() {
     );
 
     // Define the objectives
-    let objectives = vec![Objective {
-        parameter: StateParameter::SMA,
-        desired_value: xf_desired.sma(),
-        tolerance: 0.1,
-    }];
+    let objectives = vec![Objective::within_tolerance(
+        StateParameter::SMA,
+        xf_desired.sma(),
+        0.1,
+    )];
 
     let tgt = Targeter {
         prop: Arc::new(&setup),

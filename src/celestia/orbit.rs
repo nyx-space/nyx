@@ -1202,26 +1202,26 @@ impl Orbit {
     }
 
     /// Returns the direct cosine rotation matrix to convert to this inertial state.
-    pub fn dcm_from_traj_frame(&self, from: Frame) -> Matrix3<f64> {
+    pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, NyxError> {
         match from {
-            Frame::RIC => {
-                r3(-self.raan().to_radians())
-                    * r1(-self.inc().to_radians())
-                    * r3(-self.aol().to_radians())
-            }
+            Frame::RIC => Ok(r3(-self.raan().to_radians())
+                * r1(-self.inc().to_radians())
+                * r3(-self.aol().to_radians())),
             Frame::VNC => {
                 let v = self.velocity() / self.vmag();
                 let n = self.hvec() / self.hmag();
                 let c = v.cross(&n);
-                Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose()
+                Ok(Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose())
             }
             Frame::RCN => {
                 let r = self.radius() / self.rmag();
                 let n = self.hvec() / self.hmag();
                 let c = n.cross(&r);
-                Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose()
+                Ok(Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose())
             }
-            _ => panic!("did not provide a local frame"),
+            _ => Err(NyxError::CustomError(
+                "did not provide a local frame".to_string(),
+            )),
         }
     }
 

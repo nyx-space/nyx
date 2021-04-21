@@ -55,7 +55,7 @@ impl DeltaVctrl for ImpulsiveBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= state.dt && next_mnvr.end >= state.dt {
-                state.dcm_from_traj_frame(Frame::VNC) * next_mnvr.vector
+                state.dcm_from_traj_frame(Frame::VNC).unwrap() * next_mnvr.vector
             } else {
                 Vector3::zeros()
             }

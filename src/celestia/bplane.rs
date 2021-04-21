@@ -269,24 +269,16 @@ impl BPlaneTarget {
 
     pub fn to_objectives(&self) -> Vec<Objective> {
         let mut objs = vec![
-            Objective {
-                parameter: StateParameter::BdotR,
-                desired_value: self.b_r_km,
-                tolerance: 1.0,
-            },
-            Objective {
-                parameter: StateParameter::BdotT,
-                desired_value: self.b_t_km,
-                tolerance: 1.0,
-            },
+            Objective::within_tolerance(StateParameter::BdotR, self.b_r_km, 1.0),
+            Objective::within_tolerance(StateParameter::BdotT, self.b_t_km, 1.0),
         ];
 
         if self.ltof_s.abs() > std::f64::EPSILON {
-            objs.push(Objective {
-                parameter: StateParameter::BLTOF,
-                desired_value: self.ltof_s,
-                tolerance: self.tol_ltof_s * 1e5,
-            });
+            objs.push(Objective::within_tolerance(
+                StateParameter::BLTOF,
+                self.ltof_s,
+                self.tol_ltof_s * 1e5,
+            ));
         }
 
         objs

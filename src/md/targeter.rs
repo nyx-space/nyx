@@ -17,7 +17,7 @@
 */
 use super::StateParameter;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector3, U3};
+use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector3};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use std::fmt;
@@ -31,6 +31,10 @@ pub struct Objective {
     pub desired_value: f64,
     /// The precision on the desired value
     pub tolerance: f64,
+    /// A multiplicative factor this parameter's error in the targeting (defaults to 1.0)
+    pub multiplicative_factor: f64,
+    /// An additive factor to this parameters's error in the targeting (defaults to 0.0)
+    pub additive_factor: f64,
 }
 
 impl Objective {
@@ -51,6 +55,8 @@ impl Objective {
             parameter,
             desired_value,
             tolerance,
+            multiplicative_factor: 1.0,
+            additive_factor: 0.0,
         }
     }
 }
@@ -58,12 +64,24 @@ impl Objective {
 /// Defines the kind of correction to apply in the targeter
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Vary {
+    /// Vary position component X in the integration frame
     PositionX,
+    /// Vary position component Y in the integration frame
     PositionY,
+    /// Vary position component Z in the integration frame
     PositionZ,
+    /// Vary velocity component X in the integration frame
     VelocityX,
+    /// Vary velocity component Y in the integration frame
     VelocityY,
+    /// Vary velocity component Z in the integration frame
     VelocityZ,
+    /// Vary velocity component V in the VNC frame
+    VelocityV,
+    /// Vary velocity component N in the VNC frame
+    VelocityN,
+    /// Vary velocity component C in the VNC frame
+    VelocityC,
 }
 
 /// Defines a targeter solution
@@ -72,7 +90,7 @@ pub struct TargeterSolution {
     /// The corrected spacecraft state at the correction epoch
     pub state: Spacecraft,
     /// The correction vector applied
-    pub correction: Vector3<f64>,
+    pub correction: DVector<f64>,
     /// The kind of correction (position or velocity)
     pub variables: Vec<Vary>,
     /// The epoch at which the objectives are achieved
@@ -107,7 +125,12 @@ impl fmt::Display for TargeterSolution {
                     is_only_velocity = false;
                     "m"
                 }
-                Vary::VelocityX | Vary::VelocityY | Vary::VelocityZ => {
+                Vary::VelocityX
+                | Vary::VelocityY
+                | Vary::VelocityZ
+                | Vary::VelocityV
+                | Vary::VelocityN
+                | Vary::VelocityC => {
                     is_only_position = false;
                     "m/s"
                 }
@@ -146,7 +169,7 @@ impl fmt::Display for TargeterSolution {
     }
 }
 
-/// The target is a "simple" differential corrector.
+/// The target is a differential corrector.
 #[derive(Clone, Debug)]
 pub struct Targeter<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl>
 where
@@ -192,25 +215,40 @@ where
         + Allocator<f64, <D::StateType as State>::PropVecSize>
         + Allocator<f64, <D::StateType as State>::Size>,
 {
-    /// Create a new Targeter which will apply an instantaneous delta-v correction.
-    /// Defaults to 100 iterations which should be sufficient for all well-defined problems
+    /// Create a new Targeter which will apply an impulsive delta-v correction.
+    /// Defaults to 250 iterations which should be sufficient for all well-defined problems
+    pub fn new(
+        prop: Arc<&'a Propagator<'a, D, E>>,
+        variables: Vec<Vary>,
+        objectives: Vec<Objective>,
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables,
+            iterations: 250,
+        }
+    }
+
+    /// Create a new Targeter which will apply an impulsive delta-v correction.
+    /// Defaults to 250 iterations which should be sufficient for all well-defined problems
     pub fn delta_v(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
             variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
-            iterations: 300,
+            iterations: 250,
         }
     }
 
     /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
-    /// Defaults to 100 iterations which should be sufficient for all well-defined problems
+    /// Defaults to 250 iterations which should be sufficient for all well-defined problems
     pub fn delta_r(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
             variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
-            iterations: 100,
+            iterations: 250,
         }
     }
 
@@ -242,7 +280,7 @@ where
         let mut xi = xi_start;
 
         // Store the total correction in Vector3
-        let mut total_correction = Vector3::zeros();
+        let mut total_correction = DVector::from_element(self.variables.len(), 0.0);
 
         // STM index to split on
         // let split_on = if self.variables == Vary::Velocity {
@@ -250,6 +288,8 @@ where
         // } else {
         //     0
         // };
+
+        let is_full = self.objectives.len() == self.variables.len();
 
         let mut prev_err_norm = std::f64::INFINITY;
 
@@ -261,7 +301,6 @@ where
 
             let phi_k_to_0 = xf.stm();
             println!("{}", phi_k_to_0);
-            // let phi_drdv = phi_k_to_0.fixed_slice::<U3, U3>(3, split_on).to_owned();
             // let phi_inv = match phi_k_to_0
             //     .fixed_slice::<U3, U3>(0, split_on)
             //     .to_owned()
@@ -273,6 +312,13 @@ where
 
             // Build the partials
             let xf_dual = OrbitDual::from(xf.orbit);
+
+            let dcm2vnc = xf
+                .orbit
+                .dcm_from_traj_frame(Frame::VNC)
+                .unwrap()
+                .transpose();
+            let xf_dual_vnc = OrbitDual::from(xf.orbit.with_position_rotated_by(dcm2vnc));
 
             // Build the error vector
             let mut param_errors = Vec::new();
@@ -286,8 +332,12 @@ where
                 None
             };
 
-            // If we have as many objectives as variables, then we will not perform a Least Squares optimization.
-            let is_full = self.objectives.len() == self.variables.len();
+            // Build the B-Plane once, if needed
+            // let b_plane_vnc = if is_bplane_tgt {
+            //     Some(BPlane::from_dual(xf_dual_vnc)?)
+            // } else {
+            //     None
+            // };
 
             for obj in &self.objectives {
                 let partial = if obj.parameter.is_b_plane() {
@@ -301,40 +351,36 @@ where
                     xf_dual.partial_for(&obj.parameter)?
                 };
 
-                let param_err = obj.desired_value - partial.real();
+                // let partial_vnc = if obj.parameter.is_b_plane() {
+                //     match obj.parameter {
+                //         StateParameter::BdotR => b_plane_vnc.unwrap().b_r,
+                //         StateParameter::BdotT => b_plane_vnc.unwrap().b_t,
+                //         StateParameter::BLTOF => b_plane_vnc.unwrap().ltof_s,
+                //         _ => unreachable!(),
+                //     }
+                // } else {
+                //     xf_dual_vnc.partial_for(&obj.parameter)?
+                // };
+
+                let param_err = obj.multiplicative_factor * (obj.desired_value - partial.real())
+                    + obj.additive_factor;
 
                 if param_err.abs() > obj.tolerance {
                     converged = false;
                 }
                 param_errors.push(param_err);
 
-                println!("{}\n{:?}\n{}", obj.desired_value, obj.parameter, partial);
-
-                if is_full {
-                    // Only grab the partials that we need
-                    let mut tmp_row = Vec::with_capacity(self.variables.len());
-                    for var in &self.variables {
-                        tmp_row.push(match var {
-                            Vary::PositionX => partial.wtr_x(),
-                            Vary::PositionY => partial.wtr_y(),
-                            Vary::PositionZ => partial.wtr_z(),
-                            Vary::VelocityX => partial.wtr_vx(),
-                            Vary::VelocityY => partial.wtr_vy(),
-                            Vary::VelocityZ => partial.wtr_vz(),
-                        });
-                    }
-                    jac_rows.push(tmp_row);
-                } else {
-                    // Else, we will try a gradient descent approach on all of the state parameters.
-                    jac_rows.push(vec![
-                        partial.wtr_x(),
-                        partial.wtr_y(),
-                        partial.wtr_z(),
-                        partial.wtr_vx(),
-                        partial.wtr_vy(),
-                        partial.wtr_vz(),
-                    ]);
-                }
+                // Build the Jacobian with the partials of the objectives with respect to all of the final state parameters
+                // We localize the problem in the STM.
+                // TODO: VNC (how?!)
+                jac_rows.push(vec![
+                    partial.wtr_x(),
+                    partial.wtr_y(),
+                    partial.wtr_z(),
+                    partial.wtr_vx(),
+                    partial.wtr_vy(),
+                    partial.wtr_vz(),
+                ]);
             }
 
             // Build debugging information
@@ -348,7 +394,8 @@ where
 
             if converged {
                 let mut state = xi_start;
-                // XXX: This will break is 4 or more Vary
+                // Convert the total correction from VNC back to integration frame in case that's needed.
+                // let total_correction_from_vnc = dcm2vnc.transpose() * total_correction;
                 for (i, var) in self.variables.iter().enumerate() {
                     match var {
                         Vary::PositionX => state.orbit.x += total_correction[i],
@@ -357,6 +404,10 @@ where
                         Vary::VelocityX => state.orbit.vx += total_correction[i],
                         Vary::VelocityY => state.orbit.vy += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz += total_correction[i],
+                        _ => unimplemented!()
+                        // Vary::VelocityV => state.orbit.vx += total_correction_from_vnc[i],
+                        // Vary::VelocityN => state.orbit.vy += total_correction_from_vnc[i],
+                        // Vary::VelocityC => state.orbit.vz += total_correction_from_vnc[i],
                     }
                 }
 
@@ -385,81 +436,78 @@ where
             }
             prev_err_norm = err_vector.norm();
 
-            // And the Jacobian
+            // And the Jacobian, which encompasses the full state if we don't have a fully determined problem
+            // let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
             let mut jac = DMatrix::from_element(self.objectives.len(), 6, 0.0);
             for (i, row) in jac_rows.iter().enumerate() {
-                jac[(i, 0)] = row[0];
-                jac[(i, 1)] = row[1];
-                jac[(i, 2)] = row[2];
-                jac[(i, 3)] = row[3];
-                jac[(i, 4)] = row[4];
-                jac[(i, 5)] = row[5];
+                for (j, val) in row.iter().enumerate() {
+                    jac[(i, j)] = *val;
+                }
             }
 
+            println!("{}", jac);
             println!("{}", phi_k_to_0);
-            let phi_obj = jac * phi_k_to_0;
+
+            // Build the correct STM from the variables if we don't have a fully determined problem.
+            let mut phi_k_to_0_prime = DMatrix::from_element(6, self.variables.len(), 0.0);
+            for (i, var) in self.variables.iter().enumerate() {
+                let col_no = match var {
+                    Vary::PositionX => 0,
+                    Vary::PositionY => 1,
+                    Vary::PositionZ => 2,
+                    Vary::VelocityX | Vary::VelocityV => 3,
+                    Vary::VelocityY | Vary::VelocityN => 4,
+                    Vary::VelocityZ | Vary::VelocityC => 5,
+                };
+                for j in 0..6 {
+                    phi_k_to_0_prime[(j, i)] = phi_k_to_0[(j, col_no)];
+                }
+            }
+
+            let phi_obj_prime = &jac * &phi_k_to_0_prime;
+            // let phi_obj = jac * phi_k_to_0;
 
             // Compute the least squares on this Phi with the objectives
-            let phi_obj_inv = match (&phi_obj * &phi_obj.transpose()).try_inverse() {
+            let phi_obj_inv = match (&phi_obj_prime * &phi_obj_prime.transpose()).try_inverse() {
                 Some(inv) => inv,
                 None => return Err(NyxError::SingularStateTransitionMatrix),
             };
 
             // Compute the correction at xf and map it to a state error in position and velocity space
-            let delta = &phi_obj.transpose() * phi_obj_inv * err_vector;
+            let delta = &phi_obj_prime.transpose() * phi_obj_inv * err_vector;
 
             info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
             for obj in &objmsg {
                 info!("{}", obj);
             }
-            info!("Mapped {:?} error = {:.3}", self.variables, delta.norm());
+            info!("Mapped {:?} error = {:.1e}", self.variables, delta.norm());
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
                 match var {
                     Vary::PositionX => {
-                        xi.orbit.x += delta[0];
-                        total_correction[i] += delta[0];
+                        xi.orbit.x += delta[i];
+                        total_correction[i] += delta[i];
                     }
                     Vary::PositionY => {
-                        xi.orbit.y += delta[1];
-                        total_correction[i] += delta[1];
+                        xi.orbit.y += delta[i];
                     }
                     Vary::PositionZ => {
-                        xi.orbit.z += delta[2];
-                        total_correction[i] += delta[2];
+                        xi.orbit.z += delta[i];
                     }
                     Vary::VelocityX => {
-                        xi.orbit.vx += delta[3];
-                        total_correction[i] += delta[3];
+                        xi.orbit.vx += delta[i];
                     }
                     Vary::VelocityY => {
-                        xi.orbit.vy += delta[4];
-                        total_correction[i] += delta[4];
+                        xi.orbit.vy += delta[i];
                     }
                     Vary::VelocityZ => {
-                        xi.orbit.vz += delta[5];
-                        total_correction[i] += delta[5];
+                        xi.orbit.vz += delta[i];
                     }
+                    _ => unimplemented!(),
                 }
             }
-            // if self.variables == Vary::Position {
-            //     xi.orbit.x += delta[0];
-            //     xi.orbit.y += delta[1];
-            //     xi.orbit.z += delta[2];
-
-            //     total_correction[0] += delta[0];
-            //     total_correction[1] += delta[1];
-            //     total_correction[2] += delta[2];
-            // } else {
-            //     xi.orbit.vx += delta[3];
-            //     xi.orbit.vy += delta[4];
-            //     xi.orbit.vz += delta[5];
-
-            //     total_correction[0] += delta[3];
-            //     total_correction[1] += delta[4];
-            //     total_correction[2] += delta[5];
-            // }
+            total_correction += delta;
         }
 
         Err(NyxError::MaxIterReached(format!(

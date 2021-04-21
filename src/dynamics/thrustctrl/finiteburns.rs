@@ -80,7 +80,7 @@ impl ThrustControl for FiniteBurns {
                     if matches!(self.frame, Frame::Inertial) {
                         next_mnvr.vector
                     } else {
-                        osc.orbit.dcm_from_traj_frame(self.frame) * next_mnvr.vector
+                        osc.orbit.dcm_from_traj_frame(self.frame).unwrap() * next_mnvr.vector
                     }
                 } else {
                     Vector3::zeros()
