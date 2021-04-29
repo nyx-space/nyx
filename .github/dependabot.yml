@@ -1,0 +1,13 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "11:00"
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: nalgebra
+    versions:
+    - 0.24.0
+    - 0.25.0
