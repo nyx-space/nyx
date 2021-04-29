@@ -172,6 +172,9 @@ where
     pub prop: Arc<&'a Propagator<'a, D, E>>,
     /// The list of objectives of this targeter
     pub objectives: Vec<Objective>,
+    /// An optional frame (and Cosm) to compute the objectives in.
+    /// Needed if the propagation frame is separate from objectives frame (e.g. for B Plane targeting).
+    pub objective_frame: Option<(Frame, Arc<Cosm>)>,
     /// The kind of correction to apply to achieve the objectives
     pub variables: Vec<Vary>,
     /// Maximum number of iterations
@@ -208,7 +211,6 @@ where
         + Allocator<f64, <D::StateType as State>::Size>,
 {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
-    /// Defaults to 250 iterations which should be sufficient for all well-defined problems
     pub fn new(
         prop: Arc<&'a Propagator<'a, D, E>>,
         variables: Vec<Vary>,
@@ -218,37 +220,84 @@ where
             prop,
             objectives,
             variables,
-            iterations: 250,
+            iterations: 100,
+            objective_frame: None,
         }
     }
 
     /// Create a new Targeter which will apply an impulsive delta-v correction.
-    /// Defaults to 250 iterations which should be sufficient for all well-defined problems
+    pub fn delta_v_in_frame(
+        prop: Arc<&'a Propagator<'a, D, E>>,
+        objectives: Vec<Objective>,
+        objective_frame: Frame,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
+            iterations: 100,
+            objective_frame: Some((objective_frame, cosm)),
+        }
+    }
+
+    /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn delta_v(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
             variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
-            iterations: 250,
+            iterations: 100,
+            objective_frame: None,
         }
     }
 
     /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
-    /// Defaults to 250 iterations which should be sufficient for all well-defined problems
+    pub fn delta_r_in_frame(
+        prop: Arc<&'a Propagator<'a, D, E>>,
+        objectives: Vec<Objective>,
+        objective_frame: Frame,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
+            iterations: 100,
+            objective_frame: Some((objective_frame, cosm)),
+        }
+    }
+
+    /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
     pub fn delta_r(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
             variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
-            iterations: 250,
+            iterations: 100,
+            objective_frame: None,
         }
+    }
+    pub fn try_achieve_from(
+        &self,
+        initial_state: Spacecraft,
+        correction_epoch: Epoch,
+        achievement_epoch: Epoch,
+    ) -> Result<TargeterSolution, NyxError> {
+        self.try_achieve_from_with_guess(
+            initial_state,
+            &vec![0.0; self.variables.len()],
+            correction_epoch,
+            achievement_epoch,
+        )
     }
 
     /// Differential correction using hyperdual numbers for the objectives
     #[allow(clippy::comparison_chain)]
-    pub fn try_achieve_from(
+    pub fn try_achieve_from_with_guess(
         &self,
         initial_state: Spacecraft,
+        initial_guess: &[f64],
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
@@ -275,6 +324,32 @@ where
 
         // Store the total correction in Vector3
         let mut total_correction = DVector::from_element(self.variables.len(), 0.0);
+
+        // Apply the initial guess
+        for (i, var) in self.variables.iter().enumerate() {
+            match var {
+                Vary::PositionX => {
+                    xi.orbit.x += initial_guess[i];
+                }
+                Vary::PositionY => {
+                    xi.orbit.y += initial_guess[i];
+                }
+                Vary::PositionZ => {
+                    xi.orbit.z += initial_guess[i];
+                }
+                Vary::VelocityX => {
+                    xi.orbit.vx += initial_guess[i];
+                }
+                Vary::VelocityY => {
+                    xi.orbit.vy += initial_guess[i];
+                }
+                Vary::VelocityZ => {
+                    xi.orbit.vz += initial_guess[i];
+                }
+                _ => unimplemented!(),
+            }
+            total_correction[i] += initial_guess[i];
+        }
 
         let mut prev_err_norm = std::f64::INFINITY;
 
@@ -304,20 +379,25 @@ where
             xi.enable_traj_stm();
 
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
+            // Diagonal of the STM of the trajectory (will include the frame change if needed)
+            let phi_k_to_0_diag = xf.stm().diagonal();
 
-            let phi_k_to_0 = xf.stm();
-
-            // Build the partials
-            let xf_dual = OrbitDual::from(xf.orbit);
+            let xf_dual_obj_frame = match &self.objective_frame {
+                Some((frame, cosm)) => {
+                    let orbit_obj_frame = cosm.frame_chg(&xf.orbit, *frame);
+                    OrbitDual::from(orbit_obj_frame)
+                }
+                None => OrbitDual::from(xf.orbit),
+            };
 
             // Build the error vector
             let mut param_errors = Vec::new();
             let mut jac_rows = Vec::new();
             let mut converged = true;
 
-            // Build the B-Plane once, if needed
+            // Build the B-Plane once, if needed, and always in the objective frame
             let b_plane = if is_bplane_tgt {
-                Some(BPlane::from_dual(xf_dual)?)
+                Some(BPlane::from_dual(xf_dual_obj_frame)?)
             } else {
                 None
             };
@@ -334,10 +414,12 @@ where
                         _ => unreachable!(),
                     }
                 } else {
-                    xf_dual.partial_for(&obj.parameter)?
+                    xf_dual_obj_frame.partial_for(&obj.parameter)?
                 };
 
-                let param_err = obj.multiplicative_factor * (obj.desired_value - partial.real())
+                let achieved = partial.real();
+
+                let param_err = obj.multiplicative_factor * (obj.desired_value - achieved)
                     + obj.additive_factor;
 
                 if param_err.abs() > obj.tolerance {
@@ -346,11 +428,11 @@ where
                 param_errors.push(param_err);
 
                 objmsg.push(format!(
-                    "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t error = {:>width$.prec$}",
+                    "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t scaled error = {:>width$.prec$}",
                     obj.parameter,
-                    partial.real(),
+                    achieved,
                     obj.desired_value,
-                    obj.desired_value - partial.real(), width=width, prec=max_obj_tol
+                    param_err, width=width, prec=max_obj_tol
                 ));
 
                 // Build the Jacobian with the partials of the objectives with respect to all of the final state parameters
@@ -377,10 +459,7 @@ where
                         Vary::VelocityX => state.orbit.vx += total_correction[i],
                         Vary::VelocityY => state.orbit.vy += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz += total_correction[i],
-                        _ => unimplemented!()
-                        // Vary::VelocityV => state.orbit.vx += total_correction_from_vnc[i],
-                        // Vary::VelocityN => state.orbit.vy += total_correction_from_vnc[i],
-                        // Vary::VelocityC => state.orbit.vz += total_correction_from_vnc[i],
+                        _ => unimplemented!(),
                     }
                 }
 
@@ -415,7 +494,7 @@ where
             for i in 0..self.objectives.len() {
                 let jac_row = &jac_rows[i];
                 for (j, var) in self.variables.iter().enumerate() {
-                    let col_no = match var {
+                    let idx = match var {
                         Vary::PositionX => 0,
                         Vary::PositionY => 1,
                         Vary::PositionZ => 2,
@@ -424,7 +503,7 @@ where
                         Vary::VelocityZ | Vary::VelocityC => 5,
                     };
                     // We only ever need the diagonals of the STM I think?
-                    jac[(i, j)] = jac_row[col_no] * phi_k_to_0[(col_no, col_no)];
+                    jac[(i, j)] = jac_row[idx] * phi_k_to_0_diag[idx];
                 }
             }
 
@@ -466,7 +545,6 @@ where
                 match var {
                     Vary::PositionX => {
                         xi.orbit.x += delta[i];
-                        total_correction[i] += delta[i];
                     }
                     Vary::PositionY => {
                         xi.orbit.y += delta[i];

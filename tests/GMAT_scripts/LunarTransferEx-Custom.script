@@ -20,7 +20,7 @@ GMAT Sat.VY = -0.4462753967758019;
 GMAT Sat.VZ = 0.08561205662877103;
 GMAT Sat.DryMass = 1000;
 GMAT Sat.Cd = 2.2;
-GMAT Sat.Cr = 1.7;
+GMAT Sat.Cr = 1.8;
 GMAT Sat.DragArea = 15;
 GMAT Sat.SRPArea = 1;
 GMAT Sat.SPADDragScaleFactor = 1;
@@ -50,6 +50,8 @@ GMAT Sat.AttitudeDisplayStateType = 'Quaternion';
 GMAT Sat.AttitudeRateDisplayStateType = 'AngularVelocity';
 GMAT Sat.AttitudeCoordinateSystem = EarthMJ2000Eq;
 GMAT Sat.EulerAngleSequence = '321';
+
+
 
 
 
@@ -102,7 +104,7 @@ GMAT EarthFull.Type = RungeKutta89;
 GMAT EarthFull.InitialStepSize = 60;
 GMAT EarthFull.Accuracy = 9.999999999999999e-12;
 GMAT EarthFull.MinStep = 0.001;
-GMAT EarthFull.MaxStep = 45000;
+GMAT EarthFull.MaxStep = 2700;
 GMAT EarthFull.MaxStepAttempts = 50;
 GMAT EarthFull.StopIfAccuracyIsViolated = true;
 
@@ -121,10 +123,10 @@ GMAT MoonFull.StopIfAccuracyIsViolated = true;
 %----------------------------------------
 
 Create ImpulsiveBurn TOI;
-GMAT TOI.CoordinateSystem = MoonMJ2000Eq;
-GMAT TOI.Element1 = 0.14676929889;
-GMAT TOI.Element2 = 0.046042675892;
-GMAT TOI.Element3 = 0.090223244097;
+GMAT TOI.CoordinateSystem = EarthMJ2000Eq;
+GMAT TOI.Element1 = 0;
+GMAT TOI.Element2 = 0;
+GMAT TOI.Element3 = 0;
 GMAT TOI.DecrementMass = false;
 GMAT TOI.Isp = 300;
 GMAT TOI.GravitationalAccel = 9.81;
@@ -172,8 +174,8 @@ Create DifferentialCorrector DC1;
 GMAT DC1.ShowProgress = true;
 GMAT DC1.ReportStyle = Normal;
 GMAT DC1.ReportFile = 'DifferentialCorrectorDC1.data';
-GMAT DC1.MaximumIterations = 25;
-GMAT DC1.DerivativeMethod = ForwardDifference;
+GMAT DC1.MaximumIterations = 50;
+GMAT DC1.DerivativeMethod = CentralDifference;
 GMAT DC1.Algorithm = NewtonRaphson;
 
 %----------------------------------------
@@ -215,9 +217,8 @@ Propagate 'Prop to Perigee' EarthFull(Sat) {Sat.Periapsis};
 %------------------------------
 Target 'Target B-Plane' DC1 {SolveMode = Solve, ExitMode = DiscardAndContinue, ShowProgressWindow = true};
    
-   Vary 'Vary TOI.V' DC1(TOI.Element1 = 0.1, {Perturbation = 1e-005, Lower = -2., Upper = 2.0, MaxStep = .1, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
-   Vary DC1(TOI.Element2 = -0.154, {Perturbation = 0.0001, Lower = -2., Upper = 2.0, MaxStep = 0.1, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
-   Vary 'Vary TOI.B' DC1(TOI.Element3 = -0.298, {Perturbation = 1e-005, Lower = -2.5, Upper = 2.5, MaxStep = .1, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
+   Vary 'Vary TOI.V' DC1(TOI.Element1 = 0, {Perturbation = 1e-005, Lower = -3., Upper = 3.0, MaxStep = 10.0, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
+   Vary 'Vary TOI.B' DC1(TOI.Element3 = 0, {Perturbation = 1e-005, Lower = -3, Upper = 3, MaxStep = 10, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    
    Maneuver 'Apply TOI' TOI(Sat);
    

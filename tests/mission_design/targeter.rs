@@ -289,27 +289,29 @@ fn tgt_b_plane_legit() {
         .0;
 
     // Convert to the Moon J2000 frame
-    let orbit_moon = cosm.frame_chg(&periapse_spacecraft.orbit, luna);
-    let periapse_spacecraft_moon = spacecraft.with_orbit(orbit_moon);
+    // let orbit_moon = cosm.frame_chg(&periapse_spacecraft.orbit, luna);
+    // let periapse_spacecraft_moon = spacecraft.with_orbit(orbit_moon);
 
-    println!(
-        "{}\n{}",
-        periapse_spacecraft.orbit, periapse_spacecraft_moon.orbit
-    );
+    // println!(
+    //     "{}\n{}",
+    //     periapse_spacecraft.orbit, periapse_spacecraft_moon.orbit
+    // );
 
     // let b_plane_tgt = BPlaneTarget::from_bt_br(391732.3347895856, 104579.9942274809);
     let b_plane_tgt = BPlaneTarget::from_bt_br(15_000.4, 4_000.6);
 
-    let tgt = Targeter::delta_v(
+    let tgt = Targeter::delta_v_in_frame(
         Arc::new(&prop),
         b_plane_tgt.to_objectives_with_tolerance(3.0),
+        luna,
+        cosm.clone(),
     );
 
     let tcm_epoch = periapse_spacecraft.epoch();
     let loi_epoch = tcm_epoch + 556697 * TimeUnit::Second;
 
     let sol = tgt
-        .try_achieve_from(periapse_spacecraft_moon, tcm_epoch, loi_epoch)
+        .try_achieve_from(periapse_spacecraft, tcm_epoch, loi_epoch)
         .unwrap();
 
     println!("{}", sol);

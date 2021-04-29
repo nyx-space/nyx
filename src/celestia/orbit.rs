@@ -1294,10 +1294,23 @@ impl Orbit {
         self.stm_kind = StmKind::Traj;
     }
 
+    /// Disable the STM of this state
+    pub fn disable_stm(&mut self) {
+        self.stm = None;
+        self.stm_kind = StmKind::Unset;
+    }
+
     /// Copies the current state but sets the STM to identity
     pub fn with_stm(self) -> Self {
         let mut me = self;
         me.enable_stm();
+        me
+    }
+
+    /// Copies the current state but disables the STM
+    pub fn without_stm(self) -> Self {
+        let mut me = self;
+        me.disable_stm();
         me
     }
 
