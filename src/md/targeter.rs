@@ -535,11 +535,6 @@ where
 
             debug!("Correction: {:e}", delta);
 
-            info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
-            for obj in &objmsg {
-                info!("{}", obj);
-            }
-
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
                 match var {
@@ -565,6 +560,13 @@ where
                 }
             }
             total_correction += delta;
+            debug!("Total correction: {:e}", total_correction);
+
+            // Log progress
+            info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
+            for obj in &objmsg {
+                info!("{}", obj);
+            }
         }
 
         Err(NyxError::MaxIterReached(format!(
