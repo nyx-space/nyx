@@ -73,6 +73,8 @@ fn tgt_basic_sma() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
+    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
@@ -97,8 +99,17 @@ fn tgt_basic_sma() {
 
     println!("{}", tgt);
 
+    // let solution = tgt
+    //     .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+    //     .unwrap();
+
     let solution = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from_with_guess_fd(
+            spacecraft,
+            &[0.0, 0.0, 0.0],
+            orig_dt,
+            orig_dt + target_delta_t,
+        )
         .unwrap();
 
     println!("{}", solution);

@@ -170,8 +170,13 @@ where
     }
 
     /// This method propagates the provided Dynamics for the provided duration.
+    #[allow(clippy::erasing_op)]
     pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
-        if duration > 2 * TimeUnit::Minute {
+        if duration == 0 * TimeUnit::Second {
+            debug!("No propagation necessary");
+            return Ok(self.state);
+        }
+        if duration > 2 * TimeUnit::Minute || duration < -2 * TimeUnit::Minute {
             // Prevent the print spam for EKF orbit determination cases
             info!("Propagating for {}", duration);
         }
