@@ -294,7 +294,7 @@ where
 
     /// Differential correction using finite differencing
     #[allow(clippy::comparison_chain)]
-    pub fn try_achieve_from_with_guess_fd(
+    pub fn try_achieve_from_with_guess(
         &self,
         initial_state: Spacecraft,
         initial_guess: &[f64],
@@ -453,10 +453,33 @@ where
 
                     let this_xf = self.prop.with(this_xi).until_epoch(achievement_epoch)?;
 
-                    let this_achieved = OrbitDual::from(this_xf.orbit)
-                        .partial_for(&obj.parameter)?
-                        .real();
+                    let xf_dual_obj_frame = match &self.objective_frame {
+                        Some((frame, cosm)) => {
+                            let orbit_obj_frame = cosm.frame_chg(&this_xf.orbit, *frame);
+                            OrbitDual::from(orbit_obj_frame)
+                        }
+                        None => OrbitDual::from(this_xf.orbit),
+                    };
 
+                    let b_plane = if is_bplane_tgt {
+                        Some(BPlane::from_dual(xf_dual_obj_frame)?)
+                    } else {
+                        None
+                    };
+
+                    let partial = if obj.parameter.is_b_plane() {
+                        match obj.parameter {
+                            StateParameter::BdotR => b_plane.unwrap().b_r,
+                            StateParameter::BdotT => b_plane.unwrap().b_t,
+                            StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                            _ => unreachable!(),
+                        }
+                    } else {
+                        xf_dual_obj_frame.partial_for(&obj.parameter)?
+                    };
+
+                    let this_achieved = partial.real();
+ 
                     // We only ever need the diagonals of the STM I think?
                     jac[(i, j)] = (this_achieved - achieved) / pert;
                 }
@@ -572,7 +595,7 @@ where
 
     /// Differential correction using hyperdual numbers for the objectives
     #[allow(clippy::comparison_chain)]
-    pub fn try_achieve_from_with_guess(
+    pub fn try_achieve_from_with_guess_dual(
         &self,
         initial_state: Spacecraft,
         initial_guess: &[f64],
@@ -790,7 +813,7 @@ where
                         Vary::VelocityZ | Vary::VelocityC => 5,
                     };
                     // We only ever need the diagonals of the STM I think?
-                    jac[(i, j)] = jac_row[idx] * phi_k_to_0_diag[idx];
+                    jac[(i, j)] = dbg!(jac_row[idx]) * dbg!(phi_k_to_0_diag[idx]);
                 }
             }
 

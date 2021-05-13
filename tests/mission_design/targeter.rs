@@ -104,7 +104,7 @@ fn tgt_basic_sma() {
     //     .unwrap();
 
     let solution = tgt
-        .try_achieve_from_with_guess_fd(
+        .try_achieve_from_with_guess(
             spacecraft,
             &[0.0, 0.0, 0.0],
             orig_dt,
@@ -198,7 +198,7 @@ fn tgt_c3_ra_decl_velocity() {
         Objective::within_tolerance(StateParameter::Declination, 2.0, 0.1),
     ];
 
-    let tgt = Targeter::delta_r(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
     println!("{}", tgt);
 
     let solution = tgt
