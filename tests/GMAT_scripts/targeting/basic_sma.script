@@ -1,5 +1,5 @@
 %General Mission Analysis Tool(GMAT) Script
-%Created: 2021-05-13 10:55:09
+%Created: 2021-05-13 18:27:42
 
 
 %----------------------------------------
@@ -114,7 +114,7 @@ Create ReportFile ReportFile1;
 GMAT ReportFile1.SolverIterations = Current;
 GMAT ReportFile1.UpperLeft = [ 0.1458333333333333 0.03414634146341464 ];
 GMAT ReportFile1.Size = [ 0.9940476190476191 0.9634146341463414 ];
-GMAT ReportFile1.RelativeZOrder = 224;
+GMAT ReportFile1.RelativeZOrder = 239;
 GMAT ReportFile1.Maximized = true;
 GMAT ReportFile1.Filename = 'ReportFile1.txt';
 GMAT ReportFile1.Precision = 16;
@@ -133,6 +133,8 @@ GMAT ReportFile1.WriteReport = true;
 %----------------------------------------
 
 BeginMissionSequence;
+Propagate DefaultProp(DefaultSC, 'STM', 'AMatrix') {DefaultSC.ElapsedSecs = 3560.54};
+Stop;
 Target DC1 {SolveMode = Solve, ExitMode = DiscardAndContinue, ShowProgressWindow = true};
    Vary 'VaryX' DC1(ImpulsiveBurn1.Element1 = 0, {Perturbation = 0.0001, Lower = -1, Upper = 1, MaxStep = 0.2, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    Vary 'VaryY' DC1(ImpulsiveBurn1.Element2 = 0, {Perturbation = 0.0001, Lower = -1, Upper = 1, MaxStep = 0.2, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});

@@ -247,7 +247,7 @@ where
             prop,
             objectives,
             variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
-            iterations: 10,
+            iterations: 100,
             objective_frame: None,
         }
     }
@@ -381,7 +381,11 @@ where
 
         for it in 0..=self.iterations {
             // Modify each variable by 0.0001, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
-            let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
+            let mut cur_xi = xi;
+            cur_xi.enable_traj_stm();
+            let xf = self.prop.with(cur_xi).until_epoch(achievement_epoch)?;
+
+            println!("Dual STM:\n {}", xf.orbit.stm());
 
             let xf_dual_obj_frame = match &self.objective_frame {
                 Some((frame, cosm)) => {
@@ -424,6 +428,16 @@ where
 
                 let achieved = partial.real();
 
+                println!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t",
+                    partial.wtr_x(),
+                    partial.wtr_y(),
+                    partial.wtr_z(),
+                    partial.wtr_vx(),
+                    partial.wtr_vy(),
+                    partial.wtr_vz(),
+                );
+
                 let param_err = obj.multiplicative_factor * (obj.desired_value - achieved)
                     + obj.additive_factor;
 
@@ -442,16 +456,50 @@ where
 
                 for (j, var) in self.variables.iter().enumerate() {
                     let mut this_xi = xi;
+                    let stm_val;
                     match var {
-                        Vary::PositionX => this_xi.orbit.x += pert,
-                        Vary::PositionY => this_xi.orbit.y += pert,
-                        Vary::PositionZ => this_xi.orbit.z += pert,
-                        Vary::VelocityX | Vary::VelocityV => this_xi.orbit.vx += pert,
-                        Vary::VelocityY | Vary::VelocityN => this_xi.orbit.vy += pert,
-                        Vary::VelocityZ | Vary::VelocityC => this_xi.orbit.vz += pert,
+                        Vary::PositionX => {
+                            this_xi.orbit.x += pert;
+                        }
+                        Vary::PositionY => {
+                            this_xi.orbit.y += pert;
+                        }
+                        Vary::PositionZ => {
+                            this_xi.orbit.z += pert;
+                        }
+                        Vary::VelocityX | Vary::VelocityV => {
+                            this_xi.orbit.vx += pert;
+                        }
+                        Vary::VelocityY | Vary::VelocityN => {
+                            this_xi.orbit.vy += pert;
+                        }
+                        Vary::VelocityZ | Vary::VelocityC => {
+                            this_xi.orbit.vz += pert;
+                        }
                     };
 
                     let this_xf = self.prop.with(this_xi).until_epoch(achievement_epoch)?;
+
+                    match var {
+                        Vary::PositionX => {
+                            stm_val = (this_xf.orbit.x - this_xi.orbit.x) / pert;
+                        }
+                        Vary::PositionY => {
+                            stm_val = (this_xf.orbit.y - this_xi.orbit.y) / pert;
+                        }
+                        Vary::PositionZ => {
+                            stm_val = (this_xf.orbit.z - this_xi.orbit.z) / pert;
+                        }
+                        Vary::VelocityX | Vary::VelocityV => {
+                            stm_val = (this_xf.orbit.vx - this_xi.orbit.vx) / pert;
+                        }
+                        Vary::VelocityY | Vary::VelocityN => {
+                            stm_val = (this_xf.orbit.vy - this_xi.orbit.vy) / pert;
+                        }
+                        Vary::VelocityZ | Vary::VelocityC => {
+                            stm_val = (this_xf.orbit.vz - this_xi.orbit.vz) / pert;
+                        }
+                    };
 
                     let xf_dual_obj_frame = match &self.objective_frame {
                         Some((frame, cosm)) => {
@@ -479,9 +527,9 @@ where
                     };
 
                     let this_achieved = partial.real();
- 
                     // We only ever need the diagonals of the STM I think?
                     jac[(i, j)] = (this_achieved - achieved) / pert;
+                    println!("Partial for {:?}: {}", var, stm_val);
                 }
             }
 
@@ -680,7 +728,7 @@ where
 
         for it in 0..=self.iterations {
             // Now, enable the trajectory STM for this state so we can apply the correction
-            xi.enable_traj_stm();
+            xi.enable_stm();
 
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
             // Diagonal of the STM of the trajectory (will include the frame change if needed)
@@ -697,7 +745,7 @@ where
 
             // Build the error vector
             let mut param_errors = Vec::new();
-            let mut jac_rows = Vec::new();
+            // let mut jac_rows = Vec::new();
             let mut converged = true;
 
             // Build the B-Plane once, if needed, and always in the objective frame
@@ -710,7 +758,11 @@ where
             // Build debugging information
             let mut objmsg = Vec::new();
 
-            for obj in &self.objectives {
+            // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
+            // As such, it includes the STM of that variable for the whole propagation arc.
+            let mut jac = DMatrix::from_element(self.objectives.len(), self.variables.len(), 0.0);
+
+            for (i, obj) in self.objectives.iter().enumerate() {
                 let partial = if obj.parameter.is_b_plane() {
                     match obj.parameter {
                         StateParameter::BdotR => b_plane.unwrap().b_r,
@@ -743,19 +795,38 @@ where
                 // Build the Jacobian with the partials of the objectives with respect to all of the final state parameters
                 // We localize the problem in the STM.
                 // TODO: VNC (how?!)
-                jac_rows.push(vec![
+                let mut partial_vec = DVector::from_element(6, 0.0);
+                for (i, val) in [
                     partial.wtr_x(),
                     partial.wtr_y(),
                     partial.wtr_z(),
                     partial.wtr_vx(),
                     partial.wtr_vy(),
                     partial.wtr_vz(),
-                ]);
-                debug!(
-                    "jaw row {}: {:?}",
-                    jac_rows.len() - 1,
-                    jac_rows[jac_rows.len() - 1]
-                );
+                ]
+                .iter()
+                .enumerate()
+                {
+                    partial_vec[i] = *val;
+                }
+                // Multiply its transpose by the STM and extract the data
+                let mut stm_prev = xf.stm();
+                stm_prev.try_inverse_mut();
+                let obj_jac = -xf.stm() * partial_vec;
+                println!("{}", obj_jac);
+                for (j, var) in self.variables.iter().enumerate() {
+                    let idx = match var {
+                        Vary::PositionX => 0,
+                        Vary::PositionY => 1,
+                        Vary::PositionZ => 2,
+                        Vary::VelocityX | Vary::VelocityV => 3,
+                        Vary::VelocityY | Vary::VelocityN => 4,
+                        Vary::VelocityZ | Vary::VelocityC => 5,
+                    };
+                    // We only ever need the diagonals of the STM I think?
+                    jac[(i, j)] = obj_jac[idx];
+                }
+                // jac_rows.push();
             }
 
             if converged {
@@ -798,24 +869,21 @@ where
             }
             prev_err_norm = err_vector.norm();
 
-            // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
-            // As such, it includes the STM of that variable for the whole propagation arc.
-            let mut jac = DMatrix::from_element(self.objectives.len(), self.variables.len(), 0.0);
-            for i in 0..self.objectives.len() {
-                let jac_row = &jac_rows[i];
-                for (j, var) in self.variables.iter().enumerate() {
-                    let idx = match var {
-                        Vary::PositionX => 0,
-                        Vary::PositionY => 1,
-                        Vary::PositionZ => 2,
-                        Vary::VelocityX | Vary::VelocityV => 3,
-                        Vary::VelocityY | Vary::VelocityN => 4,
-                        Vary::VelocityZ | Vary::VelocityC => 5,
-                    };
-                    // We only ever need the diagonals of the STM I think?
-                    jac[(i, j)] = dbg!(jac_row[idx]) * dbg!(phi_k_to_0_diag[idx]);
-                }
-            }
+            // for i in 0..self.objectives.len() {
+            //     let jac_row = &jac_rows[i];
+            //     for (j, var) in self.variables.iter().enumerate() {
+            //         let idx = match var {
+            //             Vary::PositionX => 0,
+            //             Vary::PositionY => 1,
+            //             Vary::PositionZ => 2,
+            //             Vary::VelocityX | Vary::VelocityV => 3,
+            //             Vary::VelocityY | Vary::VelocityN => 4,
+            //             Vary::VelocityZ | Vary::VelocityC => 5,
+            //         };
+            //         // We only ever need the diagonals of the STM I think?
+            //         jac[(i, j)] = dbg!(jac_row[idx]) * dbg!(phi_k_to_0_diag[idx]);
+            //     }
+            // }
 
             debug!("Jacobian {}", jac);
 

@@ -113,6 +113,17 @@ fn tgt_basic_sma() {
         .unwrap();
 
     println!("{}", solution);
+
+    let solution = tgt
+        .try_achieve_from_with_guess_dual(
+            spacecraft,
+            &[0.0, 0.0, 0.0],
+            orig_dt,
+            orig_dt + target_delta_t,
+        )
+        .unwrap();
+
+    println!("{}", solution);
 }
 
 #[test]
@@ -193,7 +204,7 @@ fn tgt_c3_ra_decl_velocity() {
 
     // Define the objective
     let objectives = vec![
-        // Objective::within_tolerance(StateParameter::C3, -2.0, 0.5),
+        Objective::within_tolerance(StateParameter::C3, -2.0, 0.5),
         Objective::within_tolerance(StateParameter::RightAscension, 1.0, 0.1),
         Objective::within_tolerance(StateParameter::Declination, 2.0, 0.1),
     ];
