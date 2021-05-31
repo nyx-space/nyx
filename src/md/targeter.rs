@@ -21,6 +21,7 @@ use crate::dimensions::{DMatrix, DVector, DefaultAllocator};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use std::fmt;
+use std::time::{Duration, Instant};
 
 /// Defines a state parameter event finder
 #[derive(Copy, Clone, Debug)]
@@ -101,6 +102,8 @@ pub struct TargeterSolution {
     pub achieved_objectives: Vec<Objective>,
     /// The number of iterations required
     pub iterations: usize,
+    /// Computation duration
+    pub computation_dur: Duration,
 }
 
 impl fmt::Display for TargeterSolution {
@@ -155,8 +158,8 @@ impl fmt::Display for TargeterSolution {
 
         write!(
             f,
-            "Targeter solution correcting {:?} (converged in {} iterations):\n\t{}\n\tAchieved:{}\n\tFinal state:\n\t\t{}\n\t\t{:x}",
-            self.variables, self.iterations, corrmsg, objmsg, self.state, self.state
+            "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved:{}\n\tFinal state:\n\t\t{}\n\t\t{:x}",
+            self.variables,self.computation_dur.as_secs_f64(), self.iterations, corrmsg, objmsg, self.state, self.state
         )
     }
 }
@@ -284,7 +287,7 @@ where
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
-        self.try_achieve_from_with_guess(
+        self.try_achieve_from_with_guess_dual(
             initial_state,
             &vec![0.0; self.variables.len()],
             correction_epoch,
@@ -378,6 +381,8 @@ where
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
         let pert = 0.0001;
+
+        let start_instant = Instant::now();
 
         for it in 0..=self.iterations {
             // Modify each variable by 0.0001, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
@@ -534,6 +539,7 @@ where
             }
 
             if converged {
+                let conv_dur = Instant::now() - start_instant;
                 let mut state = xi_start;
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
@@ -551,6 +557,7 @@ where
                 let sol = TargeterSolution {
                     state,
                     correction: total_correction,
+                    computation_dur: conv_dur,
                     variables: self.variables.clone(),
                     achievement_epoch,
                     achieved_errors: param_errors,
@@ -726,6 +733,8 @@ where
 
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
+        let start_instant = Instant::now();
+
         for it in 0..=self.iterations {
             // Now, enable the trajectory STM for this state so we can apply the correction
             xi.enable_stm();
@@ -830,6 +839,7 @@ where
             }
 
             if converged {
+                let conv_dur = Instant::now() - start_instant;
                 let mut state = xi_start;
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
@@ -847,6 +857,7 @@ where
                 let sol = TargeterSolution {
                     state,
                     correction: total_correction,
+                    computation_dur: conv_dur,
                     variables: self.variables.clone(),
                     achievement_epoch,
                     achieved_errors: param_errors,
