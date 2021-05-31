@@ -26,27 +26,14 @@ fn tgt_sma_from_apo() {
     let setup = Propagator::default(dynamics);
 
     // Try to increase SMA
-    let xf_desired = Orbit::keplerian(
-        8_100.0,
-        0.2,
-        30.0,
-        60.0,
-        60.0,
-        180.0,
-        orig_dt + target_delta_t,
-        eme2k,
-    );
+    let xf_desired_sma = 8_100.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::SMA, xf_desired.sma())];
+    let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
 
     let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
 
     println!("{}", tgt);
-
-    // let solution = tgt
-    //     .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
-    //     .unwrap();
 
     let solution_fd = tgt
         .try_achieve_from_with_guess(
@@ -59,7 +46,7 @@ fn tgt_sma_from_apo() {
 
     println!("Finite differencing solution: {}", solution_fd);
 
-    let solution = tgt
+    let solution_hd = tgt
         .try_achieve_from_with_guess_dual(
             spacecraft,
             &[0.0, 0.0, 0.0],
@@ -68,5 +55,82 @@ fn tgt_sma_from_apo() {
         )
         .unwrap();
 
-    println!("{}", solution);
+    println!("{}", solution_hd);
+
+    let gmat_sol = 0.05312024615278713;
+    // GMAT validation
+    assert!(
+        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6,
+        "Finite differencing result different from GMAT (greater than 1 mm/s)."
+    );
+
+    // Check that the solutions nearly match
+    assert!(
+        (solution_fd.correction.norm() - solution_hd.correction.norm()).abs() < 1e-3,
+        "Difference between finite differencing and hyperduals is greater than 1 m/s"
+    );
+    println!(
+        "GMAT validation - tgt_sma_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s",
+        solution_fd.correction.norm() * 1e3,
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+    );
+}
+
+#[test]
+fn tgt_sma_from_peri() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
+
+    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
+
+    let target_delta_t: Duration = xi_orig.period() / 2.0;
+
+    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+
+    let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
+
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+        cosm,
+    ));
+    let setup = Propagator::default(dynamics);
+
+    // Try to increase SMA
+    let xf_desired_sma = 8_100.0;
+
+    // Define the objective
+    let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
+
+    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+
+    println!("{}", tgt);
+
+    let solution_fd = tgt
+        .try_achieve_from_with_guess(
+            spacecraft,
+            &[0.0, 0.0, 0.0],
+            orig_dt,
+            orig_dt + target_delta_t,
+        )
+        .unwrap();
+
+    println!("Finite differencing solution: {}", solution_fd);
+
+    let gmat_sol = 0.03550369448069638;
+    // GMAT validation
+    assert!(
+        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6,
+        "Finite differencing result different from GMAT (greater than 1 mm/s)."
+    );
+    println!(
+        "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
+        solution_fd.correction.norm() * 1e3,
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+    );
 }

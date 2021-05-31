@@ -390,8 +390,6 @@ where
             cur_xi.enable_traj_stm();
             let xf = self.prop.with(cur_xi).until_epoch(achievement_epoch)?;
 
-            println!("Dual STM:\n {}", xf.orbit.stm());
-
             let xf_dual_obj_frame = match &self.objective_frame {
                 Some((frame, cosm)) => {
                     let orbit_obj_frame = cosm.frame_chg(&xf.orbit, *frame);
@@ -433,16 +431,6 @@ where
 
                 let achieved = partial.real();
 
-                println!(
-                    "{}\t{}\t{}\t{}\t{}\t{}\t",
-                    partial.wtr_x(),
-                    partial.wtr_y(),
-                    partial.wtr_z(),
-                    partial.wtr_vx(),
-                    partial.wtr_vy(),
-                    partial.wtr_vz(),
-                );
-
                 let param_err = obj.multiplicative_factor * (obj.desired_value - achieved)
                     + obj.additive_factor;
 
@@ -461,7 +449,7 @@ where
 
                 for (j, var) in self.variables.iter().enumerate() {
                     let mut this_xi = xi;
-                    let stm_val;
+
                     match var {
                         Vary::PositionX => {
                             this_xi.orbit.x += pert;
@@ -484,27 +472,6 @@ where
                     };
 
                     let this_xf = self.prop.with(this_xi).until_epoch(achievement_epoch)?;
-
-                    match var {
-                        Vary::PositionX => {
-                            stm_val = (this_xf.orbit.x - this_xi.orbit.x) / pert;
-                        }
-                        Vary::PositionY => {
-                            stm_val = (this_xf.orbit.y - this_xi.orbit.y) / pert;
-                        }
-                        Vary::PositionZ => {
-                            stm_val = (this_xf.orbit.z - this_xi.orbit.z) / pert;
-                        }
-                        Vary::VelocityX | Vary::VelocityV => {
-                            stm_val = (this_xf.orbit.vx - this_xi.orbit.vx) / pert;
-                        }
-                        Vary::VelocityY | Vary::VelocityN => {
-                            stm_val = (this_xf.orbit.vy - this_xi.orbit.vy) / pert;
-                        }
-                        Vary::VelocityZ | Vary::VelocityC => {
-                            stm_val = (this_xf.orbit.vz - this_xi.orbit.vz) / pert;
-                        }
-                    };
 
                     let xf_dual_obj_frame = match &self.objective_frame {
                         Some((frame, cosm)) => {
@@ -534,7 +501,6 @@ where
                     let this_achieved = partial.real();
                     // We only ever need the diagonals of the STM I think?
                     jac[(i, j)] = (this_achieved - achieved) / pert;
-                    println!("Partial for {:?}: {}", var, stm_val);
                 }
             }
 
@@ -657,6 +623,8 @@ where
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
+        warn!("DO NOT USE! The dual number target is broken! https://gitlab.com/nyx-space/nyx/-/issues/207");
+
         if self.objectives.is_empty() {
             return Err(NyxError::UnderdeterminedProblem);
         }
@@ -742,7 +710,6 @@ where
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
             // Diagonal of the STM of the trajectory (will include the frame change if needed)
             debug!("STM {}", xf.stm());
-            let phi_k_to_0_diag = xf.stm().diagonal();
 
             let xf_dual_obj_frame = match &self.objective_frame {
                 Some((frame, cosm)) => {
@@ -879,22 +846,6 @@ where
                 ));
             }
             prev_err_norm = err_vector.norm();
-
-            // for i in 0..self.objectives.len() {
-            //     let jac_row = &jac_rows[i];
-            //     for (j, var) in self.variables.iter().enumerate() {
-            //         let idx = match var {
-            //             Vary::PositionX => 0,
-            //             Vary::PositionY => 1,
-            //             Vary::PositionZ => 2,
-            //             Vary::VelocityX | Vary::VelocityV => 3,
-            //             Vary::VelocityY | Vary::VelocityN => 4,
-            //             Vary::VelocityZ | Vary::VelocityC => 5,
-            //         };
-            //         // We only ever need the diagonals of the STM I think?
-            //         jac[(i, j)] = dbg!(jac_row[idx]) * dbg!(phi_k_to_0_diag[idx]);
-            //     }
-            // }
 
             debug!("Jacobian {}", jac);
 
