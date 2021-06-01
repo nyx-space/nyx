@@ -589,7 +589,7 @@ where
 
             let delta = jac_inv * err_vector;
 
-            debug!("Correction: {:e}", delta);
+            info!("Correction: {:e}", delta);
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
