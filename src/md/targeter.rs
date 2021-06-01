@@ -281,13 +281,15 @@ where
             objective_frame: None,
         }
     }
+
+    /// Runs the targeter using finite differencing (for now).
     pub fn try_achieve_from(
         &self,
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
-        self.try_achieve_from_with_guess_dual(
+        self.try_achieve_from_with_guess(
             initial_state,
             &vec![0.0; self.variables.len()],
             correction_epoch,

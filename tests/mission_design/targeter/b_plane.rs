@@ -44,9 +44,9 @@ fn tgt_b_plane_sanity() {
     println!("{}", sol);
 
     // Note that we allow for slightly larger error than the other in-place correction
-    assert!((sol.correction[0] - -0.25386251697606466).abs() < 1e-6);
-    assert!((sol.correction[1] - -0.18774460089778605).abs() < 1e-6);
-    assert!((sol.correction[2] - 0.046145009839345504).abs() < 1e-6);
+    assert!((sol.correction[0] - -0.2538646026161754).abs() < 1e-6);
+    assert!((sol.correction[1] - -0.1877439179195086).abs() < 1e-6);
+    assert!((sol.correction[2] - 0.0461438929595469).abs() < 1e-6);
 
     tgt.apply(sol).unwrap();
 }
