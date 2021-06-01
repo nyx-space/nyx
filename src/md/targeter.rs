@@ -46,7 +46,7 @@ impl Objective {
         Self::within_tolerance(
             parameter,
             desired_value,
-            1e2 * parameter.default_event_precision(),
+            parameter.default_event_precision(),
         )
     }
 
@@ -968,7 +968,7 @@ where
 
             let param_err = obj.desired_value - partial.real();
 
-            if param_err.abs() > 10.0 * obj.tolerance {
+            if param_err.abs() > obj.tolerance {
                 converged = false;
             }
             param_errors.push(param_err);
