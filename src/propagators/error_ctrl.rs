@@ -26,7 +26,7 @@ const REL_ERR_THRESH: f64 = 0.1;
 /// The Error Control trait manages how a propagator computes the error in the current step.
 pub trait ErrorCtrl
 where
-    Self: Copy,
+    Self: Copy + Send + Sync,
 {
     /// Computes the actual error of the current step.
     ///

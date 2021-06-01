@@ -69,7 +69,7 @@ pub use self::sph_harmonics::*;
 /// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
 ///  parameters), it is up to the implementor to handle time and state organization correctly.
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
-pub trait Dynamics: Clone
+pub trait Dynamics: Clone + Sync + Send
 where
     DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>,
 {

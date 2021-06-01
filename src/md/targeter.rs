@@ -15,6 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+use super::rayon::prelude::*;
 use super::StateParameter;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DMatrix, DVector, DefaultAllocator};
@@ -402,7 +403,6 @@ where
 
             // Build the error vector
             let mut param_errors = Vec::new();
-            // let mut jac_rows = Vec::new();
             let mut converged = true;
 
             // Build the B-Plane once, if needed, and always in the objective frame
@@ -449,7 +449,14 @@ where
                     param_err, width=width, prec=max_obj_tol
                 ));
 
-                for (j, var) in self.variables.iter().enumerate() {
+                let mut pert_calc: Vec<_> = self
+                    .variables
+                    .iter()
+                    .enumerate()
+                    .map(|(j, var)| (j, var, 0.0_f64))
+                    .collect();
+
+                pert_calc.par_iter_mut().for_each(|(_, var, jac_val)| {
                     let mut this_xi = xi;
 
                     match var {
@@ -473,7 +480,12 @@ where
                         }
                     };
 
-                    let this_xf = self.prop.with(this_xi).until_epoch(achievement_epoch)?;
+                    let this_xf = self
+                        .prop
+                        .clone()
+                        .with(this_xi)
+                        .until_epoch(achievement_epoch)
+                        .unwrap();
 
                     let xf_dual_obj_frame = match &self.objective_frame {
                         Some((frame, cosm)) => {
@@ -484,7 +496,7 @@ where
                     };
 
                     let b_plane = if is_bplane_tgt {
-                        Some(BPlane::from_dual(xf_dual_obj_frame)?)
+                        Some(BPlane::from_dual(xf_dual_obj_frame).unwrap())
                     } else {
                         None
                     };
@@ -497,12 +509,15 @@ where
                             _ => unreachable!(),
                         }
                     } else {
-                        xf_dual_obj_frame.partial_for(&obj.parameter)?
+                        xf_dual_obj_frame.partial_for(&obj.parameter).unwrap()
                     };
 
                     let this_achieved = partial.real();
-                    // We only ever need the diagonals of the STM I think?
-                    jac[(i, j)] = (this_achieved - achieved) / pert;
+                    *jac_val = (this_achieved - achieved) / pert;
+                });
+
+                for (j, _, jac_val) in &pert_calc {
+                    jac[(i, *j)] = *jac_val;
                 }
             }
 

@@ -64,10 +64,8 @@ impl Frame {
         match self {
             Frame::Celestial { ephem_path, .. } | Frame::Geoid { ephem_path, .. } => {
                 let mut path = Vec::with_capacity(3);
-                for p in ephem_path {
-                    if let Some(f) = p {
-                        path.push(*f)
-                    }
+                for p in ephem_path.iter().flatten() {
+                    path.push(*p)
                 }
                 path
             }
@@ -79,10 +77,8 @@ impl Frame {
         match self {
             Frame::Celestial { frame_path, .. } | Frame::Geoid { frame_path, .. } => {
                 let mut path = Vec::with_capacity(3);
-                for p in frame_path {
-                    if let Some(f) = p {
-                        path.push(*f)
-                    }
+                for p in frame_path.iter().flatten() {
+                    path.push(*p)
                 }
                 path
             }
