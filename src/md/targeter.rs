@@ -139,7 +139,8 @@ impl fmt::Display for TargeterSolution {
         write!(
             f,
             "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved:{}\n\tFinal state:\n\t\t{}\n\t\t{:x}",
-            self.variables,self.computation_dur.as_secs_f64(), self.iterations, corrmsg, objmsg, self.state, self.state
+            self.variables.iter().map(|v| format!("{:?}", v.component)).collect::<Vec<String>>(),
+            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, objmsg, self.state, self.state
         )
     }
 }
