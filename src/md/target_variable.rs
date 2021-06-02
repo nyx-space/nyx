@@ -93,9 +93,9 @@ impl Default for Variable {
             component: Vary::VelocityX,
             perturbation: 0.0001,
             init_guess: 0.0,
-            max_step: 0.5,
-            max_value: std::f64::INFINITY,
-            min_value: std::f64::NEG_INFINITY,
+            max_step: 0.2,
+            max_value: 5.0,
+            min_value: -5.0,
         }
     }
 }

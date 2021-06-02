@@ -94,6 +94,8 @@ fn tgt_b_plane_lunar_transfer() {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(15_000.4, 4_000.6);
 
+    // GMAT truth: 1.15740867962, -0.576350387399, 0.632247251449
+
     let tgt = Targeter::in_frame(
         Arc::new(&prop),
         vec![

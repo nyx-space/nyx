@@ -57,6 +57,7 @@ GMAT Sat.EulerAngleSequence = '321';
 
 
 
+
 %----------------------------------------
 %---------- Propagators
 %----------------------------------------
@@ -224,7 +225,7 @@ Target 'Target B-Plane' DC1 {SolveMode = Solve, ExitMode = DiscardAndContinue, S
    Propagate 'Prop to Moon SOI' EarthFull(Sat) {Sat.ElapsedSecs = 556697, StopTolerance = 1e-05};
    
    Achieve 'Achieve BdotT' DC1(Sat.MoonMJ2000Eq.BdotR = 4000.59308992, {Tolerance = 3});
-	Achieve 'Achieve BdotR' DC1(Sat.MoonMJ2000Eq.BdotT = 15000.4401777, {Tolerance = 3});
+   Achieve 'Achieve BdotR' DC1(Sat.MoonMJ2000Eq.BdotT = 15000.4401777, {Tolerance = 3});
    %Achieve DC1(Sat.RMAG = 390000 , {Tolerance = 200000}); 
    
 EndTarget;  % For targeter DC1
