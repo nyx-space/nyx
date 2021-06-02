@@ -181,6 +181,8 @@ where
     pub objective_frame: Option<(Frame, Arc<Cosm>)>,
     /// The kind of correction to apply to achieve the objectives
     pub variables: Vec<Vary>,
+    /// The maximum step to take for each "vary" parameter (set to None if no max step)
+    pub max_steps: Vec<Option<f64>>,
     /// Maximum number of iterations
     pub iterations: usize,
 }
@@ -219,17 +221,19 @@ where
         prop: Arc<&'a Propagator<'a, D, E>>,
         variables: Vec<Vary>,
         objectives: Vec<Objective>,
+        max_steps: Vec<Option<f64>>,
     ) -> Self {
         Self {
             prop,
             objectives,
             variables,
+            max_steps,
             iterations: 100,
             objective_frame: None,
         }
     }
 
-    /// Create a new Targeter which will apply an impulsive delta-v correction.
+    /// Create a new Targeter which will apply an impulsive delta-v correction. By default, max step is 0.5 km/s.
     pub fn delta_v_in_frame(
         prop: Arc<&'a Propagator<'a, D, E>>,
         objectives: Vec<Objective>,
@@ -240,17 +244,19 @@ where
             prop,
             objectives,
             variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
+            max_steps: vec![Some(0.5), Some(0.5), Some(0.5)],
             iterations: 100,
             objective_frame: Some((objective_frame, cosm)),
         }
     }
 
-    /// Create a new Targeter which will apply an impulsive delta-v correction.
+    /// Create a new Targeter which will apply an impulsive delta-v correction. By default, max step is 0.5 km/s.
     pub fn delta_v(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
             variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
+            max_steps: vec![Some(0.5), Some(0.5), Some(0.5)],
             iterations: 100,
             objective_frame: None,
         }
@@ -267,6 +273,7 @@ where
             prop,
             objectives,
             variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
+            max_steps: vec![None, None, None],
             iterations: 100,
             objective_frame: Some((objective_frame, cosm)),
         }
@@ -278,6 +285,7 @@ where
             prop,
             objectives,
             variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
+            max_steps: vec![None, None, None],
             iterations: 100,
             objective_frame: None,
         }
@@ -585,14 +593,21 @@ where
                 m2_inv * &jac.transpose()
             };
 
-            debug!("Inverse Jacobian {:e}", jac_inv);
+            debug!("Inverse Jacobian {}", jac_inv);
 
-            let delta = jac_inv * err_vector;
-
-            info!("Correction: {:e}", delta);
+            let mut delta = jac_inv * err_vector;
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
+                if let Some(max_step) = self.max_steps[i] {
+                    // Choose the minimum step between the provided max step and the correction.
+                    if delta[i].abs() > max_step {
+                        delta[i] = max_step * delta[i].signum();
+                    }
+                };
+
+                info!("Correction {:?} (element {}): {}", var, i, delta[i]);
+
                 match var {
                     Vary::PositionX => {
                         xi.orbit.x += delta[i];
