@@ -262,6 +262,21 @@ where
         }
     }
 
+    /// Create a new Targeter which will apply an impulsive delta-v correction without any max step.
+    pub fn delta_v_unlimited(
+        prop: Arc<&'a Propagator<'a, D, E>>,
+        objectives: Vec<Objective>,
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
+            max_steps: vec![None, None, None],
+            iterations: 100,
+            objective_frame: None,
+        }
+    }
+
     /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
     pub fn delta_r_in_frame(
         prop: Arc<&'a Propagator<'a, D, E>>,

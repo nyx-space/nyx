@@ -165,7 +165,7 @@ fn tgt_ecc_from_apo() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v_unlimited(Arc::new(&setup), objectives);
 
     println!("{}", tgt);
 
@@ -223,7 +223,7 @@ fn tgt_ecc_from_peri() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v_unlimited(Arc::new(&setup), objectives);
 
     println!("{}", tgt);
 
