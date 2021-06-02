@@ -365,6 +365,8 @@ where
                 _ => unimplemented!(),
             }
             total_correction[i] += var.init_guess;
+            // Check the validity (this function will report to log)
+            var.valid();
         }
 
         let mut prev_err_norm = std::f64::INFINITY;
@@ -592,7 +594,9 @@ where
 
             debug!("Inverse Jacobian {}", jac_inv);
 
-            let mut delta = jac_inv * err_vector;
+            let mut delta = jac_inv * &err_vector;
+
+            debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {

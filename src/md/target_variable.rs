@@ -59,6 +59,34 @@ pub struct Variable {
     pub min_value: f64,
 }
 
+impl Variable {
+    /// Returns whether the configuration of this variable is valid
+    pub fn valid(&self) -> bool {
+        if self.max_step < 0.0 {
+            error!(
+                "{:?}: max step is negative: {}",
+                self.component, self.max_step
+            );
+            return false;
+        }
+        if self.max_value < 0.0 {
+            error!(
+                "{:?}: max value is negative: {}",
+                self.component, self.max_value
+            );
+            return false;
+        }
+        if self.min_value > self.max_value {
+            error!(
+                "{:?}: min value is greater than max value: {} > {}",
+                self.component, self.min_value, self.max_value
+            );
+            return false;
+        }
+        true
+    }
+}
+
 impl Default for Variable {
     fn default() -> Self {
         Self {

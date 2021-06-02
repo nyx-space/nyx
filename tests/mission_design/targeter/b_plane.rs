@@ -100,7 +100,7 @@ fn tgt_b_plane_lunar_transfer() {
             Variable {
                 component: Vary::VelocityX,
                 min_value: -3.0,
-                max_value: -3.0,
+                max_value: 3.0,
                 perturbation: 0.0001,
                 max_step: 0.5,
                 ..Default::default()
@@ -108,7 +108,7 @@ fn tgt_b_plane_lunar_transfer() {
             Variable {
                 component: Vary::VelocityY,
                 min_value: -3.0,
-                max_value: -3.0,
+                max_value: 3.0,
                 perturbation: 0.0001,
                 max_step: 0.5,
                 ..Default::default()
@@ -116,7 +116,7 @@ fn tgt_b_plane_lunar_transfer() {
             Variable {
                 component: Vary::VelocityZ,
                 min_value: -3.0,
-                max_value: -3.0,
+                max_value: 3.0,
                 perturbation: 0.0001,
                 max_step: 0.5,
                 ..Default::default()
