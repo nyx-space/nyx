@@ -67,11 +67,9 @@ impl Ruggiero {
 impl ThrustControl for Ruggiero {
     /// Returns whether the control law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
-        for maybe_obj in &self.objectives {
-            if let Some(obj) = maybe_obj {
-                if !obj.achieved(&state.orbit) {
-                    return Ok(false);
-                }
+        for obj in self.objectives.iter().flatten() {
+            if !obj.achieved(&state.orbit) {
+                return Ok(false);
             }
         }
         Ok(true)
@@ -83,80 +81,73 @@ impl ThrustControl for Ruggiero {
         } else if sc.mode == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut ctrl = Vector3::zeros();
-            for maybe_obj in &self.objectives {
-                if let Some(obj) = maybe_obj {
-                    match *obj {
-                        Achieve::Sma { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.sma(), target, osc.sma(), tol);
-                            if weight.abs() > 0.0 {
-                                let num = osc.ecc() * osc.ta().to_radians().sin();
-                                let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
-                                let alpha = num.atan2(denom);
-                                ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
-                            }
+            for obj in self.objectives.iter().flatten() {
+                match *obj {
+                    Achieve::Sma { target, tol } => {
+                        let weight = Self::weighting(self.init_state.sma(), target, osc.sma(), tol);
+                        if weight.abs() > 0.0 {
+                            let num = osc.ecc() * osc.ta().to_radians().sin();
+                            let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
+                            let alpha = num.atan2(denom);
+                            ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
                         }
-                        Achieve::Ecc { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.ecc(), target, osc.ecc(), tol);
-                            if weight.abs() > 0.0 {
-                                let num = osc.ta().to_radians().sin();
-                                let denom =
-                                    osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
-                                let alpha = num.atan2(denom);
-                                ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
-                            }
+                    }
+                    Achieve::Ecc { target, tol } => {
+                        let weight = Self::weighting(self.init_state.ecc(), target, osc.ecc(), tol);
+                        if weight.abs() > 0.0 {
+                            let num = osc.ta().to_radians().sin();
+                            let denom = osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
+                            let alpha = num.atan2(denom);
+                            ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
                         }
-                        Achieve::Inc { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.inc(), target, osc.inc(), tol);
-                            if weight.abs() > 0.0 {
-                                let beta =
-                                    half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
-                                ctrl += unit_vector_from_angles(0.0, beta) * weight;
-                            }
+                    }
+                    Achieve::Inc { target, tol } => {
+                        let weight = Self::weighting(self.init_state.inc(), target, osc.inc(), tol);
+                        if weight.abs() > 0.0 {
+                            let beta =
+                                half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
+                            ctrl += unit_vector_from_angles(0.0, beta) * weight;
                         }
-                        Achieve::Raan { target, tol } => {
-                            // BUG: https://gitlab.com/chrisrabotin/nyx/issues/83
-                            let weight =
-                                Self::weighting(self.init_state.raan(), target, osc.raan(), tol);
-                            if weight.abs() > 0.0 {
-                                let beta =
-                                    half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
-                                ctrl += unit_vector_from_angles(0.0, beta) * weight;
-                            }
+                    }
+                    Achieve::Raan { target, tol } => {
+                        // BUG: https://gitlab.com/chrisrabotin/nyx/issues/83
+                        let weight =
+                            Self::weighting(self.init_state.raan(), target, osc.raan(), tol);
+                        if weight.abs() > 0.0 {
+                            let beta =
+                                half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
+                            ctrl += unit_vector_from_angles(0.0, beta) * weight;
                         }
-                        Achieve::Aop { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.aop(), target, osc.aop(), tol);
-                            let oe2 = 1.0 - osc.ecc().powi(2);
-                            let e3 = osc.ecc().powi(3);
-                            // Compute the optimal true anomaly for in-plane thrusting
-                            let sqrt_val = (0.25 * (oe2 / e3).powi(2) + 1.0 / 27.0).sqrt();
-                            let opti_ta_alpha = ((oe2 / (2.0 * e3) + sqrt_val).powf(1.0 / 3.0)
-                                - (-oe2 / (2.0 * e3) + sqrt_val).powf(1.0 / 3.0)
-                                - 1.0 / osc.ecc())
-                            .acos();
-                            // Compute the optimal true anomaly for out of plane thrusting
-                            let opti_ta_beta = (-osc.ecc() * osc.aop().to_radians().cos()).acos()
-                                - osc.aop().to_radians();
-                            // And choose whether to do an in-plane or out of plane thrust
-                            if (osc.ta().to_radians() - opti_ta_alpha).abs()
-                                < (osc.ta().to_radians() - opti_ta_beta).abs()
-                            {
-                                // In plane
-                                let p = osc.semi_parameter();
-                                let (sin_ta, cos_ta) = osc.ta().to_radians().sin_cos();
-                                let alpha = (-p * cos_ta).atan2((p + osc.rmag()) * sin_ta);
-                                ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
-                            } else {
-                                // Out of plane
-                                let beta = half_pi.copysign(
-                                    -(osc.ta().to_radians() + osc.aop().to_radians()).sin(),
-                                ) * osc.inc().to_radians().cos();
-                                ctrl += unit_vector_from_angles(0.0, beta) * weight;
-                            };
-                        }
+                    }
+                    Achieve::Aop { target, tol } => {
+                        let weight = Self::weighting(self.init_state.aop(), target, osc.aop(), tol);
+                        let oe2 = 1.0 - osc.ecc().powi(2);
+                        let e3 = osc.ecc().powi(3);
+                        // Compute the optimal true anomaly for in-plane thrusting
+                        let sqrt_val = (0.25 * (oe2 / e3).powi(2) + 1.0 / 27.0).sqrt();
+                        let opti_ta_alpha = ((oe2 / (2.0 * e3) + sqrt_val).powf(1.0 / 3.0)
+                            - (-oe2 / (2.0 * e3) + sqrt_val).powf(1.0 / 3.0)
+                            - 1.0 / osc.ecc())
+                        .acos();
+                        // Compute the optimal true anomaly for out of plane thrusting
+                        let opti_ta_beta = (-osc.ecc() * osc.aop().to_radians().cos()).acos()
+                            - osc.aop().to_radians();
+                        // And choose whether to do an in-plane or out of plane thrust
+                        if (osc.ta().to_radians() - opti_ta_alpha).abs()
+                            < (osc.ta().to_radians() - opti_ta_beta).abs()
+                        {
+                            // In plane
+                            let p = osc.semi_parameter();
+                            let (sin_ta, cos_ta) = osc.ta().to_radians().sin_cos();
+                            let alpha = (-p * cos_ta).atan2((p + osc.rmag()) * sin_ta);
+                            ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
+                        } else {
+                            // Out of plane
+                            let beta = half_pi
+                                .copysign(-(osc.ta().to_radians() + osc.aop().to_radians()).sin())
+                                * osc.inc().to_radians().cos();
+                            ctrl += unit_vector_from_angles(0.0, beta) * weight;
+                        };
                     }
                 }
             }
@@ -179,43 +170,37 @@ impl ThrustControl for Ruggiero {
             0.0
         } else if sc.mode == GuidanceMode::Thrust {
             let osc = sc.orbit;
-            for maybe_obj in &self.objectives {
-                if let Some(obj) = maybe_obj {
-                    match *obj {
-                        Achieve::Sma { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.sma(), target, osc.sma(), tol);
-                            if weight.abs() > 0.0 {
-                                return 1.0;
-                            }
+            for obj in self.objectives.iter().flatten() {
+                match *obj {
+                    Achieve::Sma { target, tol } => {
+                        let weight = Self::weighting(self.init_state.sma(), target, osc.sma(), tol);
+                        if weight.abs() > 0.0 {
+                            return 1.0;
                         }
-                        Achieve::Ecc { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.ecc(), target, osc.ecc(), tol);
-                            if weight.abs() > 0.0 {
-                                return 1.0;
-                            }
+                    }
+                    Achieve::Ecc { target, tol } => {
+                        let weight = Self::weighting(self.init_state.ecc(), target, osc.ecc(), tol);
+                        if weight.abs() > 0.0 {
+                            return 1.0;
                         }
-                        Achieve::Inc { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.inc(), target, osc.inc(), tol);
-                            if weight.abs() > 0.0 {
-                                return 1.0;
-                            }
+                    }
+                    Achieve::Inc { target, tol } => {
+                        let weight = Self::weighting(self.init_state.inc(), target, osc.inc(), tol);
+                        if weight.abs() > 0.0 {
+                            return 1.0;
                         }
-                        Achieve::Raan { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.raan(), target, osc.raan(), tol);
-                            if weight.abs() > 0.0 {
-                                return 1.0;
-                            }
+                    }
+                    Achieve::Raan { target, tol } => {
+                        let weight =
+                            Self::weighting(self.init_state.raan(), target, osc.raan(), tol);
+                        if weight.abs() > 0.0 {
+                            return 1.0;
                         }
-                        Achieve::Aop { target, tol } => {
-                            let weight =
-                                Self::weighting(self.init_state.aop(), target, osc.aop(), tol);
-                            if weight.abs() > 0.0 {
-                                return 1.0;
-                            }
+                    }
+                    Achieve::Aop { target, tol } => {
+                        let weight = Self::weighting(self.init_state.aop(), target, osc.aop(), tol);
+                        if weight.abs() > 0.0 {
+                            return 1.0;
                         }
                     }
                 }

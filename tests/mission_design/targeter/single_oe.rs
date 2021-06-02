@@ -162,10 +162,27 @@ fn tgt_ecc_from_apo() {
 
     let xf_desired_ecc = 0.4;
 
-    // Define the objective
-    let objectives = vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)];
-
-    let tgt = Targeter::delta_v_unlimited(Arc::new(&setup), objectives);
+    let tgt = Targeter::new(
+        Arc::new(&setup),
+        vec![
+            Variable {
+                component: Vary::VelocityX,
+                max_step: 5.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityY,
+                max_step: 5.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityZ,
+                max_step: 5.0,
+                ..Default::default()
+            },
+        ],
+        vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
+    );
 
     println!("{}", tgt);
 
@@ -220,10 +237,27 @@ fn tgt_ecc_from_peri() {
 
     let xf_desired_ecc = 0.4;
 
-    // Define the objective
-    let objectives = vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)];
-
-    let tgt = Targeter::delta_v_unlimited(Arc::new(&setup), objectives);
+    let tgt = Targeter::new(
+        Arc::new(&setup),
+        vec![
+            Variable {
+                component: Vary::VelocityX,
+                max_step: -5.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityY,
+                max_step: -5.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityZ,
+                max_step: -5.0,
+                ..Default::default()
+            },
+        ],
+        vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
+    );
 
     println!("{}", tgt);
 

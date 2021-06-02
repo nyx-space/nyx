@@ -17,10 +17,12 @@
 */
 use super::rayon::prelude::*;
 use super::StateParameter;
+pub use super::{Variable, Vary};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DMatrix, DVector, DefaultAllocator};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
+use std::convert::TryInto;
 use std::fmt;
 use std::time::{Duration, Instant};
 
@@ -63,29 +65,6 @@ impl Objective {
     }
 }
 
-/// Defines the kind of correction to apply in the targeter
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Vary {
-    /// Vary position component X in the integration frame
-    PositionX,
-    /// Vary position component Y in the integration frame
-    PositionY,
-    /// Vary position component Z in the integration frame
-    PositionZ,
-    /// Vary velocity component X in the integration frame
-    VelocityX,
-    /// Vary velocity component Y in the integration frame
-    VelocityY,
-    /// Vary velocity component Z in the integration frame
-    VelocityZ,
-    /// Vary velocity component V in the VNC frame
-    VelocityV,
-    /// Vary velocity component N in the VNC frame
-    VelocityN,
-    /// Vary velocity component C in the VNC frame
-    VelocityC,
-}
-
 /// Defines a targeter solution
 #[derive(Clone, Debug)]
 pub struct TargeterSolution {
@@ -94,7 +73,7 @@ pub struct TargeterSolution {
     /// The correction vector applied
     pub correction: DVector<f64>,
     /// The kind of correction (position or velocity)
-    pub variables: Vec<Vary>,
+    pub variables: Vec<Variable>,
     /// The epoch at which the objectives are achieved
     pub achievement_epoch: Epoch,
     /// The errors achieved
@@ -124,7 +103,7 @@ impl fmt::Display for TargeterSolution {
         let mut is_only_position = true;
         let mut is_only_velocity = true;
         for (i, var) in self.variables.iter().enumerate() {
-            let unit = match var {
+            let unit = match var.component {
                 Vary::PositionX | Vary::PositionY | Vary::PositionZ => {
                     is_only_velocity = false;
                     "m"
@@ -141,7 +120,7 @@ impl fmt::Display for TargeterSolution {
             };
             corrmsg.push_str(&format!(
                 "\n\t\t{:?} = {:.3} {}",
-                var, self.correction[i], unit
+                var.component, self.correction[i], unit
             ));
         }
 
@@ -180,9 +159,7 @@ where
     /// Needed if the propagation frame is separate from objectives frame (e.g. for B Plane targeting).
     pub objective_frame: Option<(Frame, Arc<Cosm>)>,
     /// The kind of correction to apply to achieve the objectives
-    pub variables: Vec<Vary>,
-    /// The maximum step to take for each "vary" parameter (set to None if no max step)
-    pub max_steps: Vec<Option<f64>>,
+    pub variables: Vec<Variable>,
     /// Maximum number of iterations
     pub iterations: usize,
 }
@@ -219,15 +196,13 @@ where
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn new(
         prop: Arc<&'a Propagator<'a, D, E>>,
-        variables: Vec<Vary>,
+        variables: Vec<Variable>,
         objectives: Vec<Objective>,
-        max_steps: Vec<Option<f64>>,
     ) -> Self {
         Self {
             prop,
             objectives,
             variables,
-            max_steps,
             iterations: 100,
             objective_frame: None,
         }
@@ -243,35 +218,26 @@ where
         Self {
             prop,
             objectives,
-            variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
-            max_steps: vec![Some(0.5), Some(0.5), Some(0.5)],
+            variables: vec![
+                Vary::VelocityX.try_into().unwrap(),
+                Vary::VelocityY.try_into().unwrap(),
+                Vary::VelocityZ.try_into().unwrap(),
+            ],
             iterations: 100,
             objective_frame: Some((objective_frame, cosm)),
         }
     }
 
-    /// Create a new Targeter which will apply an impulsive delta-v correction. By default, max step is 0.5 km/s.
+    /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn delta_v(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
-            variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
-            max_steps: vec![Some(0.5), Some(0.5), Some(0.5)],
-            iterations: 100,
-            objective_frame: None,
-        }
-    }
-
-    /// Create a new Targeter which will apply an impulsive delta-v correction without any max step.
-    pub fn delta_v_unlimited(
-        prop: Arc<&'a Propagator<'a, D, E>>,
-        objectives: Vec<Objective>,
-    ) -> Self {
-        Self {
-            prop,
-            objectives,
-            variables: vec![Vary::VelocityX, Vary::VelocityY, Vary::VelocityZ],
-            max_steps: vec![None, None, None],
+            variables: vec![
+                Vary::VelocityX.try_into().unwrap(),
+                Vary::VelocityY.try_into().unwrap(),
+                Vary::VelocityZ.try_into().unwrap(),
+            ],
             iterations: 100,
             objective_frame: None,
         }
@@ -287,8 +253,11 @@ where
         Self {
             prop,
             objectives,
-            variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
-            max_steps: vec![None, None, None],
+            variables: vec![
+                Vary::PositionX.try_into().unwrap(),
+                Vary::PositionY.try_into().unwrap(),
+                Vary::PositionZ.try_into().unwrap(),
+            ],
             iterations: 100,
             objective_frame: Some((objective_frame, cosm)),
         }
@@ -299,8 +268,11 @@ where
         Self {
             prop,
             objectives,
-            variables: vec![Vary::PositionX, Vary::PositionY, Vary::PositionZ],
-            max_steps: vec![None, None, None],
+            variables: vec![
+                Vary::PositionX.try_into().unwrap(),
+                Vary::PositionY.try_into().unwrap(),
+                Vary::PositionZ.try_into().unwrap(),
+            ],
             iterations: 100,
             objective_frame: None,
         }
@@ -359,7 +331,7 @@ where
 
         // Apply the initial guess
         for (i, var) in self.variables.iter().enumerate() {
-            match var {
+            match var.component {
                 Vary::PositionX => {
                     xi.orbit.x += initial_guess[i];
                 }
@@ -405,8 +377,6 @@ where
             .unwrap();
 
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
-
-        let pert = 0.0001;
 
         let start_instant = Instant::now();
 
@@ -482,24 +452,24 @@ where
                 pert_calc.par_iter_mut().for_each(|(_, var, jac_val)| {
                     let mut this_xi = xi;
 
-                    match var {
+                    match var.component {
                         Vary::PositionX => {
-                            this_xi.orbit.x += pert;
+                            this_xi.orbit.x += var.perturbation;
                         }
                         Vary::PositionY => {
-                            this_xi.orbit.y += pert;
+                            this_xi.orbit.y += var.perturbation;
                         }
                         Vary::PositionZ => {
-                            this_xi.orbit.z += pert;
+                            this_xi.orbit.z += var.perturbation;
                         }
                         Vary::VelocityX | Vary::VelocityV => {
-                            this_xi.orbit.vx += pert;
+                            this_xi.orbit.vx += var.perturbation;
                         }
                         Vary::VelocityY | Vary::VelocityN => {
-                            this_xi.orbit.vy += pert;
+                            this_xi.orbit.vy += var.perturbation;
                         }
                         Vary::VelocityZ | Vary::VelocityC => {
-                            this_xi.orbit.vz += pert;
+                            this_xi.orbit.vz += var.perturbation;
                         }
                     };
 
@@ -536,7 +506,7 @@ where
                     };
 
                     let this_achieved = partial.real();
-                    *jac_val = (this_achieved - achieved) / pert;
+                    *jac_val = (this_achieved - achieved) / var.perturbation;
                 });
 
                 for (j, _, jac_val) in &pert_calc {
@@ -549,7 +519,7 @@ where
                 let mut state = xi_start;
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
-                    match var {
+                    match var.component {
                         Vary::PositionX => state.orbit.x += total_correction[i],
                         Vary::PositionY => state.orbit.y += total_correction[i],
                         Vary::PositionZ => state.orbit.z += total_correction[i],
@@ -614,16 +584,21 @@ where
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
-                if let Some(max_step) = self.max_steps[i] {
-                    // Choose the minimum step between the provided max step and the correction.
-                    if delta[i].abs() > max_step {
-                        delta[i] = max_step * delta[i].signum();
-                    }
-                };
+                // Choose the minimum step between the provided max step and the correction.
+                if delta[i].abs() > var.max_step.abs() {
+                    delta[i] = var.max_step.abs() * delta[i].signum();
+                } else if delta[i] > var.max_value {
+                    delta[i] = var.max_value;
+                } else if delta[i] < var.min_value {
+                    delta[i] = var.min_value;
+                }
 
-                info!("Correction {:?} (element {}): {}", var, i, delta[i]);
+                info!(
+                    "Correction {:?} (element {}): {}",
+                    var.component, i, delta[i]
+                );
 
-                match var {
+                match var.component {
                     Vary::PositionX => {
                         xi.orbit.x += delta[i];
                     }
@@ -701,7 +676,7 @@ where
 
         // Apply the initial guess
         for (i, var) in self.variables.iter().enumerate() {
-            match var {
+            match var.component {
                 Vary::PositionX => {
                     xi.orbit.x += initial_guess[i];
                 }
@@ -838,7 +813,7 @@ where
                 let obj_jac = -xf.stm() * partial_vec;
                 println!("{}", obj_jac);
                 for (j, var) in self.variables.iter().enumerate() {
-                    let idx = match var {
+                    let idx = match var.component {
                         Vary::PositionX => 0,
                         Vary::PositionY => 1,
                         Vary::PositionZ => 2,
@@ -857,7 +832,7 @@ where
                 let mut state = xi_start;
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
-                    match var {
+                    match var.component {
                         Vary::PositionX => state.orbit.x += total_correction[i],
                         Vary::PositionY => state.orbit.y += total_correction[i],
                         Vary::PositionZ => state.orbit.z += total_correction[i],
@@ -918,13 +893,25 @@ where
 
             debug!("Inverse Jacobian {:e}", jac_inv);
 
-            let delta = jac_inv * err_vector;
-
-            debug!("Correction: {:e}", delta);
+            let mut delta = jac_inv * err_vector;
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
-                match var {
+                // Choose the minimum step between the provided max step and the correction.
+                if delta[i].abs() > var.max_step {
+                    delta[i] = var.max_step * delta[i].signum();
+                } else if delta[i] > var.max_value {
+                    delta[i] = var.max_value;
+                } else if delta[i] < var.min_value {
+                    delta[i] = var.min_value;
+                }
+
+                info!(
+                    "Correction {:?} (element {}): {}",
+                    var.component, i, delta[i]
+                );
+
+                match var.component {
                     Vary::PositionX => {
                         xi.orbit.x += delta[i];
                     }
