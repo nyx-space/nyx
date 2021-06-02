@@ -82,7 +82,27 @@ fn tgt_sma_ecc() {
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::new(
+        Arc::new(&setup),
+        vec![
+            Variable {
+                component: Vary::VelocityX,
+                max_step: 0.5,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityY,
+                max_step: 0.5,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityZ,
+                max_step: 0.5,
+                ..Default::default()
+            },
+        ],
+        objectives,
+    );
 
     println!("{}", tgt);
 
