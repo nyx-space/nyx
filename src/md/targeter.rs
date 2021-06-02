@@ -209,6 +209,23 @@ where
         }
     }
 
+    /// Create a new Targeter which will apply an impulsive delta-v correction.
+    pub fn in_frame(
+        prop: Arc<&'a Propagator<'a, D, E>>,
+        variables: Vec<Variable>,
+        objectives: Vec<Objective>,
+        objective_frame: Frame,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables,
+            iterations: 100,
+            objective_frame: Some((objective_frame, cosm)),
+        }
+    }
+
     /// Create a new Targeter which will apply an impulsive delta-v correction. By default, max step is 0.5 km/s.
     pub fn delta_v_in_frame(
         prop: Arc<&'a Propagator<'a, D, E>>,
@@ -286,20 +303,14 @@ where
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
-        self.try_achieve_from_with_guess(
-            initial_state,
-            &vec![0.0; self.variables.len()],
-            correction_epoch,
-            achievement_epoch,
-        )
+        self.try_achieve_fd(initial_state, correction_epoch, achievement_epoch)
     }
 
     /// Differential correction using finite differencing
     #[allow(clippy::comparison_chain)]
-    pub fn try_achieve_from_with_guess(
+    pub fn try_achieve_fd(
         &self,
         initial_state: Spacecraft,
-        initial_guess: &[f64],
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
@@ -334,26 +345,26 @@ where
         for (i, var) in self.variables.iter().enumerate() {
             match var.component {
                 Vary::PositionX => {
-                    xi.orbit.x += initial_guess[i];
+                    xi.orbit.x += var.init_guess;
                 }
                 Vary::PositionY => {
-                    xi.orbit.y += initial_guess[i];
+                    xi.orbit.y += var.init_guess;
                 }
                 Vary::PositionZ => {
-                    xi.orbit.z += initial_guess[i];
+                    xi.orbit.z += var.init_guess;
                 }
                 Vary::VelocityX => {
-                    xi.orbit.vx += initial_guess[i];
+                    xi.orbit.vx += var.init_guess;
                 }
                 Vary::VelocityY => {
-                    xi.orbit.vy += initial_guess[i];
+                    xi.orbit.vy += var.init_guess;
                 }
                 Vary::VelocityZ => {
-                    xi.orbit.vz += initial_guess[i];
+                    xi.orbit.vz += var.init_guess;
                 }
                 _ => unimplemented!(),
             }
-            total_correction[i] += initial_guess[i];
+            total_correction[i] += var.init_guess;
         }
 
         let mut prev_err_norm = std::f64::INFINITY;
@@ -639,10 +650,9 @@ where
 
     /// Differential correction using hyperdual numbers for the objectives
     #[allow(clippy::comparison_chain)]
-    pub fn try_achieve_from_with_guess_dual(
+    pub fn try_achieve_from_dual(
         &self,
         initial_state: Spacecraft,
-        initial_guess: &[f64],
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
@@ -679,26 +689,26 @@ where
         for (i, var) in self.variables.iter().enumerate() {
             match var.component {
                 Vary::PositionX => {
-                    xi.orbit.x += initial_guess[i];
+                    xi.orbit.x += var.init_guess;
                 }
                 Vary::PositionY => {
-                    xi.orbit.y += initial_guess[i];
+                    xi.orbit.y += var.init_guess;
                 }
                 Vary::PositionZ => {
-                    xi.orbit.z += initial_guess[i];
+                    xi.orbit.z += var.init_guess;
                 }
                 Vary::VelocityX => {
-                    xi.orbit.vx += initial_guess[i];
+                    xi.orbit.vx += var.init_guess;
                 }
                 Vary::VelocityY => {
-                    xi.orbit.vy += initial_guess[i];
+                    xi.orbit.vy += var.init_guess;
                 }
                 Vary::VelocityZ => {
-                    xi.orbit.vz += initial_guess[i];
+                    xi.orbit.vz += var.init_guess;
                 }
                 _ => unimplemented!(),
             }
-            total_correction[i] += initial_guess[i];
+            total_correction[i] += var.init_guess;
         }
 
         let mut prev_err_norm = std::f64::INFINITY;

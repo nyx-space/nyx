@@ -51,8 +51,9 @@ fn tgt_b_plane_sanity() {
     tgt.apply(sol).unwrap();
 }
 
+#[allow(clippy::identity_op)]
 #[test]
-fn tgt_b_plane_legit() {
+fn tgt_b_plane_lunar_transfer() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -81,10 +82,7 @@ fn tgt_b_plane_legit() {
         cosm.clone(),
     )));
 
-    // let loi_epoch = Epoch::from_str("2014-07-28 22:08:02.448000000 TAI").unwrap();
-    // let loi_epoch = epoch + 556697 * TimeUnit::Second;
-
-    let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 1.0);
+    let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 0.0);
     println!("{}", spacecraft);
 
     // Propagate to periapsis
@@ -94,20 +92,36 @@ fn tgt_b_plane_legit() {
         .unwrap()
         .0;
 
-    // Convert to the Moon J2000 frame
-    // let orbit_moon = cosm.frame_chg(&periapse_spacecraft.orbit, luna);
-    // let periapse_spacecraft_moon = spacecraft.with_orbit(orbit_moon);
-
-    // println!(
-    //     "{}\n{}",
-    //     periapse_spacecraft.orbit, periapse_spacecraft_moon.orbit
-    // );
-
-    // let b_plane_tgt = BPlaneTarget::from_bt_br(391732.3347895856, 104579.9942274809);
     let b_plane_tgt = BPlaneTarget::from_bt_br(15_000.4, 4_000.6);
 
-    let tgt = Targeter::delta_v_in_frame(
+    let tgt = Targeter::in_frame(
         Arc::new(&prop),
+        vec![
+            Variable {
+                component: Vary::VelocityX,
+                min_value: -3.0,
+                max_value: -3.0,
+                perturbation: 0.0001,
+                max_step: 0.5,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityY,
+                min_value: -3.0,
+                max_value: -3.0,
+                perturbation: 0.0001,
+                max_step: 0.5,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityZ,
+                min_value: -3.0,
+                max_value: -3.0,
+                perturbation: 0.0001,
+                max_step: 0.5,
+                ..Default::default()
+            },
+        ],
         b_plane_tgt.to_objectives_with_tolerance(3.0),
         luna,
         cosm.clone(),
@@ -121,9 +135,21 @@ fn tgt_b_plane_legit() {
         .unwrap();
 
     println!("{}", sol);
+    let gmat_sol = 1.4392745421494484;
+    // GMAT validation
+    assert!(
+        (sol.correction.norm() - gmat_sol).abs() < 1e-6,
+        "Finite differencing result different from GMAT (greater than 1 mm/s)."
+    );
 
-    assert!((sol.correction.norm() - 43.197e-3).abs() < 1e-6);
+    // Check that the solutions nearly match
+    println!(
+        "GMAT validation - tgt_b_plane_lunar_transfer: Δv = {:.3} m/s\terr = {:.6} m/s",
+        sol.correction.norm() * 1e3,
+        (sol.correction.norm() - gmat_sol).abs() * 1e3
+    );
 
+    // Check that the solution works with the same dynamics.
     tgt.apply(sol).unwrap();
 }
 

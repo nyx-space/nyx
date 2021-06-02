@@ -56,6 +56,7 @@ GMAT Sat.EulerAngleSequence = '321';
 
 
 
+
 %----------------------------------------
 %---------- Propagators
 %----------------------------------------
@@ -65,7 +66,7 @@ GMAT AllForces.CentralBody = Earth;
 GMAT AllForces.PrimaryBodies = {Earth};
 GMAT AllForces.PointMasses = {Jupiter, Luna, Sun};
 GMAT AllForces.Drag = None;
-GMAT AllForces.SRP = On;
+GMAT AllForces.SRP = Off;
 GMAT AllForces.RelativisticCorrection = Off;
 GMAT AllForces.ErrorControl = RSSStep;
 GMAT AllForces.GravityField.Earth.Degree = 0;
@@ -73,9 +74,6 @@ GMAT AllForces.GravityField.Earth.Order = 0;
 GMAT AllForces.GravityField.Earth.StmLimit = 100;
 GMAT AllForces.GravityField.Earth.PotentialFile = 'JGM2.cof';
 GMAT AllForces.GravityField.Earth.TideModel = 'None';
-GMAT AllForces.SRP.Flux = 1367;
-GMAT AllForces.SRP.SRPModel = Spherical;
-GMAT AllForces.SRP.Nominal_Sun = 149597870.691;
 
 Create ForceModel MoonAllForces;
 GMAT MoonAllForces.CentralBody = Luna;
@@ -217,8 +215,9 @@ Propagate 'Prop to Perigee' EarthFull(Sat) {Sat.Periapsis};
 %------------------------------
 Target 'Target B-Plane' DC1 {SolveMode = Solve, ExitMode = DiscardAndContinue, ShowProgressWindow = true};
    
-   Vary 'Vary TOI.V' DC1(TOI.Element1 = 0, {Perturbation = 1e-005, Lower = -3., Upper = 3.0, MaxStep = 10.0, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
-   Vary 'Vary TOI.B' DC1(TOI.Element3 = 0, {Perturbation = 1e-005, Lower = -3, Upper = 3, MaxStep = 10, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
+   Vary 'Vary TOI.X' DC1(TOI.Element1 = 0, {Perturbation = 0.0001, Lower = -3., Upper = 3.0, MaxStep = 0.5, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
+   Vary 'Vary TOI.Y' DC1(TOI.Element2 = 0, {Perturbation = 0.0001, Lower = -3, Upper = 3, MaxStep = 0.5, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
+   Vary 'Vary TOI.Z' DC1(TOI.Element3 = 0, {Perturbation = 0.0001, Lower = -3, Upper = 3, MaxStep = 0.5, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    
    Maneuver 'Apply TOI' TOI(Sat);
    

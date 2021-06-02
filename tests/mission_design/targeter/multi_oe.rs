@@ -36,12 +36,7 @@ fn tgt_c3_decl() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -92,12 +87,7 @@ fn tgt_sma_ecc() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);

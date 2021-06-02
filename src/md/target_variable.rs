@@ -49,6 +49,8 @@ pub struct Variable {
     pub component: Vary,
     /// The perturbation for the finite differencing algorithm
     pub perturbation: f64,
+    /// The initial guess of this variable
+    pub init_guess: f64,
     /// The maximum step this variable may have between each iteration
     pub max_step: f64,
     /// The absolute maximum value this parameter can ever have
@@ -62,6 +64,7 @@ impl Default for Variable {
         Self {
             component: Vary::VelocityX,
             perturbation: 0.0001,
+            init_guess: 0.0,
             max_step: 0.5,
             max_value: std::f64::INFINITY,
             min_value: std::f64::NEG_INFINITY,

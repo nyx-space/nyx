@@ -38,26 +38,10 @@ fn tgt_sma_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
-
-    let solution_hd = tgt
-        .try_achieve_from_with_guess_dual(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
-        .unwrap();
-
-    println!("{}", solution_hd);
 
     let gmat_sol = 0.05312024615278713;
     // GMAT validation
@@ -67,10 +51,6 @@ fn tgt_sma_from_apo() {
     );
 
     // Check that the solutions nearly match
-    assert!(
-        (solution_fd.correction.norm() - solution_hd.correction.norm()).abs() < 1e-3,
-        "Difference between finite differencing and hyperduals is greater than 1 m/s"
-    );
     println!(
         "GMAT validation - tgt_sma_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s",
         solution_fd.correction.norm() * 1e3,
@@ -114,26 +94,21 @@ fn tgt_sma_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
 
     let gmat_sol = 0.03550369448069638;
-    // GMAT validation
-    assert!(
-        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6,
-        "Finite differencing result different from GMAT (greater than 1 mm/s)."
-    );
     println!(
         "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
         solution_fd.correction.norm() * 1e3,
         (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+    );
+    // GMAT validation
+    assert!(
+        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6,
+        "Finite differencing result different from GMAT (greater than 1 mm/s)."
     );
 }
 
@@ -187,12 +162,7 @@ fn tgt_ecc_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -262,12 +232,7 @@ fn tgt_ecc_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -318,12 +283,7 @@ fn tgt_raan_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -373,12 +333,7 @@ fn tgt_raan_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -429,12 +384,7 @@ fn tgt_aop_from_apo() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -484,12 +434,7 @@ fn tgt_aop_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_with_guess(
-            spacecraft,
-            &[0.0, 0.0, 0.0],
-            orig_dt,
-            orig_dt + target_delta_t,
-        )
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);

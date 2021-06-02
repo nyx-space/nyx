@@ -114,7 +114,7 @@ impl BPlane {
                 },
                 b_t: OrbitPartial {
                     dual: b_vec.dot(&t_hat),
-                    param: StateParameter::BdotR,
+                    param: StateParameter::BdotT,
                 },
                 ltof_s: OrbitPartial {
                     dual: b_vec.dot(&s_hat) / orbit.vmag().dual,
@@ -128,9 +128,9 @@ impl BPlane {
     }
 
     /// Returns a newly defined B-Plane if the orbit is hyperbolic.
-    pub fn new(orbit_real: Orbit) -> Result<Self, NyxError> {
+    pub fn new(orbit: Orbit) -> Result<Self, NyxError> {
         // Convert to OrbitDual so we can target it
-        Self::from_dual(OrbitDual::from(orbit_real))
+        Self::from_dual(OrbitDual::from(orbit))
     }
 
     pub fn b_dot_t(&self) -> f64 {
