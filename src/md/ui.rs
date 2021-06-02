@@ -286,10 +286,7 @@ where
                 // Validate the stopping condition
                 // Check if it's a stopping condition
                 let prop_event = if let Some(conditions) = &scen.conditions {
-                    match conditions.get(&prop.stop_cond) {
-                        Some(c) => Some(c.clone()),
-                        None => None,
-                    }
+                    conditions.get(&prop.stop_cond).cloned()
                 } else {
                     None
                 };
