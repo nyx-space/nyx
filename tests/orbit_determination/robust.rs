@@ -666,8 +666,8 @@ fn robust_test_ekf_realistic() {
     );
     let rmag_err = (final_truth_state - est.state()).rmag();
     assert!(
-        rmag_err < 1e-1,
-        "final radius error should be on ten-meter level (is instead {:.3} m)",
+        rmag_err < 2e-1,
+        "final radius error should be less than 200 m (is instead {:.3} m)",
         rmag_err * 1e3
     );
 
