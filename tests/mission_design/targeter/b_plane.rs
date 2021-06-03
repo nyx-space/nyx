@@ -4,7 +4,7 @@ use nyx::md::targeter::*;
 use nyx::md::ui::*;
 
 #[test]
-fn tgt_b_plane_sanity() {
+fn tgt_b_plane_earth_gravity_assist() {
     // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
 
     if pretty_env_logger::try_init().is_err() {
@@ -43,17 +43,27 @@ fn tgt_b_plane_sanity() {
 
     println!("{}", sol);
 
-    // Note that we allow for slightly larger error than the other in-place correction
-    assert!((sol.correction[0] - -0.2538646026161754).abs() < 1e-6);
-    assert!((sol.correction[1] - -0.1877439179195086).abs() < 1e-6);
-    assert!((sol.correction[2] - 0.0461438929595469).abs() < 1e-6);
+    // This is the exact GMAT data from EarthGA.script
+    let gmat_sol = 0.31909814507892165;
+    println!(
+        "GMAT validation - tgt_b_plane_earth_gravity_assist: Δv = {:.3} m/s\terr = {:.6} m/s",
+        sol.correction.norm() * 1e3,
+        (sol.correction.norm() - gmat_sol).abs() * 1e3
+    );
+    // GMAT validation
+    assert!(
+        (sol.correction.norm() - gmat_sol).abs() < 1e-3,
+        "Finite differencing result different from GMAT by over 1 m/s"
+    );
 
     tgt.apply(sol).unwrap();
 }
 
 #[allow(clippy::identity_op)]
 #[test]
+#[ignore]
 fn tgt_b_plane_lunar_transfer() {
+    // WARNING: This test is ignored until https://gitlab.com/nyx-space/nyx/-/issues/212
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -94,7 +104,8 @@ fn tgt_b_plane_lunar_transfer() {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(15_000.4, 4_000.6);
 
-    // GMAT truth: 1.15740867962, -0.576350387399, 0.632247251449
+    // GMAT truth with central differencing: 1.15740867962, -0.576350387399, 0.632247251449
+    // GMAT truth with forward differencing: 1.33490412071, -0.5447988683, 1.77697094604 (approach currently in Nyx)
 
     let tgt = Targeter::in_frame(
         Arc::new(&prop),
@@ -137,7 +148,7 @@ fn tgt_b_plane_lunar_transfer() {
         .unwrap();
 
     println!("{}", sol);
-    let gmat_sol = 1.4392745421494484;
+    let gmat_sol = 2.2883182823767747;
     // GMAT validation
     assert!(
         (sol.correction.norm() - gmat_sol).abs() < 1e-6,
@@ -156,15 +167,13 @@ fn tgt_b_plane_lunar_transfer() {
 }
 
 #[test]
-fn tgt_b_plane_with_propagation() {
-    // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
-    // But perform a backward propagation to make sure that applying the linearization works.
+fn tgt_b_plane_earth_gravity_assist_with_propagation() {
+    // Rebuild the "tgt_b_plane_earth_gravity_assist" scenario but with a propagation and applying the dv earlier
 
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
 
-    // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
     let cosm = Cosm::de438_gmat();
     // Define the epoch
     let epoch = Epoch::from_gregorian_utc_at_midnight(2016, 1, 1);
@@ -204,62 +213,7 @@ fn tgt_b_plane_with_propagation() {
     println!("{}", sol);
 
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
-    assert!((sol.correction.norm() - 225.379e-3).abs() < 1e-6);
-
-    tgt.apply(sol).unwrap();
-}
-
-#[test]
-fn tgt_b_plane_remove_this() {
-    // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
-    // But perform a backward propagation to make sure that applying the linearization works.
-
-    if pretty_env_logger::try_init().is_err() {
-        println!("could not init env_logger");
-    }
-
-    // This is a reproduction of the B-plane computation from the `Ex_LunarTransfer.script` file from GMAT
-    let cosm = Cosm::de438_gmat();
-    // Define the epoch
-    let epoch = Epoch::from_gregorian_utc_at_midnight(2022, 11, 29);
-
-    // Hyperbolic orbit
-    let orbit = Orbit::cartesian(
-        4395.725834,
-        -8831.846344,
-        -5422.661606,
-        7.919679,
-        -1.783247,
-        -1.689868,
-        epoch,
-        cosm.frame("EME2000"),
-    );
-
-    let luna = cosm.frame("Luna");
-    let orbit_moon = cosm.frame_chg(&orbit, luna);
-
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
-    )));
-
-    let spacecraft = Spacecraft::from_srp_defaults(orbit_moon, 100.0, 0.0);
-
-    let b_plane_tgt = BPlaneTarget::from_bt_br(306.550415207, -5639.9403447);
-
-    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
-
-    let tcm1_epoch = epoch + 128349.0 * TimeUnit::Second;
-    let loi_epoch = tcm1_epoch + 322559.0 * TimeUnit::Second;
-
-    let sol = tgt
-        .try_achieve_from(spacecraft, tcm1_epoch, loi_epoch)
-        .unwrap();
-
-    println!("{}", sol);
-
-    // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
-    // assert!((sol.correction.norm() - 225.387e-3).abs() < 1e-3);
+    assert!((sol.correction.norm() - 225.309e-3).abs() < 1e-6);
 
     tgt.apply(sol).unwrap();
 }

@@ -58,6 +58,8 @@ GMAT Sat.EulerAngleSequence = '321';
 
 
 
+
+
 %----------------------------------------
 %---------- Propagators
 %----------------------------------------
@@ -171,10 +173,10 @@ GMAT EarthMoonRot.Secondary = Luna;
 
 Create DifferentialCorrector DC1;
 GMAT DC1.ShowProgress = true;
-GMAT DC1.ReportStyle = Normal;
+GMAT DC1.ReportStyle = Verbose;
 GMAT DC1.ReportFile = 'DifferentialCorrectorDC1.data';
 GMAT DC1.MaximumIterations = 50;
-GMAT DC1.DerivativeMethod = CentralDifference;
+GMAT DC1.DerivativeMethod = ForwardDifference;
 GMAT DC1.Algorithm = NewtonRaphson;
 
 %----------------------------------------
@@ -216,7 +218,7 @@ Propagate 'Prop to Perigee' EarthFull(Sat) {Sat.Periapsis};
 %------------------------------
 Target 'Target B-Plane' DC1 {SolveMode = Solve, ExitMode = DiscardAndContinue, ShowProgressWindow = true};
    
-   Vary 'Vary TOI.X' DC1(TOI.Element1 = 0, {Perturbation = 0.0001, Lower = -3., Upper = 3.0, MaxStep = 0.5, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
+   Vary 'Vary TOI.X' DC1(TOI.Element1 = 0, {Perturbation = 0.0001, Lower = -3, Upper = 3, MaxStep = 0.5, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    Vary 'Vary TOI.Y' DC1(TOI.Element2 = 0, {Perturbation = 0.0001, Lower = -3, Upper = 3, MaxStep = 0.5, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    Vary 'Vary TOI.Z' DC1(TOI.Element3 = 0, {Perturbation = 0.0001, Lower = -3, Upper = 3, MaxStep = 0.5, AdditiveScaleFactor = 0.0, MultiplicativeScaleFactor = 1.0});
    

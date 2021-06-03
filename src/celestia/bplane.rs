@@ -65,14 +65,14 @@ impl BPlane {
             // let s = e_hat / orbit.ecc() + (1.0 - (1.0 / orbit.ecc()).powi(2)).sqrt() * n_hat;
             // let s_hat = s / s.norm();
 
+            let incoming_asymptote_fact = (one - (one / orbit.ecc().dual).powi(2)).sqrt();
+
             let s = Vector3::new(
-                e_hat[0] / orbit.ecc().dual
-                    + (one - (one / orbit.ecc().dual).powi(2)).sqrt() * n_hat[0],
-                e_hat[1] / orbit.ecc().dual
-                    + (one - (one / orbit.ecc().dual).powi(2)).sqrt() * n_hat[1],
-                e_hat[2] / orbit.ecc().dual
-                    + (one - (one / orbit.ecc().dual).powi(2)).sqrt() * n_hat[2],
+                e_hat[0] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[0],
+                e_hat[1] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[1],
+                e_hat[2] / orbit.ecc().dual + incoming_asymptote_fact * n_hat[2],
             );
+
             let s_hat = s / norm(&s); // Just to make sure to renormalize everything
 
             // The reals implementation (which was initially validated) was:
@@ -81,15 +81,13 @@ impl BPlane {
             //         - (1.0 / orbit.ecc() * n_hat));
             let b_vec = Vector3::new(
                 orbit.semi_minor_axis().dual
-                    * ((one - (one / orbit.ecc().dual).powi(2)).sqrt() * e_hat[0]
-                        - (one / orbit.ecc().dual * n_hat[0])),
+                    * (incoming_asymptote_fact * e_hat[0] - ((one / orbit.ecc().dual) * n_hat[0])),
                 orbit.semi_minor_axis().dual
-                    * ((one - (one / orbit.ecc().dual).powi(2)).sqrt() * e_hat[1]
-                        - (one / orbit.ecc().dual * n_hat[1])),
+                    * (incoming_asymptote_fact * e_hat[1] - ((one / orbit.ecc().dual) * n_hat[1])),
                 orbit.semi_minor_axis().dual
-                    * ((one - (one / orbit.ecc().dual).powi(2)).sqrt() * e_hat[2]
-                        - (one / orbit.ecc().dual * n_hat[2])),
+                    * (incoming_asymptote_fact * e_hat[2] - ((one / orbit.ecc().dual) * n_hat[2])),
             );
+
             let t = s_hat.cross(&Vector3::new(zero, zero, one));
             let t_hat = t / norm(&t);
             let r_hat = s_hat.cross(&t_hat);
