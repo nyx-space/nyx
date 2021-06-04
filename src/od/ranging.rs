@@ -1,25 +1,41 @@
-extern crate hyperdual;
-extern crate rand;
-extern crate rand_distr;
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
 
-use self::hyperdual::linalg::norm;
-use self::hyperdual::{hyperspace_from_vector, Hyperdual};
-use self::rand::thread_rng;
-use self::rand_distr::{Distribution, Normal};
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+use super::hyperdual::linalg::norm;
+use super::hyperdual::{hyperspace_from_vector, Hyperdual};
+use super::rand::thread_rng;
+use super::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice, TimeTagged};
+use crate::celestia::{Cosm, Frame, Orbit};
 use crate::dimensions::{
     DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7,
 };
-use crate::dynamics::spacecraft::SpacecraftState;
 use crate::time::Epoch;
-use celestia::{Cosm, Frame, State};
-use utils::{r2, r3};
+use crate::utils::{r2, r3};
+use crate::Spacecraft;
+use std::fmt;
+use std::sync::Arc;
 
 /// GroundStation defines a Two Way ranging equipment.
 #[derive(Debug, Clone)]
-pub struct GroundStation<'a> {
+pub struct GroundStation {
     pub name: String,
     /// in degrees
     pub elevation_mask: f64,
@@ -31,12 +47,12 @@ pub struct GroundStation<'a> {
     pub height: f64,
     /// Frame in which this station is defined
     pub frame: Frame,
-    pub cosm: &'a Cosm,
+    pub cosm: Arc<Cosm>,
     range_noise: Normal<f64>,
     range_rate_noise: Normal<f64>,
 }
 
-impl<'a> GroundStation<'a> {
+impl GroundStation {
     /// Initializes a new Two Way ranging equipment from the noise values.
     pub fn from_noise_values(
         name: String,
@@ -47,7 +63,7 @@ impl<'a> GroundStation<'a> {
         range_noise: f64,
         range_rate_noise: f64,
         frame: Frame,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self {
             name,
@@ -62,11 +78,26 @@ impl<'a> GroundStation<'a> {
         }
     }
 
+    /// Initializes a point on the surface of a celestial object.
+    /// This is meant for analysis, not for spacecraft navigation.
+    pub fn from_point(
+        name: String,
+        latitude: f64,
+        longitude: f64,
+        height: f64,
+        frame: Frame,
+        cosm: Arc<Cosm>,
+    ) -> Self {
+        Self::from_noise_values(
+            name, 0.0, latitude, longitude, height, 0.0, 0.0, frame, cosm,
+        )
+    }
+
     pub fn dss65_madrid(
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self::from_noise_values(
             "Madrid".to_string(),
@@ -85,7 +116,7 @@ impl<'a> GroundStation<'a> {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self::from_noise_values(
             "Canberra".to_string(),
@@ -104,7 +135,7 @@ impl<'a> GroundStation<'a> {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Self {
         Self::from_noise_values(
             "Goldstone".to_string(),
@@ -118,26 +149,39 @@ impl<'a> GroundStation<'a> {
             cosm,
         )
     }
-}
-impl<'a> MeasurementDevice<State, StdMeasurement> for GroundStation<'a> {
-    /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &State) -> Option<StdMeasurement> {
+
+    /// Computes the elevation of the provided object seen from this ground station.
+    /// Also returns the ground station's orbit in the frame of the spacecraft
+    pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit) {
         use std::f64::consts::PI;
         // Convert the station to the state's frame
         let dt = rx.dt;
         let station_state =
-            State::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
+            Orbit::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
+        // Convert the station into the rx frame.
         let tx = self.cosm.frame_chg(&station_state, rx.frame);
         // Let's start by computing the range and range rate
-        let rho_ecef = rx.radius() - tx.radius();
+        let rho_tx_frame = rx.radius() - tx.radius();
 
         // Convert to SEZ to compute elevation
-        let rho_sez =
-            r2(PI / 2.0 - self.latitude.to_radians()) * r3(self.longitude.to_radians()) * rho_ecef;
-        let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
+        let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
+            * r3(self.longitude.to_radians())
+            * rho_tx_frame;
+
+        // Return elevation in degrees and tx
+        (
+            (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees(),
+            tx,
+        )
+    }
+}
+impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
+    /// Perform a measurement from the ground station to the receiver (rx).
+    fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
+        let (elevation, tx) = self.elevation_of(rx);
 
         Some(StdMeasurement::new(
-            dt,
+            rx.dt,
             tx,
             *rx,
             elevation >= self.elevation_mask,
@@ -147,16 +191,16 @@ impl<'a> MeasurementDevice<State, StdMeasurement> for GroundStation<'a> {
     }
 }
 
-impl<'a> MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation<'a> {
+impl MeasurementDevice<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, sc_rx: &SpacecraftState) -> Option<StdMeasurement> {
+    fn measure(&self, sc_rx: &Spacecraft) -> Option<StdMeasurement> {
         let rx = &sc_rx.orbit;
         match rx.frame {
             Frame::Geoid { .. } => {
                 use std::f64::consts::PI;
                 // Convert the station to the state's frame
                 let dt = rx.dt;
-                let station_state = State::from_geodesic(
+                let station_state = Orbit::from_geodesic(
                     self.latitude,
                     self.longitude,
                     self.height,
@@ -165,13 +209,13 @@ impl<'a> MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation<'a
                 );
                 let tx = self.cosm.frame_chg(&station_state, rx.frame);
                 // Let's start by computing the range and range rate
-                let rho_ecef = rx.radius() - tx.radius();
+                let rho_tx_frame = rx.radius() - tx.radius();
 
                 // Convert to SEZ to compute elevation
                 let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
                     * r3(self.longitude.to_radians())
-                    * rho_ecef;
-                let elevation = (rho_sez[(2, 0)] / rho_ecef.norm()).asin().to_degrees();
+                    * rho_tx_frame;
+                let elevation = (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees();
 
                 Some(StdMeasurement::new(
                     dt,
@@ -190,19 +234,21 @@ impl<'a> MeasurementDevice<SpacecraftState, StdMeasurement> for GroundStation<'a
     }
 }
 
-/*
-/// Computes the (approximate) Greenwich Apparent Sideral Time as per IAU2000.
-///
-/// NOTE: This is an approximation valid to within 0.9 seconds in absolute value.
-/// In fact, hifitime does not support UT1, but according to the [IERS](https://www.iers.org/IERS/EN/Science/EarthRotation/UTC.html;jsessionid=A6E88EB4CF0FC2E1A3C10D807F51B829.live2?nn=12932)
-/// UTC with leap seconds is always within 0.9 seconds to UT1, and hifitime inherently supports leap seconds.
-/// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-fn gast(at: Epoch) -> f64 {
-    use std::f64::consts::PI;
-    let tu = at.as_mjd_tai_days() - 51_544.5;
-    2.0 * PI * (0.779_057_273_264_0 + 1.002_737_811_911_354_6 * tu)
+impl fmt::Display for GroundStation {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {} (lat.: {:.2} deg    long.: {:.2} deg    alt.: {:.2} m)",
+            self.frame,
+            self.name,
+            self.latitude,
+            self.longitude,
+            self.height * 1e3,
+        )
+    }
 }
-*/
+
 /// Stores a standard measurement of range (km) and range rate (km/s)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StdMeasurement {
@@ -251,15 +297,15 @@ impl StdMeasurement {
     }
 
     /// Generate noiseless measurement
-    pub fn noiseless(dt: Epoch, tx: State, rx: State, visible: bool) -> StdMeasurement {
+    pub fn noiseless(dt: Epoch, tx: Orbit, rx: Orbit, visible: bool) -> StdMeasurement {
         Self::raw(dt, tx, rx, visible, 0.0, 0.0)
     }
 
     /// Generate a new measurement with the provided noise distribution.
     pub fn new<D: Distribution<f64>>(
         dt: Epoch,
-        tx: State,
-        rx: State,
+        tx: Orbit,
+        rx: Orbit,
         visible: bool,
         range_dist: &D,
         range_rate_dist: &D,
@@ -277,8 +323,8 @@ impl StdMeasurement {
     /// Generate a new measurement with the provided noise values.
     pub fn raw(
         dt: Epoch,
-        tx: State,
-        rx: State,
+        tx: Orbit,
+        rx: Orbit,
         visible: bool,
         range_noise: f64,
         range_rate_noise: f64,
@@ -387,7 +433,7 @@ impl RangeMsr {
         (fx, pmat)
     }
 
-    pub fn new(_: Epoch, tx: State, rx: State, visible: bool) -> RangeMsr {
+    pub fn new(tx: Orbit, rx: Orbit, visible: bool) -> RangeMsr {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
@@ -483,7 +529,7 @@ impl DopplerMsr {
         (fx, pmat)
     }
 
-    pub fn new(_: Epoch, tx: State, rx: State, visible: bool) -> DopplerMsr {
+    pub fn new(tx: Orbit, rx: Orbit, visible: bool) -> DopplerMsr {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 

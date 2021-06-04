@@ -1,9 +1,27 @@
-stable:
+unit-tests:
   image: rust:1-slim
+  variables:
+    RUST_BACKTRACE: full
   script:
     - rustup component add rustfmt
-    - RUST_BACKTRACE=full cargo test --release
     - cargo fmt -- --check
+    - cargo test --lib --release # Unit tests
+    
+integration-tests:
+  image: rust:1-slim
+  variables:
+    RUST_BACKTRACE: full
+  script:
+    - cargo test cosmic --release
+    - cargo test mission_design --release
+    - cargo test monte_carlo --release
+    - cargo test orbit_determination --release
+    - cargo test propulsion --release -j4 # Only on 4 CPUs otherwise the stack is totally used up
+    - cargo test propagation --release -j4
+
+scenario-tests:
+  image: rust:1-slim
+  script:
     - cargo run --release -- data/simple-scenario.toml --all
     # Check that when we do a unit conversion it's correct
     # NOTE: We don't do that with km output because the unit conversion leads to some rounding issues
@@ -11,4 +29,3 @@ stable:
     - cargo run --release -- data/simple-od-scenario.toml
     - cargo run --release -- "data/od_validation/*" -a
     - cargo run --release -- data/iss-example.toml -s iss_cond
-

@@ -1,10 +1,27 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 extern crate meval;
 use self::meval::{Context, Expr};
 use crate::log::error;
 use crate::na::Matrix3;
 use crate::time::{Epoch, DAYS_PER_CENTURY, J2000_OFFSET, MJD_OFFSET};
 use crate::utils::{r1, r2, r3};
-pub use celestia::xb::Identifier as XbId;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
@@ -70,7 +87,7 @@ pub struct Euler3Axis {
 
 impl ParentRotation for Euler3Axis {
     fn dcm_to_parent(&self, _: Epoch) -> Option<Matrix3<f64>> {
-        Some(self.first.dcm() * self.second.dcm() * self.third.dcm())
+        Some(self.third.dcm() * self.second.dcm() * self.first.dcm())
     }
 }
 
@@ -98,7 +115,10 @@ impl FromStr for AngleUnit {
 
 /// A time varying three-axis Euler rotation
 #[derive(Clone)]
-pub struct Euler3AxisDt {
+pub struct Euler3AxisDt
+where
+    Self: Send + Sync,
+{
     pub base_context: HashMap<String, String>,
     pub rot_order: [(EulerRotation, Expr); 3],
     pub unit: AngleUnit,
@@ -149,6 +169,7 @@ impl Euler3AxisDt {
         context: HashMap<String, String>,
         unit: AngleUnit,
     ) -> Self {
+        // We initialize this backward on purpose, cf. https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/req/rotation.html#Working%20with%20RA,%20Dec%20and%20Twist
         Self::new(
             (EulerRotation::R3(0.0), alpha_right_asc),
             (EulerRotation::R1(0.0), delta_declin),
@@ -172,9 +193,12 @@ impl fmt::Debug for Euler3AxisDt {
 
 impl ParentRotation for Euler3AxisDt {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-        let days_d = datetime.as_jde_tdb_days() - MJD_OFFSET - J2000_OFFSET;
+        let jde_tdb_days = datetime.as_jde_tdb_days();
+
+        let days_d = jde_tdb_days - MJD_OFFSET - J2000_OFFSET;
         let centuries_t = days_d / DAYS_PER_CENTURY;
         // Let's create a new context, add the time variables, and compute the rotation's context
+        // Note: this will be resolved with Chi/racr files.
         let mut ctx = Context::default();
         ctx.var("d", days_d);
         ctx.var("T", centuries_t);
@@ -188,7 +212,7 @@ impl ParentRotation for Euler3AxisDt {
             );
         }
         let mut dcm = Matrix3::identity();
-        for (angle_no, (rot, expr)) in self.rot_order.iter().enumerate() {
+        for (angle_no, (rot, expr)) in self.rot_order.iter().rev().enumerate() {
             // Compute the correct angle
             match expr.eval_with_context(&ctx) {
                 Ok(eval_angle) => {
@@ -201,9 +225,9 @@ impl ParentRotation for Euler3AxisDt {
                     // Apply the angle transformation if needed
                     if self.is_ra_dec_w {
                         if angle_no == 1 {
-                            angle -= std::f64::consts::FRAC_PI_2;
-                        } else if angle_no == 0 {
                             angle = std::f64::consts::FRAC_PI_2 - angle;
+                        } else if angle_no == 2 {
+                            angle += std::f64::consts::FRAC_PI_2;
                         }
                     }
                     let rot_with_angl = match rot {

@@ -1,7 +1,24 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 use crate::dimensions::Vector3;
-use std::error::Error;
+use crate::errors::NyxError;
 use std::f64::consts::PI;
-use std::fmt;
 
 const TAU: f64 = 2.0 * PI;
 const LAMBERT_EPSILON: f64 = 1e-4; // General epsilon
@@ -16,37 +33,11 @@ pub enum TransferKind {
     NRevs(u8),
 }
 
+#[derive(Debug)]
 pub struct LambertSolution {
     pub v_init: Vector3<f64>,
     pub v_final: Vector3<f64>,
     pub phi: f64,
-}
-
-#[derive(Debug)]
-pub enum LambertError {
-    TooClose,
-    MaxIter,
-    NotReasonablePhi,
-    MultiRevNotSupported,
-}
-
-impl fmt::Display for LambertError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TooClose => write!(f, "Too close: Δν ~=0 and A ~=0"),
-            Self::MultiRevNotSupported => {
-                write!(f, "Use the Izzo algorithm for multi-rev transfers")
-            }
-            Self::MaxIter => write!(f, "Maximum number of iterations reached"),
-            Self::NotReasonablePhi => write!(f, "No reasonable phi found to connect both radii"),
-        }
-    }
-}
-
-impl Error for LambertError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
 }
 
 /// Solves the Lambert boundary problem using a standard secant method.
@@ -59,7 +50,7 @@ pub fn standard(
     tof: f64,
     gm: f64,
     kind: TransferKind,
-) -> Result<LambertSolution, LambertError> {
+) -> Result<LambertSolution, NyxError> {
     let r_init_norm = r_init.norm();
     let r_final_norm = r_final.norm();
 
@@ -82,7 +73,7 @@ pub fn standard(
         }
         TransferKind::ShortWay => 1.0,
         TransferKind::LongWay => -1.0,
-        _ => return Err(LambertError::MultiRevNotSupported),
+        _ => return Err(NyxError::LambertMultiRevNotSupported),
     };
 
     // Compute the direction of motion
@@ -92,7 +83,7 @@ pub fn standard(
     let a = dm * (r_init_norm * r_final_norm * (1.0 + cos_dnu)).sqrt();
 
     if nu_final - nu_init < LAMBERT_EPSILON_RAD && a.abs() < LAMBERT_EPSILON {
-        return Err(LambertError::TooClose);
+        return Err(NyxError::TargetsTooClose);
     }
 
     // Define the search space (note that we do not support multirevs in this algorithm)
@@ -109,7 +100,10 @@ pub fn standard(
 
     while (cur_tof - tof).abs() > LAMBERT_EPSILON_TIME {
         if iter > 1000 {
-            return Err(LambertError::MaxIter);
+            return Err(NyxError::MaxIterReached(format!(
+                "Lambert solver failed after {} iterations",
+                1000
+            )));
         }
         iter += 1;
 
@@ -126,7 +120,7 @@ pub fn standard(
             }
             if y < 0.0 {
                 // If y is still negative, then our attempts have failed.
-                return Err(LambertError::NotReasonablePhi);
+                return Err(NyxError::LambertNotReasonablePhi);
             }
         }
 

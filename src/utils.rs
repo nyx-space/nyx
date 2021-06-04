@@ -1,8 +1,28 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 extern crate num;
 
 use self::num::traits::real::Real;
-use crate::celestia::State;
-use crate::dimensions::{Matrix3, Vector3, Vector6, U3};
+use crate::celestia::Orbit;
+use crate::dimensions::{
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Vector3, Vector6, VectorN, U3,
+};
 use std::f64;
 
 /// Returns the tilde matrix from the provided Vector3.
@@ -50,22 +70,19 @@ pub fn between_0_360(angle: f64) -> f64 {
 
 /// Returns the provided angle bounded between -180.0 and +180.0
 pub fn between_pm_180(angle: f64) -> f64 {
-    let mut bounded = angle;
-    while bounded > 180.0 {
-        bounded -= 360.0;
-    }
-    while bounded < -180.0 {
-        bounded += 360.0;
-    }
-    bounded
+    between_pm_x(angle, 180.0)
 }
 
-pub fn factorial(num: f64) -> f64 {
-    if num <= f64::EPSILON || (num - 1.0).abs() <= f64::EPSILON {
-        1.0
-    } else {
-        num * factorial(num - 1.0)
+/// Returns the provided angle bounded between -x and +x
+pub fn between_pm_x(angle: f64, x: f64) -> f64 {
+    let mut bounded = angle;
+    while bounded > x {
+        bounded -= 2.0 * x;
     }
+    while bounded < -x {
+        bounded += 2.0 * x;
+    }
+    bounded
 }
 
 /// The Kronecker delta function
@@ -122,8 +139,28 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
     b * a.dot(&b) / b.dot(&b)
 }
 
-/// Computes the RSS state errors in position and in velocity of two state vectors [P V]
-pub fn rss_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
+/// Computes the RSS state errors in two provided vectors
+pub fn rss_errors<N: DimName>(prop_err: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+where
+    DefaultAllocator: Allocator<f64, N>,
+{
+    let mut v = 0.0;
+    for i in 0..N::dim() {
+        v += (prop_err[i] - cur_state[i]).powi(2);
+    }
+    v.sqrt()
+}
+
+/// Returns the RSS orbit errors in kilometers and kilometers per second
+pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
+    (
+        rss_errors(&prop_err.radius(), &cur_state.radius()),
+        rss_errors(&prop_err.velocity(), &cur_state.velocity()),
+    )
+}
+
+/// Computes the RSS state errors in position and in velocity of two orbit vectors [P V]
+pub fn rss_orbit_vec_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
     let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
 
     let err_velocity = (prop_err.fixed_rows::<U3>(3) - cur_state.fixed_rows::<U3>(3)).norm();
@@ -131,8 +168,23 @@ pub fn rss_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f6
     (err_radius, err_velocity)
 }
 
-pub fn rss_state_errors(prop_err: &State, cur_state: &State) -> (f64, f64) {
-    rss_errors(&prop_err.to_cartesian_vec(), &cur_state.to_cartesian_vec())
+// Normalize between -1.0 and 1.0
+pub fn normalize(x: f64, min_x: f64, max_x: f64) -> f64 {
+    2.0 * (x - min_x) / (max_x - min_x) - 1.0
+}
+
+// Denormalize between -1.0 and 1.0
+pub fn denormalize(xp: f64, min_x: f64, max_x: f64) -> f64 {
+    (max_x - min_x) * (xp + 1.0) / 2.0 + min_x
+}
+
+// Source: https://stackoverflow.com/questions/38406793/why-is-capitalizing-the-first-letter-of-a-string-so-convoluted-in-rust
+pub fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+    }
 }
 
 #[test]

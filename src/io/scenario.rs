@@ -1,19 +1,37 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 use super::formatter::OutputSerde;
 use super::gravity::HarmonicsMem;
 use super::quantity::*;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
-use crate::celestia::{Frame, State};
-use crate::dynamics::spacecraft::SpacecraftState;
-use crate::propagators::events::{EventKind, OrbitalEvent, SCEvent, StopCondition};
-use crate::time::Epoch;
+use crate::celestia::{Frame, Orbit};
+use crate::md::{Event, StateParameter};
+use crate::time::{Duration, Epoch};
+use crate::NyxError;
 use std::collections::HashMap;
 use std::str::FromStr;
 
 #[derive(Deserialize)]
 pub struct StateSerde {
-    pub frame: String,
+    pub frame: Option<String>,
     pub epoch: String,
     pub x: Option<f64>,
     pub y: Option<f64>,
@@ -34,7 +52,7 @@ pub struct StateSerde {
 }
 
 impl StateSerde {
-    pub fn as_state(&self, frame: Frame) -> Result<State, ParsingError> {
+    pub fn as_state(&self, frame: Frame) -> Result<Orbit, ParsingError> {
         let epoch = match Epoch::from_str(&self.epoch) {
             Ok(epoch) => epoch,
             Err(e) => return Err(ParsingError::Quantity(format!("{}", e))),
@@ -68,7 +86,7 @@ impl StateSerde {
                 None => 1.0,
             };
 
-            Ok(State::cartesian(
+            Ok(Orbit::cartesian(
                 self.x.unwrap() * pos_mul,
                 self.y.unwrap() * pos_mul,
                 self.z.unwrap() * pos_mul,
@@ -83,7 +101,7 @@ impl StateSerde {
             let velocity = self.velocity.as_ref().unwrap();
             if position.len() != 3 || velocity.len() != 3 {
                 return Err(ParsingError::IllDefined(
-                    "State ill defined: position and velocity arrays must be of size 3 exactly"
+                    "Orbit ill defined: position and velocity arrays must be of size 3 exactly"
                         .to_string(),
                 ));
             }
@@ -94,7 +112,7 @@ impl StateSerde {
             let vy = parse_quantity(&velocity[1])?.v();
             let vz = parse_quantity(&velocity[2])?.v();
 
-            Ok(State::cartesian(x, y, z, vx, vy, vz, epoch, frame))
+            Ok(Orbit::cartesian(x, y, z, vx, vy, vz, epoch, frame))
         } else if self.sma.is_some()
             && self.ecc.is_some()
             && self.inc.is_some()
@@ -102,7 +120,7 @@ impl StateSerde {
             && self.aop.is_some()
             && self.ta.is_some()
         {
-            Ok(State::keplerian(
+            Ok(Orbit::keplerian(
                 self.sma.unwrap(),
                 self.ecc.unwrap(),
                 self.inc.unwrap(),
@@ -113,7 +131,7 @@ impl StateSerde {
                 frame,
             ))
         } else {
-            Err(ParsingError::IllDefined("State ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
+            Err(ParsingError::IllDefined("Orbit ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
         }
     }
 }
@@ -141,7 +159,7 @@ pub struct DeltaStateSerde {
 }
 
 impl DeltaStateSerde {
-    pub fn as_state(&self, base: State) -> Result<State, ParsingError> {
+    pub fn as_state(&self, base: Orbit) -> Result<Orbit, ParsingError> {
         let frame = base.frame;
         let epoch = base.dt;
         // Rebuild a valid state from the three different initializations
@@ -172,7 +190,7 @@ impl DeltaStateSerde {
                 None => 1.0,
             };
 
-            Ok(State::cartesian(
+            Ok(Orbit::cartesian(
                 self.x.unwrap_or(0.0) * pos_mul,
                 self.y.unwrap_or(0.0) * pos_mul,
                 self.z.unwrap_or(0.0) * pos_mul,
@@ -187,7 +205,7 @@ impl DeltaStateSerde {
                 Some(position) => {
                     if position.len() != 3 {
                         return Err(ParsingError::IllDefined(
-                            "State ill defined: position arrays must be of size 3 exactly"
+                            "Orbit ill defined: position arrays must be of size 3 exactly"
                                 .to_string(),
                         ));
                     }
@@ -203,7 +221,7 @@ impl DeltaStateSerde {
                 Some(velocity) => {
                     if velocity.len() != 3 {
                         return Err(ParsingError::IllDefined(
-                            "State ill defined: velocity arrays must be of size 3 exactly"
+                            "Orbit ill defined: velocity arrays must be of size 3 exactly"
                                 .to_string(),
                         ));
                     }
@@ -215,7 +233,7 @@ impl DeltaStateSerde {
                 None => (0.0, 0.0, 0.0),
             };
 
-            Ok(State::cartesian(x, y, z, vx, vy, vz, epoch, frame) + base)
+            Ok(Orbit::cartesian(x, y, z, vx, vy, vz, epoch, frame) + base)
         } else if self.sma.is_some()
             || self.ecc.is_some()
             || self.inc.is_some()
@@ -247,7 +265,7 @@ impl DeltaStateSerde {
                 Some(ta) => ta + base.ta(),
                 None => base.ta(),
             };
-            Ok(State::keplerian(sma, ecc, inc, raan, aop, ta, epoch, frame) + base)
+            Ok(Orbit::keplerian(sma, ecc, inc, raan, aop, ta, epoch, frame) + base)
         } else {
             Err(ParsingError::IllDefined("Delta state ill defined: specify either {position, velocity}, or {x,y,z,vx,vy,vz}, or Keplerian elements".to_string()))
         }
@@ -296,18 +314,15 @@ pub struct Harmonics {
 }
 
 impl Harmonics {
-    pub fn load(&self) -> HarmonicsMem {
+    pub fn load(&self) -> Result<HarmonicsMem, NyxError> {
         let gunzipped = self.file.contains("gz");
-        let order = match self.order {
-            Some(order) => order,
-            None => 0,
-        };
+        let order = self.order.unwrap_or(0);
         if self.file.contains("cof") {
-            HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped).unwrap()
+            HarmonicsMem::from_cof(self.file.as_str(), self.degree, order, gunzipped)
         } else if self.file.contains("sha") {
-            HarmonicsMem::from_shadr(self.file.as_str(), self.degree, order, gunzipped).unwrap()
+            HarmonicsMem::from_shadr(self.file.as_str(), self.degree, order, gunzipped)
         } else if self.file.contains("EGM") {
-            HarmonicsMem::from_egm(self.file.as_str(), self.degree, order, gunzipped).unwrap()
+            HarmonicsMem::from_egm(self.file.as_str(), self.degree, order, gunzipped)
         } else {
             panic!("could not guess file format from name");
         }
@@ -368,7 +383,7 @@ pub struct OdpSerde {
     /// Set the number of measurements to switch to an EKF
     pub ekf_msr_trigger: Option<usize>,
     /// Set the acceptable time between measurements
-    pub ekf_disable_time: Option<f64>,
+    pub ekf_disable_time: Option<Duration>,
     /// An optional output of a NavSolution
     pub output: Option<String>,
 }
@@ -427,46 +442,33 @@ pub struct ScenarioSerde {
 
 #[derive(Clone, Deserialize)]
 pub struct ConditionSerde {
-    pub kind: String,
-    pub value: Option<f64>,
+    /// Pattern must be `event_name = event_value`, e.g. `TA = 159`
+    pub event: String,
     pub search_until: String,
     pub hits: Option<usize>,
-    pub tolerance: Option<f64>,
 }
 
 impl ConditionSerde {
-    pub fn to_condition(&self, init_dt: Epoch) -> StopCondition<SpacecraftState> {
-        let event = match self.kind.to_lowercase().as_str() {
-            "apoapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Apoapse)),
-            "periapse" => SCEvent::orbital(OrbitalEvent::new(EventKind::Periapse)),
-            "sma" => SCEvent::orbital(OrbitalEvent::new(EventKind::Sma(self.value.unwrap()))),
-            "ecc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Ecc(self.value.unwrap()))),
-            "inc" => SCEvent::orbital(OrbitalEvent::new(EventKind::Inc(self.value.unwrap()))),
-            "raan" => SCEvent::orbital(OrbitalEvent::new(EventKind::Raan(self.value.unwrap()))),
-            "ta" => SCEvent::orbital(OrbitalEvent::new(EventKind::TA(self.value.unwrap()))),
-            _ => unimplemented!(),
+    pub fn to_condition(&self) -> Event {
+        let rplt = self.event.replace("=", "");
+        let parts: Vec<&str> = rplt.split(' ').collect();
+        let parameter = StateParameter::from_str(parts[0]).unwrap();
+        let value = if parts.len() == 2 {
+            match parts[1].trim().parse::<f64>() {
+                Ok(val) => val,
+                Err(e) => {
+                    warn!(
+                        "Could not understand value `{}` in parameter: {}",
+                        parts[1], e
+                    );
+                    0.0
+                }
+            }
+        } else {
+            0.0
         };
 
-        let search_until = Epoch::from_str(&self.search_until).unwrap();
-        match self.hits {
-            Some(hits) => StopCondition::after_hits(
-                event,
-                hits,
-                search_until - init_dt,
-                match self.tolerance {
-                    Some(tol) => tol,
-                    None => 1e-6,
-                },
-            ),
-            None => StopCondition::new(
-                event,
-                search_until - init_dt,
-                match self.tolerance {
-                    Some(tol) => tol,
-                    None => 1e-6,
-                },
-            ),
-        }
+        Event::new(parameter, value)
     }
 }
 
@@ -643,7 +645,7 @@ fn test_od_scenario() {
         snc_decay = ["20 * min", "20 min", "15 min"]
         measurements = "msr_sim"  # Or provide a file name
         ekf_msr_trigger = 30
-        ekf_disable_time = 3600  # If no measurements for an hour, disable the EKF
+        ekf_disable_time = "3600 s"  # If no measurements for an hour, disable the EKF
         output = "estimate_csv"
 
         [output.estimate_csv]

@@ -1,15 +1,36 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::serde_derive::Deserialize;
 use super::EpochFormat;
-use crate::celestia::{Cosm, Frame, State};
-use crate::dimensions::U6;
+use crate::celestia::{Cosm, Frame, Orbit};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::DefaultAllocator;
+use crate::md::StateParameter;
 use crate::od::estimate::NavSolution;
-use crate::od::EstimableState;
+use crate::{NyxError, State};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct OutputSerde {
@@ -19,14 +40,18 @@ pub struct OutputSerde {
 }
 
 impl OutputSerde {
-    pub fn to_state_formatter<'a>(&self, cosm: &'a Cosm) -> StateFormatter<'a> {
+    pub fn to_state_formatter(&self, cosm: Arc<Cosm>) -> Result<StateFormatter, NyxError> {
         match &self.headers {
-            Some(hdr) => StateFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm),
-            None => StateFormatter::default(self.filename.clone(), cosm),
+            Some(hdr) => StateFormatter::from_headers(
+                hdr.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+                self.filename.clone(),
+                cosm,
+            ),
+            None => Ok(StateFormatter::default(self.filename.clone(), cosm)),
         }
     }
 
-    pub fn to_nav_sol_formatter<'a>(&self, cosm: &'a Cosm) -> NavSolutionFormatter<'a> {
+    pub fn to_nav_sol_formatter(&self, cosm: Arc<Cosm>) -> NavSolutionFormatter {
         match &self.headers {
             Some(hdr) => {
                 NavSolutionFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm)
@@ -40,328 +65,74 @@ impl OutputSerde {
 /// TODO: Support units
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, PartialEq)]
-pub enum StateHeader {
-    /// Argument of Periapse (deg)
-    AoL { frame: Option<String> },
-    /// Argument of Latitude (deg)
-    AoP { frame: Option<String> },
-    /// Radius of apoapsis (km)
-    apoapsis { frame: Option<String> },
-    /// Eccentric anomaly (deg)
-    EA { frame: Option<String> },
-    /// Eccentricity (no unit)
-    ECC { frame: Option<String> },
-    /// The epoch in the specified format
-    Epoch(EpochFormat),
-    /// Specific energy
-    energy { frame: Option<String> },
-    /// Eccentricity vector (no unit), as [e_x,e_y,e_z]
-    evec { frame: Option<String> },
-    /// Geodetic height (km)
-    geodetic_height { frame: Option<String> },
-    /// Geodetic latitude (deg)
-    geodetic_latitude { frame: Option<String> },
-    /// Geodetic longitude (deg)
-    geodetic_longitude { frame: Option<String> },
-    /// Orbital momentum
-    hmag { frame: Option<String> },
-    /// Orbital momentum vector, as [e_x,e_y,e_z]
-    hvec { frame: Option<String> },
-    /// X component of the orbital momentum vector
-    HX { frame: Option<String> },
-    /// Y component of the orbital momentum vector
-    HY { frame: Option<String> },
-    /// Z component of the orbital momentum vector
-    HZ { frame: Option<String> },
-    /// Inclination (deg)
-    INC { frame: Option<String> },
-    /// Mean anomaly (deg)
-    MA { frame: Option<String> },
-    /// Radius of periapse (km)
-    periapsis { frame: Option<String> },
-    /// Orbital period (s)
-    period { frame: Option<String> },
-    /// Right ascension of the ascending node (deg)
-    RAAN { frame: Option<String> },
-    /// Radius vector (km), as [r_x,r_y,r_z]
-    radius { frame: Option<String> },
-    /// Norm of the radius vector
-    rmag { frame: Option<String> },
-    /// Semi parameter (km)
-    semi_parameter { frame: Option<String> },
-    /// Semi major axis (km)
-    SMA { frame: Option<String> },
-    /// True anomaly
-    TA { frame: Option<String> },
-    /// True longitude
-    TLong { frame: Option<String> },
-    /// Velocity vector (km/s), as [v_x,v_y,v_z]
-    velocity { frame: Option<String> },
-    /// Norm of the velocity vector (km/s)
-    vmag { frame: Option<String> },
-    /// X component of the radius (km)
-    X { frame: Option<String> },
-    /// Y component of the radius (km)
-    Y { frame: Option<String> },
-    /// Z component of the radius (km)
-    Z { frame: Option<String> },
-    /// X component of the velocity (km/s)
-    VX { frame: Option<String> },
-    /// Y component of the velocity (km/s)
-    VY { frame: Option<String> },
-    /// Z component of the velocity (km/s)
-    VZ { frame: Option<String> },
+pub struct StateHeader {
+    /// Stores either the state paramater or the epoch
+    pub param: StateParameter,
+    pub frame_name: Option<String>,
+    pub epoch_fmt: Option<EpochFormat>,
+}
+
+impl From<StateParameter> for StateHeader {
+    fn from(param: StateParameter) -> Self {
+        StateHeader {
+            param,
+            frame_name: None,
+            epoch_fmt: if param == StateParameter::Epoch {
+                Some(EpochFormat::GregorianUtc)
+            } else {
+                None
+            },
+        }
+    }
 }
 
 impl fmt::Display for StateHeader {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, fh: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            StateHeader::AoL { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "AoL:{}", f)
-                } else {
-                    write!(fh, "AoL")
-                }
+        let fmtd = match self.param {
+            StateParameter::X
+            | StateParameter::Y
+            | StateParameter::Z
+            | StateParameter::ApoapsisRadius
+            | StateParameter::PeriapsisRadius
+            | StateParameter::GeodeticHeight
+            | StateParameter::SemiMinorAxis
+            | StateParameter::SemiParameter
+            | StateParameter::SMA
+            | StateParameter::Rmag => {
+                format!("{:?} (km)", self.param)
             }
-            StateHeader::AoP { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "AoP:{}", f)
-                } else {
-                    write!(fh, "AoP")
-                }
+            StateParameter::VX | StateParameter::VY | StateParameter::VZ | StateParameter::Vmag => {
+                format!("{:?} (km/s)", self.param)
             }
-            StateHeader::apoapsis { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "apoapsis:{}", f)
-                } else {
-                    write!(fh, "apoapsis")
-                }
+            StateParameter::AoL
+            | StateParameter::AoP
+            | StateParameter::Declination
+            | StateParameter::EccentricAnomaly
+            | StateParameter::GeodeticLatitude
+            | StateParameter::GeodeticLongitude
+            | StateParameter::Inclination
+            | StateParameter::MeanAnomaly
+            | StateParameter::RightAscension
+            | StateParameter::RAAN
+            | StateParameter::TrueAnomaly
+            | StateParameter::TrueLongitude => {
+                format!("{:?} (deg)", self.param)
             }
-            StateHeader::EA { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "EA:{}", f)
-                } else {
-                    write!(fh, "EA")
-                }
-            }
-            StateHeader::ECC { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "ECC:{}", f)
-                } else {
-                    write!(fh, "ECC")
-                }
-            }
-            StateHeader::energy { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "energy:{}", f)
-                } else {
-                    write!(fh, "energy")
-                }
-            }
-            StateHeader::evec { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "evec:{}", f)
-                } else {
-                    write!(fh, "evec")
-                }
-            }
-            StateHeader::geodetic_height { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "geodetic_height:{}", f)
-                } else {
-                    write!(fh, "geodetic_height")
-                }
-            }
-            StateHeader::geodetic_latitude { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "geodetic_latitude:{}", f)
-                } else {
-                    write!(fh, "geodetic_latitude")
-                }
-            }
-            StateHeader::geodetic_longitude { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "geodetic_longitude:{}", f)
-                } else {
-                    write!(fh, "geodetic_longitude")
-                }
-            }
-            StateHeader::hmag { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "hmag:{}", f)
-                } else {
-                    write!(fh, "hmag")
-                }
-            }
-            StateHeader::hvec { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "hvec:{}", f)
-                } else {
-                    write!(fh, "hvec")
-                }
-            }
-            StateHeader::HX { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "HX:{}", f)
-                } else {
-                    write!(fh, "HX")
-                }
-            }
-            StateHeader::HY { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "HY:{}", f)
-                } else {
-                    write!(fh, "HY")
-                }
-            }
-            StateHeader::HZ { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "HZ:{}", f)
-                } else {
-                    write!(fh, "HZ")
-                }
-            }
-            StateHeader::INC { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "INC:{}", f)
-                } else {
-                    write!(fh, "INC")
-                }
-            }
-            StateHeader::MA { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "MA:{}", f)
-                } else {
-                    write!(fh, "MA")
-                }
-            }
-            StateHeader::periapsis { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "periapsis:{}", f)
-                } else {
-                    write!(fh, "periapsis")
-                }
-            }
-            StateHeader::period { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "period:{}", f)
-                } else {
-                    write!(fh, "period")
-                }
-            }
-            StateHeader::RAAN { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "RAAN:{}", f)
-                } else {
-                    write!(fh, "RAAN")
-                }
-            }
-            StateHeader::radius { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "radius:{}", f)
-                } else {
-                    write!(fh, "radius")
-                }
-            }
-            StateHeader::rmag { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "rmag:{}", f)
-                } else {
-                    write!(fh, "rmag")
-                }
-            }
-            StateHeader::semi_parameter { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "semi_parameter:{}", f)
-                } else {
-                    write!(fh, "semi_parameter")
-                }
-            }
-            StateHeader::SMA { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "SMA:{}", f)
-                } else {
-                    write!(fh, "SMA")
-                }
-            }
-            StateHeader::TA { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "TA:{}", f)
-                } else {
-                    write!(fh, "TA")
-                }
-            }
-            StateHeader::TLong { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "TLong:{}", f)
-                } else {
-                    write!(fh, "TLong")
-                }
-            }
-            StateHeader::velocity { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "velocity:{}", f)
-                } else {
-                    write!(fh, "velocity")
-                }
-            }
-            StateHeader::vmag { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "vmag:{}", f)
-                } else {
-                    write!(fh, "vmag")
-                }
-            }
-            StateHeader::X { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "X:{}", f)
-                } else {
-                    write!(fh, "X")
-                }
-            }
-            StateHeader::Y { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "Y:{}", f)
-                } else {
-                    write!(fh, "Y")
-                }
-            }
-            StateHeader::Z { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "Z:{}", f)
-                } else {
-                    write!(fh, "Z")
-                }
-            }
-            StateHeader::VX { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "VX:{}", f)
-                } else {
-                    write!(fh, "VX")
-                }
-            }
-            StateHeader::VY { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "VY:{}", f)
-                } else {
-                    write!(fh, "VY")
-                }
-            }
-            StateHeader::VZ { frame } => {
-                if let Some(f) = frame {
-                    write!(fh, "VZ:{}", f)
-                } else {
-                    write!(fh, "VZ")
-                }
-            }
-            StateHeader::Epoch(efmt) => write!(fh, "Epoch:{:?}", efmt),
+            _ => format!("{:?}", self.param),
+        };
+        write!(fh, "{}", fmtd)?;
+        if let Some(frame) = &self.frame_name {
+            write!(fh, ":{}", frame)?;
+        } else if let Some(epoch_fmt) = self.epoch_fmt {
+            write!(fh, ":{:?}", epoch_fmt)?;
         }
+        Ok(())
     }
 }
 
 impl Serialize for StateHeader {
-    /// NOTE: This is not part of unit testing because there is no deseralization of State (yet)
+    /// NOTE: This is not part of unit testing because there is no deseralization of Orbit (yet)
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -381,17 +152,17 @@ pub enum NavSolutionHeader {
     EstimatedState(Vec<StateHeader>),
     /// Headers for the nominal state
     NominalState(Vec<StateHeader>),
-    /// State deviation X (km)
+    /// Orbit deviation X (km)
     Delta_x,
-    /// State deviation Y (km)
+    /// Orbit deviation Y (km)
     Delta_y,
-    /// State deviation Z (km)
+    /// Orbit deviation Z (km)
     Delta_z,
-    /// State deviation VX (km/s)
+    /// Orbit deviation VX (km/s)
     Delta_vx,
-    /// State deviation VY (km/s)
+    /// Orbit deviation VY (km/s)
     Delta_vy,
-    /// State deviation VZ (km/s)
+    /// Orbit deviation VZ (km/s)
     Delta_vz,
     /// Covariance matrix [1,1]
     Cx_x { frame: Option<String> },
@@ -639,14 +410,14 @@ impl Serialize for NavSolutionHeader {
 
 /// A formatter for states
 #[derive(Clone)]
-pub struct StateFormatter<'a> {
+pub struct StateFormatter {
     pub filename: String,
     pub headers: Vec<StateHeader>,
     frames: HashMap<String, Frame>,
-    cosm: &'a Cosm,
+    cosm: Arc<Cosm>,
 }
 
-impl<'a> StateFormatter<'a> {
+impl StateFormatter {
     /// ```
     /// extern crate nyx_space as nyx;
     /// use nyx::io::formatter::StateFormatter;
@@ -654,23 +425,43 @@ impl<'a> StateFormatter<'a> {
     ///
     /// let cosm = Cosm::de438();
     /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
-    /// let hdrs = vec!["AoL".to_string(), "ea:eme2000".to_string()];
-    /// StateFormatter::from_headers(hdrs, "nope".to_string(), &cosm);
+    /// let hdrs = vec!["AoL", "ea:eme2000"];
+    /// StateFormatter::from_headers(hdrs, "nope".to_string(), cosm);
     /// ```
-    pub fn from_headers(headers: Vec<String>, filename: String, cosm: &'a Cosm) -> Self {
+    pub fn from_headers(
+        headers: Vec<&str>,
+        filename: String,
+        cosm: Arc<Cosm>,
+    ) -> Result<Self, NyxError> {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(20);
         // Rebuild the header tokens
         for hdr in &headers {
             let splt: Vec<&str> = hdr.split(':').collect();
 
-            match splt[0] {
+            match splt[0].to_lowercase().as_str() {
                 "epoch" => {
-                    hdrs.push(StateHeader::Epoch(if splt.len() == 2 {
-                        EpochFormat::from_str(splt[1]).unwrap()
+                    let epoch_fmt = if splt.len() == 2 {
+                        match EpochFormat::from_str(splt[1]) {
+                            Ok(e) => e,
+                            Err(_) => {
+                                return Err(NyxError::LoadingError(format!(
+                                    "Unknown epoch format {}",
+                                    splt[1]
+                                )))
+                            }
+                        }
                     } else {
                         EpochFormat::GregorianUtc
-                    }));
+                    };
+
+                    let hdr = StateHeader {
+                        param: StateParameter::Epoch,
+                        frame_name: None,
+                        epoch_fmt: Some(epoch_fmt),
+                    };
+
+                    hdrs.push(hdr);
                 }
                 _ => {
                     let frame_name = if splt.len() == 2 {
@@ -678,45 +469,19 @@ impl<'a> StateFormatter<'a> {
                     } else {
                         None
                     };
-                    hdrs.push(match splt[0].to_lowercase().as_str() {
-                        "aol" => StateHeader::AoL { frame: frame_name },
-                        "aop" => StateHeader::AoP { frame: frame_name },
-                        "apoapsis" => StateHeader::apoapsis { frame: frame_name },
-                        "ea" => StateHeader::EA { frame: frame_name },
-                        "ecc" => StateHeader::ECC { frame: frame_name },
-                        "energy" => StateHeader::energy { frame: frame_name },
-                        "evec" => StateHeader::evec { frame: frame_name },
-                        "geodetic_height" => StateHeader::geodetic_height { frame: frame_name },
-                        "geodetic_latitude" => StateHeader::geodetic_latitude { frame: frame_name },
-                        "geodetic_longitude" => {
-                            StateHeader::geodetic_longitude { frame: frame_name }
-                        }
-                        "hmag" => StateHeader::hmag { frame: frame_name },
-                        "hvec" => StateHeader::hvec { frame: frame_name },
-                        "hx" => StateHeader::HX { frame: frame_name },
-                        "hy" => StateHeader::HY { frame: frame_name },
-                        "hz" => StateHeader::HZ { frame: frame_name },
-                        "inc" => StateHeader::INC { frame: frame_name },
-                        "ma" => StateHeader::MA { frame: frame_name },
-                        "periapsis" => StateHeader::periapsis { frame: frame_name },
-                        "period" => StateHeader::period { frame: frame_name },
-                        "raan" => StateHeader::RAAN { frame: frame_name },
-                        "radius" => StateHeader::radius { frame: frame_name },
-                        "rmag" => StateHeader::rmag { frame: frame_name },
-                        "semi_parameter" => StateHeader::semi_parameter { frame: frame_name },
-                        "sma" => StateHeader::SMA { frame: frame_name },
-                        "ta" => StateHeader::TA { frame: frame_name },
-                        "tlong" => StateHeader::TLong { frame: frame_name },
-                        "velocity" => StateHeader::velocity { frame: frame_name },
-                        "vmag" => StateHeader::vmag { frame: frame_name },
-                        "x" => StateHeader::X { frame: frame_name },
-                        "y" => StateHeader::Y { frame: frame_name },
-                        "z" => StateHeader::Z { frame: frame_name },
-                        "vx" => StateHeader::VX { frame: frame_name },
-                        "vy" => StateHeader::VY { frame: frame_name },
-                        "vz" => StateHeader::VZ { frame: frame_name },
-                        _ => panic!("unknown header `{}`", splt[0]),
-                    });
+
+                    let param = match StateParameter::from_str(splt[0].to_lowercase().as_str()) {
+                        Ok(param) => param,
+                        Err(e) => return Err(NyxError::LoadingError(e.to_string())),
+                    };
+
+                    let hdr = StateHeader {
+                        param,
+                        frame_name,
+                        epoch_fmt: None,
+                    };
+
+                    hdrs.push(hdr);
                 }
             }
 
@@ -729,33 +494,33 @@ impl<'a> StateFormatter<'a> {
             }
         }
 
-        Self {
+        Ok(Self {
             filename,
             headers: hdrs,
             frames,
             cosm,
-        }
+        })
     }
 
     /// Default headers are [Epoch (GregorianTai), X, Y, Z, VX, VY, VZ], where position is in km and velocity in km/s.
-    pub fn default(filename: String, cosm: &'a Cosm) -> Self {
+    pub fn default(filename: String, cosm: Arc<Cosm>) -> Self {
         Self {
             filename,
             headers: vec![
-                StateHeader::Epoch(EpochFormat::GregorianTai),
-                StateHeader::X { frame: None },
-                StateHeader::Y { frame: None },
-                StateHeader::Z { frame: None },
-                StateHeader::VX { frame: None },
-                StateHeader::VY { frame: None },
-                StateHeader::VZ { frame: None },
+                From::from(StateParameter::Epoch),
+                From::from(StateParameter::X),
+                From::from(StateParameter::Y),
+                From::from(StateParameter::Z),
+                From::from(StateParameter::VX),
+                From::from(StateParameter::VY),
+                From::from(StateParameter::VZ),
             ],
             frames: HashMap::new(),
             cosm,
         }
     }
 
-    pub fn fmt(&self, state: &State) -> Vec<String> {
+    pub fn fmt(&self, state: &Orbit) -> Vec<String> {
         // Start by computing the state in all of the frames needed
         let mut mapped = HashMap::new();
         for (name, frame) in &self.frames {
@@ -764,116 +529,66 @@ impl<'a> StateFormatter<'a> {
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {
-            match hdr {
-                StateHeader::Epoch(efmt) => formatted.push(efmt.format(state.dt)),
-                StateHeader::AoL { frame }
-                | StateHeader::AoP { frame }
-                | StateHeader::apoapsis { frame }
-                | StateHeader::EA { frame }
-                | StateHeader::ECC { frame }
-                | StateHeader::energy { frame }
-                | StateHeader::evec { frame }
-                | StateHeader::geodetic_height { frame }
-                | StateHeader::geodetic_latitude { frame }
-                | StateHeader::geodetic_longitude { frame }
-                | StateHeader::hmag { frame }
-                | StateHeader::hvec { frame }
-                | StateHeader::HX { frame }
-                | StateHeader::HY { frame }
-                | StateHeader::HZ { frame }
-                | StateHeader::INC { frame }
-                | StateHeader::MA { frame }
-                | StateHeader::periapsis { frame }
-                | StateHeader::period { frame }
-                | StateHeader::RAAN { frame }
-                | StateHeader::radius { frame }
-                | StateHeader::rmag { frame }
-                | StateHeader::semi_parameter { frame }
-                | StateHeader::SMA { frame }
-                | StateHeader::TA { frame }
-                | StateHeader::TLong { frame }
-                | StateHeader::velocity { frame }
-                | StateHeader::vmag { frame }
-                | StateHeader::X { frame }
-                | StateHeader::Y { frame }
-                | StateHeader::Z { frame }
-                | StateHeader::VX { frame }
-                | StateHeader::VY { frame }
-                | StateHeader::VZ { frame } => {
-                    // Grab the state in the other frame if needed
-                    let out_state = if frame.is_some() {
-                        &mapped[&frame.as_ref().unwrap().to_lowercase()]
-                    } else {
-                        state
-                    };
-
-                    formatted.push(match hdr {
-                        StateHeader::AoL { .. } => format!("{:.16e}", out_state.aol()),
-                        StateHeader::AoP { .. } => format!("{:.16e}", out_state.aop()),
-                        StateHeader::apoapsis { .. } => format!("{:.16e}", out_state.apoapsis()),
-                        StateHeader::EA { .. } => format!("{:.16e}", out_state.ea()),
-                        StateHeader::ECC { .. } => format!("{:.16e}", out_state.ecc()),
-                        StateHeader::energy { .. } => format!("{:.16e}", out_state.energy()),
-                        StateHeader::evec { .. } => format!(
-                            "[{:.16e},{:.16e},{:.16e}]",
-                            out_state.evec()[0],
-                            out_state.evec()[1],
-                            out_state.evec()[2]
-                        ),
-                        StateHeader::geodetic_height { .. } => {
-                            format!("{:.16e}", out_state.geodetic_height())
-                        }
-                        StateHeader::geodetic_latitude { .. } => {
-                            format!("{:.16e}", out_state.geodetic_latitude())
-                        }
-                        StateHeader::geodetic_longitude { .. } => {
-                            format!("{:.16e}", out_state.geodetic_longitude())
-                        }
-                        StateHeader::hmag { .. } => format!("{:.16e}", out_state.hmag()),
-                        StateHeader::hvec { .. } => format!(
-                            "[{:.16e},{:.16e},{:.16e}]",
-                            out_state.hvec()[0],
-                            out_state.hvec()[1],
-                            out_state.hvec()[2]
-                        ),
-                        StateHeader::HX { .. } => format!("{:.16e}", out_state.hx()),
-                        StateHeader::HY { .. } => format!("{:.16e}", out_state.hy()),
-                        StateHeader::HZ { .. } => format!("{:.16e}", out_state.hz()),
-                        StateHeader::INC { .. } => format!("{:.16e}", out_state.inc()),
-                        StateHeader::MA { .. } => format!("{:.16e}", out_state.ma()),
-                        StateHeader::periapsis { .. } => format!("{:.16e}", out_state.periapsis()),
-                        StateHeader::period { .. } => format!("{:.16e}", out_state.period()),
-                        StateHeader::RAAN { .. } => format!("{:.16e}", out_state.raan()),
-                        StateHeader::radius { .. } => format!(
-                            "[{:.16e},{:.16e},{:.16e}]",
-                            out_state.radius()[0],
-                            out_state.radius()[1],
-                            out_state.radius()[2]
-                        ),
-                        StateHeader::rmag { .. } => format!("{:.16e}", out_state.rmag()),
-                        StateHeader::semi_parameter { .. } => {
-                            format!("{:.16e}", out_state.semi_parameter())
-                        }
-                        StateHeader::SMA { .. } => format!("{:.16e}", out_state.sma()),
-                        StateHeader::TA { .. } => format!("{:.16e}", out_state.ta()),
-                        StateHeader::TLong { .. } => format!("{:.16e}", out_state.tlong()),
-                        StateHeader::velocity { .. } => format!(
-                            "[{:.16e},{:.16e},{:.16e}]",
-                            out_state.velocity()[0],
-                            out_state.velocity()[1],
-                            out_state.velocity()[2]
-                        ),
-                        StateHeader::vmag { .. } => format!("{:.16e}", out_state.vmag()),
-                        StateHeader::X { .. } => format!("{:.16e}", out_state.x),
-                        StateHeader::Y { .. } => format!("{:.16e}", out_state.y),
-                        StateHeader::Z { .. } => format!("{:.16e}", out_state.z),
-                        StateHeader::VX { .. } => format!("{:.16e}", out_state.vx),
-                        StateHeader::VY { .. } => format!("{:.16e}", out_state.vy),
-                        StateHeader::VZ { .. } => format!("{:.16e}", out_state.vz),
-                        _ => panic!("unsupported header `{:?}`", hdr),
-                    });
-                }
+            // Grab the state in the other frame if needed
+            let state = if hdr.frame_name.is_some() {
+                &mapped[&hdr.frame_name.as_ref().unwrap().to_lowercase()]
+            } else {
+                state
             };
+
+            formatted.push(match hdr.param {
+                StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(state.dt),
+                StateParameter::AoL => format!("{:.16}", state.aol()),
+                StateParameter::AoP => format!("{:.16}", state.aop()),
+                StateParameter::Apoapsis => format!("{:.16}", state.ta()),
+                StateParameter::C3 => format!("{:.16}", state.c3()),
+                StateParameter::Declination => format!("{:.16}", state.declination()),
+                StateParameter::ApoapsisRadius => format!("{:.16}", state.apoapsis()),
+                StateParameter::EccentricAnomaly => format!("{:.16}", state.ea()),
+                StateParameter::Eccentricity => format!("{:.16}", state.ecc()),
+                StateParameter::Energy => format!("{:.16}", state.energy()),
+                StateParameter::GeodeticHeight => format!("{:.16}", state.geodetic_height()),
+                StateParameter::GeodeticLatitude => format!("{:.16}", state.geodetic_latitude()),
+                StateParameter::GeodeticLongitude => format!("{:.16}", state.geodetic_longitude()),
+                StateParameter::FlightPathAngle => format!("{:.16}", state.fpa()),
+                StateParameter::Hmag => format!("{:.16}", state.hmag()),
+                StateParameter::HX => format!("{:.16}", state.hx()),
+                StateParameter::HY => format!("{:.16}", state.hy()),
+                StateParameter::HZ => format!("{:.16}", state.hz()),
+                StateParameter::HyperbolicAnomaly => {
+                    format!("{:.16}", state.hyperbolic_anomaly().unwrap())
+                }
+                StateParameter::Inclination => format!("{:.16}", state.inc()),
+                StateParameter::MeanAnomaly => format!("{:.16}", state.ma()),
+                StateParameter::Periapsis => format!("{:.16}", state.ta()),
+                StateParameter::PeriapsisRadius => format!("{:.16}", state.periapsis()),
+                StateParameter::Period => format!("{:.16}", state.period().in_seconds()),
+                StateParameter::RightAscension => format!("{:.16}", state.right_ascension()),
+                StateParameter::RAAN => format!("{:.16}", state.raan()),
+                StateParameter::Rmag => format!("{:.16}", state.rmag()),
+                StateParameter::SemiParameter => format!("{:.16}", state.semi_parameter()),
+                StateParameter::SemiMinorAxis => format!("{:.16}", state.semi_minor_axis()),
+                StateParameter::SMA => format!("{:.16}", state.sma()),
+                StateParameter::TrueAnomaly => format!("{:.16}", state.ta()),
+                StateParameter::TrueLongitude => format!("{:.16}", state.tlong()),
+                StateParameter::VelocityDeclination => {
+                    format!("{:.16}", state.velocity_declination())
+                }
+                StateParameter::Vmag => format!("{:.16}", state.vmag()),
+                StateParameter::X => format!("{:.16}", state.x),
+                StateParameter::Y => format!("{:.16}", state.y),
+                StateParameter::Z => format!("{:.16}", state.z),
+                StateParameter::VX => format!("{:.16}", state.vx),
+                StateParameter::VY => format!("{:.16}", state.vy),
+                StateParameter::VZ => format!("{:.16}", state.vz),
+                StateParameter::FuelMass => {
+                    unimplemented!("No fuel for an orbit, only for spacecraft!")
+                }
+                StateParameter::Custom { .. } => {
+                    unimplemented!("Cannot format custom state parameters yet")
+                }
+                _ => unimplemented!("{:?} cannot yet be formatted (yet)", hdr.param),
+            });
         }
 
         formatted
@@ -881,14 +596,14 @@ impl<'a> StateFormatter<'a> {
 }
 
 /// A formatter for navigation solution
-pub struct NavSolutionFormatter<'a> {
+pub struct NavSolutionFormatter {
     pub filename: String,
     pub headers: Vec<NavSolutionHeader>,
-    pub estimated_headers: StateFormatter<'a>,
-    pub nominal_headers: StateFormatter<'a>,
+    pub estimated_headers: StateFormatter,
+    pub nominal_headers: StateFormatter,
 }
 
-impl<'a> NavSolutionFormatter<'a> {
+impl NavSolutionFormatter {
     /// ```
     /// extern crate nyx_space as nyx;
     /// use nyx::io::formatter::NavSolutionFormatter;
@@ -897,9 +612,9 @@ impl<'a> NavSolutionFormatter<'a> {
     /// let cosm = Cosm::de438();
     /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
     /// let hdrs = vec!["estimate:AoL".to_string(), "nominal:ea:eme2000".to_string(), "delta_x".to_string()];
-    /// NavSolutionFormatter::from_headers(hdrs, "nope".to_string(), &cosm);
+    /// NavSolutionFormatter::from_headers(hdrs, "nope".to_string(), cosm);
     /// ```
-    pub fn from_headers(headers: Vec<String>, filename: String, cosm: &'a Cosm) -> Self {
+    pub fn from_headers(headers: Vec<String>, filename: String, cosm: Arc<Cosm>) -> Self {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(40);
         let mut est_hdrs = Vec::with_capacity(20);
@@ -958,44 +673,13 @@ impl<'a> NavSolutionFormatter<'a> {
                 "cz_dot_y_dot" => hdrs.push(NavSolutionHeader::Cz_dot_y_dot { frame: frame_name }),
                 "cz_dot_z_dot" => hdrs.push(NavSolutionHeader::Cz_dot_z_dot { frame: frame_name }),
                 "estimate" | "nominal" => {
-                    let state_hdr = match splt[1] {
-                        "aol" => StateHeader::AoL { frame: frame_name },
-                        "aop" => StateHeader::AoP { frame: frame_name },
-                        "apoapsis" => StateHeader::apoapsis { frame: frame_name },
-                        "ea" => StateHeader::EA { frame: frame_name },
-                        "ecc" => StateHeader::ECC { frame: frame_name },
-                        "energy" => StateHeader::energy { frame: frame_name },
-                        "evec" => StateHeader::evec { frame: frame_name },
-                        "geodetic_height" => StateHeader::geodetic_height { frame: frame_name },
-                        "geodetic_latitude" => StateHeader::geodetic_latitude { frame: frame_name },
-                        "geodetic_longitude" => {
-                            StateHeader::geodetic_longitude { frame: frame_name }
-                        }
-                        "hmag" => StateHeader::hmag { frame: frame_name },
-                        "hvec" => StateHeader::hvec { frame: frame_name },
-                        "hx" => StateHeader::HX { frame: frame_name },
-                        "hy" => StateHeader::HY { frame: frame_name },
-                        "hz" => StateHeader::HZ { frame: frame_name },
-                        "inc" => StateHeader::INC { frame: frame_name },
-                        "ma" => StateHeader::MA { frame: frame_name },
-                        "periapsis" => StateHeader::periapsis { frame: frame_name },
-                        "period" => StateHeader::period { frame: frame_name },
-                        "raan" => StateHeader::RAAN { frame: frame_name },
-                        "radius" => StateHeader::radius { frame: frame_name },
-                        "rmag" => StateHeader::rmag { frame: frame_name },
-                        "semi_parameter" => StateHeader::semi_parameter { frame: frame_name },
-                        "sma" => StateHeader::SMA { frame: frame_name },
-                        "ta" => StateHeader::TA { frame: frame_name },
-                        "tlong" => StateHeader::TLong { frame: frame_name },
-                        "velocity" => StateHeader::velocity { frame: frame_name },
-                        "vmag" => StateHeader::vmag { frame: frame_name },
-                        "x" => StateHeader::X { frame: frame_name },
-                        "y" => StateHeader::Y { frame: frame_name },
-                        "z" => StateHeader::Z { frame: frame_name },
-                        "vx" => StateHeader::VX { frame: frame_name },
-                        "vy" => StateHeader::VY { frame: frame_name },
-                        "vz" => StateHeader::VZ { frame: frame_name },
-                        _ => panic!("unknown header `{}`", splt[0]),
+                    let param = StateParameter::from_str(splt[1].to_lowercase().as_str())
+                        .expect("Unknown paramater");
+
+                    let state_hdr = StateHeader {
+                        param,
+                        frame_name,
+                        epoch_fmt: None,
                     };
 
                     if splt[0] == "estimate" {
@@ -1019,26 +703,26 @@ impl<'a> NavSolutionFormatter<'a> {
                 filename: "file_should_not_exist".to_owned(),
                 headers: nom_hdrs,
                 frames: frames.clone(),
-                cosm: &cosm,
+                cosm: cosm.clone(),
             },
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
                 frames,
-                cosm: &cosm,
+                cosm,
             },
         }
     }
 
     /// Default headers are [Epoch (GregorianTai), X, Y, Z, VX, VY, VZ], where position is in km and velocity in km/s.
-    pub fn default(filename: String, cosm: &'a Cosm) -> Self {
+    pub fn default(filename: String, cosm: Arc<Cosm>) -> Self {
         let est_hdrs = vec![
-            StateHeader::X { frame: None },
-            StateHeader::Y { frame: None },
-            StateHeader::Z { frame: None },
-            StateHeader::VX { frame: None },
-            StateHeader::VY { frame: None },
-            StateHeader::VZ { frame: None },
+            From::from(StateParameter::X),
+            From::from(StateParameter::Y),
+            From::from(StateParameter::Z),
+            From::from(StateParameter::VX),
+            From::from(StateParameter::VY),
+            From::from(StateParameter::VZ),
         ];
         Self {
             filename,
@@ -1062,18 +746,22 @@ impl<'a> NavSolutionFormatter<'a> {
                 filename: "file_should_not_exist".to_owned(),
                 headers: Vec::new(),
                 frames: HashMap::new(),
-                cosm: &cosm,
+                cosm: cosm.clone(),
             },
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
                 frames: HashMap::new(),
-                cosm: &cosm,
+                cosm,
             },
         }
     }
 
-    pub fn fmt<T: EstimableState<U6>, S: NavSolution<T>>(&self, sol: &S) -> Vec<String> {
+    pub fn fmt<T: State, S: NavSolution<T>>(&self, sol: &S) -> Vec<String>
+    where
+        DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    {
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {

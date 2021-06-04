@@ -1,10 +1,28 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 extern crate hyperdual;
 
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
-use crate::celestia::{Frame, State};
+use crate::celestia::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, Vector3, VectorN, U3, U7};
-use crate::time::Epoch;
+use crate::dimensions::{DefaultAllocator, DimName, Matrix3, MatrixN, Vector3, VectorN, U7};
+use crate::State;
 
 pub use crate::errors::NyxError;
 
@@ -13,6 +31,7 @@ pub use crate::errors::NyxError;
 /// It is up to the engineer to ensure that the coordinate frames of the different dynamics borrowed
 /// from this module match, or perform the appropriate coordinate transformations.
 pub mod orbital;
+pub use self::orbital::*;
 
 /// The gravity module handles spherical harmonics only. It _must_ be combined with a OrbitalDynamics dynamics
 ///
@@ -22,16 +41,9 @@ pub mod orbital;
 /// The drag module handles drag in a very basic fashion. Do not use for high fidelity dynamics.
 // pub mod drag;
 
-/// The angular momentum module handles all angular momentum dynamics.
-///
-/// Note that this module does not handle attitude parameters or control. Refer to the relevant modules.
-pub mod momentum;
-
 /// The spacecraft module allows for simulation of spacecraft dynamics in general, including propulsion/maneuvers.
 pub mod spacecraft;
-
-/// Defines what a propulsion subsystem must implement, with some common propulsion systems.
-pub mod propulsion;
+pub use self::spacecraft::*;
 
 /// Defines a few examples of thrust controllers.
 pub mod thrustctrl;
@@ -39,17 +51,17 @@ pub mod thrustctrl;
 /// Defines some velocity change controllers.
 pub mod deltavctrl;
 
-/// Defines a MissionArc, i.e. a section of a spacecraft mission. Enables maneuvers design.
-pub mod missionarc;
-
 /// Defines solar radiation pressure models
 pub mod solarpressure;
+pub use self::solarpressure::*;
 
 /// Define drag models
 pub mod drag;
+pub use self::drag::*;
 
 /// Define the spherical harmonic models.
 pub mod sph_harmonics;
+pub use self::sph_harmonics::*;
 
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
@@ -57,92 +69,101 @@ pub mod sph_harmonics;
 /// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
 ///  parameters), it is up to the implementor to handle time and state organization correctly.
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
-pub trait Dynamics {
-    /// Defines the state size for these dynamics. It must be imported from `nalgebra`.
-    type StateSize: DimName;
-    /// Defines the type which will be published on the propagator channel
-    type StateType: Copy;
-    /// Returns the time of the current state
-    fn time(&self) -> f64;
-
-    /// Returns the current state of the dynamics as a vector so it can be integrated.
-    fn state_vector(&self) -> VectorN<f64, Self::StateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize>;
+pub trait Dynamics: Clone + Sync + Send
+where
+    DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>,
+{
+    /// The state of the associated hyperdual state, almost always StateType + U1
+    type HyperdualSize: DimName;
+    type StateType: State;
 
     /// Defines the equations of motion for these dynamics, or a combination of provided dynamics.
-    fn eom(&self, t: f64, state: &VectorN<f64, Self::StateSize>) -> VectorN<f64, Self::StateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize>;
-
-    /// Updates the internal state of the dynamics.
-    fn set_state(
-        &mut self,
-        new_t: f64,
-        new_state: &VectorN<f64, Self::StateSize>,
-    ) -> Result<(), NyxError>
-    where
-        DefaultAllocator: Allocator<f64, Self::StateSize>;
-
-    /// Returns the state of the dynamics
-    fn state(&self) -> Self::StateType;
-}
-
-/// A trait to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-pub trait AutoDiff: Send + Sync {
-    /// Defines the state size of the estimated state
-    type HyperStateSize: DimName;
-    type STMSize: DimName;
-
-    /// Computes both the state and the gradient of the dynamics.
-    fn eom_grad(
+    /// The time delta_t is in **seconds** PAST the context epoch. The state vector is the state which
+    /// changes for every intermediate step of the integration. The state context is the state of
+    /// what is being propagated, it should allow rebuilding a new state context from the
+    /// provided state vector.
+    fn eom(
         &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &VectorN<f64, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
+        delta_t: f64,
+        state_vec: &VectorN<f64, <Self::StateType as State>::PropVecSize>,
+        state_ctx: &Self::StateType,
+    ) -> Result<VectorN<f64, <Self::StateType as State>::PropVecSize>, NyxError>
     where
-        DefaultAllocator: Allocator<f64, Self::STMSize>
-            + Allocator<f64, Self::STMSize, Self::STMSize>
-            + Allocator<f64, Self::HyperStateSize>
-            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-        Owned<f64, Self::HyperStateSize>: Copy,
-    {
-        let hyperstate: VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize> =
-            hyperspace_from_vector(&state);
-
-        let (state, grad) = self.dual_eom(epoch, integr_frame, &hyperstate);
-
-        (state, grad)
-    }
+        DefaultAllocator: Allocator<f64, <Self::StateType as State>::PropVecSize>;
 
     /// Defines the equations of motion for Dual numbers for these dynamics.
+    /// _All_ dynamics need to allow for automatic differentiation. However, if differentiation is not supported,
+    /// then the dynamics should prevent initialization with a context which has an STM defined.
     fn dual_eom(
         &self,
-        epoch: Epoch,
-        integr_frame: Frame,
-        state: &VectorN<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-    ) -> (
-        VectorN<f64, Self::STMSize>,
-        MatrixMN<f64, Self::STMSize, Self::STMSize>,
-    )
+        delta_t: f64,
+        state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
+        state_ctx: &Self::StateType,
+    ) -> Result<
+        (
+            VectorN<f64, <Self::StateType as State>::Size>,
+            MatrixN<f64, <Self::StateType as State>::Size>,
+        ),
+        NyxError,
+    >
     where
-        DefaultAllocator: Allocator<f64, Self::HyperStateSize>
-            + Allocator<f64, Self::STMSize>
-            + Allocator<f64, Self::STMSize, Self::STMSize>
-            + Allocator<Hyperdual<f64, Self::HyperStateSize>, Self::STMSize>,
-        Owned<f64, Self::HyperStateSize>: Copy;
+        DefaultAllocator: Allocator<f64, Self::HyperdualSize>
+            + Allocator<f64, <Self::StateType as State>::Size>
+            + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
+            + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
+        Owned<f64, Self::HyperdualSize>: Copy;
+
+    /// Computes both the state and the gradient of the dynamics. This function is pre-implemented.
+    fn eom_grad(
+        &self,
+        delta_t_s: f64,
+        state_vec: &VectorN<f64, <Self::StateType as State>::Size>,
+        state_ctx: &Self::StateType,
+    ) -> Result<
+        (
+            VectorN<f64, <Self::StateType as State>::Size>,
+            MatrixN<f64, <Self::StateType as State>::Size>,
+        ),
+        NyxError,
+    >
+    where
+        DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>
+            + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
+            + Allocator<f64, Self::HyperdualSize>
+            + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
+        Owned<f64, Self::HyperdualSize>: Copy,
+    {
+        let hyperstate: VectorN<
+            Hyperdual<f64, Self::HyperdualSize>,
+            <Self::StateType as State>::Size,
+        > = hyperspace_from_vector(&state_vec);
+
+        let (state, grad) = self.dual_eom(delta_t_s, &hyperstate, &state_ctx)?;
+
+        Ok((state, grad))
+    }
+
+    /// Optionally performs some final changes after each successful integration of the equations of motion.
+    /// For example, this can be used to update the GNC mode.
+    fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
+        Ok(next_state)
+    }
 }
 
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync {
+pub trait ForceModel: Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, osc: &State) -> Vector3<f64>;
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError>;
+
+    /// Force models must implement their partials, although those will only be called if the propagation requires the
+    /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
+    fn dual_eom(
+        &self,
+        radius: &Vector3<Hyperdual<f64, U7>>,
+        osc_ctx: &Spacecraft,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
@@ -150,5 +171,13 @@ pub trait ForceModel: AutoDiff<STMSize = U3, HyperStateSize = U7> + Send + Sync 
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
 pub trait AccelModel: Send + Sync {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
-    fn eom(&self, osc: &State) -> Vector3<f64>;
+    fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError>;
+
+    /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
+    /// computation of the STM.
+    fn dual_eom(
+        &self,
+        radius: &Vector3<Hyperdual<f64, U7>>,
+        osc_ctx: &Orbit,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }

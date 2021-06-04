@@ -1,68 +1,67 @@
 extern crate csv;
-extern crate hifitime;
-extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use self::hifitime::{Epoch, SECONDS_PER_DAY};
-use self::na::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::celestia::{Cosm, State};
-use self::nyx::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm};
-use self::nyx::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
+use self::nyx::celestia::{Cosm, Orbit};
+use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
+use self::nyx::dynamics::orbital::OrbitalDynamics;
+use self::nyx::dynamics::sph_harmonics::Harmonics;
 use self::nyx::io::gravity::*;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use self::nyx::time::{Epoch, TimeUnit};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
+#[allow(clippy::identity_op)]
 #[test]
-fn ekf_fixed_step_perfect_stations() {
+fn od_tb_ekf_fixed_step_perfect_stations() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::thread;
 
     let cosm = Cosm::de438();
 
     // Define the ground stations.
     let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 5.0;
+    let ekf_disable_time = 5.0 * TimeUnit::Second;
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-    thread::spawn(move || {
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
-    });
+    // We're sharing both the propagator and the dynamics.
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+
+    let mut prop = setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    let final_truth = prop.for_duration(prop_time).unwrap();
+    println!("{}", final_truth);
 
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.recv() {
+    while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
@@ -75,9 +74,7 @@ fn ekf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
-    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-6;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -111,7 +108,11 @@ fn ekf_fixed_step_perfect_stations() {
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
-    println!("{}", est.state());
+    println!("Final estimate:\n{}", est);
+    assert!(
+        est.state_deviation().norm() < 1e-12,
+        "In perfect modeling, the state deviation should be near zero"
+    );
     for i in 0..6 {
         assert!(
             est.covar[(i, i)] >= 0.0,
@@ -135,12 +136,13 @@ fn ekf_fixed_step_perfect_stations() {
     }
 }
 
+#[allow(clippy::identity_op)]
 #[test]
-fn ckf_fixed_step_perfect_stations() {
+fn od_tb_ckf_fixed_step_perfect_stations() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::{io, thread};
+    use std::io;
 
     let cosm = Cosm::de438();
 
@@ -149,37 +151,36 @@ fn ckf_fixed_step_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-    thread::spawn(move || {
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
-    });
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+
+    let mut prop = setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.recv() {
+    while let Ok(rx_state) = truth_rx.try_recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
@@ -193,9 +194,7 @@ fn ckf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
-    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -215,13 +214,7 @@ fn ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(
-        prop_est,
-        ckf,
-        all_stations.clone(),
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -281,8 +274,11 @@ fn ckf_fixed_step_perfect_stations() {
     println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
 
     // Iterate
-    odp.iterate(&measurements, SmoothingArc::TimeGap(10.0))
-        .unwrap();
+    odp.iterate(
+        &measurements,
+        SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+    )
+    .unwrap();
 
     println!(
         "N-1 one iteration: \n{}",
@@ -295,12 +291,12 @@ fn ckf_fixed_step_perfect_stations() {
     );
 }
 
+#[allow(clippy::identity_op)]
 #[test]
-fn ckf_fixed_step_iteration_test() {
+fn od_tb_ckf_fixed_step_iteration_test() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::thread;
 
     let cosm = Cosm::de438();
 
@@ -309,37 +305,35 @@ fn ckf_fixed_step_iteration_test() {
     let range_noise = 0.1;
     let range_rate_noise = 0.001;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-    thread::spawn(move || {
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
-    });
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
+    let mut prop = setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    prop.for_duration(prop_time).unwrap();
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.recv() {
+    while let Ok(rx_state) = truth_rx.try_recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
@@ -353,9 +347,7 @@ fn ckf_fixed_step_iteration_test() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
-    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -379,20 +371,17 @@ fn ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(
-        prop_est,
-        ckf,
-        all_stations.clone(),
-        false,
-        measurements.len(),
-    );
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
 
     odp.process_measurements(&measurements).unwrap();
 
     // Iterate, and check that the initial state difference is lower
     // Iterate
-    odp.iterate(&measurements, SmoothingArc::TimeGap(10.0))
-        .unwrap();
+    odp.iterate(
+        &measurements,
+        SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+    )
+    .unwrap();
 
     let dstate_no_iteration = initial_state - initial_state2;
     let dstate_iteration = initial_state - odp.estimates[0].state();
@@ -406,13 +395,13 @@ fn ckf_fixed_step_iteration_test() {
     )
 }
 
+#[allow(clippy::identity_op)]
 #[test]
-fn ckf_fixed_step_perfect_stations_snc_covar_map() {
+fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Tests state noise compensation with covariance mapping
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::thread;
 
     let cosm = Cosm::de438();
 
@@ -421,37 +410,36 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-    thread::spawn(move || {
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
-    });
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+
+    let mut prop = setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.recv() {
+    while let Ok(rx_state) = truth_rx.try_recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
@@ -465,9 +453,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
-    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -489,7 +475,7 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(120.0, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
@@ -533,8 +519,9 @@ fn ckf_fixed_step_perfect_stations_snc_covar_map() {
     }
 }
 
+#[allow(clippy::identity_op)]
 #[test]
-fn ckf_map_covar() {
+fn od_tb_ckf_map_covar() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -546,29 +533,31 @@ fn ckf_map_covar() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 2.0 * SECONDS_PER_DAY;
-    let step_size = 10.0;
-    let opts_est = PropOpts::with_fixed_step(step_size);
+    let prop_time = 2 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
 
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let setup = Propagator::new::<RK4Fixed>(
+        OrbitalDynamics::two_body(),
+        PropOpts::with_fixed_step(step_size),
+    );
+    let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e-3;
     let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
@@ -615,14 +604,13 @@ fn ckf_map_covar() {
     }
 }
 
+#[allow(clippy::identity_op)]
 #[test]
-fn ckf_fixed_step_perfect_stations_harmonics() {
+fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
     // Tests state noise compensation with covariance mapping
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-
-    use std::thread;
 
     let cosm = Cosm::de438();
 
@@ -631,42 +619,39 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let iau_earth = cosm.frame("IAU Earth");
-    let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-    thread::spawn(move || {
-        let cosm = Cosm::de438();
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-        let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, &cosm);
-        dynamics.add_model(Box::new(harmonics));
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
-    });
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
+    let orbital_dyn = OrbitalDynamics::from_model(harmonics);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+
+    let mut prop = setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    let final_truth = prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.recv() {
+    while let Ok(rx_state) = truth_rx.try_recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
@@ -680,12 +665,7 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
-    let mut estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = HarmonicsDiff::from_stor(iau_earth, earth_sph_harm, &cosm);
-    estimator.add_model(Box::new(harmonics));
-    let prop_est = Propagator::new::<RK4Fixed>(&mut estimator, &opts_est);
+    let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -726,23 +706,25 @@ fn ckf_fixed_step_perfect_stations_harmonics() {
             );
         }
         assert!(
-            est.state_deviation().norm() < 1e-12,
-            "estimate error should be zero (perfect dynamics) ({:e})",
+            est.state_deviation().norm() < 1e-2,
+            "estimate error should be good (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
 
         wtr.serialize(est.clone())
             .expect("could not write to stdout");
     }
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n{}\n\n{}", est, est.state_deviation(), final_truth);
 }
 
+#[allow(clippy::identity_op)]
 #[test]
-fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
+fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Tests state noise compensation with covariance mapping
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
-    use std::thread;
 
     let cosm = Cosm::de438();
 
@@ -751,37 +733,35 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, &cosm);
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = SECONDS_PER_DAY;
-    let step_size = 10.0;
+    let prop_time = 1 * TimeUnit::Day;
+    let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<State>, Receiver<State>) = mpsc::channel();
+    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_mjd_tai(21545.0);
-    let initial_state = State::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    // Generate the truth data on one thread.
-    thread::spawn(move || {
-        let mut dynamics = OrbitalDynamics::two_body(initial_state);
-        let mut prop = Propagator::new::<RK4Fixed>(&mut dynamics, &opts);
-        prop.tx_chan = Some(truth_tx);
-        prop.until_time_elapsed(prop_time).unwrap();
-    });
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let mut prop = setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.recv() {
+    while let Ok(rx_state) = truth_rx.try_recv() {
         // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
@@ -795,9 +775,7 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let opts_est = PropOpts::with_fixed_step(step_size);
-    let mut tb_estimator = OrbitalDynamicsStm::two_body(initial_state);
-    let prop_est = Propagator::new::<RK4Fixed>(&mut tb_estimator, &opts_est);
+    let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
     let covar_radius = 1.0e-3;
@@ -819,12 +797,12 @@ fn ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q1 = 1e-7_f64.powi(2);
-    let process_noise1 = SNC3::from_diagonal(120.0, &[sigma_q1, sigma_q1, sigma_q1]);
+    let process_noise1 = SNC3::from_diagonal(2 * TimeUnit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
 
     let sigma_q2 = 1e-8_f64.powi(2);
     let sigma_q2_d = 3600.0;
     let mut process_noise2 = SNC3::with_decay(
-        120.0,
+        2 * TimeUnit::Day,
         &[sigma_q2, sigma_q2, sigma_q2],
         &[sigma_q2_d, sigma_q2_d, sigma_q2_d],
     );

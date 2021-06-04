@@ -1,36 +1,58 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 extern crate csv;
 
 pub use crate::celestia::*;
-use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3, U6};
-use crate::dynamics::spacecraft::SpacecraftState;
+use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
-use crate::md::ui::{MDProcess, StmStateFlag};
+use crate::md::ui::MDProcess;
 use crate::od::ranging::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};
-use crate::time::SECONDS_PER_DAY;
+use crate::propagators::Propagator;
+use crate::time::{Duration, TimeUnit};
+use crate::Orbit;
+use std::str::FromStr;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::time::Instant;
 
 pub struct OdpScenario<'a> {
     truth: MDProcess<'a>,
     nav: MDProcess<'a>,
     ekf_msr_trigger: usize,
-    ekf_disable_time: f64,
-    kf: KF<U6, U3, U2, SpacecraftState>,
-    stations: Vec<GroundStation<'a>>,
-    formatter: Option<NavSolutionFormatter<'a>>,
+    ekf_disable_time: Duration,
+    kf: KF<Orbit, U3, U2>,
+    stations: Vec<GroundStation>,
+    formatter: Option<NavSolutionFormatter>,
 }
 
 impl<'a> OdpScenario<'a> {
+    #[allow(clippy::identity_op)]
     pub fn try_from_scenario(
         scenario: &ScenarioSerde,
         seq_name: String,
-        cosm: &'a Cosm,
+        cosm: Arc<Cosm>,
     ) -> Result<Self, ParsingError> {
         if scenario.odp.is_none() {
             return Err(ParsingError::UseMdInstead);
@@ -47,9 +69,32 @@ impl<'a> OdpScenario<'a> {
         } else if scenario.stations.is_none() {
             return Err(ParsingError::OD("missing `stations` section".to_string()));
         }
-        let all_measurements = scenario.measurements.as_ref().unwrap();
-        let all_estimates = scenario.estimate.as_ref().unwrap();
-        let all_stations = scenario.stations.as_ref().unwrap();
+        let all_measurements = match scenario.measurements.as_ref() {
+            Some(msr) => msr,
+            None => {
+                return Err(ParsingError::LoadingError(
+                    "no measurements provided".to_string(),
+                ))
+            }
+        };
+
+        let all_estimates = match scenario.estimate.as_ref() {
+            Some(est) => est,
+            None => {
+                return Err(ParsingError::LoadingError(
+                    "no estimates provided".to_string(),
+                ))
+            }
+        };
+
+        let all_stations = match scenario.stations.as_ref() {
+            Some(st) => st,
+            None => {
+                return Err(ParsingError::LoadingError(
+                    "no stations provided".to_string(),
+                ))
+            }
+        };
 
         if let Some(odp_seq) = odp.get(&seq_name.to_lowercase()) {
             // Get the measurement generation
@@ -75,19 +120,19 @@ impl<'a> OdpScenario<'a> {
                                             s.elevation,
                                             s.range_noise,
                                             s.range_rate_noise,
-                                            cosm,
+                                            cosm.clone(),
                                         ),
                                         "dss34" => GroundStation::dss34_canberra(
                                             s.elevation,
                                             s.range_noise,
                                             s.range_rate_noise,
-                                            cosm,
+                                            cosm.clone(),
                                         ),
                                         "dss65" => GroundStation::dss65_madrid(
                                             s.elevation,
                                             s.range_noise,
                                             s.range_rate_noise,
-                                            cosm,
+                                            cosm.clone(),
                                         ),
                                         _ => {
                                             return Err(ParsingError::OD(format!(
@@ -107,7 +152,7 @@ impl<'a> OdpScenario<'a> {
                                         s.range_noise,
                                         s.range_rate_noise,
                                         iau_earth,
-                                        cosm,
+                                        cosm.clone(),
                                     )
                                 };
                                 stations.push(gs);
@@ -118,8 +163,8 @@ impl<'a> OdpScenario<'a> {
                     let md = MDProcess::try_from_scenario(
                         scenario,
                         msr.propagator.as_ref().unwrap().to_string(),
-                        StmStateFlag::Without(()),
-                        cosm,
+                        false,
+                        cosm.clone(),
                     )?
                     .0;
 
@@ -147,7 +192,8 @@ impl<'a> OdpScenario<'a> {
                     }
 
                     let est_init_state_serde = &scenario.state[&est_serde.state.to_lowercase()];
-                    let state_frame = cosm.frame(est_init_state_serde.frame.as_str());
+                    let state_frame =
+                        cosm.frame(est_init_state_serde.frame.as_ref().unwrap().as_str());
                     let est_init_state = est_init_state_serde.as_state(state_frame)?;
 
                     // Build the covariance
@@ -182,9 +228,9 @@ impl<'a> OdpScenario<'a> {
                             &odp_seq.initial_estimate
                         )));
                     }
-                    let mut init_sc_state = md.state();
+                    let mut init_sc_state = md.init_state;
                     init_sc_state.orbit = est_init_state;
-                    let initial_estimate = KfEstimate::from_covar(init_sc_state, cov);
+                    let initial_estimate = KfEstimate::from_covar(init_sc_state.orbit, cov);
                     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(
                         odp_seq.msr_noise[0],
                         odp_seq.msr_noise[1],
@@ -200,17 +246,23 @@ impl<'a> OdpScenario<'a> {
                                 ));
                             }
                             // Disable SNC if there is more than 120 seconds between two measurements
-                            let disable_time_s = match &odp_seq.snc_disable {
+                            let disable_time = match &odp_seq.snc_disable {
                                 None => {
                                     warn!("No SNC disable time specified, assuming 120 seconds");
-                                    120.0
+                                    2 * TimeUnit::Minute
                                 }
-                                Some(snd_disable_dt) => parse_duration(snd_disable_dt)?.v(),
+                                // Some(snd_disable_dt) => parse_duration(snd_disable_dt)?.v(),
+                                Some(snc_disable_dt) => match Duration::from_str(snc_disable_dt) {
+                                    Ok(d) => d,
+                                    Err(e) => {
+                                        return Err(ParsingError::IllDefined(format!("{}", e)))
+                                    }
+                                },
                             };
 
                             // Build the process noise
                             let process_noise = match &odp_seq.snc_decay {
-                                None => SNC3::from_diagonal(disable_time_s, snc),
+                                None => SNC3::from_diagonal(disable_time, snc),
                                 Some(decay_str) => {
                                     if decay_str.len() != 3 {
                                         return Err(ParsingError::OD(
@@ -221,7 +273,7 @@ impl<'a> OdpScenario<'a> {
                                     for (i, ds) in decay_str.iter().enumerate() {
                                         scn_decay_s[i] = parse_duration(ds)?.v();
                                     }
-                                    SNC3::with_decay(disable_time_s, snc, &scn_decay_s)
+                                    SNC3::with_decay(disable_time, snc, &scn_decay_s)
                                 }
                             };
 
@@ -234,8 +286,8 @@ impl<'a> OdpScenario<'a> {
                     let estimator = MDProcess::try_from_scenario(
                         scenario,
                         odp_seq.navigation_prop.to_string(),
-                        StmStateFlag::With(()),
-                        cosm,
+                        true,
+                        cosm.clone(),
                     )?
                     .0;
 
@@ -248,7 +300,7 @@ impl<'a> OdpScenario<'a> {
                                     output
                                 )))
                             }
-                            Some(output) => Some(output.to_nav_sol_formatter(&cosm)),
+                            Some(output) => Some(output.to_nav_sol_formatter(cosm)),
                         },
                         None => None,
                     };
@@ -263,7 +315,7 @@ impl<'a> OdpScenario<'a> {
                         },
                         ekf_disable_time: match &odp_seq.ekf_disable_time {
                             Some(val) => *val,
-                            None => 3600.0, // defaults to one hour
+                            None => 1 * TimeUnit::Hour, // defaults to one hour
                         },
                         stations,
                         formatter,
@@ -276,9 +328,9 @@ impl<'a> OdpScenario<'a> {
     }
 
     /// Will generate the measurements and run the filter.
-    pub fn execute(mut self) -> Result<(), NyxError> {
+    pub fn execute(self) -> Result<(), NyxError> {
         // Generate the measurements.
-        let prop_time = self.truth.prop_time_s.unwrap();
+        let prop_time = self.truth.prop_time.unwrap();
 
         // Create the output file for the truth
         let mut maybe_wtr = match &self.truth.formatter {
@@ -293,30 +345,30 @@ impl<'a> OdpScenario<'a> {
             None => None,
         };
 
-        let mut truth_prop = self.truth.propagator();
-        truth_prop.set_step(10.0, true);
+        let mut prop_setup = Propagator::default(self.truth.sc_dyn);
+        prop_setup.set_tolerance(self.truth.prop_tol);
+        let mut truth_prop = prop_setup.with(self.truth.init_state);
+
+        // let mut truth_prop = self.truth.propagator();
+        truth_prop.set_step(10.0 * TimeUnit::Second, true);
 
         // Set up the channels
         let (tx, rx) = channel();
         truth_prop.tx_chan = Some(tx);
 
-        let mut initial_state = Some(truth_prop.state());
+        let mut initial_state = Some(truth_prop.state);
 
         // Generate the measurements
-        info!(
-            "Generating measurements over {} seconds (~ {:.3} days)",
-            prop_time,
-            prop_time / SECONDS_PER_DAY
-        );
+        info!("Generating measurements over {} ", prop_time);
 
         let start = Instant::now();
-        info!("Initial state: {}", truth_prop.state());
+        info!("Initial state: {}", truth_prop.state);
 
-        truth_prop.until_time_elapsed(prop_time)?;
+        truth_prop.for_duration(prop_time)?;
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
-            truth_prop.state(),
+            truth_prop.state,
             (Instant::now() - start).as_secs_f64()
         );
 
@@ -354,8 +406,14 @@ impl<'a> OdpScenario<'a> {
         );
 
         // Build the ODP
-        let mut nav = self.nav.stm_propagator();
-        nav.set_step(10.0, true);
+        let mut prop_setup = Propagator::default(self.nav.sc_dyn);
+        prop_setup.set_tolerance(self.nav.prop_tol);
+        // Make sure to set the STM
+        let mut init_state = self.nav.init_state;
+        init_state.orbit.stm_identity();
+        let mut nav = prop_setup.with(init_state);
+
+        nav.set_step(10.0 * TimeUnit::Second, true);
 
         let kf = self.kf;
         let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);

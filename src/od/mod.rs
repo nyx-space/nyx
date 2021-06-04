@@ -1,12 +1,31 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+extern crate hyperdual;
+extern crate rand;
+extern crate rand_distr;
 extern crate serde;
 
-use crate::celestia::TimeTagged;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
+pub use crate::dynamics::{Dynamics, NyxError};
 use crate::time::Epoch;
-pub use dynamics::{Dynamics, NyxError};
-use std::fmt;
-use std::ops::Add;
+use crate::{State, TimeTagged};
 
 use crate::io::{CovarFormat, EpochFormat};
 
@@ -25,82 +44,26 @@ pub mod residual;
 /// Provides some helper for filtering.
 pub mod ui;
 
-/// Provides the Square Root Information Filter
-pub mod srif;
-
 /// Provides all state noise compensation functionality
 pub mod snc;
 
-/// A trait container to specify that given dynamics support linearization, and can be used for state transition matrix computation.
-///
-/// This trait will likely be made obsolete after the implementation of [#32](https://github.com/ChristopherRabotin/nyx/issues/32).
-pub trait Estimable<N>
-where
-    Self: Dynamics + Sized,
-{
-    /// Defines the state size of the estimated state
-    type LinStateSize: DimName;
-    /// Returns the estimated state
-    fn extract_estimated_state(
-        &self,
-        prop_state: &Self::StateType,
-    ) -> VectorN<f64, Self::LinStateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::LinStateSize>;
-
-    /// Returns the estimated state
-    fn estimated_state(&self) -> VectorN<f64, Self::LinStateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::LinStateSize>,
-    {
-        self.extract_estimated_state(&self.state())
-    }
-
-    /// Sets the estimated state
-    fn set_estimated_state(&mut self, new_state: VectorN<f64, Self::LinStateSize>)
-    where
-        DefaultAllocator: Allocator<f64, Self::LinStateSize>;
-
-    /// Defines the gradient of the equations of motion for these dynamics.
-    fn stm(&self) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::LinStateSize>
-            + Allocator<f64, Self::LinStateSize, Self::LinStateSize>,
-    {
-        self.extract_stm(&self.state())
-    }
-
-    /// Converts the Dynamics' state type to a measurement to be ingested in a filter
-    fn to_measurement(&self, prop_state: &Self::StateType) -> N;
-
-    /// Extracts the STM from the dynamics state
-    fn extract_stm(
-        &self,
-        prop_state: &Self::StateType,
-    ) -> MatrixMN<f64, Self::LinStateSize, Self::LinStateSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::LinStateSize>
-            + Allocator<f64, Self::LinStateSize, Self::LinStateSize>;
-}
-
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
-pub trait Filter<S, A, M, T>
+pub trait Filter<T, A, M>
 where
-    S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, S>
+        + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
-        + Allocator<f64, S, A>
-        + Allocator<f64, A, S>,
+        + Allocator<f64, <T as State>::Size, A>
+        + Allocator<f64, A, <T as State>::Size>,
 {
-    type Estimate: estimate::Estimate<S, T>;
+    type Estimate: estimate::Estimate<T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate;
@@ -110,11 +73,11 @@ where
 
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
-    fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>);
+    fn update_stm(&mut self, new_stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>);
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
-    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>);
+    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, <T as State>::Size>);
 
     /// Computes a time update/prediction at the provided nominal state (i.e. advances the filter estimate with the updated STM).
     ///
@@ -127,8 +90,8 @@ where
     fn measurement_update(
         &mut self,
         nominal_state: T,
-        real_obs: VectorN<f64, M>,
-        computed_obs: VectorN<f64, M>,
+        real_obs: &VectorN<f64, M>,
+        computed_obs: &VectorN<f64, M>,
     ) -> Result<(Self::Estimate, residual::Residual<M>), NyxError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)
@@ -173,7 +136,6 @@ where
     Self: Sized,
     Msr: Measurement,
     DefaultAllocator: Allocator<f64, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>,
 {
@@ -181,10 +143,14 @@ where
     fn measure(&self, input: &MsrIn) -> Option<Msr>;
 }
 
-pub trait EstimableState<S: DimName>:
-    TimeTagged + Add<VectorN<f64, S>, Output = Self> + Clone + PartialEq + fmt::Display + fmt::LowerExp
+pub trait EstimateFrom<O: State>
 where
-    Self: Sized,
-    DefaultAllocator: Allocator<f64, S>,
+    Self: State,
+    DefaultAllocator: Allocator<f64, <O as State>::Size>
+        + Allocator<f64, <O as State>::Size, <O as State>::Size>
+        + Allocator<f64, Self::Size>
+        + Allocator<f64, Self::Size, Self::Size>,
 {
+    fn extract(from: &O) -> Self;
+    fn add_dev(to: &O, dev: VectorN<f64, Self::Size>) -> O;
 }

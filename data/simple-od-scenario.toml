@@ -1,6 +1,6 @@
 sequence = ["my_flt"]
 
-[state.NrHO]
+[state.nrho]
 # Note: state names are case insensitive
 x = -247_356.243_556_962_3
 y = 288_461.416_024_030_9
@@ -11,7 +11,7 @@ vz = -0.189_705_982_926_050_1
 frame = "EME2000"
 epoch = "2020-01-12T04:42:54.776 TAI"
 
-[delta_state.NrHO_nav]
+[delta_state.nrho_nav]
 inherit = "nrho"
 position = ["10 m", "-5 m", "2 m"]
 
@@ -25,25 +25,25 @@ vz = 1.268_665_304_666_975
 frame = "EME2000"
 epoch = "2020-01-12T04:42:54.776 TAI"
 
-[orbital_dynamics.trUtH]
+[orbital_dynamics.truth]
 integration_frame = "EME2000"
-initial_state = "NrHo"
+initial_state = "nrho"
 point_masses = ["Sun", "Earth", "Luna"]
 accel_models = ["my_models"]
 
 [orbital_dynamics.nav]
 integration_frame = "EME2000"
-initial_state = "NrHO_nav"
+initial_state = "nrho_nav"
 point_masses = ["Sun", "Earth", "Luna"]
 accel_models = ["my_modEls"]
 
-[spacecraft.sC1_truth]
+[spacecraft.sc1_truth]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "truth"
 force_models = ["my_srp"]
 
-[spacecraft.sc1_nAv]
+[spacecraft.sc1_nav]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "nav"
@@ -54,7 +54,7 @@ dynamics = "sc1_naV"
 stop_cond = "8 hours"
 
 [propagator.truth_propagator]
-dynamics = "sc1_Truth"
+dynamics = "sc1_truth"
 stop_cond = "8 hours"
 output = "my_csv"
 
@@ -70,7 +70,7 @@ degree = 20
 order = 20
 file = "data/Luna_jggrx_1500e_sha.tab.gz"
 
-[output.my_cSv]
+[output.my_csv]
 filename = "./data/truth.csv"
 
 [odp.my_flt]

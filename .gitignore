@@ -3,4 +3,5 @@
 Cargo.lock
 tests/Papers
 node_modules/
-*.csv
+*.bsp
+*.script.bak

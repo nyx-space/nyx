@@ -1,10 +1,27 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+extern crate crossbeam;
 use std::fmt;
 
 /// Provides different methods for controlling the error computation of the integrator.
 pub mod error_ctrl;
 pub use self::error_ctrl::*;
-
-pub mod events;
 
 // Re-Export
 mod rk;
@@ -18,7 +35,10 @@ pub use self::verner::*;
 mod propagator;
 pub use self::propagator::*;
 
+use crate::time::Duration;
+
 /// The `RK` trait defines a Runge Kutta integrator.
+#[allow(clippy::upper_case_acronyms)]
 pub trait RK
 where
     Self: Sized,
@@ -41,10 +61,10 @@ where
 }
 
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct IntegrationDetails {
     /// step size used
-    pub step: f64,
+    pub step: Duration,
     /// error in the previous integration step
     pub error: f64,
     /// number of attempts needed by an adaptive step size to be within the tolerance

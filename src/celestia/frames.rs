@@ -1,47 +1,54 @@
 /*
-use super::rotations::*;
-use crate::na::Matrix3;
-use crate::time::Epoch;
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-pub use celestia::xb::Identifier as XbId;
+
+use super::Bodies;
+use crate::time::{Duration, TimeUnit};
 use std::cmp::PartialEq;
+use std::convert::TryFrom;
+use std::f64::consts::PI;
 use std::fmt;
 
-// TODO: Rename to Frame, and add an ID. Then then &Frame will be stored only in the Cosm
-// and the state can be Clonable again. Also removes any lifetime problem.
-// All transformations need to happen with the Cosm again, which isn't a bad thing!
-// Should this also have a exb ID so that we know the center object of the frame?
-// Celestial {id: i32, exb: i32, gm: f64}
-// Think about printing the state. If [399] this gives only the center, not rotation.
-// So maybe Celestial{fxb:i32, exb:i32, ...} since eventually everything here will be in an fxb?
-#[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[allow(non_snake_case, clippy::upper_case_acronyms)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Frame {
     /// Any celestial frame which only has a GM (e.g. 3 body frames)
     Celestial {
-        axb_id: i32,
-        exb_id: i32,
         gm: f64,
-        parent_axb_id: Option<i32>,
-        parent_exb_id: Option<i32>,
+        ephem_path: [Option<usize>; 3],
+        frame_path: [Option<usize>; 3],
     },
     /// Any Geoid which has a GM, flattening value, etc.
     Geoid {
-        axb_id: i32,
-        exb_id: i32,
         gm: f64,
-        parent_axb_id: Option<i32>,
-        parent_exb_id: Option<i32>,
         flattening: f64,
         equatorial_radius: f64,
         semi_major_radius: f64,
+        ephem_path: [Option<usize>; 3],
+        frame_path: [Option<usize>; 3],
     },
-    /// Velocity, Normal, Cross
+    /// Velocity, Normal, Cross (called VNB in GMAT)
     VNC,
     /// Radial, Cross, Normal
     RCN,
     /// Radial, in-track, normal
     RIC,
+    /// Used as a placeholder only
+    Inertial,
 }
 
 impl Frame {
@@ -53,6 +60,32 @@ impl Frame {
         matches!(self, Frame::Celestial { .. })
     }
 
+    pub fn ephem_path(&self) -> Vec<usize> {
+        match self {
+            Frame::Celestial { ephem_path, .. } | Frame::Geoid { ephem_path, .. } => {
+                let mut path = Vec::with_capacity(3);
+                for p in ephem_path.iter().flatten() {
+                    path.push(*p)
+                }
+                path
+            }
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
+    }
+
+    pub fn frame_path(&self) -> Vec<usize> {
+        match self {
+            Frame::Celestial { frame_path, .. } | Frame::Geoid { frame_path, .. } => {
+                let mut path = Vec::with_capacity(3);
+                for p in frame_path.iter().flatten() {
+                    path.push(*p)
+                }
+                path
+            }
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
+    }
+
     pub fn gm(&self) -> f64 {
         match self {
             Frame::Celestial { gm, .. } | Frame::Geoid { gm, .. } => *gm,
@@ -60,34 +93,10 @@ impl Frame {
         }
     }
 
-    pub fn axb_id(&self) -> i32 {
+    /// Allows mutuating the GM for this frame
+    pub fn gm_mut(&mut self, new_gm: f64) {
         match self {
-            Frame::Geoid { axb_id, .. } | Frame::Celestial { axb_id, .. } => *axb_id,
-            _ => panic!("Frame is not Celestial or Geoid in kind"),
-        }
-    }
-
-    pub fn exb_id(&self) -> i32 {
-        match self {
-            Frame::Geoid { exb_id, .. } | Frame::Celestial { exb_id, .. } => *exb_id,
-            _ => panic!("Frame is not Celestial or Geoid in kind"),
-        }
-    }
-
-    pub fn parent_axb_id(&self) -> Option<i32> {
-        match self {
-            Frame::Geoid { parent_axb_id, .. } | Frame::Celestial { parent_axb_id, .. } => {
-                *parent_axb_id
-            }
-            _ => panic!("Frame is not Celestial or Geoid in kind"),
-        }
-    }
-
-    pub fn parent_exb_id(&self) -> Option<i32> {
-        match self {
-            Frame::Geoid { parent_exb_id, .. } | Frame::Celestial { parent_exb_id, .. } => {
-                *parent_exb_id
-            }
+            Self::Geoid { ref mut gm, .. } | Self::Celestial { ref mut gm, .. } => *gm = new_gm,
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }
     }
@@ -116,47 +125,78 @@ impl Frame {
             _ => panic!("Frame is not Geoid in kind"),
         }
     }
+
+    /// Returns the angular velocity for _some_ planets and moons
+    /// Source for Earth: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016 (confirmed by https://hpiers.obspm.fr/eop-pc/models/constants.html)
+    /// Source for everything else: https://en.wikipedia.org/w/index.php?title=Day&oldid=1008298887
+    #[allow(clippy::identity_op)]
+    pub fn angular_velocity(&self) -> f64 {
+        let period_to_mean_motion = |dur: Duration| -> f64 { 2.0 * PI / dur.in_seconds() };
+        match Bodies::try_from(self.ephem_path()).unwrap() {
+            Bodies::MercuryBarycenter | Bodies::Mercury => period_to_mean_motion(
+                58 * TimeUnit::Day + 15 * TimeUnit::Hour + 30 * TimeUnit::Minute,
+            ),
+            Bodies::VenusBarycenter | Bodies::Venus => period_to_mean_motion(243 * TimeUnit::Day),
+            Bodies::Earth => 7.292_115_146_706_4e-5,
+            Bodies::Luna => period_to_mean_motion(
+                27 * TimeUnit::Day + 7 * TimeUnit::Hour + 12 * TimeUnit::Minute,
+            ),
+            Bodies::MarsBarycenter => {
+                period_to_mean_motion(1 * TimeUnit::Day + 37 * TimeUnit::Minute)
+            }
+            Bodies::JupiterBarycenter => {
+                period_to_mean_motion(9 * TimeUnit::Hour + 56 * TimeUnit::Minute)
+            }
+            Bodies::SaturnBarycenter => {
+                period_to_mean_motion(10 * TimeUnit::Hour + 30 * TimeUnit::Minute)
+            }
+            Bodies::UranusBarycenter => {
+                period_to_mean_motion(17 * TimeUnit::Hour + 14 * TimeUnit::Minute)
+            }
+            Bodies::NeptuneBarycenter => {
+                period_to_mean_motion(16 * TimeUnit::Hour + 6 * TimeUnit::Minute)
+            }
+            _ => unimplemented!(),
+        }
+    }
 }
 
 impl fmt::Display for Frame {
-    // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Frame::Celestial { axb_id, exb_id, .. } | Frame::Geoid { axb_id, exb_id, .. } => {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 write!(
                     f,
                     "{} {}",
-                    match exb_id {
-                        0 => "SSB".to_string(),
-                        10 => "Sun".to_string(),
-                        100 => "Mercury".to_string(),
-                        200 => "Venus".to_string(),
-                        300 => "Earth-Moon barycenter".to_string(),
-                        399 => "Earth".to_string(),
-                        400 => "Mars barycenter".to_string(),
-                        500 => "Jupiter barycenter".to_string(),
-                        600 => "Saturn barycenter".to_string(),
-                        700 => "Uranus barycenter".to_string(),
-                        800 => "Neptune barycenter".to_string(),
-                        _ => format!("{:3}", exb_id),
-                    },
-                    if axb_id == exb_id || exb_id - axb_id == 99 {
-                        "IAU Fixed".to_string()
-                    } else {
-                        match axb_id / 100 {
-                            0 => "J2000".to_string(),
-                            10 => "IAU Sun".to_string(),
-                            1 => "Mercury IAU Fixed".to_string(),
-                            2 => "Venus IAU Fixed".to_string(),
-                            3 => "Earth IAU Fixed".to_string(),
-                            4 => "Mars IAU Fixed".to_string(),
-                            5 => "Jupiter IAU Fixed".to_string(),
-                            6 => "Saturn IAU Fixed".to_string(),
-                            7 => "Uranus IAU Fixed".to_string(),
-                            8 => "Neptune IAU Fixed".to_string(),
-                            _ => format!("{:3}", axb_id),
-                        }
+                    Bodies::try_from(self.ephem_path()).unwrap().name(),
+                    match self.frame_path().len() {
+                        0 | 1 => "J2000".to_string(),
+                        2 => "IAU Fixed".to_string(),
+                        3 => "IAU Poles Fixed".to_string(),
+                        _ => "Custom".to_string(),
                     }
+                )
+            }
+            othframe => write!(f, "{:?}", othframe),
+        }
+    }
+}
+
+impl fmt::Debug for Frame {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Frame::Celestial { .. } | Frame::Geoid { .. } => {
+                write!(
+                    f,
+                    "{} {} (μ = {:.06} km^3/s^2)",
+                    Bodies::try_from(self.ephem_path()).unwrap().name(),
+                    match self.frame_path().len() {
+                        0 | 1 => "J2000".to_string(),
+                        2 => "IAU Fixed".to_string(),
+                        3 => "IAU Poles Fixed".to_string(),
+                        _ => "Custom".to_string(),
+                    },
+                    self.gm()
                 )
             }
             othframe => write!(f, "{:?}", othframe),

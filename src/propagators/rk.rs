@@ -1,3 +1,21 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 pub use super::RK;
 
 /// `CashKarp45` is a [Runge Kutta Cash Karp integrator](https://en.wikipedia.org/wiki/Cash%E2%80%93Karp_method).
@@ -50,6 +68,7 @@ impl RK for CashKarp45 {
 /// `RK4Fixed` is a fixed step RK4.
 ///
 /// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
+#[allow(clippy::upper_case_acronyms)]
 pub struct RK4Fixed {}
 
 impl RK for RK4Fixed {
@@ -80,6 +99,7 @@ impl RK for RK4Fixed {
 /// `RK2Fixed` is a fixed step RK4 (or midpoint method).
 ///
 /// If initialized with an `PropOpts.with_adaptive_step`, the variable step will **not** be taken into consideration.
+#[allow(clippy::upper_case_acronyms)]
 pub struct RK2Fixed {}
 
 impl RK for RK2Fixed {
@@ -108,6 +128,7 @@ const SQRT6: f64 = 2.449_489_742_783_178;
 /// `RK89` is a Runge Kutta 8-9 integrator.
 ///
 /// Coefficients taken from GMAT `src/base/propagator/RungeKutta89.cpp`.
+#[allow(clippy::upper_case_acronyms)]
 pub struct RK89 {}
 
 impl RK for RK89 {

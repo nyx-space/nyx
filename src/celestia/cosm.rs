@@ -1,34 +1,45 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 extern crate bytes;
 extern crate meval;
-extern crate petgraph;
 extern crate prost;
 extern crate rust_embed;
 extern crate toml;
 
-use self::bytes::IntoBuf;
 use self::meval::Expr;
-use self::petgraph::algo::astar;
-use self::petgraph::prelude::*;
 use self::rust_embed::RustEmbed;
-use super::cosm::prost::Message;
 use super::frames::*;
+use super::orbit::Orbit;
 use super::rotations::*;
-use super::state::State;
 use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
-use super::xb::{Ephemeris, EphemerisContainer};
+use super::xb::{Ephemeris, Xb};
 use super::SPEED_OF_LIGHT_KMS;
-use crate::hifitime::{Epoch, SECONDS_PER_DAY};
+use crate::errors::NyxError;
+use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
-use crate::na::Matrix3;
+use crate::na::{Matrix3, Matrix6};
+use crate::utils::{capitalize, rotv};
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt;
-use std::fs::File;
-use std::io::Read;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::str::FromStr;
-use std::time::Instant;
-use utils::rotv;
+use std::sync::Arc;
 
 #[derive(RustEmbed)]
 #[folder = "data/embed/"]
@@ -36,11 +47,12 @@ struct EmbeddedAsset;
 
 /// Mass of the solar system from https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Solar_System&id=905437334
 pub const SS_MASS: f64 = 1.0014;
-/// Mass of the Sun
+/// GM of the Sun in km^3/s^2
 pub const SUN_GM: f64 = 132_712_440_041.939_38;
 
 /// Enable or not light time correction for the computation of the celestial states
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum LTCorr {
     /// No correction, i.e. assumes instantaneous propagation of photons
     None,
@@ -50,239 +62,310 @@ pub enum LTCorr {
     Abberation,
 }
 
+#[derive(Debug)]
+pub struct FrameTree {
+    name: String,
+    frame: Frame,
+    // If None, and has a parent (check frame.frame_path()), then rotation is I33 (and therefore no need to compute it)
+    parent_rotation: Option<Box<dyn ParentRotation>>,
+    children: Vec<FrameTree>,
+}
+
+impl FrameTree {
+    /// Seek an ephemeris from its celestial name (e.g. Earth Moon Barycenter)
+    fn frame_seek_by_name(
+        name: &str,
+        cur_path: &mut Vec<usize>,
+        f: &FrameTree,
+    ) -> Result<Vec<usize>, NyxError> {
+        if f.name == name {
+            Ok(cur_path.to_vec())
+        } else if f.children.is_empty() {
+            Err(NyxError::ObjectNotFound(name.to_string()))
+        } else {
+            for (cno, child) in f.children.iter().enumerate() {
+                let mut this_path = cur_path.clone();
+                this_path.push(cno);
+                let child_attempt = Self::frame_seek_by_name(name, &mut this_path, child);
+                if let Ok(found_path) = child_attempt {
+                    return Ok(found_path);
+                }
+            }
+            // Could not find name in iteration, fail
+            Err(NyxError::ObjectNotFound(name.to_string()))
+        }
+    }
+}
+
 // Defines Cosm, from the Greek word for "world" or "universe".
 pub struct Cosm {
-    ephemerides: HashMap<i32, Ephemeris>,
-    ephemerides_names: HashMap<String, i32>,
-    frames: HashMap<String, Frame>,
-    axb_names: HashMap<String, i32>,
-    exb_map: Graph<i32, u8, Undirected>,
-    axb_map: Graph<i32, u8, Undirected>,
-    // Stores the rotations, cannot be in the map because Box<dyn T> is not clonable, and therefore cannot be used for A*
-    axb_rotations: HashMap<i32, Box<dyn ParentRotation>>,
-    j2k_nidx: NodeIndex<u32>,
+    pub xb: Xb,
+    pub frame_root: FrameTree,
+    // Maps the ephemeris path to the frame root path (remove this with the upcoming xb file)
+    ephem2frame_map: HashMap<Vec<usize>, Vec<usize>>,
 }
 
 impl fmt::Debug for Cosm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Cosm with {} ephemerides", self.ephemerides.keys().len())
+        writeln!(
+            f,
+            "Cosm with `{}` as ephemerides root",
+            match &self.xb.ephemeris_root {
+                Some(r) => r.name.clone(),
+                None => "NONE".to_string(),
+            }
+        )?;
+        for frame in self.frames_get() {
+            writeln!(f, "\t{:?}", frame)?;
+        }
+        write!(f, "")
     }
 }
 
-#[derive(Debug)]
-pub enum CosmError {
-    ObjectIDNotFound(i32),
-    ObjectNameNotFound(String),
-    NoInterpolationData(i32),
-    InvalidInterpolationData(String),
-    NoStateData(i32),
-    /// No path was found to convert from the first center to the second
-    DisjointFrameCenters(i32, i32),
-    /// No path was found to convert from the first orientation to the second
-    DisjointFrameOrientations(i32, i32),
-}
-
-impl fmt::Display for CosmError {
+impl fmt::Display for Cosm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CosmError: {:?}", self)
-    }
-}
-
-impl Error for CosmError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
+        write!(f, "{:?}", self)
     }
 }
 
 impl Cosm {
     /// Builds a Cosm from the *XB files. Path should _not_ contain file extension. Panics if the files could not be loaded.
-    pub fn from_xb(filename: &str) -> Self {
-        Self::try_from_xb(load_ephemeris(filename).as_ref().unwrap())
-            .unwrap_or_else(|_| panic!("could not open EXB file {}", filename))
+    pub fn from_xb(filename: &str) -> Result<Self, NyxError> {
+        Self::try_from_xb(Xb::from_file(filename)?)
     }
 
-    pub fn try_from_xb_file(filename: &str) -> Result<Self, IoError> {
-        Ok(Self::try_from_xb(&load_ephemeris(filename)?)?)
+    /// Tries to load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TDB.
+    pub fn try_de438() -> Result<Self, NyxError> {
+        let de438_buf =
+            EmbeddedAsset::get("de438s-00-50.xb").expect("Could not find asset de438s-00-550.xb");
+        Self::try_from_xb(Xb::from_buffer(&de438_buf)?)
     }
 
-    /// Tries to load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
-    pub fn try_de438() -> Result<Self, IoError> {
-        let de438_buf = EmbeddedAsset::get("de438s-00-50.exb")
-            .expect("Could not find de438s-00-550.exb as asset");
-        Ok(Self::try_from_xb(&load_ephemeris_from_buf(&de438_buf)?)?)
+    /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn de438() -> Arc<Self> {
+        Arc::new(Self::try_de438().expect("could not load embedded de438s XB file"))
     }
 
-    /// Load a subset of the DE438 EXB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
-    pub fn de438() -> Self {
-        Self::try_de438().expect("could not load embedded de438s EXB file")
+    /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn de438_raw() -> Self {
+        Self::try_de438().expect("could not load embedded de438s XB file")
     }
 
-    /// Attempts to build a Cosm from the *XB files and the embedded IAU frames
-    pub fn try_from_xb(ephemerides: &[Ephemeris]) -> Result<Self, IoError> {
-        let mut axb_map: Graph<i32, u8, Undirected> = Graph::new_undirected();
-        let j2k_nidx = axb_map.add_node(0);
+    /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
+    pub fn de438_gmat() -> Arc<Self> {
+        let mut cosm = Self::try_de438().expect("could not load embedded de438s XB file");
+        // Set all of the GMs and their body fixed frames too
+        cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+        cosm.frame_mut_gm("IAU Sun", 132_712_440_017.99);
+        cosm.frame_mut_gm("Mercury Barycenter J2000", 22_032.080_486_418);
+        // No IAU mercury
+        cosm.frame_mut_gm("Venus Barycenter J2000", 324_858.598_826_46);
+        cosm.frame_mut_gm("IAU Venus", 324_858.598_826_46);
+        cosm.frame_mut_gm("EME2000", 398_600.441_5);
+        cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
+        cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
+        cosm.frame_mut_gm("IAU Moon", 4_902.800_582_147_8);
+        cosm.frame_mut_gm("Mars Barycenter J2000", 42_828.314258067);
+        cosm.frame_mut_gm("IAU Mars", 42_828.314258067);
+        cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+        cosm.frame_mut_gm("IAU Jupiter", 126_712_767.857_80);
+        cosm.frame_mut_gm("Saturn Barycenter J2000", 37_940_626.061_137);
+        cosm.frame_mut_gm("IAU Saturn", 37_940_626.061_137);
+        cosm.frame_mut_gm("Uranus Barycenter J2000", 5_794_549.007_071_9);
+        cosm.frame_mut_gm("IAU Uranus", 5_794_549.007_071_9);
+        cosm.frame_mut_gm("Neptune Barycenter J2000", 6_836_534.063_879_3);
+        cosm.frame_mut_gm("IAU Neptune", 6_836_534.063_879_3);
 
+        Arc::new(cosm)
+    }
+
+    /// Attempts to build a Cosm from the XB files and the embedded IAU frames
+    pub fn try_from_xb(xb: Xb) -> Result<Self, NyxError> {
         let mut cosm = Cosm {
-            ephemerides: HashMap::new(),
-            ephemerides_names: HashMap::new(),
-            frames: HashMap::new(),
-            axb_names: HashMap::new(),
-            exb_map: Graph::new_undirected(),
-            axb_map,
-            axb_rotations: HashMap::new(),
-            j2k_nidx,
+            xb,
+            frame_root: FrameTree {
+                name: "SSB J2000".to_string(),
+                frame: Frame::Celestial {
+                    gm: SS_MASS * SUN_GM,
+                    ephem_path: [None, None, None],
+                    frame_path: [None, None, None],
+                },
+                parent_rotation: None,
+                children: Vec::new(),
+            },
+            ephem2frame_map: HashMap::new(),
         };
-
-        // Add J2000 as the main AXB reference frame
-        let ssb2k = Frame::Celestial {
-            axb_id: 0,
-            exb_id: 0,
-            gm: SS_MASS * SUN_GM,
-            parent_axb_id: None,
-            parent_exb_id: None,
-        };
-
-        cosm.exb_map.add_node(0);
-        cosm.axb_names.insert("J2000".to_owned(), 0);
-        cosm.frames
-            .insert("solar system barycenter j2000".to_owned(), ssb2k);
-
-        cosm.append_xb(ephemerides)?;
-
-        cosm.load_iau_frames();
-
+        cosm.append_xb();
+        cosm.load_iau_frames()?;
         Ok(cosm)
     }
 
     /// Load the IAU Frames as defined in Celest Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)
-    pub fn load_iau_frames(&mut self) {
-        let frames_start = Instant::now();
+    pub fn load_iau_frames(&mut self) -> Result<(), NyxError> {
         // Load the IAU frames from the embedded TOML
         let iau_toml_str =
             EmbeddedAsset::get("iau_frames.toml").expect("Could not find iau_frames.toml as asset");
-        if let Some(err) = self
-            .append_frames(
-                std::str::from_utf8(&iau_toml_str)
-                    .expect("Could not deserialize iau_frames.toml as string"),
-            )
-            .err()
-        {
-            error!("Could not load IAU frames: {}", err);
-        }
-        info!(
-            "Loaded {} frames in {} ms.",
-            self.frames.len(),
-            frames_start.elapsed().as_millis()
-        );
+        self.append_frames(
+            std::str::from_utf8(&iau_toml_str)
+                .expect("Could not deserialize iau_frames.toml as string"),
+        )
     }
 
-    pub fn append_xb(&mut self, ephemerides: &[Ephemeris]) -> Result<(), IoError> {
-        let j2k_str = "j2000";
-        for ephem in ephemerides {
-            let id = ephem.id.as_ref().unwrap();
+    /// Returns the machine path of the ephemeris whose orientation is requested
+    pub fn frame_find_path_for_orientation(&self, name: &str) -> Result<Vec<usize>, NyxError> {
+        if self.frame_root.name == name {
+            // Return an empty vector (but OK because we're asking for the root)
+            Ok(Vec::new())
+        } else {
+            let mut path = Vec::new();
+            Self::frame_find_path(name, &mut path, &self.frame_root)
+        }
+    }
 
-            self.ephemerides.insert(id.number, ephem.clone());
-            self.ephemerides_names.insert(id.name.clone(), id.number);
+    /// Seek a frame from its orientation name
+    fn frame_find_path(
+        frame_name: &str,
+        cur_path: &mut Vec<usize>,
+        f: &FrameTree,
+    ) -> Result<Vec<usize>, NyxError> {
+        if f.name == frame_name {
+            Ok(cur_path.to_vec())
+        } else if f.children.is_empty() {
+            Err(NyxError::ObjectNotFound(frame_name.to_string()))
+        } else {
+            for child in &f.children {
+                let mut this_path = cur_path.clone();
+                let child_attempt = Self::frame_find_path(frame_name, &mut this_path, child);
+                if let Ok(found_path) = child_attempt {
+                    return Ok(found_path);
+                }
+            }
+            // Could not find name in iteration, fail
+            Err(NyxError::ObjectNotFound(frame_name.to_string()))
+        }
+    }
 
-            // Compute the exb_id.
-            let exb_id = ephem.ref_frame.clone().unwrap().number - 100_000;
-
-            // Add this EXB to the map, and link it to its parent
-            let this_node = self.exb_map.add_node(id.number);
-            let parent_node = match self.exbid_to_map_idx(exb_id) {
-                Ok(p) => p,
-                Err(e) => panic!(e),
-            };
-            // All edges are of value 1
-            self.exb_map.add_edge(parent_node, this_node, 1);
-
-            // Build the Geoid frames -- assume all frames are geoids if they have a GM parameter
-
-            // Ephemeris exists
-            match ephem.parameters.get("GM") {
-                Some(gm) => {
-                    // It's a geoid, and we assume everything else is there
-                    let flattening = match ephem.parameters.get("Flattening") {
-                        Some(param) => param.value,
-                        None => {
-                            if id.name == "Moon" {
-                                0.0012
-                            } else {
-                                0.0
-                            }
+    /// Returns the correct frame for this ephemeris
+    fn default_frame_value(
+        e: &Ephemeris,
+        ephem_path: [Option<usize>; 3],
+        pos: usize,
+    ) -> Option<FrameTree> {
+        match e.constants.get("GM") {
+            Some(gm) => {
+                // It's a geoid, and we assume everything else is there
+                let flattening = match e.constants.get("Flattening") {
+                    Some(param) => param.value,
+                    None => {
+                        if e.name == "Moon" {
+                            0.0012
+                        } else {
+                            0.0
                         }
-                    };
-                    let equatorial_radius = match ephem.parameters.get("Equatorial radius") {
-                        Some(param) => param.value,
-                        None => {
-                            if id.name == "Moon" {
-                                1738.1
-                            } else {
-                                0.0
-                            }
+                    }
+                };
+                let equatorial_radius = match e.constants.get("Equatorial radius") {
+                    Some(param) => param.value,
+                    None => {
+                        if e.name == "Moon" {
+                            1738.1
+                        } else {
+                            0.0
                         }
-                    };
-                    let semi_major_radius = match ephem.parameters.get("Equatorial radius") {
-                        Some(param) => {
-                            if id.name == "Earth Barycenter" {
-                                6378.1370
-                            } else {
-                                param.value
-                            }
+                    }
+                };
+                let semi_major_radius = match e.constants.get("Equatorial radius") {
+                    Some(param) => {
+                        if e.name == "Earth Barycenter" {
+                            6378.1370
+                        } else {
+                            param.value
                         }
-                        None => equatorial_radius, // assume spherical if unspecified
-                    };
+                    }
+                    None => equatorial_radius, // assume spherical if unspecified
+                };
 
-                    // Let's now build the J2000 version of this body
-                    let obj = Frame::Geoid {
-                        axb_id: 0, // TODO: Get this from the EXB
-                        exb_id: id.number,
+                // Let's now build the J2000 version of this body
+                Some(FrameTree {
+                    name: format!("{} J2000", e.name.clone()),
+                    frame: Frame::Geoid {
                         gm: gm.value,
-                        parent_axb_id: None,
-                        parent_exb_id: Some(exb_id),
                         flattening,
                         equatorial_radius,
                         semi_major_radius,
-                    };
-                    self.frames.insert(
-                        format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
-                        obj,
-                    );
+                        ephem_path,
+                        frame_path: [Some(pos), None, None],
+                    },
+                    parent_rotation: None,
+                    children: Vec::new(),
+                })
+            }
+            None => {
+                if e.name.to_lowercase() == *"sun" {
+                    // Build the Sun frame in J2000
+                    Some(FrameTree {
+                        name: "Sun J2000".to_string(),
+                        frame: Frame::Geoid {
+                            gm: SUN_GM,
+                            flattening: 0.0,
+                            // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
+                            equatorial_radius: 696_342.0,
+                            semi_major_radius: 696_342.0,
+                            ephem_path,
+                            frame_path: [Some(pos), None, None],
+                        },
+                        parent_rotation: None,
+                        children: Vec::new(),
+                    })
+                } else {
+                    warn!("no GM value for XB {}", e.name);
+                    None
                 }
-                None => {
-                    match id.number {
-                        10 => {
-                            // Build the Sun frame in J2000
-                            let sun2k = Frame::Geoid {
-                                axb_id: 0,
-                                exb_id: id.number,
-                                gm: SUN_GM,
-                                parent_axb_id: None,
-                                parent_exb_id: Some(exb_id),
-                                flattening: 0.0,
-                                // From https://iopscience.iop.org/article/10.1088/0004-637X/750/2/135
-                                equatorial_radius: 696_342.0,
-                                semi_major_radius: 696_342.0,
-                            };
+            }
+        }
+    }
 
-                            self.frames.insert(
-                                format!("{} {}", id.name.clone().to_lowercase(), j2k_str),
-                                sun2k,
-                            );
-                        }
-                        _ => {
-                            warn!("no GM value for EXB ID {} (exb ID: {})", id.number, exb_id);
+    pub fn append_xb(&mut self) {
+        // Insert the links between the SSB ephem and the J2000 frame (data stored in self.frame_root!)
+        self.ephem2frame_map.insert(Vec::new(), Vec::new());
+
+        // Build the frames
+        for i in 0..self.xb.ephemeris_root.as_ref().unwrap().children.len() {
+            if let Ok(child) = self.xb.ephemeris_from_path(&[i]) {
+                // Add base J2000 frame for all barycenters
+                if let Some(frame) = Self::default_frame_value(
+                    child,
+                    [Some(i), None, None],
+                    self.frame_root.children.len(),
+                ) {
+                    self.frame_root.children.push(frame);
+                    let frame_path = vec![self.frame_root.children.len() - 1];
+                    self.ephem2frame_map.insert(vec![i], frame_path);
+                }
+
+                // Try to go one level deeper
+                for j in 0..child.children.len() {
+                    if let Ok(next_child) = self.xb.ephemeris_from_path(&[i, j]) {
+                        // Create the frame
+                        if let Some(frame) = Self::default_frame_value(
+                            next_child,
+                            [Some(i), Some(j), None],
+                            self.frame_root.children.len(),
+                        ) {
+                            // At this stage, they are all children of the J2000 frame
+                            // Bug: This should eventually use the orientation of the XB or it'll fail if it isn't J2000 based
+                            self.frame_root.children.push(frame);
+                            let frame_path = vec![self.frame_root.children.len() - 1];
+                            self.ephem2frame_map.insert(vec![i, j], frame_path);
                         }
                     }
                 }
             }
         }
-
-        Ok(())
     }
 
     /// Append Cosm with the contents of this TOML (must _not_ be the filename)
-    pub fn append_frames(&mut self, toml_content: &str) -> Result<(), IoError> {
+    pub fn append_frames(&mut self, toml_content: &str) -> Result<(), NyxError> {
         let maybe_frames: Result<frame_serde::FramesSerde, _> = toml::from_str(toml_content);
         match maybe_frames {
             Ok(mut frames) => {
@@ -308,7 +391,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse right_asc `{}` - are there any special characters? {}",
                             &name, &rot.right_asc, e);
                             error!("{}", msg);
-                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(NyxError::LoadingError(msg));
                         }
                     };
                     let declin: Expr = match rot.declin.parse() {
@@ -317,7 +400,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse declin `{}` - are there any special characters? {}",
                             &name, &rot.declin, e);
                             error!("{}", msg);
-                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(NyxError::LoadingError(msg));
                         }
                     };
                     let w_expr: Expr = match rot.w.parse() {
@@ -326,7 +409,7 @@ impl Cosm {
                             let msg = format!("[frame.{}] - could not parse w `{}` - are there any special characters? {}",
                             &name, &rot.w, e);
                             error!("{}", msg);
-                            return Err(IoError::new(IoErrorKind::InvalidData, msg));
+                            return Err(NyxError::LoadingError(msg));
                         }
                     };
 
@@ -343,65 +426,178 @@ impl Cosm {
                             None => AngleUnit::Degrees,
                         },
                     );
+
+                    // Let's now create the Frame, we'll add the ephem path and frame path just after
+                    let mut new_frame = definition.as_frame();
                     let frame_name = name.replace("_", " ").trim().to_string();
-                    // Let's now create the Frame
-                    let new_frame = definition.as_frame();
-                    // Let's now insert the frame.
-                    let node = self.axb_map.add_node(new_frame.axb_id());
-                    self.axb_names
-                        .insert(frame_name.clone(), new_frame.axb_id());
-                    // And create the edge between the IAU SUN and J2k
-                    self.axb_map.add_edge(node, self.j2k_nidx, 1);
-                    self.axb_rotations
-                        .insert(new_frame.axb_id(), Box::new(frame_rot));
-                    debug!("Loaded frame {}", frame_name);
-                    self.frames.insert(frame_name, new_frame);
+
+                    // Grab the inherited frame again so we know how to place it in the frame tree
+                    if let Some(src_frame_name) = &definition.inherit {
+                        debug!("Loaded frame {}", frame_name);
+                        let src_frame = self.try_frame(src_frame_name.as_str())?;
+                        let mut fpath = src_frame.frame_path();
+                        // And find the correct children
+                        let children = match fpath.len() {
+                            2 => {
+                                &mut self.frame_root.children[fpath[0]].children[fpath[1]].children
+                            }
+                            1 => &mut self.frame_root.children[fpath[0]].children,
+                            0 => &mut self.frame_root.children,
+                            _ => unimplemented!("Too many children for now"),
+                        };
+                        fpath.push(children.len());
+                        // Set the frame path and ephem path for this new frame
+                        match new_frame {
+                            Frame::Celestial {
+                                ref mut ephem_path,
+                                ref mut frame_path,
+                                ..
+                            }
+                            | Frame::Geoid {
+                                ref mut ephem_path,
+                                ref mut frame_path,
+                                ..
+                            } => {
+                                match fpath.len() {
+                                    3 => {
+                                        *frame_path =
+                                            [Some(fpath[0]), Some(fpath[1]), Some(fpath[2])]
+                                    }
+                                    2 => *frame_path = [Some(fpath[0]), Some(fpath[1]), None],
+                                    1 => *frame_path = [Some(fpath[0]), None, None],
+                                    _ => unimplemented!(),
+                                };
+
+                                let epath = src_frame.ephem_path();
+                                match epath.len() {
+                                    3 => {
+                                        *ephem_path =
+                                            [Some(epath[0]), Some(epath[1]), Some(epath[2])]
+                                    }
+                                    2 => *ephem_path = [Some(epath[0]), Some(epath[1]), None],
+                                    1 => *ephem_path = [Some(epath[0]), None, None],
+                                    _ => unimplemented!(),
+                                };
+                            }
+                            _ => unimplemented!(),
+                        }
+
+                        // And create and insert
+                        // Create the new FrameTree node, and insert it as a child of the current path
+                        let fnode = FrameTree {
+                            name: frame_name,
+                            frame: new_frame,
+                            parent_rotation: Some(Box::new(frame_rot)),
+                            children: Vec::new(),
+                        };
+
+                        children.push(fnode);
+                    } else {
+                        warn!(
+                            "Frame `{}` does not inherit from anyone, cannot organize tree",
+                            frame_name
+                        );
+                    }
                 }
                 Ok(())
             }
             Err(e) => {
                 error!("{}", e);
-                Err(IoError::new(IoErrorKind::InvalidData, e))
+                Err(NyxError::LoadingError(format!("{}", e)))
             }
         }
     }
 
-    fn exbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
-        for (idx, node) in self.exb_map.raw_nodes().iter().enumerate() {
-            if node.weight == id {
-                return Ok(NodeIndex::new(idx));
-            }
-        }
-        Err(CosmError::ObjectIDNotFound(id))
-    }
-
-    fn axbid_to_map_idx(&self, id: i32) -> Result<NodeIndex, CosmError> {
-        for (idx, node) in self.axb_map.raw_nodes().iter().enumerate() {
-            if node.weight == id {
-                return Ok(NodeIndex::new(idx));
-            }
-        }
-        Err(CosmError::ObjectIDNotFound(id))
-    }
-
-    fn frame_idx_name(name: &str) -> String {
-        let name = name.replace("_", " ");
-        if name.to_lowercase() == "eme2000" {
-            String::from("earth j2000")
-        } else if name.to_lowercase() == "luna" {
-            String::from("moon j2000")
-        } else if name.to_lowercase() == "ssb" {
-            String::from("solar system barycenter j2000")
+    /// Returns the expected frame name with its ephemeris name for querying
+    fn fix_frame_name(name: &str) -> String {
+        let name = name.to_lowercase().trim().replace("_", " ");
+        // Handle the specific frames
+        if name == "eme2000" {
+            String::from("Earth J2000")
+        } else if name == "luna" {
+            String::from("Moon J2000")
+        } else if name == "earth moon barycenter" {
+            String::from("Earth Barycenter J2000")
+        } else if name == "ssb" || name == "ssb j2000" {
+            String::from("SSB J2000")
         } else {
-            name.to_lowercase()
+            let splt: Vec<_> = name.split(' ').collect();
+            if splt[0] == "iau" {
+                // This is an IAU frame, so the orientation is specified first, and we don't capitalize the ephemeris name
+                vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ")
+            } else {
+                // Likely a default center and frame, so let's do some clever guessing and capitalize the words
+                let frame_name = capitalize(&splt[splt.len() - 1].to_string());
+                let ephem_name = splt[0..splt.len() - 1]
+                    .iter()
+                    .map(|word| capitalize(word))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                vec![ephem_name, frame_name].join(" ")
+            }
         }
     }
 
-    pub fn try_frame(&self, name: &str) -> Result<Frame, CosmError> {
-        match self.frames.get(Self::frame_idx_name(name).as_str()) {
-            Some(f) => Ok(*f),
-            None => Err(CosmError::ObjectNameNotFound(name.to_owned())),
+    /// Fetch the frame associated with this ephemeris name
+    /// This is slow, so avoid using it.
+    pub fn try_frame(&self, name: &str) -> Result<Frame, NyxError> {
+        let name = Self::fix_frame_name(name);
+        if self.frame_root.name == name {
+            // Return an empty vector (but OK because we're asking for the root)
+            Ok(self.frame_root.frame)
+        } else {
+            let mut path = Vec::new();
+            Ok(self.frame_from_frame_path(&FrameTree::frame_seek_by_name(
+                &name,
+                &mut path,
+                &self.frame_root,
+            )?))
         }
+    }
+
+    /// Provided an ephemeris path and an optional frame name, returns the Frame of that ephemeris.
+    /// For example, if [3, 1] is provided (Moon in J2000 in the DE file), return Moon J2000
+    /// If no frame name is provided, then the storage frame is returned. Otherwise, the correct frame is returned.
+    pub fn frame_from_ephem_path(&self, ephem_path: &[usize]) -> Frame {
+        self.frame_from_frame_path(self.ephem2frame_map.get(&ephem_path.to_vec()).unwrap())
+    }
+
+    /// Provided a frame path returns the Frame.
+    pub fn frame_from_frame_path(&self, frame_path: &[usize]) -> Frame {
+        match frame_path.len() {
+            2 => self.frame_root.children[frame_path[0]].children[frame_path[1]].frame,
+            1 => self.frame_root.children[frame_path[0]].frame,
+            0 => self.frame_root.frame,
+            _ => unimplemented!("Not expecting three layers of attitude frames"),
+        }
+    }
+
+    fn frame_names(mut names: &mut Vec<String>, f: &FrameTree) {
+        names.push(f.name.clone());
+        for child in &f.children {
+            Self::frame_names(&mut names, child);
+        }
+    }
+
+    pub fn frames_get_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        Self::frame_names(&mut names, &self.frame_root);
+        names
+    }
+
+    fn frames(mut frames: &mut Vec<Frame>, f: &FrameTree) {
+        frames.push(f.frame);
+        for child in &f.children {
+            Self::frames(&mut frames, child);
+        }
+    }
+
+    /// Returns all of the frames defined in this Cosm
+    pub fn frames_get(&self) -> Vec<Frame> {
+        let mut frames = Vec::new();
+        Self::frames(&mut frames, &self.frame_root);
+        frames
     }
 
     /// Returns the geoid from the loaded XB, if it is in there, else panics!
@@ -409,129 +605,69 @@ impl Cosm {
         self.try_frame(name).unwrap()
     }
 
-    pub fn try_frame_by_exb_id(&self, id: i32) -> Result<Frame, CosmError> {
-        if id == 0 {
-            // Requesting the SSB in J2k
-            return Ok(self.frames["solar system barycenter j2000"]);
-        }
-        match self.ephemerides.get(&id) {
-            Some(e) => {
-                // Now that we have the ephem for this ID, let's get the original frame
-                match self.frames.get(&format!(
-                    "{} j2000",
-                    e.id.as_ref().unwrap().name.to_lowercase()
-                )) {
-                    Some(f) => Ok(*f),
-                    None => Ok(self.frames[&format!(
-                        "{} barycenter j2000",
-                        e.id.as_ref().unwrap().name.to_lowercase()
-                    )]),
-                }
-            }
-            None => Err(CosmError::ObjectIDNotFound(id)),
-        }
-    }
-
-    /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame_by_exb_id(&self, id: i32) -> Frame {
-        self.try_frame_by_exb_id(id).unwrap()
-    }
-
-    /// Return the names of all the frames
-    pub fn get_frame_names(&self) -> Vec<String> {
-        self.frames.keys().cloned().collect::<Vec<String>>()
-    }
-
-    /// Returns all the frames themselves
-    pub fn get_frames(&self) -> Vec<Frame> {
-        self.frames.values().cloned().collect::<Vec<Frame>>()
-    }
-
-    pub fn try_frame_by_axb_id(&self, id: i32) -> Result<Frame, CosmError> {
-        if id == 0 {
-            // Requesting the J2k orientation
-            return Ok(self.frames["solar system barycenter j2000"]);
-        }
-        for frame in self.frames.values() {
-            if frame.axb_id() == id {
-                return Ok(*frame);
-            }
-        }
-
-        Err(CosmError::ObjectIDNotFound(id))
-    }
-
-    /// Returns the geoid from the loaded XB, if it is in there, else panics!
-    pub fn frame_by_axb_id(&self, id: i32) -> Frame {
-        self.try_frame_by_axb_id(id).unwrap()
-    }
-
-    /// Returns the list of loaded geoids
-    pub fn frames(&self) -> Vec<Frame> {
-        self.frames.iter().map(|(_, g)| *g).collect()
-    }
-
-    /// Mutates the GM value for the frame used in the ephemeris only (not for every frame at this center)
-    pub fn mut_gm_for_frame_id(&mut self, exb_id: i32, new_gm: f64) {
-        match self.ephemerides.get(&exb_id) {
-            Some(e) => {
-                // Now that we have the ephem for this ID, let's get the original frame
-                let name = e.id.as_ref().unwrap().name.clone();
-                self.mut_gm_for_frame(&name, new_gm);
-            }
-            None => panic!("no frame ID {}", exb_id),
-        }
-    }
-
     /// Mutates the GM value for the provided geoid id. Panics if ID not found.
-    pub fn mut_gm_for_frame(&mut self, name: &str, new_gm: f64) {
-        match self.frames.get_mut(Self::frame_idx_name(name).as_str()) {
-            Some(Frame::Celestial { gm, .. }) => {
-                *gm = new_gm;
-            }
-            Some(Frame::Geoid { gm, .. }) => {
-                *gm = new_gm;
-            }
-            _ => panic!("frame {} not found, or does not have a GM", name),
+    pub fn frame_mut_gm(&mut self, name: &str, new_gm: f64) {
+        // Grab the frame -- this may panic!
+        let frame_path = self.frame(name).frame_path();
+
+        match frame_path.len() {
+            2 => self.frame_root.children[frame_path[0]].children[frame_path[1]]
+                .frame
+                .gm_mut(new_gm),
+            1 => self.frame_root.children[frame_path[0]].frame.gm_mut(new_gm),
+            0 => self.frame_root.frame.gm_mut(new_gm),
+            _ => unimplemented!("Not expecting three layers of attitude frames"),
         }
     }
 
-    /// Returns the celestial state as computed from a de4xx.{FXB,EXB} file in the original frame
-    pub fn raw_celestial_state(&self, exb_id: i32, jde: f64) -> Result<State, CosmError> {
-        let ephem = self
-            .ephemerides
-            .get(&exb_id)
-            .ok_or(CosmError::ObjectIDNotFound(exb_id))?;
+    /// Returns the celestial state as computed from a de4xx.{FXB,XB} file in the original frame
+    pub fn raw_celestial_state(&self, path: &[usize], epoch: Epoch) -> Result<Orbit, NyxError> {
+        if path.is_empty() {
+            // This is the solar system barycenter, so we just return a state of zeros
+            return Ok(Orbit::cartesian(
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                epoch,
+                self.frame_root.frame,
+            ));
+        }
+        let ephem = self.xb.ephemeris_from_path(path)?;
 
         // Compute the position as per the algorithm from jplephem
         let interp = ephem
             .interpolator
             .as_ref()
-            .ok_or(CosmError::NoInterpolationData(exb_id))?;
+            .ok_or_else(|| NyxError::NoInterpolationData(ephem.name.clone()))?;
 
         // the DE file epochs are all in ET mod julian
-        let start_mod_julian = ephem.start_epoch.as_ref().unwrap().value;
+        let start_mod_julian_f64 = ephem.start_epoch.as_ref().unwrap().as_raw();
         let coefficient_count: usize = interp.position_degree as usize;
         if coefficient_count <= 2 {
             // Cf. https://gitlab.com/chrisrabotin/nyx/-/issues/131
-            return Err(CosmError::InvalidInterpolationData(format!(
-                "position_degree is less than 3 for EXB ID {}",
-                exb_id
+            return Err(NyxError::InvalidInterpolationData(format!(
+                "position_degree is less than 3 for XB {}",
+                ephem.name
             )));
         }
 
         let exb_states = match interp
             .state_data
             .as_ref()
-            .ok_or(CosmError::NoStateData(exb_id))?
+            .ok_or_else(|| NyxError::NoStateData(ephem.name.clone()))?
         {
             EqualStates(states) => states,
-            VarwindowStates(_) => panic!("var window not yet supported by Cosm"),
+            VarwindowStates(_) => panic!("variable window not yet supported by Cosm"),
         };
 
         let interval_length: f64 = exb_states.window_duration;
 
-        let delta_jde = jde - start_mod_julian;
+        let epoch_jde = epoch.as_jde_tdb_days();
+        let delta_jde = epoch_jde - start_mod_julian_f64;
+
         let index_f = (delta_jde / interval_length).floor();
         let mut offset = delta_jde - index_f * interval_length;
         let mut index = index_f as usize;
@@ -580,57 +716,55 @@ impl Cosm {
         }
 
         // Get the Geoid associated with the ephemeris frame
-        let ref_frame_id = ephem.ref_frame.as_ref().unwrap().number;
-        let ref_frame_exb_id = ref_frame_id % 100_000;
-        let storage_geoid = self.frame_by_exb_id(ref_frame_exb_id);
-        let dt = Epoch::from_jde_tai(jde);
-        Ok(State::cartesian(
+        let storage_geoid = self.frame_from_ephem_path(path);
+        Ok(Orbit::cartesian(
             x,
             y,
             z,
             vx / SECONDS_PER_DAY,
             vy / SECONDS_PER_DAY,
             vz / SECONDS_PER_DAY,
-            dt,
+            epoch,
             storage_geoid,
         ))
     }
 
-    /// Attempts to return the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`
+    /// Attempts to return the state of the celestial object at the provided time
     ///
     /// The light time correction is based on SPICE's implementation: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/spkezr_c.html .
     /// Aberration computation is a conversion of the stelab function in SPICE, available here
     /// https://github.com/ChristopherRabotin/cspice/blob/26c72936fb7ff6f366803a1419b7cc3c61e0b6e5/src/cspice/stelab.c#L255
     pub fn try_celestial_state(
         &self,
-        target_exb_id: i32,
+        target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
         correction: LTCorr,
-    ) -> Result<State, CosmError> {
+    ) -> Result<Orbit, NyxError> {
+        let target_frame = self.frame_from_ephem_path(target_ephem);
         match correction {
             LTCorr::None => {
-                let target_frame = self.try_frame_by_exb_id(target_exb_id)?;
-                let state = State::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
+                let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
             LTCorr::LightTime | LTCorr::Abberation => {
                 // Get the geometric states as seen from SSB
-                let ssb2k = self.frame_by_exb_id(0);
+                let ssb2k = self.frame_root.frame;
+
                 let obs =
-                    self.try_celestial_state(frame.exb_id(), datetime, ssb2k, LTCorr::None)?;
+                    self.try_celestial_state(&frame.ephem_path(), datetime, ssb2k, LTCorr::None)?;
                 let mut tgt =
-                    self.try_celestial_state(target_exb_id, datetime, ssb2k, LTCorr::None)?;
+                    self.try_celestial_state(target_ephem, datetime, ssb2k, LTCorr::None)?;
                 // It will take less than three iterations to converge
                 for _ in 0..3 {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
-                    let lt_dt = datetime - lt;
-                    tgt = self.celestial_state(target_exb_id, lt_dt, ssb2k, LTCorr::None);
+                    let lt_dt = datetime - lt * TimeUnit::Second;
+                    tgt = self.try_celestial_state(target_ephem, lt_dt, ssb2k, LTCorr::None)?;
                 }
                 // Compute the correct state
-                let mut state = State::cartesian(
+                let mut state = Orbit::cartesian(
                     (tgt - obs).x,
                     (tgt - obs).y,
                     (tgt - obs).z,
@@ -679,238 +813,233 @@ impl Cosm {
         }
     }
 
-    /// Returns the state of the celestial object of EXB ID `exb_id` (the target) at time `jde` `as_seen_from`, or panics
+    /// Returns the state of the celestial object (target ephem) as seen in the requested frame at the provided time
     pub fn celestial_state(
         &self,
-        target_exb_id: i32,
+        target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
         correction: LTCorr,
-    ) -> State {
-        self.try_celestial_state(target_exb_id, datetime, frame, correction)
+    ) -> Orbit {
+        self.try_celestial_state(target_ephem, datetime, frame, correction)
             .unwrap()
     }
 
-    /// Return the DCM to go from the `from` frame to the `to` frame
-    pub fn try_frame_chg_dcm_from_to(
+    /// Return the position DCM (3x3) to go from the `from` frame to the `to` frame
+    pub fn try_position_dcm_from_to(
         &self,
         from: &Frame,
         to: &Frame,
         dt: Epoch,
-    ) -> Result<Matrix3<f64>, CosmError> {
+    ) -> Result<Matrix3<f64>, NyxError> {
         // And now let's compute the rotation path
-        let rot_path = self.rotation_path(to, from)?;
-        let mut prev_axb = from.axb_id();
         let mut dcm = Matrix3::<f64>::identity();
 
-        for axb_id in rot_path {
-            // Get the frame and see in which direction we're moving
-            let next_frame = self.frame_by_axb_id(axb_id);
-            if let Some(parent) = next_frame.parent_axb_id() {
-                // There might not be a rotation at this time.
-                if let Some(next_dcm) = self.axb_rotations[&axb_id].dcm_to_parent(dt) {
-                    if parent == prev_axb {
-                        dcm *= next_dcm;
-                    } else {
-                        dcm *= next_dcm.transpose();
-                    }
+        if to.frame_path() == from.frame_path() {
+            // No need to go any further
+            return Ok(dcm);
+        }
+
+        let state_frame_path = from.frame_path();
+        let new_frame_path = to.frame_path();
+
+        // Let's get the translation path between both both states.
+        let f_common_path = self.find_common_root(&new_frame_path, &state_frame_path);
+
+        let get_dcm = |path: &[usize]| -> &FrameTree {
+            // This is absolutely terrible, and there must be a better way to do it, but it's late.
+            match path.len() {
+                1 => &self.frame_root.children[path[0]],
+                2 => &self.frame_root.children[path[0]].children[path[1]],
+                3 => &self.frame_root.children[path[0]].children[path[1]].children[path[2]],
+                _ => unimplemented!(),
+            }
+        };
+
+        // Walk forward from the destination state
+
+        for i in (f_common_path.len()..new_frame_path.len()).rev() {
+            if let Some(parent_rot) = &get_dcm(&new_frame_path[0..=i]).parent_rotation {
+                if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
+                    dcm *= next_dcm;
                 }
             }
-            prev_axb = axb_id;
         }
+        // Walk backward from current state up to common node (we transpose all backward rotations)
+        for i in (f_common_path.len()..state_frame_path.len()).rev() {
+            if let Some(parent_rot) = &get_dcm(&state_frame_path[0..=i]).parent_rotation {
+                if let Some(next_dcm) = parent_rot.dcm_to_parent(dt) {
+                    dcm *= next_dcm.transpose();
+                }
+            }
+        }
+
         Ok(dcm)
     }
 
-    /// Attempts to return the provided state in the provided frame.
-    pub fn try_frame_chg(&self, state: &State, new_frame: Frame) -> Result<State, CosmError> {
-        if state.frame == new_frame {
-            return Ok(*state);
-        }
-        // Let's get the translation path between both both states.
-        let tr_path = if state.rmag() > 0.0 {
-            // This is a state transformation, not a celestial position, so let's iterate backward
-            // Not entirely sure why, but this works.
-            self.translation_path(&new_frame, &state.frame)?
-        } else {
-            self.translation_path(&state.frame, &new_frame)?
-        };
+    /// Return the position and velocity DCM (6x6) to go from the `from` frame to the `to` frame
+    #[allow(clippy::identity_op)]
+    pub fn try_dcm_from_to(
+        &self,
+        from: &Frame,
+        to: &Frame,
+        dt: Epoch,
+    ) -> Result<Matrix6<f64>, NyxError> {
+        let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
+        // Compute the dRdt DCM with finite differencing
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+        let drdt = 0.5 * post_r_dcm - 0.5 * pre_r_dcm;
 
-        let mut new_state = if state.frame.exb_id() == 0 {
+        let mut full_dcm = Matrix6::zeros();
+        for i in 0..6 {
+            for j in 0..6 {
+                if (i < 3 && j < 3) || (i >= 3 && j >= 3) {
+                    full_dcm[(i, j)] = r_dcm[(i % 3, j % 3)];
+                } else if i >= 3 && j < 3 {
+                    full_dcm[(i, j)] = drdt[(i - 3, j)];
+                }
+            }
+        }
+
+        Ok(full_dcm)
+    }
+
+    /// Attempts to only perform a translation without rotation between two frames.
+    /// You really shouldn't be using this unless you know exactly what you're doing.
+    /// Typically, you want to use `try_frame_chg`.
+    /// **WARNING:** This will update the Frame of the Orbit to the requested one EVEN IF it doesn't rotate it.
+    pub fn try_frame_translation(
+        &self,
+        state: &Orbit,
+        new_frame: Frame,
+    ) -> Result<Orbit, NyxError> {
+        let new_ephem_path = new_frame.ephem_path();
+        let state_ephem_path = state.frame.ephem_path();
+
+        // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
+        let mut new_state = if state.rmag() > 0.0 {
+            *state
+        } else if state_ephem_path.is_empty() {
             // SSB, let's invert this
             -*state
         } else {
             *state
         };
+
+        // If we only need a rotation, let's skip trying to find the translation
+        if new_ephem_path != state_ephem_path {
+            // Let's get the translation path between both both states.
+            let e_common_path = self.find_common_root(&new_ephem_path, &state_ephem_path);
+
+            // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
+            new_state = if state.rmag() > 0.0 {
+                // Walk backward from current state up to common node
+                for i in (e_common_path.len()..state_ephem_path.len()).rev() {
+                    let next_state =
+                        self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
+                    new_state = new_state + next_state;
+                }
+
+                // Walk forward from the destination state
+                for i in (e_common_path.len()..new_ephem_path.len()).rev() {
+                    let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
+                    new_state = new_state - next_state;
+                }
+
+                new_state
+            } else {
+                let mut negated_fwd = false;
+
+                // Walk forward from the destination state
+                for i in (e_common_path.len()..new_ephem_path.len()).rev() {
+                    let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
+                    if new_ephem_path.len() < state_ephem_path.len() && i == e_common_path.len() {
+                        // We just crossed the common point going forward, so let's add the opposite of this state
+                        new_state = new_state - next_state;
+                        negated_fwd = true;
+                    } else {
+                        new_state = new_state + next_state;
+                    }
+                }
+                // Walk backward from current state up to common node
+                for i in (e_common_path.len()..state_ephem_path.len()).rev() {
+                    let next_state =
+                        self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
+                    if !negated_fwd && i == e_common_path.len() {
+                        // We just crossed the common point (and haven't passed it going forward), so let's negate this state
+                        new_state = new_state - next_state;
+                    } else {
+                        new_state = new_state + next_state;
+                    }
+                }
+
+                if negated_fwd {
+                    // Because we negated the state going forward, let's flip it back to its correct orientation now.
+                    -new_state
+                } else {
+                    new_state
+                }
+            };
+        }
         new_state.frame = new_frame;
-        let mut prev_frame_exb_id = new_state.frame.exb_id();
-        let mut neg_needed = false;
-        for body in tr_path {
-            if body.exb_id() == 0 {
-                neg_needed = !neg_needed;
-                continue;
-            }
-            // This means the target or the origin is exactly this path.
-            let mut next_state =
-                self.raw_celestial_state(body.exb_id(), state.dt.as_jde_tdb_days())?;
-            if prev_frame_exb_id == next_state.frame.exb_id() || neg_needed {
-                // Let's negate the next state prior to adding it.
-                next_state = -next_state;
-                neg_needed = true;
-            }
-            new_state = new_state + next_state;
-            prev_frame_exb_id = next_state.frame.exb_id();
-        }
-        // If we started by opposing the state, let's do it again
-        if state.frame.exb_id() == 0 {
-            new_state = -new_state;
-        }
+        Ok(new_state)
+    }
 
+    /// Attempts to return the provided state in the provided frame.
+    pub fn try_frame_chg(&self, state: &Orbit, new_frame: Frame) -> Result<Orbit, NyxError> {
+        if state.frame == new_frame {
+            return Ok(*state);
+        }
+        // Let's perform the translation
+        let mut new_state = self.try_frame_translation(state, new_frame)?;
         // And now let's compute the rotation path
-        new_state.apply_dcm(self.try_frame_chg_dcm_from_to(&state.frame, &new_frame, state.dt)?);
-
+        new_state.rotate_by(self.try_dcm_from_to(&state.frame, &new_frame, state.dt)?);
         Ok(new_state)
     }
 
     /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg(&self, state: &State, new_frame: Frame) -> State {
+    pub fn frame_chg(&self, state: &Orbit, new_frame: Frame) -> Orbit {
         self.try_frame_chg(state, new_frame).unwrap()
     }
 
-    /// Return the provided state in the provided frame, or panics
-    pub fn frame_chg_by_id(&self, state: &State, new_frame: i32) -> State {
-        let frame = self.frame_by_exb_id(new_frame);
-        self.try_frame_chg(state, frame).unwrap()
-    }
-
-    /// Returns the conversion path from the target `from` as seen from `to`.
-    fn translation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<Frame>, CosmError> {
-        if from == to {
-            // Same frames, nothing to do
-            return Ok(Vec::new());
-        }
-
-        let start_exb_idx = self.exbid_to_map_idx(to.exb_id()).unwrap();
-        let end_exb_idx = self.exbid_to_map_idx(from.exb_id()).unwrap();
-
-        match astar(
-            &self.exb_map,
-            start_exb_idx,
-            |finish| finish == end_exb_idx,
-            |_| 1,
-            |_| 0,
-        ) {
-            Some((_, path)) => {
-                // Build the path with the frames
-                let mut f_path = Vec::new();
-                // Arbitrarily high number
-                let mut common_denom = 1_000_000_000;
-                let mut denom_idx = 0;
-                for (i, idx) in path.iter().enumerate() {
-                    let exb_id = self.exb_map[*idx];
-                    if exb_id < common_denom {
-                        common_denom = exb_id;
-                        denom_idx = i;
+    /// Returns the conversion path from the target ephemeris or frame `from` as seen from `to`.
+    fn find_common_root(&self, from: &[usize], to: &[usize]) -> std::vec::Vec<usize> {
+        let mut common_root = Vec::with_capacity(3); // Unlikely to be more than 3 items
+        if from.is_empty() || to.is_empty() {
+            // It will necessarily be the root of the ephemeris
+            common_root
+        } else {
+            if from.len() < to.len() {
+                // Iterate through the items in from
+                for (n, obj) in from.iter().enumerate() {
+                    if &to[n] == obj {
+                        common_root.push(*obj);
+                    } else {
+                        // Found the end of the matching objects
+                        break;
                     }
-                    f_path.push(self.frame_by_exb_id(exb_id));
                 }
-                // Remove the common denominator
-                f_path.remove(denom_idx);
-                Ok(f_path)
-            }
-            None => Err(CosmError::DisjointFrameCenters(from.exb_id(), to.exb_id())),
-        }
-    }
-
-    /// Returns the rotation path of AXB IDs from the target `from` as seen from `to`.
-    fn rotation_path(&self, from: &Frame, to: &Frame) -> Result<Vec<i32>, CosmError> {
-        if from == to {
-            // Same frames, nothing to do
-            return Ok(Vec::new());
-        }
-
-        let start_axb_idx = self.axbid_to_map_idx(to.axb_id()).unwrap();
-        let end_axb_idx = self.axbid_to_map_idx(from.axb_id()).unwrap();
-
-        match astar(
-            &self.axb_map,
-            start_axb_idx,
-            |finish| finish == end_axb_idx,
-            |e| *e.weight(),
-            |_| 0,
-        ) {
-            Some((_, path)) => {
-                // Build the path with the frames
-                let mut f_path = Vec::new();
-                // Arbitrarily high number
-                let mut common_denom = 1_000_000_000;
-                let mut denom_idx = 0;
-                for (i, idx) in path.iter().enumerate() {
-                    let axb_id = self.axb_map[*idx];
-                    if axb_id < common_denom {
-                        common_denom = axb_id;
-                        denom_idx = i;
+            } else {
+                // Iterate through the items in from
+                for (n, obj) in to.iter().enumerate() {
+                    if &from[n] == obj {
+                        common_root.push(*obj);
+                    } else {
+                        // Found the end of the matching objects
+                        break;
                     }
-                    f_path.push(axb_id);
                 }
-                // Remove the common denominator
-                f_path.remove(denom_idx);
-                Ok(f_path)
             }
-            None => Err(CosmError::DisjointFrameOrientations(
-                from.axb_id(),
-                to.axb_id(),
-            )),
+            common_root
         }
     }
-}
-
-/// Loads the provided input_filename as an EXB
-///
-/// This function may panic!
-pub fn load_ephemeris(input_filename: &str) -> Result<Vec<Ephemeris>, IoError> {
-    let mut input_exb_buf = Vec::new();
-
-    let mut f = File::open(if !input_filename.ends_with(".exb") {
-        format!("{}.exb", input_filename)
-    } else {
-        input_filename.to_string()
-    })?;
-    f.read_to_end(&mut input_exb_buf)
-        .expect("something went wrong reading the file");
-
-    if input_exb_buf.is_empty() {
-        panic!("EXB file {} is empty (zero bytes read)", input_filename);
-    }
-
-    load_ephemeris_from_buf(&input_exb_buf)
-}
-
-/// Loads the provided input_filename as an EXB
-///
-/// This function may panic!
-pub fn load_ephemeris_from_buf(input_exb_buf: &[u8]) -> Result<Vec<Ephemeris>, IoError> {
-    let decode_start = Instant::now();
-
-    let ephcnt =
-        EphemerisContainer::decode(input_exb_buf.into_buf()).expect("could not decode EXB");
-
-    let ephemerides = ephcnt.ephemerides;
-    let num_eph = ephemerides.len();
-    if num_eph == 0 {
-        panic!("no ephemerides found in EXB");
-    }
-    info!(
-        "Loaded {} ephemerides in {} ms.",
-        num_eph,
-        decode_start.elapsed().as_millis()
-    );
-    Ok(ephemerides)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use celestia::bodies;
+    use crate::celestia::Bodies;
 
     /// Tests direct transformations. Test cases generated via jplephem, hence the EPSILON precision.
     /// Note however that there is a difference between jplephem and spiceypy, cf.
@@ -920,26 +1049,15 @@ mod tests {
         use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
-        assert_eq!(
-            cosm.translation_path(
-                &cosm.frame("Earth Barycenter J2000"),
-                &cosm.frame("Earth Barycenter J2000"),
-            )
-            .unwrap()
-            .len(),
-            0,
-            "Conversions within Earth does not require any translation"
-        );
+        let eb_frame = cosm.frame(&Bodies::EarthBarycenter.name());
+
+        assert_eq!(eb_frame.ephem_path(), Bodies::EarthBarycenter.ephem_path());
 
         assert_eq!(
-            cosm.rotation_path(
-                &cosm.frame("Earth Barycenter J2000"),
-                &cosm.frame("Earth Barycenter J2000"),
-            )
-            .unwrap()
-            .len(),
-            0,
-            "Conversions within Earth does not require any rotation"
+            cosm.find_common_root(Bodies::Earth.ephem_path(), Bodies::Earth.ephem_path())
+                .len(),
+            2,
+            "Conversions within Earth does not require any translation"
         );
 
         let jde = Epoch::from_jde_et(2_452_312.5);
@@ -950,41 +1068,60 @@ mod tests {
         let earth_moon2k = cosm.frame("Luna");
 
         assert!(
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, earth_bary2k, c)
+            cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_bary2k, c)
                 .rmag()
                 < EPSILON
         );
 
-        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, ssb2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::SSB);
-        assert!((out_state.x - -109_837_695.021_661_42).abs() < 1e-12);
-        assert!((out_state.y - 89_798_622.194_651_56).abs() < 1e-12);
-        assert!((out_state.z - 38_943_878.275_922_61).abs() < 1e-12);
-        assert!((out_state.vx - -20.400_327_981_451_596).abs() < 1e-12);
-        assert!((out_state.vy - -20.413_134_121_084_312).abs() < 1e-12);
-        assert!((out_state.vz - -8.850_448_420_104_028).abs() < 1e-12);
+        let out_state = cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, ssb2k, c);
+        assert_eq!(out_state.frame.ephem_path(), vec![]);
+        assert!((out_state.x - -109_837_695.021_661_42).abs() < EPSILON);
+        assert!((out_state.y - 89_798_622.194_651_56).abs() < EPSILON);
+        assert!((out_state.z - 38_943_878.275_922_61).abs() < EPSILON);
+        assert!(dbg!(out_state.vx - -20.400_327_981_451_596).abs() < 1e-14);
+        assert!((out_state.vy - -20.413_134_121_084_312).abs() < EPSILON);
+        assert!((out_state.vz - -8.850_448_420_104_028).abs() < EPSILON);
 
-        let out_state = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, earth_moon2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::EARTH_MOON);
-        assert!((out_state.x - 81_638.253_069_843_03).abs() < 1e-9);
-        assert!((out_state.y - 345_462.617_249_631_9).abs() < 1e-9);
-        assert!((out_state.z - 144_380.059_413_586_45).abs() < 1e-9);
-        assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < 1e-12);
-        assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < 1e-12);
-        assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < 1e-12);
+        // And the opposite transformation
+        let out_state = cosm.celestial_state(Bodies::SSB.ephem_path(), jde, earth_bary2k, c);
+        assert_eq!(
+            out_state.frame.ephem_path(),
+            Bodies::EarthBarycenter.ephem_path()
+        );
+        assert!((out_state.x - 109_837_695.021_661_42).abs() < EPSILON);
+        assert!((out_state.y - -89_798_622.194_651_56).abs() < EPSILON);
+        assert!((out_state.z - -38_943_878.275_922_61).abs() < EPSILON);
+        assert!((out_state.vx - 20.400_327_981_451_596).abs() < 1e-14);
+        assert!((out_state.vy - 20.413_134_121_084_312).abs() < EPSILON);
+        assert!((out_state.vz - 8.850_448_420_104_028).abs() < EPSILON);
+
+        let out_state =
+            cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_moon2k, c);
+        assert_eq!(out_state.frame.ephem_path(), Bodies::Luna.ephem_path());
+        // Error slightly larger in X, but still at micrometer level
+        assert!(dbg!(out_state.x - 81_638.253_069_843_03).abs() < 1e-10);
+        assert!((out_state.y - 345_462.617_249_631_9).abs() < EPSILON);
+        assert!((out_state.z - 144_380.059_413_586_45).abs() < EPSILON);
+        assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < EPSILON);
+        assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < EPSILON);
+        assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < EPSILON);
         // Add the reverse test too
-        let out_state = cosm.celestial_state(bodies::EARTH_MOON, jde, earth_bary2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::EARTH_BARYCENTER);
-        assert!((out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
-        assert!((out_state.y - -345_462.617_249_631_9).abs() < 1e-10);
-        assert!((out_state.z - -144_380.059_413_586_45).abs() < 1e-10);
+        let out_state = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, earth_bary2k, c);
+        assert_eq!(
+            out_state.frame.ephem_path(),
+            Bodies::EarthBarycenter.ephem_path()
+        );
+        // Error slightly larger in X, but still at micrometer level
+        assert!(dbg!(out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
+        assert!((out_state.y - -345_462.617_249_631_9).abs() < EPSILON);
+        assert!((out_state.z - -144_380.059_413_586_45).abs() < EPSILON);
         assert!((out_state.vx - 0.960_674_300_894_127_2).abs() < EPSILON);
         assert!((out_state.vy - -0.203_736_475_764_411_6).abs() < EPSILON);
         assert!((out_state.vz - -0.183_869_552_742_917_6).abs() < EPSILON);
 
         // The following test case comes from jplephem loaded with de438s.bsp
-        let out_state = cosm.celestial_state(bodies::SUN, jde, ssb2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::SSB);
+        let out_state = cosm.celestial_state(Bodies::Sun.ephem_path(), jde, ssb2k, c);
+        assert_eq!(out_state.frame.ephem_path(), Bodies::SSB.ephem_path());
         assert!((out_state.x - -182_936.040_274_732_14).abs() < EPSILON);
         assert!((out_state.y - -769_329.776_328_230_7).abs() < EPSILON);
         assert!((out_state.z - -321_490.795_782_183_1).abs() < EPSILON);
@@ -992,71 +1129,117 @@ mod tests {
         assert!((out_state.vy - 0.001_242_263_392_603_425).abs() < EPSILON);
         assert!((out_state.vz - 0.000_134_043_776_253_089_48).abs() < EPSILON);
 
-        let out_state = cosm.celestial_state(bodies::EARTH, jde, earth_bary2k, c);
-        assert_eq!(out_state.frame.exb_id(), bodies::EARTH_BARYCENTER);
+        // And the opposite transformation
+        let out_state =
+            cosm.celestial_state(Bodies::SSB.ephem_path(), jde, cosm.frame("Sun J2000"), c);
+        assert_eq!(out_state.frame.ephem_path(), Bodies::Sun.ephem_path());
+        assert!((out_state.x - 182_936.040_274_732_14).abs() < EPSILON);
+        assert!((out_state.y - 769_329.776_328_230_7).abs() < EPSILON);
+        assert!((out_state.z - 321_490.795_782_183_1).abs() < EPSILON);
+        assert!((out_state.vx - -0.014_716_178_620_115_785).abs() < EPSILON);
+        assert!((out_state.vy - -0.001_242_263_392_603_425).abs() < EPSILON);
+        assert!((out_state.vz - -0.000_134_043_776_253_089_48).abs() < EPSILON);
+
+        let out_state = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, earth_bary2k, c);
+        assert_eq!(
+            out_state.frame.ephem_path(),
+            Bodies::EarthBarycenter.ephem_path()
+        );
         assert!((out_state.x - 1_004.153_534_699_454_6).abs() < EPSILON);
         assert!((out_state.y - 4_249.202_979_894_305).abs() < EPSILON);
         assert!((out_state.z - 1_775.880_075_192_657_8).abs() < EPSILON);
         assert!((out_state.vx - -0.011_816_329_461_539_0).abs() < EPSILON);
         assert!((out_state.vy - 0.002_505_966_193_458_6).abs() < EPSILON);
         assert!((out_state.vz - 0.002_261_602_304_895_6).abs() < EPSILON);
+
+        // And the opposite transformation
+        let out_state = cosm.celestial_state(
+            Bodies::EarthBarycenter.ephem_path(),
+            jde,
+            cosm.frame("EME2000"),
+            c,
+        );
+        assert_eq!(out_state.frame.ephem_path(), Bodies::Earth.ephem_path());
+        assert!((out_state.x - -1_004.153_534_699_454_6).abs() < EPSILON);
+        assert!((out_state.y - -4_249.202_979_894_305).abs() < EPSILON);
+        assert!((out_state.z - -1_775.880_075_192_657_8).abs() < EPSILON);
+        assert!((out_state.vx - 0.011_816_329_461_539_0).abs() < EPSILON);
+        assert!((out_state.vy - -0.002_505_966_193_458_6).abs() < EPSILON);
+        assert!((out_state.vz - -0.002_261_602_304_895_6).abs() < EPSILON);
     }
 
     #[test]
     fn test_cosm_indirect() {
+        use crate::utils::is_diagonal;
         use std::f64::EPSILON;
 
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
 
         let cosm = Cosm::de438();
 
-        let ven2ear = cosm
-            .translation_path(&cosm.frame("VENUS BARYCENTER J2000"), &cosm.frame("Luna"))
-            .unwrap();
+        let ven2ear = cosm.find_common_root(Bodies::Venus.ephem_path(), Bodies::Luna.ephem_path());
         assert_eq!(
             ven2ear.len(),
-            3,
-            "Venus -> (SSB) -> Earth Barycenter -> Earth Moon"
+            0,
+            "Venus -> (SSB) -> Earth Barycenter -> Earth Moon, therefore common root is zero lengthed"
         );
 
-        assert_eq!(
-            cosm.rotation_path(
-                &cosm.frame("Venus Barycenter J2000"),
-                &cosm.frame("EME2000"),
-            )
-            .unwrap()
-            .len(),
-            0,
+        // In this first part of the tests, we want to check that the DCM corresponds to no rotation, or none.
+        // If the DCM is diagonal, then it does not have a rotation.
+
+        assert!(
+            is_diagonal(
+                &cosm
+                    .try_position_dcm_from_to(
+                        &cosm.frame("Earth Barycenter J2000"),
+                        &cosm.frame("Earth Barycenter J2000"),
+                        jde
+                    )
+                    .unwrap()
+            ),
             "Conversion does not require any rotation"
         );
 
-        assert_eq!(
-            cosm.rotation_path(
-                &cosm.frame("Venus Barycenter J2000"),
-                &cosm.frame("IAU Sun"),
-            )
-            .unwrap()
-            .len(),
-            1,
+        assert!(
+            is_diagonal(
+                &cosm
+                    .try_position_dcm_from_to(
+                        &cosm.frame("Venus Barycenter J2000"),
+                        &cosm.frame("EME2000"),
+                        jde
+                    )
+                    .unwrap()
+            ),
+            "Conversion does not require any rotation"
+        );
+
+        assert!(
+            !is_diagonal(
+                &cosm
+                    .try_position_dcm_from_to(
+                        &cosm.frame("Venus Barycenter J2000"),
+                        &cosm.frame("IAU Sun"),
+                        jde
+                    )
+                    .unwrap()
+            ),
             "Conversion to Sun IAU from Venus J2k requires one rotation"
         );
 
-        assert_eq!(
-            cosm.rotation_path(
-                &cosm.frame("IAU Sun"),
-                &cosm.frame("Venus Barycenter J2000"),
-            )
-            .unwrap()
-            .len(),
-            1,
-            "Conversion from Sun IAU to Venus J2k requires one rotation"
+        assert!(
+            !is_diagonal(
+                &cosm
+                    .try_position_dcm_from_to(
+                        &cosm.frame("IAU Sun"),
+                        &cosm.frame("Venus Barycenter J2000"),
+                        jde
+                    )
+                    .unwrap()
+            ),
+            "Conversion to Sun IAU from Venus J2k requires one rotation"
         );
 
         let c = LTCorr::None;
-        // Error is sometimes up to 0.6 meters!
-        // I think this is related to https://github.com/brandon-rhodes/python-jplephem/issues/33
-        let tol_pos = 7e-4; // km
-        let tol_vel = 5e-7; // km/s
 
         /*
         # Preceed all of the following python examples with
@@ -1066,50 +1249,52 @@ mod tests {
         */
 
         let earth_moon = cosm.frame("Luna");
-        let ven2ear_state = cosm.celestial_state(bodies::VENUS_BARYCENTER, jde, earth_moon, c);
-        assert_eq!(ven2ear_state.frame.exb_id(), bodies::EARTH_MOON);
+        let ven2ear_state =
+            cosm.celestial_state(Bodies::VenusBarycenter.ephem_path(), jde, earth_moon, c);
+        assert_eq!(ven2ear_state.frame.ephem_path(), Bodies::Luna.ephem_path());
         /*
         >>> ['{:.16e}'.format(x) for x in sp.spkez(1, et, "J2000", "NONE", 301)[0]]
         ['2.0512621957200775e+08', '-1.3561254792308527e+08', '-6.5578399676151529e+07', '3.6051374278177832e+01', '4.8889024622170766e+01', '2.0702933800843084e+01']
         */
-        assert!((ven2ear_state.x - 2.051_262_195_720_077_5e8).abs() < tol_pos);
-        assert!((ven2ear_state.y - -1.356_125_479_230_852_7e8).abs() < tol_pos);
-        assert!((ven2ear_state.z - -6.557_839_967_615_153e7).abs() < tol_pos);
-        assert!((ven2ear_state.vx - 3.605_137_427_817_783e1).abs() < tol_vel);
-        assert!((ven2ear_state.vy - 4.888_902_462_217_076_6e1).abs() < tol_vel);
-        assert!((ven2ear_state.vz - 2.070_293_380_084_308_4e1).abs() < tol_vel);
+        // NOTE: Venus position is quite off, not sure why.
+        assert!(dbg!(ven2ear_state.x - 2.051_262_195_720_077_5e8).abs() < 5e-4);
+        assert!(dbg!(ven2ear_state.y - -1.356_125_479_230_852_7e8).abs() < 7e-4);
+        assert!(dbg!(ven2ear_state.z - -6.557_839_967_615_153e7).abs() < 4e-4);
+        assert!(dbg!(ven2ear_state.vx - 3.605_137_427_817_783e1).abs() < 1e-8);
+        assert!(dbg!(ven2ear_state.vy - 4.888_902_462_217_076_6e1).abs() < 1e-8);
+        assert!(dbg!(ven2ear_state.vz - 2.070_293_380_084_308_4e1).abs() < 1e-8);
 
         // Check that conversion via a center frame works
         let earth_bary = cosm.frame("Earth Barycenter J2000");
-        let moon_from_emb = cosm.celestial_state(bodies::EARTH_MOON, jde, earth_bary, c);
+        let moon_from_emb = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, earth_bary, c);
         // Check this state again, as in the direct test
         /*
         >>> ['{:.16e}'.format(x) for x in sp.spkez(301, et, "J2000", "NONE", 3)[0]]
         ['-8.1576591043050896e+04', '-3.4547568914480874e+05', '-1.4439185901465410e+05', '9.6071184439702662e-01', '-2.0358322542180365e-01', '-1.8380551745739407e-01']
         */
         assert_eq!(moon_from_emb.frame, earth_bary);
-        assert!((moon_from_emb.x - -8.157_659_104_305_09e4).abs() < tol_pos);
-        assert!((moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < tol_pos);
-        assert!((moon_from_emb.z - -1.443_918_590_146_541e5).abs() < tol_pos);
-        assert!((moon_from_emb.vx - 9.607_118_443_970_266e-1).abs() < tol_vel);
-        assert!((moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < tol_vel);
-        assert!((moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < tol_vel);
+        assert!(dbg!(moon_from_emb.x - -8.157_659_104_305_09e4).abs() < 1e-4);
+        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < 1e-5);
+        assert!(dbg!(moon_from_emb.z - -1.443_918_590_146_541e5).abs() < 1e-5);
+        assert!(dbg!(moon_from_emb.vx - 9.607_118_443_970_266e-1).abs() < 1e-8);
+        assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < 1e-8);
+        assert!(dbg!(moon_from_emb.vz - -1.838_055_174_573_940_7e-1).abs() < 1e-8);
 
-        let earth_from_emb = cosm.celestial_state(bodies::EARTH, jde, earth_bary, c);
+        let earth_from_emb = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, earth_bary, c);
         /*
         >>> ['{:.16e}'.format(x) for x in sp.spkez(399, et, "J2000", "NONE", 3)[0]]
         ['1.0033950894874154e+03', '4.2493637646888546e+03', '1.7760252107225667e+03', '-1.1816791248014408e-02', '2.5040812085717632e-03', '2.2608146685133296e-03']
         */
-        assert!((earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < tol_pos);
-        assert!((earth_from_emb.y - 4.249_363_764_688_855e3).abs() < tol_pos);
-        assert!((earth_from_emb.z - 1.776_025_210_722_566_7e3).abs() < tol_pos);
-        assert!((earth_from_emb.vx - -1.181_679_124_801_440_8e-2).abs() < tol_vel);
-        assert!((earth_from_emb.vy - 2.504_081_208_571_763e-3).abs() < tol_vel);
-        assert!((earth_from_emb.vz - 2.260_814_668_513_329_6e-3).abs() < tol_vel);
+        assert!(dbg!(earth_from_emb.x - 1.003_395_089_487_415_4e3).abs() < 1e-6);
+        assert!(dbg!(earth_from_emb.y - 4.249_363_764_688_855e3).abs() < 1e-6);
+        assert!(dbg!(earth_from_emb.z - 1.776_025_210_722_566_7e3).abs() < 1e-6);
+        assert!(dbg!(earth_from_emb.vx - -1.181_679_124_801_440_8e-2).abs() < 1e-9);
+        assert!(dbg!(earth_from_emb.vy - 2.504_081_208_571_763e-3).abs() < 1e-9);
+        assert!(dbg!(earth_from_emb.vz - 2.260_814_668_513_329_6e-3).abs() < 1e-9);
 
         let eme2k = cosm.frame("EME2000");
-        let moon_from_earth = cosm.celestial_state(bodies::EARTH_MOON, jde, eme2k, c);
-        let earth_from_moon = cosm.celestial_state(bodies::EARTH, jde, earth_moon, c);
+        let moon_from_earth = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, eme2k, c);
+        let earth_from_moon = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, earth_moon, c);
 
         assert_eq!(earth_from_moon.radius(), -moon_from_earth.radius());
         assert_eq!(earth_from_moon.velocity(), -moon_from_earth.velocity());
@@ -1118,50 +1303,51 @@ mod tests {
         >>> ['{:.16e}'.format(x) for x in sp.spkez(301, et, "J2000", "NONE", 399)[0]]
         ['-8.2579986132538310e+04', '-3.4972505290949758e+05', '-1.4616788422537665e+05', '9.7252863564504100e-01', '-2.0608730663037542e-01', '-1.8606633212590740e-01']
         */
-        assert!((moon_from_earth.x - -8.257_998_613_253_831e4).abs() < tol_pos);
-        assert!((moon_from_earth.y - -3.497_250_529_094_976e5).abs() < tol_pos);
-        assert!((moon_from_earth.z - -1.461_678_842_253_766_5e5).abs() < tol_pos);
-        assert!((moon_from_earth.vx - 9.725_286_356_450_41e-1).abs() < tol_vel);
-        assert!((moon_from_earth.vy - -2.060_873_066_303_754_2e-1).abs() < tol_vel);
-        assert!((moon_from_earth.vz - -1.860_663_321_259_074e-1).abs() < tol_vel);
+        assert!(dbg!(moon_from_earth.x - -8.257_998_613_253_831e4).abs() < 1e-4);
+        assert!(dbg!(moon_from_earth.y - -3.497_250_529_094_976e5).abs() < 1e-4);
+        assert!(dbg!(moon_from_earth.z - -1.461_678_842_253_766_5e5).abs() < 1e-4);
+        assert!(dbg!(moon_from_earth.vx - 9.725_286_356_450_41e-1).abs() < 1e-9);
+        assert!(dbg!(moon_from_earth.vy - -2.060_873_066_303_754_2e-1).abs() < 1e-9);
+        assert!(dbg!(moon_from_earth.vz - -1.860_663_321_259_074e-1).abs() < 1e-9);
 
         /*
         >>> ['{:.16e}'.format(x) for x in sp.spkez(10, et, "J2000", "NONE", 399)[0]]
         ['1.0965506591533598e+08', '-9.0570891031525031e+07', '-3.9266577019474506e+07', '2.0426570124555724e+01', '2.0412112498804031e+01', '8.8484257849460111e+00']
         */
-        let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, eme2k, c);
+        let sun2ear_state = cosm.celestial_state(Bodies::Sun.ephem_path(), jde, eme2k, c);
         let ssb_frame = cosm.frame("SSB");
-        let emb_from_ssb = cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, ssb_frame, c);
-        let sun_from_ssb = cosm.celestial_state(bodies::SUN, jde, ssb_frame, c);
+        let emb_from_ssb =
+            cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, ssb_frame, c);
+        let sun_from_ssb = cosm.celestial_state(Bodies::Sun.ephem_path(), jde, ssb_frame, c);
         let delta_state = sun2ear_state + (-sun_from_ssb + emb_from_ssb + earth_from_emb);
 
         assert!(delta_state.radius().norm() < EPSILON);
         assert!(delta_state.velocity().norm() < EPSILON);
 
-        assert!((sun2ear_state.x - 1.096_550_659_153_359_8e8).abs() < tol_pos);
-        assert!((sun2ear_state.y - -9.057_089_103_152_503e7).abs() < tol_pos);
-        assert!((sun2ear_state.z - -3.926_657_701_947_451e7).abs() < tol_pos);
-        assert!((sun2ear_state.vx - 2.042_657_012_455_572_4e1).abs() < tol_vel);
-        assert!((sun2ear_state.vy - 2.041_211_249_880_403e1).abs() < tol_vel);
-        assert!((sun2ear_state.vz - 8.848_425_784_946_011).abs() < tol_vel);
+        assert!(dbg!(sun2ear_state.x - 1.096_550_659_153_359_8e8).abs() < 1e-3);
+        assert!(dbg!(sun2ear_state.y - -9.057_089_103_152_503e7).abs() < 1e-3);
+        assert!(dbg!(sun2ear_state.z - -3.926_657_701_947_451e7).abs() < 1e-3);
+        assert!(dbg!(sun2ear_state.vx - 2.042_657_012_455_572_4e1).abs() < 1e-9);
+        assert!(dbg!(sun2ear_state.vy - 2.041_211_249_880_403e1).abs() < 1e-9);
+        assert!(dbg!(sun2ear_state.vz - 8.848_425_784_946_011).abs() < 1e-9);
         // And check the converse
         let sun2k = cosm.frame("Sun J2000");
-        let sun2ear_state = cosm.celestial_state(bodies::SUN, jde, eme2k, c);
-        let ear2sun_state = cosm.celestial_state(bodies::EARTH, jde, sun2k, c);
+        let sun2ear_state = cosm.celestial_state(&sun2k.ephem_path(), jde, eme2k, c);
+        let ear2sun_state = cosm.celestial_state(&eme2k.ephem_path(), jde, sun2k, c);
         let state_sum = ear2sun_state + sun2ear_state;
-        assert!(state_sum.rmag() < EPSILON);
-        assert!(state_sum.vmag() < EPSILON);
+        assert!(state_sum.rmag() < 1e-8);
+        assert!(state_sum.vmag() < 1e-11);
     }
 
     #[test]
-    fn test_frame_change_earth2luna() {
+    fn test_cosm_frame_change_earth2luna() {
         let cosm = Cosm::de438();
         let eme2k = cosm.frame("EME2000");
         let luna = cosm.frame("Luna");
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::cartesian(
+        let lro = Orbit::cartesian(
             4.017_685_334_718_784E5,
             2.642_441_356_763_487E4,
             -3.024_209_691_251_325E4,
@@ -1172,7 +1358,7 @@ mod tests {
             eme2k,
         );
 
-        let lro_jpl = State::cartesian(
+        let lro_jpl = Orbit::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -1197,14 +1383,14 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_change_ven2luna() {
+    fn test_cosm_frame_change_ven2luna() {
         let cosm = Cosm::de438();
         let luna = cosm.frame("Luna");
         let venus = cosm.frame("Venus Barycenter J2000");
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::cartesian(
+        let lro = Orbit::cartesian(
             -4.393_308_217_174_602E7,
             1.874_075_194_166_327E8,
             8.763_986_396_329_135E7,
@@ -1215,7 +1401,7 @@ mod tests {
             venus,
         );
 
-        let lro_jpl = State::cartesian(
+        let lro_jpl = Orbit::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -1240,14 +1426,14 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_change_ssb2luna() {
+    fn test_cosm_frame_change_ssb2luna() {
         let cosm = Cosm::de438();
         let luna = cosm.frame("Luna");
         let ssb = cosm.frame("SSB");
 
         let jde = Epoch::from_jde_et(2_458_823.5);
         // From JPL HORIZONS
-        let lro = State::cartesian(
+        let lro = Orbit::cartesian(
             4.227_396_973_787_854E7,
             1.305_852_533_250_192E8,
             5.657_002_470_685_254E7,
@@ -1258,7 +1444,7 @@ mod tests {
             ssb,
         );
 
-        let lro_jpl = State::cartesian(
+        let lro_jpl = Orbit::cartesian(
             -3.692_315_939_257_387E2,
             8.329_785_181_291_3E1,
             -1.764_329_108_632_533E3,
@@ -1274,7 +1460,7 @@ mod tests {
         println!("{}", lro_wrt_moon);
         let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
         // Note that the passing conditions are very large. JPL uses de431MX, but nyx uses de438s.
-        assert!(dbg!(lro_moon_earth_delta.rmag()) < 0.3);
+        assert!(dbg!(lro_moon_earth_delta.rmag()) < 0.25);
         assert!(dbg!(lro_moon_earth_delta.vmag()) < 1e-5);
         // And the converse
         let lro_wrt_ssb = cosm.frame_chg(&lro_wrt_moon, ssb);
@@ -1290,14 +1476,18 @@ mod tests {
 
         let mars2k = cosm.frame("Mars Barycenter J2000");
 
-        let out_state =
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, mars2k, LTCorr::LightTime);
+        let out_state = cosm.celestial_state(
+            Bodies::EarthBarycenter.ephem_path(),
+            jde,
+            mars2k,
+            LTCorr::LightTime,
+        );
 
         // Note that the following data comes from SPICE (via spiceypy).
         // There is currently a difference in computation for de438s: https://github.com/brandon-rhodes/python-jplephem/issues/33 .
         // However, in writing this test, I also checked the computed light time, which matches SPICE to 2.999058779096231e-10 seconds.
         assert!(dbg!(out_state.x - -2.577_185_470_734_315_8e8).abs() < 1e-3);
-        assert!(dbg!(out_state.y - -5.814_057_247_686_307e7).abs() < 1e-3);
+        assert!(dbg!(out_state.y - -5.814_057_247_686_307e7).abs() < 1e-2);
         assert!(dbg!(out_state.z - -2.493_960_187_215_911_6e7).abs() < 1e-3);
         assert!(dbg!(out_state.vx - -3.460_563_654_257_750_7).abs() < 1e-7);
         assert!(dbg!(out_state.vy - -3.698_207_386_702_523_5e1).abs() < 1e-7);
@@ -1312,12 +1502,16 @@ mod tests {
 
         let mars2k = cosm.frame("Mars Barycenter J2000");
 
-        let out_state =
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, mars2k, LTCorr::Abberation);
+        let out_state = cosm.celestial_state(
+            Bodies::EarthBarycenter.ephem_path(),
+            jde,
+            mars2k,
+            LTCorr::Abberation,
+        );
 
-        assert!((out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
-        assert!((out_state.y - -5.812_356_237_533_56e7).abs() < 1e-3);
-        assert!((out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
+        assert!(dbg!(out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
+        assert!(dbg!(out_state.y - -5.812_356_237_533_56e7).abs() < 1e-2);
+        assert!(dbg!(out_state.z - -2.493_146_410_521_204_8e7).abs() < 1e-3);
         // Reenable this test after #96 is implemented.
         dbg!(out_state.vx - -3.463_585_965_206_417);
         dbg!(out_state.vy - -3.698_169_177_803_263e1);
@@ -1325,38 +1519,16 @@ mod tests {
     }
 
     #[test]
-    fn test_cosm_append() {
-        let mut cosm = Cosm::de438();
-        let ephem_buf = load_ephemeris("./de438s").unwrap();
-        // Let's load the same XB again to demonstrate idempotency.
-        cosm.append_xb(&ephem_buf).unwrap();
-
-        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
-
-        let mars2k = cosm.frame("Mars Barycenter J2000");
-
-        let out_state =
-            cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, mars2k, LTCorr::Abberation);
-
-        assert!((dbg!(out_state.x) - -2.577_231_712_700_484_4e8).abs() < 1e-3);
-        assert!((dbg!(out_state.y) - -5.812_356_237_533_56e7).abs() < 1e-3);
-        assert!((dbg!(out_state.z) - -2.493_146_410_521_204_8e7).abs() < 1e-3);
-        // Reenable this test after #96 is implemented.
-        dbg!(out_state.vx - -3.463_585_965_206_417);
-        dbg!(out_state.vy - -3.698_169_177_803_263e1);
-        dbg!(out_state.vz - -1.690_783_648_756_073e1);
-    }
-
-    #[test]
-    fn test_rotation_validation() {
+    fn test_cosm_rotation_validation() {
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
         let cosm = Cosm::de438();
 
-        println!("Available frames: {:?}", cosm.get_frame_names());
+        println!("Available ephems: {:?}", cosm.xb.ephemeris_get_names());
+        println!("Available frames: {:?}", cosm.frames_get_names());
 
         let sun2k = cosm.frame("Sun J2000");
         let sun_iau = cosm.frame("IAU Sun");
-        let ear_sun_2k = cosm.celestial_state(bodies::EARTH, jde, sun2k, LTCorr::None);
+        let ear_sun_2k = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, sun2k, LTCorr::None);
         let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
         let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
 
@@ -1372,10 +1544,11 @@ mod tests {
         // Test an EME2k to Earth IAU rotation
 
         let eme2k = cosm.frame("EME2000");
-        let earth_iau = cosm.frame("IAU Earth"); // 2000 Model!!
+        let earth_iau = cosm.frame("IAU Earth");
+        println!("{:?}\n{:?}", eme2k, earth_iau);
         let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
 
-        let state_eme2k = State::cartesian(
+        let state_eme2k = Orbit::cartesian(
             5_946.673_548_288_958,
             1_656.154_606_023_661,
             2_259.012_129_598_249,
@@ -1406,9 +1579,9 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-JAN-2000 12:00:00.0000 TAI'
         // Pos: -5.681756320398799e+02  6.146783778323857e+03  2.259012130187828e+03
         // Vel: -4.610834400780483e+00 -2.190121576903486e+00  6.246541569551255e+00
-        assert!((state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5 || true);
-        assert!((state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5 || true);
-        assert!((state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5 || true);
+        assert!(dbg!(state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
+        assert!(dbg!(state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
+        assert!(dbg!(state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
         // TODO: Fix the velocity computation
 
         // Case 2
@@ -1417,7 +1590,7 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '31-JAN-2000 12:00:00.0000 TAI'
         // Pos:  3.092802381110541e+02 -3.431791232988777e+03  6.891017545171710e+03
         // Vel:  6.917077556761001e+00  6.234631407415389e-01  4.062487128428244e-05
-        let state_eme2k = State::cartesian(
+        let state_eme2k = Orbit::cartesian(
             -2436.45,
             -2436.45,
             6891.037,
@@ -1430,9 +1603,9 @@ mod tests {
 
         let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
         println!("{}\n{}", state_eme2k, state_ecef);
-        assert!(dbg!(state_ecef.x - 309.280_238_111_054_1).abs() < 1e-5 || true);
-        assert!(dbg!(state_ecef.y - -3_431.791_232_988_777).abs() < 1e-5 || true);
-        assert!(dbg!(state_ecef.z - 6_891.017_545_171_71).abs() < 1e-5 || true);
+        assert!((state_ecef.x - 309.280_238_111_054_1).abs() < 1e-5);
+        assert!((state_ecef.y - -3_431.791_232_988_777).abs() < 1e-5);
+        assert!((state_ecef.z - 6_891.017_545_171_71).abs() < 1e-5);
 
         // Case 3
         // Earth Body Fixed state:
@@ -1440,7 +1613,7 @@ mod tests {
         // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-MAR-2000 12:00:00.0000 TAI'
         // Pos: -1.424497118292030e+03 -3.137502417055381e+03  6.890998090503171e+03
         // Vel:  6.323912379829687e+00 -2.871020900962905e+00  8.125749038014632e-05
-        let state_eme2k = State::cartesian(
+        let state_eme2k = Orbit::cartesian(
             -2436.45,
             -2436.45,
             6891.037,
@@ -1453,27 +1626,473 @@ mod tests {
 
         let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
         println!("{}\n{}", state_eme2k, state_ecef);
-        assert!(dbg!(state_ecef.x - -1_424.497_118_292_03).abs() < 1e-5 || true);
-        assert!(dbg!(state_ecef.y - -3_137.502_417_055_381).abs() < 1e-5 || true);
-        assert!(dbg!(state_ecef.z - 6_890.998_090_503_171).abs() < 1e-5 || true);
+        assert!((state_ecef.x - -1_424.497_118_292_03).abs() < 1e-5);
+        assert!((state_ecef.y - -3_137.502_417_055_381).abs() < 1e-5);
+        assert!((state_ecef.z - 6_890.998_090_503_171).abs() < 1e-5);
+
+        // Ground station example
+        let dt = Epoch::from_gregorian_tai_hms(2020, 1, 1, 0, 0, 20);
+        let gs = Orbit::cartesian(
+            -4461.153491497329,
+            2682.445251105359,
+            -3674.3793821716713,
+            -0.19560699645796042,
+            -0.32531244947129817,
+            0.0,
+            dt,
+            earth_iau,
+        );
+        let gs_eme = cosm.frame_chg(&gs, eme2k);
+        println!("{}\n{}", gs, gs_eme);
     }
 
     #[test]
-    fn test_cosm_frame_context() {
+    fn test_cosm_fix_frame_name() {
+        assert_eq!(
+            Cosm::fix_frame_name("Mars barycenter j2000"),
+            "Mars Barycenter J2000"
+        );
+    }
+
+    #[test]
+    fn test_cosm_rotation_spiceypy_pos_dcm() {
+        // These validation tests are from tests/spiceypy/rotations.py
+        use crate::dimensions::{Matrix3, Vector3};
+        use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
-        let jde = Epoch::from_jde_et(2_452_312.500_742_881);
+        let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);
+        // Moon Earth J2000
+        let out_state = cosm.celestial_state(
+            Bodies::Luna.ephem_path(),
+            et0,
+            cosm.frame("EME2000"),
+            LTCorr::None,
+        );
+        println!("{}", out_state);
+        let sp_ex = Vector3::new(341456.50984349, -123580.72487638, -87633.23833676);
+        println!(
+            "{}\n{:.3} m",
+            out_state.radius() - sp_ex,
+            (out_state.radius() - sp_ex).norm() * 1e3,
+        );
+        // Check that we are below 1 meter of error
+        assert!(
+            (out_state.radius() - sp_ex).norm() * 1e3 < 1.0,
+            "Larger than 1 meter error"
+        );
 
-        for frame in &cosm.frames() {
-            if frame.exb_id() == 199 || frame.exb_id() == 299 {
-                // Mercury and Venus formed differently than the standard algo expects.
-                continue;
-            }
-            print!("{}: ", frame);
-            println!(
-                "{}",
-                cosm.celestial_state(bodies::EARTH_BARYCENTER, jde, *frame, LTCorr::Abberation)
-            );
-        }
+        // Moon IAU Earth
+        let out_state = cosm.celestial_state(
+            Bodies::Luna.ephem_path(),
+            et0,
+            cosm.frame("IAU Earth"),
+            LTCorr::None,
+        );
+        println!("{}", out_state);
+        let sp_ex = Vector3::new(-7239.63398824, 363242.64460769, -86871.72713248);
+        println!(
+            "{}\n{:.3} m",
+            out_state.radius() - sp_ex,
+            (out_state.radius() - sp_ex).norm() * 1e3,
+        );
+
+        assert!(
+            (out_state.radius() - sp_ex).norm() * 1e3 < 1.0,
+            "Larger than 1 meter error"
+        );
+
+        // IAU Earth <-> EME2000
+        println!("\n=== IAU Earth <-> EME2000 ===\n");
+        let dcm = cosm
+            .try_position_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
+            .unwrap();
+
+        // Position rotation first
+        let sp_ex = Matrix3::new(
+            // First row
+            -3.58819172e-01,
+            9.33404435e-01,
+            2.22748179e-03,
+            // Second row
+            -9.33406755e-01,
+            -3.58820051e-01,
+            -5.70997090e-06,
+            // Third row
+            7.93935415e-04,
+            -2.08119539e-03,
+            9.99997519e-01,
+        );
+
+        println!("{}", (dcm - sp_ex).norm());
+        assert!((dcm - sp_ex).norm() < 1e-6, "3x3 DCM error");
+
+        let dcm_return = cosm
+            .try_position_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
+            .unwrap();
+        println!("{}", (dcm.transpose() - dcm_return).norm()); // TODO: Add as test!
+
+        // IAU Earth <-> IAU Mars
+        println!("\n=== IAU Earth <-> IAU Mars ===\n");
+        let dcm = cosm
+            .try_position_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("iau mars"), et0)
+            .unwrap();
+
+        // Position rotation first
+        let sp_ex = Matrix3::new(
+            2.58117084e-01,
+            7.55715666e-01,
+            -6.01888198e-01,
+            -9.40722808e-01,
+            3.38489522e-01,
+            2.15741174e-02,
+            2.20036747e-01,
+            5.60641307e-01,
+            7.98288891e-01,
+        );
+
+        println!("{}", (dcm - sp_ex).norm());
+        assert!((dcm - sp_ex).norm() < 1e-1, "3x3 DCM error"); // Error larger here because IAU Mars defined differently in SPICE than IAU
+
+        let dcm_return = cosm
+            .try_position_dcm_from_to(&cosm.frame("iau mars"), &cosm.frame("iau_earth"), et0)
+            .unwrap();
+        assert!(
+            (dcm.transpose() - dcm_return).norm() < EPSILON,
+            "Return DCM is not the transpose of the forward"
+        );
+    }
+
+    #[test]
+    fn test_cosm_rotation_spiceypy_dcm() {
+        // These validation tests are from tests/spiceypy/rotations.py
+        use crate::dimensions::Matrix6;
+        let cosm = Cosm::de438();
+
+        let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);
+
+        // IAU Earth <-> EME2000
+        println!("\n=== IAU Earth <-> EME2000 ===\n");
+        let dcm = cosm
+            .try_dcm_from_to(&cosm.frame("iau_earth"), &cosm.frame("EME2000"), et0)
+            .unwrap();
+
+        let sp_iau_earth_2_eme2k = Matrix6::new(
+            // First row
+            -3.58819172e-01,
+            9.33404435e-01,
+            2.22748179e-03,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            -9.33406755e-01,
+            -3.58820051e-01,
+            -5.70997090e-06,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            7.93935415e-04,
+            -2.08119539e-03,
+            9.99997519e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            6.80649250e-05,
+            2.61655068e-05,
+            3.08051436e-12,
+            -3.58819172e-01,
+            9.33404435e-01,
+            2.22748179e-03,
+            // Fifth row
+            -2.61655708e-05,
+            6.80650942e-05,
+            -1.57934025e-14,
+            -9.33406755e-01,
+            -3.58820051e-01,
+            -5.70997090e-06,
+            // Sixth row
+            -1.51762071e-07,
+            -5.78975647e-08,
+            -6.86189683e-15,
+            7.93935415e-04,
+            -2.08119539e-03,
+            9.99997519e-01,
+        );
+
+        assert!(
+            (dcm - sp_iau_earth_2_eme2k).norm() < 1e-8,
+            "IAU Earth -> EME2000"
+        );
+
+        let sp_eme2k_2_iau_earth = Matrix6::new(
+            // First row
+            -3.58819172e-01,
+            -9.33406755e-01,
+            7.93935415e-04,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            9.33404435e-01,
+            -3.58820051e-01,
+            -2.08119539e-03,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            2.22748179e-03,
+            -5.70997090e-06,
+            9.99997519e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            6.80649250e-05,
+            -2.61655708e-05,
+            -1.51762071e-07,
+            -3.58819172e-01,
+            -9.33406755e-01,
+            7.93935415e-04,
+            // Fifth row
+            2.61655068e-05,
+            6.80650942e-05,
+            -5.78975647e-08,
+            9.33404435e-01,
+            -3.58820051e-01,
+            -2.08119539e-03,
+            // Sixth row
+            3.08051436e-12,
+            -1.57934025e-14,
+            -6.86189683e-15,
+            2.22748179e-03,
+            -5.70997090e-06,
+            9.99997519e-01,
+        );
+
+        let dcm_return = cosm
+            .try_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("iau_earth"), et0)
+            .unwrap();
+
+        assert!(
+            (dcm_return - sp_eme2k_2_iau_earth).norm() < 1e-8,
+            "EME2000 -> IAU Earth"
+        );
+
+        // IAU Earth <-> IAU Mars
+        println!("\n=== IAU Earth <-> IAU Mars ===\n");
+        let dcm = cosm
+            .try_dcm_from_to(&cosm.frame("iau mars"), &cosm.frame("iau earth"), et0)
+            .unwrap();
+
+        // Position rotation first
+        let sp_iau_mars_2_iau_earth = Matrix6::new(
+            // First row
+            2.58117084e-01,
+            -9.40722808e-01,
+            2.20036747e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            7.55715666e-01,
+            3.38489522e-01,
+            5.60641307e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            -6.01888198e-01,
+            2.15741174e-02,
+            7.98288891e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            -1.15728287e-05,
+            6.38714373e-06,
+            4.08826103e-05,
+            2.58117084e-01,
+            -9.40722808e-01,
+            2.20036747e-01,
+            // Fifth row
+            5.17068221e-06,
+            1.50318153e-05,
+            -1.60453349e-05,
+            7.55715666e-01,
+            3.38489522e-01,
+            5.60641307e-01,
+            // Sixth row
+            1.52922212e-06,
+            4.26631500e-05,
+            1.17187529e-12,
+            -6.01888198e-01,
+            2.15741174e-02,
+            7.98288891e-01,
+        );
+
+        assert!(
+            (dcm - sp_iau_mars_2_iau_earth).norm() < 1e-1,
+            "IAU Mars -> IAU Earth failed"
+        );
+
+        // And backward
+        // Position rotation first
+        let sp_iau_earth_2_iau_mars = Matrix6::new(
+            // First row
+            2.58117084e-01,
+            7.55715666e-01,
+            -6.01888198e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Second row
+            -9.40722808e-01,
+            3.38489522e-01,
+            2.15741174e-02,
+            0.0,
+            0.0,
+            0.0,
+            // Third row
+            2.20036747e-01,
+            5.60641307e-01,
+            7.98288891e-01,
+            0.0,
+            0.0,
+            0.0,
+            // Fourth row
+            -1.15728287e-05,
+            5.17068221e-06,
+            1.52922212e-06,
+            2.58117084e-01,
+            7.55715666e-01,
+            -6.01888198e-01,
+            // Fifth row
+            6.38714373e-06,
+            1.50318153e-05,
+            4.26631500e-05,
+            -9.40722808e-01,
+            3.38489522e-01,
+            2.15741174e-02,
+            // Sixth row
+            4.08826103e-05,
+            -1.60453349e-05,
+            1.17187529e-12,
+            2.20036747e-01,
+            5.60641307e-01,
+            7.98288891e-01,
+        );
+
+        let dcm_return = cosm
+            .try_dcm_from_to(&cosm.frame("iau earth"), &cosm.frame("iau mars"), et0)
+            .unwrap();
+
+        // Allow for "large" error because of different IAU Mars definition
+        assert!(
+            (dcm_return - sp_iau_earth_2_iau_mars).norm() < 1e-1,
+            "IAU Earth -> IAU Mars failed"
+        );
+    }
+
+    #[test]
+    fn cosm_spice_concrete_validation() {
+        // Example from sc_query.py from an actual mission design
+        let cosm = Cosm::de438();
+        let mj2k = cosm.frame("luna");
+        let eme2k = cosm.frame("eme2000");
+
+        let et: Epoch = Epoch::from_gregorian_utc(2022, 11, 29, 6, 47, 5, 0);
+        println!("{:.6}", et.as_tdb_seconds());
+
+        let moon_state = Orbit::cartesian(
+            -274450.055,
+            197469.145,
+            120487.744,
+            7.18981408,
+            -2.46517900,
+            -1.98864578,
+            et,
+            mj2k,
+        );
+
+        let moon_into_eme2k = cosm.frame_chg(&moon_state, eme2k);
+        let sp_state_in_eme2k = Orbit::cartesian(
+            4.50272491e+03,
+            -8.84403138e+03,
+            -5.43867081e+03,
+            7.91088598e+00,
+            -1.75366723e+00,
+            -1.67218499e+00,
+            et,
+            mj2k,
+        );
+
+        println!(
+            "err: {} \t {}\nWas: {}\nIs:  {}",
+            (moon_into_eme2k - sp_state_in_eme2k).rmag(),
+            (moon_into_eme2k - sp_state_in_eme2k).vmag(),
+            moon_state,
+            moon_into_eme2k
+        );
+        // SPICE only returns data down to the meter level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).rmag() < 1e-3,
+            "error greater than expected"
+        );
+        // SPICE only returns data down to the millimeter per second level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).vmag() < 1e-6,
+            "error greater than expected"
+        );
+
+        // End of transfer
+        let et: Epoch =
+            Epoch::from_gregorian_utc(2022, 12, 4, 11, 59, 51, 0) + 884000 * TimeUnit::Microsecond;
+        println!("{:.6}", et.as_tdb_seconds());
+
+        let moon_state = Orbit::cartesian(
+            482.668990,
+            -1202.72224,
+            1766.54808,
+            0.575668933,
+            -0.975029706,
+            -1.95884493,
+            et,
+            mj2k,
+        );
+
+        let moon_into_eme2k = cosm.frame_chg(&moon_state, eme2k);
+
+        let sp_state_in_eme2k = Orbit::cartesian(
+            3.37603919e+05,
+            1.79697913e+05,
+            7.14382236e+04,
+            1.11062935e-01,
+            -1.89556775e-01,
+            -1.52151242e+00,
+            et,
+            mj2k,
+        );
+
+        println!(
+            "err: {} \t {}\nWas: {}\nIs:  {}",
+            (moon_into_eme2k - sp_state_in_eme2k).rmag(),
+            (moon_into_eme2k - sp_state_in_eme2k).vmag(),
+            moon_state,
+            moon_into_eme2k
+        );
+
+        // SPICE only returns data down to the meter level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).rmag() < 1e-3,
+            "error greater than expected"
+        );
+        // SPICE only returns data down to the millimeter per second level, so we can't check less than that
+        assert!(
+            (moon_into_eme2k - sp_state_in_eme2k).vmag() < 1e-6,
+            "error greater than expected"
+        );
     }
 }

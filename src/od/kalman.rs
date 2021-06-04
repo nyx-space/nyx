@@ -1,32 +1,57 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3};
 
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;
 pub use super::snc::SNC;
-use super::{CovarFormat, EpochFormat, EstimableState, Filter};
+use super::{CovarFormat, EpochFormat, Filter, State};
 pub use crate::errors::NyxError;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
+/// S: State size (not propagated vector size)
+/// A: Acceleration size (for SNC)
+/// M: Measurement size (used for the sensitivity matrix)
+/// T: Type of state
+/// P: Propagated vector size
 #[derive(Debug, Clone)]
-pub struct KF<S, A, M, T>
+#[allow(clippy::upper_case_acronyms)]
+pub struct KF<T, A, M>
 where
-    S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, S>
+        + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
-        + Allocator<f64, S, A>
-        + Allocator<f64, A, S>,
+        + Allocator<f64, <T as State>::Size, A>
+        + Allocator<f64, A, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// The previous estimate used in the KF computations.
-    pub prev_estimate: KfEstimate<S, T>,
+    pub prev_estimate: KfEstimate<T>,
     /// Sets the Measurement noise (usually noted R)
     pub measurement_noise: MatrixMN<f64, M, M>,
     /// A sets of process noise (usually noted Q), must be ordered chronologically
@@ -34,8 +59,8 @@ where
     /// Determines whether this KF should operate as a Conventional/Classical Kalman filter or an Extended Kalman Filter.
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
-    h_tilde: MatrixMN<f64, M, S>,
-    stm: MatrixMN<f64, S, S>,
+    h_tilde: MatrixMN<f64, M, <T as State>::Size>,
+    stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
     stm_updated: bool,
     h_tilde_updated: bool,
     epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
@@ -43,26 +68,27 @@ where
     prev_used_snc: usize,
 }
 
-impl<S, A, M, T> KF<S, A, M, T>
+impl<T, A, M> KF<T, A, M>
 where
-    S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, S>
+        + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, S, M>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, M>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
-        + Allocator<f64, S, A>
-        + Allocator<f64, A, S>,
+        + Allocator<f64, <T as State>::Size, A>
+        + Allocator<f64, A, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// Initializes this KF with an initial estimate, measurement noise, and one process noise
     pub fn new(
-        initial_estimate: KfEstimate<S, T>,
+        initial_estimate: KfEstimate<T>,
         process_noise: SNC<A>,
         measurement_noise: MatrixMN<f64, M, M>,
     ) -> Self {
@@ -84,8 +110,8 @@ where
             measurement_noise,
             process_noise: vec![process_noise],
             ekf: false,
-            h_tilde: MatrixMN::<f64, M, S>::zeros(),
-            stm: MatrixMN::<f64, S, S>::identity(),
+            h_tilde: MatrixMN::<f64, M, <T as State>::Size>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
@@ -98,7 +124,7 @@ where
     /// WARNING: SNCs MUST be ordered chronologically! They will be selected automatically by walking
     /// the list of SNCs backward until one can be applied!
     pub fn with_sncs(
-        initial_estimate: KfEstimate<S, T>,
+        initial_estimate: KfEstimate<T>,
         process_noises: Vec<SNC<A>>,
         measurement_noise: MatrixMN<f64, M, M>,
     ) -> Self {
@@ -121,8 +147,8 @@ where
             measurement_noise,
             process_noise: process_noises,
             ekf: false,
-            h_tilde: MatrixMN::<f64, M, S>::zeros(),
-            stm: MatrixMN::<f64, S, S>::identity(),
+            h_tilde: MatrixMN::<f64, M, <T as State>::Size>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
@@ -132,26 +158,24 @@ where
     }
 }
 
-impl<S, M, T> KF<S, U3, M, T>
+impl<T, M> KF<T, U3, M>
 where
-    S: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, S>
+        + Allocator<f64, <T as State>::Size>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, S, M>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, M>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, U3, U3>
-        + Allocator<f64, S, U3>
-        + Allocator<f64, U3, S>,
+        + Allocator<f64, <T as State>::Size, U3>
+        + Allocator<f64, U3, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// Initializes this KF without SNC
-    pub fn no_snc(
-        initial_estimate: KfEstimate<S, T>,
-        measurement_noise: MatrixMN<f64, M, M>,
-    ) -> Self {
+    pub fn no_snc(initial_estimate: KfEstimate<T>, measurement_noise: MatrixMN<f64, M, M>) -> Self {
         let epoch_fmt = initial_estimate.epoch_fmt;
         let covar_fmt = initial_estimate.covar_fmt;
         Self {
@@ -159,8 +183,8 @@ where
             measurement_noise,
             process_noise: Vec::new(),
             ekf: false,
-            h_tilde: MatrixMN::<f64, M, S>::zeros(),
-            stm: MatrixMN::<f64, S, S>::identity(),
+            h_tilde: MatrixMN::<f64, M, <T as State>::Size>::zeros(),
+            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
@@ -170,24 +194,25 @@ where
     }
 }
 
-impl<S, A, M, T> Filter<S, A, M, T> for KF<S, A, M, T>
+impl<T, A, M> Filter<T, A, M> for KF<T, A, M>
 where
-    S: DimName,
     A: DimName,
     M: DimName,
-    T: EstimableState<S>,
+    T: State,
     DefaultAllocator: Allocator<f64, M>
-        + Allocator<f64, S>
+        + Allocator<f64, <T as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
-        + Allocator<f64, M, S>
-        + Allocator<f64, S, M>
-        + Allocator<f64, S, S>
+        + Allocator<f64, M, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, M>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<f64, A, A>
-        + Allocator<f64, S, A>
-        + Allocator<f64, A, S>,
+        + Allocator<f64, <T as State>::Size, A>
+        + Allocator<f64, A, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size>
+        + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
-    type Estimate = KfEstimate<S, T>;
+    type Estimate = KfEstimate<T>;
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {
@@ -200,14 +225,14 @@ where
 
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
-    fn update_stm(&mut self, new_stm: MatrixMN<f64, S, S>) {
+    fn update_stm(&mut self, new_stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>) {
         self.stm = new_stm;
         self.stm_updated = true;
     }
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
-    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, S>) {
+    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, <T as State>::Size>) {
         self.h_tilde = h_tilde;
         self.h_tilde_updated = true;
     }
@@ -220,10 +245,52 @@ where
             return Err(NyxError::StateTransitionMatrixNotUpdated);
         }
 
-        let covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        // Try to apply an SNC, if applicable
+        for (i, snc) in self.process_noise.iter().enumerate().rev() {
+            if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
+                // Check if we're using another SNC than the one before
+                if self.prev_used_snc != i {
+                    info!("Switched to {}-th {}", i, snc);
+                    self.prev_used_snc = i;
+                }
+
+                // Let's compute the Gamma matrix, an approximation of the time integral
+                // which assumes that the acceleration is constant between these two measurements.
+                let mut gamma = MatrixMN::<f64, <T as State>::Size, A>::zeros();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).in_seconds();
+                for blk in 0..A::dim() / 3 {
+                    for i in 0..3 {
+                        let idx_i = i + A::dim() * blk;
+                        let idx_j = i + 3 * blk;
+                        let idx_k = i + 3 + A::dim() * blk;
+                        // For first block
+                        // (0, 0) (1, 1) (2, 2) <=> \Delta t^2/2
+                        // (3, 0) (4, 1) (5, 2) <=> \Delta t
+                        // Second block
+                        // (6, 3) (7, 4) (8, 5) <=> \Delta t^2/2
+                        // (9, 3) (10, 4) (11, 5) <=> \Delta t
+                        // * \Delta t^2/2
+                        // (i, i) when blk = 0
+                        // (i + A::dim() * blk, i + 3) when blk = 1
+                        // (i + A::dim() * blk, i + 3 * blk)
+                        // * \Delta t
+                        // (i + 3, i) when blk = 0
+                        // (i + 3, i + 9) when blk = 1 (and I think i + 12 + 3)
+                        // (i + 3 + A::dim() * blk, i + 3 * blk)
+                        gamma[(idx_i, idx_j)] = delta_t.powi(2) / 2.0;
+                        gamma[(idx_k, idx_j)] = delta_t;
+                    }
+                }
+                // Let's add the process noise
+                covar_bar += &gamma * snc_matrix * &gamma.transpose();
+                // And break so we don't add any more process noise
+                break;
+            }
+        }
 
         let state_bar = if self.ekf {
-            VectorN::<f64, S>::zeros()
+            VectorN::<f64, <T as State>::Size>::zeros()
         } else {
             &self.stm * &self.prev_estimate.state_deviation
         };
@@ -252,8 +319,8 @@ where
     fn measurement_update(
         &mut self,
         nominal_state: T,
-        real_obs: VectorN<f64, M>,
-        computed_obs: VectorN<f64, M>,
+        real_obs: &VectorN<f64, M>,
+        computed_obs: &VectorN<f64, M>,
     ) -> Result<(Self::Estimate, Residual<M>), NyxError> {
         if !self.stm_updated {
             return Err(NyxError::StateTransitionMatrixNotUpdated);
@@ -274,8 +341,8 @@ where
 
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
-                let mut gamma = MatrixMN::<f64, S, A>::zeros();
-                let delta_t = nominal_state.epoch() - self.prev_estimate.epoch();
+                let mut gamma = MatrixMN::<f64, <T as State>::Size, A>::zeros();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).in_seconds();
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;
@@ -311,10 +378,11 @@ where
         if !invertible_part.try_inverse_mut() {
             return Err(NyxError::SingularKalmanGain);
         }
-        let gain = &covar_bar * h_tilde_t * invertible_part;
+
+        let gain = &covar_bar * h_tilde_t * &invertible_part;
 
         // Compute observation deviation (usually marked as y_i)
-        let prefit = &real_obs - computed_obs;
+        let prefit = real_obs - computed_obs;
 
         // Compute the state estimate
         let (state_hat, res) = if self.ekf {
@@ -335,7 +403,8 @@ where
         };
 
         // Compute covariance (Joseph update)
-        let first_term = MatrixMN::<f64, S, S>::identity() - &gain * &self.h_tilde;
+        let first_term = MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::identity()
+            - &gain * &self.h_tilde;
         let covar = &first_term * &covar_bar * &first_term.transpose()
             + &gain * &self.measurement_noise * &gain.transpose();
 

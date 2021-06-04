@@ -1,49 +1,61 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 extern crate csv;
 extern crate rayon;
 
 use self::rayon::prelude::*;
 use super::MdHdlr;
-pub use crate::celestia::*;
+pub use super::{targeter::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
+pub use crate::celestia::{
+    try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode, LTCorr, Orbit,
+    OrbitDual,
+};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, U6};
-pub use crate::dynamics::orbital::{OrbitalDynamics, OrbitalDynamicsStm, OrbitalDynamicsT};
-use crate::dynamics::solarpressure::SolarPressure;
-use crate::dynamics::spacecraft::{Spacecraft, SpacecraftState};
-use crate::dynamics::sph_harmonics::{Harmonics, HarmonicsDiff};
+pub use crate::dynamics::{
+    Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
+};
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::formatter::*;
-use crate::io::quantity::{parse_duration, ParsingError};
+pub use crate::io::gravity::HarmonicsMem;
+use crate::io::quantity::ParsingError;
 use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
-use crate::propagators::error_ctrl::RSSStepPV;
-use crate::propagators::{PropOpts, Propagator};
-use crate::time::{Epoch, SECONDS_PER_DAY};
+pub use crate::propagators::{PropOpts, Propagator};
+pub use crate::time::{Duration, Epoch, TimeUnit};
+pub use crate::Spacecraft;
+pub use crate::{State, TimeTagged};
+use std::convert::TryFrom;
 use std::str::FromStr;
-use std::sync::mpsc::channel;
+pub use std::sync::Arc;
 use std::time::Instant;
 
-pub enum StmState<N, M> {
-    Without(N),
-    With(M),
-    Unknown,
-}
-
-impl<N, M> StmState<N, M> {
-    pub fn with(&self) -> bool {
-        matches!(self, StmState::With(_))
-    }
-}
-
-pub type StmStateFlag = StmState<(), ()>;
-
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics
+#[allow(clippy::upper_case_acronyms)]
 pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    sc_dyn: StmState<Spacecraft<'a, OrbitalDynamics<'a>>, Spacecraft<'a, OrbitalDynamicsStm<'a>>>,
-    pub formatter: Option<StateFormatter<'a>>,
-    pub prop_time_s: Option<f64>,
+    pub sc_dyn: Arc<SpacecraftDynamics<'a>>,
+    pub init_state: Spacecraft,
+    pub formatter: Option<StateFormatter>,
+    pub prop_time: Option<Duration>,
     pub prop_event: Option<ConditionSerde>,
     pub prop_tol: f64,
     pub name: String,
@@ -56,14 +68,15 @@ where
     pub fn try_from_scenario(
         scen: &ScenarioSerde,
         prop_name: String,
-        stm_flag: StmStateFlag,
-        cosm: &'a Cosm,
-    ) -> Result<(Self, Option<StateFormatter<'a>>), ParsingError> {
+        stm_flag: bool,
+        cosm: Arc<Cosm>,
+    ) -> Result<(Self, Option<StateFormatter>), ParsingError> {
         match scen.propagator.get(&prop_name.to_lowercase()) {
             None => Err(ParsingError::PropagatorNotFound(prop_name)),
             Some(prop) => {
                 #[allow(unused_assignments)]
-                let mut sc_dyn_flagged = StmState::Unknown;
+                let mut sc_dyn: SpacecraftDynamics;
+                let init_sc;
 
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
@@ -74,7 +87,10 @@ where
                                 prop_name, output
                             )))
                         }
-                        Some(out) => Some(out.to_state_formatter(cosm)),
+                        Some(out) => match out.to_state_formatter(cosm.clone()) {
+                            Ok(fmrt) => Some(fmrt),
+                            Err(ne) => return Err(ParsingError::LoadingError(ne.to_string())),
+                        },
                     }
                 } else {
                     None
@@ -130,8 +146,9 @@ where
                                             )))
                                         }
                                         Some(base) => {
-                                            let state_frame = cosm.frame(base.frame.as_str());
-                                            base.as_state(state_frame)?
+                                            let state_frame =
+                                                &cosm.frame(base.frame.as_ref().unwrap().as_str());
+                                            base.as_state(*state_frame)?
                                         }
                                     };
                                     delta_state.as_state(inherited)?
@@ -145,8 +162,14 @@ where
                         }
                     }
                     Some(init_state_sd) => {
-                        let state_frame = cosm.frame(init_state_sd.frame.as_str());
-                        init_state_sd.as_state(state_frame)?
+                        let state_frame =
+                            &cosm.frame(init_state_sd.frame.as_ref().unwrap().as_str());
+                        let mut init = init_state_sd.as_state(*state_frame)?;
+                        if stm_flag {
+                            // Specify that we want to compute the STM.
+                            init.enable_stm();
+                        }
+                        init
                     }
                 };
 
@@ -155,65 +178,48 @@ where
                     // Get the object IDs from name
                     let mut bodies = Vec::with_capacity(10);
                     for obj in pts_masses {
-                        match cosm.try_frame(obj) {
-                            Ok(frame) => bodies.push(frame.exb_id()),
-                            Err(_) => {
-                                // Let's try with "j2000" appended
-                                match cosm.try_frame(format!("{} j2000", obj).as_str()) {
-                                    Ok(frame) => bodies.push(frame.exb_id()),
-                                    Err(_) => {
-                                        bodies.push(
-                                            cosm.frame(
-                                                format!("{} barycenter j2000", obj).as_str(),
-                                            )
-                                            .exb_id(),
-                                        );
-                                    }
-                                }
+                        match Bodies::try_from(obj.to_string()) {
+                            Ok(b) => bodies.push(b),
+                            Err(e) => {
+                                return Err(ParsingError::LoadingError(format!("Snif {:?}", e)));
                             }
                         }
                     }
                     // Remove bodies which are part of the state
-                    if let Some(pos) = bodies.iter().position(|x| *x == init_state.frame.exb_id()) {
+                    if let Some(pos) = bodies
+                        .iter()
+                        .position(|x| x.ephem_path() == init_state.frame.ephem_path())
+                    {
                         bodies.remove(pos);
                     }
-                    if stm_flag.with() {
-                        let mut sc_dyn_stm = Spacecraft::with_stm(
-                            OrbitalDynamicsStm::point_masses(init_state, bodies, cosm),
-                            spacecraft.dry_mass,
-                        );
-                        if let Some(fuel_mass) = spacecraft.fuel_mass {
-                            sc_dyn_stm.fuel_mass = fuel_mass;
-                        }
 
-                        sc_dyn_flagged = StmState::With(sc_dyn_stm);
-                    } else {
-                        let mut sc_dyn = Spacecraft::new(
-                            OrbitalDynamics::point_masses(init_state, bodies, cosm),
-                            spacecraft.dry_mass,
-                        );
-                        if let Some(fuel_mass) = spacecraft.fuel_mass {
-                            sc_dyn.fuel_mass = fuel_mass;
-                        }
+                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::point_masses(
+                        &bodies,
+                        cosm.clone(),
+                    ));
 
-                        sc_dyn_flagged = StmState::Without(sc_dyn);
-                    }
-                } else if stm_flag.with() {
-                    let mut sc_dyn_stm = Spacecraft::with_stm(
-                        OrbitalDynamicsStm::two_body(init_state),
+                    init_sc = Spacecraft::new(
+                        init_state,
                         spacecraft.dry_mass,
+                        spacecraft.fuel_mass.unwrap_or(0.0),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
                     );
-                    if let Some(fuel_mass) = spacecraft.fuel_mass {
-                        sc_dyn_stm.fuel_mass = fuel_mass;
-                    }
-
-                    sc_dyn_flagged = StmState::With(sc_dyn_stm);
                 } else {
-                    let mut sc_dyn =
-                        Spacecraft::new(OrbitalDynamics::two_body(init_state), spacecraft.dry_mass);
-                    if let Some(fuel_mass) = spacecraft.fuel_mass {
-                        sc_dyn.fuel_mass = fuel_mass;
-                    }
+                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::two_body());
+
+                    init_sc = Spacecraft::new(
+                        init_state,
+                        spacecraft.dry_mass,
+                        spacecraft.fuel_mass.unwrap_or(0.0),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    );
+
                     // Add the force models
                     if let Some(force_models) = &spacecraft.force_models {
                         if scen.force_models.as_ref().is_none() {
@@ -231,34 +237,28 @@ where
                                     )))
                                 }
                                 Some(amdl) => {
+                                    let eme2k = &cosm.frame("EME2000");
+                                    let luna = &cosm.frame("Luna");
                                     for smdl in amdl.srp.values() {
-                                        let mut srp = SolarPressure::default(
-                                            smdl.sc_area,
-                                            vec![cosm.frame("EME2000"), cosm.frame("Luna")],
-                                            &cosm,
+                                        // Note that an Arc is immutable, but we want to specify everything
+                                        // so we create the SRP without the wrapper
+                                        let mut srp = SolarPressure::default_raw(
+                                            vec![*eme2k, *luna],
+                                            cosm.clone(),
                                         );
                                         srp.phi = smdl.phi;
-                                        srp.cr = smdl.cr;
-                                        match sc_dyn_flagged {
-                                            StmState::With(ref mut sc_dyn_stm) => {
-                                                sc_dyn_stm.add_model(Box::new(srp));
-                                            }
-                                            StmState::Without(ref mut sc_dyn) => {
-                                                sc_dyn.add_model(Box::new(srp));
-                                            }
-                                            _ => panic!("should not happen"),
-                                        };
+                                        sc_dyn.add_model(Arc::new(srp));
                                     }
                                 }
                             }
                         }
                     }
-
-                    sc_dyn_flagged = StmState::Without(sc_dyn);
                 }
 
                 // Add the acceleration models if applicable
                 if let Some(accel_models) = &dynamics.accel_models {
+                    // In this case, we'll need to recreate the orbital dynamics because it's behind an immutable Arc.
+                    let mut orbital_dyn = OrbitalDynamics::new_raw(vec![]);
                     for mdl in accel_models {
                         match scen.accel_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
                             None => {
@@ -269,70 +269,49 @@ where
                             }
                             Some(amdl) => {
                                 for hmdl in amdl.harmonics.values() {
-                                    let in_mem = hmdl.load();
-                                    let compute_frame = cosm.frame(hmdl.frame.as_str());
+                                    let in_mem = hmdl.load().unwrap();
+                                    let compute_frame = &cosm.frame(hmdl.frame.as_str());
 
-                                    if stm_flag.with() {
-                                        let hh =
-                                            HarmonicsDiff::from_stor(compute_frame, in_mem, &cosm);
-                                        match sc_dyn_flagged {
-                                            StmState::With(ref mut sc_dyn_stm) => {
-                                                sc_dyn_stm.orbital_dyn.add_model(Box::new(hh));
-                                            }
-                                            _ => panic!("should not happen"),
-                                        };
-                                    } else {
-                                        let hh = Harmonics::from_stor(compute_frame, in_mem, &cosm);
-                                        match sc_dyn_flagged {
-                                            StmState::Without(ref mut sc_dyn) => {
-                                                sc_dyn.orbital_dyn.add_model(Box::new(hh));
-                                            }
-                                            _ => panic!("should not happen"),
-                                        };
-                                    }
+                                    let hh =
+                                        Harmonics::from_stor(*compute_frame, in_mem, cosm.clone());
+                                    orbital_dyn.add_model(hh);
                                 }
                             }
                         }
                     }
+                    // And set these into the spacecraft dynamics
+                    sc_dyn.orbital_dyn = Arc::new(orbital_dyn);
                 }
 
                 // Validate the stopping condition
                 // Check if it's a stopping condition
                 let prop_event = if let Some(conditions) = &scen.conditions {
-                    match conditions.get(&prop.stop_cond) {
-                        Some(c) => Some(c.clone()),
-                        None => None,
-                    }
+                    conditions.get(&prop.stop_cond).cloned()
                 } else {
                     None
                 };
                 // Let's see if it's a relative time
-                let prop_time_s = if prop_event.is_none() {
-                    match parse_duration(prop.stop_cond.as_str()) {
-                        Ok(duration) => Some(duration.v()),
-                        Err(e) => {
-                            // Check to see if it's an Epoch
-                            match Epoch::from_str(prop.stop_cond.as_str()) {
-                                Err(_) => return Err(e),
-                                Ok(epoch) => Some(epoch - init_state.dt),
-                            }
-                        }
+                let prop_time = if prop_event.is_none() {
+                    match Duration::from_str(prop.stop_cond.as_str()) {
+                        Ok(d) => Some(d),
+                        Err(_) => match Epoch::from_str(prop.stop_cond.as_str()) {
+                            Err(e) => return Err(ParsingError::IllDefined(format!("{}", e))),
+                            Ok(epoch) => Some(epoch - init_state.dt),
+                        },
                     }
                 } else {
                     None
                 };
 
                 // Let's see if it's a relative time
-                let prop_tol = match prop.tolerance {
-                    Some(tol) => tol,
-                    None => 1e-12,
-                };
+                let prop_tol = prop.tolerance.unwrap_or(1e-12);
 
                 Ok((
                     Self {
-                        sc_dyn: sc_dyn_flagged,
+                        sc_dyn: Arc::new(sc_dyn),
+                        init_state: init_sc,
                         formatter: None,
-                        prop_time_s,
+                        prop_time,
                         prop_event,
                         prop_tol,
                         name: prop_name.clone(),
@@ -343,104 +322,86 @@ where
         }
     }
 
-    pub fn propagator(&mut self) -> Propagator<Spacecraft<'a, OrbitalDynamics<'a>>, RSSStepPV> {
-        match self.sc_dyn {
-            StmState::Without(ref mut sc_dyn) => {
-                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
-                p.set_tolerance(self.prop_tol);
-                p
-            }
-            _ => panic!("these dynamics are defined with stm. Use stm_propagator instead"),
-        }
-    }
-
-    pub fn stm_propagator(
-        &mut self,
-    ) -> Propagator<Spacecraft<'a, OrbitalDynamicsStm<'a>>, RSSStepPV> {
-        match self.sc_dyn {
-            StmState::With(ref mut sc_dyn) => {
-                let mut p = Propagator::default(sc_dyn, &PropOpts::default());
-                p.set_tolerance(self.prop_tol);
-                p
-            }
-            _ => panic!("these dynamics are defined without stm. Use propagator instead"),
-        }
-    }
-
-    pub fn state(&self) -> SpacecraftState {
-        match &self.sc_dyn {
-            StmState::With(sc_dyn) => sc_dyn.state(),
-            StmState::Without(sc_dyn) => sc_dyn.state(),
-            _ => panic!("only call state() on an initialized MDProcess"),
-        }
-    }
-
     pub fn execute(mut self) -> Result<(), NyxError> {
         self.execute_with(vec![])
     }
 
     /// Execute the MD with the provided handlers. Note that you must initialize your own CSV output if that's desired.
+    #[allow(clippy::identity_op)]
     pub fn execute_with(
         &mut self,
-        mut hdlrs: Vec<Box<dyn MdHdlr<SpacecraftState>>>,
+        mut hdlrs: Vec<Box<dyn MdHdlr<Spacecraft>>>,
     ) -> Result<(), NyxError> {
         // Get the prop time before the mutable ref of the propagator
-        let maybe_prop_time = self.prop_time_s;
+        let maybe_prop_time = self.prop_time;
         let maybe_prop_event = self.prop_event.clone();
 
         // Build the propagator
-        let mut prop = self.propagator();
-        // Set up the channels
-        let (tx, rx) = channel();
-        prop.tx_chan = Some(tx);
+        let mut prop_setup = Propagator::default(self.sc_dyn.clone());
+        prop_setup.set_tolerance(self.prop_tol);
+        let mut prop = prop_setup.with(self.init_state);
 
-        let mut initial_state = Some(prop.state());
+        let mut initial_state = Some(prop.state);
 
-        info!("Initial state: {}", prop.state());
+        info!("Initial state: {}", prop.state);
         let start = Instant::now();
 
         // Run
-        match maybe_prop_event {
+        let traj = match maybe_prop_event {
             Some(prop_event) => {
-                let stop_cond = prop_event.to_condition(initial_state.unwrap().orbit.dt);
-                info!("Propagating until event {:?}", stop_cond.event);
-                let rslt = prop.until_event(stop_cond);
-                if rslt.is_err() {
-                    panic!("{:?}", rslt.err());
-                }
+                let event = prop_event.to_condition();
+                let max_duration = match Duration::from_str(prop_event.search_until.as_str()) {
+                    Ok(d) => d,
+                    Err(_) => match Epoch::from_str(prop_event.search_until.as_str()) {
+                        Err(e) => return Err(NyxError::LoadingError(format!("{}", e))),
+                        Ok(epoch) => {
+                            let delta_t: Duration = epoch - prop.state.epoch();
+                            delta_t
+                        }
+                    },
+                };
+                let (_, traj) =
+                    prop.until_event(max_duration, &event, prop_event.hits.unwrap_or(0))?;
+                traj
             }
             None => {
                 // Elapsed seconds propagation
                 let prop_time = maybe_prop_time.unwrap();
-                info!(
-                    "Propagating for {} seconds (~ {:.3} days)",
-                    prop_time,
-                    prop_time / SECONDS_PER_DAY
-                );
-                prop.until_time_elapsed(prop_time)?;
+                let (_, traj) = prop.for_duration_with_traj(prop_time)?;
+                traj
             }
-        }
+        };
 
         info!(
             "Final state:   {} (computed in {:.3} seconds)",
-            prop.state(),
+            prop.state,
             (Instant::now() - start).as_secs_f64()
         );
 
-        while let Ok(prop_state) = rx.try_recv() {
-            // Provide to the handler
-            hdlrs.par_iter_mut().for_each(|hdlr| {
-                // let mut hdlr = hdlr_am.lock().unwrap();
-                if let Some(first_state) = initial_state {
-                    hdlr.handle(&first_state);
+        if !hdlrs.is_empty() {
+            // Let's write the state every minute
+            let hdlr_start = Instant::now();
+            let mut cnt = 0;
+            for prop_state in traj.every(1 * TimeUnit::Minute) {
+                cnt += 1;
+                // Provide to the handler
+                hdlrs.par_iter_mut().for_each(|hdlr| {
+                    if let Some(first_state) = initial_state {
+                        hdlr.handle(&first_state);
+                    }
+                    hdlr.handle(&prop_state);
+                });
+                // We've used the initial state (if it was there)
+                if initial_state.is_some() {
+                    initial_state = None;
                 }
-                hdlr.handle(&prop_state);
-            });
-
-            // We've used the initial state (if it was there)
-            if initial_state.is_some() {
-                initial_state = None;
             }
+
+            info!(
+                "Processed {} states in {:.3} seconds",
+                cnt,
+                (Instant::now() - hdlr_start).as_secs_f64()
+            );
         }
 
         Ok(())
