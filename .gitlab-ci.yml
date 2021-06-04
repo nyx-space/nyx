@@ -16,8 +16,8 @@ integration-tests:
     - cargo test mission_design --release
     - cargo test monte_carlo --release
     - cargo test orbit_determination --release
-    - cargo test propagation --release
     - cargo test propulsion --release -j4 # Only on 4 CPUs otherwise the stack is totally used up
+    - cargo test propagation --release -j4
 
 scenario-tests:
   image: rust:1-slim

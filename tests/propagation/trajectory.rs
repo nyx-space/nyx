@@ -296,15 +296,14 @@ fn traj_spacecraft() {
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to micrometer per second error
     assert!(
-        max_vel_err < 1e-9,
+        max_vel_err < 1e-5,
         "Maximum spacecraft velocity in interpolation is too high!"
     );
 
     // Allow for up to microgram error
     assert!(
-        max_vel_err < 1e-9,
+        max_vel_err < 1e-8,
         "Maximum spacecraft fuel in interpolation is too high!"
     );
 
