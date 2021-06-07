@@ -19,7 +19,7 @@
 use super::hyperdual::Hyperdual;
 use super::ForceModel;
 use crate::celestia::{Cosm, Frame, Spacecraft};
-use crate::dimensions::{Matrix3, Vector3, U7};
+use crate::dimensions::{Const, Matrix3, Vector3};
 use crate::errors::NyxError;
 use std::sync::Arc;
 
@@ -55,7 +55,7 @@ impl ForceModel for ConstantDrag {
 
     fn dual_eom(
         &self,
-        _radius: &Vector3<Hyperdual<f64, U7>>,
+        _radius: &Vector3<Hyperdual<f64, Const<7>>>,
         _osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
@@ -154,7 +154,7 @@ impl ForceModel for Drag {
 
     fn dual_eom(
         &self,
-        _radius: &Vector3<Hyperdual<f64, U7>>,
+        _radius: &Vector3<Hyperdual<f64, Const<7>>>,
         _osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)

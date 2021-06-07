@@ -18,7 +18,7 @@
 
 use crate::celestia::Frame;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN, U3, U6};
+use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
 use crate::time::{Duration, Epoch};
 
 use std::fmt;
@@ -42,7 +42,7 @@ where
     pub disable_time: Duration,
     // Stores the initial epoch when the SNC is requested, needed for decay. Kalman filter will edit this automatically.
     pub init_epoch: Option<Epoch>,
-    diag: VectorN<f64, A>,
+    diag: OVector<f64, A>,
     decay_diag: Option<Vec<f64>>,
     // Stores the previous epoch of the SNC request, needed for disable time
     pub prev_epoch: Option<Epoch>,
@@ -110,7 +110,7 @@ where
             "Not enough values for the size of the SNC matrix"
         );
 
-        let mut diag = VectorN::zeros();
+        let mut diag = OVector::zeros();
         for (i, v) in values.iter().enumerate() {
             diag[i] = *v;
         }
@@ -155,7 +155,7 @@ where
     /// May be None if:
     ///  1. Start time of this matrix is _after_ epoch
     ///  2. Time between epoch and previous epoch (set in the Kalman filter!) is longer than disabling time
-    pub fn to_matrix(&self, epoch: Epoch) -> Option<MatrixMN<f64, A, A>> {
+    pub fn to_matrix(&self, epoch: Epoch) -> Option<OMatrix<f64, A, A>> {
         if let Some(start_time) = self.start_time {
             if start_time > epoch {
                 // This SNC applies only later
@@ -170,7 +170,7 @@ where
             }
         }
         // Build a static matrix
-        let mut snc = MatrixMN::<f64, A, A>::zeros();
+        let mut snc = OMatrix::<f64, A, A>::zeros();
         for i in 0..self.diag.nrows() {
             snc[(i, i)] = self.diag[i];
         }

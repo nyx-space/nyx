@@ -21,7 +21,7 @@ extern crate num;
 use self::num::traits::real::Real;
 use crate::celestia::Orbit;
 use crate::dimensions::{
-    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Vector3, Vector6, VectorN, U3,
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, OVector, Vector3, Vector6,
 };
 use std::f64;
 
@@ -140,7 +140,7 @@ pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
 }
 
 /// Computes the RSS state errors in two provided vectors
-pub fn rss_errors<N: DimName>(prop_err: &VectorN<f64, N>, cur_state: &VectorN<f64, N>) -> f64
+pub fn rss_errors<N: DimName>(prop_err: &OVector<f64, N>, cur_state: &OVector<f64, N>) -> f64
 where
     DefaultAllocator: Allocator<f64, N>,
 {
@@ -161,9 +161,9 @@ pub fn rss_orbit_errors(prop_err: &Orbit, cur_state: &Orbit) -> (f64, f64) {
 
 /// Computes the RSS state errors in position and in velocity of two orbit vectors [P V]
 pub fn rss_orbit_vec_errors(prop_err: &Vector6<f64>, cur_state: &Vector6<f64>) -> (f64, f64) {
-    let err_radius = (prop_err.fixed_rows::<U3>(0) - cur_state.fixed_rows::<U3>(0)).norm();
+    let err_radius = (prop_err.fixed_rows::<3>(0) - cur_state.fixed_rows::<3>(0)).norm();
 
-    let err_velocity = (prop_err.fixed_rows::<U3>(3) - cur_state.fixed_rows::<U3>(3)).norm();
+    let err_velocity = (prop_err.fixed_rows::<3>(3) - cur_state.fixed_rows::<3>(3)).norm();
 
     (err_radius, err_velocity)
 }

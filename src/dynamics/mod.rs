@@ -21,7 +21,7 @@ extern crate hyperdual;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use crate::celestia::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, Matrix3, MatrixN, Vector3, VectorN, U7};
+use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7};
 use crate::State;
 
 pub use crate::errors::NyxError;
@@ -71,7 +71,9 @@ pub use self::sph_harmonics::*;
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
 pub trait Dynamics: Clone + Sync + Send
 where
-    DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>,
+    DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>
+        + Allocator<f64, <Self::StateType as State>::VecLength>
+        + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
 {
     /// The state of the associated hyperdual state, almost always StateType + U1
     type HyperdualSize: DimName;
@@ -85,11 +87,11 @@ where
     fn eom(
         &self,
         delta_t: f64,
-        state_vec: &VectorN<f64, <Self::StateType as State>::PropVecSize>,
+        state_vec: &OVector<f64, <Self::StateType as State>::VecLength>,
         state_ctx: &Self::StateType,
-    ) -> Result<VectorN<f64, <Self::StateType as State>::PropVecSize>, NyxError>
+    ) -> Result<OVector<f64, <Self::StateType as State>::VecLength>, NyxError>
     where
-        DefaultAllocator: Allocator<f64, <Self::StateType as State>::PropVecSize>;
+        DefaultAllocator: Allocator<f64, <Self::StateType as State>::VecLength>;
 
     /// Defines the equations of motion for Dual numbers for these dynamics.
     /// _All_ dynamics need to allow for automatic differentiation. However, if differentiation is not supported,
@@ -97,12 +99,12 @@ where
     fn dual_eom(
         &self,
         delta_t: f64,
-        state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
+        state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         state_ctx: &Self::StateType,
     ) -> Result<
         (
-            VectorN<f64, <Self::StateType as State>::Size>,
-            MatrixN<f64, <Self::StateType as State>::Size>,
+            OVector<f64, <Self::StateType as State>::Size>,
+            OMatrix<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
         ),
         NyxError,
     >
@@ -117,12 +119,12 @@ where
     fn eom_grad(
         &self,
         delta_t_s: f64,
-        state_vec: &VectorN<f64, <Self::StateType as State>::Size>,
+        state_vec: &OVector<f64, <Self::StateType as State>::Size>,
         state_ctx: &Self::StateType,
     ) -> Result<
         (
-            VectorN<f64, <Self::StateType as State>::Size>,
-            MatrixN<f64, <Self::StateType as State>::Size>,
+            OVector<f64, <Self::StateType as State>::Size>,
+            OMatrix<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
         ),
         NyxError,
     >
@@ -133,7 +135,7 @@ where
             + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy,
     {
-        let hyperstate: VectorN<
+        let hyperstate: OVector<
             Hyperdual<f64, Self::HyperdualSize>,
             <Self::StateType as State>::Size,
         > = hyperspace_from_vector(&state_vec);

@@ -37,7 +37,8 @@ fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
 /// A trait to specify how a specific event must be evaluated.
 pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
 where
-    DefaultAllocator: Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size> + Allocator<f64, S::VecLength>,
 {
     // Evaluation of event crossing, must return whether the condition happened between between both states.
     fn eval_crossing(&self, prev_state: &S, next_state: &S) -> bool {

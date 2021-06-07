@@ -74,10 +74,11 @@ pub struct ODProcess<
     S: EstimateFrom<D::StateType>,
     K: Filter<S, A, Msr::MeasurementSize>,
 > where
-    D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>
+        + Allocator<f64, <S as State>::VecLength>
+        + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
@@ -122,7 +123,7 @@ impl<
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, N, T, A, S, K>
 where
-    D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
@@ -133,12 +134,13 @@ where
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>
+        + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
         + Allocator<f64, <D::StateType as State>::Size, A>
         + Allocator<f64, A, <D::StateType as State>::Size>
         + Allocator<f64, <S as State>::Size>
+        + Allocator<f64, <S as State>::VecLength>
         + Allocator<f64, <S as State>::Size, <S as State>::Size>
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
@@ -472,7 +474,7 @@ where
     /// Builds the navigation trajectory for the estimated state only (no covariance until https://gitlab.com/nyx-space/nyx/-/issues/199!)
     pub fn to_nav_traj(&self) -> Result<Traj<S>, NyxError>
     where
-        DefaultAllocator: Allocator<f64, <S as State>::PropVecSize>,
+        DefaultAllocator: Allocator<f64, <S as State>::VecLength>,
     {
         if self.estimates.is_empty() {
             Err(NyxError::NoStateData(
@@ -500,9 +502,9 @@ impl<
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, S, K>
 where
-    D::StateType: Add<VectorN<f64, <S as State>::Size>, Output = D::StateType>,
+    D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>
+        + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
@@ -513,6 +515,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <S as State>::Size>
+        + Allocator<f64, <S as State>::VecLength>
         + Allocator<f64, <S as State>::Size, <S as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
@@ -567,6 +570,7 @@ pub trait EkfTrigger {
     where
         E: Estimate<T>,
         DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::VecLength>
             + Allocator<f64, <T as State>::Size, <T as State>::Size>;
 
     /// Return true if the filter should not longer be as extended.
@@ -585,6 +589,7 @@ impl EkfTrigger for CkfTrigger {
     where
         E: Estimate<T>,
         DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::VecLength>
             + Allocator<f64, <T as State>::Size, <T as State>::Size>,
     {
         false
@@ -619,6 +624,7 @@ impl EkfTrigger for StdEkfTrigger {
     where
         E: Estimate<T>,
         DefaultAllocator: Allocator<f64, <T as State>::Size>
+            + Allocator<f64, <T as State>::VecLength>
             + Allocator<f64, <T as State>::Size, <T as State>::Size>,
     {
         if !est.predicted() {

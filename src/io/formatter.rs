@@ -760,7 +760,8 @@ impl NavSolutionFormatter {
     pub fn fmt<T: State, S: NavSolution<T>>(&self, sol: &S) -> Vec<String>
     where
         DefaultAllocator: Allocator<f64, <T as State>::Size>
-            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+            + Allocator<f64, <T as State>::Size, <T as State>::Size>
+            + Allocator<f64, <T as State>::VecLength>,
     {
         let mut formatted = Vec::new();
 

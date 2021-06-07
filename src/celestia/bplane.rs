@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, Hyperdual};
 use super::{Frame, Orbit, OrbitDual, OrbitPartial};
-use crate::dimensions::{Matrix2, Matrix3, Vector2, Vector3, U2};
+use crate::dimensions::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::targeter::Objective;
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
@@ -349,7 +349,7 @@ pub fn try_achieve_b_plane(
 
             // Grab the first two rows of the Jacobian (discard the rest).
             let full_jac = b_plane.jacobian();
-            let jac = full_jac.fixed_rows::<U2>(0);
+            let jac = full_jac.fixed_rows::<2>(0);
             // Solve the Least Squares / compute the delta-v
             let dv = jac.transpose() * (jac * jac.transpose()).try_inverse().unwrap() * b_plane_err;
 

@@ -24,9 +24,7 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice, TimeTagged};
 use crate::celestia::{Cosm, Frame, Orbit};
-use crate::dimensions::{
-    DimName, Matrix1x6, Matrix2x6, Vector1, Vector2, VectorN, U1, U2, U3, U6, U7,
-};
+use crate::dimensions::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
 use crate::time::Epoch;
 use crate::utils::{r2, r3};
 use crate::Spacecraft;
@@ -267,13 +265,13 @@ impl StdMeasurement {
     }
 
     fn compute_sensitivity(
-        state: &VectorN<Hyperdual<f64, U7>, U6>,
+        state: &OVector<Hyperdual<f64, U7>, U6>,
         range_noise: f64,
         range_rate_noise: f64,
     ) -> (Vector2<f64>, Matrix2x6<f64>) {
         // Extract data from hyperspace
-        let range_vec = state.fixed_rows::<U3>(0).into_owned();
-        let velocity_vec = state.fixed_rows::<U3>(3).into_owned();
+        let range_vec = state.fixed_rows::<3>(0).into_owned();
+        let velocity_vec = state.fixed_rows::<3>(3).into_owned();
 
         // Code up math as usual
         let delta_v_vec = velocity_vec / norm(&range_vec);
@@ -414,10 +412,10 @@ impl RangeMsr {
     }
 
     fn compute_sensitivity(
-        state: &VectorN<Hyperdual<f64, U7>, U6>,
+        state: &OVector<Hyperdual<f64, U7>, U6>,
     ) -> (Vector1<f64>, Matrix1x6<f64>) {
         // Extract data from hyperspace
-        let range_vec = state.fixed_rows::<U3>(0).into_owned();
+        let range_vec = state.fixed_rows::<3>(0).into_owned();
 
         // Code up math as usual
         let range = norm(&range_vec);
@@ -509,11 +507,11 @@ impl DopplerMsr {
     }
 
     fn compute_sensitivity(
-        state: &VectorN<Hyperdual<f64, U7>, U6>,
+        state: &OVector<Hyperdual<f64, U7>, U6>,
     ) -> (Vector1<f64>, Matrix1x6<f64>) {
         // Extract data from hyperspace
-        let range_vec = state.fixed_rows::<U3>(0).into_owned();
-        let velocity_vec = state.fixed_rows::<U3>(3).into_owned();
+        let range_vec = state.fixed_rows::<3>(0).into_owned();
+        let velocity_vec = state.fixed_rows::<3>(3).into_owned();
 
         // Code up math as usual
         let delta_v_vec = velocity_vec / norm(&range_vec);
