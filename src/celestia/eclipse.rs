@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use super::{Cosm, Frame, LTCorr, Orbit, Spacecraft};
+pub use super::{Bodies, Cosm, Frame, LTCorr, Orbit, Spacecraft};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnit};
+use crate::TimeTagged;
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::fmt;
 use std::sync::Arc;
@@ -335,7 +336,7 @@ pub fn eclipse_state(
         // Compute the nominal area of the light source
         let nominal_area = std::f64::consts::PI * r_ls_prime.powi(2);
         // And return the percentage (between 0 and 1) of the eclipse.
-        EclipseState::Penumbra((nominal_area - shadow_area) / nominal_area)
+        EclipseState::Penumbra(1.0 - shadow_area / nominal_area)
     } else {
         // Annular eclipse.
         // If r_eb_prime is very small, then the fraction is very small: however, we note a penumbra close to 1.0 as near full light source visibility, so let's subtract one from this.
