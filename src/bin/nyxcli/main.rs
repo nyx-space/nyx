@@ -177,7 +177,9 @@ fn main() -> Result<(), ParsingError> {
                                     hdlrs.push(out);
                                 }
 
-                                info!("Executing sequence `{}`", seq_name);
+                                info!("*******************************{:*<1$}", "", seq_name.len());
+                                info!("===> Executing sequence `{}` <===", seq_name);
+                                info!("*******************************{:*<1$}", "", seq_name.len());
                                 if let Some(e) = md.execute_with(hdlrs).err() {
                                     return Err(ParsingError::ExecutionError(e));
                                 };

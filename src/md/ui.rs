@@ -220,6 +220,7 @@ where
                         0.0,
                     );
                 }
+
                 // Add the force models
                 if let Some(force_models) = &spacecraft.force_models {
                     if scen.force_models.as_ref().is_none() {
@@ -247,14 +248,11 @@ where
                                         cosm.clone(),
                                     );
                                     srp.phi = smdl.phi;
-                                    info!("{}", srp);
                                     sc_dyn.add_model(Arc::new(srp));
                                 }
                             }
                         }
                     }
-                } else {
-                    info!("No force models");
                 }
 
                 // Add the acceleration models if applicable
