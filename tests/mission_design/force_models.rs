@@ -48,7 +48,7 @@ fn srp_earth_full_vis() {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
-        "Error accumulated in full sunlight over {} : {:.3} m \t{:.3} m/s",
+        "Error accumulated in full sunlight over {} : {:.6} m \t{:.6} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
@@ -58,7 +58,7 @@ fn srp_earth_full_vis() {
 }
 
 #[test]
-fn srp_earth_penumbra() {
+fn srp_earth_leo() {
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
@@ -98,7 +98,7 @@ fn srp_earth_penumbra() {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
-        "Error accumulated in circular equatorial LEO (with penumbras) over {} : {:.3} m \t{:.3} m/s",
+        "Error accumulated in circular equatorial LEO (with penumbras) over {} : {:.6} m \t{:.6} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
@@ -148,7 +148,7 @@ fn srp_earth_meo_ecc_inc() {
 
     let (err_r, err_v) = rss_orbit_vec_errors(&final_state.orbit.to_cartesian_vec(), &rslt);
     println!(
-        "Error accumulated in ecc+inc MEO (with penumbras) over {} : {:.3} m \t{:.3} m/s",
+        "Error accumulated in ecc+inc MEO (with penumbras) over {} : {:.6} m \t{:.6} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
