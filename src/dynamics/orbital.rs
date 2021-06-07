@@ -25,6 +25,7 @@ use crate::dimensions::{
 };
 use crate::State;
 use std::f64;
+use std::fmt;
 use std::sync::Arc;
 
 pub use super::sph_harmonics::Harmonics;
@@ -74,6 +75,17 @@ impl<'a> OrbitalDynamics<'a> {
         let mut me = self.clone();
         me.add_model(accel_model);
         Arc::new(me)
+    }
+}
+
+impl<'a> fmt::Display for OrbitalDynamics<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let as_string: String = self
+            .accel_models
+            .iter()
+            .map(|x| format!("{}; ", x))
+            .collect();
+        write!(f, "Orbital dynamics: {}", as_string)
     }
 }
 
@@ -221,6 +233,13 @@ impl PointMasses {
             cosm,
             correction,
         }
+    }
+}
+
+impl fmt::Display for PointMasses {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let body_list: String = self.bodies.iter().map(|x| format!("{}; ", x)).collect();
+        write!(f, "Point masses of {}", body_list)
     }
 }
 

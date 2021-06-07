@@ -24,6 +24,8 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7};
 use crate::State;
 
+use std::fmt;
+
 pub use crate::errors::NyxError;
 
 /// The orbital module handles all Cartesian based orbital dynamics.
@@ -155,7 +157,7 @@ where
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel: Send + Sync {
+pub trait ForceModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state.
     fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError>;
 
@@ -171,7 +173,7 @@ pub trait ForceModel: Send + Sync {
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
 ///
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
-pub trait AccelModel: Send + Sync {
+pub trait AccelModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state in the integration frame.
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError>;
 

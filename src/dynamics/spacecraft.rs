@@ -26,6 +26,7 @@ use crate::errors::NyxError;
 use crate::state::State;
 use crate::time::TimeUnit;
 use crate::TimeTagged;
+use std::fmt;
 use std::sync::Arc;
 
 pub use super::solarpressure::SolarPressure;
@@ -124,6 +125,23 @@ impl<'a> SpacecraftDynamics<'a> {
             Some(ctrl) => ctrl.achieved(state),
             None => Err(NyxError::NoObjectiveDefined),
         }
+    }
+}
+
+impl<'a> fmt::Display for SpacecraftDynamics<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let force_models: String = self
+            .force_models
+            .iter()
+            .map(|x| format!("{}; ", x))
+            .collect();
+        write!(
+            f,
+            "Spacecraft dynamics (with ctrl = {}): {}\t{}",
+            self.ctrl.is_some(),
+            force_models,
+            self.orbital_dyn
+        )
     }
 }
 

@@ -219,40 +219,42 @@ where
                         0.0,
                         0.0,
                     );
-
-                    // Add the force models
-                    if let Some(force_models) = &spacecraft.force_models {
-                        if scen.force_models.as_ref().is_none() {
-                            return Err(ParsingError::MD(format!(
-                                "spacecraft `{}` refers to force models but none are defined",
-                                prop.dynamics
-                            )));
-                        }
-                        for mdl in force_models {
-                            match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
-                                None => {
-                                    return Err(ParsingError::MD(format!(
-                                        "spacecraft `{}` refers to unknown force model `{}`",
-                                        prop.dynamics, mdl
-                                    )))
-                                }
-                                Some(amdl) => {
-                                    let eme2k = &cosm.frame("EME2000");
-                                    let luna = &cosm.frame("Luna");
-                                    for smdl in amdl.srp.values() {
-                                        // Note that an Arc is immutable, but we want to specify everything
-                                        // so we create the SRP without the wrapper
-                                        let mut srp = SolarPressure::default_raw(
-                                            vec![*eme2k, *luna],
-                                            cosm.clone(),
-                                        );
-                                        srp.phi = smdl.phi;
-                                        sc_dyn.add_model(Arc::new(srp));
-                                    }
+                }
+                // Add the force models
+                if let Some(force_models) = &spacecraft.force_models {
+                    if scen.force_models.as_ref().is_none() {
+                        return Err(ParsingError::MD(format!(
+                            "spacecraft `{}` refers to force models but none are defined",
+                            prop.dynamics
+                        )));
+                    }
+                    for mdl in force_models {
+                        match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
+                            None => {
+                                return Err(ParsingError::MD(format!(
+                                    "spacecraft `{}` refers to unknown force model `{}`",
+                                    prop.dynamics, mdl
+                                )))
+                            }
+                            Some(amdl) => {
+                                let eme2k = &cosm.frame("EME2000");
+                                let luna = &cosm.frame("Luna");
+                                for smdl in amdl.srp.values() {
+                                    // Note that an Arc is immutable, but we want to specify everything
+                                    // so we create the SRP without the wrapper
+                                    let mut srp = SolarPressure::default_raw(
+                                        vec![*eme2k, *luna],
+                                        cosm.clone(),
+                                    );
+                                    srp.phi = smdl.phi;
+                                    info!("{}", srp);
+                                    sc_dyn.add_model(Arc::new(srp));
                                 }
                             }
                         }
                     }
+                } else {
+                    info!("No force models");
                 }
 
                 // Add the acceleration models if applicable
@@ -282,6 +284,8 @@ where
                     // And set these into the spacecraft dynamics
                     sc_dyn.orbital_dyn = Arc::new(orbital_dyn);
                 }
+
+                info!("{}", sc_dyn);
 
                 // Validate the stopping condition
                 // Check if it's a stopping condition

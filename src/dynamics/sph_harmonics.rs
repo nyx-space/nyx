@@ -25,6 +25,7 @@ use crate::errors::NyxError;
 use crate::io::gravity::GravityPotentialStor;
 use crate::TimeTagged;
 use std::cmp::min;
+use std::fmt;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -138,6 +139,18 @@ where
             vr01_h,
             vr11_h,
         })
+    }
+}
+
+impl<S: GravityPotentialStor + Send> fmt::Display for Harmonics<S> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} gravity field {}x{} (order x degree)",
+            self.compute_frame,
+            self.stor.max_order_m(),
+            self.stor.max_degree_n(),
+        )
     }
 }
 

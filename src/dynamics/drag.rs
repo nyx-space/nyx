@@ -21,6 +21,7 @@ use super::ForceModel;
 use crate::celestia::{Cosm, Frame, Spacecraft};
 use crate::dimensions::{Const, Matrix3, Vector3};
 use crate::errors::NyxError;
+use std::fmt;
 use std::sync::Arc;
 
 /// Density in kg/m^3 and altitudes in meters, not kilometers!
@@ -44,6 +45,16 @@ pub struct ConstantDrag {
     pub drag_frame: Frame,
     /// a Cosm reference is needed to convert to the state around the correct planet
     pub cosm: Arc<Cosm>,
+}
+
+impl fmt::Display for ConstantDrag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "\tConstant Drag rho = {} kg/m^3 in frame {}",
+            self.rho, self.drag_frame
+        )
+    }
 }
 
 impl ForceModel for ConstantDrag {
@@ -96,6 +107,16 @@ impl Drag {
             drag_frame: cosm.frame("IAU Earth"),
             cosm,
         })
+    }
+}
+
+impl fmt::Display for Drag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "\tDrag density {:?} in frame {}",
+            self.density, self.drag_frame
+        )
     }
 }
 
