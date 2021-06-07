@@ -17,7 +17,7 @@
 */
 
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, VectorN, U1, U3};
+use crate::dimensions::{DefaultAllocator, DimName, OVector, U1, U3};
 
 // This determines when to take into consideration the magnitude of the state_delta and
 // prevents dividing by too small of a number.
@@ -34,9 +34,9 @@ where
     /// of the RK propagator. The `candidate` variable is the candidate state, and `cur_state` is
     /// the current state. This function must return the error.
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>;
@@ -53,9 +53,9 @@ where
 pub struct LargestError;
 impl ErrorCtrl for LargestError {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
@@ -85,9 +85,9 @@ impl ErrorCtrl for LargestError {
 pub struct LargestStep;
 impl ErrorCtrl for LargestStep {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
@@ -115,9 +115,9 @@ impl ErrorCtrl for LargestStep {
 pub struct LargestState;
 impl ErrorCtrl for LargestState {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
@@ -148,9 +148,9 @@ impl ErrorCtrl for LargestState {
 pub struct RSSStep;
 impl ErrorCtrl for RSSStep {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
@@ -179,9 +179,9 @@ impl ErrorCtrl for RSSStep {
 pub struct RSSState;
 impl ErrorCtrl for RSSState {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
@@ -203,30 +203,30 @@ impl ErrorCtrl for RSSState {
 pub struct RSSCartesianState;
 impl ErrorCtrl for RSSCartesianState {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
         if N::dim() >= 6 {
             let err_radius = RSSState::estimate::<U3>(
-                &error_est.fixed_rows::<U3>(0).into_owned(),
-                &candidate.fixed_rows::<U3>(0).into_owned(),
-                &cur_state.fixed_rows::<U3>(0).into_owned(),
+                &error_est.fixed_rows::<3>(0).into_owned(),
+                &candidate.fixed_rows::<3>(0).into_owned(),
+                &cur_state.fixed_rows::<3>(0).into_owned(),
             );
             let err_velocity = RSSState::estimate::<U3>(
-                &error_est.fixed_rows::<U3>(3).into_owned(),
-                &candidate.fixed_rows::<U3>(3).into_owned(),
-                &cur_state.fixed_rows::<U3>(3).into_owned(),
+                &error_est.fixed_rows::<3>(3).into_owned(),
+                &candidate.fixed_rows::<3>(3).into_owned(),
+                &cur_state.fixed_rows::<3>(3).into_owned(),
             );
             let mut remaining_err = 0.0;
             for i in 6..N::dim() {
                 let this_err = RSSState::estimate::<U1>(
-                    &error_est.fixed_rows::<U1>(i).into_owned(),
-                    &candidate.fixed_rows::<U1>(i).into_owned(),
-                    &cur_state.fixed_rows::<U1>(i).into_owned(),
+                    &error_est.fixed_rows::<1>(i).into_owned(),
+                    &candidate.fixed_rows::<1>(i).into_owned(),
+                    &cur_state.fixed_rows::<1>(i).into_owned(),
                 );
                 if this_err > remaining_err {
                     remaining_err = this_err;
@@ -246,30 +246,30 @@ impl ErrorCtrl for RSSCartesianState {
 pub struct RSSCartesianStep;
 impl ErrorCtrl for RSSCartesianStep {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
         if N::dim() >= 6 {
             let err_radius = RSSStep::estimate::<U3>(
-                &error_est.fixed_rows::<U3>(0).into_owned(),
-                &candidate.fixed_rows::<U3>(0).into_owned(),
-                &cur_state.fixed_rows::<U3>(0).into_owned(),
+                &error_est.fixed_rows::<3>(0).into_owned(),
+                &candidate.fixed_rows::<3>(0).into_owned(),
+                &cur_state.fixed_rows::<3>(0).into_owned(),
             );
             let err_velocity = RSSStep::estimate::<U3>(
-                &error_est.fixed_rows::<U3>(3).into_owned(),
-                &candidate.fixed_rows::<U3>(3).into_owned(),
-                &cur_state.fixed_rows::<U3>(3).into_owned(),
+                &error_est.fixed_rows::<3>(3).into_owned(),
+                &candidate.fixed_rows::<3>(3).into_owned(),
+                &cur_state.fixed_rows::<3>(3).into_owned(),
             );
             let mut remaining_err = 0.0;
             for i in 6..N::dim() {
                 let this_err = RSSStep::estimate::<U1>(
-                    &error_est.fixed_rows::<U1>(i).into_owned(),
-                    &candidate.fixed_rows::<U1>(i).into_owned(),
-                    &cur_state.fixed_rows::<U1>(i).into_owned(),
+                    &error_est.fixed_rows::<1>(i).into_owned(),
+                    &candidate.fixed_rows::<1>(i).into_owned(),
+                    &cur_state.fixed_rows::<1>(i).into_owned(),
                 );
                 if this_err > remaining_err {
                     remaining_err = this_err;
@@ -289,33 +289,33 @@ impl ErrorCtrl for RSSCartesianStep {
 pub struct RSSCartesianStepStm;
 impl ErrorCtrl for RSSCartesianStepStm {
     fn estimate<N: DimName>(
-        error_est: &VectorN<f64, N>,
-        candidate: &VectorN<f64, N>,
-        cur_state: &VectorN<f64, N>,
+        error_est: &OVector<f64, N>,
+        candidate: &OVector<f64, N>,
+        cur_state: &OVector<f64, N>,
     ) -> f64
     where
         DefaultAllocator: Allocator<f64, N>,
     {
         let err_radius = RSSStep::estimate::<U3>(
-            &error_est.fixed_rows::<U3>(0).into_owned(),
-            &candidate.fixed_rows::<U3>(0).into_owned(),
-            &cur_state.fixed_rows::<U3>(0).into_owned(),
+            &error_est.fixed_rows::<3>(0).into_owned(),
+            &candidate.fixed_rows::<3>(0).into_owned(),
+            &cur_state.fixed_rows::<3>(0).into_owned(),
         );
         let err_velocity = RSSStep::estimate::<U3>(
-            &error_est.fixed_rows::<U3>(3).into_owned(),
-            &candidate.fixed_rows::<U3>(3).into_owned(),
-            &cur_state.fixed_rows::<U3>(3).into_owned(),
+            &error_est.fixed_rows::<3>(3).into_owned(),
+            &candidate.fixed_rows::<3>(3).into_owned(),
+            &cur_state.fixed_rows::<3>(3).into_owned(),
         );
         let err_cov_radius = RSSStep::estimate::<U3>(
-            &VectorN::<f64, U3>::new(error_est[6], error_est[6 + 7], error_est[6 + 14]),
-            &VectorN::<f64, U3>::new(candidate[6], candidate[6 + 7], candidate[6 + 14]),
-            &VectorN::<f64, U3>::new(cur_state[6], cur_state[6 + 7], cur_state[6 + 14]),
+            &OVector::<f64, U3>::new(error_est[6], error_est[6 + 7], error_est[6 + 14]),
+            &OVector::<f64, U3>::new(candidate[6], candidate[6 + 7], candidate[6 + 14]),
+            &OVector::<f64, U3>::new(cur_state[6], cur_state[6 + 7], cur_state[6 + 14]),
         );
 
         let err_cov_velocity = RSSStep::estimate::<U3>(
-            &VectorN::<f64, U3>::new(error_est[6 + 21], error_est[6 + 28], error_est[6 + 35]),
-            &VectorN::<f64, U3>::new(candidate[6 + 21], candidate[6 + 28], candidate[6 + 35]),
-            &VectorN::<f64, U3>::new(cur_state[6 + 21], cur_state[6 + 28], cur_state[6 + 35]),
+            &OVector::<f64, U3>::new(error_est[6 + 21], error_est[6 + 28], error_est[6 + 35]),
+            &OVector::<f64, U3>::new(candidate[6 + 21], candidate[6 + 28], candidate[6 + 35]),
+            &OVector::<f64, U3>::new(cur_state[6 + 21], cur_state[6 + 28], cur_state[6 + 35]),
         );
 
         let errs = vec![err_radius, err_velocity, err_cov_radius, err_cov_velocity];

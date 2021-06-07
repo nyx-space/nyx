@@ -22,7 +22,7 @@ use super::{CovarFormat, EpochFormat};
 use super::{EstimateFrom, State};
 use crate::celestia::Orbit;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::hifitime::Epoch;
 use crate::Spacecraft;
 use std::cmp::PartialEq;
@@ -32,8 +32,9 @@ use std::fmt;
 pub trait Estimate<T: State>
 where
     Self: Clone + PartialEq + Sized + fmt::Display,
-    DefaultAllocator:
-        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>,
 {
     /// An empty estimate. This is useful if wanting to store an estimate outside the scope of a filtering loop.
     fn zeros(state: T) -> Self;
@@ -50,21 +51,21 @@ where
         self.nominal_state().add(self.state_deviation())
     }
     /// The state deviation as computed by the filter.
-    fn state_deviation(&self) -> VectorN<f64, <T as State>::Size>;
+    fn state_deviation(&self) -> OVector<f64, <T as State>::Size>;
     /// The nominal state as reported by the filter dynamics
     fn nominal_state(&self) -> T;
     /// The Covariance of this estimate. Will return the predicted covariance if this is a time update/prediction.
-    fn covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size>;
+    fn covar(&self) -> OMatrix<f64, <T as State>::Size, <T as State>::Size>;
     /// The predicted covariance of this estimate from the time update
-    fn predicted_covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size>;
+    fn predicted_covar(&self) -> OMatrix<f64, <T as State>::Size, <T as State>::Size>;
     /// Sets the state deviation.
-    fn set_state_deviation(&mut self, new_state: VectorN<f64, <T as State>::Size>);
+    fn set_state_deviation(&mut self, new_state: OVector<f64, <T as State>::Size>);
     /// Sets the Covariance of this estimate
-    fn set_covar(&mut self, new_covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>);
+    fn set_covar(&mut self, new_covar: OMatrix<f64, <T as State>::Size, <T as State>::Size>);
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     fn predicted(&self) -> bool;
     /// The STM used to compute this Estimate
-    fn stm(&self) -> &MatrixMN<f64, <T as State>::Size, <T as State>::Size>;
+    fn stm(&self) -> &OMatrix<f64, <T as State>::Size, <T as State>::Size>;
     /// The Epoch format upon serialization
     fn epoch_fmt(&self) -> EpochFormat;
     /// The covariance format upon serialization
@@ -125,20 +126,21 @@ where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// The estimated state
     pub nominal_state: T,
     /// The state deviation
-    pub state_deviation: VectorN<f64, <T as State>::Size>,
+    pub state_deviation: OVector<f64, <T as State>::Size>,
     /// The Covariance of this estimate
-    pub covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
+    pub covar: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
     /// The predicted covariance of this estimate
-    pub covar_bar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
+    pub covar_bar: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
     /// Whether or not this is a predicted estimate from a time update, or an estimate from a measurement
     pub predicted: bool,
     /// The STM used to compute this Estimate
-    pub stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
+    pub stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
     /// The Epoch format upon serialization
     pub epoch_fmt: EpochFormat,
     /// The covariance format upon serialization
@@ -150,19 +152,20 @@ where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     pub fn from_covar(
         nominal_state: T,
-        covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>,
+        covar: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
     ) -> Self {
         Self {
             nominal_state,
-            state_deviation: VectorN::<f64, <T as State>::Size>::zeros(),
+            state_deviation: OVector::<f64, <T as State>::Size>::zeros(),
             covar: covar.clone(),
             covar_bar: covar,
             predicted: true,
-            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
@@ -174,16 +177,17 @@ where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn zeros(nominal_state: T) -> Self {
         Self {
             nominal_state,
-            state_deviation: VectorN::<f64, <T as State>::Size>::zeros(),
-            covar: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
-            covar_bar: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            state_deviation: OVector::<f64, <T as State>::Size>::zeros(),
+            covar: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            covar_bar: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             predicted: true,
-            stm: MatrixMN::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
@@ -193,22 +197,22 @@ where
         self.nominal_state
     }
 
-    fn state_deviation(&self) -> VectorN<f64, <T as State>::Size> {
+    fn state_deviation(&self) -> OVector<f64, <T as State>::Size> {
         self.state_deviation.clone()
     }
 
-    fn covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
+    fn covar(&self) -> OMatrix<f64, <T as State>::Size, <T as State>::Size> {
         self.covar.clone()
     }
 
-    fn predicted_covar(&self) -> MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
+    fn predicted_covar(&self) -> OMatrix<f64, <T as State>::Size, <T as State>::Size> {
         self.covar_bar.clone()
     }
 
     fn predicted(&self) -> bool {
         self.predicted
     }
-    fn stm(&self) -> &MatrixMN<f64, <T as State>::Size, <T as State>::Size> {
+    fn stm(&self) -> &OMatrix<f64, <T as State>::Size, <T as State>::Size> {
         &self.stm
     }
     fn epoch_fmt(&self) -> EpochFormat {
@@ -217,10 +221,10 @@ where
     fn covar_fmt(&self) -> CovarFormat {
         self.covar_fmt
     }
-    fn set_state_deviation(&mut self, new_state: VectorN<f64, <T as State>::Size>) {
+    fn set_state_deviation(&mut self, new_state: OVector<f64, <T as State>::Size>) {
         self.state_deviation = new_state;
     }
-    fn set_covar(&mut self, new_covar: MatrixMN<f64, <T as State>::Size, <T as State>::Size>) {
+    fn set_covar(&mut self, new_covar: OMatrix<f64, <T as State>::Size, <T as State>::Size>) {
         self.covar = new_covar;
     }
 }
@@ -230,6 +234,7 @@ where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -260,6 +265,7 @@ where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -276,6 +282,7 @@ where
     DefaultAllocator: Allocator<f64, <T as State>::Size>
         + Allocator<f64, <T as State>::Size, <T as State>::Size>
         + Allocator<usize, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     /// Serializes the estimate
@@ -328,8 +335,9 @@ where
 pub trait NavSolution<T>: Estimate<Orbit>
 where
     T: State,
-    DefaultAllocator:
-        Allocator<f64, <T as State>::Size> + Allocator<f64, <T as State>::Size, <T as State>::Size>,
+    DefaultAllocator: Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::Size, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>,
 {
     fn orbital_state(&self) -> Orbit;
     /// Returns the nominal state as computed by the dynamics
@@ -350,7 +358,7 @@ impl EstimateFrom<Spacecraft> for Orbit {
         from.orbit
     }
 
-    fn add_dev(to: &Spacecraft, dev: VectorN<f64, Self::Size>) -> Spacecraft {
+    fn add_dev(to: &Spacecraft, dev: OVector<f64, Self::Size>) -> Spacecraft {
         *to + dev
     }
 }
@@ -360,7 +368,7 @@ impl EstimateFrom<Orbit> for Orbit {
         *from
     }
 
-    fn add_dev(to: &Orbit, dev: VectorN<f64, Self::Size>) -> Orbit {
+    fn add_dev(to: &Orbit, dev: OVector<f64, Self::Size>) -> Orbit {
         *to + dev
     }
 }

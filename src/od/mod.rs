@@ -22,7 +22,7 @@ extern crate rand_distr;
 extern crate serde;
 
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, MatrixMN, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::time::Epoch;
 use crate::{State, TimeTagged};
@@ -55,6 +55,7 @@ where
     T: State,
     DefaultAllocator: Allocator<f64, M>
         + Allocator<f64, <T as State>::Size>
+        + Allocator<f64, <T as State>::VecLength>
         + Allocator<f64, A>
         + Allocator<f64, M, M>
         + Allocator<f64, M, <T as State>::Size>
@@ -73,11 +74,11 @@ where
 
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
-    fn update_stm(&mut self, new_stm: MatrixMN<f64, <T as State>::Size, <T as State>::Size>);
+    fn update_stm(&mut self, new_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>);
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
-    fn update_h_tilde(&mut self, h_tilde: MatrixMN<f64, M, <T as State>::Size>);
+    fn update_h_tilde(&mut self, h_tilde: OMatrix<f64, M, <T as State>::Size>);
 
     /// Computes a time update/prediction at the provided nominal state (i.e. advances the filter estimate with the updated STM).
     ///
@@ -90,8 +91,8 @@ where
     fn measurement_update(
         &mut self,
         nominal_state: T,
-        real_obs: &VectorN<f64, M>,
-        computed_obs: &VectorN<f64, M>,
+        real_obs: &OVector<f64, M>,
+        computed_obs: &OVector<f64, M>,
     ) -> Result<(Self::Estimate, residual::Residual<M>), NyxError>;
 
     /// Returns whether the filter is an extended filter (e.g. EKF)
@@ -117,12 +118,12 @@ where
     type MeasurementSize: DimName;
 
     /// Returns the measurement/observation as a vector.
-    fn observation(&self) -> VectorN<f64, Self::MeasurementSize>
+    fn observation(&self) -> OVector<f64, Self::MeasurementSize>
     where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> MatrixMN<f64, Self::MeasurementSize, Self::StateSize>
+    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, Self::StateSize>
     where
         DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
 
@@ -147,10 +148,12 @@ pub trait EstimateFrom<O: State>
 where
     Self: State,
     DefaultAllocator: Allocator<f64, <O as State>::Size>
+        + Allocator<f64, <O as State>::VecLength>
         + Allocator<f64, <O as State>::Size, <O as State>::Size>
         + Allocator<f64, Self::Size>
+        + Allocator<f64, Self::VecLength>
         + Allocator<f64, Self::Size, Self::Size>,
 {
     fn extract(from: &O) -> Self;
-    fn add_dev(to: &O, dev: VectorN<f64, Self::Size>) -> O;
+    fn add_dev(to: &O, dev: OVector<f64, Self::Size>) -> O;
 }

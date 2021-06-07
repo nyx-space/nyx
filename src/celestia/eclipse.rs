@@ -19,7 +19,6 @@
 pub use super::{Bodies, Cosm, Frame, LTCorr, Orbit, Spacecraft};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnit};
-use crate::TimeTagged;
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::fmt;
 use std::sync::Arc;

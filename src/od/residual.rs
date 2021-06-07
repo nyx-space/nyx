@@ -20,7 +20,7 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::EpochFormat;
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, OVector};
 use crate::hifitime::Epoch;
 use std::fmt;
 
@@ -34,9 +34,9 @@ where
     /// Date time of this Residual
     pub dt: Epoch,
     /// The prefit residual (set to zero for EKF filters)
-    pub prefit: VectorN<f64, M>,
+    pub prefit: OVector<f64, M>,
     /// The postfit residual (set to zero for EKF filters)
-    pub postfit: VectorN<f64, M>,
+    pub postfit: OVector<f64, M>,
     /// The Epoch format upon serialization
     pub epoch_fmt: EpochFormat,
 }
@@ -50,8 +50,8 @@ where
     pub fn zeros() -> Self {
         Self {
             dt: Epoch::from_tai_seconds(0.0),
-            prefit: VectorN::<f64, M>::zeros(),
-            postfit: VectorN::<f64, M>::zeros(),
+            prefit: OVector::<f64, M>::zeros(),
+            postfit: OVector::<f64, M>::zeros(),
             epoch_fmt: EpochFormat::GregorianUtc,
         }
     }
@@ -74,7 +74,7 @@ where
         Self::header(EpochFormat::GregorianUtc)
     }
 
-    pub fn new(dt: Epoch, prefit: VectorN<f64, M>, postfit: VectorN<f64, M>) -> Self {
+    pub fn new(dt: Epoch, prefit: OVector<f64, M>, postfit: OVector<f64, M>) -> Self {
         Self {
             dt,
             prefit,

@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 
 use nyx::celestia::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
-use nyx::dimensions::{Matrix6, Vector6, U3};
+use nyx::dimensions::{Matrix6, Vector6};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::*;
@@ -648,8 +648,8 @@ fn two_body_dual() {
 
     // And check the difference
     let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
-    let radius_err = stm_err.fixed_rows::<U3>(0).into_owned();
-    let velocity_err = stm_err.fixed_rows::<U3>(3).into_owned();
+    let radius_err = stm_err.fixed_rows::<3>(0).into_owned();
+    let velocity_err = stm_err.fixed_rows::<3>(3).into_owned();
 
     assert!(radius_err.norm() < 1e-1);
     assert!(velocity_err.norm() < 1e-1);
@@ -690,8 +690,8 @@ fn multi_body_dynamics_dual() {
 
     // And check the difference
     let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
-    let radius_err = stm_err.fixed_rows::<U3>(0).into_owned();
-    let velocity_err = stm_err.fixed_rows::<U3>(3).into_owned();
+    let radius_err = stm_err.fixed_rows::<3>(0).into_owned();
+    let velocity_err = stm_err.fixed_rows::<3>(3).into_owned();
 
     assert!(radius_err.norm() < 1e-3);
     assert!(velocity_err.norm() < 1e-3);

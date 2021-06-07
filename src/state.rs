@@ -18,9 +18,7 @@
 
 use crate::celestia::{Frame, GuidanceMode, Orbit, Spacecraft, StmKind};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{
-    DefaultAllocator, DimName, Matrix6, MatrixN, Vector1, VectorN, U42, U43, U6, U7,
-};
+use crate::dimensions::{Const, DefaultAllocator, DimName, Matrix6, OMatrix, OVector, Vector1};
 use crate::errors::NyxError;
 use crate::time::{Duration, Epoch};
 use std::fmt;
@@ -45,51 +43,45 @@ pub trait State:
     TimeTagged + Copy + Clone + PartialEq + fmt::Display + fmt::LowerExp + Send + Sync
 where
     Self: Sized,
-    DefaultAllocator: Allocator<f64, Self::Size>,
+    DefaultAllocator: Allocator<f64, Self::Size>
+        + Allocator<f64, Self::Size, Self::Size>
+        + Allocator<f64, Self::VecLength>,
 {
     /// Size of the state and its STM
     type Size: DimName;
-    type PropVecSize: DimName;
+    type VecLength: DimName;
     /// Initialize an empty state
     fn zeros() -> Self;
 
     /// Return this state as a vector for the propagation/estimation
-    fn as_vector(&self) -> Result<VectorN<f64, Self::PropVecSize>, NyxError>
-    where
-        DefaultAllocator: Allocator<f64, Self::PropVecSize>;
+    fn as_vector(&self) -> Result<OVector<f64, Self::VecLength>, NyxError>;
 
     /// Return this state as a vector for the propagation/estimation
-    fn stm(&self) -> Result<MatrixN<f64, Self::Size>, NyxError>
-    where
-        DefaultAllocator: Allocator<f64, Self::Size, Self::Size>;
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError>;
 
     /// Set this state
-    fn set(
-        &mut self,
-        epoch: Epoch,
-        vector: &VectorN<f64, Self::PropVecSize>,
-    ) -> Result<(), NyxError>
-    where
-        DefaultAllocator: Allocator<f64, Self::PropVecSize>;
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
+        -> Result<(), NyxError>;
 
     /// Reconstruct a new State from the provided delta time in seconds compared to the current state
     /// and with the provided vector.
-    fn ctor_from(self, delta_t_s: f64, vector: &VectorN<f64, Self::PropVecSize>) -> Self
+    fn ctor_from(self, delta_t_s: f64, vector: &OVector<f64, Self::VecLength>) -> Self
     where
-        DefaultAllocator: Allocator<f64, Self::PropVecSize>,
+        DefaultAllocator: Allocator<f64, Self::VecLength>,
     {
         let mut me = self;
         me.set(me.epoch() + delta_t_s, vector).unwrap();
         me
     }
 
-    fn add(self, other: VectorN<f64, Self::Size>) -> Self;
+    fn add(self, other: OVector<f64, Self::Size>) -> Self;
 }
 
 /// Implementation of Orbit as a State for orbital dynamics with STM
 impl State for Orbit {
-    type Size = U6;
-    type PropVecSize = U42;
+    type Size = Const<6>;
+    type VecLength = Const<42>;
+
     /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
     fn zeros() -> Self {
         let frame = Frame::Celestial {
@@ -112,8 +104,8 @@ impl State for Orbit {
         }
     }
 
-    fn as_vector(&self) -> Result<VectorN<f64, U42>, NyxError> {
-        let mut as_vec = VectorN::<f64, U42>::zeros();
+    fn as_vector(&self) -> Result<OVector<f64, Const<42>>, NyxError> {
+        let mut as_vec = OVector::<f64, Const<42>>::zeros();
         as_vec[0] = self.x;
         as_vec[1] = self.y;
         as_vec[2] = self.z;
@@ -132,7 +124,7 @@ impl State for Orbit {
         Ok(as_vec)
     }
 
-    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U42>) -> Result<(), NyxError> {
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
         self.x = vector[0];
         self.y = vector[1];
@@ -168,16 +160,16 @@ impl State for Orbit {
         }
     }
 
-    fn add(self, other: VectorN<f64, Self::Size>) -> Self {
+    fn add(self, other: OVector<f64, Self::Size>) -> Self {
         self + other
     }
 }
 
-impl Add<VectorN<f64, U6>> for Orbit {
+impl Add<OVector<f64, Const<6>>> for Orbit {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(self, other: VectorN<f64, U6>) -> Self {
+    fn add(self, other: OVector<f64, Const<6>>) -> Self {
         let mut me = self;
         me.x += other[0];
         me.y += other[1];
@@ -201,8 +193,9 @@ impl TimeTagged for Spacecraft {
 }
 
 impl State for Spacecraft {
-    type Size = U7;
-    type PropVecSize = U43;
+    type Size = Const<7>;
+    type VecLength = Const<43>;
+
     fn zeros() -> Self {
         Self {
             orbit: Orbit::zeros(),
@@ -217,9 +210,9 @@ impl State for Spacecraft {
         }
     }
 
-    fn as_vector(&self) -> Result<VectorN<f64, U43>, NyxError> {
-        let orb_vec: VectorN<f64, U42> = self.orbit.as_vector()?;
-        Ok(VectorN::<f64, U43>::from_iterator(
+    fn as_vector(&self) -> Result<OVector<f64, Const<43>>, NyxError> {
+        let orb_vec: OVector<f64, Const<42>> = self.orbit.as_vector()?;
+        Ok(OVector::<f64, Const<43>>::from_iterator(
             orb_vec
                 .iter()
                 .chain(Vector1::new(self.fuel_mass_kg).iter())
@@ -227,19 +220,19 @@ impl State for Spacecraft {
         ))
     }
 
-    fn set(&mut self, epoch: Epoch, vector: &VectorN<f64, U43>) -> Result<(), NyxError> {
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<43>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
-        let orbit_vec = vector.fixed_rows::<U42>(0).into_owned();
+        let orbit_vec = vector.fixed_rows::<42>(0).into_owned();
         self.orbit.set(epoch, &orbit_vec)?;
-        self.fuel_mass_kg = vector[U43::dim() - 1];
+        self.fuel_mass_kg = vector[43 - 1];
         Ok(())
     }
 
     /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
-    fn stm(&self) -> Result<MatrixN<f64, U7>, NyxError> {
+    fn stm(&self) -> Result<OMatrix<f64, Const<7>, Const<7>>, NyxError> {
         match self.orbit.stm {
             Some(stm) => {
-                let mut rtn = MatrixN::<f64, U7>::zeros();
+                let mut rtn = OMatrix::<f64, Const<7>, Const<7>>::zeros();
                 for i in 0..6 {
                     for j in 0..6 {
                         rtn[(i, j)] = stm[(i, j)];
@@ -252,16 +245,16 @@ impl State for Spacecraft {
         }
     }
 
-    fn add(self, other: VectorN<f64, Self::Size>) -> Self {
+    fn add(self, other: OVector<f64, Self::Size>) -> Self {
         self + other
     }
 }
 
-impl Add<VectorN<f64, U7>> for Spacecraft {
+impl Add<OVector<f64, Const<7>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(self, other: VectorN<f64, U7>) -> Self {
+    fn add(self, other: OVector<f64, Const<7>>) -> Self {
         let mut me = self;
         me.orbit.x += other[0];
         me.orbit.y += other[1];
@@ -275,11 +268,11 @@ impl Add<VectorN<f64, U7>> for Spacecraft {
     }
 }
 
-impl Add<VectorN<f64, U6>> for Spacecraft {
+impl Add<OVector<f64, Const<6>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(self, other: VectorN<f64, U6>) -> Self {
+    fn add(self, other: OVector<f64, Const<6>>) -> Self {
         let mut me = self;
         me.orbit.x += other[0];
         me.orbit.y += other[1];
@@ -303,7 +296,7 @@ fn test_set_state() {
     new_vec[4] = 5.0;
     new_vec[5] = 6.0;
 
-    let state = VectorN::<f64, U42>::from_iterator(new_vec);
+    let state = OVector::<f64, Const<42>>::from_iterator(new_vec);
     let dummy_frame = Frame::Celestial {
         gm: 398600.4415,
         ephem_path: [None, None, None],

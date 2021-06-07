@@ -20,7 +20,7 @@ use super::crossbeam::thread;
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::{IntegrationDetails, RK, RK89};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, VectorN};
+use crate::dimensions::{DefaultAllocator, OVector};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::md::trajectory::Traj;
@@ -38,7 +38,8 @@ use std::sync::Arc;
 pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>,
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     pub dynamics: Arc<D>, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
@@ -52,7 +53,8 @@ where
 impl<'a, D: Dynamics, E: ErrorCtrl> Propagator<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>,
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
     pub fn new<T: RK>(dynamics: Arc<D>, opts: PropOpts<E>) -> Self {
@@ -87,7 +89,7 @@ where
         // Pre-allocate the k used in the propagator
         let mut k = Vec::with_capacity(self.stages + 1);
         for _ in 0..self.stages {
-            k.push(VectorN::<f64, <D::StateType as State>::PropVecSize>::zeros());
+            k.push(OVector::<f64, <D::StateType as State>::VecLength>::zeros());
         }
         PropInstance {
             state,
@@ -110,7 +112,8 @@ where
 impl<'a, D: Dynamics> Propagator<'a, D, RSSCartesianStep>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>,
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
     pub fn default(dynamics: Arc<D>) -> Self {
@@ -125,7 +128,8 @@ where
 pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>,
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// The state of this propagator instance
     pub state: D::StateType,
@@ -139,16 +143,16 @@ where
     step_size: Duration, // Stores the adapted step for the _next_ call
     fixed_step: bool,
     // init_time: Epoch,
-    // init_state_vec: VectorN<f64, <D::StateType as State>::Size>,
+    // init_state_vec: OVector<f64, <D::StateType as State>::Size>,
     // Allows us to do pre-allocation of the ki vectors
-    k: Vec<VectorN<f64, <D::StateType as State>::PropVecSize>>,
+    k: Vec<OVector<f64, <D::StateType as State>::VecLength>>,
 }
 
 impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>
-        + Allocator<f64, <D::StateType as State>::Size>,
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Allows setting the step size of the propagator
     pub fn set_step(&mut self, step_size: Duration, fixed: bool) {
@@ -165,7 +169,7 @@ where
     /// Returns the state of the propagation
     ///
     /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
-    pub fn state_vector(&self) -> VectorN<f64, <D::StateType as State>::PropVecSize> {
+    pub fn state_vector(&self) -> OVector<f64, <D::StateType as State>::VecLength> {
         self.state.as_vector().unwrap()
     }
 
@@ -298,7 +302,7 @@ where
     /// To get the integration details, check `self.latest_details`.
     fn derive(
         &mut self,
-    ) -> Result<(Duration, VectorN<f64, <D::StateType as State>::PropVecSize>), NyxError> {
+    ) -> Result<(Duration, OVector<f64, <D::StateType as State>::VecLength>), NyxError> {
         let state = &self.state_vector();
         let ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
@@ -314,8 +318,7 @@ where
                 // \sum_{j=1}^{i-1} a_ij  ∀ i ∈ [2, s]
                 let mut ci: f64 = 0.0;
                 // The wi stores the a_{s1} * k_1 + a_{s2} * k_2 + ... + a_{s, s-1} * k_{s-1} +
-                let mut wi =
-                    VectorN::<f64, <D::StateType as State>::PropVecSize>::from_element(0.0);
+                let mut wi = OVector::<f64, <D::StateType as State>::VecLength>::from_element(0.0);
                 for kj in &self.k[0..i + 1] {
                     let a_ij = self.prop.a_coeffs[a_idx];
                     ci += a_ij;
@@ -334,7 +337,7 @@ where
             // State error estimation from https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Adaptive_Runge%E2%80%93Kutta_methods
             // This is consistent with GMAT https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L537
             let mut error_est =
-                VectorN::<f64, <D::StateType as State>::PropVecSize>::from_element(0.0);
+                OVector::<f64, <D::StateType as State>::VecLength>::from_element(0.0);
             for (i, ki) in self.k.iter().enumerate() {
                 let b_i = self.prop.b_coeffs[i];
                 if !self.fixed_step {

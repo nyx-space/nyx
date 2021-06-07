@@ -150,7 +150,7 @@ impl fmt::Display for TargeterSolution {
 pub struct Targeter<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>,
+        + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// The propagator setup (kind, stages, etc.)
     pub prop: Arc<&'a Propagator<'a, D, E>>,
@@ -168,7 +168,7 @@ where
 impl<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl> fmt::Display for Targeter<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>
+        + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, <D::StateType as State>::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -191,7 +191,7 @@ where
 impl<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl> Targeter<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::PropVecSize>
+        + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, <D::StateType as State>::Size>,
 {
     /// Create a new Targeter which will apply an impulsive delta-v correction.

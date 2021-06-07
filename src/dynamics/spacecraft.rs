@@ -20,7 +20,7 @@ use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
 use crate::celestia::Spacecraft;
-use crate::dimensions::{DimName, MatrixN, Vector1, Vector3, VectorN, U3, U4, U42, U43, U6, U7};
+use crate::dimensions::{DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U43, U6, U7};
 use crate::dynamics::Hyperdual;
 use crate::errors::NyxError;
 use crate::state::State;
@@ -150,16 +150,16 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
     fn eom(
         &self,
         delta_t: f64,
-        state: &VectorN<f64, U43>,
+        state: &OVector<f64, U43>,
         ctx: &Spacecraft,
-    ) -> Result<VectorN<f64, U43>, NyxError> {
+    ) -> Result<OVector<f64, U43>, NyxError> {
         // Compute the orbital dynamics
-        let orbital_dyn_vec = state.fixed_rows::<U42>(0).into_owned();
+        let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
         let d_x_orbital_dyn = self
             .orbital_dyn
             .eom(delta_t, &orbital_dyn_vec, &ctx.orbit)?;
         // Note: 0.0 is the current fuel usage at this point.
-        let mut d_x = VectorN::<f64, U43>::from_iterator(
+        let mut d_x = OVector::<f64, U43>::from_iterator(
             d_x_orbital_dyn
                 .iter()
                 .chain(Vector1::new(0.0).iter())
@@ -225,16 +225,16 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
     fn dual_eom(
         &self,
         delta_t_s: f64,
-        state_vec: &VectorN<Hyperdual<f64, Self::HyperdualSize>, U7>,
+        state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, U7>,
         ctx: &Self::StateType,
-    ) -> Result<(VectorN<f64, U7>, MatrixN<f64, U7>), NyxError> {
-        let pos_vel = state_vec.fixed_rows::<U6>(0).into_owned();
+    ) -> Result<(OVector<f64, U7>, OMatrix<f64, U7, U7>), NyxError> {
+        let pos_vel = state_vec.fixed_rows::<6>(0).into_owned();
         let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &pos_vel, &ctx.orbit)?;
         // Rebuild the appropriately sized state and STM.
-        let mut d_x = VectorN::<f64, U7>::from_iterator(
+        let mut d_x = OVector::<f64, U7>::from_iterator(
             orb_state.iter().chain(Vector1::new(0.0).iter()).cloned(),
         );
-        let mut grad = MatrixN::<f64, U7>::zeros();
+        let mut grad = OMatrix::<f64, U7, U7>::zeros();
         for i in 0..U6::dim() {
             for j in 0..U6::dim() {
                 grad[(i, j)] = orb_grad[(i, j)];
@@ -247,7 +247,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
 
         // Call the EOMs
         let total_mass = ctx.dry_mass_kg;
-        let radius = state_vec.fixed_rows::<U3>(0).into_owned();
+        let radius = state_vec.fixed_rows::<3>(0).into_owned();
 
         // Recreate the osculating state.
         let mut osc_sc = *ctx;

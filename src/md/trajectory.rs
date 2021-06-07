@@ -22,7 +22,7 @@ use super::crossbeam::thread;
 use super::rayon::prelude::*;
 use crate::celestia::{Cosm, Frame, Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, VectorN};
+use crate::dimensions::{DefaultAllocator, DimName, OVector};
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
@@ -43,7 +43,8 @@ const INTERP_TOLERANCE: f64 = 1e-10;
 #[derive(Clone)]
 pub struct Segment<S: State>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     start_epoch: Epoch,
     duration: Duration,
@@ -55,7 +56,8 @@ where
 #[derive(Clone)]
 pub struct Traj<S: State>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     /// Segments are organized as a binary tree map whose index is the
     /// number of seconds since the start of this ephemeris rounded down
@@ -70,7 +72,8 @@ where
 
 pub struct TrajIterator<'a, S: State>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     pub time_series: TimeSeries,
     /// A shared pointer to the original trajectory.
@@ -79,7 +82,8 @@ where
 
 impl<S: State> Segment<S>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     /// Evaluate a specific segment at the provided Epoch, requires an initial state as a "template"
     pub fn evaluate(&self, from: S, epoch: Epoch) -> Result<S, NyxError> {
@@ -108,7 +112,7 @@ where
         let mut state = from;
 
         // Rebuild the polynominals
-        let mut state_vec = VectorN::<f64, S::PropVecSize>::zeros();
+        let mut state_vec = OVector::<f64, S::VecLength>::zeros();
         for (cno, coeffs) in self.coefficients.iter().enumerate() {
             state_vec[cno] = Polynomial::from_slice(coeffs).evaluate(t_prime)
         }
@@ -120,14 +124,15 @@ where
 
 impl<S: State> Traj<S>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     /// Creates a new trajectory with the provided starting state (used as a template) and a receiving channel.
     /// The trajectories are always generated on a separate thread.
     pub fn new(state: S, rx: Receiver<S>) -> Result<Self, NyxError> {
         // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
         // I've spent 12h trying to understand why, but I can't, so screw it for it.
-        Self::new_bucket_as(state, if S::PropVecSize::dim() == 43 { 6 } else { 32 }, rx)
+        Self::new_bucket_as(state, if S::VecLength::dim() == 43 { 6 } else { 32 }, rx)
     }
 
     /// Creates a new trajectory but specifies the number of items per segment
@@ -685,7 +690,8 @@ impl Traj<Spacecraft> {
 
 impl<S: State> Iterator for TrajIterator<'_, S>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     type Item = S;
 
@@ -702,7 +708,8 @@ where
 
 impl<S: State> fmt::Display for Traj<S>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let dur = self.last().epoch() - self.first().epoch();
@@ -719,17 +726,18 @@ where
 
 fn interpolate<S: State>(this_wdn: Vec<S>) -> Result<Segment<S>, NyxError>
 where
-    DefaultAllocator: Allocator<f64, S::PropVecSize> + Allocator<f64, S::Size>,
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     // Generate interpolation and flush.
     let start_win_epoch = this_wdn[0].epoch();
     let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
     let window_duration = end_win_epoch - start_win_epoch;
     let mut ts = Vec::new();
-    let mut values = Vec::with_capacity(S::PropVecSize::dim());
+    let mut values = Vec::with_capacity(S::VecLength::dim());
     let mut coefficients = Vec::new();
     // Initialize the vector of values and coefficients.
-    for _ in 0..S::PropVecSize::dim() {
+    for _ in 0..S::VecLength::dim() {
         values.push(Vec::with_capacity(this_wdn.len()));
         coefficients.push(Vec::with_capacity(this_wdn.len()));
     }
