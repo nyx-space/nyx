@@ -16,9 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#![feature(const_generics)]
-#![feature(const_evaluatable_checked)]
-
 use crate::celestia::{Frame, GuidanceMode, Orbit, Spacecraft, StmKind};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{Const, DefaultAllocator, DimName, Matrix6, OMatrix, OVector, Vector1};
