@@ -76,7 +76,9 @@ where
             Some(prop) => {
                 #[allow(unused_assignments)]
                 let mut sc_dyn: SpacecraftDynamics;
-                let init_sc;
+                #[allow(unused_assignments)]
+                let mut orbital_dyn: OrbitalDynamics = OrbitalDynamics::new_raw(vec![]);
+                let mut init_sc;
 
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
@@ -173,92 +175,9 @@ where
                     }
                 };
 
-                // Create the dynamics
-                if let Some(pts_masses) = &dynamics.point_masses {
-                    // Get the object IDs from name
-                    let mut bodies = Vec::with_capacity(10);
-                    for obj in pts_masses {
-                        match Bodies::try_from(obj.to_string()) {
-                            Ok(b) => bodies.push(b),
-                            Err(e) => {
-                                return Err(ParsingError::LoadingError(format!("Snif {:?}", e)));
-                            }
-                        }
-                    }
-                    // Remove bodies which are part of the state
-                    if let Some(pos) = bodies
-                        .iter()
-                        .position(|x| x.ephem_path() == init_state.frame.ephem_path())
-                    {
-                        bodies.remove(pos);
-                    }
-
-                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::point_masses(
-                        &bodies,
-                        cosm.clone(),
-                    ));
-
-                    init_sc = Spacecraft::new(
-                        init_state,
-                        spacecraft.dry_mass,
-                        spacecraft.fuel_mass.unwrap_or(0.0),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                    );
-                } else {
-                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::two_body());
-
-                    init_sc = Spacecraft::new(
-                        init_state,
-                        spacecraft.dry_mass,
-                        spacecraft.fuel_mass.unwrap_or(0.0),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                    );
-
-                    // Add the force models
-                    if let Some(force_models) = &spacecraft.force_models {
-                        if scen.force_models.as_ref().is_none() {
-                            return Err(ParsingError::MD(format!(
-                                "spacecraft `{}` refers to force models but none are defined",
-                                prop.dynamics
-                            )));
-                        }
-                        for mdl in force_models {
-                            match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
-                                None => {
-                                    return Err(ParsingError::MD(format!(
-                                        "spacecraft `{}` refers to unknown force model `{}`",
-                                        prop.dynamics, mdl
-                                    )))
-                                }
-                                Some(amdl) => {
-                                    let eme2k = &cosm.frame("EME2000");
-                                    let luna = &cosm.frame("Luna");
-                                    for smdl in amdl.srp.values() {
-                                        // Note that an Arc is immutable, but we want to specify everything
-                                        // so we create the SRP without the wrapper
-                                        let mut srp = SolarPressure::default_raw(
-                                            vec![*eme2k, *luna],
-                                            cosm.clone(),
-                                        );
-                                        srp.phi = smdl.phi;
-                                        sc_dyn.add_model(Arc::new(srp));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Add the acceleration models if applicable
                 if let Some(accel_models) = &dynamics.accel_models {
                     // In this case, we'll need to recreate the orbital dynamics because it's behind an immutable Arc.
-                    let mut orbital_dyn = OrbitalDynamics::new_raw(vec![]);
                     for mdl in accel_models {
                         match scen.accel_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
                             None => {
@@ -279,9 +198,90 @@ where
                             }
                         }
                     }
-                    // And set these into the spacecraft dynamics
-                    sc_dyn.orbital_dyn = Arc::new(orbital_dyn);
                 }
+
+                // Create the dynamics
+                if let Some(pts_masses) = &dynamics.point_masses {
+                    // Get the object IDs from name
+                    let mut bodies = Vec::with_capacity(10);
+                    for obj in pts_masses {
+                        match Bodies::try_from(obj.to_string()) {
+                            Ok(b) => bodies.push(b),
+                            Err(e) => {
+                                return Err(ParsingError::LoadingError(format!("Snif {:?}", e)));
+                            }
+                        }
+                    }
+                    // Remove bodies which are part of the state
+                    if let Some(pos) = bodies
+                        .iter()
+                        .position(|x| x.ephem_path() == init_state.frame.ephem_path())
+                    {
+                        bodies.remove(pos);
+                    }
+
+                    orbital_dyn.add_model(PointMasses::new(&bodies, cosm.clone()));
+
+                    init_sc = Spacecraft::new(
+                        init_state,
+                        spacecraft.dry_mass,
+                        spacecraft.fuel_mass.unwrap_or(0.0),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    );
+                } else {
+                    init_sc = Spacecraft::new(
+                        init_state,
+                        spacecraft.dry_mass,
+                        spacecraft.fuel_mass.unwrap_or(0.0),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    );
+                }
+
+                sc_dyn = SpacecraftDynamics::new_raw(Arc::new(orbital_dyn));
+
+                // Add the force models
+                if let Some(force_models) = &spacecraft.force_models {
+                    if scen.force_models.as_ref().is_none() {
+                        return Err(ParsingError::MD(format!(
+                            "spacecraft `{}` refers to force models but none are defined",
+                            prop.dynamics
+                        )));
+                    }
+                    for mdl in force_models {
+                        match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
+                            None => {
+                                return Err(ParsingError::MD(format!(
+                                    "spacecraft `{}` refers to unknown force model `{}`",
+                                    prop.dynamics, mdl
+                                )))
+                            }
+                            Some(amdl) => {
+                                let eme2k = &cosm.frame("EME2000");
+                                let luna = &cosm.frame("Luna");
+                                for smdl in amdl.srp.values() {
+                                    // Note that an Arc is immutable, but we want to specify everything
+                                    // so we create the SRP without the wrapper
+                                    let mut srp = SolarPressure::default_raw(
+                                        vec![*eme2k, *luna],
+                                        cosm.clone(),
+                                    );
+                                    srp.phi = smdl.phi;
+                                    sc_dyn.add_model(Arc::new(srp));
+                                    init_sc.srp_area_m2 = smdl.sc_area;
+                                    init_sc.cr = smdl.cr;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                info!("{}", sc_dyn);
 
                 // Validate the stopping condition
                 // Check if it's a stopping condition
@@ -396,6 +396,15 @@ where
                     initial_state = None;
                 }
             }
+
+            // Make sure to add the last state too
+            // Provide to the handler
+            hdlrs.par_iter_mut().for_each(|hdlr| {
+                if let Some(first_state) = initial_state {
+                    hdlr.handle(&first_state);
+                }
+                hdlr.handle(&traj.last());
+            });
 
             info!(
                 "Processed {} states in {:.3} seconds",

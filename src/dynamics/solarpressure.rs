@@ -22,6 +22,7 @@ use crate::celestia::eclipse::EclipseLocator;
 use crate::celestia::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
 use crate::errors::NyxError;
+use std::fmt;
 use std::sync::Arc;
 
 /// Computation of solar radiation pressure is based on STK: http://help.agi.com/stk/index.htm#gator/eq-solar.htm .
@@ -123,5 +124,15 @@ impl ForceModel for SolarPressure {
         }
 
         Ok((fx, grad))
+    }
+}
+
+impl fmt::Display for SolarPressure {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "SRP with φ = {} W/m^2 and eclipse {}",
+            self.phi, self.e_loc
+        )
     }
 }

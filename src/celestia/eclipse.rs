@@ -122,11 +122,11 @@ impl fmt::Display for EclipseLocator {
         let shadow_bodies = self
             .shadow_bodies
             .iter()
-            .map(|b| format!("{} ", b))
+            .map(|b| format!("{}, ", b))
             .collect::<String>();
         write!(
             f,
-            "light-source: {}\tshadows casted by: {})",
+            "light-source: {}, shadows casted by: {}",
             self.light_source, shadow_bodies
         )
     }

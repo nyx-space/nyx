@@ -50,7 +50,8 @@ lazy_static! {
         let de438_buf: Cow<'static, [u8]> =
             EmbeddedAsset::get("de438s-00-50.xb").expect("Could not find de438s-00-55.xb as asset");
         let xb = Xb::from_buffer(&de438_buf).unwrap();
-        let cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
+        let mut cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
+        cosm.use_gmat_gm();
         Arc::new(cosm)
     };
 }
@@ -177,7 +178,9 @@ fn main() -> Result<(), ParsingError> {
                                     hdlrs.push(out);
                                 }
 
-                                info!("Executing sequence `{}`", seq_name);
+                                info!("*******************************{:*<1$}", "", seq_name.len());
+                                info!("===> Executing sequence `{}` <===", seq_name);
+                                info!("*******************************{:*<1$}", "", seq_name.len());
                                 if let Some(e) = md.execute_with(hdlrs).err() {
                                     return Err(ParsingError::ExecutionError(e));
                                 };
