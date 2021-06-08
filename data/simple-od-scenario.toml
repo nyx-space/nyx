@@ -41,13 +41,13 @@ accel_models = ["my_modEls"]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "truth"
-force_models = ["my_srp"]
+force_models = ["my_frc"]
 
 [spacecraft.sc1_nav]
 dry_mass = 100.0
 fuel_mass = 20.0
 orbital_dynamics = "nav"
-force_models = ["my_srp"]
+force_models = ["my_frc"]
 
 [propagator.nav_prop]
 dynamics = "sc1_naV"
