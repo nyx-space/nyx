@@ -50,7 +50,8 @@ lazy_static! {
         let de438_buf: Cow<'static, [u8]> =
             EmbeddedAsset::get("de438s-00-50.xb").expect("Could not find de438s-00-55.xb as asset");
         let xb = Xb::from_buffer(&de438_buf).unwrap();
-        let cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
+        let mut cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
+        cosm.use_gmat_gm();
         Arc::new(cosm)
     };
 }

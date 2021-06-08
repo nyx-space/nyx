@@ -154,28 +154,7 @@ impl Cosm {
     /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
     pub fn de438_gmat() -> Arc<Self> {
         let mut cosm = Self::try_de438().expect("could not load embedded de438s XB file");
-        // Set all of the GMs and their body fixed frames too
-        cosm.frame_mut_gm("Sun J2000", 132_712_440_017.99);
-        cosm.frame_mut_gm("IAU Sun", 132_712_440_017.99);
-        cosm.frame_mut_gm("Mercury Barycenter J2000", 22_032.080_486_418);
-        // No IAU mercury
-        cosm.frame_mut_gm("Venus Barycenter J2000", 324_858.598_826_46);
-        cosm.frame_mut_gm("IAU Venus", 324_858.598_826_46);
-        cosm.frame_mut_gm("EME2000", 398_600.441_5);
-        cosm.frame_mut_gm("IAU Earth", 398_600.441_5);
-        cosm.frame_mut_gm("Luna", 4_902.800_582_147_8);
-        cosm.frame_mut_gm("IAU Moon", 4_902.800_582_147_8);
-        cosm.frame_mut_gm("Mars Barycenter J2000", 42_828.314258067);
-        cosm.frame_mut_gm("IAU Mars", 42_828.314258067);
-        cosm.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
-        cosm.frame_mut_gm("IAU Jupiter", 126_712_767.857_80);
-        cosm.frame_mut_gm("Saturn Barycenter J2000", 37_940_626.061_137);
-        cosm.frame_mut_gm("IAU Saturn", 37_940_626.061_137);
-        cosm.frame_mut_gm("Uranus Barycenter J2000", 5_794_549.007_071_9);
-        cosm.frame_mut_gm("IAU Uranus", 5_794_549.007_071_9);
-        cosm.frame_mut_gm("Neptune Barycenter J2000", 6_836_534.063_879_3);
-        cosm.frame_mut_gm("IAU Neptune", 6_836_534.063_879_3);
-
+        cosm.use_gmat_gm();
         Arc::new(cosm)
     }
 
@@ -198,6 +177,31 @@ impl Cosm {
         cosm.append_xb();
         cosm.load_iau_frames()?;
         Ok(cosm)
+    }
+
+    /// Switch the GM values to those from GMAT
+    pub fn use_gmat_gm(&mut self) {
+        // Set all of the GMs and their body fixed frames too
+        self.frame_mut_gm("Sun J2000", 132_712_440_017.99);
+        self.frame_mut_gm("IAU Sun", 132_712_440_017.99);
+        self.frame_mut_gm("Mercury Barycenter J2000", 22_032.080_486_418);
+        // No IAU mercury
+        self.frame_mut_gm("Venus Barycenter J2000", 324_858.598_826_46);
+        self.frame_mut_gm("IAU Venus", 324_858.598_826_46);
+        self.frame_mut_gm("EME2000", 398_600.441_5);
+        self.frame_mut_gm("IAU Earth", 398_600.441_5);
+        self.frame_mut_gm("Luna", 4_902.800_582_147_8);
+        self.frame_mut_gm("IAU Moon", 4_902.800_582_147_8);
+        self.frame_mut_gm("Mars Barycenter J2000", 42_828.314258067);
+        self.frame_mut_gm("IAU Mars", 42_828.314258067);
+        self.frame_mut_gm("Jupiter Barycenter J2000", 126_712_767.857_80);
+        self.frame_mut_gm("IAU Jupiter", 126_712_767.857_80);
+        self.frame_mut_gm("Saturn Barycenter J2000", 37_940_626.061_137);
+        self.frame_mut_gm("IAU Saturn", 37_940_626.061_137);
+        self.frame_mut_gm("Uranus Barycenter J2000", 5_794_549.007_071_9);
+        self.frame_mut_gm("IAU Uranus", 5_794_549.007_071_9);
+        self.frame_mut_gm("Neptune Barycenter J2000", 6_836_534.063_879_3);
+        self.frame_mut_gm("IAU Neptune", 6_836_534.063_879_3);
     }
 
     /// Load the IAU Frames as defined in Celest Mech Dyn Astr (2018) 130:22 (https://doi.org/10.1007/s10569-017-9805-5)

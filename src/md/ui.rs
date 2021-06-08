@@ -76,7 +76,9 @@ where
             Some(prop) => {
                 #[allow(unused_assignments)]
                 let mut sc_dyn: SpacecraftDynamics;
-                let init_sc;
+                #[allow(unused_assignments)]
+                let mut orbital_dyn: OrbitalDynamics = OrbitalDynamics::new_raw(vec![]);
+                let mut init_sc;
 
                 // Validate the output
                 let formatter = if let Some(output) = &prop.output {
@@ -173,6 +175,31 @@ where
                     }
                 };
 
+                // Add the acceleration models if applicable
+                if let Some(accel_models) = &dynamics.accel_models {
+                    // In this case, we'll need to recreate the orbital dynamics because it's behind an immutable Arc.
+                    for mdl in accel_models {
+                        match scen.accel_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
+                            None => {
+                                return Err(ParsingError::MD(format!(
+                                    "dynamics `{}` refers to unknown state `{}`",
+                                    prop.dynamics, dynamics.initial_state
+                                )))
+                            }
+                            Some(amdl) => {
+                                for hmdl in amdl.harmonics.values() {
+                                    let in_mem = hmdl.load().unwrap();
+                                    let compute_frame = &cosm.frame(hmdl.frame.as_str());
+
+                                    let hh =
+                                        Harmonics::from_stor(*compute_frame, in_mem, cosm.clone());
+                                    orbital_dyn.add_model(hh);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Create the dynamics
                 if let Some(pts_masses) = &dynamics.point_masses {
                     // Get the object IDs from name
@@ -193,10 +220,7 @@ where
                         bodies.remove(pos);
                     }
 
-                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::point_masses(
-                        &bodies,
-                        cosm.clone(),
-                    ));
+                    orbital_dyn.add_model(PointMasses::new(&bodies, cosm.clone()));
 
                     init_sc = Spacecraft::new(
                         init_state,
@@ -208,8 +232,6 @@ where
                         0.0,
                     );
                 } else {
-                    sc_dyn = SpacecraftDynamics::new_raw(OrbitalDynamics::two_body());
-
                     init_sc = Spacecraft::new(
                         init_state,
                         spacecraft.dry_mass,
@@ -220,6 +242,8 @@ where
                         0.0,
                     );
                 }
+
+                sc_dyn = SpacecraftDynamics::new_raw(Arc::new(orbital_dyn));
 
                 // Add the force models
                 if let Some(force_models) = &spacecraft.force_models {
@@ -249,38 +273,12 @@ where
                                     );
                                     srp.phi = smdl.phi;
                                     sc_dyn.add_model(Arc::new(srp));
+                                    init_sc.srp_area_m2 = smdl.sc_area;
+                                    init_sc.cr = smdl.cr;
                                 }
                             }
                         }
                     }
-                }
-
-                // Add the acceleration models if applicable
-                if let Some(accel_models) = &dynamics.accel_models {
-                    // In this case, we'll need to recreate the orbital dynamics because it's behind an immutable Arc.
-                    let mut orbital_dyn = OrbitalDynamics::new_raw(vec![]);
-                    for mdl in accel_models {
-                        match scen.accel_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
-                            None => {
-                                return Err(ParsingError::MD(format!(
-                                    "dynamics `{}` refers to unknown state `{}`",
-                                    prop.dynamics, dynamics.initial_state
-                                )))
-                            }
-                            Some(amdl) => {
-                                for hmdl in amdl.harmonics.values() {
-                                    let in_mem = hmdl.load().unwrap();
-                                    let compute_frame = &cosm.frame(hmdl.frame.as_str());
-
-                                    let hh =
-                                        Harmonics::from_stor(*compute_frame, in_mem, cosm.clone());
-                                    orbital_dyn.add_model(hh);
-                                }
-                            }
-                        }
-                    }
-                    // And set these into the spacecraft dynamics
-                    sc_dyn.orbital_dyn = Arc::new(orbital_dyn);
                 }
 
                 info!("{}", sc_dyn);
@@ -398,6 +396,15 @@ where
                     initial_state = None;
                 }
             }
+
+            // Make sure to add the last state too
+            // Provide to the handler
+            hdlrs.par_iter_mut().for_each(|hdlr| {
+                if let Some(first_state) = initial_state {
+                    hdlr.handle(&first_state);
+                }
+                hdlr.handle(&traj.last());
+            });
 
             info!(
                 "Processed {} states in {:.3} seconds",
