@@ -79,25 +79,30 @@ pub struct IterationConf {
     pub max_divergences: usize,
     /// Set to true to force an ODP failure when the convergence criteria is not met
     pub force_failure: bool,
+    /// Set to true to use the RMS prefit instead of postfit
+    pub use_prefit: bool,
 }
 
 impl Default for IterationConf {
     /// The default absolute tolerance is 1e-2 (calibrated on an EKF with error).
     fn default() -> Self {
         Self {
-            smoother: SmoothingArc::TimeGap(2 * TimeUnit::Hour),
+            smoother: SmoothingArc::All,
             absolute_tol: 1e-2,
             relative_tol: 1e-3,
             max_iterations: 15,
             max_divergences: 3,
             force_failure: false,
+            use_prefit: false,
         }
     }
 }
 
 impl fmt::Display for IterationConf {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Iterate until abs = {:.2e}, or rel = {:.2e}, or {} iterations, or {} subsequent divergences with smoothing condition of {}",
+        let kind = if self.use_prefit { "prefit" } else { "postfit" };
+        write!(f, "Iterate {} residuals until abs = {:.2e}, or rel = {:.2e}, or {} iterations, or {} subsequent divergences with smoothing condition of {}",
+            kind,
             self.absolute_tol,
             self.relative_tol,
             self.max_iterations,
@@ -341,6 +346,15 @@ where
         Ok(smoothed)
     }
 
+    /// Returns the root mean square of the prefit residuals
+    pub fn rms_prefit_residual(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in &self.residuals {
+            sum += residual.prefit.dot(&residual.prefit);
+        }
+        (sum / (self.estimates.len() as f64)).sqrt()
+    }
+
     /// Returns the root mean square of the postfit residuals
     pub fn rms_postfit_residual(&self) -> f64 {
         let mut sum = 0.0;
@@ -352,8 +366,12 @@ where
 
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
     pub fn iterate(&mut self, measurements: &[Msr], config: IterationConf) -> Result<(), NyxError> {
-        // Compute the initial postfit RMS
-        let mut best_rms = self.rms_postfit_residual();
+        // Compute the initial RMS
+        let mut best_rms = if config.use_prefit {
+            self.rms_prefit_residual()
+        } else {
+            self.rms_postfit_residual()
+        };
         let mut previous_rms = best_rms;
         let mut divergence_cnt = 0;
         let mut iter_cnt = 0;
@@ -388,11 +406,19 @@ where
             self.process_measurements(measurements)?;
 
             // Compute the new RMS
-            let new_rms = self.rms_postfit_residual();
+            let new_rms = if config.use_prefit {
+                self.rms_prefit_residual()
+            } else {
+                self.rms_postfit_residual()
+            };
             if (new_rms - best_rms).abs() / best_rms < config.relative_tol {
                 info!("*****************");
                 info!("*** CONVERGED ***");
                 info!("*****************");
+                info!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    new_rms, previous_rms, best_rms
+                );
                 info!(
                     "Filter converged to relative tolerance ({:e}) after {} iterations",
                     config.relative_tol, iter_cnt
@@ -402,14 +428,14 @@ where
 
             if new_rms > previous_rms {
                 warn!(
-                    "New postfit RMS: {:.3e}\tPrevious postfit RMS: {:.3e}\tBest postfit RMS: {:.3e}",
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 divergence_cnt += 1;
                 previous_rms = new_rms;
                 if divergence_cnt >= config.max_divergences {
                     let msg = format!(
-                        "Filter iterations have continuously diverged {} times: {:?}",
+                        "Filter iterations have continuously diverged {} times: {}",
                         config.max_divergences, config
                     );
                     if config.force_failure {
@@ -422,8 +448,8 @@ where
                     warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
                 }
             } else {
-                warn!(
-                    "New postfit RMS: {:.3e}\tPrevious postfit RMS: {:.3e}\tBest postfit RMS: {:.3e}",
+                info!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
                     new_rms, previous_rms, best_rms
                 );
                 // Reset the counter
@@ -436,7 +462,7 @@ where
 
             if iter_cnt >= config.max_iterations {
                 let msg = format!(
-                    "Filter has iterated {} times but failed to reach filter convergence criteria: {:?}",
+                    "Filter has iterated {} times but failed to reach filter convergence criteria: {}",
                     config.max_iterations, config
                 );
                 if config.force_failure {
