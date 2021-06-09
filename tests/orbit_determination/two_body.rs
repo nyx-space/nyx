@@ -276,7 +276,10 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     // Iterate
     odp.iterate(
         &measurements,
-        SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+        IterationConf {
+            smoother: SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+            ..Default::default()
+        },
     )
     .unwrap();
 
@@ -379,7 +382,10 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     // Iterate
     odp.iterate(
         &measurements,
-        SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+        IterationConf {
+            smoother: SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+            ..Default::default()
+        },
     )
     .unwrap();
 

@@ -29,9 +29,11 @@ pub use super::*;
 
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
-use crate::time::Duration;
+pub use crate::time::{Duration, TimeUnit};
 use crate::State;
 
+use std::convert::TryFrom;
+use std::default::Default;
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Add;
@@ -53,11 +55,68 @@ pub enum SmoothingArc {
 impl fmt::Display for SmoothingArc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            SmoothingArc::All => write!(f, "all estimates smoothed"),
+            SmoothingArc::All => write!(f, "all estimates"),
             SmoothingArc::Epoch(e) => write!(f, "{}", e),
             SmoothingArc::TimeGap(g) => write!(f, "time gap of {}", g),
             SmoothingArc::Prediction => write!(f, "first prediction"),
         }
+    }
+}
+
+/// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
+/// The root mean squared of the postfit residuals is used to assess convergence between iterations.
+#[derive(Clone, Copy, Debug)]
+pub struct IterationConf {
+    /// The number of measurements to account for in the iteration
+    pub smoother: SmoothingArc,
+    /// The absolute tolerance of the RMS postfit residual
+    pub absolute_tol: f64,
+    /// The relative tolerance between the latest RMS postfit residual and the best RMS postfit residual so far
+    pub relative_tol: f64,
+    /// The maximum number of iterations to allow (will raise an error if the filter has not converged after this many iterations)
+    pub max_iterations: usize,
+    /// The maximum number of subsequent divergences in RMS.
+    pub max_divergences: usize,
+    /// Set to true to force an ODP failure when the convergence criteria is not met
+    pub force_failure: bool,
+}
+
+impl Default for IterationConf {
+    /// The default absolute tolerance is 1e-2 (calibrated on an EKF with error).
+    fn default() -> Self {
+        Self {
+            smoother: SmoothingArc::TimeGap(2 * TimeUnit::Hour),
+            absolute_tol: 1e-2,
+            relative_tol: 1e-3,
+            max_iterations: 15,
+            max_divergences: 3,
+            force_failure: false,
+        }
+    }
+}
+
+impl fmt::Display for IterationConf {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Iterate until abs = {:.2e}, or rel = {:.2e}, or {} iterations, or {} subsequent divergences with smoothing condition of {}",
+            self.absolute_tol,
+            self.relative_tol,
+            self.max_iterations,
+            self.max_divergences,
+            self.smoother)
+    }
+}
+
+impl TryFrom<SmoothingArc> for IterationConf {
+    type Error = NyxError;
+
+    /// Converts a smoother into an interation configuration to iterate just once without failing
+    fn try_from(smoother: SmoothingArc) -> Result<Self, Self::Error> {
+        Ok(Self {
+            smoother,
+            max_iterations: 1,
+            force_failure: false,
+            ..Default::default()
+        })
     }
 }
 
@@ -282,22 +341,112 @@ where
         Ok(smoothed)
     }
 
+    /// Returns the root mean square of the postfit residuals
+    pub fn rms_postfit_residual(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in &self.residuals {
+            sum += residual.postfit.dot(&residual.postfit);
+        }
+        (sum / (self.estimates.len() as f64)).sqrt()
+    }
+
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate(
-        &mut self,
-        measurements: &[Msr],
-        condition: SmoothingArc,
-    ) -> Result<(), NyxError> {
-        // First, smooth the estimates
-        let smoothed = self.smooth(condition)?;
-        // Reset the propagator
-        self.prop.state = self.init_state;
-        // Empty the estimates and add the first smoothed estimate as the initial estimate
-        self.estimates = Vec::with_capacity(measurements.len());
-        self.estimates.push(smoothed[0].clone());
-        self.kf.set_previous_estimate(&smoothed[0]);
-        // And re-run the filter
-        self.process_measurements(measurements)
+    pub fn iterate(&mut self, measurements: &[Msr], config: IterationConf) -> Result<(), NyxError> {
+        // Compute the initial postfit RMS
+        let mut best_rms = self.rms_postfit_residual();
+        let mut previous_rms = best_rms;
+        let mut divergence_cnt = 0;
+        let mut iter_cnt = 0;
+        loop {
+            if best_rms <= config.absolute_tol {
+                info!("*****************");
+                info!("*** CONVERGED ***");
+                info!("*****************");
+
+                info!(
+                    "Filter converged to absolute tolerance ({:e}) after {} iterations",
+                    config.absolute_tol, iter_cnt
+                );
+                return Ok(());
+            }
+
+            iter_cnt += 1;
+
+            info!("***************************");
+            info!("*** Iteration number {} ***", iter_cnt);
+            info!("***************************");
+
+            // First, smooth the estimates
+            let smoothed = self.smooth(config.smoother)?;
+            // Reset the propagator
+            self.prop.state = self.init_state;
+            // Empty the estimates and add the first smoothed estimate as the initial estimate
+            self.estimates = Vec::with_capacity(measurements.len());
+            self.estimates.push(smoothed[0].clone());
+            self.kf.set_previous_estimate(&smoothed[0]);
+            // And re-run the filter
+            self.process_measurements(measurements)?;
+
+            // Compute the new RMS
+            let new_rms = self.rms_postfit_residual();
+            if (new_rms - best_rms).abs() / best_rms < config.relative_tol {
+                info!("*****************");
+                info!("*** CONVERGED ***");
+                info!("*****************");
+                info!(
+                    "Filter converged to relative tolerance ({:e}) after {} iterations",
+                    config.relative_tol, iter_cnt
+                );
+                return Ok(());
+            }
+
+            if new_rms > previous_rms {
+                warn!(
+                    "New postfit RMS: {:.3e}\tPrevious postfit RMS: {:.3e}\tBest postfit RMS: {:.3e}",
+                    new_rms, previous_rms, best_rms
+                );
+                divergence_cnt += 1;
+                previous_rms = new_rms;
+                if divergence_cnt >= config.max_divergences {
+                    let msg = format!(
+                        "Filter iterations have continuously diverged {} times: {:?}",
+                        config.max_divergences, config
+                    );
+                    if config.force_failure {
+                        return Err(NyxError::MaxIterReached(msg));
+                    } else {
+                        error!("{}", msg);
+                        return Ok(());
+                    }
+                } else {
+                    warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
+                }
+            } else {
+                warn!(
+                    "New postfit RMS: {:.3e}\tPrevious postfit RMS: {:.3e}\tBest postfit RMS: {:.3e}",
+                    new_rms, previous_rms, best_rms
+                );
+                // Reset the counter
+                divergence_cnt = 0;
+                previous_rms = new_rms;
+                if previous_rms < best_rms {
+                    best_rms = previous_rms;
+                }
+            }
+
+            if iter_cnt >= config.max_iterations {
+                let msg = format!(
+                    "Filter has iterated {} times but failed to reach filter convergence criteria: {:?}",
+                    config.max_iterations, config
+                );
+                if config.force_failure {
+                    return Err(NyxError::MaxIterReached(msg));
+                } else {
+                    error!("{}", msg);
+                    return Ok(());
+                }
+            }
+        }
     }
 
     /// Allows processing all measurements with covariance mapping.

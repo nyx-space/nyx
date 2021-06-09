@@ -423,6 +423,8 @@ impl<'a> OdpScenario<'a> {
 
         odp.process_measurements(&sim_measurements)?;
 
+        // TODO: Iterate until convergence
+
         // Save to output file if requested
         // Create the output file
         if let Some(fmtr) = &self.formatter {

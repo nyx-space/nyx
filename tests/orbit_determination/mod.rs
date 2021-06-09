@@ -11,6 +11,7 @@ mod multi_body;
 mod robust;
 mod spacecraft;
 mod two_body;
+mod xhat_dev;
 
 use self::nyx::dimensions::{Matrix2, Matrix2x6, Matrix6, Vector2};
 use std::f64::EPSILON;
