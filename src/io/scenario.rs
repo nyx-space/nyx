@@ -71,7 +71,12 @@ impl StateSerde {
                     "km" => 1.0,
                     "m" => 1e-3,
                     "cm" => 1e-5,
-                    _ => panic!("unknown unit `{}`", unit),
+                    _ => {
+                        return Err(ParsingError::Distance(format!(
+                            "unknown unit `{}` when converting state",
+                            unit
+                        )))
+                    }
                 },
                 None => 1.0,
             };
@@ -81,7 +86,12 @@ impl StateSerde {
                     "km/s" => 1.0,
                     "m/s" => 1e-3,
                     "cm/s" => 1e-5,
-                    _ => panic!("unknown unit `{}`", unit),
+                    _ => {
+                        return Err(ParsingError::Velocity(format!(
+                            "unknown unit `{}` when converting state",
+                            unit
+                        )))
+                    }
                 },
                 None => 1.0,
             };

@@ -251,11 +251,13 @@ impl<'a> OdpScenario<'a> {
                                     warn!("No SNC disable time specified, assuming 120 seconds");
                                     2 * TimeUnit::Minute
                                 }
-                                // Some(snd_disable_dt) => parse_duration(snd_disable_dt)?.v(),
                                 Some(snc_disable_dt) => match Duration::from_str(snc_disable_dt) {
                                     Ok(d) => d,
                                     Err(e) => {
-                                        return Err(ParsingError::IllDefined(format!("{}", e)))
+                                        return Err(ParsingError::IllDefined(format!(
+                                            "When parsing SNC duration: {}",
+                                            e
+                                        )))
                                     }
                                 },
                             };

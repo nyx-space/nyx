@@ -295,7 +295,12 @@ where
                     match Duration::from_str(prop.stop_cond.as_str()) {
                         Ok(d) => Some(d),
                         Err(_) => match Epoch::from_str(prop.stop_cond.as_str()) {
-                            Err(e) => return Err(ParsingError::IllDefined(format!("{}", e))),
+                            Err(e) => {
+                                return Err(ParsingError::IllDefined(format!(
+                                    "{}: `{}`",
+                                    e, prop.stop_cond
+                                )))
+                            }
                             Ok(epoch) => Some(epoch - init_state.dt),
                         },
                     }
