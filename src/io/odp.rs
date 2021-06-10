@@ -302,7 +302,7 @@ impl<'a> OdpScenario<'a> {
                                     output
                                 )))
                             }
-                            Some(output) => Some(output.to_nav_sol_formatter(cosm)),
+                            Some(output) => Some(output.to_nav_sol_formatter(cosm)?),
                         },
                         None => None,
                     };

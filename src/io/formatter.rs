@@ -51,12 +51,12 @@ impl OutputSerde {
         }
     }
 
-    pub fn to_nav_sol_formatter(&self, cosm: Arc<Cosm>) -> NavSolutionFormatter {
+    pub fn to_nav_sol_formatter(&self, cosm: Arc<Cosm>) -> Result<NavSolutionFormatter, NyxError> {
         match &self.headers {
             Some(hdr) => {
                 NavSolutionFormatter::from_headers(hdr.to_vec(), self.filename.clone(), cosm)
             }
-            None => NavSolutionFormatter::default(self.filename.clone(), cosm),
+            None => Ok(NavSolutionFormatter::default(self.filename.clone(), cosm)),
         }
     }
 }
@@ -470,10 +470,7 @@ impl StateFormatter {
                         None
                     };
 
-                    let param = match StateParameter::from_str(splt[0].to_lowercase().as_str()) {
-                        Ok(param) => param,
-                        Err(e) => return Err(NyxError::LoadingError(e.to_string())),
-                    };
+                    let param = StateParameter::from_str(splt[0].to_lowercase().as_str())?;
 
                     let hdr = StateHeader {
                         param,
@@ -485,11 +482,13 @@ impl StateFormatter {
                 }
             }
 
-            if splt[0].to_lowercase() != "epoch" && splt.len() == 2 {
+            if splt.len() == 2 && splt[0].to_lowercase() != "epoch" {
                 // Get the frame
-                match cosm.try_frame(splt[1]) {
-                    Ok(frame) => frames.insert(splt[1].to_string(), frame),
-                    Err(e) => panic!("unknown frame `{}` in header ({})", splt[1], e),
+                match splt[1].to_lowercase().as_str() {
+                    "ric" => frames.insert(splt[1].to_string(), Frame::RIC),
+                    "rcn" => frames.insert(splt[1].to_string(), Frame::RCN),
+                    "vnc" => frames.insert(splt[1].to_string(), Frame::VNC),
+                    _ => frames.insert(splt[1].to_string(), cosm.try_frame(splt[1])?),
                 };
             }
         }
@@ -520,67 +519,73 @@ impl StateFormatter {
         }
     }
 
-    pub fn fmt(&self, state: &Orbit) -> Vec<String> {
+    pub fn fmt(&self, orbit: &Orbit) -> Vec<String> {
         // Start by computing the state in all of the frames needed
         let mut mapped = HashMap::new();
         for (name, frame) in &self.frames {
-            mapped.insert(name.to_lowercase(), self.cosm.frame_chg(state, *frame));
+            let mapped_orbit = match frame {
+                Frame::RCN | Frame::RIC | Frame::VNC => {
+                    orbit.with_position_rotated_by(orbit.dcm_from_traj_frame(*frame).unwrap())
+                }
+                _ => self.cosm.frame_chg(orbit, *frame),
+            };
+            mapped.insert(name.to_lowercase(), mapped_orbit);
         }
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {
             // Grab the state in the other frame if needed
-            let state = if hdr.frame_name.is_some() {
+            let orbit = if hdr.frame_name.is_some() {
                 &mapped[&hdr.frame_name.as_ref().unwrap().to_lowercase()]
             } else {
-                state
+                orbit
             };
 
             formatted.push(match hdr.param {
-                StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(state.dt),
-                StateParameter::AoL => format!("{:.16}", state.aol()),
-                StateParameter::AoP => format!("{:.16}", state.aop()),
-                StateParameter::Apoapsis => format!("{:.16}", state.ta()),
-                StateParameter::C3 => format!("{:.16}", state.c3()),
-                StateParameter::Declination => format!("{:.16}", state.declination()),
-                StateParameter::ApoapsisRadius => format!("{:.16}", state.apoapsis()),
-                StateParameter::EccentricAnomaly => format!("{:.16}", state.ea()),
-                StateParameter::Eccentricity => format!("{:.16}", state.ecc()),
-                StateParameter::Energy => format!("{:.16}", state.energy()),
-                StateParameter::GeodeticHeight => format!("{:.16}", state.geodetic_height()),
-                StateParameter::GeodeticLatitude => format!("{:.16}", state.geodetic_latitude()),
-                StateParameter::GeodeticLongitude => format!("{:.16}", state.geodetic_longitude()),
-                StateParameter::FlightPathAngle => format!("{:.16}", state.fpa()),
-                StateParameter::Hmag => format!("{:.16}", state.hmag()),
-                StateParameter::HX => format!("{:.16}", state.hx()),
-                StateParameter::HY => format!("{:.16}", state.hy()),
-                StateParameter::HZ => format!("{:.16}", state.hz()),
+                StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(orbit.dt),
+                StateParameter::AoL => format!("{:.16}", orbit.aol()),
+                StateParameter::AoP => format!("{:.16}", orbit.aop()),
+                StateParameter::Apoapsis => format!("{:.16}", orbit.ta()),
+                StateParameter::C3 => format!("{:.16}", orbit.c3()),
+                StateParameter::Declination => format!("{:.16}", orbit.declination()),
+                StateParameter::ApoapsisRadius => format!("{:.16}", orbit.apoapsis()),
+                StateParameter::EccentricAnomaly => format!("{:.16}", orbit.ea()),
+                StateParameter::Eccentricity => format!("{:.16}", orbit.ecc()),
+                StateParameter::Energy => format!("{:.16}", orbit.energy()),
+                StateParameter::GeodeticHeight => format!("{:.16}", orbit.geodetic_height()),
+                StateParameter::GeodeticLatitude => format!("{:.16}", orbit.geodetic_latitude()),
+                StateParameter::GeodeticLongitude => format!("{:.16}", orbit.geodetic_longitude()),
+                StateParameter::FlightPathAngle => format!("{:.16}", orbit.fpa()),
+                StateParameter::Hmag => format!("{:.16}", orbit.hmag()),
+                StateParameter::HX => format!("{:.16}", orbit.hx()),
+                StateParameter::HY => format!("{:.16}", orbit.hy()),
+                StateParameter::HZ => format!("{:.16}", orbit.hz()),
                 StateParameter::HyperbolicAnomaly => {
-                    format!("{:.16}", state.hyperbolic_anomaly().unwrap())
+                    format!("{:.16}", orbit.hyperbolic_anomaly().unwrap())
                 }
-                StateParameter::Inclination => format!("{:.16}", state.inc()),
-                StateParameter::MeanAnomaly => format!("{:.16}", state.ma()),
-                StateParameter::Periapsis => format!("{:.16}", state.ta()),
-                StateParameter::PeriapsisRadius => format!("{:.16}", state.periapsis()),
-                StateParameter::Period => format!("{:.16}", state.period().in_seconds()),
-                StateParameter::RightAscension => format!("{:.16}", state.right_ascension()),
-                StateParameter::RAAN => format!("{:.16}", state.raan()),
-                StateParameter::Rmag => format!("{:.16}", state.rmag()),
-                StateParameter::SemiParameter => format!("{:.16}", state.semi_parameter()),
-                StateParameter::SemiMinorAxis => format!("{:.16}", state.semi_minor_axis()),
-                StateParameter::SMA => format!("{:.16}", state.sma()),
-                StateParameter::TrueAnomaly => format!("{:.16}", state.ta()),
-                StateParameter::TrueLongitude => format!("{:.16}", state.tlong()),
+                StateParameter::Inclination => format!("{:.16}", orbit.inc()),
+                StateParameter::MeanAnomaly => format!("{:.16}", orbit.ma()),
+                StateParameter::Periapsis => format!("{:.16}", orbit.ta()),
+                StateParameter::PeriapsisRadius => format!("{:.16}", orbit.periapsis()),
+                StateParameter::Period => format!("{:.16}", orbit.period().in_seconds()),
+                StateParameter::RightAscension => format!("{:.16}", orbit.right_ascension()),
+                StateParameter::RAAN => format!("{:.16}", orbit.raan()),
+                StateParameter::Rmag => format!("{:.16}", orbit.rmag()),
+                StateParameter::SemiParameter => format!("{:.16}", orbit.semi_parameter()),
+                StateParameter::SemiMinorAxis => format!("{:.16}", orbit.semi_minor_axis()),
+                StateParameter::SMA => format!("{:.16}", orbit.sma()),
+                StateParameter::TrueAnomaly => format!("{:.16}", orbit.ta()),
+                StateParameter::TrueLongitude => format!("{:.16}", orbit.tlong()),
                 StateParameter::VelocityDeclination => {
-                    format!("{:.16}", state.velocity_declination())
+                    format!("{:.16}", orbit.velocity_declination())
                 }
-                StateParameter::Vmag => format!("{:.16}", state.vmag()),
-                StateParameter::X => format!("{:.16}", state.x),
-                StateParameter::Y => format!("{:.16}", state.y),
-                StateParameter::Z => format!("{:.16}", state.z),
-                StateParameter::VX => format!("{:.16}", state.vx),
-                StateParameter::VY => format!("{:.16}", state.vy),
-                StateParameter::VZ => format!("{:.16}", state.vz),
+                StateParameter::Vmag => format!("{:.16}", orbit.vmag()),
+                StateParameter::X => format!("{:.16}", orbit.x),
+                StateParameter::Y => format!("{:.16}", orbit.y),
+                StateParameter::Z => format!("{:.16}", orbit.z),
+                StateParameter::VX => format!("{:.16}", orbit.vx),
+                StateParameter::VY => format!("{:.16}", orbit.vy),
+                StateParameter::VZ => format!("{:.16}", orbit.vz),
                 StateParameter::FuelMass => {
                     unimplemented!("No fuel for an orbit, only for spacecraft!")
                 }
@@ -601,6 +606,8 @@ pub struct NavSolutionFormatter {
     pub headers: Vec<NavSolutionHeader>,
     pub estimated_headers: StateFormatter,
     pub nominal_headers: StateFormatter,
+    frames: HashMap<String, Frame>,
+    cosm: Arc<Cosm>,
 }
 
 impl NavSolutionFormatter {
@@ -614,7 +621,11 @@ impl NavSolutionFormatter {
     /// let hdrs = vec!["estimate:AoL".to_string(), "nominal:ea:eme2000".to_string(), "delta_x".to_string()];
     /// NavSolutionFormatter::from_headers(hdrs, "nope".to_string(), cosm);
     /// ```
-    pub fn from_headers(headers: Vec<String>, filename: String, cosm: Arc<Cosm>) -> Self {
+    pub fn from_headers(
+        headers: Vec<String>,
+        filename: String,
+        cosm: Arc<Cosm>,
+    ) -> Result<Self, NyxError> {
         let mut frames = HashMap::new();
         let mut hdrs = Vec::with_capacity(40);
         let mut est_hdrs = Vec::with_capacity(20);
@@ -624,20 +635,38 @@ impl NavSolutionFormatter {
             let lowered = hdr.to_lowercase();
             let splt: Vec<&str> = lowered.split(':').collect();
 
+            // Check the frames for the nominal and estimated state
+            // The frames for the covariance are checked blow
             let frame_name = if splt.len() == 3 {
                 // Check that the frame is valid
                 let name = splt[2].to_owned();
                 // Get the frame
-                match cosm.try_frame(&name) {
-                    Ok(frame) => frames.insert(name.clone(), frame),
-                    Err(e) => panic!("unknown frame `{}` in header ({})", name, e),
-                };
+                frames.insert(name.clone(), cosm.try_frame(&name)?);
                 Some(name)
+            } else if splt.len() == 2
+                && splt[0].to_lowercase() != "epoch"
+                && splt[0].to_lowercase() != "nominal"
+                && splt[0].to_lowercase() != "estimate"
+            {
+                // See if this is a frame name
+                match splt[1].to_lowercase().as_str() {
+                    "ric" => frames.insert(splt[1].to_string(), Frame::RIC),
+                    "rcn" => frames.insert(splt[1].to_string(), Frame::RCN),
+                    "vnc" => frames.insert(splt[1].to_string(), Frame::VNC),
+                    _ => {
+                        if let Ok(frame) = cosm.try_frame(splt[1]) {
+                            frames.insert(splt[1].to_string(), frame)
+                        } else {
+                            None
+                        }
+                    }
+                };
+                Some(splt[1].to_string())
             } else {
                 None
             };
 
-            match splt[0] {
+            match splt[0].to_lowercase().as_str() {
                 "epoch" => {
                     hdrs.push(NavSolutionHeader::Epoch(if splt.len() == 2 {
                         EpochFormat::from_str(splt[1]).unwrap()
@@ -688,7 +717,12 @@ impl NavSolutionFormatter {
                         nom_hdrs.push(state_hdr);
                     }
                 }
-                _ => panic!("unknown header `{}`", splt[0]),
+                _ => {
+                    return Err(NyxError::CustomError(format!(
+                        "unknown header `{}`",
+                        splt[0]
+                    )))
+                }
             }
         }
 
@@ -696,7 +730,7 @@ impl NavSolutionFormatter {
         hdrs.push(NavSolutionHeader::EstimatedState(est_hdrs.clone()));
         hdrs.push(NavSolutionHeader::NominalState(nom_hdrs.clone()));
 
-        Self {
+        Ok(Self {
             filename,
             headers: hdrs,
             nominal_headers: StateFormatter {
@@ -708,10 +742,12 @@ impl NavSolutionFormatter {
             estimated_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
-                frames,
-                cosm,
+                frames: frames.clone(),
+                cosm: cosm.clone(),
             },
-        }
+            frames,
+            cosm,
+        })
     }
 
     /// Default headers are [Epoch (GregorianTai), X, Y, Z, VX, VY, VZ], where position is in km and velocity in km/s.
@@ -752,8 +788,10 @@ impl NavSolutionFormatter {
                 filename: "file_should_not_exist".to_owned(),
                 headers: est_hdrs,
                 frames: HashMap::new(),
-                cosm,
+                cosm: cosm.clone(),
             },
+            frames: HashMap::new(),
+            cosm,
         }
     }
 
@@ -763,6 +801,22 @@ impl NavSolutionFormatter {
             + Allocator<f64, <T as State>::Size, <T as State>::Size>
             + Allocator<f64, <T as State>::VecLength>,
     {
+        // Start by computing the state in all of the frames needed
+        let mut dcms = HashMap::new();
+        let orbit = sol.orbital_state();
+        for (name, frame) in &self.frames {
+            let mapping_dcm = match frame {
+                Frame::RCN | Frame::RIC | Frame::VNC => {
+                    orbit.dcm6x6_from_traj_frame(*frame).unwrap()
+                }
+                _ => self
+                    .cosm
+                    .try_dcm_from_to(&orbit.frame, frame, orbit.dt)
+                    .unwrap(),
+            };
+            dcms.insert(name.to_lowercase(), mapping_dcm);
+        }
+
         let mut formatted = Vec::new();
 
         for hdr in &self.headers {
@@ -798,69 +852,174 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Delta_vz => {
                     formatted.push(format!("{:.16e}", sol.state_deviation()[5]))
                 }
-                NavSolutionHeader::Cx_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(0, 0)))
-                }
-                NavSolutionHeader::Cy_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(1, 0)))
-                }
-                NavSolutionHeader::Cy_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(1, 1)))
-                }
-                NavSolutionHeader::Cz_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 0)))
-                }
-                NavSolutionHeader::Cz_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 1)))
-                }
-                NavSolutionHeader::Cz_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(2, 2)))
-                }
-                NavSolutionHeader::Cx_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 0)))
-                }
-                NavSolutionHeader::Cx_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 1)))
-                }
-                NavSolutionHeader::Cx_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 2)))
-                }
-                NavSolutionHeader::Cx_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(3, 3)))
-                }
-                NavSolutionHeader::Cy_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 0)))
-                }
-                NavSolutionHeader::Cy_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 1)))
-                }
-                NavSolutionHeader::Cy_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 2)))
-                }
-                NavSolutionHeader::Cy_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 3)))
-                }
-                NavSolutionHeader::Cy_dot_y_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(4, 4)))
-                }
-                NavSolutionHeader::Cz_dot_x { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 0)))
-                }
-                NavSolutionHeader::Cz_dot_y { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 1)))
-                }
-                NavSolutionHeader::Cz_dot_z { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 2)))
-                }
-                NavSolutionHeader::Cz_dot_x_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 3)))
-                }
-                NavSolutionHeader::Cz_dot_y_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 4)))
-                }
-                NavSolutionHeader::Cz_dot_z_dot { .. } => {
-                    formatted.push(format!("{:.16e}", sol.covar_ij(5, 5)))
-                }
+                NavSolutionHeader::Cx_x { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(0, 0)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(0, 0))),
+                },
+                NavSolutionHeader::Cy_x { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(1, 0)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(1, 0))),
+                },
+                NavSolutionHeader::Cy_y { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(1, 1)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(1, 1))),
+                },
+                NavSolutionHeader::Cz_x { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(2, 0)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(2, 0))),
+                },
+                NavSolutionHeader::Cz_y { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(2, 1)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(2, 1))),
+                },
+                NavSolutionHeader::Cz_z { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(2, 2)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(2, 2))),
+                },
+                NavSolutionHeader::Cx_dot_x { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(3, 0)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 0))),
+                },
+                NavSolutionHeader::Cx_dot_y { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(3, 1)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 1))),
+                },
+                NavSolutionHeader::Cx_dot_z { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(3, 2)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 2))),
+                },
+                NavSolutionHeader::Cx_dot_x_dot { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(3, 3)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 3))),
+                },
+                NavSolutionHeader::Cy_dot_x { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(4, 0)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 0))),
+                },
+                NavSolutionHeader::Cy_dot_y { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(4, 1)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 1))),
+                },
+                NavSolutionHeader::Cy_dot_z { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(4, 2)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 2))),
+                },
+                NavSolutionHeader::Cy_dot_x_dot { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(4, 3)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 3))),
+                },
+                NavSolutionHeader::Cy_dot_y_dot { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(4, 4)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 4))),
+                },
+                NavSolutionHeader::Cz_dot_x { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(5, 0)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 0))),
+                },
+                NavSolutionHeader::Cz_dot_y { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(5, 1)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 1))),
+                },
+                NavSolutionHeader::Cz_dot_z { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(5, 2)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 2))),
+                },
+                NavSolutionHeader::Cz_dot_x_dot { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(5, 3)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 3))),
+                },
+                NavSolutionHeader::Cz_dot_y_dot { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(5, 4)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 4))),
+                },
+                NavSolutionHeader::Cz_dot_z_dot { frame } => match frame {
+                    Some(frame_name) => {
+                        // Rotate the covariance
+                        let covar = dcms[frame_name] * sol.covar();
+                        formatted.push(format!("{:.16e}", covar[(5, 5)]))
+                    }
+                    None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 5))),
+                },
             };
         }
 
