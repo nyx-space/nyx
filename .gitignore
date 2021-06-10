@@ -6,3 +6,7 @@ node_modules/
 *.bsp
 *.script.bak
 **/*.csv
+*.old
+*.svg
+*.data
+*.folded

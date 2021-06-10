@@ -156,11 +156,7 @@ fn main() -> Result<(), ParsingError> {
         };
         if should_exec {
             match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), (*COSM).clone()) {
-                Ok(odp) => {
-                    if let Some(e) = odp.execute().err() {
-                        return Err(ParsingError::ExecutionError(e));
-                    };
-                }
+                Ok(odp) => odp.execute()?,
                 Err(e) => match e {
                     ParsingError::UseMdInstead => {
                         // Build the MDP
@@ -181,9 +177,7 @@ fn main() -> Result<(), ParsingError> {
                                 info!("*******************************{:*<1$}", "", seq_name.len());
                                 info!("===> Executing sequence `{}` <===", seq_name);
                                 info!("*******************************{:*<1$}", "", seq_name.len());
-                                if let Some(e) = md.execute_with(hdlrs).err() {
-                                    return Err(ParsingError::ExecutionError(e));
-                                };
+                                md.execute_with(hdlrs)?;
                             }
                             Err(e) => {
                                 error!("{:?}", e);

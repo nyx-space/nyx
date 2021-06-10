@@ -279,6 +279,8 @@ impl<'a> OdpScenario<'a> {
                                 }
                             };
 
+                            info!("Using SNC: {}", process_noise);
+
                             // And build the filter
                             KF::new(initial_estimate, process_noise, measurement_noise)
                         }

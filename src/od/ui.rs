@@ -527,7 +527,7 @@ where
                         arc_warned = true;
                     }
                     // No measurement can be used here, let's just do a time update
-                    debug!("time update {}", dt);
+                    trace!("time update {}", dt);
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update
@@ -556,7 +556,7 @@ where
                                     &computed_meas.observation(),
                                 ) {
                                     Ok((est, res)) => {
-                                        debug!("msr update msr #{} {}", msr_cnt, dt);
+                                        trace!("msr update #{} @ {}", msr_cnt, dt);
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the

@@ -855,7 +855,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cx_x { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(0, 0)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(0, 0))),
@@ -863,7 +863,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_x { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(1, 0)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(1, 0))),
@@ -871,7 +871,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_y { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(1, 1)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(1, 1))),
@@ -879,7 +879,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_x { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(2, 0)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(2, 0))),
@@ -887,7 +887,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_y { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(2, 1)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(2, 1))),
@@ -895,7 +895,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_z { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(2, 2)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(2, 2))),
@@ -903,7 +903,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cx_dot_x { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(3, 0)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 0))),
@@ -911,7 +911,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cx_dot_y { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(3, 1)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 1))),
@@ -919,7 +919,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cx_dot_z { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(3, 2)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 2))),
@@ -927,7 +927,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cx_dot_x_dot { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(3, 3)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(3, 3))),
@@ -935,7 +935,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_dot_x { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(4, 0)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 0))),
@@ -943,7 +943,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_dot_y { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(4, 1)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 1))),
@@ -951,7 +951,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_dot_z { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(4, 2)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 2))),
@@ -959,7 +959,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_dot_x_dot { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(4, 3)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 3))),
@@ -967,7 +967,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_dot_y_dot { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(4, 4)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(4, 4))),
@@ -975,7 +975,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_dot_x { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(5, 0)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 0))),
@@ -983,7 +983,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_dot_y { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(5, 1)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 1))),
@@ -991,7 +991,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_dot_z { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(5, 2)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 2))),
@@ -999,7 +999,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_dot_x_dot { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(5, 3)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 3))),
@@ -1007,7 +1007,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_dot_y_dot { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(5, 4)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 4))),
@@ -1015,7 +1015,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cz_dot_z_dot { frame } => match frame {
                     Some(frame_name) => {
                         // Rotate the covariance
-                        let covar = dcms[frame_name] * sol.covar();
+                        let covar = dcms[frame_name] * sol.covar() * dcms[frame_name].transpose();
                         formatted.push(format!("{:.16e}", covar[(5, 5)]))
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 5))),

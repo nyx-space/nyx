@@ -159,6 +159,7 @@ where
         if let Some(start_time) = self.start_time {
             if start_time > epoch {
                 // This SNC applies only later
+                debug!("@{} SNC starts at {}", epoch, start_time);
                 return None;
             }
         }
@@ -166,6 +167,10 @@ where
         // Check the disable time, and return no SNC if the previous SNC was computed too long ago
         if let Some(prev_epoch) = self.prev_epoch {
             if epoch - prev_epoch > self.disable_time {
+                debug!(
+                    "@{} SNC disabled: prior use greater than {}",
+                    epoch, self.disable_time
+                );
                 return None;
             }
         }
@@ -182,6 +187,12 @@ where
                 snc[(i, i)] *= (-decay[i] * total_delta_t).exp();
             }
         }
+
+        trace!(
+            "@{} SNC diag {:?}",
+            epoch,
+            snc.diagonal().iter().copied().collect::<Vec<f64>>()
+        );
 
         Some(snc)
     }

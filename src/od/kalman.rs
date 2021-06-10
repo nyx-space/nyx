@@ -334,6 +334,7 @@ where
         }
 
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        let mut snc_used = false;
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
             if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {
@@ -372,9 +373,14 @@ where
                 }
                 // Let's add the process noise
                 covar_bar += &gamma * snc_matrix * &gamma.transpose();
+                snc_used = true;
                 // And break so we don't add any more process noise
                 break;
             }
+        }
+
+        if !snc_used {
+            trace!("@{} No SNC", nominal_state.epoch());
         }
 
         let h_tilde_t = &self.h_tilde.transpose();
@@ -427,6 +433,10 @@ where
         self.stm_updated = false;
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();
+        // Update the prev epoch for all SNCs
+        for snc in &mut self.process_noise {
+            snc.prev_epoch = Some(self.prev_estimate.epoch());
+        }
         Ok((estimate, res))
     }
 
