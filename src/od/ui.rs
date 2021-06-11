@@ -382,8 +382,8 @@ where
                 info!("*****************");
 
                 info!(
-                    "Filter converged to absolute tolerance ({:e}) after {} iterations",
-                    config.absolute_tol, iter_cnt
+                    "Filter converged to absolute tolerance ({:.2e} < {:.2e}) after {} iterations",
+                    best_rms, config.absolute_tol, iter_cnt
                 );
                 return Ok(());
             }
@@ -411,7 +411,8 @@ where
             } else {
                 self.rms_postfit_residual()
             };
-            if (new_rms - best_rms).abs() / best_rms < config.relative_tol {
+            let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
+            if cur_rel_rms < config.relative_tol {
                 info!("*****************");
                 info!("*** CONVERGED ***");
                 info!("*****************");
@@ -420,8 +421,8 @@ where
                     new_rms, previous_rms, best_rms
                 );
                 info!(
-                    "Filter converged to relative tolerance ({:e}) after {} iterations",
-                    config.relative_tol, iter_cnt
+                    "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
+                    cur_rel_rms, config.relative_tol, iter_cnt
                 );
                 return Ok(());
             }

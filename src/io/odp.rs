@@ -425,7 +425,7 @@ impl<'a> OdpScenario<'a> {
 
         odp.process_measurements(&sim_measurements)?;
 
-        // TODO: Iterate until convergence
+        odp.iterate(&sim_measurements, IterationConf::default())?;
 
         // Save to output file if requested
         // Create the output file

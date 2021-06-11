@@ -5,6 +5,7 @@ extern crate pretty_env_logger;
 use self::nyx::celestia::{Bodies, Cosm, Orbit};
 use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
+use self::nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
@@ -224,11 +225,20 @@ fn od_robust_test_ckf_iteration_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     prop.for_duration(prop_time).unwrap();
+
+    // Initialize the truth data output
+    let mut initial_state = Some(prop.state);
+    let truth_fmtr =
+        StateFormatter::default("data/robust_test_ckf_truth.csv".to_string(), cosm.clone());
+    let mut wtr =
+        csv::Writer::from_path(truth_fmtr.filename.clone()).expect("could not create file");
+    wtr.serialize(&truth_fmtr.headers)
+        .expect("could not write headers");
 
     let mut truth_states = Vec::with_capacity(10_000);
     // Receive the states on the main thread, and populate the measurement channel.
@@ -240,6 +250,13 @@ fn od_robust_test_ckf_iteration_multi_body() {
                 break; // We know that only one station is in visibility at each time.
             }
         }
+        if let Some(first_state) = initial_state {
+            wtr.serialize(&truth_fmtr.fmt(&first_state))
+                .expect("could not format state");
+            initial_state = None;
+        }
+        wtr.serialize(truth_fmtr.fmt(&rx_state))
+            .expect("could not format state");
         truth_states.push(rx_state)
     }
 
@@ -273,6 +290,19 @@ fn od_robust_test_ckf_iteration_multi_body() {
 
     // Clone the initial estimates
     let pre_iteration_estimates = odp.estimates.clone();
+    // Output the pre-iteration estimates
+    let fmtr = NavSolutionFormatter::default(
+        "data/robust_test_ckf_pre_iteration.csv".to_string(),
+        cosm.clone(),
+    );
+    let mut wtr = csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+    wtr.serialize(&fmtr.headers)
+        .expect("could not write headers");
+
+    for est in &odp.estimates {
+        wtr.serialize(fmtr.fmt(est))
+            .expect("could not format state");
+    }
 
     // Iterate
     odp.iterate(
@@ -284,6 +314,19 @@ fn od_robust_test_ckf_iteration_multi_body() {
         },
     )
     .unwrap();
+
+    let fmtr = NavSolutionFormatter::default(
+        "data/robust_test_ckf_post_iteration.csv".to_string(),
+        cosm.clone(),
+    );
+    let mut wtr = csv::Writer::from_path(fmtr.filename.clone()).expect("could not create file");
+    wtr.serialize(&fmtr.headers)
+        .expect("could not write headers");
+
+    for est in &odp.estimates {
+        wtr.serialize(fmtr.fmt(est))
+            .expect("could not format state");
+    }
 
     let mut rss_pos_avr = 0.0;
     let mut rss_vel_avr = 0.0;
