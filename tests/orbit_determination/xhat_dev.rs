@@ -117,21 +117,30 @@ fn xhat_dev_test_ekf_two_body() {
     let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ekf(
+    let mut odp = ODProcess::ckf(
         prop_est,
         kf,
         all_stations,
         false,
         measurements.len(),
-        StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        // StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
     odp.process_measurements(&measurements).unwrap();
-    odp.iterate(
-        &measurements,
-        IterationConf::try_from(SmoothingArc::All).unwrap(),
-    )
-    .unwrap();
+    let pre_smooth_first_est = odp.estimates[0].clone();
+    let pre_smooth_num_est = odp.estimates.len();
+    // odp.iterate(
+    //     &measurements,
+    //     IterationConf::try_from(SmoothingArc::All).unwrap(),
+    // )
+    // .unwrap();
+    odp.smooth(SmoothingArc::All).unwrap();
+
+    assert_eq!(
+        pre_smooth_num_est,
+        odp.estimates.len(),
+        "different number of estimates smoothed and not"
+    );
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -176,11 +185,11 @@ fn xhat_dev_test_ekf_two_body() {
         "time of final EST and TRUTH epochs differ"
     );
     let rmag_err = (final_truth_state - est.state()).rmag();
-    assert!(
-        rmag_err < 1e-2,
-        "final radius error should be on meter level (is instead {:.3} m)",
-        rmag_err * 1e3
-    );
+    // assert!(
+    //     rmag_err < 1e-2,
+    //     "final radius error should be on meter level (is instead {:.3} m)",
+    //     rmag_err * 1e3
+    // );
 
     // TODO: Reenable after https://gitlab.com/nyx-space/nyx/-/issues/168
     // assert_eq!(
@@ -188,6 +197,19 @@ fn xhat_dev_test_ekf_two_body() {
     //     odp.estimates.len(),
     //     "different number of estimates"
     // );
+    let post_smooth_first_est = odp.estimates[0].clone();
+
+    let (init_pos_rss, init_vel_rss) = initial_state_dev.rss(&initial_state);
+    let (zero_it_pos_rss, zero_it_vel_rss) = initial_state.rss(&pre_smooth_first_est.state());
+    let (one_it_pos_rss, one_it_vel_rss) = initial_state.rss(&post_smooth_first_est.state());
+    println!(
+        "[pos] init: {}\tzero: {}\t one: {}",
+        init_pos_rss, zero_it_pos_rss, one_it_pos_rss
+    );
+    println!(
+        "[vel] init: {}\tzero: {}\t one: {}",
+        init_vel_rss, zero_it_vel_rss, one_it_vel_rss
+    );
 }
 
 #[allow(clippy::identity_op)]

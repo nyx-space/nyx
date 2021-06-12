@@ -199,7 +199,7 @@ fn od_robust_test_ckf_iteration_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 0.5 * TimeUnit::Hour;
+    let prop_time = 10 * TimeUnit::Minute;
     let step_size = 10.0 * TimeUnit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 

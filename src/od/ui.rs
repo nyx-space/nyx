@@ -259,21 +259,42 @@ where
         let mut k = l - 1;
 
         info!("Smoothing {} estimates until {}", l + 1, condition);
-        let mut smoothed = Vec::with_capacity(l + 1);
+        let mut smoothed = Vec::with_capacity(self.estimates.len());
         // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
-        smoothed.push(self.estimates[k + 1].clone());
+        smoothed.push(self.estimates.last().unwrap().clone());
 
         loop {
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &smoothed[l - k - 1];
+            let sm_est_kp1 = &smoothed.last().unwrap();
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
-            let est_k = &self.estimates[k];
+            let est_k = &self.estimates[l - smoothed.len() + 1];
             let x_k_k = &est_k.state_deviation();
             let p_k_k = &est_k.covar();
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
-            let est_kp1 = &self.estimates[k + 1];
+            let est_kp1 = &self.estimates[l - smoothed.len()];
+
+            // Check the smoother stopping condition
+            match condition {
+                SmoothingArc::Epoch(e) => {
+                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
+                    if est_kp1.epoch() < e {
+                        break;
+                    }
+                }
+                SmoothingArc::TimeGap(gap_s) => {
+                    if est_k.epoch() - est_kp1.epoch() > gap_s {
+                        break;
+                    }
+                }
+                SmoothingArc::Prediction => {
+                    if est_kp1.predicted() {
+                        break;
+                    }
+                }
+                SmoothingArc::All => {}
+            }
 
             let phi_kp1_k = est_kp1.stm();
             // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
@@ -295,30 +316,8 @@ where
             smoothed_est_k.set_covar(p_k_l);
             // Move on
             smoothed.push(smoothed_est_k);
-            if k == 0 {
+            if smoothed.len() == self.estimates.len() {
                 break;
-            }
-            k -= 1;
-            // Check the smoother stopping condition
-            let next_est = &self.estimates[k];
-            match condition {
-                SmoothingArc::Epoch(e) => {
-                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
-                    if next_est.epoch() < e {
-                        break;
-                    }
-                }
-                SmoothingArc::TimeGap(gap_s) => {
-                    if est_k.epoch() - next_est.epoch() > gap_s {
-                        break;
-                    }
-                }
-                SmoothingArc::Prediction => {
-                    if next_est.predicted() {
-                        break;
-                    }
-                }
-                SmoothingArc::All => {}
             }
         }
 
