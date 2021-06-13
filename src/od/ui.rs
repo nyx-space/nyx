@@ -254,9 +254,8 @@ where
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&mut self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, NyxError> {
+    pub fn smooth(&self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, NyxError> {
         let l = self.estimates.len() - 1;
-        let mut k = l - 1;
 
         info!("Smoothing {} estimates until {}", l + 1, condition);
         let mut smoothed = Vec::with_capacity(self.estimates.len());
@@ -264,16 +263,19 @@ where
         smoothed.push(self.estimates.last().unwrap().clone());
 
         loop {
+            // println!("new loop");
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &smoothed.last().unwrap();
+            // let sm_est_kp1 = &smoothed.last().unwrap();
+            let sm_est_kp1 = &self.estimates[l - smoothed.len() + 1].clone();
+            // println!("{}", sm_est_kp1.epoch());
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
-            let est_k = &self.estimates[l - smoothed.len() + 1];
+            let est_k = &self.estimates[l - smoothed.len()];
             let x_k_k = &est_k.state_deviation();
             let p_k_k = &est_k.covar();
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
-            let est_kp1 = &self.estimates[l - smoothed.len()];
+            let est_kp1 = &self.estimates[l - smoothed.len() + 1];
 
             // Check the smoother stopping condition
             match condition {
@@ -328,9 +330,9 @@ where
 
         // Now, let's add all of the other estimates so that the same indexing can be done
         // between all the estimates and the smoothed estimates
-        if k > 0 {
-            // Add the estimate that might have been skipped.
-            // smoothed.push(self.estimates[k + 1].clone());
+        if smoothed.len() < self.estimates.len() {
+            // Add the estimates that might have been skipped.
+            let mut k = self.estimates.len() - smoothed.len();
             loop {
                 smoothed.push(self.estimates[k].clone());
                 if k == 0 {

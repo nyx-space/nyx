@@ -134,7 +134,8 @@ fn xhat_dev_test_ekf_two_body() {
     //     IterationConf::try_from(SmoothingArc::All).unwrap(),
     // )
     // .unwrap();
-    odp.smooth(SmoothingArc::All).unwrap();
+
+    let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
 
     assert_eq!(
         pre_smooth_num_est,
@@ -197,14 +198,15 @@ fn xhat_dev_test_ekf_two_body() {
     //     odp.estimates.len(),
     //     "different number of estimates"
     // );
-    let post_smooth_first_est = odp.estimates[0].clone();
+    let post_smooth_first_est = smoothed_estimates[0].clone();
 
     let (init_pos_rss, init_vel_rss) = initial_state_dev.rss(&initial_state);
     let (zero_it_pos_rss, zero_it_vel_rss) = initial_state.rss(&pre_smooth_first_est.state());
     let (one_it_pos_rss, one_it_vel_rss) = initial_state.rss(&post_smooth_first_est.state());
+    let (loc_it_pos_rss, _) = initial_state.rss(&smoothed_est_k.state());
     println!(
-        "[pos] init: {}\tzero: {}\t one: {}",
-        init_pos_rss, zero_it_pos_rss, one_it_pos_rss
+        "[pos] init: {}\tzero: {}\t one: {}\t loc: {}",
+        init_pos_rss, zero_it_pos_rss, one_it_pos_rss, loc_it_pos_rss
     );
     println!(
         "[vel] init: {}\tzero: {}\t one: {}",
