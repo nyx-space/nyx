@@ -262,11 +262,8 @@ where
         smoothed.push(self.estimates.last().unwrap().clone());
 
         loop {
-            // println!("new loop");
             // Borrow the previously smoothed estimate of the k+1 estimate
-            // let sm_est_kp1 = &smoothed.last().unwrap();
             let sm_est_kp1 = &self.estimates[l - smoothed.len() + 1].clone();
-            // println!("{}", sm_est_kp1.epoch());
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
@@ -323,7 +320,7 @@ where
         }
 
         info!(
-            "Condition reached after smoothing {} estimates ",
+            "Smoothing condition reached after {} estimates ",
             smoothed.len()
         );
 
@@ -350,7 +347,10 @@ where
     pub fn rms_prefit_residual(&self) -> f64 {
         let mut sum = 0.0;
         for residual in &self.residuals {
-            sum += residual.prefit.dot(&residual.prefit);
+            // sum += residual.prefit.dot(&residual.prefit);
+            let mut msr_noise_item_inv = self.kf.measurement_noise(residual.dt).diagonal().clone();
+            msr_noise_item_inv.apply(|m| 1.0 / m);
+            sum += residual.prefit.dot(&msr_noise_item_inv).powi(2);
         }
         (sum / (self.estimates.len() as f64)).sqrt()
     }

@@ -25,7 +25,7 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::time::Epoch;
-use crate::{State, TimeTagged};
+pub use crate::{State, TimeTagged};
 
 use crate::io::{CovarFormat, EpochFormat};
 
@@ -103,6 +103,9 @@ where
 
     /// Sets the process noise matrix of the estimated state
     fn set_process_noise(&mut self, snc: snc::SNC<A>);
+
+    /// Returns the measurement noise used at this given epoch
+    fn measurement_noise(&self, epoch: Epoch) -> &OMatrix<f64, M, M>;
 }
 
 /// A trait defining a measurement of size `MeasurementSize`

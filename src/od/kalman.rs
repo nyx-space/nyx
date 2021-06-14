@@ -24,6 +24,7 @@ pub use super::residual::Residual;
 pub use super::snc::SNC;
 use super::{CovarFormat, EpochFormat, Filter, State};
 pub use crate::errors::NyxError;
+pub use crate::time::Epoch;
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 /// S: State size (not propagated vector size)
@@ -217,6 +218,10 @@ where
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
     type Estimate = KfEstimate<T>;
+
+    fn measurement_noise(&self, _epoch: Epoch) -> &OMatrix<f64, M, M> {
+        &self.measurement_noise
+    }
 
     /// Returns the previous estimate
     fn previous_estimate(&self) -> &Self::Estimate {

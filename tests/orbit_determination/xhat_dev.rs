@@ -89,7 +89,7 @@ fn xhat_dev_test_ekf_two_body() {
         }
         truth_states.push(rx_state)
     }
-    let final_truth_state = truth_states[truth_states.len() - 1];
+    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -151,7 +151,7 @@ fn xhat_dev_test_ekf_two_body() {
         final_truth_state.dt == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - est.state()
+        final_truth_state - &est.state()
     );
 
     for i in 0..6 {
@@ -183,7 +183,7 @@ fn xhat_dev_test_ekf_two_body() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - &est.state()).rmag();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",
@@ -198,7 +198,7 @@ fn xhat_dev_test_ekf_two_body() {
 
     let post_smooth_first_est = odp.estimates[0].clone();
 
-    let (init_pos_rss, init_vel_rss) = initial_state_dev.rss(&initial_state);
+    let (init_pos_rss, init_vel_rss) = initial_state.rss(&initial_state_dev);
     let (zero_it_pos_rss, zero_it_vel_rss) = initial_state.rss(&pre_smooth_first_est.state());
     let (one_it_pos_rss, one_it_vel_rss) = initial_state.rss(&post_smooth_first_est.state());
     println!(
@@ -288,7 +288,7 @@ fn xhat_dev_test_ekf_multi_body() {
         truth_states.push(rx_state)
     }
 
-    let final_truth_state = truth_states[truth_states.len() - 1];
+    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -344,7 +344,7 @@ fn xhat_dev_test_ekf_multi_body() {
         "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - est.state()
+        final_truth_state - &est.state()
     );
 
     for i in 0..6 {
@@ -376,7 +376,7 @@ fn xhat_dev_test_ekf_multi_body() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - &est.state()).rmag();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",
@@ -466,7 +466,7 @@ fn xhat_dev_test_ekf_harmonics() {
         }
         truth_states.push(rx_state)
     }
-    let final_truth_state = truth_states[truth_states.len() - 1];
+    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -511,7 +511,7 @@ fn xhat_dev_test_ekf_harmonics() {
         final_truth_state.dt == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - est.state()
+        final_truth_state - &est.state()
     );
 
     for i in 0..6 {
@@ -543,7 +543,7 @@ fn xhat_dev_test_ekf_harmonics() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - &est.state()).rmag();
     assert!(
         rmag_err < 1e-1,
         "final radius error should be on ten-meter level (is instead {:.3} m)",
@@ -625,7 +625,7 @@ fn xhat_dev_test_ekf_realistic() {
         }
         truth_states.push(rx_state)
     }
-    let final_truth_state = truth_states[truth_states.len() - 1];
+    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
@@ -667,7 +667,7 @@ fn xhat_dev_test_ekf_realistic() {
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
         final_truth_state.dt == est.epoch(),
-        final_truth_state - est.state()
+        final_truth_state - &est.state()
     );
 
     for i in 0..6 {
@@ -699,7 +699,7 @@ fn xhat_dev_test_ekf_realistic() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - &est.state()).rmag();
     assert!(
         rmag_err < 5e-1,
         "final radius error should be less than 500 m (is instead {:.3} m)",
