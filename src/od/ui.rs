@@ -755,6 +755,11 @@ pub trait EkfTrigger {
     fn disable_ekf(&mut self, _epoch: Epoch) -> bool {
         false
     }
+
+    /// If some iteration configuration is returned, the filter will iterate with it before enabling the EKF.
+    fn interation_config(&self) -> Option<IterationConf> {
+        None
+    }
 }
 
 /// CkfTrigger will never switch a KF to an EKF

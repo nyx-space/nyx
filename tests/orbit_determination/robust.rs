@@ -213,9 +213,9 @@ fn od_robust_ops_test() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.9, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x += 0.05;
+    initial_state_dev.y -= 0.05;
+    initial_state_dev.z += 0.05;
     let ckf_dco = dt + 30 * TimeUnit::Minute;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
@@ -259,9 +259,9 @@ fn od_robust_ops_test() {
                 if rx_state.epoch() <= ckf_dco {
                     // Add this measurement to the CKF
                     ckf_measurements.push(meas);
-                } else {
-                    measurements.push(meas);
                 }
+                // Always add it to the full list of measurements
+                measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
@@ -301,13 +301,16 @@ fn od_robust_ops_test() {
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
-    // let kf = KF::no_snc(initial_estimate, measurement_noise);
-    let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
-    let kf = KF::new(initial_estimate, process_noise, measurement_noise);
+    let kf = KF::no_snc(initial_estimate, measurement_noise);
 
     // Set up a first OD process as a CKF using the CKF measurements
-    let mut odp = ODProcess::ckf(prop_est, kf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(
+        prop_est,
+        kf,
+        all_stations.clone(),
+        false,
+        measurements.len(),
+    );
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -328,14 +331,8 @@ fn od_robust_ops_test() {
     }
 
     // Iterate
-    // odp.iterate(&ckf_measurements, IterationConf::default())
-    //     .unwrap();
-    use std::convert::TryFrom;
-    odp.iterate(
-        &measurements,
-        IterationConf::try_from(SmoothingArc::All).unwrap(),
-    )
-    .unwrap();
+    odp.iterate(&ckf_measurements, IterationConf::default())
+        .unwrap();
 
     let fmtr = NavSolutionFormatter::default(
         "data/robust_test_ckf_post_iteration.csv".to_string(),
@@ -349,21 +346,6 @@ fn od_robust_ops_test() {
         wtr.serialize(fmtr.fmt(est))
             .expect("could not format state");
     }
-
-    // let est = &odp.estimates.last().unwrap();
-
-    // let rmag_err = (final_truth_state - &est.state()).rmag();
-    // assert!(
-    //     rmag_err < 1e-2,
-    //     "final radius error should be on meter level (is instead {:.3} m)",
-    //     rmag_err * 1e3
-    // );
-
-    // assert_eq!(
-    //     truth_states.len(),
-    //     odp.estimates.len(),
-    //     "different number of estimates"
-    // );
 
     let post_smooth_first_est = odp.estimates[0].clone();
 
@@ -379,141 +361,51 @@ fn od_robust_ops_test() {
         init_vel_rss, zero_it_vel_rss, one_it_vel_rss
     );
 
+    // NOTE: From other tests, it's evident that there isn't enough visibility in this 0.9 eccentric orbit to change the initial estimate.
     assert!(
         one_it_pos_rss <= zero_it_pos_rss,
         "RSS position not better after iteration"
     );
 
-    // let mut rss_pos_avr = 0.0;
-    // let mut rss_vel_avr = 0.0;
-    // let mut rss_pos_avr_it = 0.0;
-    // let mut rss_vel_avr_it = 0.0;
-    // let mut num_pos_ok = 0;
-    // let mut num_vel_ok = 0;
+    // From this data, let's seed the EKF.
 
-    // // Compare the initial estimates and the iterated estimates
-    // // Skip the first 10 estimates which are surprisingly good in this case
-    // // for offset in (1..odp.estimates.len()).rev() {
-    // for (offset, est) in odp.estimates.iter().enumerate() {
-    //     // let truth_state = truth_states[truth_states.len() - offset];
-    //     let truth_state = truth_states[offset];
-    //     // let prior_est = &pre_iteration_estimates[odp.estimates.len() - offset];
-    //     let prior_est = &pre_iteration_estimates[offset];
+    let ekf_num_meas = 500;
+    // Set the disable time to be very low to test enable/disable sequence
+    let ekf_disable_time = 10.0 * TimeUnit::Second;
 
-    //     // Check that the covariance deflated
-    //     // let est = &odp.estimates[odp.estimates.len() - offset];
+    let converged_est = odp.estimates[0].clone();
 
-    //     // Some sanity checks to make sure that we have correctly indexed the estimates
-    //     assert_eq!(prior_est.epoch(), est.epoch());
-    //     assert_eq!(est.epoch(), truth_state.dt);
+    let prop_est = setup.with(converged_est.state().with_stm());
+    // let kf = KF::no_snc(converged_est, measurement_noise);
+    let sigma_q = 1e-7_f64.powi(2);
+    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let kf = KF::new(converged_est, process_noise, measurement_noise);
 
-    //     let (err_p, err_v) = rss_orbit_errors(&prior_est.state(), &truth_state);
-    //     let (err_p_it, err_v_it) = rss_orbit_errors(&est.state(), &truth_state);
+    let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
+    trig.within_sigma = 3.0;
 
-    //     rss_pos_avr += err_p;
-    //     rss_vel_avr += err_v;
-    //     rss_pos_avr_it += err_p_it;
-    //     rss_vel_avr_it += err_v_it;
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
 
-    //     if err_p_it <= err_p {
-    //         num_pos_ok += 1;
-    //     }
+    odp.process_measurements(&measurements).unwrap();
 
-    //     if err_v_it <= err_v {
-    //         num_vel_ok += 1;
-    //     }
+    let est = &odp.estimates.last().unwrap();
 
-    //     if offset == 2 {
-    //         // Only the print the final estimate
-    //         println!("Estimate:\n{}", prior_est);
-    //         println!("Iterated estimate:\n{}", est);
-    //         println!("Truth:\n{}", truth_state);
+    println!("Estimate:\n{}", est);
+    println!("Truth:\n{}", final_truth_state);
 
-    //         println!(
-    //             "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-    //             err_p * 1e3,
-    //             err_v * 1e3,
-    //             truth_state - prior_est.state()
-    //         );
+    let (err_p, err_v) = final_truth_state.rss(&est.state());
 
-    //         println!(
-    //             "RSS error: iterated estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-    //             err_p_it * 1e3,
-    //             err_v_it * 1e3,
-    //             truth_state - est.state()
-    //         );
-    //     }
+    println!(
+        "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
+        err_p * 1e3,
+        err_v * 1e3,
+        final_truth_state - &est.state()
+    );
 
-    //     // The smoothed RSS errors should be better, or have the same order of magnitude or not significantly worse
-
-    //     // Compute orders of magnitude
-    //     let err_p_oom = err_p.log10().floor() as i32;
-    //     let err_v_oom = err_v.log10().floor() as i32;
-    //     let err_p_it_oom = err_p_it.log10().floor() as i32;
-    //     let err_v_it_oom = err_v_it.log10().floor() as i32;
-
-    //     if err_p_it_oom - err_p_oom > 2 {
-    //         println!(
-    //             "RSS position error after iteration not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-    //             truth_state.dt.as_gregorian_tai_str(),
-    //             odp.estimates.len() - offset,
-    //             err_p * 1e3,
-    //             err_v * 1e3,
-    //             truth_state - prior_est.state(),
-    //             err_p_it * 1e3,
-    //             err_v_it * 1e3,
-    //             truth_state - est.state()
-    //         );
-    //     }
-
-    //     if err_v_it_oom - err_v_oom > 3 {
-    //         println!(
-    //             "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-    //             truth_state.dt.as_gregorian_tai_str(),
-    //             odp.estimates.len() - offset,
-    //             err_p * 1e3,
-    //             err_v * 1e3,
-    //             truth_state - prior_est.state(),
-    //             err_p_it * 1e3,
-    //             err_v_it * 1e3,
-    //             truth_state - est.state()
-    //         );
-    //     }
-
-    //     for i in 0..6 {
-    //         if est.covar[(i, i)] < 0.0 {
-    //             println!(
-    //                 "covar diagonal element negative @ [{}, {}] = {:.3e}: @{} (#{}) -- issue #164",
-    //                 i,
-    //                 i,
-    //                 est.covar[(i, i)],
-    //                 truth_state.dt.as_gregorian_tai_str(),
-    //                 odp.estimates.len() - offset,
-    //             );
-    //         }
-    //     }
-    // }
-
-    // let cntf = odp.estimates.len() as f64;
-    // println!(
-    //     "\nPos. better: {}/{}\tVel. better: {}/{}\nPre-iteration  avr. RSS:\t{:.3e}\t{:.3e}\nPost-iteration avr. RSS:\t{:.3e}\t{:.3e}\n",
-    //     num_pos_ok,
-    //     odp.estimates.len(),
-    //     num_vel_ok,
-    //     odp.estimates.len(),
-    //     rss_pos_avr / cntf,
-    //     rss_vel_avr / cntf,
-    //     rss_pos_avr_it / cntf,
-    //     rss_vel_avr_it / cntf,
-    // );
-
-    // // For the CKF, the average RSS errors are expected to be better or on the same order of magnitude.
-    // assert!(
-    //     rss_pos_avr_it.log10().floor() - rss_pos_avr.log10().floor() < 2.0,
-    //     "Average RSS position error more than two orders of magnitude worse"
-    // );
-    // assert!(
-    //     rss_vel_avr_it.log10().floor() - rss_vel_avr.log10().floor() < 2.0,
-    //     "Average RSS velocity error more than two orders of magnitude worse"
-    // );
+    let rmag_err = (final_truth_state - &est.state()).rmag();
+    assert!(
+        rmag_err < 1e-2,
+        "final radius error should be on meter level (is instead {:.3} m)",
+        rmag_err * 1e3
+    );
 }
