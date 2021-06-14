@@ -697,7 +697,7 @@ fn xhat_dev_test_ekf_realistic() {
 
     assert_eq!(
         truth_states.len(),
-        odp.estimates.len() - 1,
+        odp.estimates.len(),
         "different number of estimates"
     );
 }
