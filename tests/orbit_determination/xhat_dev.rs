@@ -524,19 +524,8 @@ fn xhat_dev_test_ekf_harmonics() {
             );
         }
     }
-    for i in 0..6 {
-        if i < 3 {
-            assert!(
-                est.covar[(i, i)] < covar_radius,
-                "covar radius did not decrease"
-            );
-        } else {
-            assert!(
-                est.covar[(i, i)] < covar_velocity,
-                "covar velocity did not decrease"
-            );
-        }
-    }
+
+    assert!(est.within_3sigma(), "Final estimate is not within 3 sigma!");
 
     assert_eq!(
         final_truth_state.dt,
