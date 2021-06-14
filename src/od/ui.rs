@@ -118,7 +118,6 @@ impl TryFrom<SmoothingArc> for IterationConf {
     fn try_from(smoother: SmoothingArc) -> Result<Self, Self::Error> {
         Ok(Self {
             smoother,
-            max_iterations: 1,
             force_failure: false,
             ..Default::default()
         })
