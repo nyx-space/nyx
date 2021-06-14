@@ -170,12 +170,6 @@ fn od_robust_test_ekf_realistic() {
         "final radius error should be less than 500 m (is instead {:.3} m)",
         rmag_err * 1e3
     );
-
-    assert_eq!(
-        truth_states.len(),
-        odp.estimates.len() - 1,
-        "different number of estimates"
-    );
 }
 
 #[allow(clippy::identity_op)]
