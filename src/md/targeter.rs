@@ -395,9 +395,8 @@ where
         let start_instant = Instant::now();
 
         for it in 0..=self.iterations {
-            // Modify each variable by 0.0001, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
-            let mut cur_xi = xi;
-            cur_xi.enable_traj_stm();
+            // Modify each variable by the perturbation, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
+            let cur_xi = xi;
             let xf = self.prop.with(cur_xi).until_epoch(achievement_epoch)?;
 
             let xf_dual_obj_frame = match &self.objective_frame {
@@ -420,7 +419,7 @@ where
             };
 
             // Build debugging information
-            let mut objmsg = Vec::new();
+            let mut objmsg = Vec::with_capacity(self.objectives.len());
 
             // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
             // As such, it includes the STM of that variable for the whole propagation arc.
@@ -742,7 +741,7 @@ where
 
         for it in 0..=self.iterations {
             // Now, enable the trajectory STM for this state so we can apply the correction
-            xi.enable_stm();
+            xi.enable_traj_stm();
 
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
             // Diagonal of the STM of the trajectory (will include the frame change if needed)
@@ -823,8 +822,6 @@ where
                     partial_vec[i] = *val;
                 }
                 // Multiply its transpose by the STM and extract the data
-                let mut stm_prev = xf.stm();
-                stm_prev.try_inverse_mut();
                 let obj_jac = -xf.stm() * partial_vec;
                 println!("{}", obj_jac);
                 for (j, var) in self.variables.iter().enumerate() {
