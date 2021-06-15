@@ -20,15 +20,71 @@ extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate prost;
 
+pub use self::xb::Xb;
+use self::xb::{Ephemeris, Epoch as XbEpoch};
+pub use crate::celestia::{Frame, GuidanceMode, Orbit, Spacecraft, StmKind};
+use crate::dimensions::allocator::Allocator;
+use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
+pub use crate::errors::NyxError;
+use crate::time::{Duration, Epoch, TimeUnit, SECONDS_PER_DAY};
 use std::convert::TryFrom;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::time::Instant;
 
-pub use self::xb::Xb;
-use self::xb::{Ephemeris, Epoch as XbEpoch};
-pub use crate::errors::NyxError;
-use crate::time::{Epoch, TimeUnit, SECONDS_PER_DAY};
+/// A trait allowing for something to have an epoch
+pub trait TimeTagged {
+    /// Retrieve the Epoch
+    fn epoch(&self) -> Epoch;
+    /// Set the Epoch
+    fn set_epoch(&mut self, epoch: Epoch);
+
+    /// Shift this epoch by a duration (can be negative)
+    fn shift_by(&mut self, duration: Duration) {
+        self.set_epoch(self.epoch() + duration);
+    }
+}
+
+/// A trait for generate propagation and estimation state.
+/// The first parameter is the size of the state, the second is the size of the propagated state including STM and extra items.
+pub trait State:
+    TimeTagged + Copy + Clone + PartialEq + fmt::Display + fmt::LowerExp + Send + Sync
+where
+    Self: Sized,
+    DefaultAllocator: Allocator<f64, Self::Size>
+        + Allocator<f64, Self::Size, Self::Size>
+        + Allocator<f64, Self::VecLength>,
+{
+    /// Size of the state and its STM
+    type Size: DimName;
+    type VecLength: DimName;
+    /// Initialize an empty state
+    fn zeros() -> Self;
+
+    /// Return this state as a vector for the propagation/estimation
+    fn as_vector(&self) -> Result<OVector<f64, Self::VecLength>, NyxError>;
+
+    /// Return this state as a vector for the propagation/estimation
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError>;
+
+    /// Set this state
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
+        -> Result<(), NyxError>;
+
+    /// Reconstruct a new State from the provided delta time in seconds compared to the current state
+    /// and with the provided vector.
+    fn ctor_from(self, delta_t_s: f64, vector: &OVector<f64, Self::VecLength>) -> Self
+    where
+        DefaultAllocator: Allocator<f64, Self::VecLength>,
+    {
+        let mut me = self;
+        me.set(me.epoch() + delta_t_s, vector).unwrap();
+        me
+    }
+
+    fn add(self, other: OVector<f64, Self::Size>) -> Self;
+}
 
 impl XbEpoch {
     /// Returns the epoch as a raw f64, allows for speed ups if you know what is the stored time system

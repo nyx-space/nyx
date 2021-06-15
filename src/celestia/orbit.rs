@@ -24,7 +24,9 @@ use self::approx::{abs_diff_eq, relative_eq};
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
+use super::State;
 use super::{BPlane, Frame};
+use crate::dimensions::{Const, OVector};
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
 use crate::{NyxError, TimeTagged};
@@ -1602,5 +1604,110 @@ impl fmt::UpperHex for Orbit {
             format!("{:.*e}", decimals, self.aop()),
             format!("{:.*e}", decimals, self.ta()),
         )
+    }
+}
+
+/// Implementation of Orbit as a State for orbital dynamics with STM
+impl State for Orbit {
+    type Size = Const<6>;
+    type VecLength = Const<42>;
+
+    /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
+    fn zeros() -> Self {
+        let frame = Frame::Celestial {
+            gm: 1.0,
+            ephem_path: [None, None, None],
+            frame_path: [None, None, None],
+        };
+
+        Self {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            vx: 0.0,
+            vy: 0.0,
+            vz: 0.0,
+            dt: Epoch::from_tai_seconds(0.0),
+            frame,
+            stm: Some(Matrix6::identity()),
+            stm_kind: StmKind::Step,
+        }
+    }
+
+    fn as_vector(&self) -> Result<OVector<f64, Const<42>>, NyxError> {
+        let mut as_vec = OVector::<f64, Const<42>>::zeros();
+        as_vec[0] = self.x;
+        as_vec[1] = self.y;
+        as_vec[2] = self.z;
+        as_vec[3] = self.vx;
+        as_vec[4] = self.vy;
+        as_vec[5] = self.vz;
+        let mut stm_idx = 6;
+        if let Some(stm) = self.stm {
+            for i in 0..6 {
+                for j in 0..6 {
+                    as_vec[stm_idx] = stm[(i, j)];
+                    stm_idx += 1;
+                }
+            }
+        }
+        Ok(as_vec)
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) -> Result<(), NyxError> {
+        self.set_epoch(epoch);
+        self.x = vector[0];
+        self.y = vector[1];
+        self.z = vector[2];
+        self.vx = vector[3];
+        self.vy = vector[4];
+        self.vz = vector[5];
+        // And update the STM if applicable
+        match self.stm_kind {
+            StmKind::Step => {
+                let mut stm_prev = self.stm.unwrap();
+                let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
+
+                if !stm_prev.try_inverse_mut() {
+                    error!("STM not invertible: {}", stm_prev);
+                    return Err(NyxError::SingularStateTransitionMatrix);
+                }
+                self.stm = Some(stm_k_to_0 * stm_prev);
+            }
+            StmKind::Traj => {
+                let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
+                self.stm = Some(stm_k_to_0)
+            }
+            StmKind::Unset => {}
+        };
+        Ok(())
+    }
+
+    fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
+        match self.stm {
+            Some(stm) => Ok(stm),
+            None => Err(NyxError::StateTransitionMatrixUnset),
+        }
+    }
+
+    fn add(self, other: OVector<f64, Self::Size>) -> Self {
+        self + other
+    }
+}
+
+impl Add<OVector<f64, Const<6>>> for Orbit {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: OVector<f64, Const<6>>) -> Self {
+        let mut me = self;
+        me.x += other[0];
+        me.y += other[1];
+        me.z += other[2];
+        me.vx += other[3];
+        me.vy += other[4];
+        me.vz += other[5];
+
+        me
     }
 }

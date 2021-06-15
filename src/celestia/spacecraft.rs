@@ -16,11 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{Orbit, StmKind};
-use crate::dimensions::Matrix6;
+use super::{Orbit, State, StmKind, TimeTagged};
+use crate::dimensions::{Const, Matrix6, OMatrix, OVector, Vector1};
 use crate::dynamics::thrustctrl::Thruster;
+use crate::errors::NyxError;
+use crate::time::Epoch;
 use crate::utils::rss_orbit_errors;
 use std::fmt;
+use std::ops::Add;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GuidanceMode {
@@ -296,5 +299,108 @@ impl fmt::UpperHex for Spacecraft {
             format!("{:.*X}", decimals, self.orbit),
             format!("{:.*e}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
         )
+    }
+}
+
+impl TimeTagged for Spacecraft {
+    fn epoch(&self) -> Epoch {
+        self.orbit.dt
+    }
+
+    fn set_epoch(&mut self, epoch: Epoch) {
+        self.orbit.dt = epoch
+    }
+}
+
+impl State for Spacecraft {
+    type Size = Const<7>;
+    type VecLength = Const<43>;
+
+    fn zeros() -> Self {
+        Self {
+            orbit: Orbit::zeros(),
+            dry_mass_kg: 0.0,
+            fuel_mass_kg: 0.0,
+            srp_area_m2: 0.0,
+            drag_area_m2: 0.0,
+            cr: 0.0,
+            cd: 0.0,
+            thruster: None,
+            mode: GuidanceMode::Coast,
+        }
+    }
+
+    fn as_vector(&self) -> Result<OVector<f64, Const<43>>, NyxError> {
+        let orb_vec: OVector<f64, Const<42>> = self.orbit.as_vector()?;
+        Ok(OVector::<f64, Const<43>>::from_iterator(
+            orb_vec
+                .iter()
+                .chain(Vector1::new(self.fuel_mass_kg).iter())
+                .cloned(),
+        ))
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<43>>) -> Result<(), NyxError> {
+        self.set_epoch(epoch);
+        let orbit_vec = vector.fixed_rows::<42>(0).into_owned();
+        self.orbit.set(epoch, &orbit_vec)?;
+        self.fuel_mass_kg = vector[43 - 1];
+        Ok(())
+    }
+
+    /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
+    fn stm(&self) -> Result<OMatrix<f64, Const<7>, Const<7>>, NyxError> {
+        match self.orbit.stm {
+            Some(stm) => {
+                let mut rtn = OMatrix::<f64, Const<7>, Const<7>>::zeros();
+                for i in 0..6 {
+                    for j in 0..6 {
+                        rtn[(i, j)] = stm[(i, j)];
+                    }
+                }
+                rtn[(6, 6)] = 0.0;
+                Ok(rtn)
+            }
+            None => Err(NyxError::StateTransitionMatrixUnset),
+        }
+    }
+
+    fn add(self, other: OVector<f64, Self::Size>) -> Self {
+        self + other
+    }
+}
+
+impl Add<OVector<f64, Const<7>>> for Spacecraft {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: OVector<f64, Const<7>>) -> Self {
+        let mut me = self;
+        me.orbit.x += other[0];
+        me.orbit.y += other[1];
+        me.orbit.z += other[2];
+        me.orbit.vx += other[3];
+        me.orbit.vy += other[4];
+        me.orbit.vz += other[5];
+        me.fuel_mass_kg += other[6];
+
+        me
+    }
+}
+
+impl Add<OVector<f64, Const<6>>> for Spacecraft {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: OVector<f64, Const<6>>) -> Self {
+        let mut me = self;
+        me.orbit.x += other[0];
+        me.orbit.y += other[1];
+        me.orbit.z += other[2];
+        me.orbit.vx += other[3];
+        me.orbit.vy += other[4];
+        me.orbit.vz += other[5];
+
+        me
     }
 }

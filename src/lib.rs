@@ -75,5 +75,4 @@ pub mod dimensions {
 
 /// Re-export some useful things
 mod state;
-pub use self::celestia::{Orbit, Spacecraft};
-pub use self::state::{State, TimeTagged};
+pub use self::celestia::{Orbit, Spacecraft, State, TimeTagged};

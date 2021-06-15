@@ -23,9 +23,8 @@ use crate::celestia::Spacecraft;
 use crate::dimensions::{DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U43, U6, U7};
 use crate::dynamics::Hyperdual;
 use crate::errors::NyxError;
-use crate::state::State;
 use crate::time::TimeUnit;
-use crate::TimeTagged;
+use crate::{State, TimeTagged};
 use std::fmt;
 use std::sync::Arc;
 
