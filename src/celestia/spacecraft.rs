@@ -348,6 +348,7 @@ impl State for Spacecraft {
         Ok(())
     }
 
+    /// diag(STM) = [X,Y,Z,Vx,Vy,Vz,Cr,Cd,Fuel]
     /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
     fn stm(&self) -> Result<OMatrix<f64, Const<7>, Const<7>>, NyxError> {
         match self.orbit.stm {
@@ -358,7 +359,8 @@ impl State for Spacecraft {
                         rtn[(i, j)] = stm[(i, j)];
                     }
                 }
-                rtn[(6, 6)] = 0.0;
+                // TODO Add STM of Cr and Cd
+                rtn[(9, 9)] = 0.0;
                 Ok(rtn)
             }
             None => Err(NyxError::StateTransitionMatrixUnset),
@@ -400,6 +402,26 @@ impl Add<OVector<f64, Const<6>>> for Spacecraft {
         me.orbit.vx += other[3];
         me.orbit.vy += other[4];
         me.orbit.vz += other[5];
+
+        me
+    }
+}
+
+impl Add<OVector<f64, Const<9>>> for Spacecraft {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: OVector<f64, Const<9>>) -> Self {
+        let mut me = self;
+        me.orbit.x += other[0];
+        me.orbit.y += other[1];
+        me.orbit.z += other[2];
+        me.orbit.vx += other[3];
+        me.orbit.vy += other[4];
+        me.orbit.vz += other[5];
+        me.fuel_mass_kg += other[6];
+        me.cr += other[7];
+        me.cd += other[8];
 
         me
     }
