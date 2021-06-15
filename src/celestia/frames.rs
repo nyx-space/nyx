@@ -185,7 +185,7 @@ impl fmt::Display for Frame {
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
+            Frame::Celestial { gm, .. } => {
                 write!(
                     f,
                     "{} {} (μ = {:.06} km^3/s^2)",
@@ -196,7 +196,26 @@ impl fmt::Debug for Frame {
                         3 => "IAU Poles Fixed".to_string(),
                         _ => "Custom".to_string(),
                     },
-                    self.gm()
+                    gm,
+                )
+            }
+            Frame::Geoid {
+                gm,
+                equatorial_radius,
+                ..
+            } => {
+                write!(
+                    f,
+                    "{} {} (μ = {:.06} km^3/s^2 , r = {:.06} km)",
+                    Bodies::try_from(self.ephem_path()).unwrap().name(),
+                    match self.frame_path().len() {
+                        0 | 1 => "J2000".to_string(),
+                        2 => "IAU Fixed".to_string(),
+                        3 => "IAU Poles Fixed".to_string(),
+                        _ => "Custom".to_string(),
+                    },
+                    gm,
+                    equatorial_radius,
                 )
             }
             othframe => write!(f, "{:?}", othframe),

@@ -2099,4 +2099,9 @@ mod tests {
             "error greater than expected"
         );
     }
+
+    #[test]
+    fn debug_cosm() {
+        dbg!(Cosm::de438());
+    }
 }
