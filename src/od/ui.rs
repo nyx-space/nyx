@@ -29,9 +29,11 @@ pub use super::*;
 
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
-use crate::time::Duration;
+pub use crate::time::{Duration, TimeUnit};
 use crate::State;
 
+use std::convert::TryFrom;
+use std::default::Default;
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Add;
@@ -53,11 +55,72 @@ pub enum SmoothingArc {
 impl fmt::Display for SmoothingArc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            SmoothingArc::All => write!(f, "all estimates smoothed"),
+            SmoothingArc::All => write!(f, "all estimates"),
             SmoothingArc::Epoch(e) => write!(f, "{}", e),
             SmoothingArc::TimeGap(g) => write!(f, "time gap of {}", g),
             SmoothingArc::Prediction => write!(f, "first prediction"),
         }
+    }
+}
+
+/// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
+/// The root mean squared of the postfit residuals is used to assess convergence between iterations.
+#[derive(Clone, Copy, Debug)]
+pub struct IterationConf {
+    /// The number of measurements to account for in the iteration
+    pub smoother: SmoothingArc,
+    /// The absolute tolerance of the RMS postfit residual
+    pub absolute_tol: f64,
+    /// The relative tolerance between the latest RMS postfit residual and the best RMS postfit residual so far
+    pub relative_tol: f64,
+    /// The maximum number of iterations to allow (will raise an error if the filter has not converged after this many iterations)
+    pub max_iterations: usize,
+    /// The maximum number of subsequent divergences in RMS.
+    pub max_divergences: usize,
+    /// Set to true to force an ODP failure when the convergence criteria is not met
+    pub force_failure: bool,
+    /// Set to true to use the RMS prefit instead of postfit
+    pub use_prefit: bool,
+}
+
+impl Default for IterationConf {
+    /// The default absolute tolerance is 1e-2 (calibrated on an EKF with error).
+    fn default() -> Self {
+        Self {
+            smoother: SmoothingArc::All,
+            absolute_tol: 1e-2,
+            relative_tol: 1e-3,
+            max_iterations: 15,
+            max_divergences: 3,
+            force_failure: false,
+            use_prefit: false,
+        }
+    }
+}
+
+impl fmt::Display for IterationConf {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let kind = if self.use_prefit { "prefit" } else { "postfit" };
+        write!(f, "Iterate {} residuals until abs = {:.2e}, or rel = {:.2e}, or {} iterations, or {} subsequent divergences with smoothing condition of {}",
+            kind,
+            self.absolute_tol,
+            self.relative_tol,
+            self.max_iterations,
+            self.max_divergences,
+            self.smoother)
+    }
+}
+
+impl TryFrom<SmoothingArc> for IterationConf {
+    type Error = NyxError;
+
+    /// Converts a smoother into an interation configuration to iterate just once without failing
+    fn try_from(smoother: SmoothingArc) -> Result<Self, Self::Error> {
+        Ok(Self {
+            smoother,
+            force_failure: false,
+            ..Default::default()
+        })
     }
 }
 
@@ -190,26 +253,46 @@ where
     ///
     /// Estimates must be ordered in chronological order. This function will smooth the
     /// estimates from the last in the list to the first one.
-    pub fn smooth(&mut self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, NyxError> {
+    pub fn smooth(&self, condition: SmoothingArc) -> Result<Vec<K::Estimate>, NyxError> {
         let l = self.estimates.len() - 1;
-        let mut k = l - 1;
 
         info!("Smoothing {} estimates until {}", l + 1, condition);
-        let mut smoothed = Vec::with_capacity(l + 1);
+        let mut smoothed = Vec::with_capacity(self.estimates.len());
         // Set the first item of the smoothed estimates to the last estimate (we cannot smooth the very last estimate)
-        smoothed.push(self.estimates[k + 1].clone());
+        smoothed.push(self.estimates.last().unwrap().clone());
 
         loop {
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &smoothed[l - k - 1];
+            let sm_est_kp1 = &self.estimates[l - smoothed.len() + 1].clone();
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
-            let est_k = &self.estimates[k];
+            let est_k = &self.estimates[l - smoothed.len()];
             let x_k_k = &est_k.state_deviation();
             let p_k_k = &est_k.covar();
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
-            let est_kp1 = &self.estimates[k + 1];
+            let est_kp1 = &self.estimates[l - smoothed.len() + 1];
+
+            // Check the smoother stopping condition
+            match condition {
+                SmoothingArc::Epoch(e) => {
+                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
+                    if est_kp1.epoch() < e {
+                        break;
+                    }
+                }
+                SmoothingArc::TimeGap(gap_s) => {
+                    if est_k.epoch() - est_kp1.epoch() > gap_s {
+                        break;
+                    }
+                }
+                SmoothingArc::Prediction => {
+                    if est_kp1.predicted() {
+                        break;
+                    }
+                }
+                SmoothingArc::All => {}
+            }
 
             let phi_kp1_k = est_kp1.stm();
             // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
@@ -231,43 +314,21 @@ where
             smoothed_est_k.set_covar(p_k_l);
             // Move on
             smoothed.push(smoothed_est_k);
-            if k == 0 {
+            if smoothed.len() == self.estimates.len() {
                 break;
-            }
-            k -= 1;
-            // Check the smoother stopping condition
-            let next_est = &self.estimates[k];
-            match condition {
-                SmoothingArc::Epoch(e) => {
-                    // If the epoch of the next estimate is _before_ the stopping time, stop smoothing
-                    if next_est.epoch() < e {
-                        break;
-                    }
-                }
-                SmoothingArc::TimeGap(gap_s) => {
-                    if est_k.epoch() - next_est.epoch() > gap_s {
-                        break;
-                    }
-                }
-                SmoothingArc::Prediction => {
-                    if next_est.predicted() {
-                        break;
-                    }
-                }
-                SmoothingArc::All => {}
             }
         }
 
         info!(
-            "Condition reached after smoothing {} estimates ",
+            "Smoothing condition reached after {} estimates ",
             smoothed.len()
         );
 
         // Now, let's add all of the other estimates so that the same indexing can be done
         // between all the estimates and the smoothed estimates
-        if k > 0 {
-            // Add the estimate that might have been skipped.
-            // smoothed.push(self.estimates[k + 1].clone());
+        if smoothed.len() < self.estimates.len() {
+            // Add the estimates that might have been skipped.
+            let mut k = self.estimates.len() - smoothed.len();
             loop {
                 smoothed.push(self.estimates[k].clone());
                 if k == 0 {
@@ -282,22 +343,137 @@ where
         Ok(smoothed)
     }
 
+    /// Returns the root mean square of the prefit residuals
+    pub fn rms_prefit_residual(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in &self.residuals {
+            // sum += residual.prefit.dot(&residual.prefit);
+            let mut msr_noise_item_inv = self.kf.measurement_noise(residual.dt).diagonal().clone();
+            msr_noise_item_inv.apply(|m| 1.0 / m);
+            sum += residual.prefit.dot(&msr_noise_item_inv).powi(2);
+        }
+        (sum / (self.estimates.len() as f64)).sqrt()
+    }
+
+    /// Returns the root mean square of the postfit residuals
+    pub fn rms_postfit_residual(&self) -> f64 {
+        let mut sum = 0.0;
+        for residual in &self.residuals {
+            sum += residual.postfit.dot(&residual.postfit);
+        }
+        (sum / (self.estimates.len() as f64)).sqrt()
+    }
+
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate(
-        &mut self,
-        measurements: &[Msr],
-        condition: SmoothingArc,
-    ) -> Result<(), NyxError> {
-        // First, smooth the estimates
-        let smoothed = self.smooth(condition)?;
-        // Reset the propagator
-        self.prop.state = self.init_state;
-        // Empty the estimates and add the first smoothed estimate as the initial estimate
-        self.estimates = Vec::with_capacity(measurements.len());
-        self.estimates.push(smoothed[0].clone());
-        self.kf.set_previous_estimate(&smoothed[0]);
-        // And re-run the filter
-        self.process_measurements(measurements)
+    pub fn iterate(&mut self, measurements: &[Msr], config: IterationConf) -> Result<(), NyxError> {
+        // Compute the initial RMS
+        let mut best_rms = if config.use_prefit {
+            self.rms_prefit_residual()
+        } else {
+            self.rms_postfit_residual()
+        };
+        let mut previous_rms = best_rms;
+        let mut divergence_cnt = 0;
+        let mut iter_cnt = 0;
+        loop {
+            if best_rms <= config.absolute_tol {
+                info!("*****************");
+                info!("*** CONVERGED ***");
+                info!("*****************");
+
+                info!(
+                    "Filter converged to absolute tolerance ({:.2e} < {:.2e}) after {} iterations",
+                    best_rms, config.absolute_tol, iter_cnt
+                );
+                return Ok(());
+            }
+
+            iter_cnt += 1;
+
+            info!("***************************");
+            info!("*** Iteration number {} ***", iter_cnt);
+            info!("***************************");
+
+            // First, smooth the estimates
+            let smoothed = self.smooth(config.smoother)?;
+            // Reset the propagator
+            self.prop.state = self.init_state;
+            // Empty the estimates and add the first smoothed estimate as the initial estimate
+            self.estimates = Vec::with_capacity(measurements.len());
+            self.estimates.push(smoothed[0].clone());
+            self.kf.set_previous_estimate(&smoothed[0]);
+            // And re-run the filter
+            self.process_measurements(measurements)?;
+
+            // Compute the new RMS
+            let new_rms = if config.use_prefit {
+                self.rms_prefit_residual()
+            } else {
+                self.rms_postfit_residual()
+            };
+            let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
+            if cur_rel_rms < config.relative_tol {
+                info!("*****************");
+                info!("*** CONVERGED ***");
+                info!("*****************");
+                info!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    new_rms, previous_rms, best_rms
+                );
+                info!(
+                    "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
+                    cur_rel_rms, config.relative_tol, iter_cnt
+                );
+                return Ok(());
+            }
+
+            if new_rms > previous_rms {
+                warn!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    new_rms, previous_rms, best_rms
+                );
+                divergence_cnt += 1;
+                previous_rms = new_rms;
+                if divergence_cnt >= config.max_divergences {
+                    let msg = format!(
+                        "Filter iterations have continuously diverged {} times: {}",
+                        config.max_divergences, config
+                    );
+                    if config.force_failure {
+                        return Err(NyxError::MaxIterReached(msg));
+                    } else {
+                        error!("{}", msg);
+                        return Ok(());
+                    }
+                } else {
+                    warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
+                }
+            } else {
+                info!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    new_rms, previous_rms, best_rms
+                );
+                // Reset the counter
+                divergence_cnt = 0;
+                previous_rms = new_rms;
+                if previous_rms < best_rms {
+                    best_rms = previous_rms;
+                }
+            }
+
+            if iter_cnt >= config.max_iterations {
+                let msg = format!(
+                    "Filter has iterated {} times but failed to reach filter convergence criteria: {}",
+                    config.max_iterations, config
+                );
+                if config.force_failure {
+                    return Err(NyxError::MaxIterReached(msg));
+                } else {
+                    error!("{}", msg);
+                    return Ok(());
+                }
+            }
+        }
     }
 
     /// Allows processing all measurements with covariance mapping.
@@ -352,7 +528,7 @@ where
                         arc_warned = true;
                     }
                     // No measurement can be used here, let's just do a time update
-                    debug!("time update {}", dt);
+                    trace!("time update {}", dt);
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update
@@ -381,7 +557,7 @@ where
                                     &computed_meas.observation(),
                                 ) {
                                     Ok((est, res)) => {
-                                        debug!("msr update msr #{} {}", msr_cnt, dt);
+                                        trace!("msr update #{} @ {}", msr_cnt, dt);
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the
@@ -578,6 +754,11 @@ pub trait EkfTrigger {
     /// remain as such.
     fn disable_ekf(&mut self, _epoch: Epoch) -> bool {
         false
+    }
+
+    /// If some iteration configuration is returned, the filter will iterate with it before enabling the EKF.
+    fn interation_config(&self) -> Option<IterationConf> {
+        None
     }
 }
 

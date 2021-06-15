@@ -23,6 +23,7 @@ extern crate serde_derive;
 
 use crate::errors::NyxError;
 use crate::time::Epoch;
+use std::convert::From;
 use std::fmt;
 use std::str::FromStr;
 
@@ -68,6 +69,12 @@ pub enum ParsingError {
     Velocity(String),
     IllDefined(String),
     ExecutionError(NyxError),
+}
+
+impl From<NyxError> for ParsingError {
+    fn from(error: NyxError) -> Self {
+        Self::ExecutionError(error)
+    }
 }
 
 /// Specifies the format of the Epoch during serialization

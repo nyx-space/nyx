@@ -1225,6 +1225,22 @@ impl Orbit {
         }
     }
 
+    /// Returns a 6x6 DCM to convert to this inertial state.
+    /// WARNING: This DCM does NOT contain the corrections needed for the transport theorem, and therefore the velocity rotation is wrong.
+    pub fn dcm6x6_from_traj_frame(&self, from: Frame) -> Result<Matrix6<f64>, NyxError> {
+        let dcm3x3 = self.dcm_from_traj_frame(from)?;
+
+        let mut dcm = Matrix6::zeros();
+        for i in 0..3 {
+            for j in 0..3 {
+                dcm[(i, j)] = dcm3x3[(i, j)];
+                dcm[(i + 3, j + 3)] = dcm3x3[(i, j)];
+            }
+        }
+
+        Ok(dcm)
+    }
+
     /// Apply the provided delta-v (in km/s)
     pub fn apply_dv(&mut self, dv: Vector3<f64>) {
         self.vx += dv[0];

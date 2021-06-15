@@ -251,11 +251,13 @@ impl<'a> OdpScenario<'a> {
                                     warn!("No SNC disable time specified, assuming 120 seconds");
                                     2 * TimeUnit::Minute
                                 }
-                                // Some(snd_disable_dt) => parse_duration(snd_disable_dt)?.v(),
                                 Some(snc_disable_dt) => match Duration::from_str(snc_disable_dt) {
                                     Ok(d) => d,
                                     Err(e) => {
-                                        return Err(ParsingError::IllDefined(format!("{}", e)))
+                                        return Err(ParsingError::IllDefined(format!(
+                                            "When parsing SNC duration: {}",
+                                            e
+                                        )))
                                     }
                                 },
                             };
@@ -276,6 +278,8 @@ impl<'a> OdpScenario<'a> {
                                     SNC3::with_decay(disable_time, snc, &scn_decay_s)
                                 }
                             };
+
+                            info!("Using SNC: {}", process_noise);
 
                             // And build the filter
                             KF::new(initial_estimate, process_noise, measurement_noise)
@@ -300,7 +304,7 @@ impl<'a> OdpScenario<'a> {
                                     output
                                 )))
                             }
-                            Some(output) => Some(output.to_nav_sol_formatter(cosm)),
+                            Some(output) => Some(output.to_nav_sol_formatter(cosm)?),
                         },
                         None => None,
                     };
@@ -420,6 +424,8 @@ impl<'a> OdpScenario<'a> {
         let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), false, 100_000, trig);
 
         odp.process_measurements(&sim_measurements)?;
+
+        odp.iterate(&sim_measurements, IterationConf::default())?;
 
         // Save to output file if requested
         // Create the output file
