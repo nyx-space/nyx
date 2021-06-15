@@ -289,7 +289,7 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     );
 
     println!(
-        "Initial state after iteration: \n{:o}",
+        "Initial state after iteration: \n{:x}",
         odp.estimates[0].state()
     );
 }

@@ -26,7 +26,7 @@ fn srp_earth_full_vis() {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -76,7 +76,7 @@ fn srp_earth_leo() {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -126,7 +126,7 @@ fn srp_earth_meo_ecc_inc() {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -177,7 +177,7 @@ fn exp_drag_earth() {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
@@ -210,7 +210,7 @@ fn std_atm_drag_earth() {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
@@ -265,7 +265,7 @@ fn std_atm_drag_earth_low() {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 

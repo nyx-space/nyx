@@ -1511,40 +1511,96 @@ impl Serialize for Orbit {
 }
 
 impl fmt::Display for Orbit {
-    // Prints the Keplerian orbital elements with units
+    // Prints as Cartesian in floating point with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "[{}] {}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
-            self.frame, self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
+            "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
+            self.frame,
+            self.dt,
+            format!("{:.*}", decimals, self.x),
+            format!("{:.*}", decimals, self.y),
+            format!("{:.*}", decimals, self.z),
+            format!("{:.*}", decimals, self.vx),
+            format!("{:.*}", decimals, self.vy),
+            format!("{:.*}", decimals, self.vz)
         )
     }
 }
 
 impl fmt::LowerExp for Orbit {
+    // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "[{}] {}\tposition = [{:e}, {:e}, {:e}] km\tvelocity = [{:e}, {:e}, {:e}] km/s",
-            self.frame, self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
+            "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
+            self.frame,
+            self.dt,
+            format!("{:.*e}", decimals, self.x),
+            format!("{:.*e}", decimals, self.y),
+            format!("{:.*e}", decimals, self.z),
+            format!("{:.*e}", decimals, self.vx),
+            format!("{:.*e}", decimals, self.vy),
+            format!("{:.*e}", decimals, self.vz)
         )
     }
 }
 
-impl fmt::Octal for Orbit {
-    // Prints the Keplerian orbital elements with units
+impl fmt::UpperExp for Orbit {
+    // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "[{}] {}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
+            "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
             self.dt,
-            self.sma(),
-            self.ecc(),
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta()
+            format!("{:.*E}", decimals, self.x),
+            format!("{:.*E}", decimals, self.y),
+            format!("{:.*E}", decimals, self.z),
+            format!("{:.*E}", decimals, self.vx),
+            format!("{:.*E}", decimals, self.vy),
+            format!("{:.*E}", decimals, self.vz)
+        )
+    }
+}
+
+impl fmt::LowerHex for Orbit {
+    // Prints the Keplerian orbital elements in floating point with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
+        write!(
+            f,
+            "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
+            self.frame,
+            self.dt,
+            format!("{:.*}", decimals, self.sma()),
+            format!("{:.*}", decimals, self.ecc()),
+            format!("{:.*}", decimals, self.inc()),
+            format!("{:.*}", decimals, self.raan()),
+            format!("{:.*}", decimals, self.aop()),
+            format!("{:.*}", decimals, self.ta()),
+        )
+    }
+}
+
+impl fmt::UpperHex for Orbit {
+    // Prints the Keplerian orbital elements in scientific notation with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
+        write!(
+            f,
+            "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
+            self.frame,
+            self.dt,
+            format!("{:.*e}", decimals, self.sma()),
+            format!("{:.*e}", decimals, self.ecc()),
+            format!("{:.*e}", decimals, self.inc()),
+            format!("{:.*e}", decimals, self.raan()),
+            format!("{:.*e}", decimals, self.aop()),
+            format!("{:.*e}", decimals, self.ta()),
         )
     }
 }

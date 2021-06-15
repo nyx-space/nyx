@@ -215,12 +215,12 @@ impl ThrustControl for Ruggiero {
     fn next(&self, sc: &Spacecraft) -> GuidanceMode {
         if self.throttle(sc) > 0.0 {
             if sc.mode == GuidanceMode::Coast {
-                info!("enabling control: {:o}", sc.orbit);
+                info!("enabling control: {:x}", sc.orbit);
             }
             GuidanceMode::Thrust
         } else {
             if sc.mode == GuidanceMode::Thrust {
-                info!("disabling control: {:o}", sc.orbit);
+                info!("disabling control: {:x}", sc.orbit);
             }
             GuidanceMode::Coast
         }

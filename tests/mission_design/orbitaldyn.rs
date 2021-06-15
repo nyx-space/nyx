@@ -50,7 +50,7 @@ fn val_two_body_dynamics() {
     prop.for_duration(-prop_time).unwrap();
     let (err_r, err_v) =
         rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &state.to_cartesian_vec());
-    println!("RTN:  {}\nINIT: {}\n{:o}", prop.state, state, state);
+    println!("RTN:  {}\nINIT: {}\n{:x}", prop.state, state, state);
     dbg!(err_r);
     assert!(
         err_r < 1e-5,
@@ -972,7 +972,7 @@ fn hf_prop() {
         .for_duration(30.0 * TimeUnit::Day)
         .unwrap();
 
-    println!("{}\n{:o}", rslt, rslt);
+    println!("{}\n{:x}", rslt, rslt);
 }
 
 #[test]

@@ -35,7 +35,7 @@ fn event_tracker_true_anomaly() {
         let found_events = traj.find_all(e).unwrap();
         let pretty = found_events
             .iter()
-            .map(|orbit| format!("{:o}\tevent value: {}\n", orbit, e.eval(orbit)))
+            .map(|orbit| format!("{:x}\tevent value: {}\n", orbit, e.eval(orbit)))
             .collect::<String>();
         println!("[ta_tracker] {} =>\n{}", e, pretty);
     }
@@ -65,7 +65,7 @@ fn event_tracker_true_anomaly() {
     for state in traj.every(10 * TimeUnit::Second) {
         let new_e_state = e_loc.compute(&state);
         if e_state != new_e_state {
-            println!("{:o}\t{}", state, new_e_state);
+            println!("{:x}\t{}", state, new_e_state);
             e_state = new_e_state;
         }
 
@@ -92,7 +92,7 @@ fn event_tracker_true_anomaly() {
         .iter()
         .map(|orbit| {
             format!(
-                "{:o}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
                 &e_loc.compute(
@@ -117,7 +117,7 @@ fn event_tracker_true_anomaly() {
         .iter()
         .map(|orbit| {
             format!(
-                "{:o}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
                 &e_loc.compute(

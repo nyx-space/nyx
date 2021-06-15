@@ -274,7 +274,7 @@ fn multi_body_ckf_covar_map() {
     let nav_traj = odp.to_nav_traj().unwrap();
     let aop_event = Event::apoapsis();
     for found_event in nav_traj.find_all(&aop_event).unwrap() {
-        println!("{:o}", found_event);
+        println!("{:x}", found_event);
         assert!((found_event.ta() - 180.0).abs() < 1e-2)
     }
 }

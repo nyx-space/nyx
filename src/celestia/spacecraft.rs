@@ -241,33 +241,60 @@ impl PartialEq for Spacecraft {
 
 impl fmt::Display for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "{:o}\t{} kg",
-            self.orbit,
-            self.dry_mass_kg + self.fuel_mass_kg
+            "{}\t{} kg",
+            format!("{:.*x}", decimals, self.orbit),
+            format!("{:.*}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
         )
     }
 }
 
 impl fmt::LowerExp for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "{:o}\t{:e} kg",
-            self.orbit,
-            self.dry_mass_kg + self.fuel_mass_kg
+            "{}\t{} kg",
+            format!("{:.*e}", decimals, self.orbit),
+            format!("{:.*e}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
+        )
+    }
+}
+
+impl fmt::UpperExp for Spacecraft {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
+        write!(
+            f,
+            "{}\t{} kg",
+            format!("{:.*E}", decimals, self.orbit),
+            format!("{:.*E}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
         )
     }
 }
 
 impl fmt::LowerHex for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
             "{}\t{} kg",
-            self.orbit,
-            self.dry_mass_kg + self.fuel_mass_kg
+            format!("{:.*x}", decimals, self.orbit),
+            format!("{:.*}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
+        )
+    }
+}
+
+impl fmt::UpperHex for Spacecraft {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
+        write!(
+            f,
+            "{}\t{} kg",
+            format!("{:.*X}", decimals, self.orbit),
+            format!("{:.*e}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
         )
     }
 }

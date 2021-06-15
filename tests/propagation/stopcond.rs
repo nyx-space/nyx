@@ -69,7 +69,7 @@ fn stop_cond_3rd_peri() {
     // which the event finder will find.
     let (third_peri, _) = prop.until_event(5 * period, &peri_event, 4).unwrap();
 
-    println!("{:o}", third_peri);
+    println!("{:x}", third_peri);
     // Confirm that this is the third periapse event which is found
     // Again, the initial state is at periapse, so we don't check a N number of orbit forward.
     assert!(
@@ -128,7 +128,7 @@ fn stop_cond_nrho_apo() {
 
     let end_prop = Instant::now();
     println!(
-        "Propagated for {} in {} ms:\n{:o}",
+        "Propagated for {} in {} ms:\n{:x}",
         prop_time,
         (end_prop - start).as_millis(),
         orbit,
@@ -154,7 +154,7 @@ fn stop_cond_nrho_apo() {
     );
     for event_state in &events {
         let delta_t = event_state.epoch() - dt;
-        println!("{} after start:\n{:o}", delta_t, event_state);
+        println!("{} after start:\n{:x}", delta_t, event_state);
         assert!((event_state.ta() - 180.0).abs() < 0.1);
     }
 }
@@ -177,7 +177,7 @@ fn line_of_nodes() {
     let mut prop = setup.with(state);
     let (lon_state, _) = prop.until_event(3 * period, &lon_event, 0).unwrap();
     println!(
-        "{:o} => longitude = {} degrees",
+        "{:x} => longitude = {} degrees",
         lon_state,
         lon_state.geodetic_longitude()
     );
@@ -206,7 +206,7 @@ fn latitude() {
     let mut prop = setup.with(state);
     let (lon_state, _) = prop.until_event(3 * period, &lat_event, 0).unwrap();
     println!(
-        "{:o} => latitude = {} degrees",
+        "{:x} => latitude = {} degrees",
         lon_state,
         lon_state.geodetic_latitude()
     );
