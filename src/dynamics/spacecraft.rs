@@ -20,7 +20,7 @@ use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
 use crate::celestia::Spacecraft;
-use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U43, U6};
+use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U6, U73};
 use crate::dynamics::Hyperdual;
 use crate::errors::NyxError;
 use crate::time::TimeUnit;
@@ -167,16 +167,16 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
     fn eom(
         &self,
         delta_t: f64,
-        state: &OVector<f64, U43>,
+        state: &OVector<f64, U73>,
         ctx: &Spacecraft,
-    ) -> Result<OVector<f64, U43>, NyxError> {
+    ) -> Result<OVector<f64, U73>, NyxError> {
         // Compute the orbital dynamics
         let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
         let d_x_orbital_dyn = self
             .orbital_dyn
             .eom(delta_t, &orbital_dyn_vec, &ctx.orbit)?;
         // Note: 0.0 is the current fuel usage at this point.
-        let mut d_x = OVector::<f64, U43>::from_iterator(
+        let mut d_x = OVector::<f64, U73>::from_iterator(
             d_x_orbital_dyn
                 .iter()
                 .chain(Vector1::new(0.0).iter())
@@ -223,9 +223,9 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
             // Add the fuel mass to the total mass, minus the change in fuel
             total_mass += ctx.fuel_mass_kg + fuel_rate;
             for i in 0..3 {
-                d_x[i + 3] += thrust_force[i] / (ctx.dry_mass_kg + state[U43::dim() - 1]);
+                d_x[i + 3] += thrust_force[i] / (ctx.dry_mass_kg + state[U73::dim() - 1]);
             }
-            d_x[U43::dim() - 1] += fuel_rate;
+            d_x[U73::dim() - 1] += fuel_rate;
         }
 
         // Compute additional force models as needed.
@@ -245,6 +245,8 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, Const<9>>,
         ctx: &Self::StateType,
     ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), NyxError> {
+        // TODO Call this function from EOM above in the same way as done in orbital.rs
+        // This also means that the STM for the Spacecraft must also be copied into the spacecraft structure
         let one = Const::<1> {};
         let six = Const::<6> {};
         let pos_vel: OVector<Hyperdual<f64, Const<7>>, Const<6>> = OVector::from_iterator_generic(

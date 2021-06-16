@@ -18,7 +18,7 @@
 
 extern crate hyperdual;
 
-use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
+use self::hyperdual::{Hyperdual, Owned};
 use crate::celestia::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7, U9};
@@ -117,36 +117,6 @@ where
             + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
             + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy;
-
-    /// Computes both the state and the gradient of the dynamics. This function is pre-implemented.
-    fn eom_grad(
-        &self,
-        delta_t_s: f64,
-        state_vec: &OVector<f64, <Self::StateType as State>::Size>,
-        state_ctx: &Self::StateType,
-    ) -> Result<
-        (
-            OVector<f64, <Self::StateType as State>::Size>,
-            OMatrix<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
-        ),
-        NyxError,
-    >
-    where
-        DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>
-            + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
-            + Allocator<f64, Self::HyperdualSize>
-            + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
-        Owned<f64, Self::HyperdualSize>: Copy,
-    {
-        let hyperstate: OVector<
-            Hyperdual<f64, Self::HyperdualSize>,
-            <Self::StateType as State>::Size,
-        > = hyperspace_from_vector(&state_vec);
-
-        let (state, grad) = self.dual_eom(delta_t_s, &hyperstate, &state_ctx)?;
-
-        Ok((state, grad))
-    }
 
     /// Optionally performs some final changes after each successful integration of the equations of motion.
     /// For example, this can be used to update the GNC mode.

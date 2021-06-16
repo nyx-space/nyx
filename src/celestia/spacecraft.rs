@@ -314,7 +314,7 @@ impl TimeTagged for Spacecraft {
 
 impl State for Spacecraft {
     type Size = Const<9>;
-    type VecLength = Const<43>;
+    type VecLength = Const<73>;
 
     fn zeros() -> Self {
         Self {
@@ -330,9 +330,10 @@ impl State for Spacecraft {
         }
     }
 
-    fn as_vector(&self) -> Result<OVector<f64, Const<43>>, NyxError> {
+    fn as_vector(&self) -> Result<OVector<f64, Const<73>>, NyxError> {
+        // TODO: Extract the state vector and the STM independendly and add the STM components of Cr and Cd into it
         let orb_vec: OVector<f64, Const<42>> = self.orbit.as_vector()?;
-        Ok(OVector::<f64, Const<43>>::from_iterator(
+        Ok(OVector::<f64, Const<73>>::from_iterator(
             orb_vec
                 .iter()
                 .chain(Vector1::new(self.fuel_mass_kg).iter())
@@ -340,7 +341,7 @@ impl State for Spacecraft {
         ))
     }
 
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<43>>) -> Result<(), NyxError> {
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<73>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
         let orbit_vec = vector.fixed_rows::<42>(0).into_owned();
         self.orbit.set(epoch, &orbit_vec)?;

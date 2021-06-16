@@ -102,7 +102,9 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
         let (new_state, new_stm) = if ctx.stm.is_some() {
             // Then call the dual_eom with the correct state size
             let pos_vel = state.fixed_rows::<6>(0).into_owned();
-            let (state, grad) = self.eom_grad(delta_t_s, &pos_vel, ctx)?;
+
+            let (state, grad) = self.dual_eom(delta_t_s, &hyperspace_from_vector(&pos_vel), ctx)?;
+
             let stm_dt = ctx.stm() * grad;
             // Rebuild the STM as a vector.
             let mut stm_as_vec = OVector::<f64, U36>::zeros();
