@@ -20,7 +20,7 @@ use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
 use super::ForceModel;
 use crate::celestia::eclipse::EclipseLocator;
 use crate::celestia::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
-use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7};
+use crate::dimensions::{DimName, Matrix3, Vector3, U3, U7, U9};
 use crate::errors::NyxError;
 use std::fmt;
 use std::sync::Arc;
@@ -80,7 +80,7 @@ impl ForceModel for SolarPressure {
 
     fn dual_eom(
         &self,
-        _radius: &Vector3<Hyperdual<f64, U7>>,
+        _radius: &Vector3<Hyperdual<f64, U9>>,
         ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         let osc = &ctx.orbit;

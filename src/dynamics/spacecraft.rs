@@ -20,7 +20,7 @@ use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
 use crate::celestia::Spacecraft;
-use crate::dimensions::{DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U43, U6, U7};
+use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U43, U6};
 use crate::dynamics::Hyperdual;
 use crate::errors::NyxError;
 use crate::time::TimeUnit;
@@ -145,7 +145,7 @@ impl<'a> fmt::Display for SpacecraftDynamics<'a> {
 }
 
 impl<'a> Dynamics for SpacecraftDynamics<'a> {
-    type HyperdualSize = U7; // This implies that we are NOT computing the STM with the mass
+    type HyperdualSize = Const<9>; // The STM includes Cr and Cd but not the mass (which is assumed constant)
     type StateType = Spacecraft;
 
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
@@ -242,16 +242,26 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
     fn dual_eom(
         &self,
         delta_t_s: f64,
-        state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, U7>,
+        state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, Const<9>>,
         ctx: &Self::StateType,
-    ) -> Result<(OVector<f64, U7>, OMatrix<f64, U7, U7>), NyxError> {
-        let pos_vel = state_vec.fixed_rows::<6>(0).into_owned();
+    ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), NyxError> {
+        let one = Const::<1> {};
+        let six = Const::<6> {};
+        let pos_vel: OVector<Hyperdual<f64, Const<7>>, Const<6>> = OVector::from_iterator_generic(
+            six,
+            one,
+            state_vec
+                .fixed_rows::<6>(0)
+                .into_iter()
+                .map(|x| Hyperdual::from_slice(x.fixed_rows::<7>(0).as_slice())),
+        );
+
         let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &pos_vel, &ctx.orbit)?;
         // Rebuild the appropriately sized state and STM.
-        let mut d_x = OVector::<f64, U7>::from_iterator(
+        let mut d_x = OVector::<f64, Const<9>>::from_iterator(
             orb_state.iter().chain(Vector1::new(0.0).iter()).cloned(),
         );
-        let mut grad = OMatrix::<f64, U7, U7>::zeros();
+        let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
         for i in 0..U6::dim() {
             for j in 0..U6::dim() {
                 grad[(i, j)] = orb_grad[(i, j)];

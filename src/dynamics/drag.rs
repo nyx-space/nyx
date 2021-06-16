@@ -66,7 +66,7 @@ impl ForceModel for ConstantDrag {
 
     fn dual_eom(
         &self,
-        _radius: &Vector3<Hyperdual<f64, Const<7>>>,
+        _radius: &Vector3<Hyperdual<f64, Const<9>>>,
         _osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
@@ -175,7 +175,7 @@ impl ForceModel for Drag {
 
     fn dual_eom(
         &self,
-        _radius: &Vector3<Hyperdual<f64, Const<7>>>,
+        _radius: &Vector3<Hyperdual<f64, Const<9>>>,
         _osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)

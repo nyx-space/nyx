@@ -313,7 +313,7 @@ impl TimeTagged for Spacecraft {
 }
 
 impl State for Spacecraft {
-    type Size = Const<7>;
+    type Size = Const<9>;
     type VecLength = Const<43>;
 
     fn zeros() -> Self {
@@ -350,16 +350,18 @@ impl State for Spacecraft {
 
     /// diag(STM) = [X,Y,Z,Vx,Vy,Vz,Cr,Cd,Fuel]
     /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
-    fn stm(&self) -> Result<OMatrix<f64, Const<7>, Const<7>>, NyxError> {
+    fn stm(&self) -> Result<OMatrix<f64, Const<9>, Const<9>>, NyxError> {
         match self.orbit.stm {
             Some(stm) => {
-                let mut rtn = OMatrix::<f64, Const<7>, Const<7>>::zeros();
+                let mut rtn = OMatrix::<f64, Const<9>, Const<9>>::zeros();
                 for i in 0..6 {
                     for j in 0..6 {
                         rtn[(i, j)] = stm[(i, j)];
                     }
                 }
-                // TODO Add STM of Cr and Cd
+                // TODO Add STM of Cr and Cd (this assumes constant!)
+                rtn[(7, 7)] = 0.0;
+                rtn[(8, 8)] = 0.0;
                 rtn[(9, 9)] = 0.0;
                 Ok(rtn)
             }
@@ -419,9 +421,9 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
         me.orbit.vx += other[3];
         me.orbit.vy += other[4];
         me.orbit.vz += other[5];
-        me.fuel_mass_kg += other[6];
-        me.cr += other[7];
-        me.cd += other[8];
+        me.cr += other[6];
+        me.cd += other[7];
+        me.fuel_mass_kg += other[8];
 
         me
     }

@@ -21,7 +21,7 @@ extern crate hyperdual;
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
 use crate::celestia::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7};
+use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7, U9};
 use crate::State;
 
 use std::fmt;
@@ -166,12 +166,12 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
     fn dual_eom(
         &self,
-        radius: &Vector3<Hyperdual<f64, U7>>,
+        radius: &Vector3<Hyperdual<f64, U9>>,
         osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
 
-/// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
+/// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.
 ///
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
 pub trait AccelModel: Send + Sync + fmt::Display {
