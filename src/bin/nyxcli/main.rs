@@ -32,7 +32,7 @@ use dialoguer::{theme::ColorfulTheme, Select};
 use glob::glob;
 use lazy_static::lazy_static;
 use log::{debug, error, info};
-use nyx::celestia::{Cosm, Xb};
+use nyx::cosmic::{Cosm, Xb};
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
 use nyx::md::ui::MDProcess;
 use nyx::md::MdHdlr;

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::celestia::{Bodies, Cosm, Orbit};
+use crate::cosmic::{Bodies, Cosm, Orbit};
 use crate::dimensions::Vector3;
 use crate::dynamics::orbital::OrbitalDynamics;
 use crate::errors::NyxError;

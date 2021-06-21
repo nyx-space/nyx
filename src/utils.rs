@@ -19,7 +19,7 @@
 extern crate num;
 
 use self::num::traits::real::Real;
-use crate::celestia::Orbit;
+use crate::cosmic::Orbit;
 use crate::dimensions::{
     allocator::Allocator, DefaultAllocator, DimName, Matrix3, OVector, Vector3, Vector6,
 };

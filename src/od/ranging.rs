@@ -23,7 +23,7 @@ use super::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice, TimeTagged};
-use crate::celestia::{Cosm, Frame, Orbit};
+use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dimensions::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
 use crate::time::Epoch;
 use crate::utils::{r2, r3};

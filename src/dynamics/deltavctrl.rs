@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::celestia::{Frame, Orbit};
+use crate::cosmic::{Frame, Orbit};
 use crate::dimensions::Vector3;
 
 pub use super::thrustctrl::Mnvr;

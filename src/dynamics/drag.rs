@@ -18,7 +18,7 @@
 
 use super::hyperdual::Hyperdual;
 use super::ForceModel;
-use crate::celestia::{Cosm, Frame, Spacecraft};
+use crate::cosmic::{Cosm, Frame, Spacecraft};
 use crate::dimensions::{Const, Matrix3, Vector3};
 use crate::errors::NyxError;
 use std::fmt;

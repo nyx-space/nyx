@@ -52,7 +52,7 @@ impl Ord for EclipseState {
     ///
     /// ```
     /// extern crate nyx_space as nyx;
-    /// use nyx::celestia::eclipse::EclipseState;
+    /// use nyx::cosmic::eclipse::EclipseState;
     /// assert!(EclipseState::Umbra == EclipseState::Umbra);
     /// assert!(EclipseState::Visibilis == EclipseState::Visibilis);
     /// assert!(EclipseState::Penumbra(0.5) == EclipseState::Penumbra(0.5));

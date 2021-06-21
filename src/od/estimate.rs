@@ -20,7 +20,7 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{CovarFormat, EpochFormat};
 use super::{EstimateFrom, State};
-use crate::celestia::Orbit;
+use crate::cosmic::Orbit;
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::hifitime::Epoch;

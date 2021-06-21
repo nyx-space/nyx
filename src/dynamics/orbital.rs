@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, Dynamics, NyxError};
-use crate::celestia::{Bodies, Cosm, Frame, LTCorr, Orbit};
+use crate::cosmic::{Bodies, Cosm, Frame, LTCorr, Orbit};
 use crate::dimensions::{
     DimName, Matrix3, Matrix6, OVector, Vector3, Vector6, U3, U36, U4, U42, U6, U7,
 };

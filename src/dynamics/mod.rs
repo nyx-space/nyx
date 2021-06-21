@@ -19,7 +19,7 @@
 extern crate hyperdual;
 
 use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
-use crate::celestia::{Orbit, Spacecraft};
+use crate::cosmic::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7};
 use crate::State;

@@ -19,7 +19,7 @@
 use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
-use crate::celestia::Spacecraft;
+use crate::cosmic::Spacecraft;
 use crate::dimensions::{DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U43, U6, U7};
 use crate::dynamics::Hyperdual;
 use crate::errors::NyxError;

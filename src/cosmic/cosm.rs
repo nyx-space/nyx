@@ -1041,7 +1041,7 @@ impl Cosm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::celestia::Bodies;
+    use crate::cosmic::Bodies;
 
     /// Tests direct transformations. Test cases generated via jplephem, hence the EPSILON precision.
     /// Note however that there is a difference between jplephem and spiceypy, cf.

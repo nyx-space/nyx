@@ -20,7 +20,7 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::serde_derive::Deserialize;
 use super::EpochFormat;
-use crate::celestia::{Cosm, Frame, Orbit};
+use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::DefaultAllocator;
 use crate::md::StateParameter;
@@ -421,7 +421,7 @@ impl StateFormatter {
     /// ```
     /// extern crate nyx_space as nyx;
     /// use nyx::io::formatter::StateFormatter;
-    /// use nyx::celestia::Cosm;
+    /// use nyx::cosmic::Cosm;
     ///
     /// let cosm = Cosm::de438();
     /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.
@@ -614,7 +614,7 @@ impl NavSolutionFormatter {
     /// ```
     /// extern crate nyx_space as nyx;
     /// use nyx::io::formatter::NavSolutionFormatter;
-    /// use nyx::celestia::Cosm;
+    /// use nyx::cosmic::Cosm;
     ///
     /// let cosm = Cosm::de438();
     /// // In this case, we're initializing the formatter to output the AoL and the eccentric anomaly in the EME2000 frame.

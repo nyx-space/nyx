@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
-use nyx::celestia::{Cosm, Orbit};
+use nyx::cosmic::{Cosm, Orbit};
 use nyx::time::{Epoch, TimeUnit};
 
 macro_rules! f64_eq {

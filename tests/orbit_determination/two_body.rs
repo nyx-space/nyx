@@ -2,7 +2,7 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use self::nyx::celestia::{Cosm, Orbit};
+use self::nyx::cosmic::{Cosm, Orbit};
 use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::sph_harmonics::Harmonics;
