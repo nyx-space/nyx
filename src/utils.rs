@@ -196,27 +196,23 @@ fn test_tilde_matrix() {
 
 #[test]
 fn test_diagonality() {
-    assert_eq!(
-        is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        false,
+    assert!(
+        !is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         "lower triangular"
     );
 
-    assert_eq!(
-        is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        false,
+    assert!(
+        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         "symmetric but not diag"
     );
 
-    assert_eq!(
-        is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        false,
+    assert!(
+        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         "upper triangular"
     );
 
-    assert_eq!(
+    assert!(
         is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        true,
         "diagonal"
     );
 }

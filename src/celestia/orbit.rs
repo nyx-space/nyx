@@ -220,7 +220,7 @@ impl Orbit {
     /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
     ///
     /// Note that the time is **not** returned in the vector.
-    pub fn to_cartesian_vec(&self) -> Vector6<f64> {
+    pub fn to_cartesian_vec(self) -> Vector6<f64> {
         Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
     }
 
@@ -509,7 +509,7 @@ impl Orbit {
     /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
     ///
     /// Note that the time is **not** returned in the vector.
-    pub fn to_keplerian_vec(&self) -> Vector6<f64> {
+    pub fn to_keplerian_vec(self) -> Vector6<f64> {
         Vector6::new(
             self.sma(),
             self.ecc(),

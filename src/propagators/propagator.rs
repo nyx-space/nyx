@@ -514,13 +514,13 @@ fn test_options() {
     assert_eq!(opts.min_step, 1e-1 * TimeUnit::Second);
     assert_eq!(opts.max_step, 1e-1 * TimeUnit::Second);
     assert!(opts.tolerance.abs() < std::f64::EPSILON);
-    assert_eq!(opts.fixed_step, true);
+    assert!(opts.fixed_step);
 
     let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
     assert_eq!(opts.min_step, 1e-2 * TimeUnit::Second);
     assert_eq!(opts.max_step, 10.0 * TimeUnit::Second);
     assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
-    assert_eq!(opts.fixed_step, false);
+    assert!(!opts.fixed_step);
 
     let opts: PropOpts<RSSCartesianStep> = Default::default();
     assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
@@ -528,5 +528,5 @@ fn test_options() {
     assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);
     assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
     assert_eq!(opts.attempts, 50);
-    assert_eq!(opts.fixed_step, false);
+    assert!(!opts.fixed_step);
 }

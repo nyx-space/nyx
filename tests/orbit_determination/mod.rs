@@ -31,7 +31,7 @@ fn empty_estimate() {
     );
     f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
     f64_nil!(empty.stm.norm(), "expected STM norm to be nil");
-    assert_eq!(empty.predicted, true, "expected predicted to be true");
+    assert!(empty.predicted, "expected predicted to be true");
 }
 
 #[test]

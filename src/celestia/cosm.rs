@@ -1010,10 +1010,8 @@ impl Cosm {
     /// Returns the conversion path from the target ephemeris or frame `from` as seen from `to`.
     fn find_common_root(&self, from: &[usize], to: &[usize]) -> std::vec::Vec<usize> {
         let mut common_root = Vec::with_capacity(3); // Unlikely to be more than 3 items
-        if from.is_empty() || to.is_empty() {
-            // It will necessarily be the root of the ephemeris
-            common_root
-        } else {
+        if !from.is_empty() && !to.is_empty() {
+            // This is NOT the root of the ephemeris
             if from.len() < to.len() {
                 // Iterate through the items in from
                 for (n, obj) in from.iter().enumerate() {
@@ -1035,8 +1033,8 @@ impl Cosm {
                     }
                 }
             }
-            common_root
         }
+        common_root
     }
 }
 
