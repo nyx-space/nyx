@@ -237,7 +237,7 @@ where
             ],
             iterations: 100,
             objective_frame: None,
-            correction_frame: None,
+            correction_frame: Some(Frame::RCN),
         }
     }
 
@@ -627,7 +627,7 @@ where
                     "Correction {:?}{} (element {}): {}",
                     var.component,
                     match self.correction_frame {
-                        Some(f) => format!("in {:?}", f),
+                        Some(f) => format!(" in {:?}", f),
                         None => format!(""),
                     },
                     i,

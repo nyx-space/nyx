@@ -182,6 +182,7 @@ impl fmt::Display for Frame {
     }
 }
 
+#[allow(non_snake_case, clippy::upper_case_acronyms)]
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -199,7 +200,10 @@ impl fmt::Debug for Frame {
                     self.gm()
                 )
             }
-            othframe => write!(f, "{:?}", othframe),
+            Frame::VNC => write!(f, "VNC"),
+            Frame::RCN => write!(f, "RCN"),
+            Frame::RIC => write!(f, "RIC"),
+            Frame::Inertial => write!(f, "Inertial"),
         }
     }
 }
