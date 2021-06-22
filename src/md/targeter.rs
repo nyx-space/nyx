@@ -19,7 +19,7 @@ use super::rayon::prelude::*;
 use super::StateParameter;
 pub use super::{Variable, Vary};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DMatrix, DVector, DefaultAllocator};
+use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector3, Vector6};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use std::convert::TryInto;
@@ -108,12 +108,7 @@ impl fmt::Display for TargeterSolution {
                     is_only_velocity = false;
                     "m"
                 }
-                Vary::VelocityX
-                | Vary::VelocityY
-                | Vary::VelocityZ
-                | Vary::VelocityV
-                | Vary::VelocityN
-                | Vary::VelocityC => {
+                Vary::VelocityX | Vary::VelocityY | Vary::VelocityZ => {
                     is_only_position = false;
                     "m/s"
                 }
@@ -161,6 +156,8 @@ where
     pub objective_frame: Option<(Frame, Arc<Cosm>)>,
     /// The kind of correction to apply to achieve the objectives
     pub variables: Vec<Variable>,
+    /// The frame in which the correction should be applied, must be either a local frame or inertial
+    pub correction_frame: Option<Frame>,
     /// Maximum number of iterations
     pub iterations: usize,
 }
@@ -206,6 +203,7 @@ where
             variables,
             iterations: 100,
             objective_frame: None,
+            correction_frame: None,
         }
     }
 
@@ -223,6 +221,7 @@ where
             variables,
             iterations: 100,
             objective_frame: Some((objective_frame, cosm)),
+            correction_frame: None,
         }
     }
 
@@ -243,6 +242,7 @@ where
             ],
             iterations: 100,
             objective_frame: Some((objective_frame, cosm)),
+            correction_frame: None,
         }
     }
 
@@ -258,6 +258,7 @@ where
             ],
             iterations: 100,
             objective_frame: None,
+            correction_frame: None,
         }
     }
 
@@ -278,6 +279,7 @@ where
             ],
             iterations: 100,
             objective_frame: Some((objective_frame, cosm)),
+            correction_frame: None,
         }
     }
 
@@ -293,6 +295,7 @@ where
             ],
             iterations: 100,
             objective_frame: None,
+            correction_frame: None,
         }
     }
 
@@ -337,36 +340,48 @@ where
         debug!("xi_start = {}", xi_start);
 
         let mut xi = xi_start;
+        // We'll store the initial state correction here.
+        let mut state_correction = Vector6::<f64>::zeros();
 
         // Store the total correction in Vector3
         let mut total_correction = DVector::from_element(self.variables.len(), 0.0);
 
         // Apply the initial guess
         for (i, var) in self.variables.iter().enumerate() {
-            match var.component {
-                Vary::PositionX => {
-                    xi.orbit.x += var.init_guess;
-                }
-                Vary::PositionY => {
-                    xi.orbit.y += var.init_guess;
-                }
-                Vary::PositionZ => {
-                    xi.orbit.z += var.init_guess;
-                }
-                Vary::VelocityX => {
-                    xi.orbit.vx += var.init_guess;
-                }
-                Vary::VelocityY => {
-                    xi.orbit.vy += var.init_guess;
-                }
-                Vary::VelocityZ => {
-                    xi.orbit.vz += var.init_guess;
-                }
-                _ => unimplemented!(),
+            // Check the validity (this function will report to log and raise an error)
+            var.valid()?;
+            // Check that there is no attempt to target a position in a local frame
+            if self.correction_frame.is_some() && var.component.vec_index() < 3 {
+                // Then this is a position correction, which is not allowed if a frame is provided!
+                let msg = format!(
+                    "Variable is in frame {} but that frame cannot be used for a {:?} correction",
+                    self.correction_frame.unwrap(),
+                    var.component
+                );
+                error!("{}", msg);
+                return Err(NyxError::TargetError(msg));
             }
+
+            state_correction[var.component.vec_index()] += var.init_guess;
             total_correction[i] += var.init_guess;
-            // Check the validity (this function will report to log)
-            var.valid();
+        }
+
+        // Now, let's apply the correction to the initial state
+        if let Some(frame) = self.correction_frame {
+            // The following will error if the frame is not local
+            let dcm = xi.orbit.dcm_from_traj_frame(frame)?;
+            // Now, the state frame is local and the correction is only on position, so we can grab the last three elements and rotate.
+            let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
+            xi.orbit.vx += velocity_correction[0];
+            xi.orbit.vy += velocity_correction[1];
+            xi.orbit.vz += velocity_correction[2];
+        } else {
+            xi.orbit.x += state_correction[0];
+            xi.orbit.y += state_correction[1];
+            xi.orbit.z += state_correction[2];
+            xi.orbit.vx += state_correction[3];
+            xi.orbit.vy += state_correction[4];
+            xi.orbit.vz += state_correction[5];
         }
 
         let mut prev_err_norm = std::f64::INFINITY;
@@ -466,26 +481,23 @@ where
                 pert_calc.par_iter_mut().for_each(|(_, var, jac_val)| {
                     let mut this_xi = xi;
 
-                    match var.component {
-                        Vary::PositionX => {
-                            this_xi.orbit.x += var.perturbation;
-                        }
-                        Vary::PositionY => {
-                            this_xi.orbit.y += var.perturbation;
-                        }
-                        Vary::PositionZ => {
-                            this_xi.orbit.z += var.perturbation;
-                        }
-                        Vary::VelocityX | Vary::VelocityV => {
-                            this_xi.orbit.vx += var.perturbation;
-                        }
-                        Vary::VelocityY | Vary::VelocityN => {
-                            this_xi.orbit.vy += var.perturbation;
-                        }
-                        Vary::VelocityZ | Vary::VelocityC => {
-                            this_xi.orbit.vz += var.perturbation;
-                        }
-                    };
+                    let mut state_correction = Vector6::<f64>::zeros();
+                    state_correction[var.component.vec_index()] += var.perturbation;
+                    // Now, let's apply the perturbation to the initial state
+                    if let Some(frame) = self.correction_frame {
+                        let dcm = this_xi.orbit.dcm_from_traj_frame(frame).unwrap();
+                        let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
+                        this_xi.orbit.vx += velocity_correction[0];
+                        this_xi.orbit.vy += velocity_correction[1];
+                        this_xi.orbit.vz += velocity_correction[2];
+                    } else {
+                        this_xi.orbit.x += state_correction[0];
+                        this_xi.orbit.y += state_correction[1];
+                        this_xi.orbit.z += state_correction[2];
+                        this_xi.orbit.vx += state_correction[3];
+                        this_xi.orbit.vy += state_correction[4];
+                        this_xi.orbit.vz += state_correction[5];
+                    }
 
                     let this_xf = self
                         .prop
@@ -531,6 +543,10 @@ where
             if converged {
                 let conv_dur = Instant::now() - start_instant;
                 let mut state = xi_start;
+
+                // TODO: HERE. This will be a bit complicated. I'll need to rebuild a 3-sized vector using the indices of the variables
+                // and then rotate that back into the inertial frame before applying the correction.
+
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
                     match var.component {
@@ -540,7 +556,6 @@ where
                         Vary::VelocityX => state.orbit.vx += total_correction[i],
                         Vary::VelocityY => state.orbit.vy += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz += total_correction[i],
-                        _ => unimplemented!(),
                     }
                 }
 
@@ -633,7 +648,6 @@ where
                     Vary::VelocityZ => {
                         xi.orbit.vz += delta[i];
                     }
-                    _ => unimplemented!(),
                 }
             }
             total_correction += delta;
@@ -660,7 +674,7 @@ where
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
-        warn!("DO NOT USE! The dual number target is broken! https://gitlab.com/nyx-space/nyx/-/issues/207");
+        error!("DO NOT USE! The dual number target is broken! https://gitlab.com/nyx-space/nyx/-/issues/207");
 
         if self.objectives.is_empty() {
             return Err(NyxError::UnderdeterminedProblem);
@@ -710,7 +724,6 @@ where
                 Vary::VelocityZ => {
                     xi.orbit.vz += var.init_guess;
                 }
-                _ => unimplemented!(),
             }
             total_correction[i] += var.init_guess;
         }
@@ -828,14 +841,7 @@ where
                 let obj_jac = -xf.stm() * partial_vec;
                 println!("{}", obj_jac);
                 for (j, var) in self.variables.iter().enumerate() {
-                    let idx = match var.component {
-                        Vary::PositionX => 0,
-                        Vary::PositionY => 1,
-                        Vary::PositionZ => 2,
-                        Vary::VelocityX | Vary::VelocityV => 3,
-                        Vary::VelocityY | Vary::VelocityN => 4,
-                        Vary::VelocityZ | Vary::VelocityC => 5,
-                    };
+                    let idx = var.component.vec_index();
                     // We only ever need the diagonals of the STM I think?
                     jac[(i, j)] = obj_jac[idx];
                 }
@@ -854,7 +860,6 @@ where
                         Vary::VelocityX => state.orbit.vx += total_correction[i],
                         Vary::VelocityY => state.orbit.vy += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz += total_correction[i],
-                        _ => unimplemented!(),
                     }
                 }
 
@@ -945,7 +950,6 @@ where
                     Vary::VelocityZ => {
                         xi.orbit.vz += delta[i];
                     }
-                    _ => unimplemented!(),
                 }
             }
             total_correction += delta;

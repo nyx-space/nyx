@@ -17,30 +17,38 @@
 */
 
 use super::NyxError;
+use crate::cosmic::Frame;
 use std::convert::TryFrom;
 use std::default::Default;
 
 /// Defines the kind of correction to apply in the targeter
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Vary {
-    /// Vary position component X in the integration frame
+    /// Vary position component X
     PositionX,
-    /// Vary position component Y in the integration frame
+    /// Vary position component Y
     PositionY,
-    /// Vary position component Z in the integration frame
+    /// Vary position component Z
     PositionZ,
-    /// Vary velocity component X in the integration frame
+    /// Vary velocity component X
     VelocityX,
-    /// Vary velocity component Y in the integration frame
+    /// Vary velocity component Y
     VelocityY,
-    /// Vary velocity component Z in the integration frame
+    /// Vary velocity component Z
     VelocityZ,
-    /// Vary velocity component V in the VNC frame
-    VelocityV,
-    /// Vary velocity component N in the VNC frame
-    VelocityN,
-    /// Vary velocity component C in the VNC frame
-    VelocityC,
+}
+
+impl Vary {
+    pub fn vec_index(&self) -> usize {
+        match self {
+            Vary::PositionX => 0,
+            Vary::PositionY => 1,
+            Vary::PositionZ => 2,
+            Vary::VelocityX => 3,
+            Vary::VelocityY => 4,
+            Vary::VelocityZ => 5,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -57,33 +65,38 @@ pub struct Variable {
     pub max_value: f64,
     /// The absolute minimum value this parameter can ever have
     pub min_value: f64,
+    /// The frame in which this variable should be applied, must be either a local frame or inertial
+    pub frame: Option<Frame>,
 }
 
 impl Variable {
     /// Returns whether the configuration of this variable is valid
-    pub fn valid(&self) -> bool {
+    pub fn valid(&self) -> Result<(), NyxError> {
         if self.max_step < 0.0 {
-            error!(
+            let msg = format!(
                 "{:?}: max step is negative: {}",
                 self.component, self.max_step
             );
-            return false;
+            error!("{}", msg);
+            return Err(NyxError::TargetError(msg));
         }
         if self.max_value < 0.0 {
-            error!(
+            let msg = format!(
                 "{:?}: max value is negative: {}",
                 self.component, self.max_value
             );
-            return false;
+            error!("{}", msg);
+            return Err(NyxError::TargetError(msg));
         }
         if self.min_value > self.max_value {
-            error!(
+            let msg = format!(
                 "{:?}: min value is greater than max value: {} > {}",
                 self.component, self.min_value, self.max_value
             );
-            return false;
+            error!("{}", msg);
+            return Err(NyxError::TargetError(msg));
         }
-        true
+        Ok(())
     }
 }
 
@@ -96,6 +109,7 @@ impl Default for Variable {
             max_step: 0.2,
             max_value: 5.0,
             min_value: -5.0,
+            frame: None,
         }
     }
 }
@@ -110,10 +124,7 @@ impl TryFrom<Vary> for Variable {
             | Vary::PositionZ
             | Vary::VelocityX
             | Vary::VelocityY
-            | Vary::VelocityZ
-            | Vary::VelocityV
-            | Vary::VelocityN
-            | Vary::VelocityC => Ok(Self {
+            | Vary::VelocityZ => Ok(Self {
                 component: vary,
                 ..Default::default()
             }),
