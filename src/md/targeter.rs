@@ -19,7 +19,7 @@ use super::rayon::prelude::*;
 use super::StateParameter;
 pub use super::{Variable, Vary};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector3, Vector6};
+use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector6};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use std::convert::TryInto;
@@ -225,13 +225,8 @@ where
         }
     }
 
-    /// Create a new Targeter which will apply an impulsive delta-v correction. By default, max step is 0.5 km/s.
-    pub fn delta_v_in_frame(
-        prop: Arc<&'a Propagator<'a, D, E>>,
-        objectives: Vec<Objective>,
-        objective_frame: Frame,
-        cosm: Arc<Cosm>,
-    ) -> Self {
+    /// Create a new Targeter which will apply an impulsive delta-v correction on all components of the VNC frame. By default, max step is 0.5 km/s.
+    pub fn vnc(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
@@ -241,8 +236,25 @@ where
                 Vary::VelocityZ.try_into().unwrap(),
             ],
             iterations: 100,
-            objective_frame: Some((objective_frame, cosm)),
+            objective_frame: None,
             correction_frame: None,
+        }
+    }
+
+    /// Create a new Targeter which will apply an impulsive delta-v correction on the specified components of the VNC frame.
+    pub fn vnc_with_components(
+        prop: Arc<&'a Propagator<'a, D, E>>,
+        variables: Vec<Variable>,
+        objectives: Vec<Objective>,
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables,
+            iterations: 100,
+            objective_frame: None,
+            // correction_frame: None,
+            correction_frame: Some(Frame::VNC),
         }
     }
 
@@ -258,27 +270,6 @@ where
             ],
             iterations: 100,
             objective_frame: None,
-            correction_frame: None,
-        }
-    }
-
-    /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
-    pub fn delta_r_in_frame(
-        prop: Arc<&'a Propagator<'a, D, E>>,
-        objectives: Vec<Objective>,
-        objective_frame: Frame,
-        cosm: Arc<Cosm>,
-    ) -> Self {
-        Self {
-            prop,
-            objectives,
-            variables: vec![
-                Vary::PositionX.try_into().unwrap(),
-                Vary::PositionY.try_into().unwrap(),
-                Vary::PositionZ.try_into().unwrap(),
-            ],
-            iterations: 100,
-            objective_frame: Some((objective_frame, cosm)),
             correction_frame: None,
         }
     }
@@ -537,6 +528,7 @@ where
 
                 for (j, _, jac_val) in &pert_calc {
                     jac[(i, *j)] = *jac_val;
+                    dbg!(*jac_val);
                 }
             }
 
@@ -544,19 +536,24 @@ where
                 let conv_dur = Instant::now() - start_instant;
                 let mut state = xi_start;
 
-                // TODO: HERE. This will be a bit complicated. I'll need to rebuild a 3-sized vector using the indices of the variables
-                // and then rotate that back into the inertial frame before applying the correction.
-
-                // Convert the total correction from VNC back to integration frame in case that's needed.
+                let mut state_correction = Vector6::<f64>::zeros();
                 for (i, var) in self.variables.iter().enumerate() {
-                    match var.component {
-                        Vary::PositionX => state.orbit.x += total_correction[i],
-                        Vary::PositionY => state.orbit.y += total_correction[i],
-                        Vary::PositionZ => state.orbit.z += total_correction[i],
-                        Vary::VelocityX => state.orbit.vx += total_correction[i],
-                        Vary::VelocityY => state.orbit.vy += total_correction[i],
-                        Vary::VelocityZ => state.orbit.vz += total_correction[i],
-                    }
+                    state_correction[var.component.vec_index()] += total_correction[i];
+                }
+                // Now, let's apply the correction to the initial state
+                if let Some(frame) = self.correction_frame {
+                    let dcm = state.orbit.dcm_from_traj_frame(frame).unwrap();
+                    let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
+                    state.orbit.vx += velocity_correction[0];
+                    state.orbit.vy += velocity_correction[1];
+                    state.orbit.vz += velocity_correction[2];
+                } else {
+                    state.orbit.x += state_correction[0];
+                    state.orbit.y += state_correction[1];
+                    state.orbit.z += state_correction[2];
+                    state.orbit.vx += state_correction[3];
+                    state.orbit.vy += state_correction[4];
+                    state.orbit.vz += state_correction[5];
                 }
 
                 let sol = TargeterSolution {
@@ -614,6 +611,8 @@ where
             debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
 
             // And finally apply it to the xi
+            let mut state_correction = Vector6::<f64>::zeros();
+            println!("state_correction = {}", state_correction);
             for (i, var) in self.variables.iter().enumerate() {
                 // Choose the minimum step between the provided max step and the correction.
                 if delta[i].abs() > var.max_step.abs() {
@@ -625,30 +624,33 @@ where
                 }
 
                 info!(
-                    "Correction {:?} (element {}): {}",
-                    var.component, i, delta[i]
+                    "Correction {:?}{} (element {}): {}",
+                    var.component,
+                    match self.correction_frame {
+                        Some(f) => format!("in {:?}", f),
+                        None => format!(""),
+                    },
+                    i,
+                    delta[i]
                 );
 
-                match var.component {
-                    Vary::PositionX => {
-                        xi.orbit.x += delta[i];
-                    }
-                    Vary::PositionY => {
-                        xi.orbit.y += delta[i];
-                    }
-                    Vary::PositionZ => {
-                        xi.orbit.z += delta[i];
-                    }
-                    Vary::VelocityX => {
-                        xi.orbit.vx += delta[i];
-                    }
-                    Vary::VelocityY => {
-                        xi.orbit.vy += delta[i];
-                    }
-                    Vary::VelocityZ => {
-                        xi.orbit.vz += delta[i];
-                    }
-                }
+                state_correction[var.component.vec_index()] += delta[i];
+            }
+
+            // Now, let's apply the correction to the initial state
+            if let Some(frame) = self.correction_frame {
+                let dcm = xi.orbit.dcm_from_traj_frame(frame).unwrap();
+                let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
+                xi.orbit.vx += velocity_correction[0];
+                xi.orbit.vy += velocity_correction[1];
+                xi.orbit.vz += velocity_correction[2];
+            } else {
+                xi.orbit.x += state_correction[0];
+                xi.orbit.y += state_correction[1];
+                xi.orbit.z += state_correction[2];
+                xi.orbit.vx += state_correction[3];
+                xi.orbit.vy += state_correction[4];
+                xi.orbit.vz += state_correction[5];
             }
             total_correction += delta;
             debug!("Total correction: {:e}", total_correction);
