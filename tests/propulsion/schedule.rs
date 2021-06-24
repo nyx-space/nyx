@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use self::nyx::celestia::{Bodies, Cosm, Frame, GuidanceMode, Orbit, Spacecraft};
+use self::nyx::cosmic::{Bodies, Cosm, Frame, GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dimensions::Vector3;
 use self::nyx::dynamics::thrustctrl::{FiniteBurns, Mnvr, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};

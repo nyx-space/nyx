@@ -19,7 +19,7 @@
 extern crate csv;
 
 use self::csv::{QuoteStyle, Writer, WriterBuilder};
-use crate::celestia::Orbit;
+use crate::cosmic::Orbit;
 use std::fs::File;
 
 /// Exports to the XYZV data type used in Cosmographia

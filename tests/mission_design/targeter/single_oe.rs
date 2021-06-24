@@ -212,17 +212,17 @@ fn tgt_ecc_from_peri() {
         vec![
             Variable {
                 component: Vary::VelocityX,
-                max_step: -5.0,
+                max_step: 5.0,
                 ..Default::default()
             },
             Variable {
                 component: Vary::VelocityY,
-                max_step: -5.0,
+                max_step: 5.0,
                 ..Default::default()
             },
             Variable {
                 component: Vary::VelocityZ,
-                max_step: -5.0,
+                max_step: 5.0,
                 ..Default::default()
             },
         ],

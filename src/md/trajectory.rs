@@ -20,7 +20,7 @@ use super::bacon_sci::interp::lagrange;
 use super::bacon_sci::polynomial::Polynomial;
 use super::crossbeam::thread;
 use super::rayon::prelude::*;
-use crate::celestia::{Cosm, Frame, Orbit, Spacecraft};
+use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, OVector};
 use crate::errors::NyxError;

@@ -2,7 +2,7 @@ extern crate csv;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::nyx::celestia::Orbit;
+use self::nyx::cosmic::Orbit;
 use self::nyx::od::ui::{Estimate, Filter, KfEstimate, NyxError, KF};
 use self::nyx::State;
 

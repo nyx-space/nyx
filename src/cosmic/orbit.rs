@@ -31,7 +31,7 @@ use crate::{NyxError, TimeTagged};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
@@ -1202,6 +1202,9 @@ impl Orbit {
     }
 
     /// Returns the direct cosine rotation matrix to convert to this inertial state.
+    /// ## Example
+    /// let dcm_vnc2inertial = orbit.dcm_from_traj_frame(Frame::VNC)?;
+    /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
     pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, NyxError> {
         match from {
             Frame::RIC => Ok(r3(-self.raan().to_radians())
@@ -1452,6 +1455,12 @@ impl Add for &Orbit {
     }
 }
 
+impl AddAssign for Orbit {
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+
 impl Sub for &Orbit {
     type Output = Orbit;
 
@@ -1469,6 +1478,12 @@ impl Sub for &Orbit {
             stm: self.stm,
             stm_kind: self.stm_kind,
         }
+    }
+}
+
+impl SubAssign for Orbit {
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
     }
 }
 

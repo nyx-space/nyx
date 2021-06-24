@@ -229,7 +229,7 @@ impl ThrustControl for Ruggiero {
 
 #[test]
 fn ruggiero_weight() {
-    use crate::celestia::Cosm;
+    use crate::cosmic::Cosm;
     use crate::time::Epoch;
     let mut cosm = Cosm::de438_raw();
     cosm.frame_mut_gm("EME2000", 398_600.433);

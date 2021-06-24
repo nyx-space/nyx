@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::celestia::{Frame, GuidanceMode, Orbit, Spacecraft, StmKind};
+use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft, StmKind};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{Const, DefaultAllocator, DimName, Matrix6, OMatrix, OVector, Vector1};
 use crate::errors::NyxError;

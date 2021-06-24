@@ -3,7 +3,7 @@ extern crate rand;
 extern crate rand_distr;
 extern crate rayon;
 
-use nyx::celestia::{Bodies, Cosm, Orbit};
+use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::Harmonics;
 use nyx::dynamics::{OrbitalDynamics, PointMasses};
 use nyx::io::gravity::*;
