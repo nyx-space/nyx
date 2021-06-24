@@ -21,7 +21,7 @@ extern crate hyperdual;
 use self::hyperdual::{Hyperdual, Owned};
 use crate::cosmic::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7, U9};
+use crate::dimensions::{Const, DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
 
 use std::fmt;
@@ -118,7 +118,6 @@ where
             + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy;
 
-
     /// Optionally performs some final changes after each successful integration of the equations of motion.
     /// For example, this can be used to update the GNC mode.
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
@@ -137,7 +136,7 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
     fn dual_eom(
         &self,
-        radius: &Vector3<Hyperdual<f64, U9>>,
+        radius: &Vector3<Hyperdual<f64, Const<8>>>,
         osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
@@ -153,7 +152,7 @@ pub trait AccelModel: Send + Sync + fmt::Display {
     /// computation of the STM.
     fn dual_eom(
         &self,
-        radius: &Vector3<Hyperdual<f64, U7>>,
+        radius: &Vector3<Hyperdual<f64, Const<7>>>,
         osc_ctx: &Orbit,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }

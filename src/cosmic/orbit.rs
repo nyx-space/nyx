@@ -1658,6 +1658,7 @@ impl State for Orbit {
         as_vec[4] = self.vy;
         as_vec[5] = self.vz;
         let mut stm_idx = 6;
+        // TODO: Consider using https://docs.rs/nalgebra/0.27.1/nalgebra/base/struct.Matrix.html#method.reshape_generic (after tests pass)
         if let Some(stm) = self.stm {
             for i in 0..6 {
                 for j in 0..6 {

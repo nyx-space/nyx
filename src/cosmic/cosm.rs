@@ -930,13 +930,13 @@ impl Cosm {
                 for i in (e_common_path.len()..state_ephem_path.len()).rev() {
                     let next_state =
                         self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
-                    new_state = new_state + next_state;
+                    new_state += next_state;
                 }
 
                 // Walk forward from the destination state
                 for i in (e_common_path.len()..new_ephem_path.len()).rev() {
                     let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
-                    new_state = new_state - next_state;
+                    new_state -= next_state;
                 }
 
                 new_state
@@ -948,10 +948,10 @@ impl Cosm {
                     let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
                     if new_ephem_path.len() < state_ephem_path.len() && i == e_common_path.len() {
                         // We just crossed the common point going forward, so let's add the opposite of this state
-                        new_state = new_state - next_state;
+                        new_state -= next_state;
                         negated_fwd = true;
                     } else {
-                        new_state = new_state + next_state;
+                        new_state += next_state;
                     }
                 }
                 // Walk backward from current state up to common node
@@ -960,9 +960,9 @@ impl Cosm {
                         self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
                     if !negated_fwd && i == e_common_path.len() {
                         // We just crossed the common point (and haven't passed it going forward), so let's negate this state
-                        new_state = new_state - next_state;
+                        new_state -= next_state;
                     } else {
-                        new_state = new_state + next_state;
+                        new_state += next_state;
                     }
                 }
 
