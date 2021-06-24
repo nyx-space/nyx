@@ -19,10 +19,11 @@
 use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
-use crate::celestia::Spacecraft;
+use crate::cosmic::Spacecraft;
 use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector1, Vector3, U3, U4, U6, U73};
 use crate::dynamics::Hyperdual;
 use crate::errors::NyxError;
+
 use crate::time::TimeUnit;
 use crate::{State, TimeTagged};
 use std::fmt;

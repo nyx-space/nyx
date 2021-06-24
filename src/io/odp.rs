@@ -18,7 +18,7 @@
 
 extern crate csv;
 
-pub use crate::celestia::*;
+pub use crate::cosmic::*;
 use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;

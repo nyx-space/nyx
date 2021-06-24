@@ -29,8 +29,8 @@ pub mod propagators;
 /// Provides several dynamics used for orbital mechanics and attitude dynamics, which can be elegantly combined.
 pub mod dynamics;
 
-/// Provides the solar system planets, and state and (later) ephemeride management.
-pub mod celestia;
+/// Provides the solar system planets, and state and ephemeride management.
+pub mod cosmic;
 
 /// Utility functions shared by different modules, and which may be useful to engineers.
 pub mod utils;
@@ -74,4 +74,4 @@ pub mod dimensions {
 }
 
 /// Re-export some useful things
-pub use self::celestia::{Orbit, Spacecraft, State, TimeTagged};
+pub use self::cosmic::{Orbit, Spacecraft, State, TimeTagged};

@@ -66,7 +66,7 @@ pub fn dv_execution_error<R: Rng>(
 #[test]
 fn test_dv_mag_fixed() {
     use super::thread_rng;
-    use crate::celestia::{Cosm, Orbit};
+    use crate::cosmic::{Cosm, Orbit};
     use crate::time::Epoch;
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

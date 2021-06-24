@@ -1,7 +1,8 @@
+extern crate hyperdual;
 extern crate nyx_space as nyx;
 
 use hyperdual::hyperspace_from_vector;
-use nyx::celestia::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
+use nyx::cosmic::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
 use nyx::dimensions::{Matrix6, Vector6};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
 use nyx::propagators::error_ctrl::RSSCartesianStep;

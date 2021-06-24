@@ -31,8 +31,8 @@ use config::{Config, File};
 use dialoguer::{theme::ColorfulTheme, Select};
 use glob::glob;
 use lazy_static::lazy_static;
-use log::{error, info};
-use nyx::celestia::{Cosm, Xb};
+use log::{debug, error, info};
+use nyx::cosmic::{Cosm, Xb};
 use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
 use nyx::md::ui::MDProcess;
 use nyx::md::MdHdlr;
@@ -52,6 +52,7 @@ lazy_static! {
         let xb = Xb::from_buffer(&de438_buf).unwrap();
         let mut cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
         cosm.use_gmat_gm();
+        debug!("Loaded\n{}\n", cosm);
         Arc::new(cosm)
     };
 }

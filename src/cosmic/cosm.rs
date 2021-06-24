@@ -34,7 +34,7 @@ use crate::errors::NyxError;
 use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::{Matrix3, Matrix6};
-use crate::utils::{capitalize, rotv};
+use crate::utils::{capitalize, dcm_finite_differencing, rotv};
 use std::collections::HashMap;
 use std::fmt;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
@@ -893,20 +893,8 @@ impl Cosm {
         // Compute the dRdt DCM with finite differencing
         let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
         let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
-        let drdt = 0.5 * post_r_dcm - 0.5 * pre_r_dcm;
 
-        let mut full_dcm = Matrix6::zeros();
-        for i in 0..6 {
-            for j in 0..6 {
-                if (i < 3 && j < 3) || (i >= 3 && j >= 3) {
-                    full_dcm[(i, j)] = r_dcm[(i % 3, j % 3)];
-                } else if i >= 3 && j < 3 {
-                    full_dcm[(i, j)] = drdt[(i - 3, j)];
-                }
-            }
-        }
-
-        Ok(full_dcm)
+        Ok(dcm_finite_differencing(pre_r_dcm, r_dcm, post_r_dcm))
     }
 
     /// Attempts to only perform a translation without rotation between two frames.
@@ -1010,10 +998,8 @@ impl Cosm {
     /// Returns the conversion path from the target ephemeris or frame `from` as seen from `to`.
     fn find_common_root(&self, from: &[usize], to: &[usize]) -> std::vec::Vec<usize> {
         let mut common_root = Vec::with_capacity(3); // Unlikely to be more than 3 items
-        if from.is_empty() || to.is_empty() {
-            // It will necessarily be the root of the ephemeris
-            common_root
-        } else {
+        if !from.is_empty() && !to.is_empty() {
+            // This is NOT the root of the ephemeris
             if from.len() < to.len() {
                 // Iterate through the items in from
                 for (n, obj) in from.iter().enumerate() {
@@ -1035,15 +1021,15 @@ impl Cosm {
                     }
                 }
             }
-            common_root
         }
+        common_root
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::celestia::Bodies;
+    use crate::cosmic::Bodies;
 
     /// Tests direct transformations. Test cases generated via jplephem, hence the EPSILON precision.
     /// Note however that there is a difference between jplephem and spiceypy, cf.

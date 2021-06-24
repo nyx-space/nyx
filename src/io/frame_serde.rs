@@ -19,7 +19,7 @@
 extern crate toml;
 
 use super::serde_derive::Deserialize;
-use crate::celestia::Frame;
+use crate::cosmic::Frame;
 use std::collections::HashMap;
 
 #[derive(Clone, Deserialize)]

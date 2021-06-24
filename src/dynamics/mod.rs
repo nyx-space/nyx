@@ -19,7 +19,7 @@
 extern crate hyperdual;
 
 use self::hyperdual::{Hyperdual, Owned};
-use crate::celestia::{Orbit, Spacecraft};
+use crate::cosmic::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7, U9};
 use crate::State;
@@ -117,6 +117,7 @@ where
             + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
             + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy;
+
 
     /// Optionally performs some final changes after each successful integration of the equations of motion.
     /// For example, this can be used to update the GNC mode.

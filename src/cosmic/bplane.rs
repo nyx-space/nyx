@@ -265,11 +265,11 @@ impl BPlaneTarget {
         self.ltof_s.abs() > 1e-10
     }
 
-    pub fn to_objectives(&self) -> Vec<Objective> {
+    pub fn to_objectives(self) -> Vec<Objective> {
         self.to_objectives_with_tolerance(1.0)
     }
 
-    pub fn to_objectives_with_tolerance(&self, tol_km: f64) -> Vec<Objective> {
+    pub fn to_objectives_with_tolerance(self, tol_km: f64) -> Vec<Objective> {
         let mut objs = vec![
             Objective::within_tolerance(StateParameter::BdotR, self.b_r_km, tol_km),
             Objective::within_tolerance(StateParameter::BdotT, self.b_t_km, tol_km),

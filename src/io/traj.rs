@@ -22,7 +22,7 @@ use self::crossbeam::thread;
 use crate::io::scenario::StateSerde;
 use crate::md::Ephemeris;
 use crate::{
-    celestia::{Cosm, Frame},
+    cosmic::{Cosm, Frame},
     NyxError,
 };
 use std::sync::{mpsc::channel, Arc};

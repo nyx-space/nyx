@@ -1,7 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
-use nyx::celestia::{Cosm, Orbit};
+use nyx::cosmic::{Cosm, Frame, Orbit};
 use nyx::time::{Epoch, TimeUnit};
 
 macro_rules! f64_eq {
@@ -13,11 +13,6 @@ macro_rules! f64_eq {
             ($x - $val).abs()
         )
     };
-}
-
-#[test]
-fn state_def_() {
-    pel::init();
 }
 
 #[test]
@@ -110,6 +105,19 @@ fn state_def_circ_inc() {
 
     let kep = Orbit::keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, eme2k);
     f64_eq!(kep.ta(), 260.1123, "ta");
+
+    // Test that DCMs are valid
+    let dcm = kep.dcm_from_traj_frame(Frame::VNC).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
+
+    let dcm = kep.dcm_from_traj_frame(Frame::RCN).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
+
+    let dcm = kep.dcm_from_traj_frame(Frame::RIC).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 }
 
 #[test]
@@ -188,6 +196,19 @@ fn state_def_elliptical() {
         8_187.012_794_017_503,
         "semi parameter"
     );
+
+    // Test that DCMs are valid
+    let dcm = kep.dcm_from_traj_frame(Frame::VNC).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
+
+    let dcm = kep.dcm_from_traj_frame(Frame::RCN).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
+
+    let dcm = kep.dcm_from_traj_frame(Frame::RIC).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 }
 
 #[test]
@@ -264,6 +285,19 @@ fn state_def_circ_eq() {
         18_191.097_999_981_823,
         "semi parameter"
     );
+
+    // Test that DCMs are valid
+    let dcm = kep.dcm_from_traj_frame(Frame::VNC).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
+
+    let dcm = kep.dcm_from_traj_frame(Frame::RCN).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
+
+    let dcm = kep.dcm_from_traj_frame(Frame::RIC).unwrap();
+    assert!(((dcm * dcm.transpose()).determinant() - 1.0).abs() < 1e-12);
+    assert!(((dcm.transpose() * dcm).determinant() - 1.0).abs() < 1e-12);
 }
 
 #[test]

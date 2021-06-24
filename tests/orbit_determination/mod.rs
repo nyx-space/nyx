@@ -2,7 +2,7 @@ extern crate csv;
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
-use self::nyx::celestia::Orbit;
+use self::nyx::cosmic::Orbit;
 use self::nyx::od::ui::{Estimate, Filter, KfEstimate, NyxError, KF};
 use self::nyx::State;
 
@@ -31,7 +31,7 @@ fn empty_estimate() {
     );
     f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
     f64_nil!(empty.stm.norm(), "expected STM norm to be nil");
-    assert_eq!(empty.predicted, true, "expected predicted to be true");
+    assert!(empty.predicted, "expected predicted to be true");
 }
 
 #[test]

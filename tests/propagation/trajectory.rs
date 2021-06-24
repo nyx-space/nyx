@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::celestia::{Cosm, GuidanceMode, Orbit, Spacecraft};
+use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::thrustctrl::{Achieve, Ruggiero, ThrustControl, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::propagators::*;

@@ -2,7 +2,7 @@ extern crate nyx_space as nyx;
 
 #[test]
 fn nil_measurement() {
-    use self::nyx::celestia::{Cosm, Orbit};
+    use self::nyx::cosmic::{Cosm, Orbit};
     use self::nyx::od::ui::*;
     use self::nyx::time::{Epoch, J2000_OFFSET};
     use std::f64::EPSILON;

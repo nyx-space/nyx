@@ -17,7 +17,7 @@
 */
 
 use super::ThrustControl;
-use crate::celestia::{Frame, GuidanceMode, Spacecraft};
+use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::dimensions::Vector3;
 use crate::time::{Epoch, TimeUnit};
 use crate::TimeTagged;

@@ -22,7 +22,7 @@ use super::quantity::*;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
 use super::ParsingError;
-use crate::celestia::{Frame, Orbit};
+use crate::cosmic::{Frame, Orbit};
 use crate::md::{Event, StateParameter};
 use crate::time::{Duration, Epoch};
 use crate::NyxError;

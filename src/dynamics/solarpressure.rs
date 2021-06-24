@@ -18,8 +18,8 @@
 
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, Hyperdual};
 use super::ForceModel;
-use crate::celestia::eclipse::EclipseLocator;
-use crate::celestia::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
+use crate::cosmic::eclipse::EclipseLocator;
+use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::dimensions::{Const, Matrix3, Vector3};
 use crate::errors::NyxError;
 use std::fmt;

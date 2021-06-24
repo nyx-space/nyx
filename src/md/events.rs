@@ -17,7 +17,7 @@
 */
 
 use super::StateParameter;
-use crate::celestia::{Cosm, Frame, Orbit};
+use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::DefaultAllocator;
 use crate::time::{Duration, TimeUnit};

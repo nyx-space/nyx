@@ -19,9 +19,9 @@
 extern crate num;
 
 use self::num::traits::real::Real;
-use crate::celestia::Orbit;
+use crate::cosmic::Orbit;
 use crate::dimensions::{
-    allocator::Allocator, DefaultAllocator, DimName, Matrix3, OVector, Vector3, Vector6,
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3, Vector6,
 };
 use std::f64;
 
@@ -187,6 +187,28 @@ pub fn capitalize(s: &str) -> String {
     }
 }
 
+/// Builds a 6x6 DCM from the current, previous, and post DCMs, assuming that the previous and post DCMs are exactly one second before and one second after the current DCM.
+pub fn dcm_finite_differencing(
+    dcm_pre: Matrix3<f64>,
+    dcm_cur: Matrix3<f64>,
+    dcm_post: Matrix3<f64>,
+) -> Matrix6<f64> {
+    let drdt = 0.5 * dcm_post - 0.5 * dcm_pre;
+
+    let mut full_dcm = Matrix6::zeros();
+    for i in 0..6 {
+        for j in 0..6 {
+            if (i < 3 && j < 3) || (i >= 3 && j >= 3) {
+                full_dcm[(i, j)] = dcm_cur[(i % 3, j % 3)];
+            } else if i >= 3 && j < 3 {
+                full_dcm[(i, j)] = drdt[(i - 3, j)];
+            }
+        }
+    }
+
+    full_dcm
+}
+
 #[test]
 fn test_tilde_matrix() {
     let vec = Vector3::new(1.0, 2.0, 3.0);
@@ -196,27 +218,23 @@ fn test_tilde_matrix() {
 
 #[test]
 fn test_diagonality() {
-    assert_eq!(
-        is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        false,
+    assert!(
+        !is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         "lower triangular"
     );
 
-    assert_eq!(
-        is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        false,
+    assert!(
+        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         "symmetric but not diag"
     );
 
-    assert_eq!(
-        is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        false,
+    assert!(
+        !is_diagonal(&Matrix3::new(10.0, 1.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
         "upper triangular"
     );
 
-    assert_eq!(
+    assert!(
         is_diagonal(&Matrix3::new(10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 2.0)),
-        true,
         "diagonal"
     );
 }
