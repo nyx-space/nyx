@@ -21,7 +21,7 @@ extern crate num;
 use self::num::traits::real::Real;
 use crate::cosmic::Orbit;
 use crate::dimensions::{
-    allocator::Allocator, DefaultAllocator, DimName, Matrix3, OVector, Vector3, Vector6,
+    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3, Vector6,
 };
 use std::f64;
 
@@ -185,6 +185,28 @@ pub fn capitalize(s: &str) -> String {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
+}
+
+/// Builds a 6x6 DCM from the current, previous, and post DCMs, assuming that the previous and post DCMs are exactly one second before and one second after the current DCM.
+pub fn dcm_finite_differencing(
+    dcm_pre: Matrix3<f64>,
+    dcm_cur: Matrix3<f64>,
+    dcm_post: Matrix3<f64>,
+) -> Matrix6<f64> {
+    let drdt = 0.5 * dcm_post - 0.5 * dcm_pre;
+
+    let mut full_dcm = Matrix6::zeros();
+    for i in 0..6 {
+        for j in 0..6 {
+            if (i < 3 && j < 3) || (i >= 3 && j >= 3) {
+                full_dcm[(i, j)] = dcm_cur[(i % 3, j % 3)];
+            } else if i >= 3 && j < 3 {
+                full_dcm[(i, j)] = drdt[(i - 3, j)];
+            }
+        }
+    }
+
+    full_dcm
 }
 
 #[test]

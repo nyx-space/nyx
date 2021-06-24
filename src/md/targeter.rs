@@ -22,6 +22,7 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector6};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
+use crate::utils::dcm_finite_differencing;
 use std::convert::TryInto;
 use std::fmt;
 use std::time::{Duration, Instant};
@@ -237,7 +238,7 @@ where
             ],
             iterations: 100,
             objective_frame: None,
-            correction_frame: Some(Frame::RCN),
+            correction_frame: Some(Frame::VNC),
         }
     }
 
@@ -253,7 +254,6 @@ where
             variables,
             iterations: 100,
             objective_frame: None,
-            // correction_frame: None,
             correction_frame: Some(Frame::VNC),
         }
     }
@@ -291,6 +291,7 @@ where
     }
 
     /// Runs the targeter using finite differencing (for now).
+    #[allow(clippy::identity_op)]
     pub fn try_achieve_from(
         &self,
         initial_state: Spacecraft,
@@ -360,9 +361,24 @@ where
         // Now, let's apply the correction to the initial state
         if let Some(frame) = self.correction_frame {
             // The following will error if the frame is not local
-            let dcm = xi.orbit.dcm_from_traj_frame(frame)?;
+            let dcm_cur = xi.orbit.dcm_from_traj_frame(frame)?;
+            let dcm_pre = self
+                .prop
+                .with(xi)
+                .for_duration(-1 * TimeUnit::Second)?
+                .orbit
+                .dcm_from_traj_frame(frame)?;
+            let dcm_post = self
+                .prop
+                .with(xi)
+                .for_duration(1 * TimeUnit::Second)?
+                .orbit
+                .dcm_from_traj_frame(frame)?;
+            // Build the 6x6 rotation
+            let dcm = dcm_finite_differencing(dcm_pre, dcm_cur, dcm_post);
             // Now, the state frame is local and the correction is only on position, so we can grab the last three elements and rotate.
-            let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
+            let rotated_correction = dcm * state_correction;
+            let velocity_correction = rotated_correction.fixed_rows::<3>(3);
             xi.orbit.vx += velocity_correction[0];
             xi.orbit.vy += velocity_correction[1];
             xi.orbit.vz += velocity_correction[2];
@@ -474,20 +490,15 @@ where
 
                     let mut state_correction = Vector6::<f64>::zeros();
                     state_correction[var.component.vec_index()] += var.perturbation;
-                    // Now, let's apply the perturbation to the initial state
+                    // Now, let's apply the correction to the initial state
                     if let Some(frame) = self.correction_frame {
-                        let dcm = this_xi.orbit.dcm_from_traj_frame(frame).unwrap();
-                        let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
-                        this_xi.orbit.vx += velocity_correction[0];
-                        this_xi.orbit.vy += velocity_correction[1];
-                        this_xi.orbit.vz += velocity_correction[2];
+                        // The following will error if the frame is not local
+                        let dcm_vnc2inertial = this_xi.orbit.dcm_from_traj_frame(frame).unwrap();
+                        let velocity_correction =
+                            dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
+                        this_xi.orbit.apply_dv(velocity_correction);
                     } else {
-                        this_xi.orbit.x += state_correction[0];
-                        this_xi.orbit.y += state_correction[1];
-                        this_xi.orbit.z += state_correction[2];
-                        this_xi.orbit.vx += state_correction[3];
-                        this_xi.orbit.vy += state_correction[4];
-                        this_xi.orbit.vz += state_correction[5];
+                        this_xi.orbit = xi.orbit + state_correction;
                     }
 
                     let this_xf = self
@@ -528,7 +539,6 @@ where
 
                 for (j, _, jac_val) in &pert_calc {
                     jac[(i, *j)] = *jac_val;
-                    dbg!(*jac_val);
                 }
             }
 
@@ -542,18 +552,13 @@ where
                 }
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
-                    let dcm = state.orbit.dcm_from_traj_frame(frame).unwrap();
-                    let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
-                    state.orbit.vx += velocity_correction[0];
-                    state.orbit.vy += velocity_correction[1];
-                    state.orbit.vz += velocity_correction[2];
+                    let dcm_vnc2inertial =
+                        state.orbit.dcm_from_traj_frame(frame).unwrap().transpose();
+                    let velocity_correction =
+                        dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
+                    state.orbit.apply_dv(velocity_correction);
                 } else {
-                    state.orbit.x += state_correction[0];
-                    state.orbit.y += state_correction[1];
-                    state.orbit.z += state_correction[2];
-                    state.orbit.vx += state_correction[3];
-                    state.orbit.vy += state_correction[4];
-                    state.orbit.vz += state_correction[5];
+                    state.orbit = state.orbit + state_correction;
                 }
 
                 let sol = TargeterSolution {
@@ -612,7 +617,6 @@ where
 
             // And finally apply it to the xi
             let mut state_correction = Vector6::<f64>::zeros();
-            println!("state_correction = {}", state_correction);
             for (i, var) in self.variables.iter().enumerate() {
                 // Choose the minimum step between the provided max step and the correction.
                 if delta[i].abs() > var.max_step.abs() {
@@ -639,18 +643,11 @@ where
 
             // Now, let's apply the correction to the initial state
             if let Some(frame) = self.correction_frame {
-                let dcm = xi.orbit.dcm_from_traj_frame(frame).unwrap();
-                let velocity_correction = dcm * state_correction.fixed_rows::<3>(3);
-                xi.orbit.vx += velocity_correction[0];
-                xi.orbit.vy += velocity_correction[1];
-                xi.orbit.vz += velocity_correction[2];
+                let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame)?;
+                let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
+                xi.orbit.apply_dv(velocity_correction);
             } else {
-                xi.orbit.x += state_correction[0];
-                xi.orbit.y += state_correction[1];
-                xi.orbit.z += state_correction[2];
-                xi.orbit.vx += state_correction[3];
-                xi.orbit.vy += state_correction[4];
-                xi.orbit.vz += state_correction[5];
+                xi.orbit = xi.orbit + state_correction;
             }
             total_correction += delta;
             debug!("Total correction: {:e}", total_correction);
