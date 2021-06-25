@@ -155,6 +155,25 @@ fn srp_earth_meo_ecc_inc() {
     );
     assert!(err_r < 5e-2, "position error too large for SRP");
     assert!(err_v < 2e-5, "velocity error too large for SRP");
+
+    // Compare the case with the hyperdual EOMs (computation uses another part of the code)
+
+    let mut prop = setup.with(sc.with_stm());
+    let final_state_dual = prop.for_duration(prop_time).unwrap();
+
+    let (err_r, err_v) = rss_orbit_vec_errors(
+        &final_state.orbit.to_cartesian_vec(),
+        &final_state_dual.orbit.to_cartesian_vec(),
+    );
+    println!(
+        "Error between reals and duals accumulated over {} : {:.6} m \t{:.6} m/s",
+        prop_time,
+        err_r * 1e3,
+        err_v * 1e3
+    );
+    // This should be zero!
+    assert!(err_r < 2e-16, "position error too large for SRP");
+    assert!(err_v < 2e-16, "velocity error too large for SRP");
 }
 
 #[test]

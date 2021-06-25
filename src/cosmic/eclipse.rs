@@ -20,6 +20,7 @@ pub use super::{Bodies, Cosm, Frame, LTCorr, Orbit, Spacecraft};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnit};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
+use std::convert::Into;
 use std::fmt;
 use std::sync::Arc;
 
@@ -32,9 +33,9 @@ pub enum EclipseState {
     Visibilis,
 }
 
-impl EclipseState {
-    /// Returns the eclipse state as an f64: 1.0 total visibility, 0.0 total umbra.
-    pub fn as_f64(self) -> f64 {
+#[allow(clippy::from_over_into)]
+impl Into<f64> for EclipseState {
+    fn into(self) -> f64 {
         match self {
             Self::Umbra => 0.0,
             Self::Visibilis => 1.0,

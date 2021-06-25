@@ -255,6 +255,7 @@ where
         }
 
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
             if let Some(snc_matrix) = snc.to_matrix(nominal_state.epoch()) {

@@ -512,7 +512,7 @@ where
             self.prop.for_duration(delta_t)?;
 
             while let Ok(prop_state) = rx.try_recv() {
-                let nominal_state = S::extract(&prop_state);
+                let nominal_state = S::extract(prop_state);
 
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 let dt = nominal_state.epoch();
@@ -629,7 +629,7 @@ where
         info!("Mapping covariance");
 
         while let Ok(prop_state) = rx.try_recv() {
-            let nominal_state = S::extract(&prop_state);
+            let nominal_state = S::extract(prop_state);
             // Update the STM of the KF (needed between each measurement or time update)
             self.kf.update_stm(nominal_state.stm()?);
             info!("final time update {}", nominal_state.epoch());

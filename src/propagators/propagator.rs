@@ -84,8 +84,6 @@ where
     }
 
     pub fn with(&'a self, state: D::StateType) -> PropInstance<'a, D, E> {
-        // let init_time = state.epoch();
-        // let init_state_vec = dynamics.state_vector();
         // Pre-allocate the k used in the propagator
         let mut k = Vec::with_capacity(self.stages + 1);
         for _ in 0..self.stages {
@@ -142,8 +140,6 @@ where
     prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
     step_size: Duration, // Stores the adapted step for the _next_ call
     fixed_step: bool,
-    // init_time: Epoch,
-    // init_state_vec: OVector<f64, <D::StateType as State>::Size>,
     // Allows us to do pre-allocation of the ki vectors
     k: Vec<OVector<f64, <D::StateType as State>::VecLength>>,
 }
@@ -167,9 +163,7 @@ where
     }
 
     /// Returns the state of the propagation
-    ///
-    /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
-    pub fn state_vector(&self) -> OVector<f64, <D::StateType as State>::VecLength> {
+    fn state_vector(&self) -> OVector<f64, <D::StateType as State>::VecLength> {
         self.state.as_vector().unwrap()
     }
 
@@ -180,15 +174,15 @@ where
             debug!("No propagation necessary");
             return Ok(self.state);
         }
+        let stop_time = self.state.epoch() + duration;
         if duration > 2 * TimeUnit::Minute || duration < -2 * TimeUnit::Minute {
             // Prevent the print spam for EKF orbit determination cases
-            info!("Propagating for {}", duration);
+            info!("Propagating for {} until {}", duration, stop_time);
         }
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
-        let stop_time = self.state.epoch() + duration;
         loop {
             let dt = self.state.epoch();
             if (!backprop && dt + self.step_size > stop_time)

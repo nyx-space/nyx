@@ -24,7 +24,6 @@ use crate::cosmic::Spacecraft;
 use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector3};
 use crate::errors::NyxError;
 
-use crate::time::TimeUnit;
 use crate::{State, TimeTagged};
 use std::fmt;
 use std::sync::Arc;
@@ -258,6 +257,11 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, Const<8>>,
         ctx: &Self::StateType,
     ) -> Result<(OVector<f64, Const<8>>, OMatrix<f64, Const<8>, Const<8>>), NyxError> {
+        // Rebuild the appropriately sized state and STM.
+        // This is the orbital state followed by Cr and Cd
+        let mut d_x = OVector::<f64, Const<8>>::zeros();
+        let mut grad = OMatrix::<f64, Const<8>, Const<8>>::zeros();
+
         // This also means that the STM for the Spacecraft must also be copied into the spacecraft structure
         let one = Const::<1> {};
         let six = Const::<6> {};
@@ -271,15 +275,12 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         );
 
         let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &pos_vel, &ctx.orbit)?;
-        // Rebuild the appropriately sized state and STM.
-        // This is the orbital state followed by Cr and Cd
-        let mut d_x = OVector::<f64, Const<8>>::from_iterator(
-            orb_state
-                .iter()
-                .chain(OVector::<f64, Const<2>>::new(ctx.cr, ctx.cd).iter())
-                .cloned(),
-        );
-        let mut grad = OMatrix::<f64, Const<8>, Const<8>>::zeros();
+
+        // Copy the d orbit dt data
+        for (i, val) in orb_state.iter().enumerate() {
+            d_x[i] = *val;
+        }
+
         for i in 0..6 {
             for j in 0..6 {
                 grad[(i, j)] = orb_grad[(i, j)];
@@ -294,21 +295,12 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         let total_mass = ctx.mass_kg();
         let radius = state_vec.fixed_rows::<3>(0).into_owned();
 
-        // Recreate the osculating state.
-        let mut osc_sc = *ctx;
-        osc_sc.set_epoch(ctx.epoch() + delta_t_s * TimeUnit::Second);
-        osc_sc.orbit.x = orb_state[0];
-        osc_sc.orbit.y = orb_state[1];
-        osc_sc.orbit.z = orb_state[2];
-        osc_sc.orbit.vx = orb_state[3];
-        osc_sc.orbit.vy = orb_state[4];
-        osc_sc.orbit.vz = orb_state[5];
-
         for model in &self.force_models {
-            // let model_frc = model.dual_eom(delta_t, &radius, &osc_sc)? / total_mass;
-            let (model_frc, model_grad) = model.dual_eom(&radius, &osc_sc)?;
+            let (model_frc, model_grad) = model.dual_eom(&radius, ctx)?;
             for i in 0..3 {
+                // Add the velocity changes
                 d_x[i + 3] += model_frc[i] / total_mass;
+                // Add the velocity partials
                 for j in 1..4 {
                     grad[(i + 3, j - 1)] += model_grad[(i, j - 1)] / total_mass;
                 }

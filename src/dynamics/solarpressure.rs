@@ -66,9 +66,11 @@ impl ForceModel for SolarPressure {
             .cosm
             .frame_chg(osc, self.e_loc.light_source)
             .radius();
+
         let r_sun_unit = r_sun / r_sun.norm();
+
         // Compute the shaddowing factor.
-        let k = self.e_loc.compute(osc).as_f64();
+        let k: f64 = self.e_loc.compute(osc).into();
 
         let r_sun_au = r_sun.norm() / AU;
         // in N/(m^2)
@@ -96,9 +98,10 @@ impl ForceModel for SolarPressure {
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
         // Compute the shaddowing factor.
-        let k = self.e_loc.compute(osc).as_f64();
+        let k: f64 = self.e_loc.compute(osc).into();
 
-        let inv_r_sun_au = Hyperdual::<f64, Const<8>>::from_real(1.0) / (norm(&r_sun_d) / AU);
+        let r_sun_au = norm(&r_sun_d) / AU;
+        let inv_r_sun_au = Hyperdual::<f64, Const<8>>::from_real(1.0) / (r_sun_au);
         let inv_r_sun_au_p2 = inv_r_sun_au * inv_r_sun_au;
         // in N/(m^2)
         let flux_pressure =
@@ -116,7 +119,7 @@ impl ForceModel for SolarPressure {
         let mut fx = Vector3::zeros();
         let mut grad = Matrix3::zeros();
         for i in 0..3 {
-            fx[i] += dual_force[i][0];
+            fx[i] += dual_force[i].real();
             // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
             for j in 0..3 {
                 grad[(i, j)] += dual_force[i][j + 1];

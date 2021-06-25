@@ -531,7 +531,7 @@ impl StateFormatter {
             };
             mapped.insert(name.to_lowercase(), mapped_orbit);
         }
-        let mut formatted = Vec::new();
+        let mut formatted = Vec::with_capacity(self.headers.len());
 
         for hdr in &self.headers {
             // Grab the state in the other frame if needed

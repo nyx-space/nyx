@@ -354,21 +354,19 @@ impl NavSolution<Orbit> for KfEstimate<Orbit> {
 }
 
 impl EstimateFrom<Spacecraft> for Orbit {
-    fn extract(from: &Spacecraft) -> Self {
+    fn extract(from: Spacecraft) -> Self {
         from.orbit
-    }
-
-    fn add_dev(to: &Spacecraft, dev: OVector<f64, Self::Size>) -> Spacecraft {
-        *to + dev
     }
 }
 
 impl EstimateFrom<Orbit> for Orbit {
-    fn extract(from: &Orbit) -> Self {
-        *from
+    fn extract(from: Orbit) -> Self {
+        from
     }
+}
 
-    fn add_dev(to: &Orbit, dev: OVector<f64, Self::Size>) -> Orbit {
-        *to + dev
+impl EstimateFrom<Spacecraft> for Spacecraft {
+    fn extract(from: Spacecraft) -> Self {
+        from
     }
 }

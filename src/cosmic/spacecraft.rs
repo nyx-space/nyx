@@ -372,8 +372,9 @@ impl State for Spacecraft {
             orbit_vec[if i < 6 { i } else { i - 2 }] = *val;
         }
         self.orbit.set(epoch, &orbit_vec)?;
-        self.cr = vector[7];
-        self.cd = vector[8];
+        self.cr = vector[6];
+        self.cd = vector[7];
+        // TODO: Invert the STM here based on STM Kind of orbit!!
         self.cr_partials = vector.fixed_rows::<13>(44).into_owned();
         self.cd_partials = vector.fixed_rows::<15>(57).into_owned();
         self.fuel_mass_kg = vector[72];

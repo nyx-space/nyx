@@ -157,6 +157,6 @@ where
         + Allocator<f64, Self::VecLength>
         + Allocator<f64, Self::Size, Self::Size>,
 {
-    fn extract(from: &O) -> Self;
-    fn add_dev(to: &O, dev: OVector<f64, Self::Size>) -> O;
+    /// From the state extract the state to be estimated
+    fn extract(from: O) -> Self;
 }

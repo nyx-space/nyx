@@ -206,7 +206,7 @@ impl PointMasses {
 
     /// Initializes the multibody point mass dynamics with the provided list of bodies, and accounting for some light time correction
     pub fn with_correction(bodies: &[Bodies], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
-        let mut refs = Vec::new();
+        let mut refs = Vec::with_capacity(bodies.len());
         // Check that these celestial bodies exist and build their references
         for body in bodies {
             refs.push(cosm.frame_from_ephem_path(&body.ephem_path()));
@@ -221,7 +221,7 @@ impl PointMasses {
 
     /// Allows using bodies by name, defined in the non-default XB
     pub fn specific(body_names: &[String], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
-        let mut refs = Vec::new();
+        let mut refs = Vec::with_capacity(body_names.len());
         // Check that these celestial bodies exist and build their references
         for body in body_names {
             refs.push(cosm.frame(body));

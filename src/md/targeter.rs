@@ -412,7 +412,7 @@ where
             };
 
             // Build the error vector
-            let mut param_errors = Vec::new();
+            let mut param_errors = Vec::with_capacity(self.objectives.len());
             let mut converged = true;
 
             // Build the B-Plane once, if needed, and always in the objective frame
@@ -423,7 +423,7 @@ where
             };
 
             // Build debugging information
-            let mut objmsg = Vec::new();
+            let mut objmsg = Vec::with_capacity(self.objectives.len());
 
             // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
             // As such, it includes the STM of that variable for the whole propagation arc.

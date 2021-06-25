@@ -733,9 +733,9 @@ where
     let start_win_epoch = this_wdn[0].epoch();
     let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
     let window_duration = end_win_epoch - start_win_epoch;
-    let mut ts = Vec::new();
+    let mut ts = Vec::with_capacity(this_wdn.len());
     let mut values = Vec::with_capacity(S::VecLength::dim());
-    let mut coefficients = Vec::new();
+    let mut coefficients = Vec::with_capacity(S::VecLength::dim());
     // Initialize the vector of values and coefficients.
     for _ in 0..S::VecLength::dim() {
         values.push(Vec::with_capacity(this_wdn.len()));
