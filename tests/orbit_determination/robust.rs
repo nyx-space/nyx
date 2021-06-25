@@ -165,9 +165,10 @@ fn od_robust_test_ekf_realistic() {
         "time of final EST and TRUTH epochs differ"
     );
     let rmag_err = (final_truth_state - est.state()).rmag();
+
     assert!(
-        rmag_err < 5e-1,
-        "final radius error should be less than 500 m (is instead {:.3} m)",
+        rmag_err < 1e-1,
+        "final radius error should be less than 100 m (is instead {:.3} m)",
         rmag_err * 1e3
     );
 }

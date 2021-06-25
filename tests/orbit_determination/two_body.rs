@@ -134,6 +134,19 @@ fn od_tb_ekf_fixed_step_perfect_stations() {
             );
         }
     }
+
+    // Check the final estimate
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -177,7 +190,7 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
@@ -226,7 +239,7 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
             continue;
         }
         assert!(
-            est.state_deviation().norm() < 1e-6,
+            est.state_deviation().norm() < 1e-12,
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
@@ -292,6 +305,19 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
         "Initial state after iteration: \n{:x}",
         odp.estimates[0].state()
     );
+
+    // Check the final estimate
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -334,7 +360,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration(prop_time).unwrap();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         // Convert the state to ECI.
@@ -395,10 +421,30 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     println!("{}\n{}", initial_state2, odp.estimates[0].state());
 
     println!(
-        "{}\n{}",
+        "Difference in initial states radii without iterations: {} km",
         dstate_no_iteration.rmag(),
-        dstate_iteration.rmag()
-    )
+    );
+    println!(
+        "Difference in initial states radii with iterations: {} km",
+        dstate_iteration.rmag(),
+    );
+    assert!(
+        dstate_iteration.rmag() < dstate_no_iteration.rmag(),
+        "Iteration did not reduce initial error"
+    );
+
+    // Check the final estimate
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 50e-3, "More than 50 meter error");
+    assert!(delta.vmag() < 50e-6, "More than 50 mm/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -442,7 +488,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
@@ -497,7 +543,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
             println!("{}", est);
         }
         assert!(
-            est.state_deviation().norm() < 1e-6,
+            est.state_deviation().norm() < 1e-12,
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
@@ -523,6 +569,19 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
         wtr.serialize(est.clone())
             .expect("could not write to stdout");
     }
+
+    // Check the final estimate
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -584,7 +643,7 @@ fn od_tb_ckf_map_covar() {
 
     odp.map_covar(dt + prop_time).unwrap();
 
-    // Check that the covariance inflated
+    // Check that the covariance inflated (we don't get the norm of the estimate because it's zero without any truth data)
     let estimates = odp.estimates;
     let est = &estimates[estimates.len() - 1];
     for i in 0..6 {
@@ -720,8 +779,19 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
         wtr.serialize(est.clone())
             .expect("could not write to stdout");
     }
+
+    // Check the final estimate
     let est = &odp.estimates[odp.estimates.len() - 1];
-    println!("{}\n{}\n\n{}", est, est.state_deviation(), final_truth);
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -764,7 +834,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
@@ -849,4 +919,17 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         wtr.serialize(est.clone())
             .expect("could not write to stdout");
     }
+
+    // Check the final estimate
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} m/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e3
+    );
+
+    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
 }

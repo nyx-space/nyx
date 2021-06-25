@@ -17,7 +17,7 @@
 */
 
 use super::{Orbit, State, StmKind, TimeTagged};
-use crate::dimensions::{Const, Matrix6, OMatrix, OVector, Vector1};
+use crate::dimensions::{Const, Matrix6, OMatrix, OVector};
 use crate::dynamics::thrustctrl::Thruster;
 use crate::errors::NyxError;
 use crate::time::Epoch;
@@ -337,36 +337,44 @@ impl State for Spacecraft {
     }
 
     /// The vector is organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Orbit_STM(36), Cr, Cr_partials (13), Cd, Cd_partials (15), Fuel mass ]
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Orbit_STM(36), Cr_partials (13), Cd_partials (15), Fuel mass ]
     fn as_vector(&self) -> Result<OVector<f64, Const<73>>, NyxError> {
         let orb_vec: OVector<f64, Const<42>> = self.orbit.as_vector()?;
-        Ok(OVector::<f64, Const<73>>::from_iterator(
-            orb_vec
-                .iter()
-                .chain(
-                    Vector1::new(self.cr).iter().chain(
-                        self.cr_partials.iter().chain(
-                            Vector1::new(self.cd).iter().chain(
-                                self.cd_partials
-                                    .iter()
-                                    .chain(Vector1::new(self.fuel_mass_kg).iter()),
-                            ),
-                        ),
-                    ),
-                )
-                .cloned(),
-        ))
+        let mut vector = OVector::<f64, Const<73>>::zeros();
+        for (i, val) in orb_vec.iter().enumerate() {
+            // Place the orbit state first, then skip two (Cr, Cd), then copy orbit STM
+            vector[if i < 6 { i } else { i + 2 }] = *val;
+        }
+        vector[6] = self.cr;
+        vector[7] = self.cd;
+        for (i, val) in self.cr_partials.iter().enumerate() {
+            vector[i + 44] = *val;
+        }
+        for (i, val) in self.cd_partials.iter().enumerate() {
+            vector[i + 57] = *val;
+        }
+        vector[72] = self.fuel_mass_kg;
+        Ok(vector)
     }
 
     /// Vector is expected to be organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Orbit_STM(36), Cr, Cr_partials (13), Cd, Cd_partials (15), Fuel mass ]
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Orbit_STM(36), Cr_partials (13), Cd_partials (15), Fuel mass ]
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<73>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
-        let orbit_vec = vector.fixed_rows::<42>(0).into_owned();
+        // Rebuild the vectors
+        let mut orbit_vec = OVector::<f64, Const<42>>::zeros();
+        // Grab 44 elements and ignore the Cr and Cd
+        for (i, val) in vector.fixed_rows::<44>(0).iter().enumerate() {
+            if i == 6 || i == 7 {
+                // Skip Cr and Cd
+                continue;
+            }
+            orbit_vec[if i < 6 { i } else { i - 2 }] = *val;
+        }
         self.orbit.set(epoch, &orbit_vec)?;
-        self.cr = vector[42];
-        self.cr_partials = vector.fixed_rows::<13>(43).into_owned();
-        self.cd = vector[56];
+        self.cr = vector[7];
+        self.cd = vector[8];
+        self.cr_partials = vector.fixed_rows::<13>(44).into_owned();
         self.cd_partials = vector.fixed_rows::<15>(57).into_owned();
         self.fuel_mass_kg = vector[72];
         Ok(())
@@ -411,24 +419,6 @@ impl State for Spacecraft {
     }
 }
 
-impl Add<OVector<f64, Const<7>>> for Spacecraft {
-    type Output = Self;
-
-    /// Adds the provided state deviation to this orbit
-    fn add(self, other: OVector<f64, Const<7>>) -> Self {
-        let mut me = self;
-        me.orbit.x += other[0];
-        me.orbit.y += other[1];
-        me.orbit.z += other[2];
-        me.orbit.vx += other[3];
-        me.orbit.vy += other[4];
-        me.orbit.vz += other[5];
-        me.fuel_mass_kg += other[6];
-
-        me
-    }
-}
-
 impl Add<OVector<f64, Const<6>>> for Spacecraft {
     type Output = Self;
 
@@ -460,7 +450,6 @@ impl Add<OVector<f64, Const<8>>> for Spacecraft {
         me.orbit.vz += other[5];
         me.cr += other[6];
         me.cd += other[7];
-        me.fuel_mass_kg += other[8];
 
         me
     }

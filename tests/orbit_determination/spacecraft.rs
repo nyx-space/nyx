@@ -159,6 +159,18 @@ fn sc_ckf_perfect_stations() {
     let est = last_est.unwrap();
     println!("{:.2e}", est.state_deviation().norm());
     println!("{:.2e}", est.covar.norm());
-    assert!(est.state_deviation().norm() < 5e-5);
+    assert!(est.state_deviation().norm() < 1e-12);
     assert!(est.covar.norm() < 1e-5);
+
+    assert!(
+        est.state_deviation().norm() < 1e-12,
+        "estimate error should be zero (perfect dynamics) ({:e})",
+        est.state_deviation().norm()
+    );
+
+    assert!(
+        est.covar.diagonal().norm() < 1e-9,
+        "estimate covariance norm should be zero (perfect dynamics) ({:e})",
+        est.covar.diagonal().norm()
+    );
 }

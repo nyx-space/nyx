@@ -21,7 +21,7 @@ use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
 use crate::cosmic::Spacecraft;
-use crate::dimensions::{Const, OMatrix, OVector, Vector3};
+use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector3};
 use crate::errors::NyxError;
 
 use crate::time::TimeUnit;
@@ -181,6 +181,14 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
                 &hyperspace_from_vector(&osc_sc.as_vector()?.fixed_rows::<8>(0).into_owned()),
                 &osc_sc,
             )?;
+
+            for (i, val) in state.iter().enumerate() {
+                d_x[i] = *val;
+            }
+
+            for (i, val) in grad.iter().enumerate() {
+                d_x[i + <Spacecraft as State>::Size::dim()] = *val;
+            }
         } else {
             // Compute the orbital dynamics
             let orbital_dyn_vec = state.fixed_rows::<42>(0).into_owned();
