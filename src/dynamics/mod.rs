@@ -136,7 +136,7 @@ pub trait ForceModel: Send + Sync + fmt::Display {
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
     fn dual_eom(
         &self,
-        radius: &Vector3<Hyperdual<f64, Const<8>>>,
+        radius: &Vector3<Hyperdual<f64, Const<9>>>,
         osc_ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }

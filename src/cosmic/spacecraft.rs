@@ -337,36 +337,38 @@ impl State for Spacecraft {
     }
 
     /// The vector is organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Orbit_STM(36), Fuel mass, Cr, Cr_partials (13), Cd, Cd_partials (15) ]
+    /// [X, Y, Z, Vx, Vy, Vz, Orbit_STM(36), Cr, Cr_partials (13), Cd, Cd_partials (15), Fuel mass ]
     fn as_vector(&self) -> Result<OVector<f64, Const<73>>, NyxError> {
         let orb_vec: OVector<f64, Const<42>> = self.orbit.as_vector()?;
         Ok(OVector::<f64, Const<73>>::from_iterator(
             orb_vec
                 .iter()
                 .chain(
-                    OVector::<_, Const<2>>::new(self.fuel_mass_kg, self.cr)
-                        .iter()
-                        .chain(
-                            self.cr_partials
-                                .iter()
-                                .chain(Vector1::new(self.cd).iter().chain(self.cd_partials.iter())),
+                    Vector1::new(self.cr).iter().chain(
+                        self.cr_partials.iter().chain(
+                            Vector1::new(self.cd).iter().chain(
+                                self.cd_partials
+                                    .iter()
+                                    .chain(Vector1::new(self.fuel_mass_kg).iter()),
+                            ),
                         ),
+                    ),
                 )
                 .cloned(),
         ))
     }
 
     /// Vector is expected to be organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Orbit_STM(36), Fuel mass, Cr, Cr_partials (13), Cd, Cd_partials (15) ]
+    /// [X, Y, Z, Vx, Vy, Vz, Orbit_STM(36), Cr, Cr_partials (13), Cd, Cd_partials (15), Fuel mass ]
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<73>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
         let orbit_vec = vector.fixed_rows::<42>(0).into_owned();
         self.orbit.set(epoch, &orbit_vec)?;
-        self.fuel_mass_kg = vector[42];
-        self.cr = vector[43];
-        self.cr_partials = vector.fixed_rows::<13>(44).into_owned();
-        self.cd = vector[57];
-        self.cd_partials = vector.fixed_rows::<15>(58).into_owned();
+        self.cr = vector[42];
+        self.cr_partials = vector.fixed_rows::<13>(43).into_owned();
+        self.cd = vector[56];
+        self.cd_partials = vector.fixed_rows::<15>(57).into_owned();
+        self.fuel_mass_kg = vector[72];
         Ok(())
     }
 
@@ -384,19 +386,20 @@ impl State for Spacecraft {
                 for (i, val) in self.cr_partials.iter().enumerate() {
                     if i <= 7 {
                         // Row data
-                        rtn[(7, i)] = *val;
+                        rtn[(6, i)] = *val;
                     } else {
-                        rtn[(7 - i - 1, 7)] = *val;
+                        rtn[(6 - i - 1, 6)] = *val;
                     }
                 }
                 for (i, val) in self.cd_partials.iter().enumerate() {
                     if i <= 8 {
                         // Row data
-                        rtn[(8, i)] = *val;
+                        rtn[(7, i)] = *val;
                     } else {
-                        rtn[(8 - i - 1, 8)] = *val;
+                        rtn[(7 - i - 1, 7)] = *val;
                     }
                 }
+                // Fuel partial is zero for now, hence no rtn[(8,8)] = 0.0
                 Ok(rtn)
             }
             None => Err(NyxError::StateTransitionMatrixUnset),

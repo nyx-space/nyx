@@ -80,7 +80,7 @@ impl ForceModel for SolarPressure {
 
     fn dual_eom(
         &self,
-        _radius: &Vector3<Hyperdual<f64, Const<8>>>,
+        _radius: &Vector3<Hyperdual<f64, Const<9>>>,
         ctx: &Spacecraft,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         let osc = &ctx.orbit;
