@@ -6,6 +6,7 @@ use self::nyx::cosmic::{Cosm, Orbit};
 use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::sph_harmonics::Harmonics;
+use self::nyx::io::formatter::NavSolutionFormatter;
 use self::nyx::io::gravity::*;
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
@@ -151,7 +152,20 @@ fn od_tb_ekf_fixed_step_perfect_stations() {
 
 #[allow(clippy::identity_op)]
 #[test]
-fn od_tb_ckf_fixed_step_perfect_stations() {
+fn od_val_tb_ckf_fixed_step_perfect_stations() {
+    /*
+     * This tests that the state transition matrix computation is correct with two body dynamics.
+     *
+     * Specifically, the same dynamics are used for both the measurement generation and for the estimation.
+     * However, only the estimation generation propagates the STM. When STM propagation is enabled, the code will compute
+     * the dynamics using a hyperdual representation in 7 dimensions: 1 for the reals, 3 for the position partials,
+     * 3 for the velocity partials.
+     *
+     * Hence, if the filter state estimation is any different from the truth data, then it means that the equations of
+     * motion computed in hyperdual space differ from the ones computes in the reals.
+     *
+     * Thereby, this serves as a validation of the orbital dynamics implementation.
+     **/
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -177,29 +191,29 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
+    let (truth_tx, truth_rx) = mpsc::channel();
+    let mut measurements = Vec::with_capacity(10000);
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
+    // Generate the truth data on one thread.
     let orbital_dyn = OrbitalDynamics::two_body();
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     let final_truth = prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
+                break;
             }
         }
     }
@@ -207,9 +221,11 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e-3;
-    let covar_velocity = 1.0e-6;
+    let initial_state_est = initial_state.with_stm();
+    // Use the same setup as earlier
+    let prop_est = setup.with(initial_state_est);
+    let covar_radius = 1.0e-3_f64.powi(2);
+    let covar_velocity = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
         covar_radius,
@@ -219,11 +235,12 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
         covar_velocity,
     ));
 
-    // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    // Define the initial orbit estimate
+    let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+    let measurement_noise =
+        Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
@@ -231,12 +248,25 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
 
     odp.process_measurements(&measurements).unwrap();
 
+    // Initialize the formatter
+    let estimate_fmtr = NavSolutionFormatter::default("tb_ckf.csv".to_owned(), cosm);
+
     let mut wtr = csv::Writer::from_writer(io::stdout());
+    wtr.serialize(&estimate_fmtr.headers)
+        .expect("could not write to stdout");
     let mut printed = false;
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
+        }
+        for i in 0..6 {
+            assert!(
+                est.covar[(i, i)] >= 0.0,
+                "covar diagonal element negative @ [{}, {}]",
+                i,
+                i
+            );
         }
         assert!(
             est.state_deviation().norm() < 1e-12,
@@ -245,7 +275,8 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
         );
 
         if !printed {
-            wtr.serialize(est.clone())
+            // Format the estimate
+            wtr.serialize(estimate_fmtr.fmt(est))
                 .expect("could not write to stdout");
             printed = true;
         }
@@ -253,38 +284,37 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
 
     for res in &odp.residuals {
         assert!(
-            res.postfit.norm() < 1e-12,
+            res.postfit.norm() < 1e-5,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );
     }
 
-    // Check that the covariance deflated
-    let estimates = odp.estimates.clone();
-    let est = &estimates[estimates.len() - 1];
-    for i in 0..6 {
-        assert!(
-            est.covar[(i, i)] >= 0.0,
-            "covar diagonal element negative @ [{}, {}]",
-            i,
-            i
-        );
-    }
-    for i in 0..6 {
-        if i < 3 {
-            assert!(
-                est.covar[(i, i)] < covar_radius,
-                "covar radius did not decrease"
-            );
-        } else {
-            assert!(
-                est.covar[(i, i)] < covar_velocity,
-                "covar velocity did not decrease"
-            );
-        }
-    }
+    let est = odp.estimates.last().unwrap();
+    println!("estimate error {:.2e}", est.state_deviation().norm());
+    println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
-    println!("N-1 not smoothed: \n{}", estimates[estimates.len() - 2]);
+    assert!(
+        est.state_deviation().norm() < 1e-12,
+        "estimate error should be zero (perfect dynamics) ({:e})",
+        est.state_deviation().norm()
+    );
+
+    assert!(
+        est.covar.diagonal().norm() < 1e-4,
+        "estimate covariance norm should be zero (perfect dynamics) ({:e})",
+        est.covar.diagonal().norm()
+    );
+
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
 
     // Iterate
     odp.iterate(
@@ -307,17 +337,32 @@ fn od_tb_ckf_fixed_step_perfect_stations() {
     );
 
     // Check the final estimate
-    let est = &odp.estimates[odp.estimates.len() - 1];
-    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let est = odp.estimates.last().unwrap();
+    println!("estimate error {:.2e}", est.state_deviation().norm());
+    println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
+
+    assert!(
+        est.state_deviation().norm() < 1e-12,
+        "estimate error should be zero (perfect dynamics) ({:e})",
+        est.state_deviation().norm()
+    );
+
+    // Note we accept a larger covariance diagonal here because smoothing will increase the covariance
+    assert!(
+        est.covar.diagonal().norm() < 1e-4,
+        "estimate covariance norm should be zero (perfect dynamics) ({:e})",
+        est.covar.diagonal().norm()
+    );
+
     let delta = est.state() - final_truth;
     println!(
-        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
         delta.rmag() * 1e3,
         delta.vmag() * 1e6
     );
 
-    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
-    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
+    assert!(delta.rmag() < 1e-9, "More than 1 micrometer error");
+    assert!(delta.vmag() < 1e-9, "More than 1 micrometer/s error");
 }
 
 #[allow(clippy::identity_op)]

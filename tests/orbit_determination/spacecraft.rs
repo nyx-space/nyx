@@ -14,7 +14,21 @@ use std::sync::mpsc;
 
 #[allow(clippy::identity_op)]
 #[test]
-fn sc_ckf_perfect_stations() {
+fn od_val_sc_mb_srp_reals_duals_models() {
+    /*
+     * This tests that the state transition matrix computation is correct when multiple celestial gravities and solar radiation pressure
+     * are added to the model.
+     *
+     * Specifically, the same dynamics are used for both the measurement generation and for the estimation.
+     * However, only the estimation generation propagates the STM. When STM propagation is enabled, the code will compute
+     * the dynamics using a hyperdual representation in 9 dimensions: 1 for the reals, 3 for the position partials,
+     * 3 for the velocity partials, 1 for the Cr partials and 1 for the Cd partials.
+     *
+     * Hence, if the filter state estimation is any different from the truth data, then it means that the equations of
+     * motion computed in hyperdual space differ from the ones computes in the reals.
+     *
+     * Thereby, this serves as a validation of the spacecraft dynamics and SRP duals implementation.
+     **/
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -53,7 +67,8 @@ fn sc_ckf_perfect_stations() {
 
     // Generate the truth data on one thread.
 
-    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    // let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let bodies = vec![Bodies::Earth ];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let sc_dynamics =
         SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));
@@ -63,7 +78,7 @@ fn sc_ckf_perfect_stations() {
     let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
     let mut prop = setup.with(sc_init_state);
     prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_sc_state) = truth_rx.try_recv() {
@@ -80,8 +95,7 @@ fn sc_ckf_perfect_stations() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let mut initial_state_est = initial_state;
-    initial_state_est.enable_stm();
+    let initial_state_est = initial_state.with_stm();
     let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, sc_dry_mass, sc_area);
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est);
@@ -116,7 +130,6 @@ fn sc_ckf_perfect_stations() {
     wtr.serialize(&estimate_fmtr.headers)
         .expect("could not write to stdout");
     let mut printed = false;
-    let mut last_est = None;
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
@@ -131,7 +144,7 @@ fn sc_ckf_perfect_stations() {
             );
         }
         assert!(
-            est.state_deviation().norm() < 1e-4,
+            est.state_deviation().norm() < 1e-12,
             "estimate error should be zero (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
@@ -142,8 +155,6 @@ fn sc_ckf_perfect_stations() {
                 .expect("could not write to stdout");
             printed = true;
         }
-
-        last_est = Some(est);
     }
 
     for res in &odp.residuals {
@@ -154,11 +165,23 @@ fn sc_ckf_perfect_stations() {
         );
     }
 
-    // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
-    // The filter in multibody dynamics has been validated against JPL tools using a proprietary scenario.
-    let est = last_est.unwrap();
-    println!("{:.2e}", est.state_deviation().norm());
-    println!("{:.2e}", est.covar.norm());
+    let est = odp.estimates.last().unwrap();
+    println!("estimate error {:.2e}", est.state_deviation().norm());
+    println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
+
+    for i in 0..6 {
+        if i < 3 {
+            assert!(
+                est.covar[(i, i)] < covar_radius,
+                "covar radius did not decrease"
+            );
+        } else {
+            assert!(
+                est.covar[(i, i)] < covar_velocity,
+                "covar velocity did not decrease"
+            );
+        }
+    }
 
     assert!(
         est.state_deviation().norm() < 1e-12,
@@ -171,4 +194,14 @@ fn sc_ckf_perfect_stations() {
         "estimate covariance norm should be zero (perfect dynamics) ({:e})",
         est.covar.diagonal().norm()
     );
+
+    let delta = est.state() - final_truth.orbit;
+    println!(
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 1e-9, "More than 1 micrometer error");
+    assert!(delta.vmag() < 1e-9, "More than 1 micrometer/s error");
 }

@@ -672,7 +672,7 @@ fn multi_body_dynamics_dual() {
 
     let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let halo_rcvr = Orbit::cartesian_stm(
+    let halo_rcvr = Orbit::cartesian(
         333_321.004_516,
         -76_134.198_887,
         -20_873.831_939,
@@ -687,8 +687,23 @@ fn multi_body_dynamics_dual() {
     let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
-    let mut prop = setup.with(halo_rcvr);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state = setup.with(halo_rcvr).for_duration(prop_time).unwrap();
+    let mut prop = setup.with(halo_rcvr.with_stm());
+    let final_state_dual = prop.for_duration(prop_time).unwrap();
+
+    let (err_r, err_v) = rss_orbit_vec_errors(
+        &final_state.to_cartesian_vec(),
+        &final_state_dual.to_cartesian_vec(),
+    );
+    println!(
+        "Error between reals and duals accumulated over {} : {:.6} m \t{:.6} m/s",
+        prop_time,
+        err_r * 1e3,
+        err_v * 1e3
+    );
+    // This should be zero!
+    assert!(err_r < 2e-16, "position error too large for 12x12 gravity");
+    assert!(err_v < 2e-16, "velocity error too large for 12x12 gravity");
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_stm = final_state.stm.unwrap();
@@ -810,24 +825,41 @@ fn val_earth_sph_harmonics_12x12() {
 
     let dynamics = OrbitalDynamics::from_model(harmonics);
 
-    let prop_state = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9))
-        .with(state)
-        .for_duration(1 * TimeUnit::Day)
-        .unwrap();
+    let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
+    let prop_time = 1 * TimeUnit::Day;
+    let final_state = setup.with(state).for_duration(prop_time).unwrap();
 
-    println!("{}", prop_state);
+    println!("{}", final_state);
 
     println!("==> val_earth_sph_harmonics_12x12 absolute errors");
-    let delta = prop_state.to_cartesian_vec() - rslt_gmat;
+    let delta = final_state.to_cartesian_vec() - rslt_gmat;
     for i in 0..6 {
         print!("{:.0e}\t", delta[i].abs());
     }
     println!();
 
-    let (err_r, err_v) = rss_orbit_vec_errors(&prop_state.to_cartesian_vec(), &rslt_gmat);
+    let (err_r, err_v) = rss_orbit_vec_errors(&final_state.to_cartesian_vec(), &rslt_gmat);
 
     assert!(err_r < 1e-1, "12x12 failed in position: {:.5e}", err_r);
     assert!(err_v < 1e-4, "12x12 failed in velocity: {:.5e}", err_v);
+
+    // Compare the case with the hyperdual EOMs (computation uses another part of the code)
+    let mut prop = setup.with(state.with_stm());
+    let final_state_dual = prop.for_duration(prop_time).unwrap();
+
+    let (err_r, err_v) = rss_orbit_vec_errors(
+        &final_state.to_cartesian_vec(),
+        &final_state_dual.to_cartesian_vec(),
+    );
+    println!(
+        "Error between reals and duals accumulated over {} : {:.6} m \t{:.6} m/s",
+        prop_time,
+        err_r * 1e3,
+        err_v * 1e3
+    );
+    // This should be zero!
+    assert!(err_r < 2e-16, "position error too large for 12x12 gravity");
+    assert!(err_v < 2e-16, "velocity error too large for 12x12 gravity");
 }
 
 #[allow(clippy::identity_op)]

@@ -157,7 +157,6 @@ fn srp_earth_meo_ecc_inc() {
     assert!(err_v < 2e-5, "velocity error too large for SRP");
 
     // Compare the case with the hyperdual EOMs (computation uses another part of the code)
-
     let mut prop = setup.with(sc.with_stm());
     let final_state_dual = prop.for_duration(prop_time).unwrap();
 
