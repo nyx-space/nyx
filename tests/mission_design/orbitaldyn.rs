@@ -696,17 +696,23 @@ fn multi_body_dynamics_dual() {
         &final_state_dual.to_cartesian_vec(),
     );
     println!(
-        "Error between reals and duals accumulated over {} : {:.6} m \t{:.6} m/s",
+        "Error between reals and duals accumulated over {} : {:.3e} m \t{:.3e} m/s",
         prop_time,
         err_r * 1e3,
         err_v * 1e3
     );
     // This should be zero!
-    assert!(err_r < 2e-16, "position error too large for 12x12 gravity");
-    assert!(err_v < 2e-16, "velocity error too large for 12x12 gravity");
+    assert!(
+        err_r < 2e-16,
+        "position error too large for multibody gravity"
+    );
+    assert!(
+        err_v < 2e-16,
+        "velocity error too large for multibody gravity"
+    );
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
-    let final_stm = final_state.stm.unwrap();
+    let final_stm = final_state_dual.stm.unwrap();
     let final_step = prop.latest_details().step;
     prop.for_duration(-final_step).unwrap();
 
@@ -715,8 +721,8 @@ fn multi_body_dynamics_dual() {
     let radius_err = stm_err.fixed_rows::<3>(0).into_owned();
     let velocity_err = stm_err.fixed_rows::<3>(3).into_owned();
 
-    assert!(radius_err.norm() < 1e-3);
-    assert!(velocity_err.norm() < 1e-3);
+    assert!(dbg!(radius_err.norm()) < 1e-3);
+    assert!(dbg!(velocity_err.norm()) < 1e-3);
 }
 
 #[allow(clippy::identity_op)]

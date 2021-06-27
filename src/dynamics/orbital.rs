@@ -97,11 +97,13 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
         state: &OVector<f64, Const<42>>,
         ctx: &Orbit,
     ) -> Result<OVector<f64, Const<42>>, NyxError> {
+        let osc = ctx.ctor_from(delta_t_s, state);
         let (new_state, new_stm) = if ctx.stm.is_some() {
             // Then call the dual_eom with the correct state size
             let pos_vel = state.fixed_rows::<6>(0).into_owned();
 
-            let (state, grad) = self.dual_eom(delta_t_s, &hyperspace_from_vector(&pos_vel), ctx)?;
+            let (state, grad) =
+                self.dual_eom(delta_t_s, &hyperspace_from_vector(&pos_vel), &osc)?;
 
             let stm_dt = ctx.stm() * grad;
             // Rebuild the STM as a vector.
@@ -116,8 +118,6 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
             (state, stm_as_vec)
         } else {
             // Still return something of size 42, but the STM will be zeros.
-
-            let osc = ctx.ctor_from(delta_t_s, state);
             let body_acceleration = (-osc.frame.gm() / osc.rmag().powi(3)) * osc.radius();
             let mut d_x = Vector6::from_iterator(
                 osc.velocity()
@@ -263,8 +263,12 @@ impl AccelModel for PointMasses {
             let r_ij3 = st_ij.rmag().powi(3);
             let r_j = osc.radius() - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
+            // let acc = -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
+            // println!("{} {}", third_body, acc.norm());
+            // d_x += acc;
             d_x += -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
         }
+        // panic!();
         Ok(d_x)
     }
 
@@ -296,7 +300,7 @@ impl AccelModel for PointMasses {
             );
 
             let r_ij: Vector3<Hyperdual<f64, Const<7>>> = hyperspace_from_vector(&st_ij.radius());
-            let r_ij3 = norm(&r_ij).powi(3) / gm_d; // Dividing the future divisor
+            let r_ij3 = norm(&r_ij).powi(3);
 
             // The difference leads to the dual parts nulling themselves out, so let's fix that.
             let mut r_j = radius - r_ij; // sc as seen from 3rd body
@@ -304,8 +308,11 @@ impl AccelModel for PointMasses {
             r_j[1][2] = 1.0;
             r_j[2][3] = 1.0;
 
-            let r_j3 = norm(&r_j).powi(3) / gm_d; // Dividing the future divisor
-            let third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
+            let r_j3 = norm(&r_j).powi(3);
+            let mut third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
+            third_body_acc_d[0] *= gm_d;
+            third_body_acc_d[1] *= gm_d;
+            third_body_acc_d[2] *= gm_d;
 
             let (fxp, gradp) =
                 extract_jacobian_and_result::<_, Const<3>, Const<3>, _>(&third_body_acc_d);

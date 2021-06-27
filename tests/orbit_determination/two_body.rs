@@ -16,7 +16,7 @@ use std::sync::mpsc::{Receiver, Sender};
 
 #[allow(clippy::identity_op)]
 #[test]
-fn od_tb_ekf_fixed_step_perfect_stations() {
+fn od_val_tb_ekf_fixed_step_perfect_stations() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -146,8 +146,8 @@ fn od_tb_ekf_fixed_step_perfect_stations() {
         delta.vmag() * 1e6
     );
 
-    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
-    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
+    assert!(delta.rmag() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
 }
 
 #[allow(clippy::identity_op)]
@@ -376,8 +376,8 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     // Define the ground stations.
     let elevation_mask = 0.0;
-    let range_noise = 0.1;
-    let range_rate_noise = 0.001;
+    let range_noise = 0.1; // in km (so 100 meters of error)
+    let range_rate_noise = 0.001; // in km/s (or 1 meter per second of error)
     let dss65_madrid =
         GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
@@ -408,7 +408,6 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let final_truth = prop.for_duration(prop_time).unwrap();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
@@ -433,7 +432,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
         covar_velocity,
     ));
 
-    // Define the initial estimate
+    // Define the initial estimate (x_hat): add 100 meters in X, remove 100 meters in Y and add 50 meters in Z
     let mut initial_state2 = initial_state;
     initial_state2.x += 0.1;
     initial_state2.y -= 0.1;
@@ -449,8 +448,24 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     odp.process_measurements(&measurements).unwrap();
 
+    // Check the final estimate prior to iteration
+    let delta = odp.estimates.last().unwrap().state() - final_truth;
+    println!(
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(
+        delta.rmag() < range_noise,
+        "More than station level position error"
+    );
+    assert!(
+        delta.vmag() < range_rate_noise,
+        "More than stattion level velocity error"
+    );
+
     // Iterate, and check that the initial state difference is lower
-    // Iterate
     odp.iterate(
         &measurements,
         IterationConf {
@@ -465,16 +480,22 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     println!("{}\n{}", initial_state2, odp.estimates[0].state());
 
+    // Compute the order of magnitude of the errors, and check that iteration either decreases it or keeps it the same
+    let err_it_oom = dstate_iteration.rmag().log10().floor() as i32;
+    let err_no_it_oom = dstate_no_iteration.rmag().log10().floor() as i32;
+
     println!(
-        "Difference in initial states radii without iterations: {} km",
+        "Difference in initial states radii without iterations: {} km (order of mangitude: {})",
         dstate_no_iteration.rmag(),
+        err_no_it_oom
     );
     println!(
-        "Difference in initial states radii with iterations: {} km",
+        "Difference in initial states radii with iterations: {} km (order of mangitude: {})",
         dstate_iteration.rmag(),
+        err_it_oom
     );
     assert!(
-        dstate_iteration.rmag() < dstate_no_iteration.rmag(),
+        dstate_iteration.rmag() < dstate_no_iteration.rmag() || err_it_oom <= err_no_it_oom,
         "Iteration did not reduce initial error"
     );
 
@@ -537,7 +558,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
@@ -716,7 +736,7 @@ fn od_tb_ckf_map_covar() {
 
 #[allow(clippy::identity_op)]
 #[test]
-fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
+fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     // Tests state noise compensation with covariance mapping
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
@@ -762,7 +782,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
@@ -835,8 +854,8 @@ fn od_tb_ckf_fixed_step_perfect_stations_harmonics() {
         delta.vmag() * 1e6
     );
 
-    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
-    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
+    assert!(delta.rmag() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
 }
 
 #[allow(clippy::identity_op)]
@@ -883,7 +902,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        // Convert the state to ECI.
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
@@ -975,6 +993,6 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         delta.vmag() * 1e3
     );
 
-    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
-    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
+    assert!(delta.rmag() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
 }

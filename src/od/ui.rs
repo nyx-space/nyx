@@ -648,7 +648,7 @@ where
     }
 
     /// Builds the navigation trajectory for the estimated state only (no covariance until https://gitlab.com/nyx-space/nyx/-/issues/199!)
-    pub fn to_nav_traj(&self) -> Result<Traj<S>, NyxError>
+    pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
     where
         DefaultAllocator: Allocator<f64, <S as State>::VecLength>,
     {

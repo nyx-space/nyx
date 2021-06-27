@@ -164,12 +164,20 @@ fn od_robust_test_ekf_realistic() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let delta = est.state() - final_truth_state;
+    println!(
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
 
     assert!(
-        rmag_err < 1e-1,
-        "final radius error should be less than 100 m (is instead {:.3} m)",
-        rmag_err * 1e3
+        delta.rmag() < 1e-2,
+        "Position error should be on meter level"
+    );
+    assert!(
+        delta.vmag() < 1e-5,
+        "Velocity error should be on millimeter level"
     );
 }
 
