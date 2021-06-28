@@ -17,13 +17,12 @@
 */
 
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{Float, Hyperdual};
+use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dimensions::{DMatrix, Matrix3, Vector3, U7};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
 use crate::io::gravity::GravityPotentialStor;
-use crate::TimeTagged;
 use std::cmp::min;
 use std::fmt;
 use std::sync::Arc;
@@ -249,46 +248,13 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
 
     fn dual_eom(
         &self,
-        radius: &Vector3<Hyperdual<f64, U7>>,
-        ctx: &Orbit,
+        _radius: &Vector3<Hyperdual<f64, U7>>,
+        osc: &Orbit,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
-        // We manually do the translation and the rotation to ensure that we account for the rotation in the hyperdual formulation
-        // Translation part: copy the context and set the radius to the osculating radius
-        let mut ctx = *ctx;
-        ctx.x = radius[0].real();
-        ctx.y = radius[1].real();
-        ctx.z = radius[2].real();
-        // Only do a translation
-        let state = self.cosm.try_frame_translation(&ctx, self.compute_frame)?;
-        // And set the radius reals to that translated value (rest of hyperdual is identity so far)
-        let mut radius = *radius;
-        radius[0][0] = state.x;
-        radius[1][0] = state.y;
-        radius[2][0] = state.z;
+        let state = self.cosm.frame_chg(osc, self.compute_frame);
 
-        // Get the DCM to convert from the integration state to the computation frame of the harmonics
-        let dcm =
-            self.cosm
-                .try_position_dcm_from_to(&ctx.frame, &self.compute_frame, ctx.epoch())?;
-        // Convert DCM to Hyperdual DCMs
-        let mut dcm_d = Matrix3::<Hyperdual<f64, U7>>::zeros();
-        for i in 0..3 {
-            for j in 0..3 {
-                dcm_d[(i, j)] = Hyperdual::from_fn(|k| {
-                    if k == 0 {
-                        dcm[(i, j)]
-                    } else if i + 1 == k {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                })
-            }
-        }
-
-        // And rotate into the correct frame
-        let radius = dcm_d * radius;
+        let radius: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&state.radius());
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = norm(&radius);
@@ -375,12 +341,32 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
             a3 -= rr * sum3;
         }
 
-        let accel = dcm_d.transpose() * Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
+        let dcm = self
+            .cosm
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
+
+        // Convert DCM to Hyperdual DCMs
+        let mut dcm_d = Matrix3::<Hyperdual<f64, U7>>::zeros();
+        for i in 0..3 {
+            for j in 0..3 {
+                dcm_d[(i, j)] = Hyperdual::from_fn(|k| {
+                    if k == 0 {
+                        dcm[(i, j)]
+                    } else if i + 1 == k {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                })
+            }
+        }
+
+        let accel = dcm_d * Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
         // Extract data
         let mut fx = Vector3::zeros();
         let mut grad = Matrix3::zeros();
         for i in 0..3 {
-            fx[i] += accel[i][0];
+            fx[i] += accel[i].real();
             // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
             for j in 1..4 {
                 grad[(i, j - 1)] += accel[i][j];

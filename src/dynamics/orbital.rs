@@ -263,12 +263,8 @@ impl AccelModel for PointMasses {
             let r_ij3 = st_ij.rmag().powi(3);
             let r_j = osc.radius() - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
-            // let acc = -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
-            // println!("{} {}", third_body, acc.norm());
-            // d_x += acc;
             d_x += -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);
         }
-        // panic!();
         Ok(d_x)
     }
 
