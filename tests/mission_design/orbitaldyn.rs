@@ -831,7 +831,7 @@ fn val_earth_sph_harmonics_12x12() {
 
     let dynamics = OrbitalDynamics::from_model(harmonics);
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
+    let setup = Propagator::rk89(dynamics.clone(), PropOpts::with_tolerance(1e-9));
     let prop_time = 1 * TimeUnit::Day;
     let final_state = setup.with(state).for_duration(prop_time).unwrap();
 
@@ -849,6 +849,11 @@ fn val_earth_sph_harmonics_12x12() {
     assert!(err_r < 1e-1, "12x12 failed in position: {:.5e}", err_r);
     assert!(err_v < 1e-4, "12x12 failed in velocity: {:.5e}", err_v);
 
+    // We set up a new propagator with a fixed step. Without the fixed step, the error control
+    // on the STM leads to a difference of 1.04 meters in this one day propagation.
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(30.0));
+    let prop_time = 6 * TimeUnit::Hour;
+    let final_state = setup.with(state).for_duration(prop_time).unwrap();
     // Compare the case with the hyperdual EOMs (computation uses another part of the code)
     let mut prop = setup.with(state.with_stm());
     let final_state_dual = prop.for_duration(prop_time).unwrap();
