@@ -144,17 +144,21 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
     fn dual_eom(
         &self,
         _delta_t_s: f64,
-        state: &OVector<Hyperdual<f64, Const<7>>, Const<6>>,
-        ctx: &Orbit,
+        _state: &OVector<Hyperdual<f64, Const<7>>, Const<6>>,
+        osc: &Orbit,
     ) -> Result<(Vector6<f64>, Matrix6<f64>), NyxError> {
         // Extract data from hyperspace
+        // Build full state vector with partials in the right position (hence building with all six components)
+        let state: Vector6<Hyperdual<f64, Const<7>>> =
+            hyperspace_from_vector(&osc.to_cartesian_vec());
+
         let radius = state.fixed_rows::<3>(0).into_owned();
         let velocity = state.fixed_rows::<3>(3).into_owned();
 
         // Code up math as usual
         let rmag = norm(&radius);
         let body_acceleration =
-            radius * (Hyperdual::<f64, Const<7>>::from_real(-ctx.frame.gm()) / rmag.powi(3));
+            radius * (Hyperdual::<f64, Const<7>>::from_real(-osc.frame.gm()) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector6::zeros();
@@ -176,7 +180,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.dual_eom(&radius, ctx)?;
+            let (model_acc, model_grad) = model.dual_eom(&radius, osc)?;
             for i in 0..3 {
                 fx[i + 3] += model_acc[i];
                 for j in 1..4 {
@@ -270,11 +274,11 @@ impl AccelModel for PointMasses {
 
     fn dual_eom(
         &self,
-        state: &OVector<Hyperdual<f64, Const<7>>, Const<3>>,
+        _state: &OVector<Hyperdual<f64, Const<7>>, Const<3>>,
         osc: &Orbit,
     ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
-        // Extract data from hyperspace
-        let radius = state.fixed_rows::<3>(0).into_owned();
+        // Build the hyperdual space of the radius vector
+        let radius: Vector3<Hyperdual<f64, Const<7>>> = hyperspace_from_vector(&osc.radius());
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector3::zeros();
         let mut grad = Matrix3::zeros();

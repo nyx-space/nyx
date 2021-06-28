@@ -103,7 +103,7 @@ where
         &self,
         delta_t: f64,
         state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
-        state_ctx: &Self::StateType,
+        osculating_state: &Self::StateType,
     ) -> Result<
         (
             OVector<f64, <Self::StateType as State>::Size>,

@@ -718,11 +718,11 @@ fn multi_body_dynamics_dual() {
 
     // And check the difference
     let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
-    let radius_err = stm_err.fixed_rows::<3>(0).into_owned();
-    let velocity_err = stm_err.fixed_rows::<3>(3).into_owned();
+    let radius_stm_delta = stm_err.fixed_rows::<3>(0).into_owned();
+    let velocity_stm_delta = stm_err.fixed_rows::<3>(3).into_owned();
 
-    assert!(dbg!(radius_err.norm()) < 1e-3);
-    assert!(dbg!(velocity_err.norm()) < 1e-3);
+    assert!(dbg!(radius_stm_delta.norm()) < 1e-3);
+    assert!(dbg!(velocity_stm_delta.norm()) < 1e-3);
 }
 
 #[allow(clippy::identity_op)]
