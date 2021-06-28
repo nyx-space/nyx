@@ -61,10 +61,10 @@ where
         Self {
             dynamics,
             opts,
-            stages: T::stages(),
-            order: T::order(),
-            a_coeffs: T::a_coeffs(),
-            b_coeffs: T::b_coeffs(),
+            stages: T::STAGES,
+            order: T::ORDER,
+            a_coeffs: T::A_COEFFS,
+            b_coeffs: T::B_COEFFS,
         }
     }
 
@@ -101,7 +101,6 @@ where
             },
             step_size: self.opts.init_step,
             fixed_step: self.opts.fixed_step,
-            // init_time,
             k,
         }
     }

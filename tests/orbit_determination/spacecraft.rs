@@ -67,8 +67,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     // Generate the truth data on one thread.
 
-    // let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let bodies = vec![Bodies::Earth];
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let sc_dynamics =
         SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));

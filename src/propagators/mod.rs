@@ -45,19 +45,20 @@ where
 {
     /// Returns the order of this integrator (as u8 because there probably isn't an order greater than 255).
     /// The order is used for the adaptive step size only to compute the error between estimates.
-    fn order() -> u8;
+    const ORDER: u8;
 
     /// Returns the stages of this integrator (as usize because it's used as indexing)
-    fn stages() -> usize;
+    const STAGES: usize;
 
     /// Returns a pointer to a list of f64 corresponding to the A coefficients of the Butcher table for that RK.
     /// This module only supports *implicit* integrators, and as such, `Self.a_coeffs().len()` must be of
     /// size (order+1)*(order)/2.
     /// *Warning:* this RK trait supposes that the implementation is consistent, i.e. c_i = \sum_j a_{ij}.
-    fn a_coeffs() -> &'static [f64];
+    // fn a_coeffs() -> &'static [f64];
+    const A_COEFFS: &'static [f64];
     /// Returns a pointer to a list of f64 corresponding to the b_i and b^*_i coefficients of the
     /// Butcher table for that RK. `Self.a_coeffs().len()` must be of size (order+1)*2.
-    fn b_coeffs() -> &'static [f64];
+    const B_COEFFS: &'static [f64];
 }
 
 /// Stores the details of the previous integration step of a given propagator. Access as `my_prop.clone().latest_details()`.
