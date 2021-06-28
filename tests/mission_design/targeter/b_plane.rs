@@ -213,7 +213,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
     println!("{}", sol);
 
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
-    assert!((sol.correction.norm() - 225.309e-3).abs() < 1e-6);
+    assert!(sol.correction.norm() <= 225.309e-3);
 
     tgt.apply(sol).unwrap();
 }
