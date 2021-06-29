@@ -264,7 +264,7 @@ impl fmt::Display for Spacecraft {
         write!(
             f,
             "{}\t{} kg",
-            format!("{:.*x}", decimals, self.orbit),
+            format!("{:.*}", decimals, self.orbit),
             format!("{:.*}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
         )
     }

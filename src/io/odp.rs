@@ -371,10 +371,11 @@ impl<'a> OdpScenario<'a> {
         truth_prop.for_duration(prop_time)?;
 
         info!(
-            "Final state:   {} (computed in {:.3} seconds)",
-            truth_prop.state,
+            "Final state (computed in {:.3} seconds):",
             (Instant::now() - start).as_secs_f64()
         );
+        info!("\t\t{}", truth_prop.state);
+        info!("\t\t{:x}", truth_prop.state);
 
         let mut sim_measurements = Vec::with_capacity(10000);
         let start = Instant::now();
