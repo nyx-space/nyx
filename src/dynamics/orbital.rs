@@ -99,11 +99,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
     ) -> Result<OVector<f64, Const<42>>, NyxError> {
         let osc = ctx.ctor_from(delta_t_s, state);
         let (new_state, new_stm) = if ctx.stm.is_some() {
-            // Then call the dual_eom with the correct state size
-            let pos_vel = state.fixed_rows::<6>(0).into_owned();
-
-            let (state, grad) =
-                self.dual_eom(delta_t_s, &hyperspace_from_vector(&pos_vel), &osc)?;
+            let (state, grad) = self.dual_eom(delta_t_s, &osc)?;
 
             let stm_dt = ctx.stm() * grad;
             // Rebuild the STM as a vector.
@@ -144,7 +140,6 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
     fn dual_eom(
         &self,
         _delta_t_s: f64,
-        _state: &OVector<Hyperdual<f64, Const<7>>, Const<6>>,
         osc: &Orbit,
     ) -> Result<(Vector6<f64>, Matrix6<f64>), NyxError> {
         // Extract data from hyperspace
@@ -180,7 +175,8 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.dual_eom(&radius, osc)?;
+            // let (model_acc, model_grad) = model.dual_eom(&radius, osc)?;
+            let (model_acc, model_grad) = model.dual_eom(osc)?;
             for i in 0..3 {
                 fx[i + 3] += model_acc[i];
                 for j in 1..4 {
@@ -272,11 +268,7 @@ impl AccelModel for PointMasses {
         Ok(d_x)
     }
 
-    fn dual_eom(
-        &self,
-        _state: &OVector<Hyperdual<f64, Const<7>>, Const<3>>,
-        osc: &Orbit,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Build the hyperdual space of the radius vector
         let radius: Vector3<Hyperdual<f64, Const<7>>> = hyperspace_from_vector(&osc.radius());
         // Extract result into Vector6 and Matrix6

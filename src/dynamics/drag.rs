@@ -16,10 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::Hyperdual;
 use super::ForceModel;
 use crate::cosmic::{Cosm, Frame, Spacecraft};
-use crate::dimensions::{Const, Matrix3, Vector3};
+use crate::dimensions::{Matrix3, Vector3};
 use crate::errors::NyxError;
 use std::fmt;
 use std::sync::Arc;
@@ -64,11 +63,7 @@ impl ForceModel for ConstantDrag {
         Ok(-0.5 * self.rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
     }
 
-    fn dual_eom(
-        &self,
-        _radius: &Vector3<Hyperdual<f64, Const<9>>>,
-        _osc_ctx: &Spacecraft,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }
 }
@@ -173,11 +168,7 @@ impl ForceModel for Drag {
         }
     }
 
-    fn dual_eom(
-        &self,
-        _radius: &Vector3<Hyperdual<f64, Const<9>>>,
-        _osc_ctx: &Spacecraft,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }
 }

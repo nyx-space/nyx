@@ -246,11 +246,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         Ok(dcm * accel)
     }
 
-    fn dual_eom(
-        &self,
-        _radius: &Vector3<Hyperdual<f64, U7>>,
-        osc: &Orbit,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = self.cosm.frame_chg(osc, self.compute_frame);
 

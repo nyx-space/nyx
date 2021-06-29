@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::{hyperspace_from_vector, Hyperdual};
 use super::orbital::OrbitalDynamics;
 use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
@@ -177,7 +176,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         if ctx.orbit.stm.is_some() {
             let (state, grad) = self.dual_eom(
                 delta_t,
-                &hyperspace_from_vector(&osc_sc.as_vector()?.fixed_rows::<8>(0).into_owned()),
+                // &hyperspace_from_vector(&osc_sc.as_vector()?.fixed_rows::<8>(0).into_owned()),
                 &osc_sc,
             )?;
 
@@ -254,7 +253,6 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
     fn dual_eom(
         &self,
         delta_t_s: f64,
-        state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, Const<8>>,
         ctx: &Self::StateType,
     ) -> Result<(OVector<f64, Const<8>>, OMatrix<f64, Const<8>, Const<8>>), NyxError> {
         // Rebuild the appropriately sized state and STM.
@@ -262,19 +260,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         let mut d_x = OVector::<f64, Const<8>>::zeros();
         let mut grad = OMatrix::<f64, Const<8>, Const<8>>::zeros();
 
-        // This also means that the STM for the Spacecraft must also be copied into the spacecraft structure
-        let one = Const::<1> {};
-        let six = Const::<6> {};
-        let pos_vel: OVector<Hyperdual<f64, Const<7>>, Const<6>> = OVector::from_iterator_generic(
-            six,
-            one,
-            state_vec
-                .fixed_rows::<6>(0)
-                .into_iter()
-                .map(|x| Hyperdual::from_slice(x.fixed_rows::<7>(0).as_slice())),
-        );
-
-        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &pos_vel, &ctx.orbit)?;
+        let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &ctx.orbit)?;
 
         // Copy the d orbit dt data
         for (i, val) in orb_state.iter().enumerate() {
@@ -293,10 +279,8 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
 
         // Call the EOMs
         let total_mass = ctx.mass_kg();
-        let radius = state_vec.fixed_rows::<3>(0).into_owned();
-
         for model in &self.force_models {
-            let (model_frc, model_grad) = model.dual_eom(&radius, ctx)?;
+            let (model_frc, model_grad) = model.dual_eom(ctx)?;
             for i in 0..3 {
                 // Add the velocity changes
                 d_x[i + 3] += model_frc[i] / total_mass;

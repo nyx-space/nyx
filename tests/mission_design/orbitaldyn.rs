@@ -1,7 +1,5 @@
-extern crate hyperdual;
 extern crate nyx_space as nyx;
 
-use hyperdual::hyperspace_from_vector;
 use nyx::cosmic::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
 use nyx::dimensions::{Matrix6, Vector6};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
@@ -607,13 +605,7 @@ fn two_body_dual() {
 
     let dynamics = OrbitalDynamics::two_body();
 
-    let (fx, grad) = dynamics
-        .dual_eom(
-            0.0,
-            &hyperspace_from_vector(&&init.to_cartesian_vec()),
-            &init,
-        )
-        .unwrap();
+    let (fx, grad) = dynamics.dual_eom(0.0, &init).unwrap();
 
     assert!(
         (fx - expected_fx).norm() < 1e-16,

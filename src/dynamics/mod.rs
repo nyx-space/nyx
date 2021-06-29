@@ -21,7 +21,7 @@ extern crate hyperdual;
 use self::hyperdual::{Hyperdual, Owned};
 use crate::cosmic::{Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{Const, DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
+use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
 
 use std::fmt;
@@ -102,7 +102,6 @@ where
     fn dual_eom(
         &self,
         delta_t: f64,
-        state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         osculating_state: &Self::StateType,
     ) -> Result<
         (
@@ -134,11 +133,7 @@ pub trait ForceModel: Send + Sync + fmt::Display {
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    fn dual_eom(
-        &self,
-        radius: &Vector3<Hyperdual<f64, Const<9>>>,
-        osc_ctx: &Spacecraft,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(&self, osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.
@@ -150,9 +145,5 @@ pub trait AccelModel: Send + Sync + fmt::Display {
 
     /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM.
-    fn dual_eom(
-        &self,
-        radius: &Vector3<Hyperdual<f64, Const<7>>>,
-        osc_ctx: &Orbit,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(&self, osc_ctx: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }

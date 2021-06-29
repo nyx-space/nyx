@@ -80,11 +80,7 @@ impl ForceModel for SolarPressure {
         Ok(1e-3 * ctx.cr * ctx.srp_area_m2 * flux_pressure * r_sun_unit)
     }
 
-    fn dual_eom(
-        &self,
-        _radius: &Vector3<Hyperdual<f64, Const<9>>>,
-        ctx: &Spacecraft,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         let osc = &ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft
