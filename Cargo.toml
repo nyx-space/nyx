@@ -55,3 +55,11 @@ broken-donotuse = []
 [profile.dev]
 opt-level = 0
 debug = true
+
+[dependencies.pyo3]
+version = "0.13.2"
+features = ["extension-module"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "nyx_space"
