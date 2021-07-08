@@ -2088,6 +2088,6 @@ mod tests {
 
     #[test]
     fn debug_cosm() {
-        dbg!(Cosm::de438());
+        dbg!(Cosm::de438_gmat());
     }
 }

@@ -328,7 +328,7 @@ impl<'a> OdpScenario<'a> {
             }
         }
 
-        Err(ParsingError::OD("sequence not found".to_string()))
+        Err(ParsingError::SequenceNotFound(seq_name))
     }
 
     /// Will generate the measurements and run the filter.
