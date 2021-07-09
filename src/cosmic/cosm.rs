@@ -897,6 +897,24 @@ impl Cosm {
         Ok(dcm_finite_differencing(pre_r_dcm, r_dcm, post_r_dcm))
     }
 
+    /// Return the position and velocity DCM (two 3x3 matrices) to go from the `from` frame to the `to` frame
+    #[allow(clippy::identity_op)]
+    pub fn try_dcm_from_to_in_parts(
+        &self,
+        from: &Frame,
+        to: &Frame,
+        dt: Epoch,
+    ) -> Result<(Matrix3<f64>, Matrix3<f64>), NyxError> {
+        let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
+        // Compute the dRdt DCM with finite differencing
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+
+        let drdt = 0.5 * post_r_dcm - 0.5 * pre_r_dcm;
+
+        Ok((r_dcm, drdt))
+    }
+
     /// Attempts to only perform a translation without rotation between two frames.
     /// You really shouldn't be using this unless you know exactly what you're doing.
     /// Typically, you want to use `try_frame_chg`.

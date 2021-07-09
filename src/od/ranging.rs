@@ -26,7 +26,7 @@ use super::{Measurement, MeasurementDevice, TimeTagged};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dimensions::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
 use crate::time::Epoch;
-use crate::utils::{r2, r3};
+use crate::utils::dcm_assemble;
 use crate::Spacecraft;
 use std::fmt;
 use std::sync::Arc;
@@ -149,39 +149,55 @@ impl GroundStation {
     }
 
     /// Computes the elevation of the provided object seen from this ground station.
-    /// Also returns the ground station's orbit in the frame of the spacecraft
-    pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit) {
-        use std::f64::consts::PI;
-        // Convert the station to the state's frame
+    /// Also returns the ground station's orbit in the Solar System Barycenter frame
+    pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit, Orbit) {
+        // Start by computing the rotation matrix from the inertial frame to the topocentric frame of this ground station.
         let dt = rx.dt;
         let station_state =
             Orbit::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
-        // Convert the station into the rx frame.
-        let tx = self.cosm.frame_chg(&station_state, rx.frame);
-        // Let's start by computing the range and range rate
-        let rho_tx_frame = rx.radius() - tx.radius();
 
-        // Convert to SEZ to compute elevation
-        let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
-            * r3(self.longitude.to_radians())
-            * rho_tx_frame;
+        // This is called the RFT in GMAT's TopocentricAxes.cpp.
+        let dcm_topo2fixed = station_state.dcm_from_traj_frame(Frame::SEZ).unwrap();
+
+        let ssb_frame = self.cosm.frame("SSB");
+
+        // These are called RIF and RIFDot in GMAT.
+        let (dcm_inertial2fixed, dcm_inertial2fixed_dt) = self
+            .cosm
+            .try_dcm_from_to_in_parts(&self.frame, &ssb_frame, dt)
+            .unwrap();
+
+        let dcm_inertial2topo = dcm_inertial2fixed * dcm_topo2fixed.transpose();
+        let dcm_inertial2topo_dt = dcm_inertial2fixed_dt * dcm_topo2fixed.transpose();
+
+        let dcm_topo2inertial = dcm_assemble(dcm_inertial2topo, dcm_inertial2topo_dt);
+
+        // Now, compute the range vector in the solar system barycenter frame for both objects.
+        // As per GMAT MathSpec, these ranges are different.
+        let tx_ssb = self.cosm.frame_chg(&station_state, ssb_frame);
+        let rx_ssb = self.cosm.frame_chg(rx, ssb_frame);
+
+        let mut rho_sez_unit = (rx_ssb - tx_ssb)
+            .with_rotation_by(dcm_topo2inertial.transpose())
+            .radius();
+        rho_sez_unit /= rho_sez_unit.norm();
+
+        // NOTE: We don't need to normalize it here because we've already normalized rho_sez!
+        let elevation = rho_sez_unit[2].asin().to_degrees();
 
         // Return elevation in degrees and tx
-        (
-            (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees(),
-            tx,
-        )
+        (elevation, rx_ssb, tx_ssb)
     }
 }
 impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
-        let (elevation, tx) = self.elevation_of(rx);
+        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(rx);
 
         Some(StdMeasurement::new(
             rx.dt,
-            tx,
-            *rx,
+            tx_ssb,
+            rx_ssb,
             elevation >= self.elevation_mask,
             &self.range_noise,
             &self.range_rate_noise,
@@ -192,43 +208,16 @@ impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
 impl MeasurementDevice<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, sc_rx: &Spacecraft) -> Option<StdMeasurement> {
-        let rx = &sc_rx.orbit;
-        match rx.frame {
-            Frame::Geoid { .. } => {
-                use std::f64::consts::PI;
-                // Convert the station to the state's frame
-                let dt = rx.dt;
-                let station_state = Orbit::from_geodesic(
-                    self.latitude,
-                    self.longitude,
-                    self.height,
-                    dt,
-                    self.frame,
-                );
-                let tx = self.cosm.frame_chg(&station_state, rx.frame);
-                // Let's start by computing the range and range rate
-                let rho_tx_frame = rx.radius() - tx.radius();
+        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit);
 
-                // Convert to SEZ to compute elevation
-                let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
-                    * r3(self.longitude.to_radians())
-                    * rho_tx_frame;
-                let elevation = (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees();
-
-                Some(StdMeasurement::new(
-                    dt,
-                    tx,
-                    *rx,
-                    elevation >= self.elevation_mask,
-                    &self.range_noise,
-                    &self.range_rate_noise,
-                ))
-            }
-            _ => {
-                error!("Receiver is not on a geoid");
-                None
-            }
-        }
+        Some(StdMeasurement::new(
+            rx_ssb.dt,
+            tx_ssb,
+            rx_ssb,
+            elevation >= self.elevation_mask,
+            &self.range_noise,
+            &self.range_rate_noise,
+        ))
     }
 }
 

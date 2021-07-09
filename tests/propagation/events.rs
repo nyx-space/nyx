@@ -70,7 +70,7 @@ fn event_tracker_true_anomaly() {
         }
 
         // Compute the elevation
-        let (elevation, _) = gc.elevation_of(&state);
+        let (elevation, _, _) = gc.elevation_of(&state);
         if elevation > max_el {
             max_el = elevation;
             max_dt = state.epoch();

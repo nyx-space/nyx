@@ -188,18 +188,22 @@ pub fn capitalize(s: &str) -> String {
 }
 
 /// Builds a 6x6 DCM from the current, previous, and post DCMs, assuming that the previous and post DCMs are exactly one second before and one second after the current DCM.
-pub fn dcm_finite_differencing(
+pub(crate) fn dcm_finite_differencing(
     dcm_pre: Matrix3<f64>,
     dcm_cur: Matrix3<f64>,
     dcm_post: Matrix3<f64>,
 ) -> Matrix6<f64> {
     let drdt = 0.5 * dcm_post - 0.5 * dcm_pre;
 
+    dcm_assemble(dcm_cur, drdt)
+}
+
+pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> {
     let mut full_dcm = Matrix6::zeros();
     for i in 0..6 {
         for j in 0..6 {
             if (i < 3 && j < 3) || (i >= 3 && j >= 3) {
-                full_dcm[(i, j)] = dcm_cur[(i % 3, j % 3)];
+                full_dcm[(i, j)] = r[(i % 3, j % 3)];
             } else if i >= 3 && j < 3 {
                 full_dcm[(i, j)] = drdt[(i - 3, j)];
             }

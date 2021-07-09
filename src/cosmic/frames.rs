@@ -47,6 +47,8 @@ pub enum Frame {
     RCN,
     /// Radial, in-track, normal
     RIC,
+    /// SEZ or topocentric frame. The positive horizontal vector S is due south , the positive horizontal vector E is east, and the vector Z normal to the surface of the earth (up) is the third axis.
+    SEZ,
     /// Used as a placeholder only
     Inertial,
 }
@@ -159,6 +161,11 @@ impl Frame {
             _ => unimplemented!(),
         }
     }
+
+    /// Returns whether this frame is body fixed or not
+    pub fn is_body_fixed(&self) -> bool {
+        self.frame_path().len() == 2 || self.frame_path().len() == 3
+    }
 }
 
 impl fmt::Display for Frame {
@@ -222,6 +229,7 @@ impl fmt::Debug for Frame {
             Frame::VNC => write!(f, "VNC"),
             Frame::RCN => write!(f, "RCN"),
             Frame::RIC => write!(f, "RIC"),
+            Frame::SEZ => write!(f, "SEZ"),
             Frame::Inertial => write!(f, "Inertial"),
         }
     }

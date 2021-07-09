@@ -1077,6 +1077,9 @@ impl Orbit {
                 semi_major_radius,
                 ..
             } => {
+                if !self.frame.is_body_fixed() {
+                    warn!("Computation of geodetic latitude must be done in a body fixed frame and {} is not one!", self.frame);
+                }
                 let eps = 1e-12;
                 let max_attempts = 20;
                 let mut attempt_no = 0;
@@ -1114,6 +1117,9 @@ impl Orbit {
                 semi_major_radius,
                 ..
             } => {
+                if !self.frame.is_body_fixed() {
+                    warn!("Computation of geodetic height must be done in a body fixed frame and {} is not one!", self.frame);
+                }
                 let e2 = flattening * (2.0 - flattening);
                 let latitude = self.geodetic_latitude().to_radians();
                 let sin_lat = latitude.sin();
@@ -1223,6 +1229,29 @@ impl Orbit {
                 let n = self.hvec() / self.hmag();
                 let c = n.cross(&r);
                 Ok(Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose())
+            }
+            Frame::SEZ => {
+                // From the GMAT MathSpec, page 30 section 2.6.9 and from `Calculate_RFT` in `TopocentricAxes.cpp`, this returns the
+                // rotation matrix from the topocentric frame (SEZ) to body fixed frame (i.e. the transpose of GMAT's RFT matrix).
+                if !self.frame.is_body_fixed() {
+                    warn!("Computation of SEZ rotation matrix must be done in a body fixed frame and {} is not one!", self.frame);
+                }
+                if (self.x.powi(2) + self.y.powi(2)).sqrt() < 1e-3 {
+                    warn!("SEZ frame ill-defined when close to the poles");
+                }
+                let phi = self.geodetic_latitude().to_radians();
+                let lambda = self.geodetic_longitude().to_radians();
+                let z_hat = Vector3::new(
+                    phi.cos() * lambda.cos(),
+                    phi.cos() * lambda.sin(),
+                    phi.sin(),
+                );
+                let y_hat = Vector3::new(0.0, 0.0, 1.0).cross(&z_hat);
+                let x_hat = y_hat.cross(&z_hat);
+                Ok(Matrix3::new(
+                    x_hat[0], x_hat[1], x_hat[2], y_hat[0], y_hat[1], y_hat[2], z_hat[0], z_hat[1],
+                    z_hat[2],
+                ))
             }
             _ => Err(NyxError::CustomError(
                 "did not provide a local frame".to_string(),
