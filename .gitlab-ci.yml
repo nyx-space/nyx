@@ -14,13 +14,16 @@ stages:
 compile:
   stage: build
   image: rust:1-slim
-  variables:
-    CARGO_HOME: $CI_PROJECT_DIR/.cargo
-    SCCACHE_DIR: $CI_PROJECT_DIR/.cache/sccache
-    RUSTC_WRAPPER: $CARGO_HOME/bin/sccache
+  before_script:
+       - export CARGO_HOME="${PWD}/.cargo"
+       - echo $CARGO_HOME
+       - export SCCACHE_DIR="${PWD}/.cache/sccache"
+       - echo $SCCACHE_DIR
+       - export PATH="/builds/Astrolab-devops/material/.cargo/bin:$PATH"
+       - export RUSTC_WRAPPER="$CARGO_HOME/bin/sccache"
+       - echo $RUSTC_WRAPPER
   script:
     - cargo install sccache
-    - export PATH="$CI_PROJECT_DIR/.cargo/bin:$PATH"  # This must be done here or the stage will fail
     - cargo build --tests --release # Build all of the tests in release mode
     - cargo build --release # Build the binaries
   cache:
