@@ -25,7 +25,7 @@ use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
 use crate::md::ui::MDProcess;
-use crate::od::ranging::GroundStation;
+use crate::od::measurement::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
 use crate::od::{Measurement, MeasurementDevice};

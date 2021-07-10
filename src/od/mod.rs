@@ -19,6 +19,7 @@
 extern crate hyperdual;
 extern crate rand;
 extern crate rand_distr;
+extern crate rand_pcg;
 extern crate serde;
 
 use crate::dimensions::allocator::Allocator;
@@ -32,8 +33,8 @@ use crate::io::{CovarFormat, EpochFormat};
 /// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.
 pub mod kalman;
 
-/// Provides a range and range rate measuring models.
-pub mod ranging;
+/// Provides the measurement models.
+pub mod measurement;
 
 /// Provides Estimate handling functionalities.
 pub mod estimate;
@@ -46,6 +47,9 @@ pub mod ui;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
+
+/// Provides a UI to simulate measurement data
+pub mod sim;
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
 pub trait Filter<T, A, M>

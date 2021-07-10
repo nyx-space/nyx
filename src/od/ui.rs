@@ -22,7 +22,7 @@ use crate::md::trajectory::Traj;
 
 pub use super::estimate::*;
 pub use super::kalman::*;
-pub use super::ranging::*;
+pub use super::measurement::*;
 pub use super::residual::*;
 pub use super::snc::*;
 pub use super::*;
