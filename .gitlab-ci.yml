@@ -1,23 +1,52 @@
+stages: 
+  - test
+  - deploy
+
+
 unit-tests:
+  stage: test
   image: rust:1-slim
   variables:
-    RUST_BACKTRACE: full
+    RUST_BACKTRACE: 1
   script:
     - rustup component add rustfmt
     - cargo fmt -- --check
     - cargo test --lib --release # Unit tests
     
-integration-tests:
+mission-design-integration-tests:
+  stage: test
   image: rust:1-slim
   variables:
-    RUST_BACKTRACE: full
+    RUST_BACKTRACE: 1
   script:
     - cargo test cosmic --release
     - cargo test mission_design --release
-    - cargo test orbit_determination --release
     - cargo test monte_carlo --release
+
+propulsion-integration-tests:
+  stage: test
+  image: rust:1-slim
+  variables:
+    RUST_BACKTRACE: 1
+  script:
     - cargo test propulsion --release -j4 # Only on 4 CPUs otherwise the stack is totally used up
     - cargo test propagation --release -j4
+
+propagation-integration-tests:
+  stage: test
+  image: rust:1-slim
+  variables:
+    RUST_BACKTRACE: 1
+  script:
+    - cargo test propagation --release -j4
+
+orbit-determination-integration-tests:
+  stage: test
+  image: rust:1-slim
+  variables:
+    RUST_BACKTRACE: 1
+  script:
+    - cargo test orbit_determination --release
 
 scenario-tests:
   image: rust:1-slim
