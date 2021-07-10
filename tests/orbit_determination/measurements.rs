@@ -157,11 +157,9 @@ fn val_measurements_topo() {
         }
     }
     println!("Generated {} measurements for cislunar1", traj1_msr_cnt);
-    // GMAT generates 302 measurements but Nyx generates 315. Not much off, and not sure why there's a difference.
-    // Playing with the rotation matrices leads to wildly different number of measurements, that's why I'm pretty confident
-    // that the computation is correct here. Moreover, in this case, GMAT generates the same measurement twice at the start of the file... like wut?
+    // GMAT generates 302 measurements but Nyx generates 303. GMAT generates the same measurement twice at the start of the file... like wut?
     assert_eq!(
-        traj1_msr_cnt, 315,
+        traj1_msr_cnt, 303,
         "incorrect number of measurements generated"
     );
     // Now, let's check specific arbitrarily selected observations
@@ -225,9 +223,8 @@ fn val_measurements_topo() {
     }
 
     println!("Generated {} measurements for cislunar2", traj2_msr_cnt);
-    // GMAT generates 249 measurements but Nyx generates 258.
     assert_eq!(
-        traj2_msr_cnt, 258,
+        traj2_msr_cnt, 249,
         "incorrect number of measurements generated"
     );
     // Now, let's check specific arbitrarily selected observations
@@ -241,7 +238,6 @@ fn val_measurements_topo() {
             now
         );
         let obs = meas.observation();
-        println!("{}", obs[0]);
         println!(
             "range difference {:e}\t range rate difference: {:e}",
             (obs[0] - truth.range).abs(),

@@ -1248,7 +1248,9 @@ impl Orbit {
                     phi.cos() * lambda.sin(),
                     phi.sin(),
                 );
-                let y_hat = Vector3::new(0.0, 0.0, 1.0).cross(&z_hat);
+                // y_hat MUST be renormalized otherwise it's about 0.76 and therefore the rotation looses the norms conservation property.
+                let mut y_hat = Vector3::new(0.0, 0.0, 1.0).cross(&z_hat);
+                y_hat /= y_hat.norm();
                 let x_hat = y_hat.cross(&z_hat);
                 Ok(Matrix3::new(
                     x_hat[0], y_hat[0], z_hat[0], x_hat[1], y_hat[1], z_hat[1], x_hat[2], y_hat[2],
