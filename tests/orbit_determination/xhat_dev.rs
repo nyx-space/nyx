@@ -80,6 +80,7 @@ fn xhat_dev_test_ekf_two_body() {
     truth_states.push(initial_state);
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
+        let prev_len = measurements.len();
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
@@ -87,7 +88,10 @@ fn xhat_dev_test_ekf_two_body() {
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
+        if measurements.len() > prev_len {
+            // We've added a measurement so we were in visibility!
+            truth_states.push(rx_state)
+        }
     }
     let final_truth_state = truth_states.last().unwrap();
 
@@ -190,8 +194,9 @@ fn xhat_dev_test_ekf_two_body() {
         rmag_err * 1e3
     );
 
+    // BUG: Why and how are there more estimates than measurements?!
     assert_eq!(
-        truth_states.len(),
+        measurements.len(),
         odp.estimates.len(),
         "different number of estimates"
     );

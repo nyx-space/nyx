@@ -5,7 +5,7 @@ fn event_tracker_true_anomaly() {
     use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
     use nyx::md::ui::*;
     use nyx::md::EventEvaluator; // Only needed because we're manually calling e.eval
-    use nyx::od::ranging::GroundStation;
+    use nyx::od::measurement::GroundStation;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

@@ -48,8 +48,8 @@ pub mod ui;
 /// Provides all state noise compensation functionality
 pub mod snc;
 
-/// Provides a UI to simulate measurement data
-pub mod sim;
+/// Provides a UI to set up a ground station -- DRAFT of #147
+// pub mod gs_setup;
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
 pub trait Filter<T, A, M>
