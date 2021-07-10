@@ -4,25 +4,32 @@ stages:
   - quality
   - deploy
 
-cache: &cacheconf
-  key: $CI_COMMIT_REF_SLUG
-  paths:
-    - target/
+.cacheconf: &cacheconf
+    cache:
+      key: $CI_COMMIT_REF_SLUG
+      paths:
+        - .cargo/
+        - .cache/sccache
+        - target/
 
 compile:
   stage: build
   image: rust:1-slim
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+    SCCACHE_DIR: $CI_PROJECT_DIR/.cache/sccache
+    PATH: $CI_PROJECT_DIR/.cargo/bin:$PATH
+    RUSTC_WRAPPER: $CARGO_HOME/bin/sccache
   script:
+    - cargo install sccache
     - cargo build --tests --release # Build all of the tests in release mode
     - cargo build --release # Build the binaries
-  cache:
-    <<: *cacheconf
+  <<: *cacheconf
 
 unit-tests:
   stage: test
   image: rust:1-slim
-  cache:
-    <<: *cacheconf
+  <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -33,8 +40,7 @@ unit-tests:
 mission-design-integration-tests:
   stage: test
   image: rust:1-slim
-  cache:
-    <<: *cacheconf
+  <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -45,8 +51,7 @@ mission-design-integration-tests:
 propulsion-integration-tests:
   stage: test
   image: rust:1-slim
-  cache:
-    <<: *cacheconf
+  <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -56,8 +61,7 @@ propulsion-integration-tests:
 propagation-integration-tests:
   stage: test
   image: rust:1-slim
-  cache:
-    <<: *cacheconf
+  <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -66,8 +70,7 @@ propagation-integration-tests:
 orbit-determination-integration-tests:
   stage: test
   image: rust:1-slim
-  cache:
-    <<: *cacheconf
+  <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -75,8 +78,7 @@ orbit-determination-integration-tests:
 
 scenario-tests:
   image: rust:1-slim
-  cache:
-    <<: *cacheconf
+  <<: *cacheconf
   script:
     - cargo run --release -- data/simple-scenario.toml --all
     # Check that when we do a unit conversion it's correct
@@ -111,12 +113,21 @@ pages:
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
       when: manual
 
-rustfmt:
+fmt_and_lint:
   stage: quality
   image: rust:1-slim
   script:
     - rustup component add rustfmt
     - cargo fmt -- --check
+    - rustup component add clippy
+    - cargo clippy
+
+audit:
+  stage: quality
+  image: rust:1-slim
+  script:
+    - cargo install cargo-audit
+    - cargo audit
 
 # Code from https://www.collabora.com/news-and-blog/blog/2021/03/24/rust-integrating-llvm-source-base-code-coverage-with-gitlab/
 coverage:
