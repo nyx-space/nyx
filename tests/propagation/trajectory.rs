@@ -41,9 +41,7 @@ fn traj_ephem() {
     assert_eq!(ephem.last(), end_state, "Wrong final state");
     assert!(ephem.last().stm().norm() > 0.0, "STM is not set!");
     assert!(
-        ephem
-            .evaluate(end_state.dt + 1 * TimeUnit::Nanosecond)
-            .is_err(),
+        ephem.at(end_state.dt + 1 * TimeUnit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
     );
 
@@ -56,7 +54,7 @@ fn traj_ephem() {
     });
 
     // Evaluate the first time of the trajectory to make sure that one is there too.
-    let eval_state = ephem.evaluate(start_dt).unwrap();
+    let eval_state = ephem.at(start_dt).unwrap();
 
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
@@ -64,7 +62,7 @@ fn traj_ephem() {
         (eval_state.as_vector().unwrap() - start_state.with_stm().as_vector().unwrap()).norm();
 
     while let Ok(prop_state) = rx.recv() {
-        let eval_state = ephem.evaluate(prop_state.dt).unwrap();
+        let eval_state = ephem.at(prop_state.dt).unwrap();
 
         let pos_err = (eval_state.radius() - prop_state.radius()).norm();
         if pos_err > max_pos_err {
@@ -110,14 +108,14 @@ fn traj_ephem() {
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
 
-    let conv_state = ephem_back_to_earth.evaluate(start_dt).unwrap();
+    let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
     let mut max_pos_err = (eval_state.radius() - conv_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
     let mut max_err =
         (eval_state.as_vector().unwrap() - conv_state.with_stm().as_vector().unwrap()).norm();
 
     for conv_state in ephem_back_to_earth.every(5 * TimeUnit::Minute) {
-        let eval_state = ephem.evaluate(conv_state.dt).unwrap();
+        let eval_state = ephem.at(conv_state.dt).unwrap();
 
         let pos_err = (eval_state.radius() - conv_state.radius()).norm();
         if pos_err > max_pos_err {
@@ -223,7 +221,7 @@ fn traj_spacecraft() {
 
     for epoch in TimeSeries::inclusive(start_dt, start_dt + prop_time, 1 * TimeUnit::Day) {
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
-        let sc_state = traj.evaluate(epoch).unwrap();
+        let sc_state = traj.at(epoch).unwrap();
         let mode_then = ruggiero_ctrl.next(&sc_state);
         if mode_then != prev_mode {
             println!(
@@ -240,7 +238,7 @@ fn traj_spacecraft() {
     assert_eq!(traj.first(), start_state, "Wrong initial state");
     assert_eq!(traj.last(), end_state, "Wrong final state");
     assert!(
-        traj.evaluate(end_state.epoch() + 1 * TimeUnit::Nanosecond)
+        traj.at(end_state.epoch() + 1 * TimeUnit::Nanosecond)
             .is_err(),
         "Expected to be outside of interpolation window!"
     );
@@ -254,7 +252,7 @@ fn traj_spacecraft() {
     });
 
     // Evaluate the first time of the trajectory to make sure that one is there too.
-    let eval_state = traj.evaluate(start_dt).unwrap();
+    let eval_state = traj.at(start_dt).unwrap();
 
     let mut max_pos_err = (eval_state.orbit.radius() - start_state.orbit.radius()).norm();
     let mut max_vel_err = (eval_state.orbit.velocity() - start_state.orbit.velocity()).norm();
@@ -262,7 +260,7 @@ fn traj_spacecraft() {
     let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
 
     while let Ok(prop_state) = rx.recv() {
-        let eval_state = traj.evaluate(prop_state.epoch()).unwrap();
+        let eval_state = traj.at(prop_state.epoch()).unwrap();
 
         let pos_err = (eval_state.orbit.radius() - prop_state.orbit.radius()).norm();
         if pos_err > max_pos_err {
@@ -312,12 +310,12 @@ fn traj_spacecraft() {
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
 
-    let conv_state = ephem_back_to_earth.evaluate(start_dt).unwrap();
+    let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
     let mut max_pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
     let mut max_vel_err = (eval_state.orbit.velocity() - conv_state.orbit.velocity()).norm();
 
     for conv_state in ephem_back_to_earth.every(5 * TimeUnit::Minute) {
-        let eval_state = traj.evaluate(conv_state.epoch()).unwrap();
+        let eval_state = traj.at(conv_state.epoch()).unwrap();
 
         let pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
         if pos_err > max_pos_err {
@@ -372,9 +370,9 @@ fn traj_ephem_backward() {
     for epoch in TimeSeries::inclusive(start_dt - 31 * TimeUnit::Day, start_dt, 1 * TimeUnit::Day) {
         cnt += 1.0;
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
-        // let state = ephem.evaluate(epoch + 17 * TimeUnit::Second).unwrap();
+        // let state = ephem.at(epoch + 17 * TimeUnit::Second).unwrap();
         // sum_sma += state.sma();
-        match ephem.evaluate(epoch) {
+        match ephem.at(epoch) {
             Ok(state) => sum_sma += state.sma(),
             Err(e) => println!("{}", e),
         }
@@ -393,9 +391,7 @@ fn traj_ephem_backward() {
     assert_eq!(ephem.last(), end_state, "Wrong final state");
     assert!(ephem.last().stm().norm() > 0.0, "STM is not set!");
     assert!(
-        ephem
-            .evaluate(end_state.dt + 1 * TimeUnit::Nanosecond)
-            .is_err(),
+        ephem.at(end_state.dt + 1 * TimeUnit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
     );
 
@@ -408,14 +404,14 @@ fn traj_ephem_backward() {
     });
 
     // Evaluate the first time of the trajectory to make sure that one is there too.
-    let eval_state = ephem.evaluate(start_dt).unwrap();
+    let eval_state = ephem.at(start_dt).unwrap();
 
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
     let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
 
     while let Ok(prop_state) = rx.recv() {
-        let eval_state = ephem.evaluate(prop_state.dt).unwrap();
+        let eval_state = ephem.at(prop_state.dt).unwrap();
 
         let pos_err = (eval_state.radius() - prop_state.radius()).norm();
         if pos_err > max_pos_err {

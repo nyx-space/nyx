@@ -200,7 +200,7 @@ where
     }
 
     /// Evaluate the trajectory at this specific epoch.
-    pub fn evaluate(&self, epoch: Epoch) -> Result<S, NyxError> {
+    pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
         let offset_s = ((epoch - self.start_state.epoch()).in_seconds().floor()) as i32;
 
         // Retrieve that segment
@@ -268,14 +268,14 @@ where
         let mut xa = 0.0;
         let mut xb = (xb_e - xa_e).in_seconds();
         // Evaluate the event at both bounds
-        let mut ya = event.eval(&self.evaluate(xa_e)?);
-        let mut yb = event.eval(&self.evaluate(xb_e)?);
+        let mut ya = event.eval(&self.at(xa_e)?);
+        let mut yb = event.eval(&self.at(xb_e)?);
 
         // Check if we're already at the root
         if ya.abs() <= event.value_precision().abs() {
-            return self.evaluate(xa_e);
+            return self.at(xa_e);
         } else if yb.abs() <= event.value_precision().abs() {
-            return self.evaluate(xb_e);
+            return self.at(xb_e);
         }
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
@@ -285,10 +285,10 @@ where
 
         for _ in 0..max_iter {
             if ya.abs() < event.value_precision().abs() {
-                return self.evaluate(xa_e + xa * TimeUnit::Second);
+                return self.at(xa_e + xa * TimeUnit::Second);
             }
             if yb.abs() < event.value_precision().abs() {
-                return self.evaluate(xa_e + xb * TimeUnit::Second);
+                return self.at(xa_e + xb * TimeUnit::Second);
             }
             if has_converged(xa, xb) {
                 // The event isn't in the bracket
@@ -315,14 +315,14 @@ where
             } else {
                 flag = false;
             }
-            let next_try = self.evaluate(xa_e + s * TimeUnit::Second)?;
+            let next_try = self.at(xa_e + s * TimeUnit::Second)?;
             let ys = event.eval(&next_try);
             xd = xc;
             xc = xb;
             yc = yb;
             if ya * ys < 0.0 {
                 // Root bracketed between a and s
-                let next_try = self.evaluate(xa_e + xa * TimeUnit::Second)?;
+                let next_try = self.at(xa_e + xa * TimeUnit::Second)?;
                 let ya_p = event.eval(&next_try);
                 let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
@@ -333,7 +333,7 @@ where
                 }
             } else {
                 // Root bracketed between s and b
-                let next_try = self.evaluate(xa_e + xb * TimeUnit::Second)?;
+                let next_try = self.at(xa_e + xb * TimeUnit::Second)?;
                 let yb_p = event.eval(&next_try);
                 let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {
@@ -469,7 +469,7 @@ where
             TimeSeries::inclusive(self.first().epoch(), self.last().epoch(), step).collect();
 
         epochs.into_par_iter().for_each_with(sender, |s, epoch| {
-            let state = self.evaluate(epoch).unwrap();
+            let state = self.at(epoch).unwrap();
             let this_eval = event.eval(&state);
             s.send((this_eval, state)).unwrap();
         });
@@ -697,7 +697,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.time_series.next() {
-            Some(next_epoch) => match self.traj.evaluate(next_epoch) {
+            Some(next_epoch) => match self.traj.at(next_epoch) {
                 Ok(item) => Some(item),
                 _ => None,
             },

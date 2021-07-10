@@ -95,16 +95,8 @@ fn event_tracker_true_anomaly() {
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() - 10 * TimeUnit::Second)
-                        .unwrap()
-                ),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() + 10 * TimeUnit::Second)
-                        .unwrap()
-                )
+                &e_loc.compute(&traj.at(orbit.epoch() - 10 * TimeUnit::Second).unwrap()),
+                &e_loc.compute(&traj.at(orbit.epoch() + 10 * TimeUnit::Second).unwrap())
             )
         })
         .collect::<String>();
@@ -120,16 +112,8 @@ fn event_tracker_true_anomaly() {
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() - 10 * TimeUnit::Second)
-                        .unwrap()
-                ),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() + 10 * TimeUnit::Second)
-                        .unwrap()
-                )
+                &e_loc.compute(&traj.at(orbit.epoch() - 10 * TimeUnit::Second).unwrap()),
+                &e_loc.compute(&traj.at(orbit.epoch() + 10 * TimeUnit::Second).unwrap())
             )
         })
         .collect::<String>();

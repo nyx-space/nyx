@@ -1,0 +1,236 @@
+%General Mission Analysis Tool(GMAT) Script
+%Created: 2021-07-09 16:08:22
+
+
+%----------------------------------------
+%---------- Spacecraft
+%----------------------------------------
+
+Create Spacecraft Cislunar;
+GMAT Cislunar.DateFormat = TAIGregorian;
+GMAT Cislunar.Epoch = '29 Nov 2022 06:47:28.000';
+GMAT Cislunar.CoordinateSystem = EarthMJ2000Eq;
+GMAT Cislunar.DisplayStateType = Cartesian;
+GMAT Cislunar.X = 4391.84282386;
+GMAT Cislunar.Y = -8819.24914059;
+GMAT Cislunar.Z = -5415.11431877;
+GMAT Cislunar.VX = 7.92817749977;
+GMAT Cislunar.VY = -1.78800739052;
+GMAT Cislunar.VZ = -1.69330836191;
+GMAT Cislunar.DryMass = 850;
+GMAT Cislunar.Cd = 2.2;
+GMAT Cislunar.Cr = 1.8;
+GMAT Cislunar.DragArea = 15;
+GMAT Cislunar.SRPArea = 1;
+GMAT Cislunar.SPADDragScaleFactor = 1;
+GMAT Cislunar.SPADSRPScaleFactor = 1;
+GMAT Cislunar.NAIFId = -10000001;
+GMAT Cislunar.NAIFIdReferenceFrame = -9000001;
+GMAT Cislunar.OrbitColor = Red;
+GMAT Cislunar.TargetColor = Teal;
+GMAT Cislunar.OrbitErrorCovariance = [ 1e+70 0 0 0 0 0 ; 0 1e+70 0 0 0 0 ; 0 0 1e+70 0 0 0 ; 0 0 0 1e+70 0 0 ; 0 0 0 0 1e+70 0 ; 0 0 0 0 0 1e+70 ];
+GMAT Cislunar.CdSigma = 1e+70;
+GMAT Cislunar.CrSigma = 1e+70;
+GMAT Cislunar.Id = 'SatId';
+GMAT Cislunar.Attitude = CoordinateSystemFixed;
+GMAT Cislunar.SPADSRPInterpolationMethod = Bilinear;
+GMAT Cislunar.SPADSRPScaleFactorSigma = 1e+70;
+GMAT Cislunar.SPADDragInterpolationMethod = Bilinear;
+GMAT Cislunar.SPADDragScaleFactorSigma = 1e+70;
+GMAT Cislunar.AddHardware = {SatTransponder, HGA};
+GMAT Cislunar.ModelFile = 'aura.3ds';
+GMAT Cislunar.ModelOffsetX = 0;
+GMAT Cislunar.ModelOffsetY = 0;
+GMAT Cislunar.ModelOffsetZ = 0;
+GMAT Cislunar.ModelRotationX = 0;
+GMAT Cislunar.ModelRotationY = 0;
+GMAT Cislunar.ModelRotationZ = 0;
+GMAT Cislunar.ModelScale = 1;
+GMAT Cislunar.AttitudeDisplayStateType = 'Quaternion';
+GMAT Cislunar.AttitudeRateDisplayStateType = 'AngularVelocity';
+GMAT Cislunar.AttitudeCoordinateSystem = EarthMJ2000Eq;
+GMAT Cislunar.EulerAngleSequence = '321';
+
+%----------------------------------------
+%---------- Hardware Components
+%----------------------------------------
+
+Create Antenna HGA;
+GMAT HGA.DirectionX = 1;
+GMAT HGA.DirectionY = 0;
+GMAT HGA.DirectionZ = 0;
+GMAT HGA.SecondDirectionX = 0;
+GMAT HGA.SecondDirectionY = 1;
+GMAT HGA.SecondDirectionZ = 0;
+GMAT HGA.HWOriginInBCSX = 0;
+GMAT HGA.HWOriginInBCSY = 0;
+GMAT HGA.HWOriginInBCSZ = 0;
+
+Create Transponder SatTransponder;
+GMAT SatTransponder.HardwareDelay = 1e-06; %seconds
+GMAT SatTransponder.PrimaryAntenna = HGA;
+GMAT SatTransponder.TurnAroundRatio = '880/749';
+
+%  Ground Station electronics. 
+Create Transmitter DSNTransmitter;
+
+GMAT DSNTransmitter.PrimaryAntenna = DSNAntenna;
+GMAT DSNTransmitter.Frequency = 7200;   %MHz
+
+Create Receiver DSNReceiver;
+GMAT DSNReceiver.PrimaryAntenna = DSNAntenna;
+GMAT DSNReceiver.Id = '0';
+
+Create Antenna DSNAntenna;
+GMAT DSNAntenna.DirectionX = 1;
+GMAT DSNAntenna.DirectionY = 0;
+GMAT DSNAntenna.DirectionZ = 0;
+GMAT DSNAntenna.SecondDirectionX = 0;
+GMAT DSNAntenna.SecondDirectionY = 1;
+GMAT DSNAntenna.SecondDirectionZ = 0;
+GMAT DSNAntenna.HWOriginInBCSX = 0;
+GMAT DSNAntenna.HWOriginInBCSY = 0;
+GMAT DSNAntenna.HWOriginInBCSZ = 0;
+
+%----------------------------------------
+%---------- GroundStations
+%----------------------------------------
+
+Create GroundStation DSSMadrid;
+GMAT DSSMadrid.OrbitColor = Thistle;
+GMAT DSSMadrid.TargetColor = DarkGray;
+GMAT DSSMadrid.CentralBody = Earth;
+GMAT DSSMadrid.StateType = Spherical;
+GMAT DSSMadrid.HorizonReference = Sphere;
+GMAT DSSMadrid.Location1 = 40.427222;
+GMAT DSSMadrid.Location2 = 4.250556;
+GMAT DSSMadrid.Location3 = 0.834939;
+GMAT DSSMadrid.Id = 'DSS Madrid';
+
+GMAT DSSMadrid.AddHardware = {DSNTransmitter, DSNReceiver, DSNAntenna};
+GMAT DSSMadrid.IonosphereModel = 'None';
+GMAT DSSMadrid.TroposphereModel = 'None';
+GMAT DSSMadrid.DataSource = 'Constant';
+GMAT DSSMadrid.Temperature = 295.1;
+GMAT DSSMadrid.Pressure = 1013.5;
+GMAT DSSMadrid.Humidity = 55;
+GMAT DSSMadrid.MinimumElevationAngle = 7;
+GMAT DSSMadrid.ErrorModels = {DSNrange, DSNdoppler};
+
+
+
+%----------------------------------------
+%---------- ForceModels
+%----------------------------------------
+
+Create ForceModel DefaultProp_ForceModel;
+GMAT DefaultProp_ForceModel.CentralBody = Earth;
+GMAT DefaultProp_ForceModel.PrimaryBodies = {Earth};
+GMAT DefaultProp_ForceModel.PointMasses = {Luna, Sun};
+GMAT DefaultProp_ForceModel.Drag = None;
+GMAT DefaultProp_ForceModel.SRP = Off;
+GMAT DefaultProp_ForceModel.RelativisticCorrection = Off;
+GMAT DefaultProp_ForceModel.ErrorControl = None;
+GMAT DefaultProp_ForceModel.GravityField.Earth.Degree = 0;
+GMAT DefaultProp_ForceModel.GravityField.Earth.Order = 0;
+GMAT DefaultProp_ForceModel.GravityField.Earth.StmLimit = 100;
+GMAT DefaultProp_ForceModel.GravityField.Earth.PotentialFile = 'JGM2.cof';
+GMAT DefaultProp_ForceModel.GravityField.Earth.TideModel = 'None';
+
+%----------------------------------------
+%---------- Propagators
+%----------------------------------------
+
+Create Propagator DefaultProp;
+GMAT DefaultProp.FM = DefaultProp_ForceModel;
+GMAT DefaultProp.Type = RungeKutta4;
+GMAT DefaultProp.InitialStepSize = 10;
+GMAT DefaultProp.Accuracy = 9.999999999999999e-12;
+GMAT DefaultProp.MinStep = 0;
+GMAT DefaultProp.MaxStep = 10;
+GMAT DefaultProp.MaxStepAttempts = 50;
+GMAT DefaultProp.StopIfAccuracyIsViolated = true;
+
+%----------------------------------------
+%---------- ErrorModels
+%----------------------------------------
+
+
+%   Create Ground station error models
+Create ErrorModel DSNrange;
+GMAT DSNrange.Type = 'Range';
+GMAT DSNrange.NoiseSigma = 1e-12; %10.63;
+GMAT DSNrange.Bias = 0;
+GMAT DSNrange.BiasSigma = 1e+70;
+
+Create ErrorModel DSNdoppler;
+GMAT DSNdoppler.Type = 'RangeRate';
+GMAT DSNdoppler.NoiseSigma = 1e-12; %0.0282;
+GMAT DSNdoppler.Bias = 0;
+GMAT DSNdoppler.BiasSigma = 1e+70;
+
+%----------------------------------------
+%---------- MeasurementModels
+%----------------------------------------
+
+Create TrackingFileSet DSNsimData;
+GMAT DSNsimData.AddTrackingConfig = {'{{DSSMadrid,Cislunar},Range}', '{{DSSMadrid,Cislunar},RangeRate}'};
+GMAT DSNsimData.FileName = {'nyx_gmat_rho_rhodot_cislunar2.gmd'};
+GMAT DSNsimData.UseLightTime = true;
+
+%DSNsimData.UseLightTi               = false;
+GMAT DSNsimData.UseRelativityCorrection = false;
+GMAT DSNsimData.UseETminusTAI = false;
+GMAT DSNsimData.AberrationCorrection = 'None';
+GMAT DSNsimData.SimRangeModuloConstant = 33554432;
+
+GMAT DSNsimData.SimDopplerCountInterval = 10;
+GMAT DSNsimData.SimTDRSNode4Frequency = 2000;
+GMAT DSNsimData.SimTDRSNode4FrequencyBand = 1;
+GMAT DSNsimData.SimTDRSSmarId = 0;
+GMAT DSNsimData.SimTDRSDataFlag = 0;
+
+%----------------------------------------
+%---------- Solvers
+%----------------------------------------
+
+Create Simulator Sim;
+GMAT Sim.AddData = {DSNsimData};
+GMAT Sim.Propagator = DefaultProp
+GMAT Sim.EpochFormat = TAIGregorian;
+GMAT Sim.InitialEpoch = '29 Nov 2022 06:47:28.000';
+GMAT Sim.FinalEpoch = '29 Nov 2022 18:47:28.000';
+GMAT Sim.MeasurementTimeStep = 60;
+GMAT Sim.AddNoise = Off;
+
+%----------------------------------------
+%---------- Subscribers
+%----------------------------------------
+
+Create ReportFile ReportFile1;
+GMAT ReportFile1.SolverIterations = Current;
+GMAT ReportFile1.UpperLeft = [ 0 0 ];
+GMAT ReportFile1.Size = [ 0 0 ];
+GMAT ReportFile1.RelativeZOrder = 0;
+GMAT ReportFile1.Maximized = false;
+GMAT ReportFile1.Filename = 'ReportFile1.txt';
+GMAT ReportFile1.Precision = 16;
+GMAT ReportFile1.Add = {Cislunar.A1ModJulian, Cislunar.EarthMJ2000Eq.X};
+GMAT ReportFile1.WriteHeaders = true;
+GMAT ReportFile1.LeftJustify = On;
+GMAT ReportFile1.ZeroFill = Off;
+GMAT ReportFile1.FixedWidth = true;
+GMAT ReportFile1.Delimiter = ' ';
+GMAT ReportFile1.ColumnWidth = 23;
+GMAT ReportFile1.WriteReport = true;
+
+
+%----------------------------------------
+%---------- Mission Sequence
+%----------------------------------------
+
+BeginMissionSequence;
+RunSimulator Sim;
+%Propagate DefaultProp(Cislunar) {Cislunar.ElapsedSecs = 7200};
+
+

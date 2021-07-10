@@ -1209,7 +1209,7 @@ impl Orbit {
         }
     }
 
-    /// Returns the direct cosine rotation matrix to convert to this inertial state.
+    /// Returns the direct cosine rotation matrix to convert to this state's frame (inertial or otherwise).
     /// ## Example
     /// let dcm_vnc2inertial = orbit.dcm_from_traj_frame(Frame::VNC)?;
     /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
@@ -1232,7 +1232,9 @@ impl Orbit {
             }
             Frame::SEZ => {
                 // From the GMAT MathSpec, page 30 section 2.6.9 and from `Calculate_RFT` in `TopocentricAxes.cpp`, this returns the
-                // rotation matrix from the topocentric frame (SEZ) to body fixed frame (i.e. the transpose of GMAT's RFT matrix).
+                // rotation matrix from the topocentric frame (SEZ) to body fixed frame.
+                // In the GMAT MathSpec notation, R_{IF} is the DCM from body fixed to inertial. Similarly, R{FT} is from topocentric
+                // to body fixed.
                 if !self.frame.is_body_fixed() {
                     warn!("Computation of SEZ rotation matrix must be done in a body fixed frame and {} is not one!", self.frame);
                 }
@@ -1249,7 +1251,7 @@ impl Orbit {
                 let y_hat = Vector3::new(0.0, 0.0, 1.0).cross(&z_hat);
                 let x_hat = y_hat.cross(&z_hat);
                 Ok(Matrix3::new(
-                    x_hat[0], x_hat[1], x_hat[2], y_hat[0], y_hat[1], y_hat[2], z_hat[0], z_hat[1],
+                    x_hat[0], y_hat[0], z_hat[0], x_hat[1], y_hat[1], z_hat[1], x_hat[2], y_hat[2],
                     z_hat[2],
                 ))
             }

@@ -136,7 +136,7 @@ fn val_b_plane_gmat() {
     let luna = cosm.frame("Luna");
     for data in &datum {
         // let state = moon_traj.evaluate(data.epoch).unwrap(); // Cf #190
-        let eme2k_state = traj.evaluate(data.epoch).unwrap();
+        let eme2k_state = traj.at(data.epoch).unwrap();
         let state = cosm.frame_chg(&eme2k_state, luna);
         println!("{}\n{:x}", state, state);
         assert!(
@@ -169,7 +169,7 @@ fn val_b_plane_gmat() {
     }
 
     // Check some stuff for the first b plane
-    let eme2k_state = traj.evaluate(datum[0].epoch).unwrap();
+    let eme2k_state = traj.at(datum[0].epoch).unwrap();
     let state = cosm.frame_chg(&eme2k_state, luna);
     let b_plane = state.b_plane().unwrap();
     println!("{}\n{}", b_plane, b_plane.jacobian());

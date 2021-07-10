@@ -26,7 +26,6 @@ use super::{Measurement, MeasurementDevice, TimeTagged};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dimensions::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
 use crate::time::Epoch;
-use crate::utils::dcm_assemble;
 use crate::Spacecraft;
 use std::fmt;
 use std::sync::Arc;
@@ -151,42 +150,29 @@ impl GroundStation {
     /// Computes the elevation of the provided object seen from this ground station.
     /// Also returns the ground station's orbit in the Solar System Barycenter frame
     pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit, Orbit) {
-        // Start by computing the rotation matrix from the inertial frame to the topocentric frame of this ground station.
+        // Start by converting the receiver spacecraft into the ground station frame.
+        let rx_gs_frame = self.cosm.frame_chg(rx, self.frame);
+
         let dt = rx.dt;
-        let station_state =
+        // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
+        let tx_gs_frame =
             Orbit::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
+        // Note: we're only looking at the radis so we don't need to apply the transport theorem here.
+        let dcm_topo2fixed = tx_gs_frame.dcm_from_traj_frame(Frame::SEZ).unwrap();
 
-        // This is called the RFT in GMAT's TopocentricAxes.cpp.
-        let dcm_topo2fixed = station_state.dcm_from_traj_frame(Frame::SEZ).unwrap();
+        // Now, rotate the spacecraft in the SEZ frame to compute its elevation as seen from the ground station.
+        // We transpose the DCM so that it's the fixed to topocentric rotation.
+        // WARNING: This is a non inertial frame, so the norm of the vectors are not conserved.
+        let rx_sez = rx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
+        let tx_sez = tx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
+        // Now, let's compute the range ρ.
+        let rho_sez = rx_sez - tx_sez;
 
-        let ssb_frame = self.cosm.frame("SSB");
+        // Finally, compute the elevation (math is the same as declination)
+        let elevation = rho_sez.declination();
 
-        // These are called RIF and RIFDot in GMAT.
-        let (dcm_inertial2fixed, dcm_inertial2fixed_dt) = self
-            .cosm
-            .try_dcm_from_to_in_parts(&self.frame, &ssb_frame, dt)
-            .unwrap();
-
-        let dcm_inertial2topo = dcm_inertial2fixed * dcm_topo2fixed.transpose();
-        let dcm_inertial2topo_dt = dcm_inertial2fixed_dt * dcm_topo2fixed.transpose();
-
-        let dcm_topo2inertial = dcm_assemble(dcm_inertial2topo, dcm_inertial2topo_dt);
-
-        // Now, compute the range vector in the solar system barycenter frame for both objects.
-        // As per GMAT MathSpec, these ranges are different.
-        let tx_ssb = self.cosm.frame_chg(&station_state, ssb_frame);
-        let rx_ssb = self.cosm.frame_chg(rx, ssb_frame);
-
-        let mut rho_sez_unit = (rx_ssb - tx_ssb)
-            .with_rotation_by(dcm_topo2inertial.transpose())
-            .radius();
-        rho_sez_unit /= rho_sez_unit.norm();
-
-        // NOTE: We don't need to normalize it here because we've already normalized rho_sez!
-        let elevation = rho_sez_unit[2].asin().to_degrees();
-
-        // Return elevation in degrees and tx
-        (elevation, rx_ssb, tx_ssb)
+        // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
+        (elevation, *rx, self.cosm.frame_chg(&tx_gs_frame, rx.frame))
     }
 }
 impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
