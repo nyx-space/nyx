@@ -5,12 +5,11 @@ stages:
   - deploy
 
 .cacheconf: &cacheconf
-    cache:
-      key: $CI_COMMIT_REF_SLUG
-      paths:
-        - .cargo/
-        - .cache/sccache
-        - target/
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - .cargo/
+      - .cache/sccache
+      - target/
 
 compile:
   stage: build
@@ -24,12 +23,14 @@ compile:
     - cargo install sccache
     - cargo build --tests --release # Build all of the tests in release mode
     - cargo build --release # Build the binaries
-  <<: *cacheconf
+  cache:
+    <<: *cacheconf
 
 unit-tests:
   stage: test
   image: rust:1-slim
-  <<: *cacheconf
+  cache:
+    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -40,7 +41,8 @@ unit-tests:
 mission-design-integration-tests:
   stage: test
   image: rust:1-slim
-  <<: *cacheconf
+  cache:
+    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -51,7 +53,8 @@ mission-design-integration-tests:
 propulsion-integration-tests:
   stage: test
   image: rust:1-slim
-  <<: *cacheconf
+  cache:
+    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -61,7 +64,8 @@ propulsion-integration-tests:
 propagation-integration-tests:
   stage: test
   image: rust:1-slim
-  <<: *cacheconf
+  cache:
+    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -70,7 +74,8 @@ propagation-integration-tests:
 orbit-determination-integration-tests:
   stage: test
   image: rust:1-slim
-  <<: *cacheconf
+  cache:
+    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -78,7 +83,8 @@ orbit-determination-integration-tests:
 
 scenario-tests:
   image: rust:1-slim
-  <<: *cacheconf
+  cache:
+    <<: *cacheconf
   script:
     - cargo run --release -- data/simple-scenario.toml --all
     # Check that when we do a unit conversion it's correct
