@@ -17,9 +17,9 @@ compile:
   variables:
     CARGO_HOME: $CI_PROJECT_DIR/.cargo
     SCCACHE_DIR: $CI_PROJECT_DIR/.cache/sccache
-    PATH: $CI_PROJECT_DIR/.cargo/bin:$PATH
     RUSTC_WRAPPER: $CARGO_HOME/bin/sccache
   script:
+    - export PATH="$CI_PROJECT_DIR/.cargo/bin:$PATH"  # This must be done here or the stage will fail
     - cargo install sccache
     - cargo build --tests --release # Build all of the tests in release mode
     - cargo build --release # Build the binaries
