@@ -12,8 +12,6 @@ use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
 use self::nyx::utils::rss_orbit_errors;
 use std::convert::TryFrom;
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
 
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
@@ -51,7 +49,6 @@ fn xhat_dev_test_ekf_two_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -73,27 +70,20 @@ fn xhat_dev_test_ekf_two_body() {
 
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
-    let mut truth_states = Vec::with_capacity(10_000);
-    truth_states.push(initial_state);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
-        let prev_len = measurements.len();
+    let (_, traj) = setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        if measurements.len() > prev_len {
-            // We've added a measurement so we were in visibility!
-            truth_states.push(rx_state)
-        }
     }
-    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -148,6 +138,7 @@ fn xhat_dev_test_ekf_two_body() {
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
     println!("Estimate:\n{}", est);
+    let final_truth_state = traj.at(est.epoch()).unwrap();
     println!("Truth:\n{}", final_truth_state);
     let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
     println!(
@@ -155,7 +146,7 @@ fn xhat_dev_test_ekf_two_body() {
         final_truth_state.dt == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - &est.state()
+        final_truth_state - est.state()
     );
 
     for i in 0..6 {
@@ -187,18 +178,11 @@ fn xhat_dev_test_ekf_two_body() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - &est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",
         rmag_err * 1e3
-    );
-
-    // BUG: Why and how are there more estimates than measurements?!
-    assert_eq!(
-        measurements.len(),
-        odp.estimates.len(),
-        "different number of estimates"
     );
 
     let post_smooth_first_est = odp.estimates[0].clone();
@@ -254,7 +238,6 @@ fn xhat_dev_test_ekf_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -277,23 +260,21 @@ fn xhat_dev_test_ekf_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
-    let mut truth_states = Vec::with_capacity(10_000);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+
+    let (_, traj) = setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
     }
-
-    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -335,6 +316,7 @@ fn xhat_dev_test_ekf_multi_body() {
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
+    let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
@@ -349,7 +331,7 @@ fn xhat_dev_test_ekf_multi_body() {
         "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - &est.state()
+        final_truth_state - est.state()
     );
 
     for i in 0..6 {
@@ -381,17 +363,11 @@ fn xhat_dev_test_ekf_multi_body() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - &est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",
         rmag_err * 1e3
-    );
-
-    assert_eq!(
-        truth_states.len(),
-        odp.estimates.len() - 1,
-        "different number of estimates"
     );
 }
 
@@ -425,7 +401,6 @@ fn xhat_dev_test_ekf_harmonics() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -455,23 +430,21 @@ fn xhat_dev_test_ekf_harmonics() {
     let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(&bodies, cosm)]);
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
 
-    let mut truth_states = Vec::with_capacity(10_000);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    let (_, traj) = setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
     }
-    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -508,6 +481,8 @@ fn xhat_dev_test_ekf_harmonics() {
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
+    let final_truth_state = traj.at(est.epoch()).unwrap();
+
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
     let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
@@ -516,7 +491,7 @@ fn xhat_dev_test_ekf_harmonics() {
         final_truth_state.dt == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - &est.state()
+        final_truth_state - est.state()
     );
 
     for i in 0..6 {
@@ -537,17 +512,11 @@ fn xhat_dev_test_ekf_harmonics() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - &est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag();
     assert!(
         rmag_err < 1e-1,
         "final radius error should be on ten-meter level (is instead {:.3} m)",
         rmag_err * 1e3
-    );
-
-    assert_eq!(
-        truth_states.len(),
-        odp.estimates.len() - 1,
-        "different number of estimates"
     );
 }
 
@@ -581,7 +550,6 @@ fn xhat_dev_test_ekf_realistic() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -603,23 +571,21 @@ fn xhat_dev_test_ekf_realistic() {
     ];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = truth_setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
 
-    let mut truth_states = Vec::with_capacity(10_000);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    let (_, traj) = truth_setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
     }
-    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
@@ -656,12 +622,14 @@ fn xhat_dev_test_ekf_realistic() {
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
+    let final_truth_state = traj.at(est.epoch()).unwrap();
+
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
         final_truth_state.dt == est.epoch(),
-        final_truth_state - &est.state()
+        final_truth_state - est.state()
     );
 
     for i in 0..6 {
@@ -693,7 +661,7 @@ fn xhat_dev_test_ekf_realistic() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - &est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag();
     assert!(
         rmag_err < 5e-1,
         "final radius error should be less than 500 m (is instead {:.3} m)",
@@ -727,7 +695,6 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -750,21 +717,19 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let (_, traj) = setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
-    let mut truth_states = Vec::with_capacity(10_000);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
     }
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
@@ -809,11 +774,11 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     // Test smoothed estimates
     // Skip the first 10 estimates which are surprisingly good in this case
     for offset in (1..odp.estimates.len() - 10).rev() {
-        let truth_state = truth_states[truth_states.len() - offset];
         let smoothed_est = &smoothed_estimates[odp.estimates.len() - offset];
 
         // Check that the covariance deflated
         let est = &odp.estimates[odp.estimates.len() - offset];
+        let truth_state = traj.at(est.epoch()).unwrap();
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(smoothed_est.epoch(), est.epoch());
@@ -875,11 +840,6 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
                 rmag_err < 1e-2,
                 "final radius error should be on meter level (is instead {:.3} m)",
                 rmag_err * 1e3
-            );
-            assert_eq!(
-                truth_states.len(),
-                odp.estimates.len() - 1,
-                "different number of estimates"
             );
         }
 
@@ -989,7 +949,6 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -1012,21 +971,19 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let (_, traj) = setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
-    let mut truth_states = Vec::with_capacity(10_000);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
     }
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
@@ -1084,11 +1041,11 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     // Test smoothed estimates
     // Skip the first 10 estimates which are surprisingly good in this case
     for offset in (1..odp.estimates.len() - 10).rev() {
-        let truth_state = truth_states[truth_states.len() - offset];
         let smoothed_est = &smoothed_estimates[odp.estimates.len() - offset];
 
         // Check that the covariance deflated
         let est = &odp.estimates[odp.estimates.len() - offset];
+        let truth_state = traj.at(est.epoch()).unwrap();
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(smoothed_est.epoch(), est.epoch());
@@ -1150,11 +1107,6 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 rmag_err < 1e-2,
                 "final radius error should be on meter level (is instead {:.3} m)",
                 rmag_err * 1e3
-            );
-            assert_eq!(
-                truth_states.len(),
-                odp.estimates.len() - 1,
-                "different number of estimates"
             );
         }
 
@@ -1259,7 +1211,6 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -1282,21 +1233,19 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let (_, traj) = setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
-    let mut truth_states = Vec::with_capacity(10_000);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
     }
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
@@ -1347,11 +1296,11 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     // Compare the initial estimates and the iterated estimates
     // Skip the first 10 estimates which are surprisingly good in this case
     for offset in (1..odp.estimates.len() - 10).rev() {
-        let truth_state = truth_states[truth_states.len() - offset];
         let prior_est = &pre_iteration_estimates[odp.estimates.len() - offset];
 
         // Check that the covariance deflated
         let est = &odp.estimates[odp.estimates.len() - offset];
+        let truth_state = traj.at(est.epoch()).unwrap();
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(prior_est.epoch(), est.epoch());
@@ -1413,11 +1362,6 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                 rmag_err < 1e-2,
                 "final radius error should be on meter level (is instead {:.3} m)",
                 rmag_err * 1e3
-            );
-            assert_eq!(
-                truth_states.len(),
-                odp.estimates.len() - 1,
-                "different number of estimates"
             );
         }
 
