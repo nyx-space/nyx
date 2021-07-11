@@ -10,7 +10,6 @@ use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};
 use self::nyx::utils::rss_orbit_errors;
-use std::sync::mpsc;
 
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
@@ -22,7 +21,6 @@ use std::sync::mpsc;
 #[test]
 fn od_robust_test_ekf_realistic() {
     // TODO: Add gravity field differences.
-    // TODO: Generate measurements from trajectory?
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -50,7 +48,6 @@ fn od_robust_test_ekf_realistic() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
@@ -72,23 +69,20 @@ fn od_robust_test_ekf_realistic() {
     ];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = truth_setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let (_, traj) = truth_setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
-    let mut truth_states = Vec::with_capacity(10_000);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
-        truth_states.push(rx_state)
     }
-    let final_truth_state = truth_states[truth_states.len() - 1];
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
@@ -124,9 +118,10 @@ fn od_robust_test_ekf_realistic() {
     odp.process_measurements(&measurements).unwrap();
     odp.iterate(&measurements, IterationConf::default())
         .unwrap();
-
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
+    let final_truth_state = traj.at(est.epoch()).unwrap();
+
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
     println!(
@@ -207,7 +202,6 @@ fn od_robust_ops_test() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
     let mut ckf_measurements = Vec::with_capacity(1000);
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
@@ -219,7 +213,7 @@ fn od_robust_ops_test() {
     initial_state_dev.x += 0.05;
     initial_state_dev.y -= 0.05;
     initial_state_dev.z += 0.05;
-    let ckf_dco = dt + 30 * TimeUnit::Minute;
+    let ckf_dco_cnt = 250; // The first 250 measurements will be used in the CKF setup
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
@@ -239,12 +233,13 @@ fn od_robust_ops_test() {
         cosm.clone(),
     );
     let truth_setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = truth_setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let (_, traj) = truth_setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
     // Initialize the truth data output
-    let mut initial_state_out = Some(prop.state);
+    let mut initial_state_out = Some(initial_state);
     let truth_fmtr =
         StateFormatter::default("data/robust_test_ckf_truth.csv".to_string(), cosm.clone());
     let mut wtr =
@@ -252,14 +247,11 @@ fn od_robust_ops_test() {
     wtr.serialize(&truth_fmtr.headers)
         .expect("could not write headers");
 
-    let mut truth_states = Vec::with_capacity(10_000);
-    truth_states.push(prop.state);
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
-                if rx_state.epoch() <= ckf_dco {
+                if ckf_measurements.len() < ckf_dco_cnt {
                     // Add this measurement to the CKF
                     ckf_measurements.push(meas);
                 }
@@ -268,17 +260,15 @@ fn od_robust_ops_test() {
                 break; // We know that only one station is in visibility at each time.
             }
         }
+
         if let Some(first_state) = initial_state_out {
             wtr.serialize(&truth_fmtr.fmt(&first_state))
                 .expect("could not format state");
             initial_state_out = None;
         }
-        wtr.serialize(truth_fmtr.fmt(&rx_state))
+        wtr.serialize(truth_fmtr.fmt(&state))
             .expect("could not format state");
-        truth_states.push(rx_state)
     }
-
-    let final_truth_state = truth_states.last().unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -392,6 +382,7 @@ fn od_robust_ops_test() {
     odp.process_measurements(&measurements).unwrap();
 
     let est = &odp.estimates.last().unwrap();
+    let final_truth_state = traj.at(est.epoch()).unwrap();
 
     println!("Estimate:\n{}", est);
     println!("Truth:\n{}", final_truth_state);
@@ -402,10 +393,10 @@ fn od_robust_ops_test() {
         "RSS error: estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
         err_p * 1e3,
         err_v * 1e3,
-        final_truth_state - &est.state()
+        final_truth_state - est.state()
     );
 
-    let rmag_err = (final_truth_state - &est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",

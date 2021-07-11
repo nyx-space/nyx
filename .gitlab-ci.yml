@@ -4,45 +4,28 @@ stages:
   - quality
   - deploy
 
-.cacheconf: &cacheconf
-    key: $CI_COMMIT_REF_SLUG
-    paths:
-      - .cargo/
-      - .cache/sccache
-      - target/
-
 compile:
   stage: build
   image: rust:1-bullseye
-  variables:
-    CARGO_HOME: $CI_PROJECT_DIR/.cargo
-    SCCACHE_DIR: $CI_PROJECT_DIR/.cache/sccache
   script:
-    - cargo install sccache
-    - export PATH="$CI_PROJECT_DIR/.cargo/bin:$PATH" # Must be here or the stage will fail to start
-    - export RUSTC_WRAPPER="$CARGO_HOME/bin/sccache" # Must be after sccache is installed
     - cargo build --tests --release # Build all of the tests in release mode
     - cargo build --release # Build the binaries
-  cache:
-    <<: *cacheconf
+  artifacts:
+    paths:
+      - target/
+      - Cargo.lock
 
 unit-tests:
   stage: test
   image: rust:1-bullseye
-  cache:
-    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
-    - rustup component add rustfmt
-    - cargo fmt -- --check
     - cargo test --lib --release # Unit tests
     
 mission-design-integration-tests:
   stage: test
   image: rust:1-bullseye
-  cache:
-    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -53,8 +36,6 @@ mission-design-integration-tests:
 propulsion-integration-tests:
   stage: test
   image: rust:1-bullseye
-  cache:
-    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -64,8 +45,6 @@ propulsion-integration-tests:
 propagation-integration-tests:
   stage: test
   image: rust:1-bullseye
-  cache:
-    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -74,8 +53,6 @@ propagation-integration-tests:
 orbit-determination-integration-tests:
   stage: test
   image: rust:1-bullseye
-  cache:
-    <<: *cacheconf
   variables:
     RUST_BACKTRACE: 1
   script:
@@ -83,8 +60,6 @@ orbit-determination-integration-tests:
 
 scenario-tests:
   image: rust:1-bullseye
-  cache:
-    <<: *cacheconf
   script:
     - cargo run --release -- data/simple-scenario.toml --all
     # Check that when we do a unit conversion it's correct
@@ -138,9 +113,8 @@ audit:
 # Code from https://www.collabora.com/news-and-blog/blog/2021/03/24/rust-integrating-llvm-source-base-code-coverage-with-gitlab/
 coverage:
   stage: quality
-  image: "rustdocker/rust:nightly"  # Eventually switch to rust-1-bullseye and add python
-  cache:
-    <<: *cacheconf
+  # image: "rustdocker/rust:nightly"  # Eventually switch to rust-1-bullseye and add python
+  image: rust:1-bullseye
   variables:
     RUSTFLAGS: "-Zinstrument-coverage"
     LLVM_PROFILE_FILE: "coverage-%p-%m.profraw"
