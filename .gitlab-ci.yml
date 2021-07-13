@@ -1,6 +1,7 @@
 stages: 
   - build
   - test
+  - test-intensive
   - quality
   - deploy
 
@@ -34,13 +35,12 @@ mission-design-integration-tests:
     - cargo test monte_carlo --release
 
 propulsion-integration-tests:
-  stage: test
+  stage: test-intensive
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
   script:
-    - cargo test propulsion --release -j4 # Only on 4 CPUs otherwise the stack is totally used up
-    - cargo test propagation --release -j4
+    - cargo test propulsion --release
 
 propagation-integration-tests:
   stage: test
@@ -48,7 +48,7 @@ propagation-integration-tests:
   variables:
     RUST_BACKTRACE: 1
   script:
-    - cargo test propagation --release -j4
+    - cargo test propagation --release
 
 orbit-determination-integration-tests:
   stage: test
