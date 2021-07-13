@@ -385,7 +385,7 @@ fn xhat_dev_test_ekf_harmonics() {
     // Set the disable time to be very low to test enable/disable sequence
     let ekf_disable_time = 1 * TimeUnit::Minute;
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
+    let range_noise = 1e-6;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
         GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());

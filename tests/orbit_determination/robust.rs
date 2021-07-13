@@ -307,6 +307,12 @@ fn od_robust_ops_test() {
 
     odp.process_measurements(&measurements).unwrap();
 
+    let est = &odp.estimates.last().unwrap();
+    let final_truth_state = traj.at(est.epoch()).unwrap();
+
+    println!("CKF Estimate:\n{}", est);
+    println!("CKF Truth:\n{}", final_truth_state);
+
     // Clone the initial estimate
     let pre_smooth_first_est = odp.estimates[0].clone();
     // Output the pre-iteration estimates
