@@ -187,7 +187,7 @@ fn od_robust_ops_test() {
     let cosm = Cosm::de438();
 
     let elevation_mask = 0.0;
-    let range_noise = 1e-10;
+    let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
         GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
@@ -196,6 +196,10 @@ fn od_robust_ops_test() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
+    // Bug identified in #147 means we need to redefine the stations here without noise
+    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, 0.0, 0.0, cosm.clone());
+    let dss34_canberra = GroundStation::dss13_goldstone(elevation_mask, 0.0, 0.0, cosm.clone());
+    let all_stations_no_noise = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * TimeUnit::Day;
@@ -265,7 +269,7 @@ fn od_robust_ops_test() {
             .expect("could not format state");
     }
 
-    let ekf_msr_trig = measurements.len() / 10;
+    let ekf_msr_trig = measurements.len() / 5;
 
     println!(
         "Generated {} measurements in total (using {} for CKF)",
@@ -304,7 +308,14 @@ fn od_robust_ops_test() {
     let mut trig = StdEkfTrigger::new(ekf_msr_trig, 10.0 * TimeUnit::Second);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
+    let mut odp = ODProcess::ekf(
+        prop_est,
+        kf,
+        all_stations_no_noise,
+        false,
+        measurements.len(),
+        trig,
+    );
 
     odp.process_measurements(&measurements).unwrap();
 
