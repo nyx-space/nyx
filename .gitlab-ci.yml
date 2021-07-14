@@ -1,9 +1,17 @@
 stages: 
   - build
   - test
-  - test-intensive
+  - test-resrc-intense
   - quality
   - deploy
+
+cache:
+  paths:
+    - .cargo
+    - target
+
+variables:
+  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
 
 compile:
   stage: build
@@ -11,10 +19,10 @@ compile:
   script:
     - cargo build --tests --release # Build all of the tests in release mode
     - cargo build --release # Build the binaries
-  artifacts:
-    paths:
-      - target/
-      - Cargo.lock
+  # artifacts:
+  #   paths:
+  #     - target/
+  #     - Cargo.lock
 
 unit-tests:
   stage: test
@@ -35,20 +43,20 @@ mission-design-integration-tests:
     - cargo test monte_carlo --release
 
 propulsion-integration-tests:
-  stage: test-intensive
+  stage: test-resrc-intense
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
   script:
-    - cargo test propulsion --release
+    - cargo test propulsion --release -j4
 
 propagation-integration-tests:
-  stage: test
+  stage: test-resrc-intense
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
   script:
-    - cargo test propagation --release
+    - cargo test propagation --release -j4
 
 orbit-determination-integration-tests:
   stage: test
