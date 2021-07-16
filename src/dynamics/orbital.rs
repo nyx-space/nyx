@@ -185,9 +185,8 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
             }
         }
 
-        // Multiply the gradient (A matrix) with the previous STM to get the \frac{d \Phi}{dt}
-        // This function returns the time derivative of each function.
-        // Ok((dx, grad * osc.stm()))
+        // This function returns the time derivative of each function. The propagator will add this to the state vector (which has the previous STM).
+        // This is why we don't multiply the gradient (A matrix) with the previous STM
         Ok((dx, grad))
     }
 }

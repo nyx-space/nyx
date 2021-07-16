@@ -1357,7 +1357,7 @@ impl Orbit {
     /// Copies the current state but sets the STM to identity
     pub fn with_stm(self) -> Self {
         let mut me = self;
-        me.enable_stm();
+        me.enable_traj_stm();
         me
     }
 
@@ -1715,7 +1715,7 @@ impl State for Orbit {
         match self.stm_kind {
             StmKind::Step => {
                 let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
-                if false {
+                if true {
                     let mut stm_prev = self.stm.unwrap();
                     // println!("{}", stm_k_to_0);
                     // if stm_k_to_0[(0, 0)].is_nan() {
@@ -1726,7 +1726,7 @@ impl State for Orbit {
                         error!("STM not invertible: {}", stm_prev);
                         return Err(NyxError::SingularStateTransitionMatrix);
                     }
-                    println!("BLAH{}{}", epoch, stm_k_to_0 * stm_prev);
+                    // println!("BLAH{}{}", epoch, stm_k_to_0 * stm_prev);
                     self.stm = Some(stm_k_to_0 * stm_prev);
                 } else {
                     // Traj STM
