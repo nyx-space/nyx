@@ -33,8 +33,6 @@ pub enum NyxError {
     MaxIterReached(String),
     /// Event not in braket
     EventNotInEpochBraket(String, String),
-    /// The STM was not updated prior to requesting a filter update
-    StateTransitionMatrixNotUpdated,
     /// The operation was expecting the state to have an STM, but it isn't present.
     StateTransitionMatrixUnset,
     /// The sensitivity matrix was not updated prior to requesting a filter measurement update
@@ -84,9 +82,6 @@ impl fmt::Display for NyxError {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::StateTransitionMatrixNotUpdated => {
-                write!(f, "STM was not updated prior to time or measurement update")
-            }
             Self::SensitivityNotUpdated => write!(
                 f,
                 "The measurement matrix H_tilde was not updated prior to measurement update"

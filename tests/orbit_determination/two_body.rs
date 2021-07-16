@@ -191,7 +191,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
+    // let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000);
 
     // Define state information.
@@ -203,17 +203,28 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let orbital_dyn = OrbitalDynamics::two_body();
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    let final_truth = prop.for_duration(prop_time).unwrap();
+    let (final_truth, traj) = setup
+        .with(initial_state)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
+    // while let Ok(rx_state) = truth_rx.try_recv() {
+    //     for station in all_stations.iter() {
+    //         let meas = station.measure(&rx_state).unwrap();
+    //         if meas.visible() {
+    //             measurements.push(meas);
+    //             break;
+    //         }
+    //     }
+    // }
+
+    for state in traj.every(10 * TimeUnit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&state).unwrap();
             if meas.visible() {
                 measurements.push(meas);
-                break;
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }

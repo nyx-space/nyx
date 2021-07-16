@@ -13,7 +13,7 @@ mod spacecraft;
 mod two_body;
 mod xhat_dev;
 
-use self::nyx::dimensions::{Matrix2, Matrix2x6, Matrix6, Vector2};
+use self::nyx::dimensions::{Matrix2, Matrix2x6, Vector2};
 use std::f64::EPSILON;
 
 macro_rules! f64_nil {
@@ -30,7 +30,10 @@ fn empty_estimate() {
         "expected state norm to be nil"
     );
     f64_nil!(empty.covar.norm(), "expected covar norm to be nil");
-    f64_nil!(empty.stm.norm(), "expected STM norm to be nil");
+    f64_nil!(
+        empty.stm.diagonal().norm() - 6.0_f64.sqrt(),
+        "expected STM norm to be sqrt(dim(STM))"
+    );
     assert!(empty.predicted, "expected predicted to be true");
 }
 
@@ -49,22 +52,8 @@ fn filter_errors() {
     let real_obs = &Vector2::zeros();
     let computed_obs = &Vector2::zeros();
     let sensitivity = Matrix2x6::zeros();
-    let stm = Matrix6::zeros();
 
     let mut ckf = KF::no_snc(initial_estimate, measurement_noise);
-    match ckf.time_update(Orbit::zeros()) {
-        Ok(_) => panic!("expected the time update to fail"),
-        Err(e) => {
-            assert_eq!(e, NyxError::StateTransitionMatrixNotUpdated);
-        }
-    }
-    match ckf.measurement_update(Orbit::zeros(), real_obs, computed_obs) {
-        Ok(_) => panic!("expected the measurement update to fail"),
-        Err(e) => {
-            assert_eq!(e, NyxError::StateTransitionMatrixNotUpdated);
-        }
-    }
-    ckf.update_stm(stm);
     match ckf.measurement_update(Orbit::zeros(), real_obs, computed_obs) {
         Ok(_) => panic!("expected the measurement update to fail"),
         Err(e) => {

@@ -1,3 +1,4 @@
+extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use nyx::cosmic::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
@@ -706,10 +707,32 @@ fn multi_body_dynamics_dual() {
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_stm = final_state_dual.stm.unwrap();
     let final_step = prop.latest_details().step;
-    prop.for_duration(-final_step).unwrap();
+    println!("{}", final_step.in_seconds());
+    let just_prev = setup
+        .with(halo_rcvr.with_stm())
+        .for_duration(prop_time - final_step)
+        .unwrap();
+
+    // Inverse the just previous STM
+    let inv_just_prev = just_prev.stm().clone().try_inverse().unwrap();
+
+    use na::LU;
+    let lu = LU::new(just_prev.stm());
+    let u_inv = lu.u().try_inverse().unwrap();
+    let l_inv = lu.l().try_inverse().unwrap();
+
+    let inv_just_prev2 = u_inv * l_inv;
+
+    println!("{}", inv_just_prev2 - inv_just_prev);
+
+    let just_prev_stm = final_stm * inv_just_prev;
+    println!("{}", just_prev_stm);
+
+    let just_prev_stm2 = final_stm * inv_just_prev2;
+    println!("{:e}", just_prev_stm2 - just_prev_stm);
 
     // And check the difference
-    let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
+    let stm_err = just_prev_stm * just_prev.to_cartesian_vec() - final_state.to_cartesian_vec();
     let radius_stm_delta = stm_err.fixed_rows::<3>(0).into_owned();
     let velocity_stm_delta = stm_err.fixed_rows::<3>(3).into_owned();
 

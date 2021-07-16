@@ -325,6 +325,10 @@ impl State for Spacecraft {
     type Size = Const<8>;
     type VecLength = Const<73>;
 
+    fn reset_stm(&mut self) {
+        self.orbit.stm_identity();
+    }
+
     fn zeros() -> Self {
         Self::default()
     }

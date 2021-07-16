@@ -1630,6 +1630,10 @@ impl State for Orbit {
     type Size = Const<6>;
     type VecLength = Const<42>;
 
+    fn reset_stm(&mut self) {
+        self.stm_identity();
+    }
+
     /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
     fn zeros() -> Self {
         let frame = Frame::Celestial {

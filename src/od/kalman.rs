@@ -62,8 +62,6 @@ where
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
     h_tilde: OMatrix<f64, M, <T as State>::Size>,
-    traj_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
-    stm_updated: bool,
     h_tilde_updated: bool,
     epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
     covar_fmt: CovarFormat, // Idem
@@ -114,8 +112,6 @@ where
             process_noise: vec![process_noise],
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            traj_stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
-            stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
@@ -151,8 +147,6 @@ where
             process_noise: process_noises,
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            traj_stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
-            stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
@@ -188,8 +182,6 @@ where
             process_noise: Vec::new(),
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            traj_stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
-            stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
@@ -232,13 +224,6 @@ where
         self.prev_estimate = est.clone();
     }
 
-    /// Update the State Transition Matrix (STM). This function **must** be called in between each
-    /// call to `time_update` or `measurement_update`.
-    fn update_stm(&mut self, new_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>) {
-        self.traj_stm = new_stm;
-        self.stm_updated = true;
-    }
-
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
     fn update_h_tilde(&mut self, h_tilde: OMatrix<f64, M, <T as State>::Size>) {
@@ -250,17 +235,20 @@ where
     ///
     /// May return a FilterError if the STM was not updated.
     fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError> {
-        if !self.stm_updated {
-            return Err(NyxError::StateTransitionMatrixNotUpdated);
-        }
-
         // Compute the STM for the step between the previous nominal STM and this one.
-        let traj_stm_inv = match self.traj_stm.clone().try_inverse() {
+        let traj_stm_inv = match self.prev_estimate.stm().clone().try_inverse() {
             Some(traj_stm_inv) => traj_stm_inv,
             None => return Err(NyxError::SingularStateTransitionMatrix),
         };
 
         let stm = nominal_state.stm()? * traj_stm_inv;
+
+        println!(
+            "[time_update] From {} to {}, STM =",
+            self.prev_estimate.epoch(),
+            nominal_state.epoch()
+        );
+        println!("{}", stm);
 
         let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
 
@@ -317,12 +305,11 @@ where
             state_deviation: state_bar,
             covar: covar_bar.clone(),
             covar_bar,
-            stm: self.traj_stm.clone(),
+            stm: nominal_state.stm()?.clone(),
             predicted: true,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
-        self.stm_updated = false;
         self.prev_estimate = estimate.clone();
         // Update the prev epoch for all SNCs
         for snc in &mut self.process_noise {
@@ -340,16 +327,24 @@ where
         real_obs: &OVector<f64, M>,
         computed_obs: &OVector<f64, M>,
     ) -> Result<(Self::Estimate, Residual<M>), NyxError> {
-        if !self.stm_updated {
-            return Err(NyxError::StateTransitionMatrixNotUpdated);
-        }
         if !self.h_tilde_updated {
             return Err(NyxError::SensitivityNotUpdated);
         }
 
         // Compute the STM for the step between the previous nominal STM and this one.
-        let traj_stm_inv = self.traj_stm.clone().try_inverse().unwrap();
+        let traj_stm_inv = match self.prev_estimate.stm().clone().try_inverse() {
+            Some(traj_stm_inv) => traj_stm_inv,
+            None => return Err(NyxError::SingularStateTransitionMatrix),
+        };
+
         let stm = nominal_state.stm()? * traj_stm_inv;
+
+        println!(
+            "From {} to {}, STM =",
+            self.prev_estimate.epoch(),
+            nominal_state.epoch()
+        );
+        println!("{}", stm);
 
         let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
         let mut snc_used = false;
@@ -442,13 +437,12 @@ where
             state_deviation: state_hat,
             covar,
             covar_bar,
-            stm: self.traj_stm.clone(),
+            stm: nominal_state.stm()?.clone(),
             predicted: false,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
 
-        self.stm_updated = false;
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();
         // Update the prev epoch for all SNCs

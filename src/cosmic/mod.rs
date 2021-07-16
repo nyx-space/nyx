@@ -68,6 +68,9 @@ where
     /// Return this state as a vector for the propagation/estimation
     fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError>;
 
+    /// Return this state as a vector for the propagation/estimation
+    fn reset_stm(&mut self);
+
     /// Set this state
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
         -> Result<(), NyxError>;

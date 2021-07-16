@@ -523,10 +523,6 @@ where
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 let dt = nominal_state.epoch();
 
-                // Update the STM of the KF (needed between each measurement or time update)
-                let traj_stm = nominal_state.stm()?;
-                self.kf.update_stm(traj_stm);
-
                 // Check if we should do a time update or a measurement update
                 if next_msr_epoch > dt {
                     if msr_cnt == 0 && !arc_warned {
@@ -582,11 +578,16 @@ where
                                             self.prop.state =
                                                 self.prop.state + est.state_deviation();
                                         }
+                                        // self.prop.state.reset_stm();
                                         self.estimates.push(est);
                                         self.residuals.push(res);
                                     }
                                     Err(e) => return Err(e),
                                 }
+
+                                // if msr_cnt > 100 {
+                                //     panic!();
+                                // }
 
                                 // If we do not have simultaneous measurements from different devices
                                 // then we don't need to check the visibility from other devices
@@ -637,7 +638,6 @@ where
         while let Ok(prop_state) = rx.try_recv() {
             let nominal_state = S::extract(prop_state);
             // Update the STM of the KF (needed between each measurement or time update)
-            self.kf.update_stm(nominal_state.stm()?);
             info!("final time update {}", nominal_state.epoch());
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
