@@ -176,13 +176,25 @@ fn srp_earth_meo_ecc_inc() {
     match envvar("CI") {
         Ok(_) => {
             // We're running on Gitlab. It seems to have more rounding error than my computer...
-            assert!(err_r < 1e-3, "Position error too large for SRP for CI");
-            assert!(err_v < 1e-6, "Velocity error too large for SRP for CI");
+            assert!(
+                err_r < 1e-3,
+                "Error between reals and duals too large for SRP for CI"
+            );
+            assert!(
+                err_v < 1e-6,
+                "Error between reals and duals too large for SRP for CI"
+            );
         }
         Err(_) => {
             // Running on a better machine, allow less error
-            assert!(err_r < 2e-8, "Position error too large for SRP");
-            assert!(err_v < 1e-11, "Velocity error too large for SRP");
+            assert!(
+                err_r < 2e-8,
+                "Error between reals and duals too large for SRP"
+            );
+            assert!(
+                err_v < 1e-11,
+                "Error between reals and duals too large for SRP"
+            );
         }
     }
 }

@@ -255,7 +255,11 @@ where
         }
 
         // Compute the STM for the step between the previous nominal STM and this one.
-        let traj_stm_inv = self.traj_stm.clone().try_inverse().unwrap();
+        let traj_stm_inv = match self.traj_stm.clone().try_inverse() {
+            Some(traj_stm_inv) => traj_stm_inv,
+            None => return Err(NyxError::SingularStateTransitionMatrix),
+        };
+
         let stm = nominal_state.stm()? * traj_stm_inv;
 
         let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
@@ -313,7 +317,7 @@ where
             state_deviation: state_bar,
             covar: covar_bar.clone(),
             covar_bar,
-            stm: stm.clone(),
+            stm: self.traj_stm.clone(),
             predicted: true,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
@@ -438,7 +442,7 @@ where
             state_deviation: state_hat,
             covar,
             covar_bar,
-            stm: stm.clone(),
+            stm: self.traj_stm.clone(),
             predicted: false,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,

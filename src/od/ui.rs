@@ -295,7 +295,12 @@ where
                 SmoothingArc::All => {}
             }
 
-            let phi_kp1_k = est_kp1.stm();
+            // Compute the STM between both steps taken by the filter
+            let stm_kp1_0 = est_kp1.stm();
+            let stm_0_k = est_k.stm().clone().try_inverse().unwrap();
+
+            let phi_kp1_k = stm_kp1_0 * stm_0_k;
+            info!("{}", phi_kp1_k);
             // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
             let p_kp1_k = est_kp1.predicted_covar();
             let p_kp1_k_inv = &p_kp1_k
@@ -520,33 +525,7 @@ where
 
                 // Update the STM of the KF (needed between each measurement or time update)
                 let traj_stm = nominal_state.stm()?;
-
-                // println!(
-                //     "Will invert {} and multiply with {}",
-                //     self.kf.previous_estimate().stm(),
-                //     traj_stm
-                // );
-
-                // let stm_prev_inv = self
-                //     .kf
-                //     .previous_estimate()
-                //     .stm()
-                //     .clone_owned()
-                //     .try_inverse()
-                //     .unwrap();
-
-                // // if !stm_prev.try_inverse_mut() {
-                // //     error!("STM not invertible: {}", stm_prev);
-                // //     return Err(NyxError::SingularStateTransitionMatrix);
-                // // }
-                // let stm = traj_stm * stm_prev_inv;
-
-                // Compute the STM for the step taken
-                info!("update stm {} {}", nominal_state.epoch(), traj_stm);
                 self.kf.update_stm(traj_stm);
-                // if msr_cnt > 2 {
-                //     panic!();
-                // }
 
                 // Check if we should do a time update or a measurement update
                 if next_msr_epoch > dt {

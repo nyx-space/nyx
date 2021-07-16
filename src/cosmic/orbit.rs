@@ -1690,9 +1690,9 @@ impl State for Orbit {
         as_vec[3] = self.vx;
         as_vec[4] = self.vy;
         as_vec[5] = self.vz;
-        let mut stm_idx = 6;
-        // TODO: Consider using https://docs.rs/nalgebra/0.27.1/nalgebra/base/struct.Matrix.html#method.reshape_generic (after tests pass)
+        // cf. https://gitlab.com/nyx-space/nyx/-/issues/36
         if let Some(stm) = self.stm {
+            let mut stm_idx = 6;
             for i in 0..6 {
                 for j in 0..6 {
                     as_vec[stm_idx] = stm[(i, j)];
@@ -1715,27 +1715,13 @@ impl State for Orbit {
         match self.stm_kind {
             StmKind::Step => {
                 let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
-                if true {
-                    let mut stm_prev = self.stm.unwrap();
-                    // println!("{}", stm_k_to_0);
-                    // if stm_k_to_0[(0, 0)].is_nan() {
-                    //     panic!("nan");
-                    // }
 
-                    if !stm_prev.try_inverse_mut() {
-                        error!("STM not invertible: {}", stm_prev);
-                        return Err(NyxError::SingularStateTransitionMatrix);
-                    }
-                    // println!("BLAH{}{}", epoch, stm_k_to_0 * stm_prev);
-                    self.stm = Some(stm_k_to_0 * stm_prev);
-                } else {
-                    // Traj STM
-                    // println!("TRAJ{}{}", epoch, stm_k_to_0);
-                    // if stm_k_to_0[(0, 0)].is_nan() {
-                    //     panic!("nan");
-                    // }
-                    self.stm = Some(stm_k_to_0);
-                }
+                // Traj STM
+                // println!("TRAJ{}{}", epoch, stm_k_to_0);
+                // if stm_k_to_0[(0, 0)].is_nan() {
+                //     panic!("nan");
+                // }
+                self.stm = Some(stm_k_to_0);
             }
             StmKind::Traj => {
                 let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);

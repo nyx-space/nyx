@@ -17,7 +17,7 @@
 */
 
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OVector, U1, U3};
+use crate::dimensions::{Const, DefaultAllocator, DimName, OVector, U1, U3};
 
 // This determines when to take into consideration the magnitude of the state_delta and
 // prevents dividing by too small of a number.
@@ -264,18 +264,7 @@ impl ErrorCtrl for RSSCartesianStep {
                 &candidate.fixed_rows::<3>(3).into_owned(),
                 &cur_state.fixed_rows::<3>(3).into_owned(),
             );
-            let mut remaining_err = 0.0;
-            for i in 6..N::dim() {
-                let this_err = RSSStep::estimate::<U1>(
-                    &error_est.fixed_rows::<1>(i).into_owned(),
-                    &candidate.fixed_rows::<1>(i).into_owned(),
-                    &cur_state.fixed_rows::<1>(i).into_owned(),
-                );
-                if this_err > remaining_err {
-                    remaining_err = this_err;
-                }
-            }
-            remaining_err.max(err_radius.max(err_velocity))
+            err_radius.max(err_velocity)
         } else {
             RSSStep::estimate(error_est, candidate, cur_state)
         }
