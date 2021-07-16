@@ -165,7 +165,7 @@ where
             covar: covar.clone(),
             covar_bar: covar,
             predicted: true,
-            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
@@ -187,7 +187,7 @@ where
             covar: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             covar_bar: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             predicted: true,
-            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }

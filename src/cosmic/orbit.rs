@@ -1714,14 +1714,28 @@ impl State for Orbit {
         // And update the STM if applicable
         match self.stm_kind {
             StmKind::Step => {
-                let mut stm_prev = self.stm.unwrap();
                 let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
+                if false {
+                    let mut stm_prev = self.stm.unwrap();
+                    // println!("{}", stm_k_to_0);
+                    // if stm_k_to_0[(0, 0)].is_nan() {
+                    //     panic!("nan");
+                    // }
 
-                if !stm_prev.try_inverse_mut() {
-                    error!("STM not invertible: {}", stm_prev);
-                    return Err(NyxError::SingularStateTransitionMatrix);
+                    if !stm_prev.try_inverse_mut() {
+                        error!("STM not invertible: {}", stm_prev);
+                        return Err(NyxError::SingularStateTransitionMatrix);
+                    }
+                    println!("BLAH{}{}", epoch, stm_k_to_0 * stm_prev);
+                    self.stm = Some(stm_k_to_0 * stm_prev);
+                } else {
+                    // Traj STM
+                    // println!("TRAJ{}{}", epoch, stm_k_to_0);
+                    // if stm_k_to_0[(0, 0)].is_nan() {
+                    //     panic!("nan");
+                    // }
+                    self.stm = Some(stm_k_to_0);
                 }
-                self.stm = Some(stm_k_to_0 * stm_prev);
             }
             StmKind::Traj => {
                 let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);

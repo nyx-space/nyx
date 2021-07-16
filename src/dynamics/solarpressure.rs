@@ -112,17 +112,17 @@ impl ForceModel for SolarPressure {
         dual_force[2] = dual_force_scalar * flux_pressure * r_sun_unit[2];
 
         // Extract result into Vector6 and Matrix6
-        let mut fx = Vector3::zeros();
+        let mut dx = Vector3::zeros();
         let mut grad = Matrix3::zeros();
         for i in 0..3 {
-            fx[i] += dual_force[i].real();
+            dx[i] += dual_force[i].real();
             // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
             for j in 0..3 {
                 grad[(i, j)] += dual_force[i][j + 1];
             }
         }
 
-        Ok((fx, grad))
+        Ok((dx, grad))
     }
 }
 

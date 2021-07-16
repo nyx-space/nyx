@@ -359,15 +359,15 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
 
         let accel = dcm_d * Vector3::new(a0 + a3 * s_, a1 + a3 * t_, a2 + a3 * u_);
         // Extract data
-        let mut fx = Vector3::zeros();
+        let mut dx = Vector3::zeros();
         let mut grad = Matrix3::zeros();
         for i in 0..3 {
-            fx[i] += accel[i].real();
+            dx[i] += accel[i].real();
             // NOTE: Although the hyperdual state is of size 7, we're only setting the values up to 3 (Matrix3)
             for j in 1..4 {
                 grad[(i, j - 1)] += accel[i][j];
             }
         }
-        Ok((fx, grad))
+        Ok((dx, grad))
     }
 }

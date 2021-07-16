@@ -62,7 +62,7 @@ where
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
     h_tilde: OMatrix<f64, M, <T as State>::Size>,
-    stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
+    traj_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
     stm_updated: bool,
     h_tilde_updated: bool,
     epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
@@ -114,7 +114,7 @@ where
             process_noise: vec![process_noise],
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            traj_stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
@@ -151,7 +151,7 @@ where
             process_noise: process_noises,
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            traj_stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
@@ -188,7 +188,7 @@ where
             process_noise: Vec::new(),
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
-            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            traj_stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
@@ -235,7 +235,7 @@ where
     /// Update the State Transition Matrix (STM). This function **must** be called in between each
     /// call to `time_update` or `measurement_update`.
     fn update_stm(&mut self, new_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>) {
-        self.stm = new_stm;
+        self.traj_stm = new_stm;
         self.stm_updated = true;
     }
 
@@ -254,7 +254,11 @@ where
             return Err(NyxError::StateTransitionMatrixNotUpdated);
         }
 
-        let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        // Compute the STM for the step between the previous nominal STM and this one.
+        let traj_stm_inv = self.traj_stm.clone().try_inverse().unwrap();
+        let stm = nominal_state.stm()? * traj_stm_inv;
+
+        let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
 
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
@@ -302,14 +306,14 @@ where
         let state_bar = if self.ekf {
             OVector::<f64, <T as State>::Size>::zeros()
         } else {
-            &self.stm * &self.prev_estimate.state_deviation
+            &stm * &self.prev_estimate.state_deviation
         };
         let estimate = KfEstimate {
             nominal_state,
             state_deviation: state_bar,
             covar: covar_bar.clone(),
             covar_bar,
-            stm: self.stm.clone(),
+            stm: stm.clone(),
             predicted: true,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
@@ -339,7 +343,11 @@ where
             return Err(NyxError::SensitivityNotUpdated);
         }
 
-        let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
+        // Compute the STM for the step between the previous nominal STM and this one.
+        let traj_stm_inv = self.traj_stm.clone().try_inverse().unwrap();
+        let stm = nominal_state.stm()? * traj_stm_inv;
+
+        let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
         let mut snc_used = false;
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
@@ -410,7 +418,7 @@ where
             )
         } else {
             // Must do a time update first
-            let state_bar = &self.stm * &self.prev_estimate.state_deviation;
+            let state_bar = &stm * &self.prev_estimate.state_deviation;
             let postfit = &prefit - (&self.h_tilde * &state_bar);
             (
                 state_bar + &gain * &postfit,
@@ -430,7 +438,7 @@ where
             state_deviation: state_hat,
             covar,
             covar_bar,
-            stm: self.stm.clone(),
+            stm: stm.clone(),
             predicted: false,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,

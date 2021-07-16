@@ -156,10 +156,10 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
             radius * (Hyperdual::<f64, Const<7>>::from_real(-osc.frame.gm()) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
-        let mut fx = Vector6::zeros();
+        let mut dx = Vector6::zeros();
         let mut grad = Matrix6::zeros();
         for i in 0..6 {
-            fx[i] = if i < 3 {
+            dx[i] = if i < 3 {
                 velocity[i].real()
             } else {
                 body_acceleration[i - 3].real()
@@ -178,14 +178,17 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
             // let (model_acc, model_grad) = model.dual_eom(&radius, osc)?;
             let (model_acc, model_grad) = model.dual_eom(osc)?;
             for i in 0..3 {
-                fx[i + 3] += model_acc[i];
+                dx[i + 3] += model_acc[i];
                 for j in 1..4 {
                     grad[(i + 3, j - 1)] += model_grad[(i, j - 1)];
                 }
             }
         }
 
-        Ok((fx, grad))
+        // Multiply the gradient (A matrix) with the previous STM to get the \frac{d \Phi}{dt}
+        // This function returns the time derivative of each function.
+        // Ok((dx, grad * osc.stm()))
+        Ok((dx, grad))
     }
 }
 

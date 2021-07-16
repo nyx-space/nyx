@@ -191,6 +191,7 @@ where
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
         + Allocator<f64, Msr::StateSize>
+        + Allocator<usize, Msr::StateSize, Msr::StateSize>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
@@ -518,8 +519,34 @@ where
                 let dt = nominal_state.epoch();
 
                 // Update the STM of the KF (needed between each measurement or time update)
-                let stm = nominal_state.stm()?;
-                self.kf.update_stm(stm);
+                let traj_stm = nominal_state.stm()?;
+
+                // println!(
+                //     "Will invert {} and multiply with {}",
+                //     self.kf.previous_estimate().stm(),
+                //     traj_stm
+                // );
+
+                // let stm_prev_inv = self
+                //     .kf
+                //     .previous_estimate()
+                //     .stm()
+                //     .clone_owned()
+                //     .try_inverse()
+                //     .unwrap();
+
+                // // if !stm_prev.try_inverse_mut() {
+                // //     error!("STM not invertible: {}", stm_prev);
+                // //     return Err(NyxError::SingularStateTransitionMatrix);
+                // // }
+                // let stm = traj_stm * stm_prev_inv;
+
+                // Compute the STM for the step taken
+                info!("update stm {} {}", nominal_state.epoch(), traj_stm);
+                self.kf.update_stm(traj_stm);
+                // if msr_cnt > 2 {
+                //     panic!();
+                // }
 
                 // Check if we should do a time update or a measurement update
                 if next_msr_epoch > dt {
