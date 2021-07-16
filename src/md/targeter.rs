@@ -400,7 +400,7 @@ where
         for it in 0..=self.iterations {
             // Modify each variable by 0.0001, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
             let mut cur_xi = xi;
-            cur_xi.enable_traj_stm();
+            cur_xi.enable_stm();
             let xf = self.prop.with(cur_xi).until_epoch(achievement_epoch)?;
 
             let xf_dual_obj_frame = match &self.objective_frame {

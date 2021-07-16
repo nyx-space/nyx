@@ -22,7 +22,7 @@ extern crate prost;
 
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
-pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft, StmKind};
+pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
 use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::errors::NyxError;

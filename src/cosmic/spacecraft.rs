@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{Orbit, State, StmKind, TimeTagged};
+use super::{Orbit, State, TimeTagged};
 use crate::dimensions::{Const, Matrix6, OMatrix, OVector};
 use crate::dynamics::thrustctrl::Thruster;
 use crate::errors::NyxError;
@@ -215,13 +215,6 @@ impl Spacecraft {
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.orbit.stm = Some(Matrix6::identity());
-        self.orbit.stm_kind = StmKind::Step;
-    }
-
-    /// Sets the STM of this state of identity, which also enables computation of the STM for trajectory optimization
-    pub fn enable_traj_stm(&mut self) {
-        self.orbit.stm = Some(Matrix6::identity());
-        self.orbit.stm_kind = StmKind::Traj;
     }
 
     /// Copies the current state but sets the STM to identity

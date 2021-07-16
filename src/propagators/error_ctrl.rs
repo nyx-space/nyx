@@ -17,7 +17,7 @@
 */
 
 use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{Const, DefaultAllocator, DimName, OVector, U1, U3};
+use crate::dimensions::{DefaultAllocator, DimName, OVector, U1, U3};
 
 // This determines when to take into consideration the magnitude of the state_delta and
 // prevents dividing by too small of a number.
