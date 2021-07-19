@@ -59,3 +59,8 @@ of Colorado at Boulder. I work for Masten Space Systems on the XL-1 Moon Lander 
 
 # Examples
 Refer to the [showcase](https://nyxspace.com/showcase/).
+
+
+# Python todo
+- Reasonable interface with numpy for state?
+- Have uniform process to deal with all the trait-based interfaces
