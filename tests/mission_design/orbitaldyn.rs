@@ -595,6 +595,8 @@ fn two_body_dual() {
         eme2k,
     );
 
+    println!("{:x}", init);
+
     let expected_fx = Vector6::new(
         -3.288_789_003_770_57,
         -2.226_285_193_102_822,
@@ -635,30 +637,43 @@ fn two_body_dual() {
         (grad - expected).norm()
     );
 
-    let prop_time = 1 * TimeUnit::Day;
+    // [Earth J2000] 1917-11-14T00:00:00 UTC   sma = 22000.000344 km   ecc = 0.010000  inc = 30.000000 deg     raan = 80.000000 deg    aop = 40.000000 deg     ta = 0.000000 deg
+    // Quite non-linear near periapsis
+    let prop_time = 2 * TimeUnit::Minute;
+    let step_size = 10 * TimeUnit::Second;
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
     let mut prop = setup.with(init);
     let final_state = prop.for_duration(prop_time).unwrap();
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
-    let final_stm = final_state.stm.unwrap();
-    let final_step = prop.latest_details().step;
-    prop.for_duration(-final_step).unwrap();
+    let stm_k_to_0 = final_state.stm.unwrap();
+
+    let prev_state = setup
+        .with(init.with_stm())
+        .for_duration(prop_time - step_size)
+        .unwrap();
+    let stm_km1_to_0 = prev_state.stm.unwrap();
+
+    let stm_k_to_km1 = stm_k_to_0 * stm_km1_to_0.try_inverse().unwrap();
 
     // And check the difference
-    let stm_err = final_stm * prop.state.to_cartesian_vec() - final_state.to_cartesian_vec();
+    let stm_err = stm_k_to_km1 * prev_state.to_cartesian_vec() - final_state.to_cartesian_vec();
     let radius_err = stm_err.fixed_rows::<3>(0).into_owned();
     let velocity_err = stm_err.fixed_rows::<3>(3).into_owned();
 
-    assert!(radius_err.norm() < 1e-1);
-    assert!(velocity_err.norm() < 1e-1);
+    assert!(dbg!(radius_err.norm()) < 1e-1);
+    assert!(dbg!(velocity_err.norm()) < 1e-1);
 }
 
 #[allow(clippy::identity_op)]
 #[test]
 fn multi_body_dynamics_dual() {
-    let prop_time = 10 * TimeUnit::Second;
+    // After trial and error, it seems that the linearization breaks after 45 minutes for this example.
+    // Specifically, inverting the previous STM and multiplying it with the next STM to compute the STM
+    // of this one step will round too much and cause an error greater than one meter.
+    let prop_time = 45 * TimeUnit::Minute;
+    let step_size = 10 * TimeUnit::Second;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -679,7 +694,7 @@ fn multi_body_dynamics_dual() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
     let final_state = setup.with(halo_rcvr).for_duration(prop_time).unwrap();
     let mut prop = setup.with(halo_rcvr.with_stm());
     let final_state_dual = prop.for_duration(prop_time).unwrap();
@@ -705,22 +720,18 @@ fn multi_body_dynamics_dual() {
     );
 
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
-    let final_stm = final_state_dual.stm.unwrap();
-    let final_step = prop.latest_details().step;
+    let stm_k_to_0 = final_state_dual.stm.unwrap();
 
-    let just_prev = setup
-        .with(final_state_dual.with_stm())
-        .for_duration(-final_step)
+    let prev_state = setup
+        .with(halo_rcvr.with_stm())
+        .for_duration(prop_time - step_size)
         .unwrap();
+    let stm_km1_to_0 = prev_state.stm.unwrap();
 
-    // Inverse the just previous STM
-    let inv_just_prev = just_prev.stm().try_inverse().unwrap();
-
-    let just_prev_stm = inv_just_prev;
-    println!("{:e}", just_prev_stm);
+    let stm_k_to_km1 = stm_k_to_0 * stm_km1_to_0.try_inverse().unwrap();
 
     // And check the difference
-    let stm_err = just_prev_stm * just_prev.to_cartesian_vec() - final_state.to_cartesian_vec();
+    let stm_err = stm_k_to_km1 * prev_state.to_cartesian_vec() - final_state.to_cartesian_vec();
     let radius_stm_delta = stm_err.fixed_rows::<3>(0).into_owned();
     let velocity_stm_delta = stm_err.fixed_rows::<3>(3).into_owned();
 
