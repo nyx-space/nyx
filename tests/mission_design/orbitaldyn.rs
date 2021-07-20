@@ -658,7 +658,7 @@ fn two_body_dual() {
 #[allow(clippy::identity_op)]
 #[test]
 fn multi_body_dynamics_dual() {
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 10 * TimeUnit::Second;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -707,29 +707,17 @@ fn multi_body_dynamics_dual() {
     // Check that the STM is correct by back propagating by the previous step, and multiplying by the STM.
     let final_stm = final_state_dual.stm.unwrap();
     let final_step = prop.latest_details().step;
-    println!("{}", final_step.in_seconds());
+
     let just_prev = setup
-        .with(halo_rcvr.with_stm())
-        .for_duration(prop_time - final_step)
+        .with(final_state_dual.with_stm())
+        .for_duration(-final_step)
         .unwrap();
 
     // Inverse the just previous STM
-    let inv_just_prev = just_prev.stm().clone().try_inverse().unwrap();
+    let inv_just_prev = just_prev.stm().try_inverse().unwrap();
 
-    use na::LU;
-    let lu = LU::new(just_prev.stm());
-    let u_inv = lu.u().try_inverse().unwrap();
-    let l_inv = lu.l().try_inverse().unwrap();
-
-    let inv_just_prev2 = u_inv * l_inv;
-
-    println!("{}", inv_just_prev2 - inv_just_prev);
-
-    let just_prev_stm = final_stm * inv_just_prev;
-    println!("{}", just_prev_stm);
-
-    let just_prev_stm2 = final_stm * inv_just_prev2;
-    println!("{:e}", just_prev_stm2 - just_prev_stm);
+    let just_prev_stm = inv_just_prev;
+    println!("{:e}", just_prev_stm);
 
     // And check the difference
     let stm_err = just_prev_stm * just_prev.to_cartesian_vec() - final_state.to_cartesian_vec();
