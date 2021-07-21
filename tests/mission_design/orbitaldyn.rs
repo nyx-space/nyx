@@ -8,7 +8,7 @@ use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
-use nyx::TimeTagged;
+use nyx::{State, TimeTagged};
 
 #[allow(clippy::identity_op)]
 #[test]
@@ -698,6 +698,11 @@ fn multi_body_dynamics_dual() {
     let final_state = setup.with(halo_rcvr).for_duration(prop_time).unwrap();
     let mut prop = setup.with(halo_rcvr.with_stm());
     let final_state_dual = prop.for_duration(prop_time).unwrap();
+
+    // Test that reset_stm() and a single step will lead to the correct STM diagonals
+    prop.state.reset_stm();
+    let post_reset = prop.for_duration(step_size).unwrap();
+    println!("{}", post_reset.stm());
 
     let (err_r, err_v) = rss_orbit_vec_errors(
         &final_state.to_cartesian_vec(),

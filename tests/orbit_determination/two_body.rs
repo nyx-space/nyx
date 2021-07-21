@@ -191,7 +191,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
-    // let (truth_tx, truth_rx) = mpsc::channel();
+    let (truth_tx, truth_rx) = mpsc::channel();
     let mut measurements = Vec::with_capacity(10000);
 
     // Define state information.
@@ -203,31 +203,41 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let orbital_dyn = OrbitalDynamics::two_body();
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let (final_truth, traj) = setup
-        .with(initial_state)
-        .for_duration_with_traj(prop_time)
-        .unwrap();
+    // let (final_truth, traj) = setup
+    //     .with(initial_state)
+    //     .for_duration_with_traj(prop_time)
+    //     .unwrap();
+    let mut prop = setup.with(initial_state);
+    prop.tx_chan = Some(truth_tx);
+    let final_truth = prop.for_duration(prop_time).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
-    // while let Ok(rx_state) = truth_rx.try_recv() {
-    //     for station in all_stations.iter() {
-    //         let meas = station.measure(&rx_state).unwrap();
-    //         if meas.visible() {
-    //             measurements.push(meas);
-    //             break;
-    //         }
-    //     }
-    // }
-
-    for state in traj.every(10 * TimeUnit::Second) {
+    while let Ok(rx_state) = truth_rx.try_recv() {
+        // Convert the state to ECI.
+        let mut was_visible = false;
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
+                was_visible = true;
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
+        // assert!(was_visible, "oh no {}", rx_state.epoch());
+        if !was_visible {
+            println!("No visibility at {}", rx_state.epoch());
+        }
     }
+
+    // for state in traj.every(10 * TimeUnit::Second) {
+    //     for station in all_stations.iter() {
+    //         let meas = station.measure(&state).unwrap();
+    //         if meas.visible() {
+    //             measurements.push(meas);
+    //             break; // We know that only one station is in visibility at each time.
+    //         }
+    //     }
+    // }
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -235,8 +245,8 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let initial_state_est = initial_state.with_stm();
     // Use the same setup as earlier
     let prop_est = setup.with(initial_state_est);
-    let covar_radius = 1.0e-3_f64.powi(2);
-    let covar_velocity = 1.0e-6_f64.powi(2);
+    let covar_radius = 1.0e-3;
+    let covar_velocity = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
         covar_radius,
         covar_radius,
@@ -250,8 +260,9 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    let measurement_noise =
-        Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
+    // let measurement_noise =
+    //     Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
@@ -271,12 +282,16 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
         }
+        println!("{}\n{}\n{}", est.predicted(), est, est.stm());
+        // assert!(!est.predicted(), "There should be no predictions");
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,
-                "covar diagonal element negative @ [{}, {}]",
+                "covar diagonal element negative @ [{}, {}] = {:e} @ {}",
                 i,
-                i
+                i,
+                est.covar[(i, i)],
+                est.epoch()
             );
         }
         assert!(
@@ -295,7 +310,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     for res in &odp.residuals {
         assert!(
-            res.postfit.norm() < 1e-5,
+            res.postfit.norm() < 1e-12,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );
@@ -306,7 +321,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
     assert!(
-        est.state_deviation().norm() < 1e-12,
+        est.state_deviation().norm() < 1e-10,
         "estimate error should be zero (perfect dynamics) ({:e})",
         est.state_deviation().norm()
     );

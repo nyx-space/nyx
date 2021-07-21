@@ -19,7 +19,6 @@
 extern crate hyperdual;
 extern crate rand;
 extern crate rand_distr;
-extern crate rand_pcg;
 extern crate serde;
 
 use crate::dimensions::allocator::Allocator;
@@ -33,7 +32,7 @@ use crate::io::{CovarFormat, EpochFormat};
 /// Provides the Kalman filters. The [examples](https://github.com/ChristopherRabotin/nyx/tree/master/examples) folder may help in the setup.
 pub mod kalman;
 
-/// Provides the measurement models.
+/// Provides a range and range rate measuring models.
 pub mod measurement;
 
 /// Provides Estimate handling functionalities.
@@ -47,9 +46,6 @@ pub mod ui;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
-
-/// Provides a UI to set up a ground station -- DRAFT of #147
-// pub mod gs_setup;
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
 pub trait Filter<T, A, M>
@@ -75,6 +71,10 @@ where
 
     /// Set the previous estimate
     fn set_previous_estimate(&mut self, est: &Self::Estimate);
+
+    /// Update the State Transition Matrix (STM). This function **must** be called in between each
+    /// call to `time_update` or `measurement_update`.
+    fn update_stm(&mut self, new_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>);
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.

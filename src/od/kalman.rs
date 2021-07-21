@@ -24,7 +24,7 @@ pub use super::residual::Residual;
 pub use super::snc::SNC;
 use super::{CovarFormat, EpochFormat, Filter, State};
 pub use crate::errors::NyxError;
-pub use crate::time::Epoch;
+pub use crate::time::{Epoch, TimeUnit};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 /// S: State size (not propagated vector size)
@@ -62,6 +62,8 @@ where
     /// Recall that one should switch to an Extended KF only once the estimate is good (i.e. after a few good measurement updates on a CKF).
     pub ekf: bool,
     h_tilde: OMatrix<f64, M, <T as State>::Size>,
+    stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
+    stm_updated: bool,
     h_tilde_updated: bool,
     epoch_fmt: EpochFormat, // Stored here only for simplification, kinda ugly
     covar_fmt: CovarFormat, // Idem
@@ -112,6 +114,8 @@ where
             process_noise: vec![process_noise],
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
@@ -147,6 +151,8 @@ where
             process_noise: process_noises,
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
@@ -182,6 +188,8 @@ where
             process_noise: Vec::new(),
             ekf: false,
             h_tilde: OMatrix::<f64, M, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            stm_updated: false,
             h_tilde_updated: false,
             epoch_fmt,
             covar_fmt,
@@ -224,6 +232,13 @@ where
         self.prev_estimate = est.clone();
     }
 
+    /// Update the State Transition Matrix (STM). This function **must** be called in between each
+    /// call to `time_update` or `measurement_update`.
+    fn update_stm(&mut self, new_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>) {
+        self.stm = new_stm;
+        self.stm_updated = true;
+    }
+
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
     fn update_h_tilde(&mut self, h_tilde: OMatrix<f64, M, <T as State>::Size>) {
@@ -236,21 +251,26 @@ where
     /// May return a FilterError if the STM was not updated.
     fn time_update(&mut self, nominal_state: T) -> Result<Self::Estimate, NyxError> {
         // Compute the STM for the step between the previous nominal STM and this one.
-        let traj_stm_inv = match self.prev_estimate.stm().clone().try_inverse() {
-            Some(traj_stm_inv) => traj_stm_inv,
-            None => return Err(NyxError::SingularStateTransitionMatrix),
-        };
+        // let traj_stm_inv = match self.prev_estimate.stm().clone().try_inverse() {
+        //     Some(traj_stm_inv) => traj_stm_inv,
+        //     None => return Err(NyxError::SingularStateTransitionMatrix),
+        // };
 
-        let stm = nominal_state.stm()? * traj_stm_inv;
+        // let stm = nominal_state.stm()? * traj_stm_inv;
+        // let stm = nominal_state.stm()?;
+        if !self.stm_updated {
+            panic!("STM not updated");
+        }
 
-        println!(
-            "[time_update] From {} to {}, STM =",
-            self.prev_estimate.epoch(),
-            nominal_state.epoch()
-        );
-        println!("{}", stm);
+        // if nominal_state.epoch() - self.prev_estimate.epoch() > 10 * TimeUnit::Second {
+        //     println!(
+        //         "[time_update] For {} difference STM =",
+        //         nominal_state.epoch() - self.prev_estimate.epoch()
+        //     );
+        //     println!("{:e}", stm);
+        // }
 
-        let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
+        let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
 
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
@@ -298,18 +318,19 @@ where
         let state_bar = if self.ekf {
             OVector::<f64, <T as State>::Size>::zeros()
         } else {
-            &stm * &self.prev_estimate.state_deviation
+            &self.stm * &self.prev_estimate.state_deviation
         };
         let estimate = KfEstimate {
             nominal_state,
             state_deviation: state_bar,
             covar: covar_bar.clone(),
             covar_bar,
-            stm: nominal_state.stm()?.clone(),
+            stm: self.stm.clone(),
             predicted: true,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
+        self.stm_updated = false;
         self.prev_estimate = estimate.clone();
         // Update the prev epoch for all SNCs
         for snc in &mut self.process_noise {
@@ -331,22 +352,28 @@ where
             return Err(NyxError::SensitivityNotUpdated);
         }
 
+        if !self.stm_updated {
+            panic!("STM not updated");
+        }
+
         // Compute the STM for the step between the previous nominal STM and this one.
-        let traj_stm_inv = match self.prev_estimate.stm().clone().try_inverse() {
-            Some(traj_stm_inv) => traj_stm_inv,
-            None => return Err(NyxError::SingularStateTransitionMatrix),
-        };
+        // let traj_stm_inv = match self.prev_estimate.stm().clone().try_inverse() {
+        //     Some(traj_stm_inv) => traj_stm_inv,
+        //     None => return Err(NyxError::SingularStateTransitionMatrix),
+        // };
 
-        let stm = nominal_state.stm()? * traj_stm_inv;
+        // let stm = nominal_state.stm()? * traj_stm_inv;
+        // let stm = nominal_state.stm()?;
 
-        println!(
-            "From {} to {}, STM =",
-            self.prev_estimate.epoch(),
-            nominal_state.epoch()
-        );
-        println!("{}", stm);
+        if nominal_state.epoch() - self.prev_estimate.epoch() > 10 * TimeUnit::Second {
+            println!(
+                "[measurement_update] For {} difference STM =",
+                nominal_state.epoch() - self.prev_estimate.epoch()
+            );
+            println!("{:e}", self.stm);
+        }
 
-        let mut covar_bar = &stm * &self.prev_estimate.covar * &stm.transpose();
+        let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         let mut snc_used = false;
         // Try to apply an SNC, if applicable
         for (i, snc) in self.process_noise.iter().enumerate().rev() {
@@ -417,7 +444,7 @@ where
             )
         } else {
             // Must do a time update first
-            let state_bar = &stm * &self.prev_estimate.state_deviation;
+            let state_bar = &self.stm * &self.prev_estimate.state_deviation;
             let postfit = &prefit - (&self.h_tilde * &state_bar);
             (
                 state_bar + &gain * &postfit,
@@ -437,12 +464,12 @@ where
             state_deviation: state_hat,
             covar,
             covar_bar,
-            stm: nominal_state.stm()?.clone(),
+            stm: self.stm.clone(),
             predicted: false,
             epoch_fmt: self.epoch_fmt,
             covar_fmt: self.covar_fmt,
         };
-
+        self.stm_updated = false;
         self.h_tilde_updated = false;
         self.prev_estimate = estimate.clone();
         // Update the prev epoch for all SNCs

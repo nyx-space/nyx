@@ -296,10 +296,11 @@ where
             }
 
             // Compute the STM between both steps taken by the filter
-            let stm_kp1_0 = est_kp1.stm();
+            // let stm_kp1_0 = est_kp1.stm();
             let stm_0_k = est_k.stm().clone().try_inverse().unwrap();
 
-            let phi_kp1_k = stm_kp1_0 * stm_0_k;
+            // let phi_kp1_k = stm_kp1_0 * stm_0_k;
+            let phi_kp1_k = stm_0_k;
             info!("{}", phi_kp1_k);
             // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
             let p_kp1_k = est_kp1.predicted_covar();
@@ -523,6 +524,10 @@ where
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
                 let dt = nominal_state.epoch();
 
+                // Update the STM of the KF (needed between each measurement or time update)
+                let stm = nominal_state.stm()?;
+                self.kf.update_stm(stm);
+
                 // Check if we should do a time update or a measurement update
                 if next_msr_epoch > dt {
                     if msr_cnt == 0 && !arc_warned {
@@ -539,6 +544,12 @@ where
                         }
                         Err(e) => return Err(e),
                     }
+                    println!(
+                        "Reset STM after time update\n{}{}",
+                        dt,
+                        nominal_state.stm()?
+                    );
+                    self.prop.state.reset_stm();
                 } else {
                     // The epochs match, so this is a valid measurement to use
                     // Get the computed observations
@@ -578,7 +589,7 @@ where
                                             self.prop.state =
                                                 self.prop.state + est.state_deviation();
                                         }
-                                        // self.prop.state.reset_stm();
+                                        self.prop.state.reset_stm();
                                         self.estimates.push(est);
                                         self.residuals.push(res);
                                     }
