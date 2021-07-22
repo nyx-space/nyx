@@ -213,19 +213,12 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        // Convert the state to ECI.
-        let mut was_visible = false;
         for station in all_stations.iter() {
             let meas = station.measure(&rx_state).unwrap();
             if meas.visible() {
-                was_visible = true;
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
-        }
-        // assert!(was_visible, "oh no {}", rx_state.epoch());
-        if !was_visible {
-            println!("No visibility at {}", rx_state.epoch());
         }
     }
 
@@ -282,7 +275,6 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
         }
-        println!("{}\n{}\n{}", est.predicted(), est, est.stm());
         // assert!(!est.predicted(), "There should be no predictions");
         for i in 0..6 {
             assert!(
@@ -321,13 +313,13 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     println!("estimate covariance {:.2e}", est.covar.diagonal().norm());
 
     assert!(
-        est.state_deviation().norm() < 1e-10,
+        est.state_deviation().norm() < 1e-12,
         "estimate error should be zero (perfect dynamics) ({:e})",
         est.state_deviation().norm()
     );
 
     assert!(
-        est.covar.diagonal().norm() < 1e-4,
+        est.covar.diagonal().norm() < 1e-6,
         "estimate covariance norm should be zero (perfect dynamics) ({:e})",
         est.covar.diagonal().norm()
     );

@@ -262,14 +262,6 @@ where
             panic!("STM not updated");
         }
 
-        // if nominal_state.epoch() - self.prev_estimate.epoch() > 10 * TimeUnit::Second {
-        //     println!(
-        //         "[time_update] For {} difference STM =",
-        //         nominal_state.epoch() - self.prev_estimate.epoch()
-        //     );
-        //     println!("{:e}", stm);
-        // }
-
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
 
         // Try to apply an SNC, if applicable
@@ -356,22 +348,7 @@ where
             panic!("STM not updated");
         }
 
-        // Compute the STM for the step between the previous nominal STM and this one.
-        // let traj_stm_inv = match self.prev_estimate.stm().clone().try_inverse() {
-        //     Some(traj_stm_inv) => traj_stm_inv,
-        //     None => return Err(NyxError::SingularStateTransitionMatrix),
-        // };
-
-        // let stm = nominal_state.stm()? * traj_stm_inv;
         // let stm = nominal_state.stm()?;
-
-        if nominal_state.epoch() - self.prev_estimate.epoch() > 10 * TimeUnit::Second {
-            println!(
-                "[measurement_update] For {} difference STM =",
-                nominal_state.epoch() - self.prev_estimate.epoch()
-            );
-            println!("{:e}", self.stm);
-        }
 
         let mut covar_bar = &self.stm * &self.prev_estimate.covar * &self.stm.transpose();
         let mut snc_used = false;

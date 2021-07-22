@@ -175,7 +175,7 @@ where
         }
         let stop_time = self.state.epoch() + duration;
         if duration > 2 * TimeUnit::Minute || duration < -2 * TimeUnit::Minute {
-            // Prevent the print spam for EKF orbit determination cases
+            // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
         let backprop = duration < TimeUnit::Nanosecond;
@@ -195,34 +195,17 @@ where
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
-                let (t, state_vec) = self.derive()?;
-                self.state.set(self.state.epoch() + t, &state_vec)?;
-                self.state = self.prop.dynamics.finally(self.state)?;
+
+                self.single_step()?;
+
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
-                if !self.prevent_tx {
-                    if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send(self.state) {
-                            warn!("could not publish to channel: {}", e)
-                        }
-                    }
-                }
                 if backprop {
                     self.step_size = -self.step_size; // Restore to a positive step size
                 }
                 return Ok(self.state);
             } else {
-                let (t, state_vec) = self.derive()?;
-
-                self.state.set(self.state.epoch() + t, &state_vec)?;
-                self.state = self.prop.dynamics.finally(self.state)?;
-                if !self.prevent_tx {
-                    if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send(self.state) {
-                            warn!("could not publish to channel: {}", e)
-                        }
-                    }
-                }
+                self.single_step()?;
             }
         }
     }
@@ -287,6 +270,22 @@ where
             Some(event_state) => Ok((*event_state, traj)),
             None => Err(NyxError::UnsufficientTriggers(trigger, events.len())),
         }
+    }
+
+    /// Take a single propagator step and emit the result on the TX channel (if enabled)
+    pub fn single_step(&mut self) -> Result<(), NyxError> {
+        let (t, state_vec) = self.derive()?;
+        self.state.set(self.state.epoch() + t, &state_vec)?;
+        self.state = self.prop.dynamics.finally(self.state)?;
+
+        if !self.prevent_tx {
+            if let Some(ref chan) = self.tx_chan {
+                if let Err(e) = chan.send(self.state) {
+                    warn!("could not publish to channel: {}", e)
+                }
+            }
+        }
+        Ok(())
     }
 
     /// This method integrates whichever function is provided as `d_xdt`. Everything passed to this function is in **seconds**.
