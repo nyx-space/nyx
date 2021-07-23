@@ -203,10 +203,6 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let orbital_dyn = OrbitalDynamics::two_body();
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    // let (final_truth, traj) = setup
-    //     .with(initial_state)
-    //     .for_duration_with_traj(prop_time)
-    //     .unwrap();
     let mut prop = setup.with(initial_state);
     prop.tx_chan = Some(truth_tx);
     let final_truth = prop.for_duration(prop_time).unwrap();
@@ -221,16 +217,6 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
             }
         }
     }
-
-    // for state in traj.every(10 * TimeUnit::Second) {
-    //     for station in all_stations.iter() {
-    //         let meas = station.measure(&state).unwrap();
-    //         if meas.visible() {
-    //             measurements.push(meas);
-    //             break; // We know that only one station is in visibility at each time.
-    //         }
-    //     }
-    // }
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -253,8 +239,6 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let initial_estimate = KfEstimate::from_covar(initial_state_est, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
-    // let measurement_noise =
-    //     Matrix2::from_diagonal(&Vector2::new(15e-3_f64.powi(2), 1e-5_f64.powi(2)));
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
@@ -269,13 +253,34 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let mut wtr = csv::Writer::from_writer(io::stdout());
     wtr.serialize(&estimate_fmtr.headers)
         .expect("could not write to stdout");
+    // Check that we have as many estimates as steps taken by the propagator.
+    // Note that this test cannot work when using a variable step propagator in that same setup.
+    // We're adding +1 because the propagation time is inclusive on both ends.
+    let expected_num_estimates = (prop_time.in_seconds() / step_size.in_seconds()) as usize + 1;
+
+    // Checkt that there are no duplicates of epochs.
+    let mut prev_epoch = odp.estimates[0].epoch();
+    for i in 1..odp.estimates.len() {
+        let this_epoch = odp.estimates[i].epoch();
+        assert!(
+            this_epoch > prev_epoch,
+            "Estimates not continuously going forward"
+        );
+        prev_epoch = this_epoch;
+    }
+
+    assert_eq!(
+        odp.estimates.len(),
+        expected_num_estimates,
+        "Different number of estimates received"
+    );
+
     let mut printed = false;
     for (no, est) in odp.estimates.iter().enumerate() {
         if no == 0 {
             // Skip the first estimate which is the initial estimate provided by user
             continue;
         }
-        // assert!(!est.predicted(), "There should be no predictions");
         for i in 0..6 {
             assert!(
                 est.covar[(i, i)] >= 0.0,

@@ -187,8 +187,8 @@ fn od_robust_ops_test() {
     let cosm = Cosm::de438();
 
     let elevation_mask = 0.0;
-    let range_noise = 1e-5;
-    let range_rate_noise = 1e-7;
+    let range_noise = 0.0; // 1e-5
+    let range_rate_noise = 0.0; // 1e-7
     let dss65_madrid =
         GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
     let dss34_canberra =
@@ -269,7 +269,7 @@ fn od_robust_ops_test() {
             .expect("could not format state");
     }
 
-    let ekf_msr_trig = measurements.len() / 5;
+    let ekf_msr_trig = measurements.len() / 1;
 
     println!(
         "Generated {} measurements in total (using {} for CKF)",
@@ -404,23 +404,23 @@ fn od_robust_ops_test() {
 
     // Check that the iteration leads to better results
     assert!(
-        err_p < err_p_no_it,
+        err_p <= err_p_no_it,
         "Position error not better after iteration: {:.3e} m < {:.3e} m",
         err_p * 1e3,
         err_p_no_it * 1e3
     );
     assert!(
-        err_v < err_v_no_it,
+        err_v <= err_v_no_it,
         "Velocity error not better after iteration {:.3e} m/s < {:.3e} m/s",
         err_v * 1e3,
         err_v_no_it * 1e3
     );
 
     // Reenable after #147
-    // let rmag_err = (final_truth_state - est.state()).rmag();
-    // assert!(
-    //     rmag_err < 1e-2,
-    //     "final radius error should be on meter level (is instead {:.3} m)",
-    //     rmag_err * 1e3
-    // );
+    let rmag_err = (final_truth_state - est.state()).rmag();
+    assert!(
+        rmag_err < 1e-2,
+        "final radius error should be on meter level (is instead {:.3} m)",
+        rmag_err * 1e3
+    );
 }

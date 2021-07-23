@@ -283,7 +283,7 @@ where
                     }
                 }
                 SmoothingArc::TimeGap(gap_s) => {
-                    if est_k.epoch() - est_kp1.epoch() > gap_s {
+                    if est_kp1.epoch() - est_k.epoch() > gap_s {
                         break;
                     }
                 }
@@ -298,7 +298,9 @@ where
             // Compute the STM between both steps taken by the filter
             // The filter will reset the STM between each estimate it computes, time update or measurement update.
             // Therefore, the STM is simply the inverse of the one we used previously.
-            let phi_kp1_k = match est_k.stm().clone().try_inverse() {
+            // est_kp1 is the estimate that used the STM from time k to time k+1. So the STM stored there
+            // is \Phi_{k \to k+1}. Let's invert that.
+            let phi_kp1_k = match est_kp1.stm().clone().try_inverse() {
                 Some(inv_stm) => inv_stm,
                 None => return Err(NyxError::SingularStateTransitionMatrix),
             };
@@ -519,18 +521,25 @@ where
             // Advance the propagator
             loop {
                 let delta_t = next_msr_epoch - dt;
-                if self.prop.details.step > delta_t {
-                    if delta_t != 0 * TimeUnit::Second {
-                        // Take one final step of exactly the needed duration until the next measurement
-                        self.prop.for_duration(delta_t)?;
-                    }
-                    // Extract the state and update the STM in the filter.
-                    let prop_state = self.prop.state;
-                    let nominal_state = S::extract(prop_state);
-                    // Get the datetime and info needed to compute the theoretical measurement according to the model
-                    dt = nominal_state.epoch();
-                    // The epochs match, so this is a valid measurement to use
-                    // Now perform a measurement update
+                if self.prop.details.step < delta_t {
+                    // Do a single step and (probably) a time update, but we'll see that later
+                    self.prop.single_step()?;
+                } else {
+                    assert!(delta_t.in_seconds() >= 0.0, "The filter must take a step backward. Please file a detail bug: https://gitlab.com/nyx-space/nyx/-/issues.");
+                    // Take one final step of exactly the needed duration until the next measurement
+                    self.prop.for_duration(delta_t)?;
+                }
+
+                // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
+
+                // Extract the state and update the STM in the filter.
+                let nominal_state = S::extract(self.prop.state);
+                // Get the datetime and info needed to compute the theoretical measurement according to the model
+                dt = nominal_state.epoch();
+
+                if nominal_state.epoch() == next_msr_epoch {
+                    // Perform a measurement update
+
                     // Get the computed observations
                     for device in self.devices.iter() {
                         if let Some(computed_meas) = device.measure(&nominal_state) {
@@ -597,14 +606,6 @@ where
 
                     break;
                 } else {
-                    // Do a single step and a time update
-                    self.prop.single_step()?;
-
-                    // Extract the state and update the STM in the filter.
-                    let prop_state = self.prop.state;
-                    let nominal_state = S::extract(prop_state);
-                    // Get the datetime and info needed to compute the theoretical measurement according to the model
-                    dt = nominal_state.epoch();
                     // No measurement can be used here, let's just do a time update
                     trace!("time update {}", dt);
                     match self.kf.time_update(nominal_state) {
