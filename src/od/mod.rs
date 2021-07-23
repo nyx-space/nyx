@@ -72,10 +72,6 @@ where
     /// Set the previous estimate
     fn set_previous_estimate(&mut self, est: &Self::Estimate);
 
-    /// Update the State Transition Matrix (STM). This function **must** be called in between each
-    /// call to `time_update` or `measurement_update`.
-    fn update_stm(&mut self, new_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>);
-
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
     fn update_h_tilde(&mut self, h_tilde: OMatrix<f64, M, <T as State>::Size>);

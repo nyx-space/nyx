@@ -529,10 +529,6 @@ where
                     let nominal_state = S::extract(prop_state);
                     // Get the datetime and info needed to compute the theoretical measurement according to the model
                     dt = nominal_state.epoch();
-                    // Update the STM of the KF (needed between each measurement or time update)
-                    let stm = nominal_state.stm()?;
-                    self.kf.update_stm(stm);
-
                     // The epochs match, so this is a valid measurement to use
                     // Now perform a measurement update
                     // Get the computed observations
@@ -609,10 +605,6 @@ where
                     let nominal_state = S::extract(prop_state);
                     // Get the datetime and info needed to compute the theoretical measurement according to the model
                     dt = nominal_state.epoch();
-                    // Update the STM of the KF (needed between each measurement or time update)
-                    let stm = nominal_state.stm()?;
-                    self.kf.update_stm(stm);
-
                     // No measurement can be used here, let's just do a time update
                     trace!("time update {}", dt);
                     match self.kf.time_update(nominal_state) {
@@ -658,10 +650,6 @@ where
             let nominal_state = S::extract(prop_state);
             // Get the datetime and info needed to compute the theoretical measurement according to the model
             dt = nominal_state.epoch();
-            // Update the STM of the KF (needed between each measurement or time update)
-            let stm = nominal_state.stm()?;
-            self.kf.update_stm(stm);
-
             // No measurement can be used here, let's just do a time update
             trace!("time update {}", dt);
             match self.kf.time_update(nominal_state) {
