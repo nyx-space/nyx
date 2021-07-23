@@ -148,7 +148,7 @@ impl GroundStation {
     }
 
     /// Computes the elevation of the provided object seen from this ground station.
-    /// Also returns the ground station's orbit in the Solar System Barycenter frame
+    /// Also returns the ground station's orbit in the frame of the receiver
     pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit, Orbit) {
         // Start by converting the receiver spacecraft into the ground station frame.
         let rx_gs_frame = self.cosm.frame_chg(rx, self.frame);
@@ -178,12 +178,12 @@ impl GroundStation {
 impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
-        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(rx);
+        let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx);
 
         Some(StdMeasurement::new(
             rx.dt,
-            tx_ssb,
-            rx_ssb,
+            tx_rxf,
+            rx_rxf,
             elevation >= self.elevation_mask,
             &self.range_noise,
             &self.range_rate_noise,

@@ -296,12 +296,12 @@ where
             }
 
             // Compute the STM between both steps taken by the filter
-            // let stm_kp1_0 = est_kp1.stm();
-            let stm_0_k = est_k.stm().clone().try_inverse().unwrap();
-
-            // let phi_kp1_k = stm_kp1_0 * stm_0_k;
-            let phi_kp1_k = stm_0_k;
-            info!("{}", phi_kp1_k);
+            // The filter will reset the STM between each estimate it computes, time update or measurement update.
+            // Therefore, the STM is simply the inverse of the one we used previously.
+            let phi_kp1_k = match est_k.stm().clone().try_inverse() {
+                Some(inv_stm) => inv_stm,
+                None => return Err(NyxError::SingularStateTransitionMatrix),
+            };
             // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
             let p_kp1_k = est_kp1.predicted_covar();
             let p_kp1_k_inv = &p_kp1_k
@@ -488,8 +488,6 @@ where
     /// WARNING: Measurements **MUST** be ordered in positive chronological time.
     #[allow(clippy::erasing_op)]
     pub fn process_measurements(&mut self, measurements: &[Msr]) -> Result<(), NyxError> {
-        // let (tx, rx) = channel();
-        // self.prop.tx_chan = Some(tx);
         assert!(
             !measurements.is_empty(),
             "must have at least one measurement"
@@ -500,14 +498,9 @@ where
         let prop_time = measurements[num_msrs - 1].epoch() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {}", prop_time);
 
-        // Push the initial estimate
-        // let prev = self.kf.previous_estimate().clone();
-        // let mut prev_dt = self.kf.previous_estimate().epoch();
         let mut dt = self.prop.state.epoch();
 
         let mut reported = vec![false; 11];
-        // let mut arc_warned = false;
-
         info!(
             "Processing {} measurements with covariance mapping",
             num_msrs
@@ -523,13 +516,8 @@ where
         for (msr_cnt, msr) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
 
-            // Set the max step size to the time difference between now and the next measurement
-            // TODO maybe?
-            // self.prop.prop.set_max_step(delta_t);
-
             // Advance the propagator
             loop {
-                // let dt = self.state.epoch();
                 let delta_t = next_msr_epoch - dt;
                 if self.prop.details.step > delta_t {
                     if delta_t != 0 * TimeUnit::Second {
@@ -650,29 +638,43 @@ where
 
     /// Allows for covariance mapping without processing measurements
     pub fn map_covar(&mut self, end_epoch: Epoch) -> Result<(), NyxError> {
-        // TODO: Update/fix this for a bunch of time updates
-        let (tx, rx) = channel();
-        self.prop.tx_chan = Some(tx);
-        // Start by propagating the estimator (on the same thread).
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
-        info!("Propagating for {} seconds", prop_time);
+        info!(
+            "Propagating for {} seconds and mapping covariance",
+            prop_time
+        );
 
-        self.prop.for_duration(prop_time)?;
+        loop {
+            let mut dt = self.prop.state.epoch();
+            if dt + self.prop.details.step > end_epoch {
+                self.prop.until_epoch(end_epoch)?;
+            } else {
+                self.prop.single_step()?;
+            }
+            // Perform time update
 
-        info!("Mapping covariance");
-
-        while let Ok(prop_state) = rx.try_recv() {
+            // Extract the state and update the STM in the filter.
+            let prop_state = self.prop.state;
             let nominal_state = S::extract(prop_state);
+            // Get the datetime and info needed to compute the theoretical measurement according to the model
+            dt = nominal_state.epoch();
             // Update the STM of the KF (needed between each measurement or time update)
-            info!("final time update {}", nominal_state.epoch());
+            let stm = nominal_state.stm()?;
+            self.kf.update_stm(stm);
+
+            // No measurement can be used here, let's just do a time update
+            trace!("time update {}", dt);
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
-                    if self.kf.is_extended() {
-                        self.prop.state = self.prop.state + est.state_deviation();
-                    }
+                    // State deviation is always zero for an EKF time update
+                    // therefore we don't do anything different for an extended filter
                     self.estimates.push(est);
                 }
                 Err(e) => return Err(e),
+            }
+            self.prop.state.reset_stm();
+            if dt == end_epoch {
+                break;
             }
         }
 
