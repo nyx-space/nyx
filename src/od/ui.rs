@@ -264,13 +264,11 @@ where
 
         loop {
             // Borrow the previously smoothed estimate of the k+1 estimate
-            let sm_est_kp1 = &self.estimates[l - smoothed.len() + 1].clone();
+            let sm_est_kp1 = &self.estimates[l - smoothed.len() + 1];
             let x_kp1_l = sm_est_kp1.state_deviation();
             let p_kp1_l = sm_est_kp1.covar();
             // Borrow the k-th estimate, which we're smoothing with the next estimate
             let est_k = &self.estimates[l - smoothed.len()];
-            let x_k_k = &est_k.state_deviation();
-            let p_k_k = &est_k.covar();
             // Borrow the k+1-th estimate, which we're smoothing with the next estimate
             let est_kp1 = &self.estimates[l - smoothed.len() + 1];
 
@@ -292,7 +290,11 @@ where
                         break;
                     }
                 }
-                SmoothingArc::All => {}
+                SmoothingArc::All => {
+                    // if est_k.epoch() == est_kp1.epoch() {
+                    //     break;
+                    // }
+                }
             }
 
             // Compute the STM between both steps taken by the filter
@@ -300,27 +302,23 @@ where
             // Therefore, the STM is simply the inverse of the one we used previously.
             // est_kp1 is the estimate that used the STM from time k to time k+1. So the STM stored there
             // is \Phi_{k \to k+1}. Let's invert that.
-            let phi_kp1_k = match est_kp1.stm().clone().try_inverse() {
-                Some(inv_stm) => inv_stm,
-                None => return Err(NyxError::SingularStateTransitionMatrix),
-            };
-            // let p_kp1_k = phi_kp1_k * p_k_k * phi_kp1_k.transpose(); // TODO: Add SNC here, which is effectively covar_bar!
-            let p_kp1_k = est_kp1.predicted_covar();
-            let p_kp1_k_inv = &p_kp1_k
+            let phi_kp1_k = &est_kp1
+                .stm()
+                .clone()
                 .try_inverse()
-                .ok_or(NyxError::SingularCovarianceMatrix)?;
-            // Compute Sk
-            let sk = p_k_k * phi_kp1_k.transpose() * p_kp1_k_inv;
-            // Compute smoothed estimate
-            let x_k_l = x_k_k + &sk * (x_kp1_l - phi_kp1_k * x_k_k);
+                .ok_or(NyxError::SingularStateTransitionMatrix)?;
+
+            // Compute smoothed state deviation
+            let x_k_l = phi_kp1_k * x_kp1_l;
             // Compute smoothed covariance
-            let p_k_l = p_k_k + &sk * (p_kp1_l - &est_kp1.covar()) * &sk.transpose();
+            let p_k_l = phi_kp1_k * p_kp1_l * phi_kp1_k.transpose();
             // Store into vector
             let mut smoothed_est_k = est_k.clone();
             // Compute the smoothed state deviation
             smoothed_est_k.set_state_deviation(x_k_l);
             // Compute the smoothed covariance
             smoothed_est_k.set_covar(p_k_l);
+
             // Move on
             smoothed.push(smoothed_est_k);
             if smoothed.len() == self.estimates.len() {
@@ -524,8 +522,8 @@ where
                 if self.prop.details.step < delta_t {
                     // Do a single step and (probably) a time update, but we'll see that later
                     self.prop.single_step()?;
-                } else {
-                    assert!(delta_t.in_seconds() >= 0.0, "The filter must take a step backward. Please file a detail bug: https://gitlab.com/nyx-space/nyx/-/issues.");
+                } else if delta_t.in_seconds() > 0.0 {
+                    // assert!(delta_t.in_seconds() >= 0.0, "The filter must take a step backward. Please file a detail bug: https://gitlab.com/nyx-space/nyx/-/issues.");
                     // Take one final step of exactly the needed duration until the next measurement
                     self.prop.for_duration(delta_t)?;
                 }

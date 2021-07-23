@@ -258,10 +258,11 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     // We're adding +1 because the propagation time is inclusive on both ends.
     let expected_num_estimates = (prop_time.in_seconds() / step_size.in_seconds()) as usize + 1;
 
-    // Checkt that there are no duplicates of epochs.
+    // Check that there are no duplicates of epochs.
     let mut prev_epoch = odp.estimates[0].epoch();
-    for i in 1..odp.estimates.len() {
-        let this_epoch = odp.estimates[i].epoch();
+
+    for est in odp.estimates.iter().skip(1) {
+        let this_epoch = est.epoch();
         assert!(
             this_epoch > prev_epoch,
             "Estimates not continuously going forward"
