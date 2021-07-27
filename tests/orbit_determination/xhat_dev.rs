@@ -977,11 +977,11 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     // For the CKF, the average RSS errors are expected to be better.
     assert!(
-        rss_pos_avr_sm <= rss_pos_avr,
+        rss_pos_avr_sm / cntf <= rss_pos_avr / cntf,
         "Average RSS position error not better"
     );
     assert!(
-        rss_vel_avr_sm <= rss_vel_avr,
+        rss_vel_avr_sm / cntf <= rss_vel_avr / cntf,
         "Average RSS velocity error not better"
     );
 
