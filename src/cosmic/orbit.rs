@@ -531,7 +531,7 @@ impl Orbit {
         self.hvec().norm()
     }
 
-    /// Returns the specific mechanical energy
+    /// Returns the specific mechanical energy in km^2/s^2
     pub fn energy(&self) -> f64 {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {

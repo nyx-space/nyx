@@ -482,3 +482,113 @@ fn with_init() {
         f64_eq!(new_orbit.periapsis(), new_rp, "wrong rp");
     }
 }
+
+#[test]
+fn orbit_dual_test() {
+    use nyx::cosmic::OrbitDual;
+    use nyx::md::StateParameter;
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+
+    let dt = Epoch::from_mjd_tai(21_545.0);
+    let cart = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 1.0, dt, eme2k,
+    );
+
+    println!("{:x}", cart);
+
+    let cart_dual = OrbitDual::from(cart);
+    println!("{}", eme2k.gm());
+    println!("|v| = {}", cart_dual.vmag());
+    println!("|v|^2 = {}", cart_dual.vmag().dual * cart_dual.vmag().dual);
+    println!("x = {}", cart_dual.x);
+    println!("y = {}", cart_dual.y);
+    println!("z = {}", cart_dual.z);
+    println!("\\xi = {}\n\n", cart_dual.energy());
+
+    // Now print the table
+    let params = vec![
+        StateParameter::AoL,
+        StateParameter::AoP,
+        StateParameter::Apoapsis,
+        StateParameter::C3,
+        StateParameter::Declination,
+        StateParameter::EccentricAnomaly,
+        StateParameter::Eccentricity,
+        StateParameter::Energy,
+        StateParameter::FlightPathAngle,
+        StateParameter::GeodeticHeight,
+        StateParameter::GeodeticLatitude,
+        StateParameter::GeodeticLongitude,
+        StateParameter::Hmag,
+        StateParameter::HX,
+        StateParameter::HY,
+        StateParameter::HZ,
+        StateParameter::Inclination,
+        StateParameter::MeanAnomaly,
+        StateParameter::Periapsis,
+        StateParameter::RightAscension,
+        StateParameter::RAAN,
+        StateParameter::Rmag,
+        StateParameter::SemiParameter,
+        StateParameter::SMA,
+        StateParameter::TrueLongitude,
+        StateParameter::Vmag,
+        StateParameter::X,
+        StateParameter::Y,
+        StateParameter::Z,
+        StateParameter::VX,
+        StateParameter::VY,
+        StateParameter::VZ,
+    ];
+    for param in &params {
+        let dual = cart_dual.partial_for(&param).unwrap();
+        println!(
+            "{:?} & {} & {} & {} & {} & {} & {} \\\\",
+            param,
+            if dual.wtr_x().abs() > 1e-2 {
+                "large"
+            } else if dual.wtr_x().abs() > 0.0 {
+                "small"
+            } else {
+                "none"
+            },
+            if dual.wtr_y().abs() > 1e-2 {
+                "large"
+            } else if dual.wtr_y().abs() > 0.0 {
+                "small"
+            } else {
+                "none"
+            },
+            if dual.wtr_z().abs() > 1e-2 {
+                "large"
+            } else if dual.wtr_z().abs() > 0.0 {
+                "small"
+            } else {
+                "none"
+            },
+            if dual.wtr_vx().abs() > 1e-2 {
+                "large"
+            } else if dual.wtr_vx().abs() > 0.0 {
+                "small"
+            } else {
+                "none"
+            },
+            if dual.wtr_vy().abs() > 1e-2 {
+                "large"
+            } else if dual.wtr_vy().abs() > 0.0 {
+                "small"
+            } else {
+                "none"
+            },
+            if dual.wtr_vz().abs() > 1e-2 {
+                "large"
+            } else if dual.wtr_vz().abs() > 0.0 {
+                "small"
+            } else {
+                "none"
+            },
+            // dual,
+        );
+    }
+}
