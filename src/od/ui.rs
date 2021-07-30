@@ -523,7 +523,6 @@ where
                     // Do a single step and (probably) a time update, but we'll see that later
                     self.prop.single_step()?;
                 } else if delta_t.in_seconds() > 0.0 {
-                    // assert!(delta_t.in_seconds() >= 0.0, "The filter must take a step backward. Please file a detail bug: https://gitlab.com/nyx-space/nyx/-/issues.");
                     // Take one final step of exactly the needed duration until the next measurement
                     self.prop.for_duration(delta_t)?;
                 }

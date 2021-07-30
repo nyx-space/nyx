@@ -21,8 +21,10 @@ extern crate num;
 use self::num::traits::real::Real;
 use crate::cosmic::Orbit;
 use crate::dimensions::{
-    allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3, Vector6,
+    allocator::Allocator, DMatrix, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3,
+    Vector6,
 };
+use crate::NyxError;
 use std::f64;
 
 /// Returns the tilde matrix from the provided Vector3.
@@ -211,6 +213,29 @@ pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> 
     }
 
     full_dcm
+}
+
+/// Compute the Moore Penrose pseudo-inverse if needed, else the real inverse
+pub(crate) fn pseudo_inverse(mat: DMatrix<f64>, err: NyxError) -> Result<DMatrix<f64>, NyxError> {
+    let (rows, cols) = mat.shape();
+    if cols == rows {
+        match mat.try_inverse() {
+            Some(inv) => Ok(inv),
+            None => return Err(err),
+        }
+    } else if rows < cols {
+        let m1_inv = match (&mat * &mat.transpose()).try_inverse() {
+            Some(inv) => inv,
+            None => return Err(err),
+        };
+        Ok(&mat.transpose() * m1_inv)
+    } else {
+        let m2_inv = match (&mat.transpose() * &mat).try_inverse() {
+            Some(inv) => inv,
+            None => return Err(err),
+        };
+        Ok(m2_inv * &mat.transpose())
+    }
 }
 
 #[test]

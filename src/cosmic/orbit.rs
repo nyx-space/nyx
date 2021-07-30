@@ -1383,6 +1383,13 @@ impl PartialEq for Orbit {
             && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
             && self.frame == other.frame
+            && self.stm.is_some()
+            && other.stm.is_some()
+            && if self.stm.is_some() {
+                self.stm.unwrap() == other.stm.unwrap()
+            } else {
+                true
+            }
     }
 }
 
@@ -1663,7 +1670,6 @@ impl State for Orbit {
         as_vec[3] = self.vx;
         as_vec[4] = self.vy;
         as_vec[5] = self.vz;
-        // cf. https://gitlab.com/nyx-space/nyx/-/issues/36
         if let Some(stm) = self.stm {
             let mut stm_idx = 6;
             for i in 0..6 {
