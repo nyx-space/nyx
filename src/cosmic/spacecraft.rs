@@ -17,7 +17,7 @@
 */
 
 use super::{Orbit, State, TimeTagged};
-use crate::dimensions::{Const, Matrix6, OMatrix, OVector};
+use crate::dimensions::{Const, Matrix6, OMatrix, OVector, U8};
 use crate::dynamics::thrustctrl::Thruster;
 use crate::errors::NyxError;
 use crate::time::Epoch;
@@ -229,10 +229,11 @@ impl Spacecraft {
         self.orbit.stm = Some(Matrix6::identity());
     }
 
-    /// Unwraps this STM, or panics if unset.
-    pub fn stm(&self) -> Matrix6<f64> {
-        self.orbit.stm.unwrap()
-    }
+    // /// Unwraps this STM, or panics if unset.
+    // pub fn stm(&self) -> OMatrix<f64, U8, U8> {
+    //     // self.orbit.stm.unwrap()
+    //     self.stm().unwrap()
+    // }
 
     /// Returns the total mass in kilograms
     pub fn mass_kg(&self) -> f64 {
@@ -334,47 +335,86 @@ impl State for Spacecraft {
     }
 
     /// The vector is organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Orbit_STM(36), Cr_partials (13), Cd_partials (15), Fuel mass ]
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, Orbit_STM(36), Cr_partials (13), Cd_partials (15) ]
     fn as_vector(&self) -> Result<OVector<f64, Const<73>>, NyxError> {
         let orb_vec: OVector<f64, Const<42>> = self.orbit.as_vector()?;
         let mut vector = OVector::<f64, Const<73>>::zeros();
         for (i, val) in orb_vec.iter().enumerate() {
-            // Place the orbit state first, then skip two (Cr, Cd), then copy orbit STM
-            vector[if i < 6 { i } else { i + 2 }] = *val;
+            // Place the orbit state first, then skip three (Cr, Cd, Fuel), then copy orbit STM
+            vector[if i < 6 { i } else { i + 3 }] = *val;
         }
         vector[6] = self.cr;
         vector[7] = self.cd;
-        for (i, val) in self.cr_partials.iter().enumerate() {
-            vector[i + 44] = *val;
-        }
-        for (i, val) in self.cd_partials.iter().enumerate() {
-            vector[i + 57] = *val;
-        }
-        vector[72] = self.fuel_mass_kg;
+        vector[8] = self.fuel_mass_kg;
+        println!("[as_vector]\nself.orbit = {}", self.orbit);
+        // println!("vector\n=");
+        // for (i, val) in vector.as_slice()[9..].iter().enumerate() {
+        //     println!("|\t{}\t| # {}", val, i);
+        // }
+        // for (i, val) in self.cr_partials.iter().enumerate() {
+        //     vector[i + 45] = *val;
+        // }
+        // for (i, val) in self.cd_partials.iter().enumerate() {
+        //     vector[i + 58] = *val;
+        // }
         Ok(vector)
     }
 
     /// Vector is expected to be organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Orbit_STM(36), Cr_partials (13), Cd_partials (15), Fuel mass ]
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, Orbit_STM(36), Cr_partials (13), Cd_partials (15) ]
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<73>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
         // Rebuild the vectors
         let mut orbit_vec = OVector::<f64, Const<42>>::zeros();
-        // Grab 44 elements and ignore the Cr and Cd
-        for (i, val) in vector.fixed_rows::<44>(0).iter().enumerate() {
-            if i == 6 || i == 7 {
-                // Skip Cr and Cd
+
+        for (i, val) in vector.fixed_rows::<45>(0).iter().enumerate() {
+            if i == 6 || i == 7 || i == 8 {
+                // Skip Cr, Cd and fuel mass
                 continue;
             }
-            orbit_vec[if i < 6 { i } else { i - 2 }] = *val;
+            orbit_vec[if i < 6 { i } else { i - 3 }] = *val;
         }
+        // let stm_k_to_0 = OMatrix::<f64, U8, U8>::from_row_slice(&vector.as_slice()[9..]);
+
+        // let mut stm_idx = 6;
+        // let stm_slice = &vector.as_slice()[9..];
+        // let mut orbit_stm = OMatrix::<f64, Const<6>, Const<6>>::zeros();
+        // for col in 0..6 {
+        //     for row in 0..6 {
+        //         orbit_stm[(row, col)] = stm_slice[row + 8 * col];
+        //         orbit_vec[stm_idx] = stm_slice[row + 8 * col];
+        //         println!("#{} => {} @ {}", row + 8 * col, orbit_vec[stm_idx], stm_idx);
+        //         stm_idx += 1;
+        //     }
+        // }
+
+        // let orbit_stm_k_to_0 = stm_k_to_0.fixed_slice::<6, 6>(0, 0).to_owned();
+        // for (i, val) in orbit_stm_k_to_0.iter().enumerate() {
+        //     orbit_vec[stm_idx + i] = *val;
+        // }
+
+        println!("[set]");
+        // println!("vector\n={}", vector);
+        // println!("vector slice\n=");
+        // for (i, val) in vector.as_slice()[9..].iter().enumerate() {
+        //     println!("|\t{}\t| # {}", val, i);
+        // }
+        // println!("stm_k_to_0 = {}", stm_k_to_0);
+        println!("orbit_vec {}", orbit_vec);
+        // println!("orbit_stm_k_to_0 = {}", orbit_stm_k_to_0);
         self.orbit.set(epoch, &orbit_vec)?;
+        println!("orbit stm = {}", self.orbit.stm());
         self.cr = vector[6];
         self.cd = vector[7];
-        // TODO: Invert the STM here based on STM Kind of orbit!!
-        self.cr_partials = vector.fixed_rows::<13>(44).into_owned();
-        self.cd_partials = vector.fixed_rows::<15>(57).into_owned();
-        self.fuel_mass_kg = vector[72];
+        self.fuel_mass_kg = vector[8];
+        // self.cr_partials = vector.fixed_rows::<13>(44).into_owned();
+        // self.cd_partials = vector.fixed_rows::<15>(57).into_owned();
+        let orbit_stm = self.orbit.stm().clone();
+        let orbit_top_left = orbit_stm.fixed_slice::<3, 3>(0, 0); //.to_owned();
+                                                                  // Determinant should be 1
+        if (orbit_top_left.determinant() - 1.0).abs() > 0.0 {
+            panic!("ugh");
+        }
         Ok(())
     }
 
@@ -389,22 +429,22 @@ impl State for Spacecraft {
                         rtn[(i, j)] = stm[(i, j)];
                     }
                 }
-                for (i, val) in self.cr_partials.iter().enumerate() {
-                    if i <= 7 {
-                        // Row data
-                        rtn[(6, i)] = *val;
-                    } else {
-                        rtn[(6 - i - 1, 6)] = *val;
-                    }
-                }
-                for (i, val) in self.cd_partials.iter().enumerate() {
-                    if i <= 8 {
-                        // Row data
-                        rtn[(7, i)] = *val;
-                    } else {
-                        rtn[(7 - i - 1, 7)] = *val;
-                    }
-                }
+                // for (i, val) in self.cr_partials.iter().enumerate() {
+                //     if i <= 7 {
+                //         // Row data
+                //         rtn[(6, i)] = *val;
+                //     } else {
+                //         rtn[(6 - i - 1, 6)] = *val;
+                //     }
+                // }
+                // for (i, val) in self.cd_partials.iter().enumerate() {
+                //     if i <= 8 {
+                //         // Row data
+                //         rtn[(7, i)] = *val;
+                //     } else {
+                //         rtn[(7 - i - 1, 7)] = *val;
+                //     }
+                // }
                 // Fuel partial is zero for now, hence no rtn[(8,8)] = 0.0
                 Ok(rtn)
             }

@@ -28,10 +28,12 @@ fn tgt_b_plane_earth_gravity_assist() {
         cosm.frame("EME2000"),
     );
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
-    )));
+    let prop = Propagator::default(
+        (OrbitalDynamics::point_masses(
+            &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+            cosm,
+        )),
+    );
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
 
@@ -39,7 +41,7 @@ fn tgt_b_plane_earth_gravity_assist() {
 
     let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
 
-    let sol = tgt.try_achieve_from(spacecraft, epoch, epoch).unwrap();
+    let sol = tgt.try_achieve_from(orbit, epoch, epoch).unwrap();
 
     println!("{}", sol);
 
@@ -87,17 +89,19 @@ fn tgt_b_plane_lunar_transfer() {
         eme2k,
     );
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm.clone(),
-    )));
+    let prop = Propagator::default(
+        (OrbitalDynamics::point_masses(
+            &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+            cosm.clone(),
+        )),
+    );
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 1000.0, 0.0);
     println!("{}", spacecraft);
 
     // Propagate to periapsis
     let periapse_spacecraft = prop
-        .with(spacecraft)
+        .with(orbit)
         .until_event(1 * orbit.period(), &Event::periapsis(), 1)
         .unwrap()
         .0;
@@ -190,17 +194,16 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
         cosm.frame("EME2000"),
     );
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
-        cosm,
-    )));
+    let prop = Propagator::default(
+        (OrbitalDynamics::point_masses(
+            &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+            cosm,
+        )),
+    );
 
     let spacecraft = Spacecraft::from_srp_defaults(orbit, 100.0, 0.0);
 
-    let prior_sc = prop
-        .with(spacecraft)
-        .for_duration(-12 * TimeUnit::Hour)
-        .unwrap();
+    let prior_sc = prop.with(orbit).for_duration(-12 * TimeUnit::Hour).unwrap();
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 

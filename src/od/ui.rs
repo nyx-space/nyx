@@ -149,6 +149,7 @@ pub struct ODProcess<
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <S as State>::Size, <S as State>::Size>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
@@ -198,6 +199,7 @@ where
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, A>
         + Allocator<f64, A, A>
@@ -710,6 +712,7 @@ where
         + Allocator<f64, <S as State>::Size, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <S as State>::Size>
         + Allocator<f64, <S as State>::VecLength>
         + Allocator<f64, <S as State>::Size, <S as State>::Size>

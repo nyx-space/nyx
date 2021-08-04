@@ -166,7 +166,7 @@ impl Xb {
             None => Err(NyxError::ObjectNotFound("not ephemeris root".to_string())),
             Some(root) => {
                 if path.is_empty() {
-                    return Ok(&root);
+                    return Ok(root);
                 }
                 for pos in path {
                     if root.children.get(*pos).is_none() {
@@ -226,7 +226,7 @@ impl Xb {
                     Ok(Vec::new())
                 } else {
                     let mut path = Vec::new();
-                    Self::ephemeris_seek_by_name(&name, &mut path, &root)
+                    Self::ephemeris_seek_by_name(&name, &mut path, root)
                 }
             }
         }
@@ -242,7 +242,7 @@ impl Xb {
     pub fn ephemeris_get_names(&self) -> Vec<String> {
         let mut names = Vec::new();
         if let Some(root) = &self.ephemeris_root {
-            Self::ephemeris_names(&mut names, &root);
+            Self::ephemeris_names(&mut names, root);
         }
         names
     }

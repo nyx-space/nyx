@@ -1356,7 +1356,7 @@ impl Orbit {
 
     /// Returns the root sum square error between this state and the other, in kilometers for the position and kilometers per second in velocity
     pub fn rss(&self, other: &Self) -> (f64, f64) {
-        rss_orbit_errors(&self, other)
+        rss_orbit_errors(self, other)
     }
 }
 
@@ -1432,6 +1432,7 @@ impl Sub for Orbit {
 }
 
 impl Neg for Orbit {
+    // TODO: Change to Result and invert the STM?
     type Output = Orbit;
 
     /// Subtract one state from another. STM will be copied from &self.
@@ -1671,12 +1672,15 @@ impl State for Orbit {
         as_vec[4] = self.vy;
         as_vec[5] = self.vz;
         if let Some(stm) = self.stm {
-            let mut stm_idx = 6;
-            for i in 0..6 {
-                for j in 0..6 {
-                    as_vec[stm_idx] = stm[(i, j)];
-                    stm_idx += 1;
-                }
+            // let mut stm_idx = 6;
+            // for i in 0..6 {
+            //     for j in 0..6 {
+            //         as_vec[stm_idx] = stm[(i, j)];
+            //         stm_idx += 1;
+            //     }
+            // }
+            for (idx, stm_val) in stm.as_slice().iter().enumerate() {
+                as_vec[idx + 6] = *stm_val;
             }
         }
         Ok(as_vec)
@@ -1692,8 +1696,9 @@ impl State for Orbit {
         self.vz = vector[5];
         // And update the STM if applicable
         if self.stm.is_some() {
-            let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
-            self.stm = Some(stm_k_to_0)
+            // let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
+            let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
+            self.stm = Some(stm_k_to_0);
         }
         Ok(())
     }

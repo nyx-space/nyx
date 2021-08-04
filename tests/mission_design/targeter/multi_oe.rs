@@ -22,7 +22,7 @@ fn tgt_c3_decl() {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let dynamics = (OrbitalDynamics::two_body());
     let setup = Propagator::default(dynamics);
 
     // Define the objective
@@ -36,7 +36,7 @@ fn tgt_c3_decl() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(xi_orig, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -73,7 +73,7 @@ fn tgt_sma_ecc() {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let dynamics = (OrbitalDynamics::two_body());
     let setup = Propagator::default(dynamics);
 
     // Define the objective
@@ -107,7 +107,77 @@ fn tgt_sma_ecc() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(xi_orig, orig_dt, orig_dt + target_delta_t)
+        .unwrap();
+
+    println!("Finite differencing solution: {}", solution_fd);
+
+    let gmat_sol = 3.1160765514523914;
+    println!(
+        "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
+        solution_fd.correction.norm() * 1e3,
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+    );
+    // GMAT validation
+    assert!(
+        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6
+            || solution_fd.correction.norm() < gmat_sol,
+        "Finite differencing result different from GMAT and greater!"
+    );
+}
+
+#[test]
+fn tgt_hd_sma_ecc() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
+
+    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
+
+    let target_delta_t: Duration = xi_orig.period() / 20.0;
+
+    let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
+
+    let dynamics = (OrbitalDynamics::two_body());
+    let setup = Propagator::default(dynamics);
+
+    // Define the objective
+    let objectives = vec![
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
+        Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
+    ];
+
+    let tgt = Targeter::new(
+        Arc::new(&setup),
+        vec![
+            Variable {
+                component: Vary::VelocityX,
+                max_step: 0.5,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityY,
+                max_step: 0.5,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::VelocityZ,
+                max_step: 0.5,
+                ..Default::default()
+            },
+        ],
+        objectives,
+    );
+
+    println!("{}", tgt);
+
+    let solution_fd = tgt
+        .try_achieve_from_dual(xi_orig, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);

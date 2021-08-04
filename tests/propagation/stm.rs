@@ -1,10 +1,11 @@
 extern crate nyx_space as nyx;
-use nyx::cosmic::{Bodies, Cosm, Orbit};
+use nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
 use nyx::dimensions::{Matrix2, Matrix6};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit};
-use nyx::State;
+use nyx::{State, TimeTagged};
+use nyx_space::md::ui::SpacecraftDynamics;
 
 // These tests compare the computation of the state transition matrix between the finite differencing methoid (common) and hyperdual numbers.
 // Conclusion: hyperdual numbers lead to less error than finite differencing.
@@ -290,23 +291,62 @@ fn stm_hifi_variable_step() {
 
 #[test]
 fn orbit_set_unset() {
-    let m0 = Matrix2::new(1.0, 2.0, 3.0, 4.0);
-
-    let mut m1 = Matrix2::zeros();
-    m1.copy_from_slice(m0.as_slice());
-
-    assert_eq!(m1, m0);
-
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+    let mut init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+
+    // Change STM
+    let stm_data = (0..36).map(|x| x as f64).collect::<Vec<f64>>();
+    init.stm.as_mut().unwrap().copy_from_slice(&stm_data);
+
+    println!("{}", init.stm());
 
     let init_vec = init.as_vector().unwrap();
 
     let mut init2 = init;
     init2.set(epoch, &init_vec).unwrap();
 
+    println!("{}", init2.stm());
+
     assert_eq!(init, init2);
+}
+
+#[test]
+fn sc_set_unset() {
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+    let init_sc = Spacecraft::from_srp_defaults(init, 100.0, 1.0);
+
+    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun],
+        cosm.clone(),
+    )));
+
+    let sc = prop.with(init_sc).for_duration(2 * TimeUnit::Hour).unwrap();
+
+    let vec = sc.as_vector().unwrap();
+
+    let mut init2 = sc;
+    init2.set(sc.epoch(), &vec).unwrap();
+
+    assert_eq!(sc, init2);
+}
+
+#[test]
+fn slices() {
+    let m0 = Matrix2::new(1.0, 2.0, 3.0, 4.0);
+
+    println!("{}", m0);
+
+    let mut m1 = Matrix2::zeros();
+    m1.copy_from_slice(m0.as_slice());
+
+    assert_eq!(m1, m0);
+
+    assert_eq!(Matrix2::from_column_slice(m0.as_slice()), m0);
 }

@@ -216,6 +216,7 @@ pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> 
 }
 
 /// Compute the Moore Penrose pseudo-inverse if needed, else the real inverse
+#[allow(clippy::comparison_chain)]
 pub(crate) fn pseudo_inverse(mat: DMatrix<f64>, err: NyxError) -> Result<DMatrix<f64>, NyxError> {
     let (rows, cols) = mat.shape();
     if cols == rows {
@@ -312,4 +313,17 @@ fn test_projv() {
 fn test_angle_bounds() {
     assert!((between_pm_180(181.0) - -179.0).abs() < std::f64::EPSILON);
     assert!((between_0_360(-179.0) - 181.0).abs() < std::f64::EPSILON);
+}
+
+#[test]
+fn test_pseudo_inv() {
+    let mut mat = DMatrix::from_element(1, 3, 0.0);
+    mat[(0, 0)] = -1407.273208782421;
+    mat[(0, 1)] = -2146.3100013104886;
+    mat[(0, 2)] = 84.05022886527551;
+
+    println!(
+        "{}",
+        pseudo_inverse(mat, NyxError::PartialsUndefined).unwrap()
+    );
 }
