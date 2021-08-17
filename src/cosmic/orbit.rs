@@ -1672,13 +1672,6 @@ impl State for Orbit {
         as_vec[4] = self.vy;
         as_vec[5] = self.vz;
         if let Some(stm) = self.stm {
-            // let mut stm_idx = 6;
-            // for i in 0..6 {
-            //     for j in 0..6 {
-            //         as_vec[stm_idx] = stm[(i, j)];
-            //         stm_idx += 1;
-            //     }
-            // }
             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
                 as_vec[idx + 6] = *stm_val;
             }
@@ -1696,7 +1689,6 @@ impl State for Orbit {
         self.vz = vector[5];
         // And update the STM if applicable
         if self.stm.is_some() {
-            // let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
             let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
             self.stm = Some(stm_k_to_0);
         }

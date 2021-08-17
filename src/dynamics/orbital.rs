@@ -20,7 +20,7 @@ use super::hyperdual::linalg::norm;
 use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, Dynamics, NyxError};
 use crate::cosmic::{Bodies, Cosm, Frame, LTCorr, Orbit};
-use crate::dimensions::{Const, Matrix3, Matrix6, OMatrix, OVector, Vector3, Vector6};
+use crate::dimensions::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::State;
 use std::f64;
 use std::fmt;
@@ -104,14 +104,6 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
             let stm_dt = ctx.stm() * grad;
             // Rebuild the STM as a vector.
             let stm_as_vec = OVector::<f64, Const<36>>::from_column_slice(stm_dt.as_slice());
-            // let mut stm_as_vec = OVector::<f64, Const<36>>::zeros();
-            // let mut stm_idx = 0;
-            // for i in 0..6 {
-            //     for j in 0..6 {
-            //         stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
-            //         stm_idx += 1;
-            //     }
-            // }
             (state, stm_as_vec)
         } else {
             // Still return something of size 42, but the STM will be zeros.
