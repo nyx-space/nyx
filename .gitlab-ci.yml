@@ -44,7 +44,7 @@ propulsion-integration-tests:
   variables:
     RUST_BACKTRACE: 1
   script:
-    - cargo test propulsion --release -j4
+    - cargo test propulsion --release
 
 propagation-integration-tests:
   stage: test-resrc-intense
@@ -52,7 +52,7 @@ propagation-integration-tests:
   variables:
     RUST_BACKTRACE: 1
   script:
-    - cargo test propagation --release -j4
+    - cargo test propagation --release
 
 orbit-determination-integration-tests:
   stage: test
