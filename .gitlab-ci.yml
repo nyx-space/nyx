@@ -1,8 +1,8 @@
 stages: 
   - build
   - test
-  - quality # TODO: MOVE BACK BELOW
   - test-resrc-intense
+  - quality
   - deploy
 
 cache:
@@ -114,12 +114,12 @@ audit:
   script:
     - cargo install cargo-audit
     - cargo audit
+  allow_failure: true
 
 # Code from https://www.collabora.com/news-and-blog/blog/2021/03/24/rust-integrating-llvm-source-base-code-coverage-with-gitlab/
 coverage:
   stage: quality
-  # image: "rustdocker/rust:nightly"  # Eventually switch to rust-1-bullseye and add python
-  image: rust:1-bullseye
+  image: "rustdocker/rust:nightly"
   variables:
     RUSTFLAGS: "-Zinstrument-coverage"
     LLVM_PROFILE_FILE: "coverage-%p-%m.profraw"
