@@ -1344,11 +1344,6 @@ impl Orbit {
         me
     }
 
-    /// Sets the STM of this state of identity
-    pub fn stm_identity(&mut self) {
-        self.stm = Some(Matrix6::identity());
-    }
-
     /// Returns the root sum square error between this state and the other, in kilometers for the position and kilometers per second in velocity
     pub fn rss(&self, other: &Self) -> (f64, f64) {
         rss_orbit_errors(self, other)
@@ -1378,8 +1373,7 @@ impl PartialEq for Orbit {
             && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
             && self.frame == other.frame
-            && self.stm.is_some()
-            && other.stm.is_some()
+            && self.stm.is_some() == other.stm.is_some()
             && if self.stm.is_some() {
                 self.stm.unwrap() == other.stm.unwrap()
             } else {
@@ -1633,7 +1627,7 @@ impl State for Orbit {
     type VecLength = Const<42>;
 
     fn reset_stm(&mut self) {
-        self.stm_identity();
+        self.stm = Some(Matrix6::identity());
     }
 
     /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.

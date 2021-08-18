@@ -468,7 +468,7 @@ where
                     .collect();
 
                 pert_calc.par_iter_mut().for_each(|(_, var, jac_val)| {
-                    let mut this_xi = xi;
+                    let mut this_xi = xi.with_stm();
 
                     let mut state_correction = Vector6::<f64>::zeros();
                     state_correction[var.component.vec_index()] += var.perturbation;

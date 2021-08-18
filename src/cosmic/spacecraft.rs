@@ -227,6 +227,7 @@ impl Spacecraft {
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.orbit.stm = Some(Matrix6::identity());
+        self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
     }
 
     /// Copies the current state but sets the STM to identity
@@ -234,11 +235,6 @@ impl Spacecraft {
         let mut me = self;
         me.enable_stm();
         me
-    }
-
-    /// Sets the STM of this state of identity
-    pub fn stm_identity(&mut self) {
-        self.orbit.stm = Some(Matrix6::identity());
     }
 
     /// Returns the total mass in kilograms
@@ -333,7 +329,8 @@ impl State for Spacecraft {
     type VecLength = Const<90>;
 
     fn reset_stm(&mut self) {
-        self.orbit.stm_identity();
+        self.orbit.reset_stm();
+        self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
     }
 
     fn zeros() -> Self {

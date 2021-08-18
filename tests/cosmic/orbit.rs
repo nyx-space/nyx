@@ -542,7 +542,7 @@ fn orbit_dual_test() {
         StateParameter::VZ,
     ];
     for param in &params {
-        let dual = cart_dual.partial_for(&param).unwrap();
+        let dual = cart_dual.partial_for(param).unwrap();
         println!(
             "{:?} & {} & {} & {} & {} & {} & {} \\\\",
             param,

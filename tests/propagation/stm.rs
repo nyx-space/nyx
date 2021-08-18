@@ -359,39 +359,6 @@ fn sc_set_unset_static() {
 }
 
 #[test]
-fn sc_set_unset_dynamic() {
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
-    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-
-    let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
-    let init_sc = Spacecraft::from_srp_defaults(init, 100.0, 1.0);
-
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
-        &[Bodies::Luna, Bodies::Sun],
-        cosm.clone(),
-    )));
-
-    let sc = prop.with(init_sc).for_duration(2 * TimeUnit::Hour).unwrap();
-
-    let stm = sc.stm().unwrap();
-    print!("{}", stm);
-    let det_stm_pos = stm.fixed_slice::<3, 3>(0, 0).determinant();
-
-    assert!(
-        (det_stm_pos - 1.0).abs() < 2e-16,
-        "STM position is not identity"
-    );
-
-    let vec = sc.as_vector().unwrap();
-
-    let mut init2 = sc;
-    init2.set(sc.epoch(), &vec).unwrap();
-
-    assert_eq!(sc, init2);
-}
-
-#[test]
 fn sc_and_orbit_stm_chk() {
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");

@@ -246,7 +246,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
             for i in 0..3 {
                 d_x[i + 3] += thrust_force[i] / osc_sc.mass_kg();
             }
-            d_x[72] += fuel_rate;
+            d_x[8] += fuel_rate;
         }
         Ok(d_x)
     }

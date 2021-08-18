@@ -21,7 +21,7 @@ fn traj_ephem() {
     );
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(start_state.with_stm());
+    let mut prop = setup.with(start_state);
     // The trajectory must always be generated on its own thread, no need to worry about it ;-)
     let (end_state, ephem) = prop.for_duration_with_traj(31 * TimeUnit::Day).unwrap();
 
@@ -39,7 +39,7 @@ fn traj_ephem() {
 
     assert_eq!(ephem.first(), start_state, "Wrong initial state");
     assert_eq!(ephem.last(), end_state, "Wrong final state");
-    assert!(ephem.last().stm().unwrap().norm() > 0.0, "STM is not set!");
+    assert!(ephem.last().stm().is_err(), "STM is set!");
     assert!(
         ephem.at(end_state.dt + 1 * TimeUnit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
@@ -49,7 +49,7 @@ fn traj_ephem() {
 
     let (tx, rx) = channel();
     std::thread::spawn(move || {
-        let mut prop = setup.with(start_state.with_stm()).with_tx(tx);
+        let mut prop = setup.with(start_state).with_tx(tx);
         prop.for_duration(31 * TimeUnit::Day).unwrap();
     });
 
@@ -58,8 +58,7 @@ fn traj_ephem() {
 
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
-    let mut max_err =
-        (eval_state.as_vector().unwrap() - start_state.with_stm().as_vector().unwrap()).norm();
+    let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.at(prop_state.dt).unwrap();
@@ -111,8 +110,7 @@ fn traj_ephem() {
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
     let mut max_pos_err = (eval_state.radius() - conv_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
-    let mut max_err =
-        (eval_state.as_vector().unwrap() - conv_state.with_stm().as_vector().unwrap()).norm();
+    let mut max_err = (eval_state.as_vector().unwrap() - conv_state.as_vector().unwrap()).norm();
 
     for conv_state in ephem_back_to_earth.every(5 * TimeUnit::Minute) {
         let eval_state = ephem.at(conv_state.dt).unwrap();
@@ -360,7 +358,7 @@ fn traj_ephem_backward() {
     );
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
-    let mut prop = setup.with(start_state.with_stm());
+    let mut prop = setup.with(start_state);
     let (end_state, ephem) = prop.for_duration_with_traj(-31 * TimeUnit::Day).unwrap();
 
     // Example of iterating through the trajectory.
