@@ -16,8 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+extern crate nalgebra as na;
 extern crate num;
 
+use self::na::Complex;
 use self::num::traits::real::Real;
 use crate::cosmic::Orbit;
 use crate::dimensions::{
@@ -55,6 +57,43 @@ pub fn is_diagonal(m: &Matrix3<f64>) -> bool {
             }
         }
     }
+    true
+}
+
+/// Returns whether this matrix represent a stable linear system looking at its eigen values.
+/// NOTE: This code is not super pretty on purpose to make it clear that we're covering all of the cases
+#[allow(clippy::if_same_then_else)]
+#[allow(clippy::branches_sharing_code)]
+pub fn are_eigenvalues_stable<N: DimName>(eigenvalues: OVector<Complex<f64>, N>) -> bool
+where
+    DefaultAllocator: Allocator<Complex<f64>, N>,
+{
+    // Source: https://eng.libretexts.org/Bookshelves/Industrial_and_Systems_Engineering/Book%3A_Chemical_Process_Dynamics_and_Controls_(Woolf)/10%3A_Dynamical_Systems_Analysis/10.04%3A_Using_eigenvalues_and_eigenvectors_to_find_stability_and_solve_ODEs#Summary_of_Eigenvalue_Graphs
+    for ev in &eigenvalues {
+        if ev.im.abs() > 0.0 {
+            // There is an imaginary part to this eigenvalue
+            if ev.re > 0.0 {
+                // At least one of the EVs has a positive real part and a non-zero imaginary part
+                // This is sufficient condition for unstability
+                return false;
+            } else {
+                // Option 1: The real part is zero, the system is oscilliatory
+                // Option 2: The real part is negative, so the systems tends toward stability
+                continue;
+            }
+        } else {
+            // There is no imaginary part
+            if ev.re > 0.0 {
+                // Real value is positive, so the system is unstable
+                return false;
+            } else {
+                // Option 1: The real value is negative, so the system is stable
+                // Option 2: The real value is zero, so the system is invariant
+                continue;
+            }
+        }
+    }
+
     true
 }
 
@@ -117,7 +156,7 @@ pub fn r3(angle: f64) -> Matrix3<f64> {
 /// Rotate a vector about a given axis
 pub fn rotv(v: &Vector3<f64>, axis: &Vector3<f64>, theta: f64) -> Vector3<f64> {
     let k_hat = axis / axis.norm();
-    v * theta.cos() + k_hat.cross(&v) * theta.sin() + k_hat.dot(&v) * k_hat * (1.0 - theta.cos())
+    v * theta.cos() + k_hat.cross(v) * theta.sin() + k_hat.dot(v) * k_hat * (1.0 - theta.cos())
 }
 
 /// Returns the components of vector a orthogonal to b
@@ -138,7 +177,7 @@ pub fn perpv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
 
 /// Returns the projection of a onto b
 pub fn projv(a: &Vector3<f64>, b: &Vector3<f64>) -> Vector3<f64> {
-    b * a.dot(&b) / b.dot(&b)
+    b * a.dot(b) / b.dot(b)
 }
 
 /// Computes the RSS state errors in two provided vectors
@@ -222,7 +261,7 @@ pub(crate) fn pseudo_inverse(mat: DMatrix<f64>, err: NyxError) -> Result<DMatrix
     if cols == rows {
         match mat.try_inverse() {
             Some(inv) => Ok(inv),
-            None => return Err(err),
+            None => Err(err),
         }
     } else if rows < cols {
         let m1_inv = match (&mat * &mat.transpose()).try_inverse() {

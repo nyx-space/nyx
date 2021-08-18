@@ -22,7 +22,7 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector6};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
-use crate::utils::pseudo_inverse;
+use crate::utils::{are_eigenvalues_stable, pseudo_inverse};
 use std::convert::TryInto;
 use std::fmt;
 use std::time::{Duration, Instant};
@@ -639,10 +639,6 @@ where
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
-        if achievement_epoch - correction_epoch > 0.5 * TimeUnit::Hour {
-            warn!("A time difference of {} might break the linearization of the STM. As per AAS-21-715, this targeting method may break", achievement_epoch - correction_epoch);
-        }
-
         if self.objectives.is_empty() {
             return Err(NyxError::UnderdeterminedProblem);
         }
@@ -728,12 +724,11 @@ where
             let xf = self.prop.with(xi).until_epoch(achievement_epoch)?.orbit;
 
             // Check linearization
-            let lina_err = xf.stm().unwrap() * xi.orbit.to_cartesian_vec() - xf.to_cartesian_vec();
-            debug!("{}", xf.stm().unwrap());
-            debug!("STM err {}", lina_err);
-            // Check the linearization error in position
-            if lina_err.fixed_rows::<3>(0).norm() > 10.0 {
-                warn!("STM linearization is broken for the requested time step");
+            if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
+                warn!(
+                    "STM linearization is broken for the requested time step of {}",
+                    achievement_epoch - correction_epoch
+                );
             }
 
             let xf_dual_obj_frame = match &self.objective_frame {

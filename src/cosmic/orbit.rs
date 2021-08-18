@@ -1427,7 +1427,6 @@ impl Sub for Orbit {
 }
 
 impl Neg for Orbit {
-    // TODO: Change to Result and invert the STM?
     type Output = Orbit;
 
     /// Subtract one state from another. STM will be copied from &self.

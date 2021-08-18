@@ -113,7 +113,7 @@ fn tgt_sma_from_peri_fd() {
 }
 
 #[test]
-fn tgt_sma_from_peri_hd() {
+fn tgt_hd_sma_from_peri() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -123,7 +123,7 @@ fn tgt_sma_from_peri_hd() {
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
-    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
+    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k).with_stm();
 
     let target_delta_t: Duration = xi_orig.period() / 40.0;
 
