@@ -237,7 +237,7 @@ where
     pub fn every_between(&self, step: Duration, start: Epoch, end: Epoch) -> TrajIterator<S> {
         TrajIterator {
             time_series: TimeSeries::inclusive(start, end, step),
-            traj: &self,
+            traj: self,
         }
     }
 

@@ -166,25 +166,26 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
     fn eom(
         &self,
         delta_t: f64,
-        state: &OVector<f64, Const<73>>,
+        state: &OVector<f64, Const<90>>,
         ctx: &Spacecraft,
-    ) -> Result<OVector<f64, Const<73>>, NyxError> {
+    ) -> Result<OVector<f64, Const<90>>, NyxError> {
         // Rebuild the osculating state for the EOM context.
         let osc_sc = ctx.ctor_from(delta_t, state);
-        let mut d_x = OVector::<f64, Const<73>>::zeros();
+        let mut d_x = OVector::<f64, Const<90>>::zeros();
 
         if ctx.orbit.stm.is_some() {
-            let (state, grad) = self.dual_eom(
-                delta_t,
-                // &hyperspace_from_vector(&osc_sc.as_vector()?.fixed_rows::<8>(0).into_owned()),
-                &osc_sc,
-            )?;
+            // Call the gradient (also called the dual EOM function of the force models)
+            let (state, grad) = self.dual_eom(delta_t, &osc_sc)?;
 
+            // Apply the gradient to the STM
+            let stm_dt = ctx.stm()? * grad;
+
+            // Rebuild the state vectors
             for (i, val) in state.iter().enumerate() {
                 d_x[i] = *val;
             }
 
-            for (i, val) in grad.iter().enumerate() {
+            for (i, val) in stm_dt.iter().enumerate() {
                 d_x[i + <Spacecraft as State>::Size::dim()] = *val;
             }
         } else {
@@ -254,11 +255,11 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         &self,
         delta_t_s: f64,
         ctx: &Self::StateType,
-    ) -> Result<(OVector<f64, Const<8>>, OMatrix<f64, Const<8>, Const<8>>), NyxError> {
+    ) -> Result<(OVector<f64, Const<9>>, OMatrix<f64, Const<9>, Const<9>>), NyxError> {
         // Rebuild the appropriately sized state and STM.
         // This is the orbital state followed by Cr and Cd
-        let mut d_x = OVector::<f64, Const<8>>::zeros();
-        let mut grad = OMatrix::<f64, Const<8>, Const<8>>::zeros();
+        let mut d_x = OVector::<f64, Const<9>>::zeros();
+        let mut grad = OMatrix::<f64, Const<9>, Const<9>>::zeros();
 
         let (orb_state, orb_grad) = self.orbital_dyn.dual_eom(delta_t_s, &ctx.orbit)?;
 

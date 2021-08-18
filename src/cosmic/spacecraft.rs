@@ -17,7 +17,7 @@
 */
 
 use super::{Orbit, State, TimeTagged};
-use crate::dimensions::{Const, Matrix6, OMatrix, OVector};
+use crate::dimensions::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::dynamics::thrustctrl::Thruster;
 use crate::errors::NyxError;
 use crate::time::Epoch;
@@ -54,7 +54,7 @@ pub struct Spacecraft {
     /// Guidance mode determines whether the thruster should fire or not
     pub mode: GuidanceMode,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
-    pub stm: Option<OMatrix<f64, Const<8>, Const<8>>>,
+    pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
 }
 
 impl Default for Spacecraft {
@@ -95,7 +95,7 @@ impl Spacecraft {
             cd,
             stm: orbit
                 .stm
-                .map(|_| OMatrix::<f64, Const<8>, Const<8>>::identity()),
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -108,7 +108,7 @@ impl Spacecraft {
             srp_area_m2,
             stm: orbit
                 .stm
-                .map(|_| OMatrix::<f64, Const<8>, Const<8>>::identity()),
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -121,7 +121,7 @@ impl Spacecraft {
             drag_area_m2,
             stm: orbit
                 .stm
-                .map(|_| OMatrix::<f64, Const<8>, Const<8>>::identity()),
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -142,7 +142,7 @@ impl Spacecraft {
             mode: init_mode,
             stm: orbit
                 .stm
-                .map(|_| OMatrix::<f64, Const<8>, Const<8>>::identity()),
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -210,7 +210,7 @@ impl Spacecraft {
         me.orbit = orbit;
         me.stm = orbit
             .stm
-            .map(|_| OMatrix::<f64, Const<8>, Const<8>>::identity());
+            .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity());
         me
     }
 
@@ -240,12 +240,6 @@ impl Spacecraft {
     pub fn stm_identity(&mut self) {
         self.orbit.stm = Some(Matrix6::identity());
     }
-
-    // /// Unwraps this STM, or panics if unset.
-    // pub fn stm(&self) -> OMatrix<f64, U8, U8> {
-    //     // self.orbit.stm.unwrap()
-    //     self.stm().unwrap()
-    // }
 
     /// Returns the total mass in kilograms
     pub fn mass_kg(&self) -> f64 {
@@ -335,8 +329,8 @@ impl TimeTagged for Spacecraft {
 }
 
 impl State for Spacecraft {
-    type Size = Const<8>;
-    type VecLength = Const<73>;
+    type Size = Const<9>;
+    type VecLength = Const<90>;
 
     fn reset_stm(&mut self) {
         self.orbit.stm_identity();
@@ -347,9 +341,9 @@ impl State for Spacecraft {
     }
 
     /// The vector is organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(8x8)]
-    fn as_vector(&self) -> Result<OVector<f64, Const<73>>, NyxError> {
-        let mut vector = OVector::<f64, Const<73>>::zeros();
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
+    fn as_vector(&self) -> Result<OVector<f64, Const<90>>, NyxError> {
+        let mut vector = OVector::<f64, Const<90>>::zeros();
         // Set the orbit state info
         for (i, val) in self.orbit.to_cartesian_vec().iter().enumerate() {
             // Place the orbit state first, then skip three (Cr, Cd, Fuel), then copy orbit STM
@@ -363,23 +357,25 @@ impl State for Spacecraft {
             // Set the 6x6 of the orbit STM first
             for i in 0..6 {
                 for j in 0..6 {
-                    stm[(i, j)] = self.orbit.stm()[(i, j)];
+                    stm[(i, j)] = self.orbit.stm().unwrap()[(i, j)];
                 }
             }
             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
-                vector[idx + 9] = *stm_val;
+                vector[idx + Self::Size::dim()] = *stm_val;
             }
         }
         Ok(vector)
     }
 
     /// Vector is expected to be organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(8x8)]
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<73>>) -> Result<(), NyxError> {
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<90>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
-        let sc_state = OVector::<f64, Const<9>>::from_column_slice(&vector.as_slice()[..9]);
-        let sc_full_stm =
-            OMatrix::<f64, Const<8>, Const<8>>::from_column_slice(&vector.as_slice()[9..]);
+        let sc_state =
+            OVector::<f64, Self::Size>::from_column_slice(&vector.as_slice()[..Self::Size::dim()]);
+        let sc_full_stm = OMatrix::<f64, Self::Size, Self::Size>::from_column_slice(
+            &vector.as_slice()[Self::Size::dim()..],
+        );
 
         if self.stm.is_some() {
             self.stm = Some(sc_full_stm);
@@ -409,7 +405,7 @@ impl State for Spacecraft {
 
     /// diag(STM) = [X,Y,Z,Vx,Vy,Vz,Cr,Cd,Fuel]
     /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
-    fn stm(&self) -> Result<OMatrix<f64, Const<8>, Const<8>>, NyxError> {
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError> {
         match self.stm {
             Some(stm) => Ok(stm),
             None => Err(NyxError::StateTransitionMatrixUnset),
@@ -438,11 +434,11 @@ impl Add<OVector<f64, Const<6>>> for Spacecraft {
     }
 }
 
-impl Add<OVector<f64, Const<8>>> for Spacecraft {
+impl Add<OVector<f64, Const<9>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(self, other: OVector<f64, Const<8>>) -> Self {
+    fn add(self, other: OVector<f64, Const<9>>) -> Self {
         let mut me = self;
         me.orbit.x += other[0];
         me.orbit.y += other[1];
@@ -452,6 +448,7 @@ impl Add<OVector<f64, Const<8>>> for Spacecraft {
         me.orbit.vz += other[5];
         me.cr += other[6];
         me.cd += other[7];
+        me.fuel_mass_kg += other[8];
 
         me
     }

@@ -39,7 +39,7 @@ fn traj_ephem() {
 
     assert_eq!(ephem.first(), start_state, "Wrong initial state");
     assert_eq!(ephem.last(), end_state, "Wrong final state");
-    assert!(ephem.last().stm().norm() > 0.0, "STM is not set!");
+    assert!(ephem.last().stm().unwrap().norm() > 0.0, "STM is not set!");
     assert!(
         ephem.at(end_state.dt + 1 * TimeUnit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
@@ -389,7 +389,7 @@ fn traj_ephem_backward() {
 
     assert_eq!(ephem.first(), start_state, "Wrong initial state");
     assert_eq!(ephem.last(), end_state, "Wrong final state");
-    assert!(ephem.last().stm().norm() > 0.0, "STM is not set!");
+    assert!(ephem.last().stm().unwrap().norm() > 0.0, "STM is not set!");
     assert!(
         ephem.at(end_state.dt + 1 * TimeUnit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"

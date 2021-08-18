@@ -22,7 +22,7 @@ fn tgt_vnc_c3_decl() {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = (OrbitalDynamics::two_body());
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::default(dynamics);
 
     // Define the objective
@@ -36,7 +36,7 @@ fn tgt_vnc_c3_decl() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(xi_orig, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -73,7 +73,7 @@ fn tgt_vnc_sma_ecc() {
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
-    let dynamics = (OrbitalDynamics::two_body());
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::default(dynamics);
 
     // Define the objective
@@ -107,7 +107,7 @@ fn tgt_vnc_sma_ecc() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from(xi_orig, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);

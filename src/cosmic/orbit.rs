@@ -1349,11 +1349,6 @@ impl Orbit {
         self.stm = Some(Matrix6::identity());
     }
 
-    /// Unwraps this STM, or panics if unset.
-    pub fn stm(&self) -> Matrix6<f64> {
-        self.stm.unwrap()
-    }
-
     /// Returns the root sum square error between this state and the other, in kilometers for the position and kilometers per second in velocity
     pub fn rss(&self, other: &Self) -> (f64, f64) {
         rss_orbit_errors(self, other)

@@ -699,12 +699,12 @@ fn multi_body_dynamics_dual() {
     let final_state = setup.with(halo_rcvr).for_duration(prop_time).unwrap();
     let mut prop = setup.with(halo_rcvr.with_stm());
     let final_state_dual = prop.for_duration(prop_time).unwrap();
-    println!("Final STM {}", final_state_dual.stm());
+    println!("Final STM {}", final_state_dual.stm().unwrap());
 
     // Test that reset_stm() and a single step will lead to the correct STM diagonals
     prop.state.reset_stm();
     let post_reset = prop.for_duration(step_size).unwrap();
-    println!("{}", post_reset.stm());
+    println!("{}", post_reset.stm().unwrap());
 
     let (err_r, err_v) = rss_orbit_vec_errors(
         &final_state.to_cartesian_vec(),

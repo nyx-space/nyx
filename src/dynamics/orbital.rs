@@ -101,7 +101,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
         let (new_state, new_stm) = if ctx.stm.is_some() {
             let (state, grad) = self.dual_eom(delta_t_s, &osc)?;
 
-            let stm_dt = ctx.stm() * grad;
+            let stm_dt = ctx.stm()? * grad;
             // Rebuild the STM as a vector.
             let stm_as_vec = OVector::<f64, Const<36>>::from_column_slice(stm_dt.as_slice());
             (state, stm_as_vec)
