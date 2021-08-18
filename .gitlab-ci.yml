@@ -1,8 +1,8 @@
 stages: 
   - build
   - test
+  - quality # TODO: MOVE BACK BELOW
   - test-resrc-intense
-  - quality
   - deploy
 
 cache:
@@ -19,10 +19,6 @@ compile:
   script:
     - cargo build --tests --release # Build all of the tests in release mode
     - cargo build --release # Build the binaries
-  # artifacts:
-  #   paths:
-  #     - target/
-  #     - Cargo.lock
 
 unit-tests:
   stage: test

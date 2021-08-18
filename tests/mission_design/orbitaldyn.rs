@@ -742,7 +742,7 @@ fn multi_body_dynamics_dual() {
     let radius_stm_delta = stm_err.fixed_rows::<3>(0).into_owned();
     let velocity_stm_delta = stm_err.fixed_rows::<3>(3).into_owned();
 
-    assert!(dbg!(radius_stm_delta.norm()) < 1e-3);
+    assert!(dbg!(radius_stm_delta.norm()) < 1e-2);
     assert!(dbg!(velocity_stm_delta.norm()) < 1e-3);
 }
 
