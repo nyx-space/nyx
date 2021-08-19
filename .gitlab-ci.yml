@@ -43,6 +43,7 @@ propulsion-integration-tests:
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
+  retry: 3
   script:
     - cargo test propulsion --release
 
@@ -51,6 +52,7 @@ propagation-integration-tests:
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
+  retry: 3  # Trajectory generation sometimes messes up
   script:
     - cargo test propagation --release
 
@@ -60,8 +62,8 @@ orbit-determination-integration-tests:
   variables:
     RUST_BACKTRACE: 1
   script:
-    - echo "REENABLE THIS TEST"
-    # - cargo test orbit_determination --release
+    - cargo test orbit_determination --release
+  allow_failure: true
 
 scenario-tests:
   image: rust:1-bullseye
