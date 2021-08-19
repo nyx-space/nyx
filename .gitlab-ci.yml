@@ -61,6 +61,7 @@ orbit-determination-integration-tests:
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
+  retry: 2
   script:
     - cargo test orbit_determination --release
   allow_failure: true
