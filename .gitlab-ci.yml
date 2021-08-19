@@ -43,7 +43,7 @@ propulsion-integration-tests:
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
-  retry: 3
+  retry: 2
   script:
     - cargo test propulsion --release
 
@@ -52,7 +52,7 @@ propagation-integration-tests:
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
-  retry: 3  # Trajectory generation sometimes messes up
+  retry: 2  # Trajectory generation sometimes messes up
   script:
     - cargo test propagation --release
 
