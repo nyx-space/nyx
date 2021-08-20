@@ -39,6 +39,7 @@ pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     pub dynamics: Arc<D>, // Stores the dynamics used. *Must* use this to get the latest values
@@ -54,6 +55,7 @@ impl<'a, D: Dynamics, E: ErrorCtrl> Propagator<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
@@ -110,6 +112,7 @@ impl<'a, D: Dynamics> Propagator<'a, D, RSSCartesianStep>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
@@ -126,6 +129,7 @@ pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// The state of this propagator instance
@@ -147,6 +151,7 @@ impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Allows setting the step size of the propagator
@@ -159,11 +164,6 @@ where
     pub fn with_tx(mut self, tx: Sender<D::StateType>) -> Self {
         self.tx_chan = Some(tx);
         self
-    }
-
-    /// Returns the state of the propagation
-    fn state_vector(&self) -> OVector<f64, <D::StateType as State>::VecLength> {
-        self.state.as_vector().unwrap()
     }
 
     /// This method propagates the provided Dynamics for the provided duration.
@@ -295,7 +295,7 @@ where
     fn derive(
         &mut self,
     ) -> Result<(Duration, OVector<f64, <D::StateType as State>::VecLength>), NyxError> {
-        let state = &self.state_vector();
+        let state = &self.state.as_vector()?;
         let ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
@@ -345,7 +345,7 @@ where
                 return Ok(((self.details.step), next_state));
             } else {
                 // Compute the error estimate.
-                self.details.error = E::estimate(&error_est, &next_state, &state);
+                self.details.error = E::estimate(&error_est, &next_state, state);
                 if self.details.error <= self.prop.opts.tolerance
                     || step_size <= self.prop.opts.min_step.in_seconds()
                     || self.details.attempts >= self.prop.opts.attempts

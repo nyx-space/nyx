@@ -531,7 +531,7 @@ impl Orbit {
         self.hvec().norm()
     }
 
-    /// Returns the specific mechanical energy
+    /// Returns the specific mechanical energy in km^2/s^2
     pub fn energy(&self) -> f64 {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
@@ -1344,19 +1344,9 @@ impl Orbit {
         me
     }
 
-    /// Sets the STM of this state of identity
-    pub fn stm_identity(&mut self) {
-        self.stm = Some(Matrix6::identity());
-    }
-
-    /// Unwraps this STM, or panics if unset.
-    pub fn stm(&self) -> Matrix6<f64> {
-        self.stm.unwrap()
-    }
-
     /// Returns the root sum square error between this state and the other, in kilometers for the position and kilometers per second in velocity
     pub fn rss(&self, other: &Self) -> (f64, f64) {
-        rss_orbit_errors(&self, other)
+        rss_orbit_errors(self, other)
     }
 }
 
@@ -1383,6 +1373,12 @@ impl PartialEq for Orbit {
             && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
             && self.frame == other.frame
+            && self.stm.is_some() == other.stm.is_some()
+            && if self.stm.is_some() {
+                self.stm.unwrap() == other.stm.unwrap()
+            } else {
+                true
+            }
     }
 }
 
@@ -1631,7 +1627,7 @@ impl State for Orbit {
     type VecLength = Const<42>;
 
     fn reset_stm(&mut self) {
-        self.stm_identity();
+        self.stm = Some(Matrix6::identity());
     }
 
     /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
@@ -1663,14 +1659,9 @@ impl State for Orbit {
         as_vec[3] = self.vx;
         as_vec[4] = self.vy;
         as_vec[5] = self.vz;
-        // cf. https://gitlab.com/nyx-space/nyx/-/issues/36
         if let Some(stm) = self.stm {
-            let mut stm_idx = 6;
-            for i in 0..6 {
-                for j in 0..6 {
-                    as_vec[stm_idx] = stm[(i, j)];
-                    stm_idx += 1;
-                }
+            for (idx, stm_val) in stm.as_slice().iter().enumerate() {
+                as_vec[idx + 6] = *stm_val;
             }
         }
         Ok(as_vec)
@@ -1686,8 +1677,8 @@ impl State for Orbit {
         self.vz = vector[5];
         // And update the STM if applicable
         if self.stm.is_some() {
-            let stm_k_to_0 = Matrix6::from_row_slice(&vector.as_slice()[6..]);
-            self.stm = Some(stm_k_to_0)
+            let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
+            self.stm = Some(stm_k_to_0);
         }
         Ok(())
     }

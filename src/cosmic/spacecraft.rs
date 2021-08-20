@@ -17,7 +17,7 @@
 */
 
 use super::{Orbit, State, TimeTagged};
-use crate::dimensions::{Const, Matrix6, OMatrix, OVector};
+use crate::dimensions::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::dynamics::thrustctrl::Thruster;
 use crate::errors::NyxError;
 use crate::time::Epoch;
@@ -53,10 +53,8 @@ pub struct Spacecraft {
     pub thruster: Option<Thruster>,
     /// Guidance mode determines whether the thruster should fire or not
     pub mode: GuidanceMode,
-    /// Cr_partials only contains the column and row data needed to expand the 6x6 of the orbital STM (2x6+1 = 13), organized by row then column data
-    pub cr_partials: OVector<f64, Const<13>>,
-    /// Cd_partials only contains the column and row data needed to expand the 7x7 of the orbital STM + Cr partials (2x7+1 = 15), organized by row then column data
-    pub cd_partials: OVector<f64, Const<15>>,
+    /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
+    pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
 }
 
 impl Default for Spacecraft {
@@ -71,8 +69,7 @@ impl Default for Spacecraft {
             cd: 2.2,
             thruster: None,
             mode: GuidanceMode::Coast,
-            cr_partials: OVector::<f64, Const<13>>::zeros(),
-            cd_partials: OVector::<f64, Const<15>>::zeros(),
+            stm: None,
         }
     }
 }
@@ -96,6 +93,9 @@ impl Spacecraft {
             drag_area_m2,
             cr,
             cd,
+            stm: orbit
+                .stm
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -106,6 +106,9 @@ impl Spacecraft {
             orbit,
             dry_mass_kg,
             srp_area_m2,
+            stm: orbit
+                .stm
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -116,6 +119,9 @@ impl Spacecraft {
             orbit,
             dry_mass_kg,
             drag_area_m2,
+            stm: orbit
+                .stm
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -134,6 +140,9 @@ impl Spacecraft {
             fuel_mass_kg,
             thruster: Some(thruster),
             mode: init_mode,
+            stm: orbit
+                .stm
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
     }
@@ -199,6 +208,9 @@ impl Spacecraft {
     pub fn with_orbit(self, orbit: Orbit) -> Self {
         let mut me = self;
         me.orbit = orbit;
+        me.stm = orbit
+            .stm
+            .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity());
         me
     }
 
@@ -215,6 +227,7 @@ impl Spacecraft {
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.orbit.stm = Some(Matrix6::identity());
+        self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
     }
 
     /// Copies the current state but sets the STM to identity
@@ -222,16 +235,6 @@ impl Spacecraft {
         let mut me = self;
         me.enable_stm();
         me
-    }
-
-    /// Sets the STM of this state of identity
-    pub fn stm_identity(&mut self) {
-        self.orbit.stm = Some(Matrix6::identity());
-    }
-
-    /// Unwraps this STM, or panics if unset.
-    pub fn stm(&self) -> Matrix6<f64> {
-        self.orbit.stm.unwrap()
     }
 
     /// Returns the total mass in kilograms
@@ -322,11 +325,12 @@ impl TimeTagged for Spacecraft {
 }
 
 impl State for Spacecraft {
-    type Size = Const<8>;
-    type VecLength = Const<73>;
+    type Size = Const<9>;
+    type VecLength = Const<90>;
 
     fn reset_stm(&mut self) {
-        self.orbit.stm_identity();
+        self.orbit.reset_stm();
+        self.stm = Some(OMatrix::<f64, Const<9>, Const<9>>::identity());
     }
 
     fn zeros() -> Self {
@@ -334,80 +338,73 @@ impl State for Spacecraft {
     }
 
     /// The vector is organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Orbit_STM(36), Cr_partials (13), Cd_partials (15), Fuel mass ]
-    fn as_vector(&self) -> Result<OVector<f64, Const<73>>, NyxError> {
-        let orb_vec: OVector<f64, Const<42>> = self.orbit.as_vector()?;
-        let mut vector = OVector::<f64, Const<73>>::zeros();
-        for (i, val) in orb_vec.iter().enumerate() {
-            // Place the orbit state first, then skip two (Cr, Cd), then copy orbit STM
-            vector[if i < 6 { i } else { i + 2 }] = *val;
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
+    fn as_vector(&self) -> Result<OVector<f64, Const<90>>, NyxError> {
+        let mut vector = OVector::<f64, Const<90>>::zeros();
+        // Set the orbit state info
+        for (i, val) in self.orbit.to_cartesian_vec().iter().enumerate() {
+            // Place the orbit state first, then skip three (Cr, Cd, Fuel), then copy orbit STM
+            vector[if i < 6 { i } else { i + 3 }] = *val;
         }
+        // Set the spacecraft parameters
         vector[6] = self.cr;
         vector[7] = self.cd;
-        for (i, val) in self.cr_partials.iter().enumerate() {
-            vector[i + 44] = *val;
+        vector[8] = self.fuel_mass_kg;
+        if let Some(mut stm) = self.stm {
+            // Set the 6x6 of the orbit STM first
+            for i in 0..6 {
+                for j in 0..6 {
+                    stm[(i, j)] = self.orbit.stm().unwrap()[(i, j)];
+                }
+            }
+            for (idx, stm_val) in stm.as_slice().iter().enumerate() {
+                vector[idx + Self::Size::dim()] = *stm_val;
+            }
         }
-        for (i, val) in self.cd_partials.iter().enumerate() {
-            vector[i + 57] = *val;
-        }
-        vector[72] = self.fuel_mass_kg;
         Ok(vector)
     }
 
     /// Vector is expected to be organized as such:
-    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Orbit_STM(36), Cr_partials (13), Cd_partials (15), Fuel mass ]
-    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<73>>) -> Result<(), NyxError> {
+    /// [X, Y, Z, Vx, Vy, Vz, Cr, Cd, Fuel mass, STM(9x9)]
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<90>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
-        // Rebuild the vectors
-        let mut orbit_vec = OVector::<f64, Const<42>>::zeros();
-        // Grab 44 elements and ignore the Cr and Cd
-        for (i, val) in vector.fixed_rows::<44>(0).iter().enumerate() {
-            if i == 6 || i == 7 {
-                // Skip Cr and Cd
-                continue;
-            }
-            orbit_vec[if i < 6 { i } else { i - 2 }] = *val;
+        let sc_state =
+            OVector::<f64, Self::Size>::from_column_slice(&vector.as_slice()[..Self::Size::dim()]);
+        let sc_full_stm = OMatrix::<f64, Self::Size, Self::Size>::from_column_slice(
+            &vector.as_slice()[Self::Size::dim()..],
+        );
+
+        if self.stm.is_some() {
+            self.stm = Some(sc_full_stm);
         }
+
+        // Extract the orbit information
+        let orbit_state = sc_state.fixed_rows::<6>(0).into_owned();
+        let orbit_stm = sc_full_stm.fixed_slice::<6, 6>(0, 0).into_owned();
+        // Rebuild the orbit vector
+        let mut orbit_vec = OVector::<f64, Const<42>>::zeros();
+        orbit_vec[0] = orbit_state[0];
+        orbit_vec[1] = orbit_state[1];
+        orbit_vec[2] = orbit_state[2];
+        orbit_vec[3] = orbit_state[3];
+        orbit_vec[4] = orbit_state[4];
+        orbit_vec[5] = orbit_state[5];
+        for (idx, stm_val) in orbit_stm.as_slice().iter().enumerate() {
+            orbit_vec[idx + 6] = *stm_val;
+        }
+        // And set the orbit information
         self.orbit.set(epoch, &orbit_vec)?;
-        self.cr = vector[6];
-        self.cd = vector[7];
-        // TODO: Invert the STM here based on STM Kind of orbit!!
-        self.cr_partials = vector.fixed_rows::<13>(44).into_owned();
-        self.cd_partials = vector.fixed_rows::<15>(57).into_owned();
-        self.fuel_mass_kg = vector[72];
+        self.cr = sc_state[6];
+        self.cd = sc_state[7];
+        self.fuel_mass_kg = sc_state[8];
         Ok(())
     }
 
     /// diag(STM) = [X,Y,Z,Vx,Vy,Vz,Cr,Cd,Fuel]
     /// WARNING: Currently the STM assumes that the fuel mass is constant at ALL TIMES!
-    fn stm(&self) -> Result<OMatrix<f64, Const<8>, Const<8>>, NyxError> {
-        match self.orbit.stm {
-            Some(stm) => {
-                let mut rtn = OMatrix::<f64, Const<8>, Const<8>>::zeros();
-                for i in 0..6 {
-                    for j in 0..6 {
-                        rtn[(i, j)] = stm[(i, j)];
-                    }
-                }
-                for (i, val) in self.cr_partials.iter().enumerate() {
-                    if i <= 7 {
-                        // Row data
-                        rtn[(6, i)] = *val;
-                    } else {
-                        rtn[(6 - i - 1, 6)] = *val;
-                    }
-                }
-                for (i, val) in self.cd_partials.iter().enumerate() {
-                    if i <= 8 {
-                        // Row data
-                        rtn[(7, i)] = *val;
-                    } else {
-                        rtn[(7 - i - 1, 7)] = *val;
-                    }
-                }
-                // Fuel partial is zero for now, hence no rtn[(8,8)] = 0.0
-                Ok(rtn)
-            }
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError> {
+        match self.stm {
+            Some(stm) => Ok(stm),
             None => Err(NyxError::StateTransitionMatrixUnset),
         }
     }
@@ -434,11 +431,11 @@ impl Add<OVector<f64, Const<6>>> for Spacecraft {
     }
 }
 
-impl Add<OVector<f64, Const<8>>> for Spacecraft {
+impl Add<OVector<f64, Const<9>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
-    fn add(self, other: OVector<f64, Const<8>>) -> Self {
+    fn add(self, other: OVector<f64, Const<9>>) -> Self {
         let mut me = self;
         me.orbit.x += other[0];
         me.orbit.y += other[1];
@@ -448,6 +445,7 @@ impl Add<OVector<f64, Const<8>>> for Spacecraft {
         me.orbit.vz += other[5];
         me.cr += other[6];
         me.cd += other[7];
+        me.fuel_mass_kg += other[8];
 
         me
     }

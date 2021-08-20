@@ -132,7 +132,7 @@ where
     pub fn new(state: S, rx: Receiver<S>) -> Result<Self, NyxError> {
         // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
         // I've spent 12h trying to understand why, but I can't, so screw it for it.
-        Self::new_bucket_as(state, if S::VecLength::dim() == 73 { 6 } else { 32 }, rx)
+        Self::new_bucket_as(state, if S::VecLength::dim() == 90 { 6 } else { 32 }, rx)
     }
 
     /// Creates a new trajectory but specifies the number of items per segment
@@ -237,7 +237,7 @@ where
     pub fn every_between(&self, step: Duration, start: Epoch, end: Epoch) -> TrajIterator<S> {
         TrajIterator {
             time_series: TimeSeries::inclusive(start, end, step),
-            traj: &self,
+            traj: self,
         }
     }
 

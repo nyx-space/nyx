@@ -281,7 +281,7 @@ pub fn eclipse_state(
             observer.frame,
             LTCorr::None,
         );
-        return line_of_sight(observer, &observed, eclipsing_body, &cosm);
+        return line_of_sight(observer, &observed, eclipsing_body, cosm);
     }
     // All of the computations happen with the observer as the center.
     // `eb` stands for eclipsing body; `ls` stands for light source.
@@ -367,9 +367,9 @@ pub fn line_of_sight(
     let r1 = &cosm.frame_chg(observed, eclipsing_body).radius();
     let r2 = &cosm.frame_chg(observer, eclipsing_body).radius();
 
-    let r1sq = r1.dot(&r1);
-    let r2sq = r2.dot(&r2);
-    let r1dotr2 = r1.dot(&r2);
+    let r1sq = r1.dot(r1);
+    let r2sq = r2.dot(r2);
+    let r1dotr2 = r1.dot(r2);
 
     let tau = (r1sq - r1dotr2) / (r1sq + r2sq - 2.0 * r1dotr2);
     if !(0.0..=1.0).contains(&tau)

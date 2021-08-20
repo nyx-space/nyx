@@ -414,8 +414,7 @@ impl<'a> OdpScenario<'a> {
         let mut prop_setup = Propagator::default(self.nav.sc_dyn);
         prop_setup.set_tolerance(self.nav.prop_tol);
         // Make sure to set the STM
-        let mut init_state = self.nav.init_state;
-        init_state.orbit.stm_identity();
+        let init_state = self.nav.init_state.with_stm();
         let mut nav = prop_setup.with(init_state);
 
         nav.set_step(10.0 * TimeUnit::Second, true);

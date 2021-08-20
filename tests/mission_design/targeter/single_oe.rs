@@ -59,7 +59,7 @@ fn tgt_sma_from_apo() {
 }
 
 #[test]
-fn tgt_sma_from_peri() {
+fn tgt_sma_from_peri_fd() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -71,7 +71,7 @@ fn tgt_sma_from_peri() {
 
     let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
-    let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t: Duration = xi_orig.period() / 20.0;
 
     println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
 
@@ -113,8 +113,7 @@ fn tgt_sma_from_peri() {
 }
 
 #[test]
-#[ignore]
-fn tgt_sma_from_peri_hd() {
+fn tgt_hd_sma_from_peri() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -124,13 +123,13 @@ fn tgt_sma_from_peri_hd() {
 
     let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
 
-    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
+    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k).with_stm();
 
-    let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t: Duration = xi_orig.period() / 40.0;
 
     println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
 
-    let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
+    let spacecraft = Spacecraft::new(xi_orig, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
@@ -144,7 +143,8 @@ fn tgt_sma_from_peri_hd() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let mut tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    tgt.iterations = 5;
 
     println!("{}", tgt);
 
@@ -165,6 +165,57 @@ fn tgt_sma_from_peri_hd() {
         (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6,
         "Finite differencing result different from GMAT (greater than 1 mm/s)."
     );
+}
+
+#[test]
+fn orbit_stm_chk() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
+
+    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
+
+    // let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t = 100.0 * TimeUnit::Second;
+
+    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+
+    // let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
+
+    let dynamics = OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
+        cosm,
+    );
+    let setup = Propagator::default(dynamics);
+    let mut prop_instance = setup.with(xi_orig.with_stm());
+
+    let achievement_epoch = orig_dt + target_delta_t;
+
+    loop {
+        let prev_state = prop_instance.state.to_cartesian_vec();
+        prop_instance.single_step().unwrap();
+        if prop_instance.state.epoch() > achievement_epoch {
+            // Go backward if we've done too far
+            prop_instance.until_epoch(achievement_epoch).unwrap();
+        }
+        let stm_k_kp1 = prop_instance.state.stm().unwrap();
+        println!(
+            "{}=>err = {}",
+            stm_k_kp1,
+            stm_k_kp1 * prev_state - prop_instance.state.to_cartesian_vec()
+        );
+        // traj_stm *= stm_k_kp1;
+        // And reset the STM
+        prop_instance.state.reset_stm();
+        if prop_instance.state.epoch() == achievement_epoch {
+            break;
+        }
+    }
 }
 
 // Eccentricity

@@ -101,16 +101,9 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
         let (new_state, new_stm) = if ctx.stm.is_some() {
             let (state, grad) = self.dual_eom(delta_t_s, &osc)?;
 
-            let stm_dt = ctx.stm() * grad;
+            let stm_dt = ctx.stm()? * grad;
             // Rebuild the STM as a vector.
-            let mut stm_as_vec = OVector::<f64, Const<36>>::zeros();
-            let mut stm_idx = 0;
-            for i in 0..6 {
-                for j in 0..6 {
-                    stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
-                    stm_idx += 1;
-                }
-            }
+            let stm_as_vec = OVector::<f64, Const<36>>::from_column_slice(stm_dt.as_slice());
             (state, stm_as_vec)
         } else {
             // Still return something of size 42, but the STM will be zeros.
@@ -211,7 +204,7 @@ impl PointMasses {
         let mut refs = Vec::with_capacity(bodies.len());
         // Check that these celestial bodies exist and build their references
         for body in bodies {
-            refs.push(cosm.frame_from_ephem_path(&body.ephem_path()));
+            refs.push(cosm.frame_from_ephem_path(body.ephem_path()));
         }
 
         Self {

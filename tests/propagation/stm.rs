@@ -1,10 +1,11 @@
 extern crate nyx_space as nyx;
-use nyx::cosmic::{Bodies, Cosm, Orbit};
-use nyx::dimensions::{Matrix2, Matrix6};
+use nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
+use nyx::dimensions::{Const, Matrix6, OVector};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit};
-use nyx::State;
+use nyx::{State, TimeTagged};
+use nyx_space::md::ui::SpacecraftDynamics;
 
 // These tests compare the computation of the state transition matrix between the finite differencing methoid (common) and hyperdual numbers.
 // Conclusion: hyperdual numbers lead to less error than finite differencing.
@@ -34,9 +35,9 @@ fn stm_fixed_step() {
 
         let nominal = ten_steps.to_cartesian_vec();
 
-        let stm_err_ten_steps = ten_steps.stm() * init.to_cartesian_vec() - nominal;
+        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_vec() - nominal;
 
-        println!("HD ten_steps.stm() = {}", ten_steps.stm());
+        println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
         println!("HD stm_err_ten_steps = {}", stm_err_ten_steps);
 
@@ -109,9 +110,9 @@ fn stm_variable_step() {
 
         let nominal = ten_steps.to_cartesian_vec();
 
-        let stm_err_ten_steps = ten_steps.stm() * init.to_cartesian_vec() - nominal;
+        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_vec() - nominal;
 
-        println!("HD ten_steps.stm() = {}", ten_steps.stm());
+        println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
         println!("HD stm_err_ten_steps = {}", stm_err_ten_steps);
 
@@ -184,15 +185,15 @@ fn stm_between_steps() {
             .for_duration(100 * TimeUnit::Second)
             .unwrap();
 
-        let phi_t100_t0 = t100.stm();
+        let phi_t100_t0 = t100.stm().unwrap();
 
         let t50 = prop.with(init).for_duration(50 * TimeUnit::Second).unwrap();
 
-        let phi_t50_t0 = t50.stm();
+        let phi_t50_t0 = t50.stm().unwrap();
 
         let t50_to_t100 = prop.with(t50).for_duration(50 * TimeUnit::Second).unwrap();
 
-        let phi_t100_t50 = t50_to_t100.stm();
+        let phi_t100_t50 = t50_to_t100.stm().unwrap();
 
         let phi_t100_t50_prime = phi_t100_t0 * phi_t50_t0.try_inverse().unwrap();
 
@@ -235,9 +236,9 @@ fn stm_hifi_variable_step() {
 
         let nominal = ten_steps.to_cartesian_vec();
 
-        let stm_err_ten_steps = ten_steps.stm() * init.to_cartesian_vec() - nominal;
+        let stm_err_ten_steps = ten_steps.stm().unwrap() * init.to_cartesian_vec() - nominal;
 
-        println!("HD ten_steps.stm() = {}", ten_steps.stm());
+        println!("HD ten_steps.stm() = {}", ten_steps.stm().unwrap());
 
         println!("HD stm_err_ten_steps = {}", stm_err_ten_steps);
 
@@ -289,19 +290,16 @@ fn stm_hifi_variable_step() {
 }
 
 #[test]
-fn orbit_set_unset() {
-    let m0 = Matrix2::new(1.0, 2.0, 3.0, 4.0);
-
-    let mut m1 = Matrix2::zeros();
-    m1.copy_from_slice(m0.as_slice());
-
-    assert_eq!(m1, m0);
-
+fn orbit_set_unset_static() {
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+    let mut init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+
+    // Change STM
+    let stm_data = (0..36).map(|x| x as f64).collect::<Vec<f64>>();
+    init.stm.as_mut().unwrap().copy_from_slice(&stm_data);
 
     let init_vec = init.as_vector().unwrap();
 
@@ -309,4 +307,95 @@ fn orbit_set_unset() {
     init2.set(epoch, &init_vec).unwrap();
 
     assert_eq!(init, init2);
+}
+
+#[test]
+fn orbit_set_unset() {
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+
+    let prop = Propagator::default(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun],
+        cosm.clone(),
+    ));
+
+    let orbit = prop.with(init).for_duration(2 * TimeUnit::Hour).unwrap();
+
+    let vec = orbit.as_vector().unwrap();
+
+    let mut init2 = orbit;
+    init2.set(orbit.epoch(), &vec).unwrap();
+
+    assert_eq!(orbit, init2);
+}
+
+#[test]
+fn sc_set_unset_static() {
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+    let mut init_sc = Spacecraft::from_srp_defaults(init, 100.0, 1.0);
+
+    // Change the full vector
+    let data = (0..90).map(|x| x as f64).collect::<Vec<f64>>();
+    init_sc
+        .set(
+            init.epoch(),
+            &OVector::<f64, Const<90>>::from_column_slice(&data),
+        )
+        .unwrap();
+
+    let init_vec = init_sc.as_vector().unwrap();
+
+    let mut init2 = init_sc;
+    init2.set(epoch, &init_vec).unwrap();
+
+    assert_eq!(init_sc, init2);
+}
+
+#[test]
+fn sc_and_orbit_stm_chk() {
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+
+    let init_orbit = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
+    let init_sc = Spacecraft::from_srp_defaults(init_orbit, 0.0, 0.0);
+
+    let prop_orbit = Propagator::default(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun],
+        cosm.clone(),
+    ));
+
+    let prop_sc = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+        &[Bodies::Luna, Bodies::Sun],
+        cosm.clone(),
+    )));
+
+    let final_orbit = prop_orbit
+        .with(init_orbit)
+        .for_duration(2 * TimeUnit::Hour)
+        .unwrap();
+    let final_sc = prop_sc
+        .with(init_sc)
+        .for_duration(2 * TimeUnit::Hour)
+        .unwrap();
+
+    assert_eq!(
+        final_orbit, final_sc.orbit,
+        "Identical dynamics for Spacecraft and Orbit lead to different states"
+    );
+
+    let sc_stm = final_sc.stm().unwrap();
+    let sc_orbit_stm = sc_stm.fixed_slice::<6, 6>(0, 0);
+    assert_eq!(
+        sc_orbit_stm,
+        final_orbit.stm().unwrap(),
+        "Identical dynamics for Spacecraft and Orbit lead to different STM"
+    );
 }

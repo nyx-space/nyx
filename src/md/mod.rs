@@ -80,7 +80,7 @@ impl MdHdlr<Spacecraft> for OrbitStateOutput {
 impl MdHdlr<Orbit> for OrbitStateOutput {
     fn handle(&mut self, state: &Orbit) {
         self.csv_out
-            .serialize(self.fmtr.fmt(&state))
+            .serialize(self.fmtr.fmt(state))
             .expect("could not format state");
     }
 }

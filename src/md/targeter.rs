@@ -22,6 +22,7 @@ use crate::dimensions::allocator::Allocator;
 use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector6};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
+use crate::utils::{are_eigenvalues_stable, pseudo_inverse};
 use std::convert::TryInto;
 use std::fmt;
 use std::time::{Duration, Instant};
@@ -401,14 +402,14 @@ where
             // Modify each variable by 0.0001, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
             let mut cur_xi = xi;
             cur_xi.enable_stm();
-            let xf = self.prop.with(cur_xi).until_epoch(achievement_epoch)?;
+            let xf = self.prop.with(cur_xi).until_epoch(achievement_epoch)?.orbit;
 
             let xf_dual_obj_frame = match &self.objective_frame {
                 Some((frame, cosm)) => {
-                    let orbit_obj_frame = cosm.frame_chg(&xf.orbit, *frame);
+                    let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
                     OrbitDual::from(orbit_obj_frame)
                 }
-                None => OrbitDual::from(xf.orbit),
+                None => OrbitDual::from(xf),
             };
 
             // Build the error vector
@@ -467,7 +468,7 @@ where
                     .collect();
 
                 pert_calc.par_iter_mut().for_each(|(_, var, jac_val)| {
-                    let mut this_xi = xi;
+                    let mut this_xi = xi.with_stm();
 
                     let mut state_correction = Vector6::<f64>::zeros();
                     state_correction[var.component.vec_index()] += var.perturbation;
@@ -479,7 +480,7 @@ where
                             dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                         this_xi.orbit.apply_dv(velocity_correction);
                     } else {
-                        this_xi.orbit = xi.orbit + state_correction;
+                        this_xi = xi + state_correction;
                     }
 
                     let this_xf = self
@@ -487,14 +488,15 @@ where
                         .clone()
                         .with(this_xi)
                         .until_epoch(achievement_epoch)
-                        .unwrap();
+                        .unwrap()
+                        .orbit;
 
                     let xf_dual_obj_frame = match &self.objective_frame {
                         Some((frame, cosm)) => {
-                            let orbit_obj_frame = cosm.frame_chg(&this_xf.orbit, *frame);
+                            let orbit_obj_frame = cosm.frame_chg(&this_xf, *frame);
                             OrbitDual::from(orbit_obj_frame)
                         }
-                        None => OrbitDual::from(this_xf.orbit),
+                        None => OrbitDual::from(this_xf),
                     };
 
                     let b_plane = if is_bplane_tgt {
@@ -571,24 +573,7 @@ where
             debug!("Jacobian {}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = if self.variables.len() == self.objectives.len() {
-                match jac.try_inverse() {
-                    Some(inv) => inv,
-                    None => return Err(NyxError::SingularStateTransitionMatrix),
-                }
-            } else if self.objectives.len() < self.variables.len() {
-                let m1_inv = match (&jac * &jac.transpose()).try_inverse() {
-                    Some(inv) => inv,
-                    None => return Err(NyxError::SingularStateTransitionMatrix),
-                };
-                &jac.transpose() * m1_inv
-            } else {
-                let m2_inv = match (&jac.transpose() * &jac).try_inverse() {
-                    Some(inv) => inv,
-                    None => return Err(NyxError::SingularStateTransitionMatrix),
-                };
-                m2_inv * &jac.transpose()
-            };
+            let jac_inv = pseudo_inverse(jac, NyxError::SingularStateTransitionMatrix)?;
 
             debug!("Inverse Jacobian {}", jac_inv);
 
@@ -628,7 +613,7 @@ where
                 let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                 xi.orbit.apply_dv(velocity_correction);
             } else {
-                xi.orbit = xi.orbit + state_correction;
+                xi = xi + state_correction;
             }
             total_correction += delta;
             debug!("Total correction: {:e}", total_correction);
@@ -654,8 +639,6 @@ where
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
-        error!("DO NOT USE! The dual number target is broken! https://gitlab.com/nyx-space/nyx/-/issues/207");
-
         if self.objectives.is_empty() {
             return Err(NyxError::UnderdeterminedProblem);
         }
@@ -737,16 +720,23 @@ where
             // Now, enable the trajectory STM for this state so we can apply the correction
             xi.enable_stm();
 
-            let xf = self.prop.with(xi).until_epoch(achievement_epoch)?;
-            // Diagonal of the STM of the trajectory (will include the frame change if needed)
-            debug!("STM {}", xf.stm());
+            // Full propagation for a half period duration is slightly more precise than a step by step one with multiplications in between.
+            let xf = self.prop.with(xi).until_epoch(achievement_epoch)?.orbit;
+
+            // Check linearization
+            if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
+                warn!(
+                    "STM linearization is broken for the requested time step of {}",
+                    achievement_epoch - correction_epoch
+                );
+            }
 
             let xf_dual_obj_frame = match &self.objective_frame {
                 Some((frame, cosm)) => {
-                    let orbit_obj_frame = cosm.frame_chg(&xf.orbit, *frame);
+                    let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
                     OrbitDual::from(orbit_obj_frame)
                 }
-                None => OrbitDual::from(xf.orbit),
+                None => OrbitDual::from(xf),
             };
 
             // Build the error vector
@@ -769,7 +759,7 @@ where
             let mut jac = DMatrix::from_element(self.objectives.len(), self.variables.len(), 0.0);
 
             for (i, obj) in self.objectives.iter().enumerate() {
-                let partial = if obj.parameter.is_b_plane() {
+                let xf_partial = if obj.parameter.is_b_plane() {
                     match obj.parameter {
                         StateParameter::BdotR => b_plane.unwrap().b_r,
                         StateParameter::BdotT => b_plane.unwrap().b_t,
@@ -780,7 +770,7 @@ where
                     xf_dual_obj_frame.partial_for(&obj.parameter)?
                 };
 
-                let achieved = partial.real();
+                let achieved = xf_partial.real();
 
                 let param_err = obj.multiplicative_factor * (obj.desired_value - achieved)
                     + obj.additive_factor;
@@ -801,31 +791,27 @@ where
                 // Build the Jacobian with the partials of the objectives with respect to all of the final state parameters
                 // We localize the problem in the STM.
                 // TODO: VNC (how?!)
-                let mut partial_vec = DVector::from_element(6, 0.0);
+                let mut partial_vec = DMatrix::from_element(1, 6, 0.0);
                 for (i, val) in [
-                    partial.wtr_x(),
-                    partial.wtr_y(),
-                    partial.wtr_z(),
-                    partial.wtr_vx(),
-                    partial.wtr_vy(),
-                    partial.wtr_vz(),
+                    xf_partial.wtr_x(),
+                    xf_partial.wtr_y(),
+                    xf_partial.wtr_z(),
+                    xf_partial.wtr_vx(),
+                    xf_partial.wtr_vy(),
+                    xf_partial.wtr_vz(),
                 ]
                 .iter()
                 .enumerate()
                 {
-                    partial_vec[i] = *val;
+                    partial_vec[(0, i)] = *val;
                 }
-                // Multiply its transpose by the STM and extract the data
-                let mut stm_prev = xf.stm();
-                stm_prev.try_inverse_mut();
-                let obj_jac = -xf.stm() * partial_vec;
-                println!("{}", obj_jac);
+
                 for (j, var) in self.variables.iter().enumerate() {
                     let idx = var.component.vec_index();
-                    // We only ever need the diagonals of the STM I think?
-                    jac[(i, j)] = obj_jac[idx];
+                    // Compute the partial of the objective over all components wrt to all of the components in the STM of the control variable.
+                    let rslt = &partial_vec * xf.stm().unwrap().fixed_columns::<1>(idx);
+                    jac[(i, j)] = rslt[(0, 0)];
                 }
-                // jac_rows.push();
             }
 
             if converged {
@@ -872,28 +858,13 @@ where
             debug!("Jacobian {}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = if self.variables.len() == self.objectives.len() {
-                match jac.try_inverse() {
-                    Some(inv) => inv,
-                    None => return Err(NyxError::SingularStateTransitionMatrix),
-                }
-            } else if self.objectives.len() < self.variables.len() {
-                let m1_inv = match (&jac * &jac.transpose()).try_inverse() {
-                    Some(inv) => inv,
-                    None => return Err(NyxError::SingularStateTransitionMatrix),
-                };
-                &jac.transpose() * m1_inv
-            } else {
-                let m2_inv = match (&jac.transpose() * &jac).try_inverse() {
-                    Some(inv) => inv,
-                    None => return Err(NyxError::SingularStateTransitionMatrix),
-                };
-                m2_inv * &jac.transpose()
-            };
+            let jac_inv = pseudo_inverse(jac, NyxError::SingularStateTransitionMatrix)?;
 
-            debug!("Inverse Jacobian {:e}", jac_inv);
+            debug!("Inverse Jacobian {}", jac_inv);
 
-            let mut delta = jac_inv * err_vector;
+            let mut delta = jac_inv * &err_vector;
+
+            debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
 
             // And finally apply it to the xi
             for (i, var) in self.variables.iter().enumerate() {
@@ -961,7 +932,7 @@ where
     pub fn apply_with_traj(
         &self,
         solution: TargeterSolution,
-    ) -> Result<(Spacecraft, ScTraj), NyxError> {
+    ) -> Result<(Spacecraft, Traj<Spacecraft>), NyxError> {
         // Propagate until achievement epoch
         let (xf, traj) = self
             .prop
