@@ -176,9 +176,11 @@ fn od_robust_test_ekf_realistic() {
     );
 }
 
+#[ignore]
 #[allow(clippy::identity_op)]
 #[test]
 fn od_robust_ops_test() {
+    // TODO: Enable this test after IOD (https://gitlab.com/nyx-space/nyx/-/issues/196), which will bring down the initial error and allow working with a converged state.
     // TODO: Update this test after #147
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
