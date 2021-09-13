@@ -93,7 +93,7 @@ where
         }
         PropInstance {
             state,
-            prop: Arc::new(self),
+            prop: self,
             tx_chan: None,
             prevent_tx: false,
             details: IntegrationDetails {
@@ -135,7 +135,7 @@ where
     /// The state of this propagator instance
     pub state: D::StateType,
     /// The propagator setup (kind, stages, etc.)
-    pub prop: Arc<&'a Propagator<'a, D, E>>,
+    pub prop: &'a Propagator<'a, D, E>,
     /// An output channel for all of the states computed by this propagator instance
     pub tx_chan: Option<Sender<D::StateType>>,
     /// Stores the details of the previous integration step
