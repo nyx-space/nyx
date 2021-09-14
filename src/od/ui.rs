@@ -130,7 +130,7 @@ pub struct ODProcess<
     'a,
     D: Dynamics,
     E: ErrorCtrl,
-    Msr: Measurement<StateSize = <S as State>::Size>,
+    Msr: Measurement<S>,
     N: MeasurementDevice<S, Msr>,
     T: EkfTrigger,
     A: DimName,
@@ -143,8 +143,8 @@ pub struct ODProcess<
         + Allocator<f64, <S as State>::VecLength>
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, S::Size>
+        + Allocator<f64, S::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
@@ -179,7 +179,7 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement<StateSize = <S as State>::Size>,
+        Msr: Measurement<S>,
         N: MeasurementDevice<S, Msr>,
         T: EkfTrigger,
         A: DimName,
@@ -190,9 +190,9 @@ where
     D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize>
-        + Allocator<usize, Msr::StateSize, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, S::Size>
+        + Allocator<f64, S::Size>
+        + Allocator<usize, S::Size, S::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
@@ -693,7 +693,7 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement<StateSize = <S as State>::Size>,
+        Msr: Measurement<S>,
         N: MeasurementDevice<S, Msr>,
         A: DimName,
         S: EstimateFrom<D::StateType>,
@@ -704,8 +704,8 @@ where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, S::Size>
+        + Allocator<f64, S::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>

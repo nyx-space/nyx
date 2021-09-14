@@ -105,14 +105,15 @@ where
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
-pub trait Measurement: TimeTagged
+pub trait Measurement<S>: TimeTagged
 where
     Self: Sized,
-    DefaultAllocator: Allocator<f64, Self::MeasurementSize>
-        + Allocator<f64, Self::MeasurementSize, Self::StateSize>,
+    S: State,
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>
+        + Allocator<f64, Self::MeasurementSize, <S as State>::Size>,
 {
-    /// Defines the state size of the estimated state
-    type StateSize: DimName;
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;
 
@@ -122,9 +123,9 @@ where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, Self::StateSize>
+    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, <S as State>::Size>
     where
-        DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
+        DefaultAllocator: Allocator<f64, <S as State>::Size, Self::MeasurementSize>;
 
     /// Returns whether the transmitter and receiver where in line of sight.
     fn visible(&self) -> bool;
@@ -134,10 +135,13 @@ where
 pub trait MeasurementDevice<MsrIn, Msr>
 where
     Self: Sized,
-    Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::StateSize>
+    MsrIn: State,
+    Msr: Measurement<MsrIn>,
+    DefaultAllocator: Allocator<f64, MsrIn::Size>
+        + Allocator<f64, MsrIn::Size, MsrIn::Size>
+        + Allocator<f64, MsrIn::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>,
+        + Allocator<f64, Msr::MeasurementSize, MsrIn::Size>,
 {
     /// Returns the measurement if the device and generate one, else returns None
     fn measure(&self, input: &MsrIn) -> Option<Msr>;

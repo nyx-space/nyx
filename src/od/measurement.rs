@@ -24,7 +24,9 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice, TimeTagged};
 use crate::cosmic::{Cosm, Frame, Orbit};
-use crate::dimensions::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
+use crate::dimensions::{
+    DimName, Matrix1x6, Matrix2x6, OVector, SMatrix, Vector1, Vector2, U1, U2, U6, U7,
+};
 use crate::time::Epoch;
 use crate::Spacecraft;
 use std::fmt;
@@ -175,6 +177,7 @@ impl GroundStation {
         (elevation, *rx, self.cosm.frame_chg(&tx_gs_frame, rx.frame))
     }
 }
+
 impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
@@ -327,8 +330,7 @@ impl StdMeasurement {
     }
 }
 
-impl Measurement for StdMeasurement {
-    type StateSize = U6;
+impl Measurement<Orbit> for StdMeasurement {
     type MeasurementSize = U2;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -339,6 +341,25 @@ impl Measurement for StdMeasurement {
     }
 
     fn sensitivity(&self) -> Matrix2x6<f64> {
+        self.h_tilde
+    }
+
+    fn visible(&self) -> bool {
+        self.visible
+    }
+}
+
+impl Measurement<Spacecraft> for StdMeasurement {
+    type MeasurementSize = U2;
+
+    /// Returns this measurement as a vector of Range and Range Rate
+    ///
+    /// **Units:** km, km/s
+    fn observation(&self) -> Vector2<f64> {
+        self.obs
+    }
+
+    fn sensitivity(&self) -> SMatrix<f64, 2, 9> {
         self.h_tilde
     }
 
@@ -423,8 +444,7 @@ impl RangeMsr {
     }
 }
 
-impl Measurement for RangeMsr {
-    type StateSize = U6;
+impl Measurement<Orbit> for RangeMsr {
     type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -519,8 +539,7 @@ impl DopplerMsr {
     }
 }
 
-impl Measurement for DopplerMsr {
-    type StateSize = U6;
+impl Measurement<Orbit> for DopplerMsr {
     type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate
