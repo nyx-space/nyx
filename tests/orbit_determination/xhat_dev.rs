@@ -115,8 +115,6 @@ fn xhat_dev_test_ekf_two_body() {
         prop_est,
         kf,
         all_stations,
-        false,
-        measurements.len(),
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
@@ -305,7 +303,7 @@ fn xhat_dev_test_ekf_multi_body() {
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig);
 
     odp.process_measurements(&measurements).unwrap();
     odp.iterate(
@@ -475,7 +473,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -616,7 +614,7 @@ fn xhat_dev_test_ekf_realistic() {
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -756,7 +754,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, kf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -1037,8 +1035,6 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         prop_est,
         kf,
         all_stations,
-        false,
-        measurements.len(),
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
@@ -1288,7 +1284,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, kf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 

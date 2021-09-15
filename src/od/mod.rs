@@ -109,10 +109,13 @@ pub trait Measurement: TimeTagged
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
-        + Allocator<f64, Self::MeasurementSize, Self::StateSize>,
+        + Allocator<f64, <Self::State as State>::Size>
+        + Allocator<f64, <Self::State as State>::Size, <Self::State as State>::Size>
+        + Allocator<f64, <Self::State as State>::VecLength>
+        + Allocator<f64, Self::MeasurementSize, <Self::State as State>::Size>,
 {
     /// Defines the state size of the estimated state
-    type StateSize: DimName;
+    type State: State;
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;
 
@@ -122,9 +125,9 @@ where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, Self::StateSize>
+    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
     where
-        DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
+        DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
 
     /// Returns whether the transmitter and receiver where in line of sight.
     fn visible(&self) -> bool;
@@ -135,9 +138,11 @@ pub trait MeasurementDevice<MsrIn, Msr>
 where
     Self: Sized,
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::StateSize>
+    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>,
+        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
 {
     /// Returns the measurement if the device and generate one, else returns None
     fn measure(&self, input: &MsrIn) -> Option<Msr>;

@@ -52,7 +52,7 @@ pub fn traj_from_csv(
                     Ok(record) => {
                         // Compute the frame
                         this_frame = match &record.frame {
-                            Some(f) => cosm.try_frame(&f)?,
+                            Some(f) => cosm.try_frame(f)?,
                             None => default_frame.unwrap(),
                         };
                         match record.as_state(this_frame) {

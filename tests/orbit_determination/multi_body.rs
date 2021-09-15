@@ -90,7 +90,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -225,7 +225,7 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 

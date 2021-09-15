@@ -100,8 +100,6 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
         prop_est,
         kf,
         all_stations,
-        false,
-        measurements.len(),
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
     );
 
@@ -243,7 +241,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -468,7 +466,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -620,7 +618,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -728,7 +726,7 @@ fn od_tb_ckf_map_covar() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::default_ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.map_covar(dt + prop_time).unwrap();
 
@@ -840,7 +838,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -977,7 +975,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 

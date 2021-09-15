@@ -113,7 +113,7 @@ fn od_robust_test_ekf_realistic() {
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, false, measurements.len(), trig);
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig);
 
     odp.process_measurements(&measurements).unwrap();
     odp.iterate(&measurements, IterationConf::default())
@@ -310,14 +310,7 @@ fn od_robust_ops_test() {
     let mut trig = StdEkfTrigger::new(ekf_msr_trig, 10.0 * TimeUnit::Second);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(
-        prop_est,
-        kf,
-        all_stations_no_noise,
-        false,
-        measurements.len(),
-        trig,
-    );
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations_no_noise, trig);
 
     odp.process_measurements(&measurements).unwrap();
 

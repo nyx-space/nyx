@@ -130,7 +130,7 @@ pub struct ODProcess<
     'a,
     D: Dynamics,
     E: ErrorCtrl,
-    Msr: Measurement<StateSize = <S as State>::Size>,
+    Msr: Measurement<State = S>,
     N: MeasurementDevice<S, Msr>,
     T: EkfTrigger,
     A: DimName,
@@ -143,8 +143,8 @@ pub struct ODProcess<
         + Allocator<f64, <S as State>::VecLength>
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, S::Size>
+        + Allocator<f64, S::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
@@ -164,8 +164,6 @@ pub struct ODProcess<
     pub kf: K,
     /// List of measurement devices used
     pub devices: Vec<N>,
-    /// Whether or not these devices can make simultaneous measurements of the spacecraft
-    pub simultaneous_msr: bool,
     /// Vector of estimates available after a pass
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
@@ -179,7 +177,7 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement<StateSize = <S as State>::Size>,
+        Msr: Measurement<State = S>,
         N: MeasurementDevice<S, Msr>,
         T: EkfTrigger,
         A: DimName,
@@ -190,9 +188,9 @@ where
     D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize>
-        + Allocator<usize, Msr::StateSize, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, S::Size>
+        + Allocator<f64, S::Size>
+        + Allocator<usize, S::Size, S::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>
@@ -211,31 +209,7 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ekf(
-        prop: PropInstance<'a, D, E>,
-        kf: K,
-        devices: Vec<N>,
-        simultaneous_msr: bool,
-        num_expected_msr: usize,
-        trigger: T,
-    ) -> Self {
-        let init_state = prop.state;
-        let mut estimates = Vec::with_capacity(num_expected_msr + 1);
-        estimates.push(kf.previous_estimate().clone());
-        Self {
-            prop,
-            kf,
-            devices,
-            simultaneous_msr,
-            estimates,
-            residuals: Vec::with_capacity(num_expected_msr),
-            ekf_trigger: trigger,
-            init_state,
-            _marker: PhantomData::<A>,
-        }
-    }
-
-    pub fn default_ekf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
+    pub fn ekf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
         let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
@@ -243,7 +217,6 @@ where
             prop,
             kf,
             devices,
-            simultaneous_msr: false,
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
@@ -582,13 +555,6 @@ where
                                     }
                                     Err(e) => return Err(e),
                                 }
-
-                                // If we do not have simultaneous measurements from different devices
-                                // then we don't need to check the visibility from other devices
-                                // if one is in visibility.
-                                if !self.simultaneous_msr {
-                                    break;
-                                }
                             }
                         }
                     }
@@ -693,7 +659,7 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: Measurement<StateSize = <S as State>::Size>,
+        Msr: Measurement<State = S>,
         N: MeasurementDevice<S, Msr>,
         A: DimName,
         S: EstimateFrom<D::StateType>,
@@ -704,8 +670,8 @@ where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>
-        + Allocator<f64, Msr::StateSize>
+        + Allocator<f64, Msr::MeasurementSize, S::Size>
+        + Allocator<f64, S::Size>
         + Allocator<f64, Msr::MeasurementSize, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, Msr::MeasurementSize>
@@ -723,30 +689,7 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ckf(
-        prop: PropInstance<'a, D, E>,
-        kf: K,
-        devices: Vec<N>,
-        simultaneous_msr: bool,
-        num_expected_msr: usize,
-    ) -> Self {
-        let init_state = prop.state;
-        let mut estimates = Vec::with_capacity(num_expected_msr + 1);
-        estimates.push(kf.previous_estimate().clone());
-        Self {
-            prop,
-            kf,
-            devices,
-            simultaneous_msr,
-            estimates,
-            residuals: Vec::with_capacity(num_expected_msr),
-            ekf_trigger: CkfTrigger {},
-            init_state,
-            _marker: PhantomData::<A>,
-        }
-    }
-
-    pub fn default_ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
+    pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
         let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
@@ -754,7 +697,6 @@ where
             prop,
             kf,
             devices,
-            simultaneous_msr: false,
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},

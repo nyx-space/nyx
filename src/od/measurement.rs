@@ -328,7 +328,7 @@ impl StdMeasurement {
 }
 
 impl Measurement for StdMeasurement {
-    type StateSize = U6;
+    type State = Orbit;
     type MeasurementSize = U2;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -424,7 +424,7 @@ impl RangeMsr {
 }
 
 impl Measurement for RangeMsr {
-    type StateSize = U6;
+    type State = Orbit;
     type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -520,7 +520,7 @@ impl DopplerMsr {
 }
 
 impl Measurement for DopplerMsr {
-    type StateSize = U6;
+    type State = Orbit;
     type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate

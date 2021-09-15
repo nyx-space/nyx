@@ -100,7 +100,7 @@ impl<'a> OdpScenario<'a> {
             // Get the measurement generation
             match all_measurements.get(&odp_seq.measurements.to_lowercase()) {
                 None => unimplemented!("{}", &odp_seq.measurements),
-                Some(ref msr) => {
+                Some(msr) => {
                     // Get the IAU Earth frame
                     let iau_earth = cosm.frame("IAU Earth");
                     // Build the stations
@@ -421,7 +421,7 @@ impl<'a> OdpScenario<'a> {
 
         let kf = self.kf;
         let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
-        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), false, 100_000, trig);
+        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), trig);
 
         odp.process_measurements(&sim_measurements)?;
 

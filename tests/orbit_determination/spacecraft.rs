@@ -118,7 +118,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
