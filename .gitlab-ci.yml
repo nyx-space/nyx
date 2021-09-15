@@ -45,7 +45,9 @@ propulsion-integration-tests:
     RUST_BACKTRACE: 1
   retry: 2
   script:
-    - cargo test propulsion --release
+    - cargo test closedloop_single --release -j2
+    - cargo test closedloop_multi --release -j2
+    - cargo test schedule --release -j2
 
 propagation-integration-tests:
   stage: test-resrc-intense
@@ -54,7 +56,11 @@ propagation-integration-tests:
     RUST_BACKTRACE: 1
   retry: 2  # Trajectory generation sometimes messes up
   script:
-    - cargo test propagation --release
+    - cargo test stopcond --release -j2
+    - cargo test stm --release -j2
+    - cargo test events --release -j2
+    - cargo test targeter --release -j2
+    - cargo test trajectory --release -j2
 
 orbit-determination-integration-tests:
   stage: test
