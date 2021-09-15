@@ -33,7 +33,7 @@ fn tgt_sma_from_apo() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -89,7 +89,7 @@ fn tgt_sma_from_peri_fd() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -143,7 +143,7 @@ fn tgt_hd_sma_from_peri() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let mut tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let mut tgt = Targeter::delta_v(&setup, objectives);
     tgt.iterations = 5;
 
     println!("{}", tgt);
@@ -244,7 +244,7 @@ fn tgt_ecc_from_apo() {
     let xf_desired_ecc = 0.4;
 
     let tgt = Targeter::new(
-        Arc::new(&setup),
+        &setup,
         vec![
             Variable {
                 component: Vary::VelocityX,
@@ -314,7 +314,7 @@ fn tgt_ecc_from_peri() {
     let xf_desired_ecc = 0.4;
 
     let tgt = Targeter::new(
-        Arc::new(&setup),
+        &setup,
         vec![
             Variable {
                 component: Vary::VelocityX,
@@ -384,7 +384,7 @@ fn tgt_raan_from_apo() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::RAAN, xf_desired_raan)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -435,7 +435,7 @@ fn tgt_raan_from_peri() {
     let objectives = vec![Objective::new(StateParameter::RAAN, xf_desired_raan)];
 
     let tgt = Targeter::new(
-        Arc::new(&setup),
+        &setup,
         vec![
             Variable {
                 component: Vary::VelocityX,
@@ -505,7 +505,7 @@ fn tgt_aop_from_apo() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::AoP, xf_desired_aop)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -555,7 +555,7 @@ fn tgt_aop_from_peri() {
     // Define the objective
     let objectives = vec![Objective::new(StateParameter::AoP, xf_desired_aop)];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 

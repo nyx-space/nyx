@@ -31,7 +31,7 @@ fn tgt_c3_decl() {
         Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
     ];
 
-    let tgt = Targeter::delta_v(Arc::new(&setup), objectives);
+    let tgt = Targeter::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -83,7 +83,7 @@ fn tgt_sma_ecc() {
     ];
 
     let tgt = Targeter::new(
-        Arc::new(&setup),
+        &setup,
         vec![
             Variable {
                 component: Vary::VelocityX,
@@ -153,7 +153,7 @@ fn tgt_hd_sma_ecc() {
     ];
 
     let tgt = Targeter::new(
-        Arc::new(&setup),
+        &setup,
         vec![
             Variable {
                 component: Vary::VelocityX,

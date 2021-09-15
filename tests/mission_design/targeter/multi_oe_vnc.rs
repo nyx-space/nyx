@@ -31,7 +31,7 @@ fn tgt_vnc_c3_decl() {
         Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
     ];
 
-    let tgt = Targeter::vnc(Arc::new(&setup), objectives);
+    let tgt = Targeter::vnc(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -83,7 +83,7 @@ fn tgt_vnc_sma_ecc() {
     ];
 
     let tgt = Targeter::vnc_with_components(
-        Arc::new(&setup),
+        &setup,
         vec![
             Variable {
                 component: Vary::VelocityX,

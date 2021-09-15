@@ -1,6 +1,6 @@
 [package]
 name = "nyx-space"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 edition = "2018"
 resolver = "2"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]

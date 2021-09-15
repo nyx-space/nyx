@@ -149,7 +149,7 @@ where
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// The propagator setup (kind, stages, etc.)
-    pub prop: Arc<&'a Propagator<'a, D, E>>,
+    pub prop: &'a Propagator<'a, D, E>,
     /// The list of objectives of this targeter
     pub objectives: Vec<Objective>,
     /// An optional frame (and Cosm) to compute the objectives in.
@@ -194,7 +194,7 @@ where
 {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn new(
-        prop: Arc<&'a Propagator<'a, D, E>>,
+        prop: &'a Propagator<'a, D, E>,
         variables: Vec<Variable>,
         objectives: Vec<Objective>,
     ) -> Self {
@@ -210,7 +210,7 @@ where
 
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn in_frame(
-        prop: Arc<&'a Propagator<'a, D, E>>,
+        prop: &'a Propagator<'a, D, E>,
         variables: Vec<Variable>,
         objectives: Vec<Objective>,
         objective_frame: Frame,
@@ -227,7 +227,7 @@ where
     }
 
     /// Create a new Targeter which will apply an impulsive delta-v correction on all components of the VNC frame. By default, max step is 0.5 km/s.
-    pub fn vnc(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
+    pub fn vnc(prop: &'a Propagator<'a, D, E>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
@@ -244,7 +244,7 @@ where
 
     /// Create a new Targeter which will apply an impulsive delta-v correction on the specified components of the VNC frame.
     pub fn vnc_with_components(
-        prop: Arc<&'a Propagator<'a, D, E>>,
+        prop: &'a Propagator<'a, D, E>,
         variables: Vec<Variable>,
         objectives: Vec<Objective>,
     ) -> Self {
@@ -259,7 +259,7 @@ where
     }
 
     /// Create a new Targeter which will apply an impulsive delta-v correction.
-    pub fn delta_v(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
+    pub fn delta_v(prop: &'a Propagator<'a, D, E>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
@@ -275,7 +275,7 @@ where
     }
 
     /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
-    pub fn delta_r(prop: Arc<&'a Propagator<'a, D, E>>, objectives: Vec<Objective>) -> Self {
+    pub fn delta_r(prop: &'a Propagator<'a, D, E>, objectives: Vec<Objective>) -> Self {
         Self {
             prop,
             objectives,
