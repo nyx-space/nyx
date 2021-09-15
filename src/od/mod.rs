@@ -105,7 +105,7 @@ where
 }
 
 /// A trait defining a measurement of size `MeasurementSize`
-pub trait Measurement<S>: TimeTagged
+pub trait Measurement: TimeTagged
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
