@@ -1,0 +1,3 @@
+<?xml version="1.0"?>
+<!DOCTYPE foo SYSTEM "file:./not-a-real-file.xml">
+<foo>bar</foo>

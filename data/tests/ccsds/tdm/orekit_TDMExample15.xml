@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="fdsxml-1.0-master.xsd"
+     id="CCSDS_TDM_VERS" version="1.0">
+  <header>
+    <COMMENT>TDM example created by yyyyy-nnnA Nav Team (NASA/JPL)</COMMENT>
+    <COMMENT>The following are clock offsets, in seconds between the</COMMENT>
+    <COMMENT>clocks at each DSN complex relative to UTC(NIST). The offset</COMMENT>
+    <COMMENT>is a mean of readings using several GPS space vehicles in</COMMENT>
+    <COMMENT>common view. Value is "station clock minus UTC”.</COMMENT>
+    <CREATION_DATE>2005-06-10T15:45:00.000</CREATION_DATE>
+    <ORIGINATOR>NASA/JPL</ORIGINATOR>
+  </header>
+  <body>
+    <segment>
+      <metadata>
+        <COMMENT>Note: SPC10 switched back to Maser1 from Maser2 on 2005-142</COMMENT>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        <START_TIME>2005-05-22T12:00:00.000</START_TIME>
+        <STOP_TIME>2005-05-25T12:00:00.000</STOP_TIME>
+        <PARTICIPANT_1>DSS-10</PARTICIPANT_1>
+        <PARTICIPANT_2>UTC-NIST</PARTICIPANT_2>
+      </metadata>
+      <data>
+        <COMMENT>This is a data comment</COMMENT>
+        <observation>
+          <EPOCH>2005-05-22T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>9.56E-7</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-22T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>6.944E-14</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-23T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>9.62E-7</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-23T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>-2.083E-13</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-24T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>9.44E-7</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-24T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>-2.778E-13</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-25T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>9.2E-7</CLOCK_BIAS>
+        </observation>
+      </data>
+    </segment>
+    <segment>
+      <metadata>
+        <COMMENT>This is a meta-data comment</COMMENT>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        <START_TIME>2005-05-22T12:00:00.000</START_TIME>
+        <STOP_TIME>2005-05-25T12:00:00.000</STOP_TIME>
+        <PARTICIPANT_1>DSS-40</PARTICIPANT_1>
+        <PARTICIPANT_2>UTC-NIST</PARTICIPANT_2>
+      </metadata>
+      <data>
+        <COMMENT>This is a data comment</COMMENT>
+        <observation>
+          <EPOCH>2005-05-22T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-7.4E-7</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-22T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>-3.125E-13</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-23T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-7.67E-7</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-23T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>-1.62E-13</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-24T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-7.81E-7</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-24T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>-4.745E-13</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-25T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-8.22E-7</CLOCK_BIAS>
+        </observation>
+      </data>
+    </segment>
+    <segment>
+      <metadata>
+        <COMMENT>This is a meta-data comment</COMMENT>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        <START_TIME>2005-05-22T12:00:00.000</START_TIME>
+        <STOP_TIME>2005-05-25T12:00:00.000</STOP_TIME>
+        <PARTICIPANT_1>DSS-60</PARTICIPANT_1>
+        <PARTICIPANT_2>UTC-NIST</PARTICIPANT_2>
+      </metadata>
+      <data>
+        <COMMENT>This is a data comment</COMMENT>
+        <observation>
+          <EPOCH>2005-05-22T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-1.782E-6</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-22T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>1.736E-13</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-23T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-1.767E-6</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-23T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>1.157E-14</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-24T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-1.766E-6</CLOCK_BIAS>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-24T12:00:00.000</EPOCH>
+          <CLOCK_DRIFT>8.102E-14</CLOCK_DRIFT>
+        </observation>
+        <observation>
+          <EPOCH>2005-05-25T12:00:00.000</EPOCH>
+          <CLOCK_BIAS>-1.759E-6</CLOCK_BIAS>
+        </observation>
+      </data>
+    </segment>
+  </body>
+</tdm>
