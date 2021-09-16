@@ -74,6 +74,8 @@ pub enum NyxError {
     TargetError(String),
     /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
     UnderdeterminedProblem,
+    /// Returned if CCSDS encountered an error
+    CCSDS(String),
     /// Some custom error for new dynamics
     CustomError(String),
 }

@@ -6,31 +6,26 @@ use yaserde::de::from_str;
 
 #[test]
 fn load_orekit_examples() {
-  let xml = r#"
-    <?xml version="1.0" encoding="UTF-8"?>
-<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:noNamespaceSchemaLocation="fdsxml-1.0-master.xsd"
-     id="CCSDS_TDM_VERS" version="1.0">
-  <header>
-    <COMMENT>TDM example created by yyyyy-nnnA Nav Team (NASA/JPL)</COMMENT>
-    <COMMENT>StarTrek 1-way data, Ka band down</COMMENT>
-    <CREATION_DATE>2005-06-09T20:15:00.000</CREATION_DATE>
-    <ORIGINATOR>NASA/JPL</ORIGINATOR>
-  </header>
-  <body>
-    <segment>
-      <metadata>
-        <COMMENT>This is a meta-data comment</COMMENT>
-        <TRACK_ID>BLAH</TRACK_ID>
-        <TIME_SYSTEM>Tai</TIME_SYSTEM>
-      </metadata>
-    </segment>
-  </body>
-</tdm>
-    "#;
+  use std::fs;
 
   // Then need to movee things around for supper on ground station work
-  let tdm: Tdm = from_str(xml).unwrap();
+  let tdm: Tdm =
+    from_str(&fs::read_to_string("./data/tests/ccsds/tdm/orekit_TDMExample4.xml").unwrap())
+      .unwrap();
 
   print!("{:?}", tdm);
+
+  // Check a few things from the header
+  assert!(!tdm.header.comments().is_empty());
+  assert_eq!(
+    tdm.body.segment[0].metadata.participant(1).unwrap().name,
+    "DSS-24".to_owned()
+  );
+  assert_eq!(
+    tdm.body.segment[0].metadata.participant(2).unwrap().name,
+    "yyyy-nnnA".to_owned()
+  );
+  assert!(
+    (tdm.body.segment[0].metadata.correction_range.unwrap() - 46.7741).abs() < std::f64::EPSILON
+  );
 }
