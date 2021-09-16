@@ -138,13 +138,6 @@ pub struct ForceModel {
 impl ForceModel {}
 
 #[pyclass]
-pub struct Dynamics {
-    pub inner: Arc<dyn DynamicsRs>
-}
-#[pymethods]
-impl Dynamics {}
-
-#[pyclass]
 pub struct OrbitalDynamics
 {
     pub inner: Arc<OrbitalDynamicsRs<'static>>

@@ -1,12 +1,14 @@
 use pyo3::{prelude::*, wrap_pymodule, types::PyType};
 
 use crate::io::gravity::HarmonicsMem as HarmonicsMemRs;
+use crate::io::scenario::ScenarioSerde as ScenarioSerdeRs;
 
 /// nyx_space.io
 #[pymodule]
 fn io(_py: Python, m: &PyModule) -> PyResult<()>
 {
     m.add_wrapped(wrap_pymodule!(gravity))?;
+    m.add_class::<ScenarioSerde>()?;
     Ok(())
 }
 
@@ -37,5 +39,21 @@ impl HarmonicsMem {
     ) -> PyResult<Self>
     {
         Ok(Self { inner: HarmonicsMemRs::from_cof(filepath, degree, order, gunzipped)? })
+    }
+}
+
+#[pyclass]
+pub struct ScenarioSerde
+{
+    pub inner: ScenarioSerdeRs
+}
+
+#[pymethods]
+impl ScenarioSerde {
+    #[classmethod]
+    pub fn from_toml_str(_cls: &PyType, toml_str: &str) -> PyResult<Self> {
+        Ok(Self {
+            inner: toml::from_str(toml_str).unwrap()
+        })
     }
 }

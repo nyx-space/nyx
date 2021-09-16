@@ -1,7 +1,7 @@
 /// This package provides python bindings for the rust crate
 /// [nyx-space](http://gitlab.com/nyx-space/nyx) by building
 /// a native Python extension using [PyO3](https://github.com/pyO3/pyO3)
-use std::sync::Arc;
+
 use pyo3::prelude::*;
 use pyo3::{wrap_pymodule};
 use pyo3::exceptions::PyException;
@@ -16,12 +16,15 @@ mod time;
 use time::PyInit_time;
 mod cosmic;
 use cosmic::PyInit_cosmic;
-mod dynamics;
-use dynamics::PyInit_dynamics;
-mod propagators;
-use propagators::PyInit_propagators;
-mod od;
-use od::PyInit_od;
+mod md;
+use md::PyInit_md;
+
+// mod dynamics;
+// use dynamics::PyInit_dynamics;
+// mod propagators;
+// use propagators::PyInit_propagators;
+// mod od;
+// use od::PyInit_od;
 
 impl std::convert::From<NyxError> for PyErr 
 {
@@ -33,11 +36,12 @@ impl std::convert::From<NyxError> for PyErr
 #[pymodule]
 fn nyx_space(_py: Python, m: &PyModule) -> PyResult<()>
 {
-    m.add_wrapped(wrap_pymodule!(propagators))?;
-    m.add_wrapped(wrap_pymodule!(dynamics))?;
+    // m.add_wrapped(wrap_pymodule!(propagators))?;
+    // m.add_wrapped(wrap_pymodule!(dynamics))?;
     m.add_wrapped(wrap_pymodule!(cosmic))?;
     m.add_wrapped(wrap_pymodule!(time))?;
     m.add_wrapped(wrap_pymodule!(io))?;
+    m.add_wrapped(wrap_pymodule!(md))?;
     m.add_class::<Spacecraft>()?;
     Ok(())
 }
@@ -70,13 +74,6 @@ impl Spacecraft {
                 cr,
                 cd
             )
-        }
-    }
-
-    pub fn state(&self) -> od::State
-    {
-        od::State {
-            inner: Arc::new(self.inner.clone())
         }
     }
 }
