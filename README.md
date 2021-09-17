@@ -62,5 +62,43 @@ Refer to the [showcase](https://nyxspace.com/showcase/).
 
 
 # Python todo
-- Reasonable interface with numpy for state?
-- Have uniform process to deal with all the trait-based interfaces
+
+The "[maturin](https://crates.io/crates/maturin)" python package is used to build the python bindings.
+
+```
+pip install maturin
+```
+
+Build the python bindings using the following command.
+```
+maturin build --cargo-extra-args="--features python"
+```
+
+This creates a wheel file in `./target/wheels/` which can be installed using `pip install <filename.whl>`.
+
+For development mode, the following command may be used that automatically installs the python module
+
+```
+maturin develop --cargo-extra-args="--features python"
+```
+
+## Python code example
+
+This minimal example runs the scenario defined in `data/simple-scenario.toml` using the Python bindings.
+
+```
+from nyx_space import md
+from nyx_space import io
+from nyx_space import cosmic
+
+# Initialize the cosm which stores the ephemeris
+cosm = cosmic.Cosm.de438()
+
+with open('data/simple-scenario.toml', 'r') as f:
+    scen_data = f.read()
+
+scenario = io.ScenarioSerde.from_toml_str(scen_data)
+
+md.MDProcess.execute_all_in_scenario(scenario, cosm)
+
+```

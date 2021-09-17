@@ -49,16 +49,19 @@ rand_pcg = "0.3"
 yaserde = "0.7.0"
 yaserde_derive = "0.7.0"
 
-[features]
-broken-donotuse = []
-
 [profile.dev]
 opt-level = 0
 debug = true
 
+[features]
+default = []
+python = ["pyo3"]
+broken-donotuse = []
+
 [dependencies.pyo3]
 version = "0.13.2"
 features = ["extension-module"]
+optional = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
