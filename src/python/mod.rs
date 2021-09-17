@@ -1,15 +1,13 @@
+use crate::cosmic::Spacecraft as SpacecraftRs;
+use crate::errors::NyxError;
+use pyo3::exceptions::PyException;
 /// This package provides python bindings for the rust crate
 /// [nyx-space](http://gitlab.com/nyx-space/nyx) by building
 /// a native Python extension using [PyO3](https://github.com/pyO3/pyO3)
-
 use pyo3::prelude::*;
-use pyo3::{wrap_pymodule};
-use pyo3::exceptions::PyException;
-use crate::errors::NyxError;
-use crate::cosmic::Spacecraft as SpacecraftRs;
+use pyo3::wrap_pymodule;
 
 /// A Python module implemented in Rust.
-
 mod io;
 use io::PyInit_io;
 mod time;
@@ -26,16 +24,14 @@ use md::PyInit_md;
 // mod od;
 // use od::PyInit_od;
 
-impl std::convert::From<NyxError> for PyErr 
-{
+impl std::convert::From<NyxError> for PyErr {
     fn from(err: NyxError) -> PyErr {
         PyException::new_err(err.to_string())
     }
 }
 
 #[pymodule]
-fn nyx_space(_py: Python, m: &PyModule) -> PyResult<()>
-{
+fn nyx_space(_py: Python, m: &PyModule) -> PyResult<()> {
     // m.add_wrapped(wrap_pymodule!(propagators))?;
     // m.add_wrapped(wrap_pymodule!(dynamics))?;
     m.add_wrapped(wrap_pymodule!(cosmic))?;
@@ -48,7 +44,7 @@ fn nyx_space(_py: Python, m: &PyModule) -> PyResult<()>
 
 #[pyclass]
 pub struct Spacecraft {
-    pub inner: SpacecraftRs
+    pub inner: SpacecraftRs,
 }
 
 #[pymethods]
@@ -61,9 +57,8 @@ impl Spacecraft {
         srp_area_m2: f64,
         drag_area_m2: f64,
         cr: f64,
-        cd: f64
-    ) -> Self
-    {
+        cd: f64,
+    ) -> Self {
         Self {
             inner: SpacecraftRs::new(
                 orbit.inner,
@@ -72,8 +67,8 @@ impl Spacecraft {
                 srp_area_m2,
                 drag_area_m2,
                 cr,
-                cd
-            )
+                cd,
+            ),
         }
     }
 }
