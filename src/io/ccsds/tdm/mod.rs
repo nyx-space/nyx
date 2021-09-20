@@ -69,7 +69,124 @@ pub struct Body {
 pub struct Segment {
     #[yaserde(child)]
     pub metadata: Metadata,
-    // data: Data,
+    #[yaserde(child)]
+    pub data: Data,
+}
+
+#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+pub struct Data {
+    #[yaserde(child, rename = "COMMENT")]
+    comment: Vec<String>,
+    #[yaserde(child, rename = "observation")]
+    observations: Vec<Observation>,
+}
+
+#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[yaserde(flatten)]
+#[allow(non_snake_case)]
+pub struct Observation {
+    #[yaserde(child, rename = "EPOCH")]
+    epoch: String,
+    #[yaserde(child)]
+    ANGLE_1: Option<f64>,
+    #[yaserde(child)]
+    ANGLE_2: Option<f64>,
+    #[yaserde(child)]
+    CARRIER_POWER: Option<f64>,
+    #[yaserde(child)]
+    CLOCK_BIBAS: Option<f64>,
+    #[yaserde(child)]
+    CLOCK_DRIFT: Option<f64>,
+    #[yaserde(child)]
+    COMMENT: Option<String>,
+    #[yaserde(child)]
+    DATA_START: Option<String>,
+    #[yaserde(child)]
+    DATA_END: Option<String>,
+    #[yaserde(child)]
+    DOPLLER_COUNT: Option<f64>,
+    #[yaserde(child)]
+    DOPPLER_INSTANTANEOUS: Option<f64>,
+    #[yaserde(child)]
+    DOPPLER_INTEGRATED: Option<f64>,
+    #[yaserde(child)]
+    DOR: Option<f64>,
+    #[yaserde(child)]
+    MAG: Option<f64>,
+    #[yaserde(child)]
+    PC_N0: Option<f64>,
+    #[yaserde(child)]
+    PR_N0: Option<f64>,
+    #[yaserde(child)]
+    PRESSURE: Option<f64>,
+    #[yaserde(child)]
+    RANGE: Option<f64>,
+    #[yaserde(child)]
+    RCS: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_FREQ_1: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_FREQ_2: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_FREQ_3: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_FREQ_4: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_FREQ_5: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_FREQ: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_PHASE_CT_1: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_PHASE_CT_2: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_PHASE_CT_3: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_PHASE_CT_4: Option<f64>,
+    #[yaserde(child)]
+    RECEIVE_PHASE_CT_5: Option<f64>,
+    #[yaserde(child)]
+    RHUMIDITY: Option<f64>,
+    #[yaserde(child)]
+    STEC: Option<f64>,
+    #[yaserde(child)]
+    TEMPERATURE: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_1: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_2: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_3: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_4: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_5: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_RATE_1: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_RATE_2: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_RATE_3: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_RATE_4: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_FREQ_RATE_5: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_PHASE_CT_1: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_PHASE_CT_2: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_PHASE_CT_3: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_PHASE_CT_4: Option<f64>,
+    #[yaserde(child)]
+    TRANSMIT_PHASE_CT_5: Option<f64>,
+    #[yaserde(child)]
+    TROPO_DRY: Option<f64>,
+    #[yaserde(child)]
+    TROPO_WET: Option<f64>,
+    #[yaserde(child)]
+    VLBI_DELAY: Option<f64>,
 }
 
 #[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]

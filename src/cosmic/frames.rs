@@ -210,11 +210,12 @@ impl fmt::Debug for Frame {
             Frame::Geoid {
                 gm,
                 equatorial_radius,
+                flattening,
                 ..
             } => {
                 write!(
                     f,
-                    "{} {} (μ = {:.06} km^3/s^2 , r = {:.06} km)",
+                    "{} {} (μ = {:.06} km^3/s^2 , r = {:.06} km, f = {:.09})",
                     Bodies::try_from(self.ephem_path()).unwrap().name(),
                     match self.frame_path().len() {
                         0 | 1 => "J2000".to_string(),
@@ -224,6 +225,7 @@ impl fmt::Debug for Frame {
                     },
                     gm,
                     equatorial_radius,
+                    flattening,
                 )
             }
             Frame::VNC => write!(f, "VNC"),
