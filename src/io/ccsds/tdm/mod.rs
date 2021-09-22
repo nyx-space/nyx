@@ -27,9 +27,10 @@ extern crate yaserde;
 extern crate yaserde_derive;
 
 use self::serde_derive::Deserialize;
-use crate::NyxError;
+use crate::{time::Epoch, NyxError};
+use std::convert::TryFrom;
+use std::str::FromStr;
 use yaserde_derive::{YaDeserialize, YaSerialize};
-// use self::serde_with::{CommaSeparator, SpaceSeparator, StringWithSeparator};
 
 #[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
 pub struct Tdm {
@@ -78,115 +79,8 @@ pub struct Data {
     #[yaserde(child, rename = "COMMENT")]
     comment: Vec<String>,
     #[yaserde(child, rename = "observation")]
-    observations: Vec<Observation>,
-}
-
-#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
-#[yaserde(flatten)]
-#[allow(non_snake_case)]
-pub struct Observation {
-    #[yaserde(child, rename = "EPOCH")]
-    epoch: String,
-    #[yaserde(child)]
-    ANGLE_1: Option<f64>,
-    #[yaserde(child)]
-    ANGLE_2: Option<f64>,
-    #[yaserde(child)]
-    CARRIER_POWER: Option<f64>,
-    #[yaserde(child)]
-    CLOCK_BIBAS: Option<f64>,
-    #[yaserde(child)]
-    CLOCK_DRIFT: Option<f64>,
-    #[yaserde(child)]
-    COMMENT: Option<String>,
-    #[yaserde(child)]
-    DATA_START: Option<String>,
-    #[yaserde(child)]
-    DATA_END: Option<String>,
-    #[yaserde(child)]
-    DOPLLER_COUNT: Option<f64>,
-    #[yaserde(child)]
-    DOPPLER_INSTANTANEOUS: Option<f64>,
-    #[yaserde(child)]
-    DOPPLER_INTEGRATED: Option<f64>,
-    #[yaserde(child)]
-    DOR: Option<f64>,
-    #[yaserde(child)]
-    MAG: Option<f64>,
-    #[yaserde(child)]
-    PC_N0: Option<f64>,
-    #[yaserde(child)]
-    PR_N0: Option<f64>,
-    #[yaserde(child)]
-    PRESSURE: Option<f64>,
-    #[yaserde(child)]
-    RANGE: Option<f64>,
-    #[yaserde(child)]
-    RCS: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_FREQ_1: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_FREQ_2: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_FREQ_3: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_FREQ_4: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_FREQ_5: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_FREQ: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_PHASE_CT_1: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_PHASE_CT_2: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_PHASE_CT_3: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_PHASE_CT_4: Option<f64>,
-    #[yaserde(child)]
-    RECEIVE_PHASE_CT_5: Option<f64>,
-    #[yaserde(child)]
-    RHUMIDITY: Option<f64>,
-    #[yaserde(child)]
-    STEC: Option<f64>,
-    #[yaserde(child)]
-    TEMPERATURE: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_1: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_2: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_3: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_4: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_5: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_RATE_1: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_RATE_2: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_RATE_3: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_RATE_4: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_FREQ_RATE_5: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_PHASE_CT_1: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_PHASE_CT_2: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_PHASE_CT_3: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_PHASE_CT_4: Option<f64>,
-    #[yaserde(child)]
-    TRANSMIT_PHASE_CT_5: Option<f64>,
-    #[yaserde(child)]
-    TROPO_DRY: Option<f64>,
-    #[yaserde(child)]
-    TROPO_WET: Option<f64>,
-    #[yaserde(child)]
-    VLBI_DELAY: Option<f64>,
+    pub observations: Vec<TdmObservation>,
+    iter_idx: u32,
 }
 
 #[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
@@ -374,6 +268,26 @@ impl Metadata {
     }
 }
 
+impl Data {
+    pub fn comments(&self) -> String {
+        self.comment.join(" ")
+    }
+}
+
+impl Iterator for Data {
+    type Item = Result<Observation, NyxError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.observations.get(self.iter_idx as usize) {
+            Some(obs) => {
+                self.iter_idx += 1;
+                Some(Observation::try_from(obs))
+            }
+            None => None,
+        }
+    }
+}
+
 pub struct Participant {
     pub name: String,
     pub ephemeris: Option<String>,
@@ -532,5 +446,287 @@ pub enum YesNo {
 impl Default for YesNo {
     fn default() -> Self {
         Self::Yes
+    }
+}
+
+#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[yaserde(flatten)]
+#[allow(non_snake_case)]
+pub struct TdmObservation {
+    #[yaserde(child, rename = "EPOCH")]
+    epoch: String,
+    #[yaserde(child, rename = "ANGLE_1")]
+    angle_1_deg: Option<f64>,
+    #[yaserde(child, rename = "ANGLE_2")]
+    angle_2_deg: Option<f64>,
+    #[yaserde(child, rename = "CARRIER_POWER")]
+    carrier_power_dbw: Option<f64>,
+    #[yaserde(child, rename = "CLOCK_BIAS")]
+    clock_bias_s: Option<f64>,
+    #[yaserde(child, rename = "CLOCK_DRIFT")]
+    clock_drift_ss: Option<f64>,
+    #[yaserde(child, rename = "COMMENT")]
+    comment: Option<String>,
+    #[yaserde(child, rename = "DOPPLER_COUNT")]
+    doppler_count: Option<f64>,
+    #[yaserde(child, rename = "DOPPLER_INSTANTANEOUS")]
+    doppler_instantaneous_kms: Option<f64>,
+    #[yaserde(child, rename = "DOPPLER_INTEGRATED")]
+    doppler_integrated_kms: Option<f64>,
+    #[yaserde(child, rename = "DOR")]
+    dor_s: Option<f64>,
+    #[yaserde(child, rename = "MAG")]
+    mag: Option<f64>,
+    /// Carrier power to noise spectral density ratio
+    #[yaserde(child, rename = "PC_N0")]
+    pc_n0_dbhz: Option<f64>,
+    /// Ranging power to noise spectral density ratio
+    #[yaserde(child, rename = "PR_N0")]
+    pr_n0_dbhz: Option<f64>,
+    #[yaserde(child, rename = "PRESSURE")]
+    pressure_hpa: Option<f64>,
+    /// Range is specified in either km, s, or RU (hence the "xyz" notation for the units)
+    #[yaserde(child, rename = "RANGE")]
+    range_xyz: Option<f64>,
+    /// Radar cross section
+    #[yaserde(child, rename = "RCS")]
+    rcs_m2: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_FREQ_1")]
+    receive_freq_1_hz: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_FREQ_2")]
+    receive_freq_2_hz: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_FREQ_3")]
+    receive_freq_3_hz: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_FREQ_4")]
+    receive_freq_4_hz: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_FREQ_5")]
+    receive_freq_5_hz: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_FREQ")]
+    receive_freq_hz: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_PHASE_CT_1")]
+    receive_phase_ct_1: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_PHASE_CT_2")]
+    receive_phase_ct_2: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_PHASE_CT_3")]
+    receive_phase_ct_3: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_PHASE_CT_4")]
+    receive_phase_ct_4: Option<f64>,
+    #[yaserde(child, rename = "RECEIVE_PHASE_CT_5")]
+    receive_phase_ct_5: Option<f64>,
+    #[yaserde(child, rename = "RHUMIDITY")]
+    rhumidity_prct: Option<f64>,
+    /// Slant Total Electron Count
+    #[yaserde(child, rename = "STEC")]
+    stec_tecu: Option<f64>,
+    #[yaserde(child, rename = "TEMPERATURE")]
+    temperature_k: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_1")]
+    transmit_freq_1_hz: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_2")]
+    transmit_freq_2_hz: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_3")]
+    transmit_freq_3_hz: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_4")]
+    transmit_freq_4_hz: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_5")]
+    transmit_freq_5_hz: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_RATE_1")]
+    transmit_freq_rate_1_hzs: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_RATE_2")]
+    transmit_freq_rate_2_hzs: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_RATE_3")]
+    transmit_freq_rate_3_hzs: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_RATE_4")]
+    transmit_freq_rate_4_hzs: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_FREQ_RATE_5")]
+    transmit_freq_rate_5_hzs: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_PHASE_CT_1")]
+    transmit_phase_ct_1: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_PHASE_CT_2")]
+    transmit_phase_ct_2: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_PHASE_CT_3")]
+    transmit_phase_ct_3: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_PHASE_CT_4")]
+    transmit_phase_ct_4: Option<f64>,
+    #[yaserde(child, rename = "TRANSMIT_PHASE_CT_5")]
+    transmit_phase_ct_5: Option<f64>,
+    /// Dry zenith delay through the  troposphere  measured  at  the  timetag
+    #[yaserde(child, rename = "TROPO_DRY")]
+    tropo_dry_m: Option<f64>,
+    /// Wet zenith delay through the  troposphere  measured  at  the  timetag
+    #[yaserde(child, rename = "TROPO_WET")]
+    tropo_wet_m: Option<f64>,
+    #[yaserde(child, rename = "VLBI_DELAY")]
+    vlbi_delay_s: Option<f64>,
+}
+
+/// A parsed observation value from a TDM
+#[derive(Debug, Copy, Clone, PartialEq)]
+#[allow(non_camel_case_types)]
+pub enum ObservationValue {
+    Angle1_deg(f64),
+    Angle2_deg(f64),
+    CarrierPower_dbw(f64),
+    ClockBias_s(f64),
+    ClockDrift_ss(f64),
+    Comment(f64),
+    DopplerCount(f64),
+    DopplerInstantaneous_kms(f64),
+    DopplerIntegrated_kms(f64),
+    Dor_s(f64),
+    Mag(f64),
+    /// Carrier power to noise spectral density ratio
+    PcN0_dbhz(f64),
+    /// Ranging power to noise spectral density ratio
+    PrN0_dbhz(f64),
+    Pressure_hpa(f64),
+    /// Range is specified in either km, s, or RU (hence the "xyz" notation for the units)
+    Range_xyz(f64),
+    /// Radar cross section
+    Rcs_m2(f64),
+    ReceiveFreq1_hz(f64),
+    ReceiveFreq2_hz(f64),
+    ReceiveFreq3_hz(f64),
+    ReceiveFreq4_hz(f64),
+    ReceiveFreq5_hz(f64),
+    ReceiveFreq_hz(f64),
+    ReceivePhase_ct_1(f64),
+    ReceivePhase_ct_2(f64),
+    ReceivePhase_ct_3(f64),
+    ReceivePhase_ct_4(f64),
+    ReceivePhase_ct_5(f64),
+    Rhumidity_prct(f64),
+    Stec_tecu(f64),
+    /// Slant Total Electron Count
+    Temperature_k(f64),
+    TransmitFreq1_hz(f64),
+    TransmitFreq2_hz(f64),
+    TransmitFreq3_hz(f64),
+    TransmitFreq4_hz(f64),
+    TransmitFreq5_hz(f64),
+    TransmitFreqRate1_hzs(f64),
+    TransmitFreqRate2_hzs(f64),
+    TransmitFreqRate3_hzs(f64),
+    TransmitFreqRate4_hzs(f64),
+    TransmitFreqRate5_hzs(f64),
+    TransmitPhaseCt_1(f64),
+    TransmitPhaseCt_2(f64),
+    TransmitPhaseCt_3(f64),
+    TransmitPhaseCt_4(f64),
+    TransmitPhaseCt_5(f64),
+    TropoDry_m(f64),
+    /// Dry zenith delay through the  troposphere  measured  at  the  timetag
+    TropoWet_m(f64),
+    /// Wet zenith delay through the  troposphere  measured  at  the  timetag
+    VlbiDelay_s(f64),
+}
+
+/// A parsed observation from a TDM, with its epoch and value
+#[derive(Debug)]
+pub struct Observation {
+    pub epoch: Epoch,
+    pub value: ObservationValue,
+}
+
+impl TryFrom<&TdmObservation> for Observation {
+    type Error = NyxError;
+
+    fn try_from(raw_obs: &TdmObservation) -> Result<Self, Self::Error> {
+        let epoch = match Epoch::from_str(&raw_obs.epoch) {
+            Ok(e) => e,
+            Err(_) => return Err(NyxError::CCSDS("Could not decode epoch".to_string())),
+        };
+
+        let value = if raw_obs.angle_1_deg.is_some() {
+            ObservationValue::Angle1_deg(raw_obs.angle_1_deg.unwrap())
+        } else if raw_obs.angle_2_deg.is_some() {
+            ObservationValue::Angle2_deg(raw_obs.angle_2_deg.unwrap())
+        } else if raw_obs.carrier_power_dbw.is_some() {
+            ObservationValue::CarrierPower_dbw(raw_obs.carrier_power_dbw.unwrap())
+        } else if raw_obs.clock_bias_s.is_some() {
+            ObservationValue::ClockBias_s(raw_obs.clock_bias_s.unwrap())
+        } else if raw_obs.clock_drift_ss.is_some() {
+            ObservationValue::ClockDrift_ss(raw_obs.clock_drift_ss.unwrap())
+        } else if raw_obs.doppler_count.is_some() {
+            ObservationValue::DopplerCount(raw_obs.doppler_count.unwrap())
+        } else if raw_obs.doppler_instantaneous_kms.is_some() {
+            ObservationValue::DopplerInstantaneous_kms(raw_obs.doppler_instantaneous_kms.unwrap())
+        } else if raw_obs.doppler_integrated_kms.is_some() {
+            ObservationValue::DopplerIntegrated_kms(raw_obs.doppler_integrated_kms.unwrap())
+        } else if raw_obs.dor_s.is_some() {
+            ObservationValue::Dor_s(raw_obs.dor_s.unwrap())
+        } else if raw_obs.mag.is_some() {
+            ObservationValue::Mag(raw_obs.mag.unwrap())
+        } else if raw_obs.pc_n0_dbhz.is_some() {
+            ObservationValue::PcN0_dbhz(raw_obs.pc_n0_dbhz.unwrap())
+        } else if raw_obs.pr_n0_dbhz.is_some() {
+            ObservationValue::PrN0_dbhz(raw_obs.pr_n0_dbhz.unwrap())
+        } else if raw_obs.pressure_hpa.is_some() {
+            ObservationValue::Pressure_hpa(raw_obs.pressure_hpa.unwrap())
+        } else if raw_obs.range_xyz.is_some() {
+            ObservationValue::Range_xyz(raw_obs.range_xyz.unwrap())
+        } else if raw_obs.rcs_m2.is_some() {
+            ObservationValue::Rcs_m2(raw_obs.rcs_m2.unwrap())
+        } else if raw_obs.receive_freq_1_hz.is_some() {
+            ObservationValue::ReceiveFreq1_hz(raw_obs.receive_freq_1_hz.unwrap())
+        } else if raw_obs.receive_freq_2_hz.is_some() {
+            ObservationValue::ReceiveFreq2_hz(raw_obs.receive_freq_2_hz.unwrap())
+        } else if raw_obs.receive_freq_3_hz.is_some() {
+            ObservationValue::ReceiveFreq3_hz(raw_obs.receive_freq_3_hz.unwrap())
+        } else if raw_obs.receive_freq_4_hz.is_some() {
+            ObservationValue::ReceiveFreq4_hz(raw_obs.receive_freq_4_hz.unwrap())
+        } else if raw_obs.receive_freq_5_hz.is_some() {
+            ObservationValue::ReceiveFreq5_hz(raw_obs.receive_freq_5_hz.unwrap())
+        } else if raw_obs.receive_freq_hz.is_some() {
+            ObservationValue::ReceiveFreq_hz(raw_obs.receive_freq_hz.unwrap())
+        } else if raw_obs.rhumidity_prct.is_some() {
+            ObservationValue::Rhumidity_prct(raw_obs.rhumidity_prct.unwrap())
+        } else if raw_obs.stec_tecu.is_some() {
+            ObservationValue::Stec_tecu(raw_obs.stec_tecu.unwrap())
+        } else if raw_obs.temperature_k.is_some() {
+            ObservationValue::Temperature_k(raw_obs.temperature_k.unwrap())
+        } else if raw_obs.transmit_freq_1_hz.is_some() {
+            ObservationValue::TransmitFreq1_hz(raw_obs.transmit_freq_1_hz.unwrap())
+        } else if raw_obs.transmit_freq_2_hz.is_some() {
+            ObservationValue::TransmitFreq2_hz(raw_obs.transmit_freq_2_hz.unwrap())
+        } else if raw_obs.transmit_freq_3_hz.is_some() {
+            ObservationValue::TransmitFreq3_hz(raw_obs.transmit_freq_3_hz.unwrap())
+        } else if raw_obs.transmit_freq_4_hz.is_some() {
+            ObservationValue::TransmitFreq4_hz(raw_obs.transmit_freq_4_hz.unwrap())
+        } else if raw_obs.transmit_freq_5_hz.is_some() {
+            ObservationValue::TransmitFreq5_hz(raw_obs.transmit_freq_5_hz.unwrap())
+        } else if raw_obs.transmit_phase_ct_1.is_some() {
+            ObservationValue::TransmitPhaseCt_1(raw_obs.transmit_phase_ct_1.unwrap())
+        } else if raw_obs.transmit_phase_ct_2.is_some() {
+            ObservationValue::TransmitPhaseCt_2(raw_obs.transmit_phase_ct_2.unwrap())
+        } else if raw_obs.transmit_phase_ct_3.is_some() {
+            ObservationValue::TransmitPhaseCt_3(raw_obs.transmit_phase_ct_3.unwrap())
+        } else if raw_obs.transmit_phase_ct_4.is_some() {
+            ObservationValue::TransmitPhaseCt_4(raw_obs.transmit_phase_ct_4.unwrap())
+        } else if raw_obs.transmit_phase_ct_5.is_some() {
+            ObservationValue::TransmitPhaseCt_5(raw_obs.transmit_phase_ct_5.unwrap())
+        } else if raw_obs.tropo_dry_m.is_some() {
+            ObservationValue::TropoDry_m(raw_obs.tropo_dry_m.unwrap())
+        } else if raw_obs.tropo_wet_m.is_some() {
+            ObservationValue::TropoWet_m(raw_obs.tropo_wet_m.unwrap())
+        } else if raw_obs.vlbi_delay_s.is_some() {
+            ObservationValue::VlbiDelay_s(raw_obs.vlbi_delay_s.unwrap())
+        } else if raw_obs.transmit_freq_rate_1_hzs.is_some() {
+            ObservationValue::TransmitFreqRate1_hzs(raw_obs.transmit_freq_rate_1_hzs.unwrap())
+        } else if raw_obs.transmit_freq_rate_2_hzs.is_some() {
+            ObservationValue::TransmitFreqRate2_hzs(raw_obs.transmit_freq_rate_2_hzs.unwrap())
+        } else if raw_obs.transmit_freq_rate_3_hzs.is_some() {
+            ObservationValue::TransmitFreqRate3_hzs(raw_obs.transmit_freq_rate_3_hzs.unwrap())
+        } else if raw_obs.transmit_freq_rate_4_hzs.is_some() {
+            ObservationValue::TransmitFreqRate4_hzs(raw_obs.transmit_freq_rate_4_hzs.unwrap())
+        } else if raw_obs.transmit_freq_rate_5_hzs.is_some() {
+            ObservationValue::TransmitFreqRate5_hzs(raw_obs.transmit_freq_rate_5_hzs.unwrap())
+        } else {
+            return Err(NyxError::CCSDS(
+                "No observation value specified".to_string(),
+            ));
+        };
+
+        Ok(Observation { epoch, value })
     }
 }

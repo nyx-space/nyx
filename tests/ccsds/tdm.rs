@@ -1,7 +1,8 @@
 extern crate nyx_space as nyx;
 extern crate yaserde;
 
-use nyx::io::ccsds::tdm::Tdm;
+use nyx::io::ccsds::tdm::{Observation, Tdm};
+use std::convert::TryFrom;
 use yaserde::de::from_str;
 
 #[test]
@@ -12,8 +13,6 @@ fn load_orekit_examples() {
   let tdm: Tdm =
     from_str(&fs::read_to_string("./data/tests/ccsds/tdm/orekit_TDMExample4.xml").unwrap())
       .unwrap();
-
-  print!("{:?}", tdm);
 
   // Check a few things from the header
   assert!(!tdm.header.comments().is_empty());
@@ -28,4 +27,23 @@ fn load_orekit_examples() {
   assert!(
     (tdm.body.segment[0].metadata.correction_range.unwrap() - 46.7741).abs() < std::f64::EPSILON
   );
+
+  // Iterate through the measurements and convert them on the fly
+  for observation in &tdm.body.segment[0].data.observations {
+    let obs = Observation::try_from(observation).unwrap();
+    println!("{:?}", obs);
+  }
+
+  // ALl keywords demo
+  let tdm: Tdm = from_str(
+    &fs::read_to_string("./data/tests/ccsds/tdm/orekit_TDMExampleAllKeywordsSingleDiff.xml")
+      .unwrap(),
+  )
+  .unwrap();
+
+  // Iterate through the measurements and convert them on the fly
+  for observation in &tdm.body.segment[0].data.observations {
+    let obs = Observation::try_from(observation).unwrap();
+    println!("{:?}", obs);
+  }
 }
