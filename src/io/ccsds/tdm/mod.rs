@@ -80,7 +80,6 @@ pub struct Data {
     comment: Vec<String>,
     #[yaserde(child, rename = "observation")]
     pub observations: Vec<TdmObservation>,
-    iter_idx: u32,
 }
 
 #[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
@@ -271,20 +270,6 @@ impl Metadata {
 impl Data {
     pub fn comments(&self) -> String {
         self.comment.join(" ")
-    }
-}
-
-impl Iterator for Data {
-    type Item = Result<Observation, NyxError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.observations.get(self.iter_idx as usize) {
-            Some(obs) => {
-                self.iter_idx += 1;
-                Some(Observation::try_from(obs))
-            }
-            None => None,
-        }
     }
 }
 
@@ -569,7 +554,6 @@ pub enum ObservationValue {
     CarrierPower_dbw(f64),
     ClockBias_s(f64),
     ClockDrift_ss(f64),
-    Comment(f64),
     DopplerCount(f64),
     DopplerInstantaneous_kms(f64),
     DopplerIntegrated_kms(f64),

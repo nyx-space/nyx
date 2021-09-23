@@ -144,7 +144,7 @@ impl<'a> fmt::Display for SpacecraftDynamics<'a> {
 }
 
 impl<'a> Dynamics for SpacecraftDynamics<'a> {
-    type HyperdualSize = Const<9>; // The STM includes Cr and Cd but not the mass (which is assumed constant)
+    type HyperdualSize = Const<9>;
     type StateType = Spacecraft;
 
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {

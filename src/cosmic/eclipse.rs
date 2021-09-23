@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub use super::{Bodies, Cosm, Frame, LTCorr, Orbit, Spacecraft};
+pub use super::{Bodies, Cosm, Frame, LightTimeCalc, Orbit, Spacecraft};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, TimeUnit};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
@@ -279,7 +279,7 @@ pub fn eclipse_state(
             &light_source.ephem_path(),
             observer.dt,
             observer.frame,
-            LTCorr::None,
+            LightTimeCalc::None,
         );
         return line_of_sight(observer, &observed, eclipsing_body, cosm);
     }

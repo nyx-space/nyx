@@ -53,7 +53,7 @@ pub const SUN_GM: f64 = 132_712_440_041.939_38;
 /// Enable or not light time correction for the computation of the celestial states
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
-pub enum LTCorr {
+pub enum LightTimeCalc {
     /// No correction, i.e. assumes instantaneous propagation of photons
     None,
     /// Accounts for light-time correction. This is corresponds to CN in SPICE.
@@ -743,29 +743,34 @@ impl Cosm {
         target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
-        correction: LTCorr,
+        correction: LightTimeCalc,
     ) -> Result<Orbit, NyxError> {
         let target_frame = self.frame_from_ephem_path(target_ephem);
         match correction {
-            LTCorr::None => {
+            LightTimeCalc::None => {
                 let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
-            LTCorr::LightTime | LTCorr::Abberation => {
+            LightTimeCalc::LightTime | LightTimeCalc::Abberation => {
                 // Get the geometric states as seen from SSB
                 let ssb2k = self.frame_root.frame;
 
-                let obs =
-                    self.try_celestial_state(&frame.ephem_path(), datetime, ssb2k, LTCorr::None)?;
+                let obs = self.try_celestial_state(
+                    &frame.ephem_path(),
+                    datetime,
+                    ssb2k,
+                    LightTimeCalc::None,
+                )?;
                 let mut tgt =
-                    self.try_celestial_state(target_ephem, datetime, ssb2k, LTCorr::None)?;
+                    self.try_celestial_state(target_ephem, datetime, ssb2k, LightTimeCalc::None)?;
                 // It will take less than three iterations to converge
                 for _ in 0..3 {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
                     let lt_dt = datetime - lt * TimeUnit::Second;
-                    tgt = self.try_celestial_state(target_ephem, lt_dt, ssb2k, LTCorr::None)?;
+                    tgt =
+                        self.try_celestial_state(target_ephem, lt_dt, ssb2k, LightTimeCalc::None)?;
                 }
                 // Compute the correct state
                 let mut state = Orbit::cartesian(
@@ -788,7 +793,7 @@ impl Cosm {
                 state.vy = tgt.vy * (1.0 - dltdt) - obs.vy;
                 state.vz = tgt.vz * (1.0 - dltdt) - obs.vz;
 
-                if correction == LTCorr::Abberation {
+                if correction == LightTimeCalc::Abberation {
                     // Get a unit vector that points in the direction of the object
                     let r_hat = state.r_hat();
                     // Get the velocity vector (of the observer) scaled with respect to the speed of light
@@ -823,7 +828,7 @@ impl Cosm {
         target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
-        correction: LTCorr,
+        correction: LightTimeCalc,
     ) -> Orbit {
         self.try_celestial_state(target_ephem, datetime, frame, correction)
             .unwrap()
@@ -1069,7 +1074,7 @@ mod tests {
         );
 
         let jde = Epoch::from_jde_et(2_452_312.5);
-        let c = LTCorr::None;
+        let c = LightTimeCalc::None;
 
         let earth_bary2k = cosm.frame("Earth Barycenter J2000");
         let ssb2k = cosm.frame("SSB");
@@ -1247,7 +1252,7 @@ mod tests {
             "Conversion to Sun IAU from Venus J2k requires one rotation"
         );
 
-        let c = LTCorr::None;
+        let c = LightTimeCalc::None;
 
         /*
         # Preceed all of the following python examples with
@@ -1488,7 +1493,7 @@ mod tests {
             Bodies::EarthBarycenter.ephem_path(),
             jde,
             mars2k,
-            LTCorr::LightTime,
+            LightTimeCalc::LightTime,
         );
 
         // Note that the following data comes from SPICE (via spiceypy).
@@ -1514,7 +1519,7 @@ mod tests {
             Bodies::EarthBarycenter.ephem_path(),
             jde,
             mars2k,
-            LTCorr::Abberation,
+            LightTimeCalc::Abberation,
         );
 
         assert!(dbg!(out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
@@ -1536,7 +1541,8 @@ mod tests {
 
         let sun2k = cosm.frame("Sun J2000");
         let sun_iau = cosm.frame("IAU Sun");
-        let ear_sun_2k = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, sun2k, LTCorr::None);
+        let ear_sun_2k =
+            cosm.celestial_state(Bodies::Earth.ephem_path(), jde, sun2k, LightTimeCalc::None);
         let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
         let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
 
@@ -1675,7 +1681,7 @@ mod tests {
             Bodies::Luna.ephem_path(),
             et0,
             cosm.frame("EME2000"),
-            LTCorr::None,
+            LightTimeCalc::None,
         );
         println!("{}", out_state);
         let sp_ex = Vector3::new(341456.50984349, -123580.72487638, -87633.23833676);
@@ -1695,7 +1701,7 @@ mod tests {
             Bodies::Luna.ephem_path(),
             et0,
             cosm.frame("IAU Earth"),
-            LTCorr::None,
+            LightTimeCalc::None,
         );
         println!("{}", out_state);
         let sp_ex = Vector3::new(-7239.63398824, 363242.64460769, -86871.72713248);

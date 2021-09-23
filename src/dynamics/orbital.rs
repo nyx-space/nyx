@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, Dynamics, NyxError};
-use crate::cosmic::{Bodies, Cosm, Frame, LTCorr, Orbit};
+use crate::cosmic::{Bodies, Cosm, Frame, LightTimeCalc, Orbit};
 use crate::dimensions::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::State;
 use std::f64;
@@ -190,17 +190,17 @@ pub struct PointMasses {
     /// Optional point to a Cosm, needed if extra point masses are needed
     pub cosm: Arc<Cosm>,
     /// Light-time correction computation if extra point masses are needed
-    pub correction: LTCorr,
+    pub correction: LightTimeCalc,
 }
 
 impl PointMasses {
     /// Initializes the multibody point mass dynamics with the provided list of bodies
     pub fn new(bodies: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
-        Arc::new(Self::with_correction(bodies, cosm, LTCorr::None))
+        Arc::new(Self::with_correction(bodies, cosm, LightTimeCalc::None))
     }
 
     /// Initializes the multibody point mass dynamics with the provided list of bodies, and accounting for some light time correction
-    pub fn with_correction(bodies: &[Bodies], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
+    pub fn with_correction(bodies: &[Bodies], cosm: Arc<Cosm>, correction: LightTimeCalc) -> Self {
         let mut refs = Vec::with_capacity(bodies.len());
         // Check that these celestial bodies exist and build their references
         for body in bodies {
@@ -215,7 +215,7 @@ impl PointMasses {
     }
 
     /// Allows using bodies by name, defined in the non-default XB
-    pub fn specific(body_names: &[String], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
+    pub fn specific(body_names: &[String], cosm: Arc<Cosm>, correction: LightTimeCalc) -> Self {
         let mut refs = Vec::with_capacity(body_names.len());
         // Check that these celestial bodies exist and build their references
         for body in body_names {
