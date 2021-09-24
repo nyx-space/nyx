@@ -78,40 +78,6 @@ where
     }
 }
 
-/// Anything that can estimate the provided NavState should implement this
-pub struct NavSystem<X, P, S, T>
-where
-    X: State,
-    P: State,
-    T: State,
-    S: NavState<X, P> + EmbedState<T>,
-    DefaultAllocator: Allocator<f64, X::Size>
-        + Allocator<f64, X::VecLength>
-        + Allocator<f64, X::Size, X::Size>
-        + Allocator<f64, P::Size>
-        + Allocator<f64, P::VecLength>
-        + Allocator<f64, P::Size, P::Size>
-        + Allocator<f64, S::Size>
-        + Allocator<f64, S::VecLength>
-        + Allocator<f64, S::Size, S::Size>
-        + Allocator<f64, T::Size>
-        + Allocator<f64, T::VecLength>
-        + Allocator<f64, T::Size, T::Size>,
-{
-    pub state: S,
-    pub sensors: Vec<Arc<dyn NavSensor<T>>>,
-    _x: PhantomData<X>,
-    _p: PhantomData<P>,
-}
-
-pub trait NavSensor<T>
-where
-    T: State,
-    DefaultAllocator:
-        Allocator<f64, T::Size> + Allocator<f64, T::VecLength> + Allocator<f64, T::Size, T::Size>,
-{
-}
-
 /**** End trait definitions ****/
 
 impl EmbedState<Orbit> for Spacecraft {
