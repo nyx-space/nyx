@@ -1,8 +1,8 @@
-use super::measurement::GroundStation;
 use super::rand_pcg::Pcg64Mcg;
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::od::measurement::GroundStation;
+use crate::time::{Duration, Epoch};
 use std::default::Default;
-
+// Should be a scheduler
 /// A structure defining how a ground station is configured for a given tracking pass.
 #[derive(Debug, Clone)]
 pub struct GSSetup {

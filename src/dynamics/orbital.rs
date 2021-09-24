@@ -97,7 +97,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
         state: &OVector<f64, Const<42>>,
         ctx: &Orbit,
     ) -> Result<OVector<f64, Const<42>>, NyxError> {
-        let osc = ctx.ctor_from(delta_t_s, state);
+        let osc = ctx.set_with_delta_seconds(delta_t_s, state);
         let (new_state, new_stm) = if ctx.stm.is_some() {
             let (state, grad) = self.dual_eom(delta_t_s, &osc)?;
 

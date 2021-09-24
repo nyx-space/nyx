@@ -314,16 +314,6 @@ impl fmt::UpperHex for Spacecraft {
     }
 }
 
-impl TimeTagged for Spacecraft {
-    fn epoch(&self) -> Epoch {
-        self.orbit.dt
-    }
-
-    fn set_epoch(&mut self, epoch: Epoch) {
-        self.orbit.dt = epoch
-    }
-}
-
 impl State for Spacecraft {
     type Size = Const<9>;
     type VecLength = Const<90>;
@@ -407,6 +397,14 @@ impl State for Spacecraft {
             Some(stm) => Ok(stm),
             None => Err(NyxError::StateTransitionMatrixUnset),
         }
+    }
+
+    fn epoch(&self) -> Epoch {
+        self.orbit.dt
+    }
+
+    fn set_epoch(&mut self, epoch: Epoch) {
+        self.orbit.dt = epoch
     }
 
     fn add(self, other: OVector<f64, Self::Size>) -> Self {

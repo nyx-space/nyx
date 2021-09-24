@@ -29,7 +29,7 @@ use super::{BPlane, Frame};
 use crate::dimensions::{Const, OVector};
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
-use crate::{NyxError, TimeTagged};
+use crate::NyxError;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
@@ -1350,16 +1350,6 @@ impl Orbit {
     }
 }
 
-impl TimeTagged for Orbit {
-    fn epoch(&self) -> Epoch {
-        self.dt
-    }
-
-    fn set_epoch(&mut self, epoch: Epoch) {
-        self.dt = epoch
-    }
-}
-
 impl PartialEq for Orbit {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
     fn eq(&self, other: &Orbit) -> bool {
@@ -1688,6 +1678,14 @@ impl State for Orbit {
             Some(stm) => Ok(stm),
             None => Err(NyxError::StateTransitionMatrixUnset),
         }
+    }
+
+    fn epoch(&self) -> Epoch {
+        self.dt
+    }
+
+    fn set_epoch(&mut self, epoch: Epoch) {
+        self.dt = epoch
     }
 
     fn add(self, other: OVector<f64, Self::Size>) -> Self {

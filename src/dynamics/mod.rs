@@ -65,6 +65,10 @@ pub use self::drag::*;
 pub mod sph_harmonics;
 pub use self::sph_harmonics::*;
 
+/// Defines the Exponentially Correlated Random Variable dynamics
+// pub mod ecrv;
+// pub use self::ecrv::*;
+
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
 /// Its design is such that several of the provided dynamics can be combined fairly easily. However,

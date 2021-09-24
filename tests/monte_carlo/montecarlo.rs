@@ -9,7 +9,7 @@ use nyx::dynamics::{OrbitalDynamics, PointMasses};
 use nyx::io::gravity::*;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit};
-use nyx::TimeTagged;
+use nyx::State;
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;

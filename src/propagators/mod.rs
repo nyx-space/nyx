@@ -54,7 +54,6 @@ where
     /// This module only supports *implicit* integrators, and as such, `Self.a_coeffs().len()` must be of
     /// size (order+1)*(order)/2.
     /// *Warning:* this RK trait supposes that the implementation is consistent, i.e. c_i = \sum_j a_{ij}.
-    // fn a_coeffs() -> &'static [f64];
     const A_COEFFS: &'static [f64];
     /// Returns a pointer to a list of f64 corresponding to the b_i and b^*_i coefficients of the
     /// Butcher table for that RK. `Self.a_coeffs().len()` must be of size (order+1)*2.

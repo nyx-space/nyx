@@ -23,7 +23,7 @@ use crate::cosmic::Spacecraft;
 use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector3};
 use crate::errors::NyxError;
 
-use crate::{State, TimeTagged};
+use crate::State;
 use std::fmt;
 use std::sync::Arc;
 
@@ -170,7 +170,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         ctx: &Spacecraft,
     ) -> Result<OVector<f64, Const<90>>, NyxError> {
         // Rebuild the osculating state for the EOM context.
-        let osc_sc = ctx.ctor_from(delta_t, state);
+        let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
         let mut d_x = OVector::<f64, Const<90>>::zeros();
 
         if ctx.orbit.stm.is_some() {

@@ -8,7 +8,7 @@ use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, J2000_OFFSET};
-use nyx::TimeTagged;
+use nyx::State;
 
 #[test]
 fn stop_cond_3rd_apo() {

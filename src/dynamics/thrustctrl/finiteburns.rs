@@ -20,7 +20,7 @@ use super::ThrustControl;
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::dimensions::Vector3;
 use crate::time::{Epoch, TimeUnit};
-use crate::TimeTagged;
+use crate::State;
 use std::sync::Arc;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
