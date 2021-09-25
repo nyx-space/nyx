@@ -26,7 +26,7 @@ use crate::errors::NyxError;
 use crate::md::trajectory::Traj;
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeUnit};
-use crate::{State, TimeTagged};
+use crate::State;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;

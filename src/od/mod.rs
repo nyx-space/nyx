@@ -46,7 +46,7 @@ pub mod ui;
 
 /// Provides all of the measurements functionality, including measurement simulation
 pub mod msr;
-pub mod nav;
+
 /// Provides all state noise compensation functionality
 pub mod snc;
 

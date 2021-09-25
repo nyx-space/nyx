@@ -12,8 +12,6 @@ pub mod arc;
 
 pub mod sim;
 
-pub mod sensor;
-
 /*
 
 // How to use
