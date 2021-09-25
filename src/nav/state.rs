@@ -14,9 +14,9 @@ use std::sync::Arc;
 pub trait EmbedState<O: State>
 where
     Self: State,
-    DefaultAllocator: Allocator<f64, <O>::Size>
-        + Allocator<f64, <O>::VecLength>
-        + Allocator<f64, <O>::Size, <O>::Size>
+    DefaultAllocator: Allocator<f64, O::Size>
+        + Allocator<f64, O::VecLength>
+        + Allocator<f64, O::Size, O::Size>
         + Allocator<f64, Self::Size>
         + Allocator<f64, Self::VecLength>
         + Allocator<f64, Self::Size, Self::Size>,
@@ -98,9 +98,9 @@ impl EmbedState<NoParameters> for Orbit {
     fn embed(&mut self, _: NoParameters) {}
 }
 
-pub type OrbitEstimate = Orbit;
+pub type OrbitNavState = Orbit;
 
-impl NavState<Orbit, NoParameters> for OrbitEstimate {}
+impl NavState<Orbit, NoParameters> for OrbitNavState {}
 
 // #[derive(Copy, Clone, Debug, PartialEq)]
 // pub struct NavState<X: State, P: State>

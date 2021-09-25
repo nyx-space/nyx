@@ -65,7 +65,7 @@ impl NavModel<Const<5>, ODEstState, Orbit, ClockBias> {}
 /// A SimulatedNavModel allows the simulation of a navigation model
 /// For example, for a ground station that support simultaneous two way doppler (measurement/obs of size 1) and angles observations (obs of size 2)
 /// in order to estimate a navigation state composed of an Orbit and a ClockBias then an implementation of NavModel would be a structure
-/// that does: `impl NavModel<Const<3>, NavState<Orbit, ClockBias>, Orbit, ClockBias> {}`
+/// that does: `impl SimulatedNavModel<Const<3>, NavState<Orbit, ClockBias>, Orbit, ClockBias> {}`
 pub trait SimulatedNavModel<N, S, X, P, R>
 where
     N: DimName,
