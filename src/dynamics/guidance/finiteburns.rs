@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::ThrustControl;
+use super::GuidanceLaw;
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::dimensions::Vector3;
 use crate::time::{Epoch, TimeUnit};
@@ -69,7 +69,7 @@ impl FiniteBurns {
     }
 }
 
-impl ThrustControl for FiniteBurns {
+impl GuidanceLaw for FiniteBurns {
     fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.

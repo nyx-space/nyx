@@ -155,14 +155,12 @@ impl GroundStation {
 
         let dt = rx.dt;
         // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
-        let tx_gs_frame =
-            Orbit::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
+        let tx_gs_frame = self.to_orbit(dt);
         // Note: we're only looking at the radis so we don't need to apply the transport theorem here.
         let dcm_topo2fixed = tx_gs_frame.dcm_from_traj_frame(Frame::SEZ).unwrap();
 
         // Now, rotate the spacecraft in the SEZ frame to compute its elevation as seen from the ground station.
         // We transpose the DCM so that it's the fixed to topocentric rotation.
-        // WARNING: This is a non inertial frame, so the norm of the vectors are not conserved.
         let rx_sez = rx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
         let tx_sez = tx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
         // Now, let's compute the range ρ.
@@ -173,6 +171,17 @@ impl GroundStation {
 
         // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
         (elevation, *rx, self.cosm.frame_chg(&tx_gs_frame, rx.frame))
+    }
+
+    /// Return this ground station as an orbit in its current frame
+    pub fn to_orbit(&self, epoch: Epoch) -> Orbit {
+        Orbit::from_geodesic(
+            self.latitude,
+            self.longitude,
+            self.height,
+            epoch,
+            self.frame,
+        )
     }
 }
 

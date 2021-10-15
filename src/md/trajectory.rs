@@ -28,7 +28,7 @@ use crate::io::formatter::StateFormatter;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::utils::normalize;
-use crate::{State, TimeTagged};
+use crate::State;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::Iterator;

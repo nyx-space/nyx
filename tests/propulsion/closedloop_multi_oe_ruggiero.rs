@@ -2,7 +2,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
-use self::nyx::dynamics::thrustctrl::{Achieve, Ruggiero, Thruster};
+use self::nyx::dynamics::guidance::{Achieve, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::{Event, StateParameter};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};

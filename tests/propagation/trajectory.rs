@@ -1,11 +1,11 @@
 extern crate nyx_space as nyx;
 
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
-use nyx::dynamics::thrustctrl::{Achieve, Ruggiero, ThrustControl, Thruster};
+use nyx::dynamics::guidance::{Achieve, GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, TimeUnit};
-use nyx::{State, TimeTagged};
+use nyx::State;
 use std::sync::mpsc::channel;
 
 #[allow(clippy::identity_op)]

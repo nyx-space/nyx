@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::guidance::GuidanceLaw;
 use super::orbital::OrbitalDynamics;
-use super::thrustctrl::ThrustControl;
 use super::{Dynamics, ForceModel};
 use crate::cosmic::Spacecraft;
 use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector3};
@@ -36,7 +36,7 @@ const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edi
 pub struct SpacecraftDynamics<'a> {
     pub orbital_dyn: Arc<OrbitalDynamics<'a>>,
     pub force_models: Vec<Arc<dyn ForceModel + 'a>>,
-    pub ctrl: Option<Arc<dyn ThrustControl + 'a>>,
+    pub ctrl: Option<Arc<dyn GuidanceLaw + 'a>>,
     pub decrement_mass: bool,
 }
 
@@ -45,7 +45,7 @@ impl<'a> SpacecraftDynamics<'a> {
     /// By default, the mass of the vehicle will be decremented as propellant is consummed.
     pub fn with_ctrl(
         orbital_dyn: Arc<OrbitalDynamics<'a>>,
-        ctrl: Arc<dyn ThrustControl + 'a>,
+        ctrl: Arc<dyn GuidanceLaw + 'a>,
     ) -> Arc<Self> {
         Arc::new(Self {
             orbital_dyn,
@@ -59,7 +59,7 @@ impl<'a> SpacecraftDynamics<'a> {
     /// Will _not_ decrement the fuel mass as propellant is consummed.
     pub fn with_ctrl_no_decr(
         orbital_dyn: Arc<OrbitalDynamics<'a>>,
-        ctrl: Arc<dyn ThrustControl + 'a>,
+        ctrl: Arc<dyn GuidanceLaw + 'a>,
     ) -> Arc<Self> {
         Arc::new(Self {
             orbital_dyn,

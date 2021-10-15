@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{Orbit, State, TimeTagged};
+use super::{Orbit, State};
 use crate::dimensions::{Const, DimName, Matrix6, OMatrix, OVector};
-use crate::dynamics::thrustctrl::Thruster;
+use crate::dynamics::guidance::Thruster;
 use crate::errors::NyxError;
 use crate::time::Epoch;
 use crate::utils::rss_orbit_errors;

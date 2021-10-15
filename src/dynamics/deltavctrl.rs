@@ -19,7 +19,7 @@
 use crate::cosmic::{Frame, Orbit};
 use crate::dimensions::Vector3;
 
-pub use super::thrustctrl::Mnvr;
+pub use super::guidance::Mnvr;
 
 /// The `DeltaVctrl` trait handles control laws, optimizations, and other such methods for
 /// controlling the change in velocity of a point mass during a mission arc (`MissionArc`).

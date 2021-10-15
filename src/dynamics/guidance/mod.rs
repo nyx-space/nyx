@@ -33,10 +33,10 @@ pub struct Thruster {
     pub isp: f64,
 }
 
-/// The `ThrustControl` trait handles control laws, optimizations, and other such methods for
+/// The `GuidanceLaw` trait handles guidance laws, optimizations, and other such methods for
 /// controlling the overall thrust direction when tied to a `Spacecraft`. For delta V control,
 /// tie the DeltaVctrl to a MissionArc.
-pub trait ThrustControl: Send + Sync {
+pub trait GuidanceLaw: Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
     fn direction(&self, state: &Spacecraft) -> Vector3<f64>;
 

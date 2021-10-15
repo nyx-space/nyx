@@ -47,8 +47,8 @@ pub use self::orbital::*;
 pub mod spacecraft;
 pub use self::spacecraft::*;
 
-/// Defines a few examples of thrust controllers.
-pub mod thrustctrl;
+/// Defines a few examples of guidance laws.
+pub mod guidance;
 
 /// Defines some velocity change controllers.
 pub mod deltavctrl;

@@ -17,8 +17,8 @@
 */
 
 use super::{
-    unit_vector_from_angles, Achieve, Frame, GuidanceMode, NyxError, Orbit, Spacecraft,
-    ThrustControl, Vector3,
+    unit_vector_from_angles, Achieve, Frame, GuidanceLaw, GuidanceMode, NyxError, Orbit,
+    Spacecraft, Vector3,
 };
 use std::f64::consts::FRAC_PI_2 as half_pi;
 use std::sync::Arc;
@@ -64,7 +64,7 @@ impl Ruggiero {
     }
 }
 
-impl ThrustControl for Ruggiero {
+impl GuidanceLaw for Ruggiero {
     /// Returns whether the control law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         for obj in self.objectives.iter().flatten() {
