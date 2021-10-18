@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
 use super::{Dynamics, NyxError};
-use crate::dimensions::{Const, Matrix3, Matrix6, OVector, SVector, Vector3, Vector6};
+use crate::linalg::{Const, Matrix3, Matrix6, OVector, SVector, Vector3, Vector6};
 use crate::State;
 use std::f64;
 use std::fmt;

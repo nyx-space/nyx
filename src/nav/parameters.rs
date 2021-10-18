@@ -1,6 +1,6 @@
 use crate::cosmic::{Orbit, Spacecraft};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{
     Const, DefaultAllocator, DimAdd, DimMul, DimName, DimProd, DimSum, OMatrix, OVector, SVector,
 };
 use crate::time::{Duration, Epoch};

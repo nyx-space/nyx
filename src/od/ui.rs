@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::Traj;
 
 pub use super::estimate::*;

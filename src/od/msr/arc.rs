@@ -1,8 +1,8 @@
 extern crate nalgebra;
 use self::nalgebra::vector;
 use super::{ObservationOf, Observer};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{Const, DefaultAllocator, DimName, OMatrix, SVector};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{Const, DefaultAllocator, DimName, OMatrix, SVector};
 use crate::State;
 use std::marker::PhantomData;
 

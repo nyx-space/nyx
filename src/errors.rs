@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::Spacecraft;
 use std::error::Error;
 use std::fmt;
 
@@ -24,7 +25,8 @@ pub enum NyxError {
     /// STM is singular, check the automatic differentiation function and file a bug
     SingularStateTransitionMatrix,
     /// Fuel exhausted error, try running without fuel depletion, and then adding it.
-    FuelExhausted,
+    /// Parameter is the state at which the fuel has exhaused
+    FuelExhausted(Box<Spacecraft>),
     /// Propagation event not triggered withinin the max propagation time
     ConditionNeverTriggered,
     /// Propagation event not hit enough times (requested, found).
@@ -83,7 +85,7 @@ pub enum NyxError {
 impl fmt::Display for NyxError {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
+        match self {
             Self::SensitivityNotUpdated => write!(
                 f,
                 "The measurement matrix H_tilde was not updated prior to measurement update"
@@ -99,9 +101,10 @@ impl fmt::Display for NyxError {
             Self::SingularCovarianceMatrix => {
                 write!(f, "Covariance is singular, smoothing cannot proceed")
             }
-            Self::FuelExhausted => write!(
+            Self::FuelExhausted(sc) => write!(
                 f,
-                "Spacecraft fuel exhausted, disable fuel depletion and place maneuvers"
+                "Spacecraft fuel exhausted, disable fuel depletion and place maneuvers\n{}",
+                sc
             ),
             Self::ConditionNeverTriggered => write!(
                 f,

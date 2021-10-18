@@ -18,7 +18,7 @@
 
 use super::GuidanceLaw;
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
-use crate::dimensions::Vector3;
+use crate::linalg::Vector3;
 use crate::time::{Epoch, TimeUnit};
 use crate::State;
 use std::sync::Arc;

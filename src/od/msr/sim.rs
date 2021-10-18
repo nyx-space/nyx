@@ -1,8 +1,6 @@
 use super::{ObservationOf, Observer};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{
-    Const, DVector, DefaultAllocator, Dim, DimName, OMatrix, OVector, SVector,
-};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{Const, DVector, DefaultAllocator, Dim, DimName, OMatrix, OVector, SVector};
 use crate::State;
 use std::sync::Arc;
 

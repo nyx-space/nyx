@@ -22,7 +22,7 @@ extern crate num;
 use self::na::Complex;
 use self::num::traits::real::Real;
 use crate::cosmic::Orbit;
-use crate::dimensions::{
+use crate::linalg::{
     allocator::Allocator, DMatrix, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3,
     Vector6,
 };

@@ -18,8 +18,8 @@
 
 use super::StateParameter;
 use crate::cosmic::{Cosm, Frame, Orbit};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::DefaultAllocator;
 use crate::time::{Duration, TimeUnit};
 use crate::utils::between_pm_x;
 use crate::{Spacecraft, State};

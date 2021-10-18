@@ -17,8 +17,8 @@
 */
 
 use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
-use crate::dimensions::Vector3;
 use crate::errors::NyxError;
+use crate::linalg::Vector3;
 
 mod finiteburns;
 pub use finiteburns::{FiniteBurns, Mnvr};

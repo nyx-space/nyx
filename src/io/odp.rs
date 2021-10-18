@@ -19,11 +19,11 @@
 extern crate csv;
 
 pub use crate::cosmic::*;
-use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
+use crate::linalg::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::md::ui::MDProcess;
 use crate::od::measurement::GroundStation;
 use crate::od::ui::snc::SNC3;

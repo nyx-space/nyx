@@ -17,9 +17,9 @@
 */
 
 use crate::cosmic::{Bodies, Cosm, Orbit};
-use crate::dimensions::Vector3;
 use crate::dynamics::orbital::OrbitalDynamics;
 use crate::errors::NyxError;
+use crate::linalg::Vector3;
 use crate::propagators::{PropOpts, Propagator};
 use crate::time::Duration;
 use crate::tools::lambert::{standard, TransferKind};

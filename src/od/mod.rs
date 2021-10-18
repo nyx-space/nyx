@@ -21,9 +21,9 @@ extern crate rand;
 extern crate rand_distr;
 extern crate serde;
 
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::dynamics::{Dynamics, NyxError};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
 pub use crate::{State, TimeTagged};
 

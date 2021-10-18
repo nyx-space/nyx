@@ -19,7 +19,7 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
 use crate::cosmic::{Cosm, Frame, Orbit};
-use crate::dimensions::{DMatrix, Matrix3, Vector3, U7};
+use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
 use crate::io::gravity::GravityPotentialStor;

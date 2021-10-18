@@ -1671,7 +1671,7 @@ mod tests {
     #[test]
     fn test_cosm_rotation_spiceypy_pos_dcm() {
         // These validation tests are from tests/spiceypy/rotations.py
-        use crate::dimensions::{Matrix3, Vector3};
+        use crate::linalg::{Matrix3, Vector3};
         use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
@@ -1780,7 +1780,7 @@ mod tests {
     #[test]
     fn test_cosm_rotation_spiceypy_dcm() {
         // These validation tests are from tests/spiceypy/rotations.py
-        use crate::dimensions::Matrix6;
+        use crate::linalg::Matrix6;
         let cosm = Cosm::de438();
 
         let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);

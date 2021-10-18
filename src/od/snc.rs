@@ -17,8 +17,8 @@
 */
 
 use crate::cosmic::Frame;
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
 use crate::time::{Duration, Epoch};
 
 use std::fmt;

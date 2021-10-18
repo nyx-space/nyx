@@ -1,8 +1,8 @@
 extern crate nyx_space as nyx;
 
 use nyx::cosmic::{Cosm, Orbit, Spacecraft};
-use nyx::dimensions::Vector6;
 use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
+use nyx::linalg::Vector6;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnit};
 use nyx::utils::rss_orbit_vec_errors;

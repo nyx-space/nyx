@@ -18,8 +18,8 @@
 
 use super::ForceModel;
 use crate::cosmic::{Cosm, Frame, Spacecraft};
-use crate::dimensions::{Matrix3, Vector3};
 use crate::errors::NyxError;
+use crate::linalg::{Matrix3, Vector3};
 use std::fmt;
 use std::sync::Arc;
 

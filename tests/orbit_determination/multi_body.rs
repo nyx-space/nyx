@@ -6,7 +6,7 @@ use self::nyx::md::ui::*;
 use self::nyx::od::ui::*;
 
 // Extra testing imports
-use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
+use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::propagators::RK4Fixed;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};

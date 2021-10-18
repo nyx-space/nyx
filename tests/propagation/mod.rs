@@ -13,7 +13,7 @@ fn orbit_finder() {
     extern crate nyx_space as nyx;
     use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
     use nyx::cosmic::{Bodies, Cosm, LightTimeCalc, Orbit};
-    use nyx::dimensions::Vector3;
+    use nyx::linalg::Vector3;
     use nyx::md::ui::*;
     use nyx::od::ui::GroundStation;
     use nyx::time::Epoch;

@@ -18,8 +18,9 @@
 use super::rayon::prelude::*;
 use super::StateParameter;
 pub use super::{Variable, Vary};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DMatrix, DVector, DefaultAllocator, Vector6};
+use crate::cosmic::OrbitPartial;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector6};
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::utils::{are_eigenvalues_stable, pseudo_inverse};
@@ -63,6 +64,20 @@ impl Objective {
             multiplicative_factor: 1.0,
             additive_factor: 0.0,
         }
+    }
+
+    /// Returns whether this objective has been achieve, and the associated parameter error.
+    pub fn assess(&self, achieved: OrbitPartial) -> (bool, f64) {
+        self.assess_raw(achieved.real())
+    }
+
+    /// Returns whether this objective has been achieve, and the associated parameter error.
+    /// Warning: the parameter `achieved` must be in the same unit as the objective.
+    pub fn assess_raw(&self, achieved: f64) -> (bool, f64) {
+        let param_err =
+            self.multiplicative_factor * (self.desired_value - achieved) + self.additive_factor;
+
+        (param_err.abs() > self.tolerance, param_err)
     }
 }
 
@@ -444,10 +459,8 @@ where
 
                 let achieved = partial.real();
 
-                let param_err = obj.multiplicative_factor * (obj.desired_value - achieved)
-                    + obj.additive_factor;
-
-                if param_err.abs() > obj.tolerance {
+                let (ok, param_err) = obj.assess_raw(achieved);
+                if !ok {
                     converged = false;
                 }
                 param_errors.push(param_err);
@@ -726,7 +739,7 @@ where
             // Check linearization
             if !are_eigenvalues_stable(xf.stm().unwrap().complex_eigenvalues()) {
                 warn!(
-                    "STM linearization is broken for the requested time step of {}",
+                    "[!!!] STM linearization is broken for the requested time step of {} [!!!]",
                     achievement_epoch - correction_epoch
                 );
             }
@@ -772,10 +785,8 @@ where
 
                 let achieved = xf_partial.real();
 
-                let param_err = obj.multiplicative_factor * (obj.desired_value - achieved)
-                    + obj.additive_factor;
-
-                if param_err.abs() > obj.tolerance {
+                let (ok, param_err) = obj.assess_raw(achieved);
+                if !ok {
                     converged = false;
                 }
                 param_errors.push(param_err);
@@ -927,8 +938,6 @@ where
 
     /// Apply a correction and propagate to achievement epoch, return the final state and trajectory.
     /// Also checks that the objectives are indeed matched.
-    /// WARNING: This checks that the final objectives are matched with TEN TIMES the initial tolerances
-    /// XXX Check why that is the case.
     pub fn apply_with_traj(
         &self,
         solution: TargeterSolution,

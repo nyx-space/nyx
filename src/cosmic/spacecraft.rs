@@ -17,9 +17,9 @@
 */
 
 use super::{Orbit, State};
-use crate::dimensions::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::dynamics::guidance::Thruster;
 use crate::errors::NyxError;
+use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::time::Epoch;
 use crate::utils::rss_orbit_errors;
 use std::default::Default;
@@ -259,9 +259,9 @@ impl fmt::Display for Spacecraft {
         let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "{}\t{} kg",
-            format!("{:.*}", decimals, self.orbit),
+            "total mass = {}kg  @  {}",
             format!("{:.*}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*}", decimals, self.orbit),
         )
     }
 }
@@ -271,9 +271,9 @@ impl fmt::LowerExp for Spacecraft {
         let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "{}\t{} kg",
-            format!("{:.*e}", decimals, self.orbit),
+            "total mass = {}kg  @  {}",
             format!("{:.*e}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*e}", decimals, self.orbit),
         )
     }
 }
@@ -283,9 +283,9 @@ impl fmt::UpperExp for Spacecraft {
         let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "{}\t{} kg",
-            format!("{:.*E}", decimals, self.orbit),
+            "total mass = {}kg  @  {}",
             format!("{:.*E}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*E}", decimals, self.orbit),
         )
     }
 }
@@ -295,9 +295,9 @@ impl fmt::LowerHex for Spacecraft {
         let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "{}\t{} kg",
-            format!("{:.*x}", decimals, self.orbit),
+            "total mass = {}kg  @  {}",
             format!("{:.*}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*x}", decimals, self.orbit),
         )
     }
 }
@@ -307,9 +307,9 @@ impl fmt::UpperHex for Spacecraft {
         let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "{}\t{} kg",
-            format!("{:.*X}", decimals, self.orbit),
+            "total mass = {}kg  @  {}",
             format!("{:.*e}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*X}", decimals, self.orbit),
         )
     }
 }

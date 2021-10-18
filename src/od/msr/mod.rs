@@ -1,8 +1,8 @@
 extern crate rand_pcg;
 
 // use super::{Measurement, MeasurementDevice};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{Const, DMatrix, DVector, DefaultAllocator, DimName, OMatrix, SVector};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{Const, DMatrix, DVector, DefaultAllocator, DimName, OMatrix, SVector};
 use crate::{time::Epoch, NyxError, State, TimeTagged};
 
 pub mod gs_setup;

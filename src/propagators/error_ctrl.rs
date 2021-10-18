@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OVector, U1, U3};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OVector, U1, U3};
 
 // This determines when to take into consideration the magnitude of the state_delta and
 // prevents dividing by too small of a number.

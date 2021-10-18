@@ -17,7 +17,7 @@
 */
 
 use super::flate2::read::GzDecoder;
-use crate::dimensions::DMatrix;
+use crate::linalg::DMatrix;
 use crate::NyxError;
 use std::fs::File;
 use std::io::prelude::*;

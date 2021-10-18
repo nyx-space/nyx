@@ -23,8 +23,8 @@ extern crate prost;
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
 pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::errors::NyxError;
 use crate::time::{Duration, Epoch, TimeUnit, SECONDS_PER_DAY};
 use std::fmt;
@@ -57,17 +57,27 @@ where
     /// Size of the state and its STM
     type Size: DimName;
     type VecLength: DimName;
+
     /// Initialize an empty state
-    fn zeros() -> Self;
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn zeros() -> Self {
+        unimplemented!()
+    }
 
     /// Return this state as a vector for the propagation/estimation
     fn as_vector(&self) -> Result<OVector<f64, Self::VecLength>, NyxError>;
 
     /// Return this state as a vector for the propagation/estimation
-    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError>;
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError> {
+        unimplemented!()
+    }
 
     /// Return this state as a vector for the propagation/estimation
-    fn reset_stm(&mut self);
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn reset_stm(&mut self) {
+        unimplemented!()
+    }
 
     /// Set this state
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
@@ -89,7 +99,10 @@ where
     /// Set the Epoch
     fn set_epoch(&mut self, epoch: Epoch);
 
-    fn add(self, other: OVector<f64, Self::Size>) -> Self;
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn add(self, _other: OVector<f64, Self::Size>) -> Self {
+        unimplemented!()
+    }
 }
 
 impl XbEpoch {

@@ -17,7 +17,7 @@
 */
 
 use crate::cosmic::{Frame, Orbit};
-use crate::dimensions::Vector3;
+use crate::linalg::Vector3;
 
 pub use super::guidance::Mnvr;
 

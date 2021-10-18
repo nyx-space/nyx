@@ -26,7 +26,7 @@ use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::State;
 use super::{BPlane, Frame};
-use crate::dimensions::{Const, OVector};
+use crate::linalg::{Const, OVector};
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
 use crate::NyxError;

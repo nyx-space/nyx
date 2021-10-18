@@ -72,7 +72,7 @@ pub mod time {
 }
 
 /// Re-export nalgebra
-pub mod dimensions {
+pub mod linalg {
     pub use na::base::*;
 }
 

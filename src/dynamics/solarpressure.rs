@@ -20,8 +20,8 @@ use super::hyperdual::{hyperspace_from_vector, linalg::norm, Float, Hyperdual};
 use super::ForceModel;
 use crate::cosmic::eclipse::EclipseLocator;
 use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
-use crate::dimensions::{Const, Matrix3, Vector3};
 use crate::errors::NyxError;
+use crate::linalg::{Const, Matrix3, Vector3};
 use std::fmt;
 use std::sync::Arc;
 

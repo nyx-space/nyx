@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector, U3};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3};
 
 pub use super::estimate::{Estimate, KfEstimate};
 pub use super::residual::Residual;

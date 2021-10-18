@@ -13,7 +13,7 @@ mod spacecraft;
 mod two_body;
 mod xhat_dev;
 
-use self::nyx::dimensions::{Matrix2, Matrix2x6, Vector2};
+use self::nyx::linalg::{Matrix2, Matrix2x6, Vector2};
 use std::f64::EPSILON;
 
 macro_rules! f64_nil {

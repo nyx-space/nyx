@@ -19,10 +19,10 @@
 use super::crossbeam::thread;
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::{IntegrationDetails, RK, RK89};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, OVector};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::Traj;
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeUnit};

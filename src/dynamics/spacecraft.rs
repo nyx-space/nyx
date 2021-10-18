@@ -20,8 +20,8 @@ use super::guidance::GuidanceLaw;
 use super::orbital::OrbitalDynamics;
 use super::{Dynamics, ForceModel};
 use crate::cosmic::Spacecraft;
-use crate::dimensions::{Const, DimName, OMatrix, OVector, Vector3};
 use crate::errors::NyxError;
+use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 
 use crate::State;
 use std::fmt;
@@ -150,7 +150,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
-            return Err(NyxError::FuelExhausted);
+            return Err(NyxError::FuelExhausted(Box::new(next_state)));
         }
 
         if let Some(ctrl) = &self.ctrl {

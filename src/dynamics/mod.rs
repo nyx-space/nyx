@@ -20,8 +20,8 @@ extern crate hyperdual;
 
 use self::hyperdual::{Hyperdual, Owned};
 use crate::cosmic::{Orbit, Spacecraft};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
 
 use std::fmt;
@@ -105,8 +105,8 @@ where
     /// then the dynamics should prevent initialization with a context which has an STM defined.
     fn dual_eom(
         &self,
-        delta_t: f64,
-        osculating_state: &Self::StateType,
+        _delta_t: f64,
+        _osculating_state: &Self::StateType,
     ) -> Result<
         (
             OVector<f64, <Self::StateType as State>::Size>,
@@ -119,7 +119,10 @@ where
             + Allocator<f64, <Self::StateType as State>::Size>
             + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
             + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
-        Owned<f64, Self::HyperdualSize>: Copy;
+        Owned<f64, Self::HyperdualSize>: Copy,
+    {
+        unimplemented!()
+    }
 
     /// Optionally performs some final changes after each successful integration of the equations of motion.
     /// For example, this can be used to update the GNC mode.
