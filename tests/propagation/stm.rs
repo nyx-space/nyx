@@ -4,7 +4,7 @@ use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::linalg::{Const, Matrix6, OVector};
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeUnit};
-use nyx::{State, TimeTagged};
+use nyx::State;
 use nyx_space::md::ui::SpacecraftDynamics;
 
 // These tests compare the computation of the state transition matrix between the finite differencing methoid (common) and hyperdual numbers.

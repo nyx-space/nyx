@@ -66,18 +66,18 @@ impl Objective {
         }
     }
 
-    /// Returns whether this objective has been achieve, and the associated parameter error.
+    /// Returns whether this objective has been achieved, and the associated parameter error.
     pub fn assess(&self, achieved: OrbitPartial) -> (bool, f64) {
         self.assess_raw(achieved.real())
     }
 
-    /// Returns whether this objective has been achieve, and the associated parameter error.
+    /// Returns whether this objective has been achieved, and the associated parameter error.
     /// Warning: the parameter `achieved` must be in the same unit as the objective.
     pub fn assess_raw(&self, achieved: f64) -> (bool, f64) {
         let param_err =
             self.multiplicative_factor * (self.desired_value - achieved) + self.additive_factor;
 
-        (param_err.abs() > self.tolerance, param_err)
+        (param_err.abs() <= self.tolerance, param_err)
     }
 }
 
