@@ -114,55 +114,60 @@ where
             let mut initial_state = self.x0;
             let mut all_dvs = DVector::from_element(3 * self.nodes.len(), 0.0);
             let mut outer_jacobian =
-                DMatrix::from_element(3 * self.nodes.len(), 3 * (self.nodes.len() - 2), 0.0);
+                DMatrix::from_element(3 * self.nodes.len(), 3 * self.nodes.len(), 0.0);
             // Build the vector of the intermediate nodes, excluding the starting and final positions.
-            let mut node_vector = DVector::from_element(3 * (self.nodes.len() - 2), 0.0);
+            let mut node_vector = DVector::from_element(3 * self.nodes.len(), 0.0);
 
-            for i in 1..self.nodes.len() {
+            // dbg!(&self.nodes);
+
+            for i in 0..self.nodes.len() {
                 // Add the current node info to the node vector
-                node_vector[3 * (i - 1)] = self.nodes[i][0].desired_value;
-                node_vector[3 * (i - 1) + 1] = self.nodes[i][1].desired_value;
-                node_vector[3 * (i - 1) + 2] = self.nodes[i][2].desired_value;
+                node_vector[3 * i] = self.nodes[i][0].desired_value;
+                node_vector[3 * i + 1] = self.nodes[i][1].desired_value;
+                node_vector[3 * i + 2] = self.nodes[i][2].desired_value;
                 // Build the targeter
                 let tgt = Targeter::delta_v(self.prop, self.nodes[i].to_vec());
-                let sol = tgt.try_achieve_from_dual(
-                    initial_state,
-                    initial_state.epoch(),
-                    self.epochs[i],
-                )?;
-                // Store the Δv and the initial state for the next targeter.
-                initial_state = sol.achieved;
+                let sol =
+                    tgt.try_achieve_fd(initial_state, initial_state.epoch(), self.epochs[i])?;
+                // println!("[{}] {} => {}", i, initial_state, sol.achieved);
                 let nominal_delta_v =
                     Vector3::new(sol.correction[0], sol.correction[1], sol.correction[2]);
+                println!("\n{} => {}", i, nominal_delta_v);
 
-                all_dvs[3 * (i - 1)] = nominal_delta_v[0];
-                all_dvs[3 * (i - 1) + 1] = nominal_delta_v[1];
-                all_dvs[3 * (i - 1) + 2] = nominal_delta_v[2];
+                all_dvs[3 * i] = nominal_delta_v[0];
+                all_dvs[3 * i + 1] = nominal_delta_v[1];
+                all_dvs[3 * i + 2] = nominal_delta_v[2];
 
                 // Now, let's perturb the position of each node component to compute the
                 // partial derivative of the delta_v with respect to each component of the node position.
                 for j in 0..3 {
                     let mut next_node = self.nodes[i].to_vec();
                     next_node[j].desired_value += next_node[j].tolerance;
-                    let inner_tgt = Targeter::delta_v(self.prop, self.nodes[i].to_vec());
-                    let inner_sol = inner_tgt.try_achieve_from_dual(
+                    let inner_tgt = Targeter::delta_v(self.prop, next_node.to_vec());
+                    let inner_sol = inner_tgt.try_achieve_fd(
                         initial_state,
                         initial_state.epoch(),
                         self.epochs[i],
                     )?;
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(i - 1 + j, 3 * (i - 1))] =
+                    outer_jacobian[(3 * i + j, 3 * i)] =
                         (inner_sol.correction[0] - nominal_delta_v[0]) / next_node[j].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(i - 1 + j, 3 * (i - 1) + 1)] =
+                    outer_jacobian[(3 * i + j, 3 * i + 1)] =
                         (inner_sol.correction[1] - nominal_delta_v[1]) / next_node[j].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(i - 1 + j, 3 * (i - 1) + 2)] =
+                    outer_jacobian[(3 * i + j, 3 * i + 2)] =
                         (inner_sol.correction[2] - nominal_delta_v[2]) / next_node[j].tolerance;
                 }
+
+                // Store the Δv and the initial state for the next targeter.
+                initial_state = sol.achieved;
             }
+            // println!("{}", outer_jacobian);
+            // println!("node_vector = {}", node_vector);
             // Compute the cost -- used to stop the algorithm if it does not change much.
-            let cost_vec = &outer_jacobian * &node_vector;
+            let cost_vec = all_dvs;
+            // println!("cost_vec = {}", cost_vec);
             let new_cost = match cost {
                 CostFunction::MinimumEnergy => cost_vec.dot(&cost_vec),
                 CostFunction::MinimumFuel => cost_vec.dot(&cost_vec).sqrt(),
@@ -172,7 +177,8 @@ where
                 "new_cost = {:.3}\timprovement = {:.3}",
                 new_cost, cost_improvmt
             );
-            if cost_improvmt < 0.01 {
+            if cost_improvmt.abs() < 0.01 {
+                println!("We're done!");
                 // If the cost does not improve by more than 1%, stop iteration
                 return Ok(());
             }
@@ -180,13 +186,16 @@ where
             prev_cost = new_cost;
 
             // 2. Solve for the next position of the nodes using a pseudo inverse.
-            let delta_r = pseudo_inverse(outer_jacobian, NyxError::SingularJacobian)? * cost_vec;
+            let inv_jac = pseudo_inverse(outer_jacobian, NyxError::SingularJacobian)?;
+            let delta_r = inv_jac * cost_vec;
+            println!("delta_r = {}", delta_r);
 
             // 3. Apply the correction to the node positions and iterator
-            node_vector -= delta_r;
+            node_vector = -delta_r;
             for (i, val) in node_vector.iter().enumerate() {
-                let node_no = i % 3;
-                let component_no = i - node_no;
+                let node_no = i / 3;
+                let component_no = i % 3;
+                // dbg!(node_no, component_no, i);
                 self.nodes[node_no][component_no].desired_value += val;
             }
         }

@@ -754,7 +754,6 @@ where
 
             // Build the error vector
             let mut param_errors = Vec::new();
-            // let mut jac_rows = Vec::new();
             let mut converged = true;
 
             // Build the B-Plane once, if needed, and always in the objective frame

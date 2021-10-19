@@ -7,6 +7,10 @@ use std::str::FromStr;
 
 #[test]
 fn landing_demo() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
     const SITE_LAT_DEG: f64 = -86.798;
     const SITE_LONG_DEG: f64 = -21.150;
     const SITE_HEIGHT_KM: f64 = 0.4;
@@ -68,5 +72,5 @@ fn landing_demo() {
     // And run the multiple shooting algorithm
 
     let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls, 3, &prop).unwrap();
-    opti.solve(CostFunction::MinimumFuel);
+    opti.solve(CostFunction::MinimumEnergy).unwrap();
 }
