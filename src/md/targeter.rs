@@ -86,12 +86,12 @@ impl Objective {
 pub struct TargeterSolution {
     /// The corrected spacecraft state at the correction epoch
     pub state: Spacecraft,
+    /// The state at which the objectives are achieved
+    pub achieved: Spacecraft,
     /// The correction vector applied
     pub correction: DVector<f64>,
     /// The kind of correction (position or velocity)
     pub variables: Vec<Variable>,
-    /// The epoch at which the objectives are achieved
-    pub achievement_epoch: Epoch,
     /// The errors achieved
     pub achieved_errors: Vec<f64>,
     /// The objectives set in the targeter
@@ -559,10 +559,10 @@ where
 
                 let sol = TargeterSolution {
                     state,
+                    achieved: xi_start.with_orbit(xf),
                     correction: total_correction,
                     computation_dur: conv_dur,
                     variables: self.variables.clone(),
-                    achievement_epoch,
                     achieved_errors: param_errors,
                     achieved_objectives: self.objectives.clone(),
                     iterations: it,
@@ -586,7 +586,7 @@ where
             debug!("Jacobian {}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = pseudo_inverse(jac, NyxError::SingularStateTransitionMatrix)?;
+            let jac_inv = pseudo_inverse(jac, NyxError::SingularJacobian)?;
 
             debug!("Inverse Jacobian {}", jac_inv);
 
@@ -842,10 +842,10 @@ where
 
                 let sol = TargeterSolution {
                     state,
+                    achieved: xi_start.with_orbit(xf),
                     correction: total_correction,
                     computation_dur: conv_dur,
                     variables: self.variables.clone(),
-                    achievement_epoch,
                     achieved_errors: param_errors,
                     achieved_objectives: self.objectives.clone(),
                     iterations: it,
@@ -869,7 +869,7 @@ where
             debug!("Jacobian {}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = pseudo_inverse(jac, NyxError::SingularStateTransitionMatrix)?;
+            let jac_inv = pseudo_inverse(jac, NyxError::SingularJacobian)?;
 
             debug!("Inverse Jacobian {}", jac_inv);
 
@@ -946,7 +946,7 @@ where
         let (xf, traj) = self
             .prop
             .with(solution.state)
-            .until_epoch_with_traj(solution.achievement_epoch)?;
+            .until_epoch_with_traj(solution.achieved.epoch())?;
 
         // Build the partials
         let xf_dual = OrbitDual::from(xf.orbit);

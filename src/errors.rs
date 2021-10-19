@@ -43,6 +43,8 @@ pub enum NyxError {
     SingularKalmanGain,
     /// Covariance is singular
     SingularCovarianceMatrix,
+    /// Jacobian of some optimization problem is singular
+    SingularJacobian,
     TargetsTooClose,
     LambertNotReasonablePhi,
     LambertMultiRevNotSupported,
