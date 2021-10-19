@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
+use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
 use crate::errors::NyxError;
 use crate::linalg::Vector3;
 
@@ -31,6 +31,13 @@ pub use ruggiero::Ruggiero;
 pub struct Thruster {
     pub thrust: f64,
     pub isp: f64,
+}
+
+impl Thruster {
+    /// Returns the exhaust velocity v_e in meters per second
+    pub fn exhaust_velocity(&self) -> f64 {
+        self.isp * STD_GRAVITY
+    }
 }
 
 /// The `GuidanceLaw` trait handles guidance laws, optimizations, and other such methods for

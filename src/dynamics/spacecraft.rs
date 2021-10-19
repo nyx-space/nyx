@@ -19,7 +19,7 @@
 use super::guidance::GuidanceLaw;
 use super::orbital::OrbitalDynamics;
 use super::{Dynamics, ForceModel};
-use crate::cosmic::Spacecraft;
+use crate::cosmic::{Spacecraft, STD_GRAVITY};
 use crate::errors::NyxError;
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 
@@ -30,7 +30,6 @@ use std::sync::Arc;
 pub use super::solarpressure::SolarPressure;
 
 const NORM_ERR: f64 = 1e-12;
-const STD_GRAVITY: f64 = 9.80665; // From NIST special publication 330, 2008 edition
 
 #[derive(Clone)]
 pub struct SpacecraftDynamics<'a> {

@@ -23,9 +23,9 @@ extern crate prost;
 pub use self::xb::Xb;
 use self::xb::{Ephemeris, Epoch as XbEpoch};
 pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
+pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
-pub use crate::errors::NyxError;
 use crate::time::{Duration, Epoch, TimeUnit, SECONDS_PER_DAY};
 use std::fmt;
 use std::fs::File;
@@ -311,3 +311,6 @@ pub const SPEED_OF_LIGHT_KMS: f64 = SPEED_OF_LIGHT / 1000.0;
 
 /// Astronomical unit, in kilometers, according to the [IAU](https://www.iau.org/public/themes/measuring/).
 pub const AU: f64 = 149_597_870.700;
+
+/// From NIST special publication 330, 2008 edition, in meters per second squared
+pub const STD_GRAVITY: f64 = 9.80665;
