@@ -1,5 +1,5 @@
 # Validation
-**WARNING:** This document is outdated. Please refer to nyxspae.com for the latest validation information.
+**WARNING:** This document is outdated. Please refer to the [MathSpec on nyxspace.com](https://nyxspace.com/MathSpec/) for the latest validation information.
 
 The validation process ensures that the dynamics are correctly implemented.
 
