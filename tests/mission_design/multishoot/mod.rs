@@ -71,6 +71,6 @@ fn landing_demo() {
 
     // And run the multiple shooting algorithm
 
-    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls, 3, &prop).unwrap();
-    opti.solve(CostFunction::MinimumEnergy).unwrap();
+    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 17, &prop).unwrap();
+    opti.solve(CostFunction::MinimumFuel).unwrap();
 }
