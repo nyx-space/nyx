@@ -17,6 +17,7 @@
 */
 
 pub use super::CostFunction;
+use crate::dynamics::guidance::{FiniteBurns, Mnvr};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector3};
 use crate::md::targeter::{Objective, Targeter};
@@ -222,7 +223,6 @@ where
 
                     /* ***
                      ** 2.D. Compute the difference between the arrival and departure velocities and node i+1
-                     ** NOTE: Disabled for now because I don't see how this makes sense... unless it's back propagated??
                      ** *** */
                     let dv_ip1 = inner_sol_b.achieved.orbit.velocity()
                         - initial_states[i + 1].orbit.velocity();
@@ -249,17 +249,47 @@ where
                 }
             };
             let cost_improvmt = (new_cost - prev_cost) / new_cost.abs();
-            println!(
-                "new_cost = {:.3}\timprovement = {:.3}",
-                new_cost, cost_improvmt
-            );
+            // If the cost does not improve by more than 1%, stop iteration
             if cost_improvmt.abs() < 0.01 {
-                // println!(
-                //     "new_cost = {:.3}\timprovement = {:.3}",
-                //     new_cost, cost_improvmt
-                // );
+                println!(
+                    "new_cost = {:.3}\timprovement = {:.3}",
+                    new_cost, cost_improvmt
+                );
                 println!("We're done!");
-                // If the cost does not improve by more than 1%, stop iteration
+
+                /* ***
+                 ** TEMP FIN -- Check the finite burns work
+                 ** *** */
+                for (i, node) in self.nodes.iter().enumerate() {
+                    // Run the unpertubed targeter
+                    let tgt = Targeter::delta_v(self.prop, node.to_vec());
+                    let sol = tgt.try_achieve_fd(
+                        initial_states[i],
+                        initial_states[i].epoch(),
+                        self.epochs[i],
+                    )?;
+                    // And check that it converged on the proper solution
+                    if i == self.nodes.len() - 1 {
+                        let sc = tgt.apply(sol)?;
+                        let r_miss = (sc.orbit.radius() - self.xf.radius()).norm();
+                        let v_miss = (sc.orbit.velocity() - self.xf.velocity()).norm();
+                        println!(
+                            "\nFINALLY\tr_miss = {:.1} m\tv_miss = {:.1} m/s",
+                            r_miss * 1e3,
+                            v_miss * 1e3
+                        );
+                    }
+                }
+
+                /* ***
+                 ** FIN. Build the FiniteBurn schedule
+                 ** TODO!!
+                 ** *** */
+                // let mut mnvr_vec = Vec::with_capacity(self.nodes.len());
+                // for node in self.nodes {
+                //     mnvr_vec.push();
+                // }
+
                 return Ok(());
             }
 
@@ -282,6 +312,10 @@ where
             for (i, val) in node_vector.iter().enumerate() {
                 let node_no = i / 3;
                 let component_no = i % 3;
+                if node_no == self.nodes.len() - 1 {
+                    // Don't change the xf position
+                    break;
+                }
                 self.nodes[node_no][component_no].desired_value += val;
             }
             self.current_iteration += 1;
@@ -297,6 +331,7 @@ where
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, <D::StateType as State>::Size>,
 {
+    #[allow(clippy::or_fun_call)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut nodemsg = String::from("");
         for (i, node) in self.nodes.iter().enumerate() {

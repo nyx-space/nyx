@@ -57,6 +57,11 @@ fn landing_demo() {
         GuidanceMode::Coast,
     );
     println!("Start: {}", xl1);
+    println!(
+        "Start: |r| = {:.4} km\t|v| = {:.4} km/s",
+        xl1.orbit.rmag(),
+        xl1.orbit.vmag()
+    );
 
     /* *** */
     /* Run the differential corrector for the initial guess of the velocity vector. */
@@ -64,6 +69,10 @@ fn landing_demo() {
     // Convert the landing site into the same frame as the spacecraft and use that as targeting values
     let ls_luna = cosm.frame_chg(&ls, moonj2k);
     println!("LANDING SITE: {}", ls_luna);
+    println!(
+        "LANDING SITE slant angle: φ = {} deg",
+        xl1.orbit.r_hat().dot(&ls_luna.r_hat()).acos().to_degrees()
+    );
 
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
 
