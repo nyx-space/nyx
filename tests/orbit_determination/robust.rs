@@ -3,9 +3,9 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use self::nyx::cosmic::{Bodies, Cosm, Orbit};
-use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
+use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, TimeUnit};

@@ -21,7 +21,7 @@ fn landing_demo() {
     /* Define the landing epoch, landing site, and initial orbit. */
     /* *** */
     // Epoch of passage at zenith
-    let e = Epoch::from_str("2023-11-25T03:02:14.904144287").unwrap();
+    let e = Epoch::from_str("2023-11-25T14:20:00.0").unwrap();
     // Landing site
     let ls = Orbit::from_geodesic(
         SITE_LAT_DEG,
@@ -31,13 +31,13 @@ fn landing_demo() {
         cosm.frame("IAU Moon"),
     );
 
-    let start_orbit = Orbit::keplerian(
-        5873.100000,
-        0.661491,
-        69.327288,
-        176.514124,
-        283.206000,
-        144.089731,
+    let start_orbit = Orbit::cartesian(
+        90.17852649,
+        -36.46422273,
+        -1757.51628437,
+        -1.50058776,
+        -0.82699041,
+        -0.10562691,
         e,
         moonj2k,
     );
@@ -56,30 +56,37 @@ fn landing_demo() {
         thruster,
         GuidanceMode::Coast,
     );
-    println!("Start: {}", xl1);
-    println!(
-        "Start: |r| = {:.4} km\t|v| = {:.4} km/s",
-        xl1.orbit.rmag(),
-        xl1.orbit.vmag()
-    );
 
     /* *** */
     /* Run the differential corrector for the initial guess of the velocity vector. */
     /* *** */
     // Convert the landing site into the same frame as the spacecraft and use that as targeting values
     let ls_luna = cosm.frame_chg(&ls, moonj2k);
-    println!("LANDING SITE: {}", ls_luna);
-    println!(
-        "LANDING SITE slant angle: φ = {} deg",
-        xl1.orbit.r_hat().dot(&ls_luna.r_hat()).acos().to_degrees()
-    );
 
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
 
-    let pdi_start = prop.with(xl1).for_duration(-17 * TimeUnit::Minute).unwrap();
+    let pdi_start = prop.with(xl1).for_duration(-7 * TimeUnit::Minute).unwrap();
+
+    println!("Start: {}", pdi_start);
+    println!(
+        "Start: |r| = {:.4} km\t|v| = {:.4} km/s",
+        pdi_start.orbit.rmag(),
+        pdi_start.orbit.vmag()
+    );
+
+    println!("LANDING SITE: {}", ls_luna);
+    println!(
+        "LANDING SITE slant angle: φ = {} deg",
+        pdi_start
+            .orbit
+            .r_hat()
+            .dot(&ls_luna.r_hat())
+            .acos()
+            .to_degrees()
+    );
 
     // And run the multiple shooting algorithm
 
-    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 17, &prop).unwrap();
+    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 5, &prop).unwrap();
     opti.solve(CostFunction::MinimumFuel).unwrap();
 }

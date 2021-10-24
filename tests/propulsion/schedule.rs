@@ -1,9 +1,9 @@
 extern crate nyx_space as nyx;
 
 use self::nyx::cosmic::{Bodies, Cosm, Frame, GuidanceMode, Orbit, Spacecraft};
-use self::nyx::linalg::Vector3;
 use self::nyx::dynamics::guidance::{FiniteBurns, Mnvr, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
+use self::nyx::linalg::Vector3;
 use self::nyx::propagators::{PropOpts, Propagator};
 use self::nyx::time::{Epoch, TimeUnit};
 use self::nyx::utils::rss_orbit_vec_errors;

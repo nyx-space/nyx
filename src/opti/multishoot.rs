@@ -83,6 +83,7 @@ where
         let mut epochs = Vec::with_capacity(node_count + 1);
         let mut prev_node_radius = x0.orbit.radius();
         let mut prev_node_epoch = x0.epoch();
+
         for _ in 0..node_count {
             // Compute the position we want.
             let this_node = prev_node_radius + distance_increment * direction;
@@ -113,20 +114,21 @@ where
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for _ in 0..self.max_iterations {
             println!("{}", self);
-            /* ***
-             ** 1. Solve a simple differential corrector between each node
-             ** *** */
             let mut initial_states = Vec::with_capacity(self.nodes.len());
             initial_states.push(self.x0);
             let mut outer_jacobian =
-                DMatrix::from_element(3 * (self.nodes.len() - 2), 3 * self.nodes.len(), 0.0);
+                DMatrix::from_element(3 * (self.nodes.len() - 1), 3 * self.nodes.len(), 0.0);
             // Build the vector of the intermediate nodes, excluding the starting and final positions.
-            let mut node_vector = DVector::from_element(3 * (self.nodes.len() - 2), 0.0);
+            let mut node_vector = DVector::from_element(3 * (self.nodes.len() - 1), 0.0);
             let mut cost_vec = DVector::from_element(3 * (self.nodes.len() - 1), 0.0);
-            let mut cost_vec_jac = DVector::from_element(3 * (self.nodes.len() - 2), 0.0);
+
+            // Reset the all_dvs
+            self.all_dvs = Vec::with_capacity(self.all_dvs.len());
 
             for i in 0..self.nodes.len() {
-                // Run the unpertubed targeter
+                /* ***
+                 ** 1. Solve the delta-v differential corrector between each node
+                 ** *** */
                 let tgt = Targeter::delta_v(self.prop, self.nodes[i].to_vec());
                 let sol = tgt.try_achieve_fd(
                     initial_states[i],
@@ -136,34 +138,25 @@ where
 
                 let nominal_delta_v =
                     Vector3::new(sol.correction[0], sol.correction[1], sol.correction[2]);
-                // println!("{} => {:.3e} km/s", i, nominal_delta_v.norm());
 
                 self.all_dvs.push(nominal_delta_v);
                 // Store the Δv and the initial state for the next targeter.
                 initial_states.push(sol.achieved);
             }
+            // NOTE: We have two separate loops because we need the initial state of node i+2 for the dv computation
+            // of the third entry to the outer jacobian.
+            for i in 0..(self.nodes.len() - 2) {
+                // Add the nominal node info to the node vector
+                node_vector[3 * i] = self.nodes[i][0].desired_value;
+                node_vector[3 * i + 1] = self.nodes[i][1].desired_value;
+                node_vector[3 * i + 2] = self.nodes[i][2].desired_value;
 
-            for j in 0..3 {
-                cost_vec[j] = self.all_dvs[0][j];
-            }
-
-            /* ***
-             ** 2. Perturb each node and compute the partial of the Δv for the (i-1), i, and (i+1) nodes
-             ** where the partial on the i+1 -th node is just the difference between the velocity at the
-             ** achieved state and the initial state at that node.
-             ** *** */
-            for i in 1..(self.nodes.len() - 1) {
-                // Add the current node info to the node vector
-                node_vector[3 * (i - 1)] = self.nodes[i][0].desired_value;
-                node_vector[3 * (i - 1) + 1] = self.nodes[i][1].desired_value;
-                node_vector[3 * (i - 1) + 2] = self.nodes[i][2].desired_value;
-
-                let idx = i - 1;
-
-                for j in 0..3 {
-                    cost_vec_jac[3 * idx + j] = self.all_dvs[i][j];
-                    cost_vec[3 * i + j] = self.all_dvs[i][j];
-                }
+                /* ***
+                 ** 2. Perturb each node and compute the partial of the Δv for the (i-1), i, and (i+1) nodes
+                 ** where the partial on the i+1 -th node is just the difference between the velocity at the
+                 ** achieved state and the initial state at that node.
+                 ** We don't perturb the endpoint node
+                 ** *** */
 
                 for axis in 0..3 {
                     /* ***
@@ -185,20 +178,20 @@ where
                     )?;
 
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * idx)] = (inner_sol_a.correction[0]
+                    outer_jacobian[(3 * i + axis, 3 * i)] = (inner_sol_a.correction[0]
                         - self.all_dvs[i][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * idx + 1)] = (inner_sol_a.correction[1]
+                    outer_jacobian[(3 * i + axis, 3 * i + 1)] = (inner_sol_a.correction[1]
                         - self.all_dvs[i][1])
                         / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * idx + 2)] = (inner_sol_a.correction[2]
+                    outer_jacobian[(3 * i + axis, 3 * i + 2)] = (inner_sol_a.correction[2]
                         - self.all_dvs[i][2])
                         / next_node[axis].tolerance;
 
                     /* ***
-                     ** 2.C. Rerun the targeter from the new state at the perturbed node to the next node
+                     ** 2.C. Rerun the targeter from the new state at the perturbed node to the next unpertubed node
                      ** *** */
                     let inner_tgt_b = Targeter::delta_v(self.prop, self.nodes[i + 1].to_vec());
                     let inner_sol_b = inner_tgt_b.try_achieve_fd(
@@ -209,38 +202,44 @@ where
 
                     // Compute the partials wrt the next Δv
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * (idx + 1))] = (inner_sol_b.correction[0]
-                        - self.all_dvs[i][0])
+                    outer_jacobian[(3 * i + axis, 3 * (i + 1))] = (inner_sol_b.correction[0]
+                        - self.all_dvs[i + 1][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * (idx + 1) + 1)] =
-                        (inner_sol_b.correction[1] - self.all_dvs[i][1])
-                            / next_node[axis].tolerance;
+                    outer_jacobian[(3 * i + axis, 3 * (i + 1) + 1)] = (inner_sol_b.correction[1]
+                        - self.all_dvs[i + 1][1])
+                        / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * (idx + 1) + 2)] =
-                        (inner_sol_b.correction[2] - self.all_dvs[i][2])
-                            / next_node[axis].tolerance;
+                    outer_jacobian[(3 * i + axis, 3 * (i + 1) + 2)] = (inner_sol_b.correction[2]
+                        - self.all_dvs[i + 1][2])
+                        / next_node[axis].tolerance;
 
                     /* ***
                      ** 2.D. Compute the difference between the arrival and departure velocities and node i+1
                      ** *** */
-                    let dv_ip1 = inner_sol_b.achieved.orbit.velocity()
-                        - initial_states[i + 1].orbit.velocity();
-
-                    // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * (idx + 2))] =
-                        dv_ip1[0] / next_node[axis].tolerance;
-                    // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * (idx + 2) + 1)] =
-                        dv_ip1[1] / next_node[axis].tolerance;
-                    // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * idx + axis, 3 * (idx + 2) + 2)] =
-                        dv_ip1[2] / next_node[axis].tolerance;
+                    if i < self.nodes.len() - 2 {
+                        let dv_ip1 = inner_sol_b.achieved.orbit.velocity()
+                            - initial_states[i + 2].orbit.velocity();
+                        // ∂Δv_x / ∂r_x
+                        outer_jacobian[(3 * i + axis, 3 * (i + 2))] =
+                            dv_ip1[0] / next_node[axis].tolerance;
+                        // ∂Δv_y / ∂r_x
+                        outer_jacobian[(3 * i + axis, 3 * (i + 2) + 1)] =
+                            dv_ip1[1] / next_node[axis].tolerance;
+                        // ∂Δv_z / ∂r_x
+                        outer_jacobian[(3 * i + axis, 3 * (i + 2) + 2)] =
+                            dv_ip1[2] / next_node[axis].tolerance;
+                    }
                 }
             }
 
-            // println!("{:.1e}", outer_jacobian);
-            // println!("node_vector = {}", node_vector);
+            // Build the cost vector
+            for i in 0..(self.nodes.len() - 1) {
+                for j in 0..3 {
+                    cost_vec[3 * i + j] = self.all_dvs[i][j];
+                }
+            }
+
             // Compute the cost -- used to stop the algorithm if it does not change much.
             let new_cost = match cost {
                 CostFunction::MinimumEnergy => cost_vec.dot(&cost_vec) + self.all_dvs[0].norm(),
@@ -248,13 +247,14 @@ where
                     cost_vec.dot(&cost_vec).sqrt() + self.all_dvs[0].norm().sqrt()
                 }
             };
-            let cost_improvmt = (new_cost - prev_cost) / new_cost.abs();
+            // If the new cost is greater than the previous one, then the cost improvement is negative.
+            let cost_improvmt = (prev_cost - new_cost) / new_cost.abs();
             // If the cost does not improve by more than 1%, stop iteration
+            println!(
+                "new_cost = {:.3}\timprovement = {:.3}",
+                new_cost, cost_improvmt
+            );
             if cost_improvmt.abs() < 0.01 {
-                println!(
-                    "new_cost = {:.3}\timprovement = {:.3}",
-                    new_cost, cost_improvmt
-                );
                 println!("We're done!");
 
                 /* ***
@@ -294,26 +294,19 @@ where
             }
 
             prev_cost = new_cost;
-
+            println!("outer_jacobian {:.3e}", outer_jacobian);
             // 2. Solve for the next position of the nodes using a pseudo inverse.
             let inv_jac = pseudo_inverse(outer_jacobian, NyxError::SingularJacobian)?;
-            // println!("inv_jac = {}x{}", inv_jac.nrows(), inv_jac.ncols());
-            // println!(
-            //     "cost = {}\nslice={}",
-            //     cost_vec,
-            //     cost_vec.slice((3, 0), (3 * (self.nodes.len() - 2), 1))
-            // );
-            let delta_r = inv_jac * cost_vec_jac;
-            // println!("delta_r = {}x{}", delta_r.nrows(), delta_r.ncols());
-            // println!("delta_r = {:.3e}", delta_r);
-
+            let delta_r = inv_jac * cost_vec;
             // 3. Apply the correction to the node positions and iterator
             node_vector = -delta_r;
+            println!("node_vector {:.3}", node_vector);
             for (i, val) in node_vector.iter().enumerate() {
                 let node_no = i / 3;
                 let component_no = i % 3;
                 if node_no == self.nodes.len() - 1 {
                     // Don't change the xf position
+                    println!("TRIGGERD");
                     break;
                 }
                 self.nodes[node_no][component_no].desired_value += val;
@@ -335,17 +328,20 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut nodemsg = String::from("");
         for (i, node) in self.nodes.iter().enumerate() {
+            let dv = match self.all_dvs.get(i) {
+                Some(dv) => dv.clone(),
+                None => Vector3::zeros(),
+            };
             nodemsg.push_str(&format!(
-                "[{:.3}, {:.3}, {:.3}, {}, {}, {}],\n",
+                "[{:.3}, {:.3}, {:.3}, {}, {}, {}, {}, {}, {}],\n",
                 node[0].desired_value,
                 node[1].desired_value,
                 node[2].desired_value,
                 self.current_iteration,
-                self.all_dvs
-                    .get(i)
-                    .or(Some(&Vector3::zeros()))
-                    .unwrap()
-                    .norm(),
+                dv[0],
+                dv[1],
+                dv[2],
+                dv.norm(),
                 i
             ));
         }
