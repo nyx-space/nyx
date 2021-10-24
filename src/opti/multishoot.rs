@@ -117,10 +117,10 @@ where
             let mut initial_states = Vec::with_capacity(self.nodes.len());
             initial_states.push(self.x0);
             let mut outer_jacobian =
-                DMatrix::from_element(3 * (self.nodes.len() - 1), 3 * self.nodes.len(), 0.0);
+                DMatrix::from_element(3 * self.nodes.len(), 3 * (self.nodes.len() - 1), 0.0);
             // Build the vector of the intermediate nodes, excluding the starting and final positions.
             let mut node_vector = DVector::from_element(3 * (self.nodes.len() - 1), 0.0);
-            let mut cost_vec = DVector::from_element(3 * (self.nodes.len() - 1), 0.0);
+            let mut cost_vec = DVector::from_element(3 * self.nodes.len(), 0.0);
 
             // Reset the all_dvs
             self.all_dvs = Vec::with_capacity(self.all_dvs.len());
@@ -145,7 +145,7 @@ where
             }
             // NOTE: We have two separate loops because we need the initial state of node i+2 for the dv computation
             // of the third entry to the outer jacobian.
-            for i in 0..(self.nodes.len() - 2) {
+            for i in 0..(self.nodes.len() - 1) {
                 // Add the nominal node info to the node vector
                 node_vector[3 * i] = self.nodes[i][0].desired_value;
                 node_vector[3 * i + 1] = self.nodes[i][1].desired_value;
@@ -178,15 +178,15 @@ where
                     )?;
 
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * i + axis, 3 * i)] = (inner_sol_a.correction[0]
+                    outer_jacobian[(3 * i, 3 * i + axis)] = (inner_sol_a.correction[0]
                         - self.all_dvs[i][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * i + axis, 3 * i + 1)] = (inner_sol_a.correction[1]
+                    outer_jacobian[(3 * i + 1, 3 * i + axis)] = (inner_sol_a.correction[1]
                         - self.all_dvs[i][1])
                         / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * i + axis, 3 * i + 2)] = (inner_sol_a.correction[2]
+                    outer_jacobian[(3 * i + 2, 3 * i + axis)] = (inner_sol_a.correction[2]
                         - self.all_dvs[i][2])
                         / next_node[axis].tolerance;
 
@@ -202,39 +202,39 @@ where
 
                     // Compute the partials wrt the next Δv
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * i + axis, 3 * (i + 1))] = (inner_sol_b.correction[0]
+                    outer_jacobian[(3 * (i + 1), 3 * i + axis)] = (inner_sol_b.correction[0]
                         - self.all_dvs[i + 1][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * i + axis, 3 * (i + 1) + 1)] = (inner_sol_b.correction[1]
+                    outer_jacobian[(3 * (i + 1) + 1, 3 * i + axis)] = (inner_sol_b.correction[1]
                         - self.all_dvs[i + 1][1])
                         / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * i + axis, 3 * (i + 1) + 2)] = (inner_sol_b.correction[2]
+                    outer_jacobian[(3 * (i + 1) + 2, 3 * i + axis)] = (inner_sol_b.correction[2]
                         - self.all_dvs[i + 1][2])
                         / next_node[axis].tolerance;
 
                     /* ***
                      ** 2.D. Compute the difference between the arrival and departure velocities and node i+1
                      ** *** */
-                    if i < self.nodes.len() - 2 {
+                    if i < self.nodes.len() - 3 {
                         let dv_ip1 = inner_sol_b.achieved.orbit.velocity()
                             - initial_states[i + 2].orbit.velocity();
                         // ∂Δv_x / ∂r_x
-                        outer_jacobian[(3 * i + axis, 3 * (i + 2))] =
+                        outer_jacobian[(3 * (i + 2), 3 * i + axis)] =
                             dv_ip1[0] / next_node[axis].tolerance;
                         // ∂Δv_y / ∂r_x
-                        outer_jacobian[(3 * i + axis, 3 * (i + 2) + 1)] =
+                        outer_jacobian[(3 * (i + 2) + 1, 3 * i + axis)] =
                             dv_ip1[1] / next_node[axis].tolerance;
                         // ∂Δv_z / ∂r_x
-                        outer_jacobian[(3 * i + axis, 3 * (i + 2) + 2)] =
+                        outer_jacobian[(3 * (i + 2) + 2, 3 * i + axis)] =
                             dv_ip1[2] / next_node[axis].tolerance;
                     }
                 }
             }
 
             // Build the cost vector
-            for i in 0..(self.nodes.len() - 1) {
+            for i in 0..self.nodes.len() {
                 for j in 0..3 {
                     cost_vec[3 * i + j] = self.all_dvs[i][j];
                 }
@@ -242,11 +242,15 @@ where
 
             // Compute the cost -- used to stop the algorithm if it does not change much.
             let new_cost = match cost {
-                CostFunction::MinimumEnergy => cost_vec.dot(&cost_vec) + self.all_dvs[0].norm(),
-                CostFunction::MinimumFuel => {
-                    cost_vec.dot(&cost_vec).sqrt() + self.all_dvs[0].norm().sqrt()
-                }
+                CostFunction::MinimumEnergy => cost_vec.dot(&cost_vec),
+                CostFunction::MinimumFuel => cost_vec.dot(&cost_vec).sqrt(),
             };
+
+            println!("node_vector = {}", node_vector);
+
+            let dv_prime = &outer_jacobian * node_vector - &cost_vec;
+            println!("dv_prime {}", dv_prime);
+
             // If the new cost is greater than the previous one, then the cost improvement is negative.
             let cost_improvmt = (prev_cost - new_cost) / new_cost.abs();
             // If the cost does not improve by more than 1%, stop iteration
