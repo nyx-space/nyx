@@ -14,6 +14,7 @@ fn landing_demo() {
     const SITE_LAT_DEG: f64 = -86.798;
     const SITE_LONG_DEG: f64 = -21.150;
     const SITE_HEIGHT_KM: f64 = 0.4;
+    const ALTITUDE_BUFFER_KM: f64 = 0.2; // Add 200 meters of buffer
     let cosm = Cosm::de438_gmat();
     let moonj2k = cosm.frame("Luna");
 
@@ -26,7 +27,7 @@ fn landing_demo() {
     let ls = Orbit::from_geodesic(
         SITE_LAT_DEG,
         SITE_LONG_DEG,
-        SITE_HEIGHT_KM,
+        SITE_HEIGHT_KM + ALTITUDE_BUFFER_KM,
         e,
         cosm.frame("IAU Moon"),
     );
@@ -86,7 +87,6 @@ fn landing_demo() {
     );
 
     // And run the multiple shooting algorithm
-
-    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 5, &prop).unwrap();
+    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 7 * 30, &prop).unwrap();
     opti.solve(CostFunction::MinimumFuel).unwrap();
 }

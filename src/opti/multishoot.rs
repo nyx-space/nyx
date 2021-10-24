@@ -17,7 +17,7 @@
 */
 
 pub use super::CostFunction;
-use crate::dynamics::guidance::{FiniteBurns, Mnvr};
+// use crate::dynamics::guidance::{FiniteBurns, Mnvr};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector3};
 use crate::md::targeter::{Objective, Targeter};
@@ -246,19 +246,14 @@ where
                 CostFunction::MinimumFuel => cost_vec.dot(&cost_vec).sqrt(),
             };
 
-            println!("node_vector = {}", node_vector);
-
-            let dv_prime = &outer_jacobian * node_vector - &cost_vec;
-            println!("dv_prime {}", dv_prime);
-
             // If the new cost is greater than the previous one, then the cost improvement is negative.
             let cost_improvmt = (prev_cost - new_cost) / new_cost.abs();
             // If the cost does not improve by more than 1%, stop iteration
-            println!(
-                "new_cost = {:.3}\timprovement = {:.3}",
-                new_cost, cost_improvmt
-            );
             if cost_improvmt.abs() < 0.01 {
+                println!(
+                    "new_cost = {:.3}\timprovement = {:.3}",
+                    new_cost, cost_improvmt
+                );
                 println!("We're done!");
 
                 /* ***
@@ -298,21 +293,14 @@ where
             }
 
             prev_cost = new_cost;
-            println!("outer_jacobian {:.3e}", outer_jacobian);
             // 2. Solve for the next position of the nodes using a pseudo inverse.
             let inv_jac = pseudo_inverse(outer_jacobian, NyxError::SingularJacobian)?;
             let delta_r = inv_jac * cost_vec;
             // 3. Apply the correction to the node positions and iterator
             node_vector = -delta_r;
-            println!("node_vector {:.3}", node_vector);
             for (i, val) in node_vector.iter().enumerate() {
                 let node_no = i / 3;
                 let component_no = i % 3;
-                if node_no == self.nodes.len() - 1 {
-                    // Don't change the xf position
-                    println!("TRIGGERD");
-                    break;
-                }
                 self.nodes[node_no][component_no].desired_value += val;
             }
             self.current_iteration += 1;
@@ -328,9 +316,23 @@ where
         + Allocator<f64, <D::StateType as State>::VecLength>
         + Allocator<f64, <D::StateType as State>::Size>,
 {
-    #[allow(clippy::or_fun_call)]
+    #[allow(clippy::or_fun_call, clippy::clone_on_copy)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut nodemsg = String::from("");
+        // Add the starting point too
+        nodemsg.push_str(&format!(
+            "[{:.3}, {:.3}, {:.3}, {}, {}, {}, {}, {}, {}],\n",
+            self.x0.orbit.x,
+            self.x0.orbit.y,
+            self.x0.orbit.z,
+            self.current_iteration,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0
+        ));
+
         for (i, node) in self.nodes.iter().enumerate() {
             let dv = match self.all_dvs.get(i) {
                 Some(dv) => dv.clone(),
@@ -346,7 +348,7 @@ where
                 dv[1],
                 dv[2],
                 dv.norm(),
-                i
+                i + 1
             ));
         }
         write!(f, "{}", nodemsg)
