@@ -110,7 +110,7 @@ where
     }
 
     /// Solve the multiple shooting problem by finding the arrangement of nodes to minimize the cost function.
-    pub fn solve(&mut self, cost: CostFunction) -> Result<(), NyxError> {
+    pub fn solve(&mut self, cost: CostFunction) -> Result<Spacecraft, NyxError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for _ in 0..self.max_iterations {
             println!("{}", self);
@@ -118,8 +118,6 @@ where
             initial_states.push(self.x0);
             let mut outer_jacobian =
                 DMatrix::from_element(3 * self.nodes.len(), 3 * (self.nodes.len() - 1), 0.0);
-            // Build the vector of the intermediate nodes, excluding the starting and final positions.
-            let mut node_vector = DVector::from_element(3 * (self.nodes.len() - 1), 0.0);
             let mut cost_vec = DVector::from_element(3 * self.nodes.len(), 0.0);
 
             // Reset the all_dvs
@@ -146,11 +144,6 @@ where
             // NOTE: We have two separate loops because we need the initial state of node i+2 for the dv computation
             // of the third entry to the outer jacobian.
             for i in 0..(self.nodes.len() - 1) {
-                // Add the nominal node info to the node vector
-                node_vector[3 * i] = self.nodes[i][0].desired_value;
-                node_vector[3 * i + 1] = self.nodes[i][1].desired_value;
-                node_vector[3 * i + 2] = self.nodes[i][2].desired_value;
-
                 /* ***
                  ** 2. Perturb each node and compute the partial of the Δv for the (i-1), i, and (i+1) nodes
                  ** where the partial on the i+1 -th node is just the difference between the velocity at the
@@ -257,7 +250,7 @@ where
                 println!("We're done!");
 
                 /* ***
-                 ** TEMP FIN -- Check the finite burns work
+                 ** FIN -- Check the impulsive burns work
                  ** *** */
                 for (i, node) in self.nodes.iter().enumerate() {
                     // Run the unpertubed targeter
@@ -277,19 +270,12 @@ where
                             r_miss * 1e3,
                             v_miss * 1e3
                         );
+                        // And return the final state
+                        return Ok(sc);
                     }
                 }
 
-                /* ***
-                 ** FIN. Build the FiniteBurn schedule
-                 ** TODO!!
-                 ** *** */
-                // let mut mnvr_vec = Vec::with_capacity(self.nodes.len());
-                // for node in self.nodes {
-                //     mnvr_vec.push();
-                // }
-
-                return Ok(());
+                unreachable!();
             }
 
             prev_cost = new_cost;
@@ -297,7 +283,7 @@ where
             let inv_jac = pseudo_inverse(outer_jacobian, NyxError::SingularJacobian)?;
             let delta_r = inv_jac * cost_vec;
             // 3. Apply the correction to the node positions and iterator
-            node_vector = -delta_r;
+            let node_vector = -delta_r;
             for (i, val) in node_vector.iter().enumerate() {
                 let node_no = i / 3;
                 let component_no = i % 3;

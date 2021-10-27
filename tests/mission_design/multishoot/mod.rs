@@ -21,17 +21,20 @@ fn landing_demo() {
     /* *** */
     /* Define the landing epoch, landing site, and initial orbit. */
     /* *** */
-    // Epoch of passage at zenith
-    let e = Epoch::from_str("2023-11-25T14:20:00.0").unwrap();
+    // Landing epoch
+    let e_landing = Epoch::from_str("2023-11-25T14:20:00.0").unwrap();
+    let vertical_landing_duration = 2 * TimeUnit::Minute;
+    let e_pre_landing = e_landing - vertical_landing_duration;
     // Landing site
     let ls = Orbit::from_geodesic(
         SITE_LAT_DEG,
         SITE_LONG_DEG,
         SITE_HEIGHT_KM + ALTITUDE_BUFFER_KM,
-        e,
+        e_pre_landing,
         cosm.frame("IAU Moon"),
     );
 
+    // And of DRM
     let start_orbit = Orbit::cartesian(
         90.17852649,
         -36.46422273,
@@ -39,7 +42,7 @@ fn landing_demo() {
         -1.50058776,
         -0.82699041,
         -0.10562691,
-        e,
+        e_landing,
         moonj2k,
     );
 
@@ -87,6 +90,21 @@ fn landing_demo() {
     );
 
     // And run the multiple shooting algorithm
-    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 7 * 30, &prop).unwrap();
-    opti.solve(CostFunction::MinimumFuel).unwrap();
+    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 7 * 3, &prop).unwrap();
+    let sc_near_ls = opti.solve(CostFunction::MinimumFuel).unwrap();
+    // Now, try to land with zero velocity and check again the accuracy
+    let objectives = vec![Objective::new(StateParameter::Vmag, 1.0e-3)];
+    let tgt = Targeter::delta_v(&prop, objectives);
+    let sc_landing_tgt = tgt
+        .try_achieve_from(sc_near_ls, sc_near_ls.epoch(), e_landing)
+        .unwrap();
+    // Check r_miss and v_miss
+    let r_miss = (sc_landing_tgt.achieved.orbit.radius() - ls_luna.radius()).norm();
+    let v_miss = (sc_landing_tgt.achieved.orbit.velocity() - ls_luna.velocity()).norm();
+    println!(
+        "\nFINALLY\n{}\n\tr_miss = {:.1} m\tv_miss = {:.1} m/s",
+        sc_landing_tgt,
+        r_miss * 1e3,
+        v_miss * 1e3
+    );
 }
