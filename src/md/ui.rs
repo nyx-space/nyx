@@ -221,27 +221,17 @@ where
                     }
 
                     orbital_dyn.add_model(PointMasses::new(&bodies, cosm.clone()));
-
-                    init_sc = Spacecraft::new(
-                        init_state,
-                        spacecraft.dry_mass,
-                        spacecraft.fuel_mass.unwrap_or(0.0),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                    );
-                } else {
-                    init_sc = Spacecraft::new(
-                        init_state,
-                        spacecraft.dry_mass,
-                        spacecraft.fuel_mass.unwrap_or(0.0),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                    );
                 }
+
+                init_sc = Spacecraft::new(
+                    init_state,
+                    spacecraft.dry_mass,
+                    spacecraft.fuel_mass.unwrap_or(0.0),
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                );
 
                 sc_dyn = SpacecraftDynamics::new_raw(Arc::new(orbital_dyn));
 

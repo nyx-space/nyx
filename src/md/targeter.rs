@@ -115,7 +115,10 @@ impl fmt::Display for TargeterSolution {
             ));
         }
 
-        let mut corrmsg = format!("Correction @ {}:", self.state.epoch());
+        let mut corrmsg = format!(
+            "Correction @ {}:",
+            self.state.epoch().as_gregorian_utc_str()
+        );
         let mut is_only_position = true;
         let mut is_only_velocity = true;
         for (i, var) in self.variables.iter().enumerate() {
@@ -151,7 +154,7 @@ impl fmt::Display for TargeterSolution {
             f,
             "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved @ {}:{}\n\tFinal state:\n\t\t{}\n\t\t{:x}",
             self.variables.iter().map(|v| format!("{:?}", v.component)).collect::<Vec<String>>(),
-            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.state.epoch(), objmsg, self.state, self.state
+            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.achieved.epoch().as_gregorian_utc_str(), objmsg, self.state, self.state
         )
     }
 }
