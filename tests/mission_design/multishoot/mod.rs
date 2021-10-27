@@ -14,7 +14,7 @@ fn landing_demo() {
     const SITE_LAT_DEG: f64 = -86.798;
     const SITE_LONG_DEG: f64 = -21.150;
     const SITE_HEIGHT_KM: f64 = 0.4;
-    const ALTITUDE_BUFFER_KM: f64 = 0.2; // Add 200 meters of buffer
+    const ALTITUDE_BUFFER_KM: f64 = 0.5;
     let cosm = Cosm::de438_gmat();
     let moonj2k = cosm.frame("Luna");
 
@@ -25,12 +25,20 @@ fn landing_demo() {
     let e_landing = Epoch::from_str("2023-11-25T14:20:00.0").unwrap();
     let vertical_landing_duration = 2 * TimeUnit::Minute;
     let e_pre_landing = e_landing - vertical_landing_duration;
-    // Landing site
-    let ls = Orbit::from_geodesic(
+    // Landing site with buffer
+    let ls_buf = Orbit::from_geodesic(
         SITE_LAT_DEG,
         SITE_LONG_DEG,
         SITE_HEIGHT_KM + ALTITUDE_BUFFER_KM,
         e_pre_landing,
+        cosm.frame("IAU Moon"),
+    );
+
+    let ls = Orbit::from_geodesic(
+        SITE_LAT_DEG,
+        SITE_LONG_DEG,
+        SITE_HEIGHT_KM,
+        e_landing,
         cosm.frame("IAU Moon"),
     );
 
@@ -65,6 +73,7 @@ fn landing_demo() {
     /* Run the differential corrector for the initial guess of the velocity vector. */
     /* *** */
     // Convert the landing site into the same frame as the spacecraft and use that as targeting values
+    let ls_luna_buf = cosm.frame_chg(&ls_buf, moonj2k);
     let ls_luna = cosm.frame_chg(&ls, moonj2k);
 
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
@@ -90,8 +99,28 @@ fn landing_demo() {
     );
 
     // And run the multiple shooting algorithm
-    let mut opti = MultipleShooting::equidistant_nodes(pdi_start, ls_luna, 7 * 3, &prop).unwrap();
-    let sc_near_ls = opti.solve(CostFunction::MinimumFuel).unwrap();
+    let num_nodes = 7 * 3;
+    let mut opti =
+        MultipleShooting::equidistant_nodes(pdi_start, ls_luna_buf, num_nodes, &prop).unwrap();
+    let full_solution = opti.solve(CostFunction::MinimumFuel).unwrap();
+    let solution = &full_solution.solutions[num_nodes - 1];
+    let sc_near_ls = solution.achieved;
+    println!("Multiple shooting solution:\n{}", solution);
+    println!(
+        "SC above landing site: {}\taltitude = {:.3} km\t\tlanding site altitude: = {:.3} km",
+        sc_near_ls,
+        sc_near_ls.orbit.geodetic_height(),
+        ls_luna.geodetic_height()
+    );
+    // Check r_miss and v_miss
+    let r_miss = (sc_near_ls.orbit.radius() - ls_luna_buf.radius()).norm();
+    let v_miss = (sc_near_ls.orbit.velocity() - ls_luna_buf.velocity()).norm();
+    println!(
+        "\nABOVE\n{}\n\tr_miss = {:.1} m\tv_miss = {:.1} m/s",
+        sc_near_ls,
+        r_miss * 1e3,
+        v_miss * 1e3
+    );
     // Now, try to land with zero velocity and check again the accuracy
     let objectives = vec![Objective::new(StateParameter::Vmag, 1.0e-3)];
     let tgt = Targeter::delta_v(&prop, objectives);

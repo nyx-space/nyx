@@ -18,12 +18,12 @@
 
 pub use super::CostFunction;
 // use crate::dynamics::guidance::{FiniteBurns, Mnvr};
+use super::ctrlnodes::Node;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector3};
-use crate::md::targeter::{Objective, Targeter};
+use crate::md::targeter::Targeter;
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
-use crate::time::Epoch;
 use crate::utils::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
 
@@ -38,10 +38,8 @@ where
 {
     /// The propagator setup (kind, stages, etc.)
     pub prop: &'a Propagator<'a, D, E>,
-    /// List of position nodes of the optimal trajectory
-    pub nodes: Vec<[Objective; 3]>,
-    /// List of epoch at which the nodes must be met
-    pub epochs: Vec<Epoch>,
+    /// List of nodes of the optimal trajectory
+    pub nodes: Vec<Node>,
     /// Starting point, must be a spacecraft equipped with a thruster
     pub x0: Spacecraft,
     /// Destination (Should this be the final node?)
@@ -80,27 +78,26 @@ where
 
         // Build each node successively (includes xf)
         let mut nodes = Vec::with_capacity(node_count + 1);
-        let mut epochs = Vec::with_capacity(node_count + 1);
         let mut prev_node_radius = x0.orbit.radius();
         let mut prev_node_epoch = x0.epoch();
 
         for _ in 0..node_count {
             // Compute the position we want.
             let this_node = prev_node_radius + distance_increment * direction;
-            nodes.push([
-                Objective::new(StateParameter::X, this_node[0]),
-                Objective::new(StateParameter::Y, this_node[1]),
-                Objective::new(StateParameter::Z, this_node[2]),
-            ]);
             let this_epoch = prev_node_epoch + duration_increment;
-            epochs.push(this_epoch);
+            nodes.push(Node {
+                x: this_node[0],
+                y: this_node[1],
+                z: this_node[2],
+                frame: x0.orbit.frame,
+                epoch: this_epoch,
+            });
             prev_node_radius = this_node;
             prev_node_epoch = this_epoch;
         }
         Ok(Self {
             prop,
             nodes,
-            epochs,
             x0,
             xf,
             current_iteration: 0,
@@ -110,7 +107,7 @@ where
     }
 
     /// Solve the multiple shooting problem by finding the arrangement of nodes to minimize the cost function.
-    pub fn solve(&mut self, cost: CostFunction) -> Result<Spacecraft, NyxError> {
+    pub fn solve(&mut self, cost: CostFunction) -> Result<MultipleShootingSolution, NyxError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for _ in 0..self.max_iterations {
             println!("{}", self);
@@ -127,11 +124,11 @@ where
                 /* ***
                  ** 1. Solve the delta-v differential corrector between each node
                  ** *** */
-                let tgt = Targeter::delta_v(self.prop, self.nodes[i].to_vec());
+                let tgt = Targeter::delta_v(self.prop, self.nodes[i].to_targeter_objective());
                 let sol = tgt.try_achieve_fd(
                     initial_states[i],
                     initial_states[i].epoch(),
-                    self.epochs[i],
+                    self.nodes[i].epoch,
                 )?;
 
                 let nominal_delta_v =
@@ -155,7 +152,7 @@ where
                     /* ***
                      ** 2.A. Perturb the i-th node
                      ** *** */
-                    let mut next_node = self.nodes[i].to_vec();
+                    let mut next_node = self.nodes[i].to_targeter_objective();
                     next_node[axis].desired_value += next_node[axis].tolerance;
                     /* ***
                      ** 2.b. Rerun the targeter from the previous node to this one
@@ -167,7 +164,7 @@ where
                     let inner_sol_a = inner_tgt_a.try_achieve_fd(
                         initial_states[i],
                         initial_states[i].epoch(),
-                        self.epochs[i],
+                        self.nodes[i].epoch,
                     )?;
 
                     // ∂Δv_x / ∂r_x
@@ -186,11 +183,12 @@ where
                     /* ***
                      ** 2.C. Rerun the targeter from the new state at the perturbed node to the next unpertubed node
                      ** *** */
-                    let inner_tgt_b = Targeter::delta_v(self.prop, self.nodes[i + 1].to_vec());
+                    let inner_tgt_b =
+                        Targeter::delta_v(self.prop, self.nodes[i + 1].to_targeter_objective());
                     let inner_sol_b = inner_tgt_b.try_achieve_fd(
                         inner_sol_a.achieved,
                         inner_sol_a.achieved.epoch(),
-                        self.epochs[i + 1],
+                        self.nodes[i + 1].epoch,
                     )?;
 
                     // Compute the partials wrt the next Δv
@@ -250,32 +248,30 @@ where
                 println!("We're done!");
 
                 /* ***
-                 ** FIN -- Check the impulsive burns work
+                 ** FIN -- Check the impulsive burns work and return all targeter solutions
                  ** *** */
+                let mut ms_sol = MultipleShootingSolution {
+                    x0: self.x0,
+                    xf: self.xf,
+                    nodes: self.nodes.clone(),
+                    solutions: Vec::with_capacity(self.nodes.len()),
+                };
+                let mut initial_states = Vec::with_capacity(self.nodes.len());
+                initial_states.push(self.x0);
+
                 for (i, node) in self.nodes.iter().enumerate() {
                     // Run the unpertubed targeter
-                    let tgt = Targeter::delta_v(self.prop, node.to_vec());
+                    let tgt = Targeter::delta_v(self.prop, node.to_targeter_objective());
                     let sol = tgt.try_achieve_fd(
                         initial_states[i],
                         initial_states[i].epoch(),
-                        self.epochs[i],
+                        node.epoch,
                     )?;
-                    // And check that it converged on the proper solution
-                    if i == self.nodes.len() - 1 {
-                        let sc = tgt.apply(sol)?;
-                        let r_miss = (sc.orbit.radius() - self.xf.radius()).norm();
-                        let v_miss = (sc.orbit.velocity() - self.xf.velocity()).norm();
-                        println!(
-                            "\nFINALLY\tr_miss = {:.1} m\tv_miss = {:.1} m/s",
-                            r_miss * 1e3,
-                            v_miss * 1e3
-                        );
-                        // And return the final state
-                        return Ok(sc);
-                    }
+                    initial_states.push(sol.achieved);
+                    ms_sol.solutions.push(sol);
                 }
 
-                unreachable!();
+                return Ok(ms_sol);
             }
 
             prev_cost = new_cost;
@@ -287,7 +283,12 @@ where
             for (i, val) in node_vector.iter().enumerate() {
                 let node_no = i / 3;
                 let component_no = i % 3;
-                self.nodes[node_no][component_no].desired_value += val;
+                match component_no {
+                    0 => self.nodes[node_no].x += val,
+                    1 => self.nodes[node_no].y += val,
+                    2 => self.nodes[node_no].z += val,
+                    _ => unreachable!(),
+                }
             }
             self.current_iteration += 1;
         }
@@ -326,9 +327,9 @@ where
             };
             nodemsg.push_str(&format!(
                 "[{:.3}, {:.3}, {:.3}, {}, {}, {}, {}, {}, {}],\n",
-                node[0].desired_value,
-                node[1].desired_value,
-                node[2].desired_value,
+                node.x,
+                node.y,
+                node.z,
                 self.current_iteration,
                 dv[0],
                 dv[1],
@@ -338,5 +339,22 @@ where
             ));
         }
         write!(f, "{}", nodemsg)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MultipleShootingSolution {
+    pub x0: Spacecraft,
+    pub xf: Orbit,
+    pub nodes: Vec<Node>,
+    pub solutions: Vec<TargeterSolution>,
+}
+
+impl fmt::Display for MultipleShootingSolution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for sol in &self.solutions {
+            write!(f, "{}", sol)?;
+        }
+        Ok(())
     }
 }

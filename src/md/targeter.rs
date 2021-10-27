@@ -115,7 +115,7 @@ impl fmt::Display for TargeterSolution {
             ));
         }
 
-        let mut corrmsg = String::from("Correction:");
+        let mut corrmsg = format!("Correction @ {}:", self.state.epoch());
         let mut is_only_position = true;
         let mut is_only_velocity = true;
         for (i, var) in self.variables.iter().enumerate() {
@@ -149,9 +149,9 @@ impl fmt::Display for TargeterSolution {
 
         write!(
             f,
-            "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved:{}\n\tFinal state:\n\t\t{}\n\t\t{:x}",
+            "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved @ {}:{}\n\tFinal state:\n\t\t{}\n\t\t{:x}",
             self.variables.iter().map(|v| format!("{:?}", v.component)).collect::<Vec<String>>(),
-            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, objmsg, self.state, self.state
+            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.state.epoch(), objmsg, self.state, self.state
         )
     }
 }
@@ -930,7 +930,7 @@ where
     }
 
     /// Apply a correction and propagate to achievement epoch. Also checks that the objectives are indeed matched
-    pub fn apply(&self, solution: TargeterSolution) -> Result<Spacecraft, NyxError> {
+    pub fn apply(&self, solution: &TargeterSolution) -> Result<Spacecraft, NyxError> {
         let (xf, _) = self.apply_with_traj(solution)?;
         Ok(xf)
     }
@@ -939,7 +939,7 @@ where
     /// Also checks that the objectives are indeed matched.
     pub fn apply_with_traj(
         &self,
-        solution: TargeterSolution,
+        solution: &TargeterSolution,
     ) -> Result<(Spacecraft, Traj<Spacecraft>), NyxError> {
         // Propagate until achievement epoch
         let (xf, traj) = self

@@ -56,7 +56,7 @@ fn tgt_b_plane_earth_gravity_assist() {
         "Finite differencing result different from GMAT by over 1 m/s"
     );
 
-    tgt.apply(sol).unwrap();
+    tgt.apply(&sol).unwrap();
 }
 
 #[allow(clippy::identity_op)]
@@ -163,7 +163,7 @@ fn tgt_b_plane_lunar_transfer() {
     );
 
     // Check that the solution works with the same dynamics.
-    tgt.apply(sol).unwrap();
+    tgt.apply(&sol).unwrap();
 }
 
 #[test]
@@ -215,5 +215,5 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
     assert!(sol.correction.norm() <= 225.309e-3);
 
-    tgt.apply(sol).unwrap();
+    tgt.apply(&sol).unwrap();
 }
