@@ -5,6 +5,8 @@ use nyx::md::ui::*;
 use nyx::opti::multishoot::*;
 use std::str::FromStr;
 
+// TODO -- Add an Earth orbit to Lunar orbit multiple shooting algorithm and see if that works
+
 #[test]
 fn landing_demo() {
     if pretty_env_logger::try_init().is_err() {
@@ -103,6 +105,33 @@ fn landing_demo() {
     let mut opti =
         MultipleShooting::equidistant_nodes(pdi_start, ls_luna_buf, num_nodes, &prop).unwrap();
     let full_solution = opti.solve(CostFunction::MinimumFuel).unwrap();
+
+    for (i, traj) in full_solution
+        .build_trajectories(&prop)
+        .unwrap()
+        .iter()
+        .enumerate()
+    {
+        traj.to_csv_with_step(
+            &format!("multishoot_to_node_{}.csv", i),
+            2 * TimeUnit::Second,
+            cosm.clone(),
+        )
+        .unwrap();
+    }
+    // And propagate the final state too
+    let (_, traj) = prop
+        .with(full_solution.solutions.last().unwrap().achieved)
+        .for_duration_with_traj(2 * TimeUnit::Hour)
+        .unwrap();
+
+    traj.to_csv_with_step(
+        &"multishoot_to_end.csv".to_string(),
+        2 * TimeUnit::Second,
+        cosm.clone(),
+    )
+    .unwrap();
+
     let solution = &full_solution.solutions[num_nodes - 1];
     let sc_near_ls = solution.achieved;
     println!("Multiple shooting solution:\n{}", solution);
@@ -116,23 +145,41 @@ fn landing_demo() {
     let r_miss = (sc_near_ls.orbit.radius() - ls_luna_buf.radius()).norm();
     let v_miss = (sc_near_ls.orbit.velocity() - ls_luna_buf.velocity()).norm();
     println!(
-        "\nABOVE\n{}\n\tr_miss = {:.1} m\tv_miss = {:.1} m/s",
+        "\nABOVE\n{}\n\tr_miss = {:.1} m\tv_miss = {:.1} m/s\n\theight = {:.3} km (want: {:.3} km)\tlat = {:.3} deg (want: {:.3} deg)\tlong = {:.3} deg (want: {:.3} deg)",
         sc_near_ls,
         r_miss * 1e3,
-        v_miss * 1e3
+        v_miss * 1e3,
+        sc_near_ls.orbit.geodetic_height(),
+        ls_luna.geodetic_height(),
+        sc_near_ls.orbit.geodetic_latitude(),
+        ls_luna.geodetic_latitude(),
+        sc_near_ls.orbit.geodetic_longitude(),
+        ls_luna.geodetic_longitude(),
     );
+
+    // Just propagate this spacecraft until lunar impact
+    let interception = prop
+        .with(sc_near_ls)
+        .until_event(
+            2 * TimeUnit::Hour,
+            &Event::within_tolerance(StateParameter::Rmag, ls_luna.rmag(), 1e-3),
+            0,
+        )
+        .unwrap()
+        .0;
+
     // Now, try to land with zero velocity and check again the accuracy
-    let objectives = vec![Objective::new(StateParameter::Vmag, 1.0e-3)];
-    let tgt = Targeter::delta_v(&prop, objectives);
-    let sc_landing_tgt = tgt
-        .try_achieve_from(sc_near_ls, sc_near_ls.epoch(), e_landing)
-        .unwrap();
+    // let objectives = vec![Objective::new(StateParameter::Vmag, 1.0e-3)];
+    // let tgt = Targeter::delta_v(&prop, objectives);
+    // let sc_landing_tgt = tgt
+    //     .try_achieve_from(sc_near_ls, sc_near_ls.epoch(), e_landing)
+    //     .unwrap();
     // Check r_miss and v_miss
-    let r_miss = (sc_landing_tgt.achieved.orbit.radius() - ls_luna.radius()).norm();
-    let v_miss = (sc_landing_tgt.achieved.orbit.velocity() - ls_luna.velocity()).norm();
+    let r_miss = (interception.orbit.radius() - ls_luna.radius()).norm();
+    let v_miss = (interception.orbit.velocity() - ls_luna.velocity()).norm();
     println!(
         "\nFINALLY\n{}\n\tr_miss = {:.1} m\tv_miss = {:.1} m/s",
-        sc_landing_tgt,
+        interception,
         r_miss * 1e3,
         v_miss * 1e3
     );

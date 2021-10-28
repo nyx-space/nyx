@@ -110,7 +110,6 @@ where
     pub fn solve(&mut self, cost: CostFunction) -> Result<MultipleShootingSolution, NyxError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for _ in 0..self.max_iterations {
-            println!("{}", self);
             let mut initial_states = Vec::with_capacity(self.nodes.len());
             initial_states.push(self.x0);
             let mut outer_jacobian =
@@ -356,5 +355,28 @@ impl fmt::Display for MultipleShootingSolution {
             write!(f, "{}", sol)?;
         }
         Ok(())
+    }
+}
+
+impl MultipleShootingSolution {
+    /// Allows building the trajectories between different nodes
+    /// This will rebuild the targeters and apply the solutions sequentially
+    pub fn build_trajectories<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl>(
+        &self,
+        prop: &'a Propagator<'a, D, E>,
+    ) -> Result<Vec<ScTraj>, NyxError>
+    where
+        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::VecLength>,
+    {
+        let mut trajz = Vec::with_capacity(self.nodes.len());
+
+        for (i, node) in self.nodes.iter().enumerate() {
+            let (_, traj) = Targeter::delta_v(prop, node.to_targeter_objective())
+                .apply_with_traj(&self.solutions[i])?;
+            trajz.push(traj);
+        }
+
+        Ok(trajz)
     }
 }
