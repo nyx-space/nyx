@@ -570,7 +570,12 @@ where
                     achieved_objectives: self.objectives.clone(),
                     iterations: it,
                 };
-                info!("Targeter -- CONVERGED in {} iterations", it);
+                // Log success as info
+                if it == 1 {
+                    info!("Targeter -- CONVERGED in 1 iteration");
+                } else {
+                    info!("Targeter -- CONVERGED in {} iterations", it);
+                }
                 for obj in &objmsg {
                     info!("{}", obj);
                 }
@@ -589,7 +594,7 @@ where
             debug!("Jacobian {}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = pseudo_inverse(jac, NyxError::SingularJacobian)?;
+            let jac_inv = pseudo_inverse(&jac, NyxError::SingularJacobian)?;
 
             debug!("Inverse Jacobian {}", jac_inv);
 
@@ -609,7 +614,7 @@ where
                     delta[i] = var.min_value;
                 }
 
-                info!(
+                debug!(
                     "Correction {:?}{} (element {}): {}",
                     var.component,
                     match self.correction_frame {
@@ -634,10 +639,10 @@ where
             total_correction += delta;
             debug!("Total correction: {:e}", total_correction);
 
-            // Log progress
-            info!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
+            // Log progress to debug
+            debug!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
             for obj in &objmsg {
-                info!("{}", obj);
+                debug!("{}", obj);
             }
         }
 
@@ -871,7 +876,7 @@ where
             debug!("Jacobian {}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = pseudo_inverse(jac, NyxError::SingularJacobian)?;
+            let jac_inv = pseudo_inverse(&jac, NyxError::SingularJacobian)?;
 
             debug!("Inverse Jacobian {}", jac_inv);
 

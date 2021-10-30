@@ -80,6 +80,8 @@ pub enum NyxError {
     UnderdeterminedProblem,
     /// Returned if CCSDS encountered an error
     CCSDS(String),
+    /// Returned if the targeter for `node_no` has failed
+    MultipleShootingTargeter(usize, Box<NyxError>),
     /// Some custom error for new dynamics
     CustomError(String),
 }
@@ -118,6 +120,9 @@ impl fmt::Display for NyxError {
             }
             Self::LambertNotReasonablePhi => {
                 write!(f, "No reasonable phi found to connect both radii")
+            }
+            Self::MultipleShootingTargeter(n, e) => {
+                write!(f, "Multiple shooting failed on node {} with {}", n, e)
             }
             _ => write!(f, "{:?}", self),
         }

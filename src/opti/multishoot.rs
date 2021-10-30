@@ -24,8 +24,10 @@ use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector3};
 use crate::md::targeter::Targeter;
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
+use crate::tools::lambert::{standard, TransferKind};
 use crate::utils::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
+use std::sync::Arc;
 
 use std::fmt;
 
@@ -47,6 +49,10 @@ where
     pub current_iteration: usize,
     /// The maximum number of iterations allowed
     pub max_iterations: usize,
+    /// Threshold after which the outer loop is considered to have converged,
+    /// e.g. 0.01 means that a 1% of less improvement in case between two iterations
+    /// will stop the iterations.
+    pub improvement_threshold: f64,
     pub all_dvs: Vec<Vector3<f64>>,
 }
 
@@ -59,6 +65,7 @@ where
     /// Builds a multiple shooting structure assuming that the optimal trajectory is a straight line
     /// between the start and end points. The position of the nodes will be update at each iteration
     /// of the outer loop.
+    /// NOTE: this may cause some nodes to be below the surface of a celestial object if in low orbit
     pub fn equidistant_nodes(
         x0: Spacecraft,
         xf: Orbit,
@@ -101,7 +108,162 @@ where
             x0,
             xf,
             current_iteration: 0,
-            max_iterations: 20,
+            max_iterations: 50,
+            improvement_threshold: 0.01,
+            all_dvs: Vec::with_capacity(node_count),
+        })
+    }
+
+    /// Builds a multiple shooting structure assuming that the optimal trajectory is near the Lambert
+    /// solution that connects the start and end points. The position of the nodes will be update at
+    /// each iteration of the outer loop.
+    pub fn lambert_heuristic(
+        x0: Spacecraft,
+        xf: Orbit,
+        node_count: usize,
+        prop: &'a Propagator<'a, D, E>,
+    ) -> Result<Self, NyxError> {
+        if node_count < 3 {
+            error!("At least three nodes are needed for a multiple shooting optimization");
+            return Err(NyxError::UnderdeterminedProblem);
+        }
+
+        let delta_t = xf.epoch() - x0.epoch();
+
+        let lambert_sol = standard(
+            x0.orbit.radius(),
+            xf.radius(),
+            delta_t.in_seconds(),
+            x0.orbit.frame.gm(),
+            TransferKind::ShortWay,
+        )?;
+
+        // Get into the transfer orbit.
+        let mut lambert_x0 = x0.orbit;
+        lambert_x0.vx = lambert_sol.v_init[0];
+        lambert_x0.vy = lambert_sol.v_init[1];
+        lambert_x0.vz = lambert_sol.v_init[2];
+
+        // Propagate for the TOF
+        let (prop_xf, traj) = Propagator::default(OrbitalDynamics::two_body())
+            .with(lambert_x0)
+            .for_duration_with_traj(delta_t)?;
+        // Check that the Lambert solution was good enough
+        println!(
+            "Lambert error: {:.3} m",
+            1e3 * (prop_xf.radius() - xf.radius()).norm()
+        );
+
+        // Now, create the nodes at equidistant times on that trajectory
+        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
+
+        // Build each node successively (includes xf)
+        let mut nodes = Vec::with_capacity(node_count + 1);
+        let mut prev_node_epoch = x0.epoch();
+
+        for _ in 0..node_count {
+            // Compute the position we want.
+            let this_epoch = prev_node_epoch + duration_increment;
+            let this_node = traj.at(this_epoch)?.radius();
+            nodes.push(Node {
+                x: this_node[0],
+                y: this_node[1],
+                z: this_node[2],
+                frame: x0.orbit.frame,
+                epoch: this_epoch,
+            });
+            prev_node_epoch = this_epoch;
+        }
+        Ok(Self {
+            prop,
+            nodes,
+            x0,
+            xf,
+            current_iteration: 0,
+            max_iterations: 50,
+            improvement_threshold: 0.01,
+            all_dvs: Vec::with_capacity(node_count),
+        })
+    }
+
+    /// Builds a multiple shooting structure assuming that the optimal trajectory is near a linear
+    /// heuristic in altitude and direction.
+    /// For example, if x0 has an altitude of 100 km and xf has an altitude
+    /// of 200 km, and 10 nodes are required over 10 minutes, then node 1 will be 110 km, node 2 220km, etc.
+    /// body_frame must be a body fixed frame
+    pub fn linear_heuristic(
+        x0: Spacecraft,
+        xf: Orbit,
+        node_count: usize,
+        body_frame: Frame,
+        prop: &'a Propagator<'a, D, E>,
+        cosm: Arc<Cosm>,
+    ) -> Result<Self, NyxError> {
+        if node_count < 3 {
+            error!("At least three nodes are needed for a multiple shooting optimization");
+            return Err(NyxError::UnderdeterminedProblem);
+        }
+
+        if !body_frame.is_body_fixed() {
+            return Err(NyxError::TargetError(
+                "Body frame is not body fixed".to_string(),
+            ));
+        }
+
+        let delta_t = xf.epoch() - x0.epoch();
+        let xf_bf = cosm.frame_chg(&xf, body_frame);
+
+        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
+
+        let (_, traj) = prop.with(x0).for_duration_with_traj(delta_t)?;
+
+        // Build each node successively (includes xf)
+        let mut nodes = Vec::with_capacity(node_count + 1);
+        let mut prev_node_epoch = x0.epoch();
+
+        let inertial_frame = x0.orbit.frame;
+        for i in 0..node_count {
+            // Compute the position we want.
+            let this_epoch = prev_node_epoch + duration_increment;
+            let orbit_point = traj.at(this_epoch)?.orbit;
+            // Convert this orbit into the body frame
+            let orbit_point_bf = cosm.frame_chg(&orbit_point, body_frame);
+            // Note that the altitude here might be different, so we scale the altitude change by the current altitude
+            let desired_alt_i = (xf_bf.geodetic_height() - orbit_point_bf.geodetic_height())
+                / ((node_count - i) as f64);
+            // Build the node in the body frame and convert that to the original frame
+            let node_bf = Orbit::from_geodesic(
+                orbit_point_bf.geodetic_latitude(),
+                orbit_point_bf.geodetic_longitude(),
+                orbit_point_bf.geodetic_height() + desired_alt_i,
+                this_epoch,
+                body_frame,
+            );
+            println!(
+                "{}-th node alt: {:.3} m \txf alt: {:.3} m",
+                i,
+                1e3 * node_bf.geodetic_height(),
+                1e3 * xf_bf.geodetic_height()
+            );
+            // Convert that back into the inertial frame
+            let this_node = cosm.frame_chg(&node_bf, inertial_frame).radius();
+            nodes.push(Node {
+                x: this_node[0],
+                y: this_node[1],
+                z: this_node[2],
+                frame: inertial_frame,
+                epoch: this_epoch,
+            });
+            prev_node_epoch = this_epoch;
+        }
+        Ok(Self {
+            prop,
+            nodes,
+            x0,
+            xf,
+            current_iteration: 0,
+            max_iterations: 50,
+            improvement_threshold: 0.01,
             all_dvs: Vec::with_capacity(node_count),
         })
     }
@@ -109,7 +271,7 @@ where
     /// Solve the multiple shooting problem by finding the arrangement of nodes to minimize the cost function.
     pub fn solve(&mut self, cost: CostFunction) -> Result<MultipleShootingSolution, NyxError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
-        for _ in 0..self.max_iterations {
+        for it in 0..self.max_iterations {
             let mut initial_states = Vec::with_capacity(self.nodes.len());
             initial_states.push(self.x0);
             let mut outer_jacobian =
@@ -124,11 +286,14 @@ where
                  ** 1. Solve the delta-v differential corrector between each node
                  ** *** */
                 let tgt = Targeter::delta_v(self.prop, self.nodes[i].to_targeter_objective());
-                let sol = tgt.try_achieve_fd(
+                let sol = match tgt.try_achieve_fd(
                     initial_states[i],
                     initial_states[i].epoch(),
                     self.nodes[i].epoch,
-                )?;
+                ) {
+                    Ok(sol) => sol,
+                    Err(e) => return Err(NyxError::MultipleShootingTargeter(i, Box::new(e))),
+                };
 
                 let nominal_delta_v =
                     Vector3::new(sol.correction[0], sol.correction[1], sol.correction[2]);
@@ -160,11 +325,14 @@ where
                      ** *** */
 
                     let inner_tgt_a = Targeter::delta_v(self.prop, next_node.to_vec());
-                    let inner_sol_a = inner_tgt_a.try_achieve_fd(
+                    let inner_sol_a = match inner_tgt_a.try_achieve_fd(
                         initial_states[i],
                         initial_states[i].epoch(),
                         self.nodes[i].epoch,
-                    )?;
+                    ) {
+                        Ok(sol) => sol,
+                        Err(e) => return Err(NyxError::MultipleShootingTargeter(i, Box::new(e))),
+                    };
 
                     // ∂Δv_x / ∂r_x
                     outer_jacobian[(3 * i, 3 * i + axis)] = (inner_sol_a.correction[0]
@@ -238,13 +406,23 @@ where
 
             // If the new cost is greater than the previous one, then the cost improvement is negative.
             let cost_improvmt = (prev_cost - new_cost) / new_cost.abs();
-            // If the cost does not improve by more than 1%, stop iteration
-            if cost_improvmt.abs() < 0.01 {
-                println!(
-                    "new_cost = {:.3}\timprovement = {:.3}",
-                    new_cost, cost_improvmt
-                );
-                println!("We're done!");
+            // If the cost does not improve by more than threshold stop iteration
+            match cost {
+                CostFunction::MinimumEnergy => info!(
+                    "Multiple shooting iteration #{}\t\tCost = {:.3} km^2/s^2\timprovement = {:.2}%",
+                    it,
+                    new_cost,
+                    100.0 * cost_improvmt
+                ),
+                CostFunction::MinimumFuel => info!(
+                    "Multiple shooting iteration #{}\t\tCost = {:.3} km/s\timprovement = {:.2}%",
+                    it,
+                    new_cost,
+                    100.0 * cost_improvmt
+                ),
+            };
+            if cost_improvmt.abs() < self.improvement_threshold {
+                info!("Improvement below desired threshold. Running targeter on computed nodes.");
 
                 /* ***
                  ** FIN -- Check the impulsive burns work and return all targeter solutions
@@ -275,7 +453,13 @@ where
 
             prev_cost = new_cost;
             // 2. Solve for the next position of the nodes using a pseudo inverse.
-            let inv_jac = pseudo_inverse(outer_jacobian, NyxError::SingularJacobian)?;
+            let inv_jac = match pseudo_inverse(&outer_jacobian, NyxError::SingularJacobian) {
+                Ok(inv_jac) => inv_jac,
+                Err(e) => {
+                    error!("Singular Jacobian {:.3}", outer_jacobian);
+                    return Err(e);
+                }
+            };
             let delta_r = inv_jac * cost_vec;
             // 3. Apply the correction to the node positions and iterator
             let node_vector = -delta_r;

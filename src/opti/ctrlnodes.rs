@@ -38,4 +38,8 @@ impl Node {
             Objective::new(StateParameter::Z, self.z),
         ];
     }
+
+    pub fn rmag(&self) -> f64 {
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+    }
 }

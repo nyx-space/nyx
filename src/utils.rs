@@ -255,26 +255,27 @@ pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> 
 }
 
 /// Compute the Moore Penrose pseudo-inverse if needed, else the real inverse
+/// Warning: if this is a square matrix, it will be cloned prior to being inversed
 #[allow(clippy::comparison_chain)]
-pub(crate) fn pseudo_inverse(mat: DMatrix<f64>, err: NyxError) -> Result<DMatrix<f64>, NyxError> {
+pub(crate) fn pseudo_inverse(mat: &DMatrix<f64>, err: NyxError) -> Result<DMatrix<f64>, NyxError> {
     let (rows, cols) = mat.shape();
     if cols == rows {
-        match mat.try_inverse() {
+        match mat.clone().try_inverse() {
             Some(inv) => Ok(inv),
             None => Err(err),
         }
     } else if rows < cols {
-        let m1_inv = match (&mat * &mat.transpose()).try_inverse() {
+        let m1_inv = match (mat * mat.transpose()).try_inverse() {
             Some(inv) => inv,
             None => return Err(err),
         };
-        Ok(&mat.transpose() * m1_inv)
+        Ok(mat.transpose() * m1_inv)
     } else {
-        let m2_inv = match (&mat.transpose() * &mat).try_inverse() {
+        let m2_inv = match (mat.transpose() * mat).try_inverse() {
             Some(inv) => inv,
             None => return Err(err),
         };
-        Ok(m2_inv * &mat.transpose())
+        Ok(m2_inv * mat.transpose())
     }
 }
 
@@ -363,6 +364,6 @@ fn test_pseudo_inv() {
 
     println!(
         "{}",
-        pseudo_inverse(mat, NyxError::PartialsUndefined).unwrap()
+        pseudo_inverse(&mat, NyxError::PartialsUndefined).unwrap()
     );
 }

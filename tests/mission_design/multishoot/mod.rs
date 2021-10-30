@@ -74,19 +74,25 @@ fn landing_demo() {
     /* *** */
     /* Run the differential corrector for the initial guess of the velocity vector. */
     /* *** */
-    // Convert the landing site into the same frame as the spacecraft and use that as targeting values
-    let ls_luna_buf = cosm.frame_chg(&ls_buf, moonj2k);
-    let ls_luna = cosm.frame_chg(&ls, moonj2k);
-
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
 
     let pdi_start = prop.with(xl1).for_duration(-7 * TimeUnit::Minute).unwrap();
 
+    let pdi_start_fixed = cosm.frame_chg(&pdi_start.orbit, cosm.frame("IAU Moon"));
+
+    let num_nodes = 7 * 3;
+    let ls_luna = cosm.frame_chg(&ls, moonj2k);
+
+    // Convert the landing site into the same frame as the spacecraft and use that as targeting values
+    let ls_luna_buf = cosm.frame_chg(&ls_buf, moonj2k);
+
     println!("Start: {}", pdi_start);
     println!(
-        "Start: |r| = {:.4} km\t|v| = {:.4} km/s",
+        "Start: |r| = {:.4} km\t|v| = {:.4} km/s\taltitude = {:.4} km\tlanding altitude = {:.4} km",
         pdi_start.orbit.rmag(),
-        pdi_start.orbit.vmag()
+        pdi_start.orbit.vmag(),
+        pdi_start_fixed.geodetic_height(),
+        ls_buf.geodetic_height()
     );
 
     println!("LANDING SITE: {}", ls_luna);
@@ -101,12 +107,44 @@ fn landing_demo() {
     );
 
     // And run the multiple shooting algorithm
-    let num_nodes = 7 * 3;
-    let mut opti =
-        MultipleShooting::equidistant_nodes(pdi_start, ls_luna_buf, num_nodes, &prop).unwrap();
-    let full_solution = opti.solve(CostFunction::MinimumFuel).unwrap();
+    let mut opti = MultipleShooting::linear_heuristic(
+        pdi_start,
+        ls_luna_buf,
+        num_nodes,
+        cosm.frame("IAU Moon"),
+        &prop,
+        cosm.clone(),
+    )
+    .unwrap();
 
-    for (i, traj) in full_solution
+    // Check that all nodes are above the surface
+    println!("Initial nodes\nNode no,X (km),Y (km),Z (km),Epoch:GregorianUtc");
+    for (i, node) in opti.nodes.iter().enumerate() {
+        println!(
+            "{}, {}, {}, {}, '{}'",
+            i,
+            node.x,
+            node.y,
+            node.z,
+            node.epoch.as_gregorian_utc_str()
+        );
+    }
+
+    let multishoot_sol = opti.solve(CostFunction::MinimumFuel).unwrap();
+
+    println!("Final nodes\nNode no,X (km),Y (km),Z (km),Epoch:GregorianUtc");
+    for (i, node) in opti.nodes.iter().enumerate() {
+        println!(
+            "{}, {}, {}, {}, '{}'",
+            i,
+            node.x,
+            node.y,
+            node.z,
+            node.epoch.as_gregorian_utc_str()
+        );
+    }
+
+    for (i, traj) in multishoot_sol
         .build_trajectories(&prop)
         .unwrap()
         .iter()
@@ -121,7 +159,7 @@ fn landing_demo() {
     }
     // And propagate the final state too
     let (_, traj) = prop
-        .with(full_solution.solutions.last().unwrap().achieved)
+        .with(multishoot_sol.solutions.last().unwrap().achieved)
         .for_duration_with_traj(2 * TimeUnit::Hour)
         .unwrap();
 
@@ -132,9 +170,20 @@ fn landing_demo() {
     )
     .unwrap();
 
-    let solution = &full_solution.solutions[num_nodes - 1];
+    let solution = &multishoot_sol.solutions[num_nodes - 1];
     let sc_near_ls = solution.achieved;
-    println!("Multiple shooting solution:\n{}", solution);
+    // Compute the total delta-v of the solution
+    let mut dv_ms = 0.0;
+    for sol in &multishoot_sol.solutions {
+        dv_ms += sol.correction.norm() * 1e3;
+    }
+    println!(
+        "Multiple shooting solution requires a total of {} m/s",
+        dv_ms
+    );
+
+    println!("{}", multishoot_sol);
+
     println!(
         "SC above landing site: {}\taltitude = {:.3} km\t\tlanding site altitude: = {:.3} km",
         sc_near_ls,
