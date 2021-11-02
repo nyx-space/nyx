@@ -17,6 +17,7 @@
 */
 
 extern crate meval;
+
 use self::meval::{Context, Expr};
 use crate::log::error;
 use crate::na::Matrix3;
@@ -165,7 +166,7 @@ impl Euler3AxisDt {
     pub fn from_ra_dec_w(
         alpha_right_asc: Expr,
         delta_declin: Expr,
-        w: Expr,
+        w_twist: Expr,
         context: HashMap<String, String>,
         unit: AngleUnit,
     ) -> Self {
@@ -173,7 +174,7 @@ impl Euler3AxisDt {
         Self::new(
             (EulerRotation::R3(0.0), alpha_right_asc),
             (EulerRotation::R1(0.0), delta_declin),
-            (EulerRotation::R3(0.0), w),
+            (EulerRotation::R3(0.0), w_twist),
             context,
             unit,
             true,
