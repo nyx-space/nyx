@@ -3,7 +3,6 @@ extern crate nyx_space as nyx;
 use nyx::dynamics::guidance::Thruster;
 use nyx::md::ui::*;
 use nyx::opti::multishoot::*;
-use std::str::FromStr;
 
 // TODO -- Add an Earth orbit to Lunar orbit multiple shooting algorithm and see if that works
 
@@ -19,21 +18,30 @@ fn landing_demo() {
     const ALTITUDE_BUFFER_KM: f64 = 0.5;
     let cosm = Cosm::de438_gmat();
     let moonj2k = cosm.frame("Luna");
+    let moon_iau = cosm.frame("IAU Moon");
 
     /* *** */
     /* Define the landing epoch, landing site, and initial orbit. */
     /* *** */
     // Landing epoch
-    let e_landing = Epoch::from_str("2023-11-25T14:20:00.0").unwrap();
-    let vertical_landing_duration = 2 * TimeUnit::Minute;
-    let e_pre_landing = e_landing - vertical_landing_duration;
+    let e_landing = Epoch::from_gregorian_utc(2023, 11, 25, 14, 19, 26, 789000000);
+    // let e_landing = Epoch::from_str("2023-11-25T14:19:26.789000 UTC").unwrap();
+    // let vertical_landing_duration = 2 * TimeUnit::Minute;
+    // let e_pre_landing = e_landing - vertical_landing_duration;
     // Landing site with buffer
     let ls_buf = Orbit::from_geodesic(
         SITE_LAT_DEG,
         SITE_LONG_DEG,
         SITE_HEIGHT_KM + ALTITUDE_BUFFER_KM,
-        e_pre_landing,
-        cosm.frame("IAU Moon"),
+        e_landing,
+        moon_iau,
+    );
+    println!(
+        "Target landing site (with buffer):\n{}\nlong = {:.2} deg\tlat = {:.2} deg\talt = {:.3}km\t",
+        ls_buf,
+        ls_buf.geodetic_longitude(),
+        ls_buf.geodetic_latitude(),
+        ls_buf.geodetic_height()
     );
 
     let ls = Orbit::from_geodesic(
@@ -41,19 +49,28 @@ fn landing_demo() {
         SITE_LONG_DEG,
         SITE_HEIGHT_KM,
         e_landing,
-        cosm.frame("IAU Moon"),
+        moon_iau,
     );
 
-    // And of DRM
+    // DRM state in Moon J2000
     let start_orbit = Orbit::cartesian(
-        90.17852649,
-        -36.46422273,
-        -1757.51628437,
-        -1.50058776,
-        -0.82699041,
-        -0.10562691,
+        -77.19951157,
+        637.0714101,
+        -1639.05629855,
+        0.72861834,
+        1.47489041,
+        0.48984635,
         e_landing,
         moonj2k,
+    );
+
+    let start_orbit_iau = cosm.frame_chg(&start_orbit, moon_iau);
+    println!(
+        "DRM end\n{}\nlong = {:.2} deg\tlat = {:.2} deg\talt = {:.3}km\t",
+        start_orbit_iau,
+        start_orbit_iau.geodetic_longitude(),
+        start_orbit_iau.geodetic_latitude(),
+        start_orbit_iau.geodetic_height()
     );
 
     let thruster = Thruster {
@@ -76,23 +93,25 @@ fn landing_demo() {
     /* *** */
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
 
-    let pdi_start = prop.with(xl1).for_duration(-7 * TimeUnit::Minute).unwrap();
+    let pdi_start = prop.with(xl1).for_duration(-8 * TimeUnit::Minute).unwrap();
 
     let pdi_start_fixed = cosm.frame_chg(&pdi_start.orbit, cosm.frame("IAU Moon"));
 
-    let num_nodes = 7 * 3;
+    let num_nodes = 8 * 3;
     let ls_luna = cosm.frame_chg(&ls, moonj2k);
 
     // Convert the landing site into the same frame as the spacecraft and use that as targeting values
     let ls_luna_buf = cosm.frame_chg(&ls_buf, moonj2k);
 
-    println!("Start: {}", pdi_start);
+    println!("PDI start: {}", pdi_start);
     println!(
-        "Start: |r| = {:.4} km\t|v| = {:.4} km/s\taltitude = {:.4} km\tlanding altitude = {:.4} km",
+        "PDI Start: |r| = {:.4} km\t|v| = {:.4} km/s\taltitude = {:.4} km\tlanding altitude = {:.4} km\nPDI lat = {:.2} deg\tlong = {:.2} deg",
         pdi_start.orbit.rmag(),
         pdi_start.orbit.vmag(),
         pdi_start_fixed.geodetic_height(),
-        ls_buf.geodetic_height()
+        ls_buf.geodetic_height(),
+        pdi_start_fixed.geodetic_latitude(),
+        pdi_start_fixed.geodetic_longitude()
     );
 
     println!("LANDING SITE: {}", ls_luna);

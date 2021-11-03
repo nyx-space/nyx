@@ -1348,17 +1348,13 @@ impl Orbit {
     pub fn rss(&self, other: &Self) -> (f64, f64) {
         rss_orbit_errors(self, other)
     }
-}
 
-impl PartialEq for Orbit {
-    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
-    fn eq(&self, other: &Orbit) -> bool {
-        let distance_tol = 1e-5; // centimeter
-        let velocity_tol = 1e-5; // centimeter per second
+    /// Returns whether this orbit and another are equal within the specified radial and velocity absolute tolerances
+    pub fn eq_within(&self, other: &Self, radial_tol: f64, velocity_tol: f64) -> bool {
         self.dt == other.dt
-            && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol
+            && (self.x - other.x).abs() < radial_tol
+            && (self.y - other.y).abs() < radial_tol
+            && (self.z - other.z).abs() < radial_tol
             && (self.vx - other.vx).abs() < velocity_tol
             && (self.vy - other.vy).abs() < velocity_tol
             && (self.vz - other.vz).abs() < velocity_tol
@@ -1369,6 +1365,15 @@ impl PartialEq for Orbit {
             } else {
                 true
             }
+    }
+}
+
+impl PartialEq for Orbit {
+    /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
+    fn eq(&self, other: &Orbit) -> bool {
+        let radial_tol = 1e-5; // centimeter
+        let velocity_tol = 1e-5; // centimeter per second
+        self.eq_within(other, radial_tol, velocity_tol)
     }
 }
 

@@ -136,18 +136,27 @@ pub fn kronecker<T: Real>(a: T, b: T) -> T {
 }
 
 /// Returns a rotation about the X axis. The angle must be provided in radians.
+/// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
+/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system. 
+/// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
 pub fn r1(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
     Matrix3::new(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c)
 }
 
 /// Returns a rotation about the Y axis. The angle must be provided in radians.
+/// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
+/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system. 
+/// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
 pub fn r2(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
     Matrix3::new(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c)
 }
 
 /// Returns a rotation about the Z axis. The angle must be provided in radians.
+/// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
+/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system. 
+/// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
 pub fn r3(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
     Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)

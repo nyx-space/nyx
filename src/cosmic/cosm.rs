@@ -678,6 +678,11 @@ impl Cosm {
         if index == exb_states.position.len() {
             index -= 1;
             offset = interval_length;
+        } else if index > exb_states.position.len() {
+            return Err(NyxError::NoInterpolationData(format!(
+                "No interpolation data for date {}",
+                epoch
+            )));
         }
         let pos_coeffs = &exb_states.position[index];
 
@@ -1547,11 +1552,11 @@ mod tests {
         let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
 
         assert!(
-            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 1e-6,
+            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 2e-16,
             "a single rotation changes rmag"
         );
         assert!(
-            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-6,
+            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-7,
             "reverse rotation does not match initial state"
         );
 
@@ -1560,43 +1565,75 @@ mod tests {
         let eme2k = cosm.frame("EME2000");
         let earth_iau = cosm.frame("IAU Earth");
         println!("{:?}\n{:?}", eme2k, earth_iau);
-        let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
 
+        let dt = Epoch::from_gregorian_utc(2023, 11, 16, 06, 11, 19, 146200000);
+
+        // Case 1: Initialize from EME2000
         let state_eme2k = Orbit::cartesian(
-            5_946.673_548_288_958,
-            1_656.154_606_023_661,
-            2_259.012_129_598_249,
-            -3.098_683_050_943_824,
-            4.579_534_132_135_011,
-            6.246_541_551_539_432,
+            2196.260617879428,
+            5161.156645108604,
+            3026.122639999121,
+            -0.376262062797,
+            0.159851964260,
+            0.000983174100,
             dt,
             eme2k,
         );
-        let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
-        println!("{}\n{}", state_eme2k, state_ecef);
-        let delta_state = cosm.frame_chg(&state_ecef, eme2k) - state_eme2k;
+
+        let state_iau_earth = Orbit::cartesian(
+            925.651012109672,
+            -5529.343261192083,
+            3031.179663596684,
+            0.000032603895,
+            -0.000229009865,
+            0.000108943879,
+            dt,
+            earth_iau,
+        );
+
+        let state_iau_earth_computed = cosm.frame_chg(&state_eme2k, earth_iau);
+        let delta_state = cosm.frame_chg(&state_iau_earth_computed, eme2k) - state_eme2k;
+
         assert!(
-            delta_state.rmag().abs() < 1e-9,
+            delta_state.rmag().abs() < 1e-11,
             "Inverse rotation is broken"
         );
         assert!(
-            delta_state.vmag().abs() < 1e-9,
+            delta_state.vmag().abs() < 1e-11,
             "Inverse rotation is broken"
         );
-        // Monte validation
-        // EME2000 state:
-        // State (km, km/sec)
-        // 'Earth' -> 'test' in 'EME2000' at '01-JAN-2000 12:00:00.0000 TAI'
-        // Pos:  5.946673548288958e+03  1.656154606023661e+03  2.259012129598249e+03
-        // Vel: -3.098683050943824e+00  4.579534132135011e+00  6.246541551539432e+00Earth Body Fixed state:
-        // State (km, km/sec)
-        // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-JAN-2000 12:00:00.0000 TAI'
-        // Pos: -5.681756320398799e+02  6.146783778323857e+03  2.259012130187828e+03
-        // Vel: -4.610834400780483e+00 -2.190121576903486e+00  6.246541569551255e+00
-        assert!(dbg!(state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
-        assert!(dbg!(state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
-        assert!(dbg!(state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
-        // TODO: Fix the velocity computation
+
+        // Check the state matches
+        let dcm = cosm
+            .try_position_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("IAU_Moon"), dt)
+            .unwrap();
+        // The DCM matches SPICE very well
+
+        let spice_dcm = Matrix3::new(
+            -0.0517208410530453,
+            0.9259079323890239,
+            0.3741917360656812,
+            -0.9986038252635100,
+            -0.0439204209304354,
+            -0.0293495620815480,
+            -0.0107403337867543,
+            -0.3751872830525792,
+            0.9268868042354325,
+        );
+        assert!(
+            (dcm - spice_dcm).norm() < 1e-9,
+            "DCM EME2000 -> IAU Moon error too large"
+        );
+
+        let (pos_rss, vel_rss) = state_iau_earth.rss(&state_iau_earth_computed);
+        dbg!(pos_rss, vel_rss);
+
+        assert!(
+            state_iau_earth.eq_within(&state_iau_earth_computed, 1e-4, 1e-4),
+            "EME2000 -> IAU Earth failed\nComputed: {}\nExpected: {}",
+            state_iau_earth_computed,
+            state_iau_earth,
+        );
 
         // Case 2
         // Earth Body Fixed state:

@@ -24,7 +24,6 @@ use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector3};
 use crate::md::targeter::Targeter;
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
-use crate::tools::lambert::{standard, TransferKind};
 use crate::utils::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
 use std::sync::Arc;
@@ -114,78 +113,6 @@ where
         })
     }
 
-    /// Builds a multiple shooting structure assuming that the optimal trajectory is near the Lambert
-    /// solution that connects the start and end points. The position of the nodes will be update at
-    /// each iteration of the outer loop.
-    pub fn lambert_heuristic(
-        x0: Spacecraft,
-        xf: Orbit,
-        node_count: usize,
-        prop: &'a Propagator<'a, D, E>,
-    ) -> Result<Self, NyxError> {
-        if node_count < 3 {
-            error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::UnderdeterminedProblem);
-        }
-
-        let delta_t = xf.epoch() - x0.epoch();
-
-        let lambert_sol = standard(
-            x0.orbit.radius(),
-            xf.radius(),
-            delta_t.in_seconds(),
-            x0.orbit.frame.gm(),
-            TransferKind::ShortWay,
-        )?;
-
-        // Get into the transfer orbit.
-        let mut lambert_x0 = x0.orbit;
-        lambert_x0.vx = lambert_sol.v_init[0];
-        lambert_x0.vy = lambert_sol.v_init[1];
-        lambert_x0.vz = lambert_sol.v_init[2];
-
-        // Propagate for the TOF
-        let (prop_xf, traj) = Propagator::default(OrbitalDynamics::two_body())
-            .with(lambert_x0)
-            .for_duration_with_traj(delta_t)?;
-        // Check that the Lambert solution was good enough
-        println!(
-            "Lambert error: {:.3} m",
-            1e3 * (prop_xf.radius() - xf.radius()).norm()
-        );
-
-        // Now, create the nodes at equidistant times on that trajectory
-        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
-
-        // Build each node successively (includes xf)
-        let mut nodes = Vec::with_capacity(node_count + 1);
-        let mut prev_node_epoch = x0.epoch();
-
-        for _ in 0..node_count {
-            // Compute the position we want.
-            let this_epoch = prev_node_epoch + duration_increment;
-            let this_node = traj.at(this_epoch)?.radius();
-            nodes.push(Node {
-                x: this_node[0],
-                y: this_node[1],
-                z: this_node[2],
-                frame: x0.orbit.frame,
-                epoch: this_epoch,
-            });
-            prev_node_epoch = this_epoch;
-        }
-        Ok(Self {
-            prop,
-            nodes,
-            x0,
-            xf,
-            current_iteration: 0,
-            max_iterations: 50,
-            improvement_threshold: 0.01,
-            all_dvs: Vec::with_capacity(node_count),
-        })
-    }
-
     /// Builds a multiple shooting structure assuming that the optimal trajectory is near a linear
     /// heuristic in altitude and direction.
     /// For example, if x0 has an altitude of 100 km and xf has an altitude
@@ -230,20 +157,20 @@ where
             let orbit_point_bf = cosm.frame_chg(&orbit_point, body_frame);
             // Note that the altitude here might be different, so we scale the altitude change by the current altitude
             let desired_alt_i = (xf_bf.geodetic_height() - orbit_point_bf.geodetic_height())
-                / ((node_count - i) as f64);
+                / ((node_count - i) as f64).sqrt();
             // Build the node in the body frame and convert that to the original frame
             let node_bf = Orbit::from_geodesic(
                 orbit_point_bf.geodetic_latitude(),
                 orbit_point_bf.geodetic_longitude(),
-                orbit_point_bf.geodetic_height() + desired_alt_i,
+                orbit_point_bf.geodetic_height() + dbg!(desired_alt_i),
                 this_epoch,
                 body_frame,
             );
             println!(
-                "{}-th node alt: {:.3} m \txf alt: {:.3} m",
+                "{}-th node alt: {:.3} m (want: {:.3})",
                 i,
                 1e3 * node_bf.geodetic_height(),
-                1e3 * xf_bf.geodetic_height()
+                1e3 * xf_bf.geodetic_height(),
             );
             // Convert that back into the inertial frame
             let this_node = cosm.frame_chg(&node_bf, inertial_frame).radius();
