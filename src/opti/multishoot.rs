@@ -78,6 +78,9 @@ where
 
         // Compute the direction of the objective
         let mut direction = xf.radius() - x0.orbit.radius();
+        if direction.norm() < 2e-16 {
+            return Err(NyxError::TargetsTooClose);
+        }
         let distance_increment = direction.norm() / (node_count as f64);
         let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
         direction /= direction.norm();
@@ -118,7 +121,7 @@ where
     /// For example, if x0 has an altitude of 100 km and xf has an altitude
     /// of 200 km, and 10 nodes are required over 10 minutes, then node 1 will be 110 km, node 2 220km, etc.
     /// body_frame must be a body fixed frame
-    pub fn linear_heuristic(
+    pub fn linear_altitude_heuristic(
         x0: Spacecraft,
         xf: Orbit,
         node_count: usize,
@@ -162,15 +165,9 @@ where
             let node_bf = Orbit::from_geodesic(
                 orbit_point_bf.geodetic_latitude(),
                 orbit_point_bf.geodetic_longitude(),
-                orbit_point_bf.geodetic_height() + dbg!(desired_alt_i),
+                orbit_point_bf.geodetic_height() + desired_alt_i,
                 this_epoch,
                 body_frame,
-            );
-            println!(
-                "{}-th node alt: {:.3} m (want: {:.3})",
-                i,
-                1e3 * node_bf.geodetic_height(),
-                1e3 * xf_bf.geodetic_height(),
             );
             // Convert that back into the inertial frame
             let this_node = cosm.frame_chg(&node_bf, inertial_frame).radius();
