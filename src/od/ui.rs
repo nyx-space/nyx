@@ -169,6 +169,7 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
+    simultaneous_msr: bool,
     init_state: D::StateType,
     _marker: PhantomData<A>,
 }
@@ -221,6 +222,7 @@ where
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
             init_state,
+            simultaneous_msr: false,
             _marker: PhantomData::<A>,
         }
     }
@@ -555,6 +557,13 @@ where
                                     }
                                     Err(e) => return Err(e),
                                 }
+
+                                // If we do not have simultaneous measurements from different devices
+                                // then we don't need to check the visibility from other devices
+                                // if one is in visibility.
+                                if !self.simultaneous_msr {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -697,6 +706,7 @@ where
             prop,
             kf,
             devices,
+            simultaneous_msr: false,
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: CkfTrigger {},
