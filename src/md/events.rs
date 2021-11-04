@@ -19,10 +19,11 @@
 use super::StateParameter;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
+use crate::linalg::{DefaultAllocator, Vector3};
 use crate::time::{Duration, TimeUnit};
 use crate::utils::between_pm_x;
 use crate::{Spacecraft, State};
+use std::default::Default;
 use std::fmt;
 use std::sync::Arc;
 
@@ -148,6 +149,18 @@ impl Event {
     }
 }
 
+impl Default for Event {
+    fn default() -> Self {
+        Self {
+            parameter: StateParameter::Custom { mapping: 0 },
+            desired_value: 0.0,
+            value_precision: 1e-3,
+            epoch_precision: TimeUnit::Second,
+            in_frame: None,
+        }
+    }
+}
+
 impl EventEvaluator<Orbit> for Event {
     #[allow(clippy::identity_op)]
     fn epoch_precision(&self) -> Duration {
@@ -202,6 +215,14 @@ impl EventEvaluator<Orbit> for Event {
             }
             StateParameter::RAAN => angled_value(state.raan(), self.desired_value),
             StateParameter::Rmag => state.rmag() - self.desired_value,
+            StateParameter::SlantAngle { x, y, z } => {
+                let mut tgt = Vector3::new(x, y, z);
+                tgt /= tgt.norm();
+                angled_value(
+                    state.r_hat().dot(&tgt).acos().to_degrees(),
+                    self.desired_value,
+                )
+            }
             StateParameter::SemiParameter => state.semi_parameter() - self.desired_value,
             StateParameter::SemiMinorAxis => state.semi_minor_axis() - self.desired_value,
             StateParameter::SMA => state.sma() - self.desired_value,

@@ -87,6 +87,8 @@ pub enum StateParameter {
     Rmag,
     /// Semi parameter (km)
     SemiParameter,
+    /// Computes the slant angle by returning the arccos of the dot product between state's radius vector and the provided vector coordinates. The vector will be normalized if needed.
+    SlantAngle { x: f64, y: f64, z: f64 },
     /// Semi major axis (km)
     SMA,
     /// Semi minor axis (km)
@@ -139,6 +141,7 @@ impl StateParameter {
             | Self::MeanAnomaly
             | Self::EccentricAnomaly
             | Self::HyperbolicAnomaly
+            | Self::SlantAngle { .. }
             | Self::TrueAnomaly => 1e-3,
 
             // Distances
