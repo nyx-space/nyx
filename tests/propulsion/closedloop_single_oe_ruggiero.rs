@@ -40,7 +40,7 @@ fn rugg_sma() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -95,7 +95,7 @@ fn rugg_sma_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -152,7 +152,7 @@ fn rugg_inc() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -209,7 +209,7 @@ fn rugg_inc_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -266,7 +266,7 @@ fn rugg_ecc() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -323,7 +323,7 @@ fn rugg_ecc_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -382,7 +382,7 @@ fn rugg_aop() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -440,7 +440,7 @@ fn rugg_aop_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -498,7 +498,7 @@ fn rugg_raan() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_raan] {:x}", orbit);
 
     let setup = Propagator::new::<RK4Fixed>(

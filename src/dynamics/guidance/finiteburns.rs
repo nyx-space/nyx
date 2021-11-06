@@ -19,8 +19,10 @@
 use super::GuidanceLaw;
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::linalg::Vector3;
+use crate::md::ui::{Propagator, SpacecraftDynamics};
+use crate::propagators::ErrorCtrl;
 use crate::time::{Epoch, TimeUnit};
-use crate::State;
+use crate::{NyxError, State};
 use std::sync::Arc;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
@@ -38,14 +40,95 @@ pub struct Mnvr {
 }
 
 impl Mnvr {
-    /// Creates an instantaneous maneuver whose vector is the deltaV.
-    pub fn instantaneous(dt: Epoch, vector: Vector3<f64>) -> Self {
+    /// Creates an impulsive maneuver whose vector is the deltaV.
+    pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>) -> Self {
         Self {
             start: dt,
             end: dt + TimeUnit::Microsecond,
             thrust_lvl: 1.0,
             vector,
         }
+    }
+
+    /// Creates a manneuver from the provided time-invariant delta-v, in km/s
+    pub fn from_time_invariant(
+        start: Epoch,
+        end: Epoch,
+        thrust_lvl: f64,
+        dvector: Vector3<f64>,
+    ) -> Self {
+        Self {
+            start,
+            end,
+            thrust_lvl,
+            vector: dvector,
+        }
+    }
+
+    /// Converts the input delta-v vector in km/s at the provided Epoch to a finite burn
+    /// Uses Copernicus algorithm as described in "AAS 12-236: Recent Improvements to the Copernicus Trajectory Design and Optimization System" by Williams et al.
+    /// The vector is expected to be in the same frame as the spaceraft's orbit.
+    /// Convergence criteria:
+    ///     1. If the change in the duration of the burn is less than 1 seconds; or
+    ///     2. If the magnitude of the thrust vector matches the impulsive maneuver to less than 1 mm/s
+    pub fn impulsive_to_finite<'a, E: ErrorCtrl>(
+        epoch: Epoch,
+        dv: Vector3<f64>,
+        spacecraft: Spacecraft,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+    ) -> Result<Self, NyxError> {
+        if spacecraft.thruster.is_none() {
+            // Can't do any conversion to finite burns without a thruster
+            return Err(NyxError::CtrlExistsButNoThrusterAvail);
+        }
+
+        // Clone the dynamics
+        let mut prop = prop.clone();
+        // Propagate to the dv epoch
+        prop.dynamics = prop.dynamics.without_ctrl();
+        let sc_at_dv_epoch = prop.with(spacecraft).until_epoch(epoch)?;
+        // Calculate the u, dot u (=0) and ddot u from this state
+        let u = dv / dv.norm();
+        let r = sc_at_dv_epoch.orbit.radius();
+        let rmag = sc_at_dv_epoch.orbit.rmag();
+        let u_ddot = (3.0 * sc_at_dv_epoch.orbit.frame.gm() / rmag.powi(5))
+            * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
+        // Compute the control rates
+
+        // Compute a few thruster parameters
+        let thruster = spacecraft.thruster.as_ref().unwrap();
+        let c = thruster.exhaust_velocity();
+
+        let mut delta_tfb =
+            ((c * spacecraft.mass_kg()) / thruster.thrust) * (1.0 - (-dv.norm() / c).exp());
+
+        // Start iteration
+        let max_iter = 25;
+        let mut converged = false;
+
+        for _ in 0..max_iter {
+            let fb_guess = FiniteBurns {
+                mnvrs: vec![Self {
+                    start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
+                    end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
+                    thrust_lvl: 1.0,
+                    vector: u,
+                }],
+                frame: spacecraft.orbit.frame,
+            };
+            // Set
+
+            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
+        }
+
+        if !converged {
+            return Err(NyxError::MaxIterReached(format!(
+                "Finite burn failed to converge after {} iterations.",
+                max_iter
+            )));
+        }
+
+        todo!()
     }
 }
 

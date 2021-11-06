@@ -60,7 +60,7 @@ fn qlaw_as_ruggiero_case_a() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:x}", orbit);
 
     let setup = Propagator::new::<RK4Fixed>(
@@ -130,7 +130,7 @@ fn qlaw_as_ruggiero_case_b() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -194,7 +194,7 @@ fn qlaw_as_ruggiero_case_c() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -267,7 +267,7 @@ fn qlaw_as_ruggiero_case_d() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -345,7 +345,7 @@ fn qlaw_as_ruggiero_case_e() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -414,7 +414,7 @@ fn qlaw_as_ruggiero_case_f() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_f] {:x}", orbit);
 
     let (tx, rx): (Sender<Spacecraft>, Receiver<Spacecraft>) = mpsc::channel();
@@ -494,7 +494,7 @@ fn ruggiero_iepc_2011_102() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(

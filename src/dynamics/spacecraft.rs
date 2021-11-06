@@ -42,7 +42,7 @@ pub struct SpacecraftDynamics<'a> {
 impl<'a> SpacecraftDynamics<'a> {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// By default, the mass of the vehicle will be decremented as propellant is consummed.
-    pub fn with_ctrl(
+    pub fn from_ctrl(
         orbital_dyn: Arc<OrbitalDynamics<'a>>,
         ctrl: Arc<dyn GuidanceLaw + 'a>,
     ) -> Arc<Self> {
@@ -56,7 +56,7 @@ impl<'a> SpacecraftDynamics<'a> {
 
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// Will _not_ decrement the fuel mass as propellant is consummed.
-    pub fn with_ctrl_no_decr(
+    pub fn from_ctrl_no_decr(
         orbital_dyn: Arc<OrbitalDynamics<'a>>,
         ctrl: Arc<dyn GuidanceLaw + 'a>,
     ) -> Arc<Self> {
@@ -122,6 +122,26 @@ impl<'a> SpacecraftDynamics<'a> {
             Some(ctrl) => ctrl.achieved(state),
             None => Err(NyxError::NoObjectiveDefined),
         }
+    }
+
+    /// Clone these spacecraft dynamics and update the control to the one provided.
+    pub fn with_ctrl(&self, ctrl: Arc<dyn GuidanceLaw + 'a>) -> Arc<Self> {
+        Arc::new(Self {
+            orbital_dyn: self.orbital_dyn.clone(),
+            ctrl: Some(ctrl),
+            force_models: self.force_models.clone(),
+            decrement_mass: self.decrement_mass,
+        })
+    }
+
+    /// Clone these spacecraft dynamics and remove any control model
+    pub fn without_ctrl(&self) -> Arc<Self> {
+        Arc::new(Self {
+            orbital_dyn: self.orbital_dyn.clone(),
+            ctrl: None,
+            force_models: self.force_models.clone(),
+            decrement_mass: self.decrement_mass,
+        })
     }
 }
 

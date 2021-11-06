@@ -188,7 +188,7 @@ fn traj_spacecraft() {
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc_dynamics =
-        SpacecraftDynamics::with_ctrl(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
+        SpacecraftDynamics::from_ctrl(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
 
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * TimeUnit::Minute + 10 * TimeUnit::Second;

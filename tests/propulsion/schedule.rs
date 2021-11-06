@@ -47,21 +47,19 @@ fn val_transfer_schedule_no_depl() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
 
-    // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
-
     // Define the maneuver and its schedule
-    let mnvr0 = Mnvr {
-        start: Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
-        end: end_time,
-        thrust_lvl: 1.0, // Full thrust
-        vector: Vector3::new(1.0, 0.0, 0.0),
-    };
+    let mnvr0 = Mnvr::from_time_invariant(
+        Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
+        end_time,
+        1.0, // Full thrust
+        Vector3::new(1.0, 0.0, 0.0),
+    );
 
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
 
     // And create the spacecraft with that controller
     // Disable fuel mass decrement
-    let sc = SpacecraftDynamics::with_ctrl_no_decr(orbital_dyn, schedule);
+    let sc = SpacecraftDynamics::from_ctrl_no_decr(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
@@ -144,17 +142,17 @@ fn val_transfer_schedule_depl() {
     // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
 
     // Define the maneuver and its schedule
-    let mnvr0 = Mnvr {
-        start: Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
-        end: end_time,
-        thrust_lvl: 1.0, // Full thrust
-        vector: Vector3::new(1.0, 0.0, 0.0),
-    };
+    let mnvr0 = Mnvr::from_time_invariant(
+        Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
+        end_time,
+        1.0, // Full thrust
+        Vector3::new(1.0, 0.0, 0.0),
+    );
 
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0], Frame::VNC);
 
     // And create the spacecraft with that controller
-    let sc = SpacecraftDynamics::with_ctrl(orbital_dyn, schedule);
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))

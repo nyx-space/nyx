@@ -60,6 +60,9 @@ pub mod opti;
 /// Monte Carlo module
 pub mod mc;
 
+/// Polynomial and fitting module
+pub mod polyfit;
+
 #[macro_use]
 extern crate log;
 extern crate hifitime;
