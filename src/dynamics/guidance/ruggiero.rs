@@ -17,7 +17,7 @@
 */
 
 use super::{
-    unit_vector_from_angles, Achieve, Frame, GuidanceLaw, GuidanceMode, NyxError, Orbit,
+    unit_vector_from_plane_angles, Achieve, Frame, GuidanceLaw, GuidanceMode, NyxError, Orbit,
     Spacecraft, Vector3,
 };
 use std::f64::consts::FRAC_PI_2 as half_pi;
@@ -89,7 +89,7 @@ impl GuidanceLaw for Ruggiero {
                             let num = osc.ecc() * osc.ta().to_radians().sin();
                             let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
                             let alpha = num.atan2(denom);
-                            ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
+                            ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         }
                     }
                     Achieve::Ecc { target, tol } => {
@@ -98,7 +98,7 @@ impl GuidanceLaw for Ruggiero {
                             let num = osc.ta().to_radians().sin();
                             let denom = osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
                             let alpha = num.atan2(denom);
-                            ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
+                            ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         }
                     }
                     Achieve::Inc { target, tol } => {
@@ -106,7 +106,7 @@ impl GuidanceLaw for Ruggiero {
                         if weight.abs() > 0.0 {
                             let beta =
                                 half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
-                            ctrl += unit_vector_from_angles(0.0, beta) * weight;
+                            ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                         }
                     }
                     Achieve::Raan { target, tol } => {
@@ -116,7 +116,7 @@ impl GuidanceLaw for Ruggiero {
                         if weight.abs() > 0.0 {
                             let beta =
                                 half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
-                            ctrl += unit_vector_from_angles(0.0, beta) * weight;
+                            ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                         }
                     }
                     Achieve::Aop { target, tol } => {
@@ -140,13 +140,13 @@ impl GuidanceLaw for Ruggiero {
                             let p = osc.semi_parameter();
                             let (sin_ta, cos_ta) = osc.ta().to_radians().sin_cos();
                             let alpha = (-p * cos_ta).atan2((p + osc.rmag()) * sin_ta);
-                            ctrl += unit_vector_from_angles(alpha, 0.0) * weight;
+                            ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         } else {
                             // Out of plane
                             let beta = half_pi
                                 .copysign(-(osc.ta().to_radians() + osc.aop().to_radians()).sin())
                                 * osc.inc().to_radians().cos();
-                            ctrl += unit_vector_from_angles(0.0, beta) * weight;
+                            ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                         };
                     }
                 }

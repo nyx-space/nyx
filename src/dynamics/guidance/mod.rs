@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::f64::consts::FRAC_PI_6;
+
 use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
 use crate::errors::NyxError;
 use crate::linalg::Vector3;
@@ -82,10 +84,25 @@ impl Achieve {
     }
 }
 
-fn unit_vector_from_angles(alpha: f64, beta: f64) -> Vector3<f64> {
+/// Converts the alpha (in-plane) and beta (out-of-plane) angles in the RCN frame to the unit vector in the RCN frame
+fn unit_vector_from_plane_angles(alpha: f64, beta: f64) -> Vector3<f64> {
     Vector3::new(
         alpha.sin() * beta.cos(),
         alpha.cos() * beta.cos(),
         beta.sin(),
     )
+}
+
+/// Converts the provided unit vector into in-plane and out-of-plane angles in the RCN frame, returned in radians
+fn plane_angles_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
+    (vhat[0].atan2(vhat[1]), vhat[2].asin())
+}
+
+#[test]
+fn name() {
+    let alpha = 5.0 * FRAC_PI_6;
+    let beta = 2.0 * FRAC_PI_6;
+    let (alpha2, beta2) = plane_angles_from_unit_vector(unit_vector_from_plane_angles(alpha, beta));
+    assert!((alpha2 - alpha).abs() < 2e-16);
+    assert!((beta2 - beta).abs() < 2e-16);
 }

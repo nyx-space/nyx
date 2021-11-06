@@ -16,10 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::GuidanceLaw;
+use super::{plane_angles_from_unit_vector, unit_vector_from_plane_angles, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::linalg::Vector3;
 use crate::md::ui::{Propagator, SpacecraftDynamics};
+use crate::polyfit::CommonPolynomial;
 use crate::propagators::ErrorCtrl;
 use crate::time::{Epoch, TimeUnit};
 use crate::{NyxError, State};
@@ -35,19 +36,17 @@ pub struct Mnvr {
     pub end: Epoch,
     /// Thrust level, if 1.0 use all thruster available at full power
     pub thrust_lvl: f64,
-    /// Direction of the thrust in the VNC frame
-    pub vector: Vector3<f64>,
+    /// The interpolation polynomial for the in-plane angle
+    pub alpha_inplane: CommonPolynomial,
+    /// The interpolation polynomial for the out-of-plane angle
+    pub beta_outofplane: CommonPolynomial,
 }
 
 impl Mnvr {
     /// Creates an impulsive maneuver whose vector is the deltaV.
+    /// TODO: This should use William's algorithm
     pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>) -> Self {
-        Self {
-            start: dt,
-            end: dt + TimeUnit::Microsecond,
-            thrust_lvl: 1.0,
-            vector,
-        }
+        Self::from_time_invariant(dt, dt + TimeUnit::Millisecond, 1.0, vector)
     }
 
     /// Creates a manneuver from the provided time-invariant delta-v, in km/s
@@ -55,13 +54,16 @@ impl Mnvr {
         start: Epoch,
         end: Epoch,
         thrust_lvl: f64,
-        dvector: Vector3<f64>,
+        vector: Vector3<f64>,
     ) -> Self {
+        // Convert to angles
+        let (alpha, beta) = plane_angles_from_unit_vector(vector);
         Self {
             start,
             end,
-            thrust_lvl,
-            vector: dvector,
+            thrust_lvl: 1.0,
+            alpha_inplane: CommonPolynomial::Constant(alpha),
+            beta_outofplane: CommonPolynomial::Constant(beta),
         }
     }
 
@@ -82,53 +84,61 @@ impl Mnvr {
             return Err(NyxError::CtrlExistsButNoThrusterAvail);
         }
 
-        // Clone the dynamics
-        let mut prop = prop.clone();
-        // Propagate to the dv epoch
-        prop.dynamics = prop.dynamics.without_ctrl();
-        let sc_at_dv_epoch = prop.with(spacecraft).until_epoch(epoch)?;
-        // Calculate the u, dot u (=0) and ddot u from this state
-        let u = dv / dv.norm();
-        let r = sc_at_dv_epoch.orbit.radius();
-        let rmag = sc_at_dv_epoch.orbit.rmag();
-        let u_ddot = (3.0 * sc_at_dv_epoch.orbit.frame.gm() / rmag.powi(5))
-            * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
-        // Compute the control rates
+        // // Clone the dynamics
+        // let mut prop = prop.clone();
+        // // Propagate to the dv epoch
+        // prop.dynamics = prop.dynamics.without_ctrl();
+        // let sc_at_dv_epoch = prop.with(spacecraft).until_epoch(epoch)?;
+        // // Calculate the u, dot u (=0) and ddot u from this state
+        // let u = dv / dv.norm();
+        // let r = sc_at_dv_epoch.orbit.radius();
+        // let rmag = sc_at_dv_epoch.orbit.rmag();
+        // let u_ddot = (3.0 * sc_at_dv_epoch.orbit.frame.gm() / rmag.powi(5))
+        //     * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
+        // // Compute the control rates
 
-        // Compute a few thruster parameters
-        let thruster = spacecraft.thruster.as_ref().unwrap();
-        let c = thruster.exhaust_velocity();
+        // // Compute a few thruster parameters
+        // let thruster = spacecraft.thruster.as_ref().unwrap();
+        // let c = thruster.exhaust_velocity();
 
-        let mut delta_tfb =
-            ((c * spacecraft.mass_kg()) / thruster.thrust) * (1.0 - (-dv.norm() / c).exp());
+        // let mut delta_tfb =
+        //     ((c * spacecraft.mass_kg()) / thruster.thrust) * (1.0 - (-dv.norm() / c).exp());
 
-        // Start iteration
-        let max_iter = 25;
-        let mut converged = false;
+        // // Start iteration
+        // let max_iter = 25;
+        // let mut converged = false;
 
-        for _ in 0..max_iter {
-            let fb_guess = FiniteBurns {
-                mnvrs: vec![Self {
-                    start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
-                    end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
-                    thrust_lvl: 1.0,
-                    vector: u,
-                }],
-                frame: spacecraft.orbit.frame,
-            };
-            // Set
+        // for _ in 0..max_iter {
+        //     let fb_guess = FiniteBurns {
+        //         mnvrs: vec![Self {
+        //             start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
+        //             end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
+        //             thrust_lvl: 1.0,
+        //             vector: u,
+        //         }],
+        //         frame: spacecraft.orbit.frame,
+        //     };
+        //     // Set
 
-            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
-        }
+        //     prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
+        // }
 
-        if !converged {
-            return Err(NyxError::MaxIterReached(format!(
-                "Finite burn failed to converge after {} iterations.",
-                max_iter
-            )));
-        }
+        // if !converged {
+        //     return Err(NyxError::MaxIterReached(format!(
+        //         "Finite burn failed to converge after {} iterations.",
+        //         max_iter
+        //     )));
+        // }
 
         todo!()
+    }
+
+    /// Return the thrust vector computed at the provided epoch
+    pub fn vector(&self, epoch: Epoch) -> Vector3<f64> {
+        let t = (epoch - self.start).in_seconds();
+        let alpha = self.alpha_inplane.eval(t);
+        let beta = self.beta_outofplane.eval(t);
+        unit_vector_from_plane_angles(alpha, beta)
     }
 }
 
@@ -161,9 +171,10 @@ impl GuidanceLaw for FiniteBurns {
                 let next_mnvr = self.mnvrs[mnvr_no as usize];
                 if next_mnvr.start <= osc.epoch() {
                     if matches!(self.frame, Frame::Inertial) {
-                        next_mnvr.vector
+                        next_mnvr.vector(osc.epoch())
                     } else {
-                        osc.orbit.dcm_from_traj_frame(self.frame).unwrap() * next_mnvr.vector
+                        osc.orbit.dcm_from_traj_frame(self.frame).unwrap()
+                            * next_mnvr.vector(osc.epoch())
                     }
                 } else {
                     Vector3::zeros()

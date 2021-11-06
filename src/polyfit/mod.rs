@@ -79,6 +79,29 @@ impl CommonPolynomial {
     }
 }
 
+impl fmt::Display for CommonPolynomial {
+    /// Prints the polynomial with the least significant coefficients first
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Self::Constant(a) => write!(f, "{}", Polynomial::<1> { coefficients: [a] }),
+            &Self::Linear(a, b) => write!(
+                f,
+                "{}",
+                Polynomial::<2> {
+                    coefficients: [b, a],
+                }
+            ),
+            &Self::Quadratic(a, b, c) => write!(
+                f,
+                "{}",
+                Polynomial::<3> {
+                    coefficients: [c, b, a],
+                }
+            ),
+        }
+    }
+}
+
 #[test]
 fn poly_constant() {
     let c = CommonPolynomial::Constant(10.0);
@@ -122,4 +145,8 @@ fn poly_print() {
         coefficients: [101.0, -2.0, 3.0],
     };
     println!("{}", p);
+    assert_eq!(
+        format!("{}", p),
+        format!("{}", CommonPolynomial::Quadratic(3.0, -2.0, 101.0))
+    );
 }
