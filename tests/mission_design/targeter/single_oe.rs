@@ -149,7 +149,7 @@ fn tgt_hd_sma_from_peri() {
     println!("{}", tgt);
 
     let solution_fd = tgt
-        .try_achieve_from_dual(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_dual(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);

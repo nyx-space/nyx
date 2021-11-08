@@ -210,7 +210,7 @@ where
                  ** 1. Solve the delta-v differential corrector between each node
                  ** *** */
                 let tgt = Targeter::delta_v(self.prop, self.nodes[i].to_targeter_objective());
-                let sol = match tgt.try_achieve_fd(
+                let sol = match tgt.try_achieve_dual(
                     initial_states[i],
                     initial_states[i].epoch(),
                     self.nodes[i].epoch,
@@ -249,7 +249,7 @@ where
                      ** *** */
 
                     let inner_tgt_a = Targeter::delta_v(self.prop, next_node.to_vec());
-                    let inner_sol_a = match inner_tgt_a.try_achieve_fd(
+                    let inner_sol_a = match inner_tgt_a.try_achieve_dual(
                         initial_states[i],
                         initial_states[i].epoch(),
                         self.nodes[i].epoch,
@@ -276,7 +276,7 @@ where
                      ** *** */
                     let inner_tgt_b =
                         Targeter::delta_v(self.prop, self.nodes[i + 1].to_targeter_objective());
-                    let inner_sol_b = inner_tgt_b.try_achieve_fd(
+                    let inner_sol_b = inner_tgt_b.try_achieve_dual(
                         inner_sol_a.achieved_state,
                         inner_sol_a.achieved_state.epoch(),
                         self.nodes[i + 1].epoch,
@@ -363,7 +363,7 @@ where
                 for (i, node) in self.nodes.iter().enumerate() {
                     // Run the unpertubed targeter
                     let tgt = Targeter::delta_v(self.prop, node.to_targeter_objective());
-                    let sol = tgt.try_achieve_fd(
+                    let sol = tgt.try_achieve_dual(
                         initial_states[i],
                         initial_states[i].epoch(),
                         node.epoch,

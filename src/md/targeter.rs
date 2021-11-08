@@ -657,7 +657,7 @@ where
 
     /// Differential correction using hyperdual numbers for the objectives
     #[allow(clippy::comparison_chain)]
-    pub fn try_achieve_from_dual(
+    pub fn try_achieve_dual(
         &self,
         initial_state: Spacecraft,
         correction_epoch: Epoch,
