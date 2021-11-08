@@ -117,7 +117,7 @@ where
     }
 
     /// Builds a multiple shooting structure assuming that the optimal trajectory is near a linear
-    /// heuristic in altitude and direction.
+    /// heuristic in geodetic altitude and direction.
     /// For example, if x0 has an altitude of 100 km and xf has an altitude
     /// of 200 km, and 10 nodes are required over 10 minutes, then node 1 will be 110 km, node 2 220km, etc.
     /// body_frame must be a body fixed frame
@@ -186,7 +186,7 @@ where
             x0,
             xf,
             current_iteration: 0,
-            max_iterations: 50,
+            max_iterations: 100,
             improvement_threshold: 0.01,
             all_dvs: Vec::with_capacity(node_count),
         })
@@ -224,7 +224,7 @@ where
 
                 self.all_dvs.push(nominal_delta_v);
                 // Store the Δv and the initial state for the next targeter.
-                initial_states.push(sol.achieved);
+                initial_states.push(sol.achieved_state);
             }
             // NOTE: We have two separate loops because we need the initial state of node i+2 for the dv computation
             // of the third entry to the outer jacobian.
@@ -277,8 +277,8 @@ where
                     let inner_tgt_b =
                         Targeter::delta_v(self.prop, self.nodes[i + 1].to_targeter_objective());
                     let inner_sol_b = inner_tgt_b.try_achieve_fd(
-                        inner_sol_a.achieved,
-                        inner_sol_a.achieved.epoch(),
+                        inner_sol_a.achieved_state,
+                        inner_sol_a.achieved_state.epoch(),
                         self.nodes[i + 1].epoch,
                     )?;
 
@@ -300,7 +300,7 @@ where
                      ** 2.D. Compute the difference between the arrival and departure velocities and node i+1
                      ** *** */
                     if i < self.nodes.len() - 3 {
-                        let dv_ip1 = inner_sol_b.achieved.orbit.velocity()
+                        let dv_ip1 = inner_sol_b.achieved_state.orbit.velocity()
                             - initial_states[i + 2].orbit.velocity();
                         // ∂Δv_x / ∂r_x
                         outer_jacobian[(3 * (i + 2), 3 * i + axis)] =
@@ -368,7 +368,7 @@ where
                         initial_states[i].epoch(),
                         node.epoch,
                     )?;
-                    initial_states.push(sol.achieved);
+                    initial_states.push(sol.achieved_state);
                     ms_sol.solutions.push(sol);
                 }
 

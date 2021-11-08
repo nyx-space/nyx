@@ -85,9 +85,9 @@ impl Objective {
 #[derive(Clone, Debug)]
 pub struct TargeterSolution {
     /// The corrected spacecraft state at the correction epoch
-    pub state: Spacecraft,
+    pub corrected_state: Spacecraft,
     /// The state at which the objectives are achieved
-    pub achieved: Spacecraft,
+    pub achieved_state: Spacecraft,
     /// The correction vector applied
     pub correction: DVector<f64>,
     /// The kind of correction (position or velocity)
@@ -117,7 +117,7 @@ impl fmt::Display for TargeterSolution {
 
         let mut corrmsg = format!(
             "Correction @ {}:",
-            self.state.epoch().as_gregorian_utc_str()
+            self.corrected_state.epoch().as_gregorian_utc_str()
         );
         let mut is_only_position = true;
         let mut is_only_velocity = true;
@@ -150,11 +150,11 @@ impl fmt::Display for TargeterSolution {
             ));
         }
 
-        write!(
+        writeln!(
             f,
-            "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved @ {}:{}\n\tFinal state:\n\t\t{}\n\t\t{:x}",
+            "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved @ {}:{}\n\tCorrected state:\n\t\t{}\n\t\t{:x}\n\tAchieved state:\n\t\t{}\n\t\t{:x}",
             self.variables.iter().map(|v| format!("{:?}", v.component)).collect::<Vec<String>>(),
-            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.achieved.epoch().as_gregorian_utc_str(), objmsg, self.state, self.state
+            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.achieved_state.epoch().as_gregorian_utc_str(), objmsg, self.corrected_state, self.corrected_state, self.achieved_state, self.achieved_state
         )
     }
 }
@@ -543,7 +543,7 @@ where
 
             if converged {
                 let conv_dur = Instant::now() - start_instant;
-                let mut state = xi_start;
+                let mut corrected_state = xi_start;
 
                 let mut state_correction = Vector6::<f64>::zeros();
                 for (i, var) in self.variables.iter().enumerate() {
@@ -551,18 +551,21 @@ where
                 }
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
-                    let dcm_vnc2inertial =
-                        state.orbit.dcm_from_traj_frame(frame).unwrap().transpose();
+                    let dcm_vnc2inertial = corrected_state
+                        .orbit
+                        .dcm_from_traj_frame(frame)
+                        .unwrap()
+                        .transpose();
                     let velocity_correction =
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                    state.orbit.apply_dv(velocity_correction);
+                    corrected_state.orbit.apply_dv(velocity_correction);
                 } else {
-                    state.orbit = state.orbit + state_correction;
+                    corrected_state.orbit = corrected_state.orbit + state_correction;
                 }
 
                 let sol = TargeterSolution {
-                    state,
-                    achieved: xi_start.with_orbit(xf),
+                    corrected_state,
+                    achieved_state: xi_start.with_orbit(xf),
                     correction: total_correction,
                     computation_dur: conv_dur,
                     variables: self.variables.clone(),
@@ -848,8 +851,8 @@ where
                 }
 
                 let sol = TargeterSolution {
-                    state,
-                    achieved: xi_start.with_orbit(xf),
+                    corrected_state: state,
+                    achieved_state: xi_start.with_orbit(xf),
                     correction: total_correction,
                     computation_dur: conv_dur,
                     variables: self.variables.clone(),
@@ -952,8 +955,8 @@ where
         // Propagate until achievement epoch
         let (xf, traj) = self
             .prop
-            .with(solution.state)
-            .until_epoch_with_traj(solution.achieved.epoch())?;
+            .with(solution.corrected_state)
+            .until_epoch_with_traj(solution.achieved_state.epoch())?;
 
         // Build the partials
         let xf_dual = OrbitDual::from(xf.orbit);

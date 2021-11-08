@@ -27,7 +27,7 @@ fn orbit_raising() {
         90.0,
         90.0,
         60.0,
-        epoch + 30 * TimeUnit::Minute,
+        epoch + 2 * start.period(),
         eme2k,
     );
 
@@ -87,7 +87,7 @@ fn orbit_raising() {
     }
 
     let solution = &multishoot_sol.solutions[node_count - 1];
-    let sc_sol = solution.achieved;
+    let sc_sol = solution.achieved_state;
 
     println!("{}", multishoot_sol);
 
@@ -100,6 +100,30 @@ fn orbit_raising() {
         "Multiple shooting solution requires a total of {} m/s",
         dv_ms
     );
+
+    // Propagate the initial orbit too
+    prop.with(sc)
+        .for_duration_with_traj(start.period())
+        .unwrap()
+        .1
+        .to_csv_with_step(
+            &"multishoot_start.csv".to_string(),
+            2 * TimeUnit::Second,
+            cosm.clone(),
+        )
+        .unwrap();
+
+    // Propagate the initial orbit too
+    prop.with(sc.with_orbit(target))
+        .for_duration_with_traj(target.period())
+        .unwrap()
+        .1
+        .to_csv_with_step(
+            &"multishoot_target.csv".to_string(),
+            2 * TimeUnit::Second,
+            cosm.clone(),
+        )
+        .unwrap();
 
     // Just propagate this spacecraft for one orbit for plotting
     let (_, end_traj) = prop
@@ -114,4 +138,22 @@ fn orbit_raising() {
             cosm.clone(),
         )
         .unwrap();
+
+    // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
+    let achieved_geoheight = cosm
+        .frame_chg(
+            &multishoot_sol
+                .solutions
+                .last()
+                .unwrap()
+                .achieved_state
+                .orbit,
+            iau_earth,
+        )
+        .geodetic_height();
+    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height();
+    assert!(
+        (achieved_geoheight - target_geoheight).abs() < 1e-3,
+        "Geodetic height achieved greater than 1 m above goal"
+    );
 }

@@ -46,7 +46,7 @@ fn tgt_sma_from_apo() {
     let gmat_sol = 0.05312024615278713;
     // GMAT validation
     assert!(
-        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6,
+        dbg!(solution_fd.correction.norm() - gmat_sol).abs() < 1e-6,
         "Finite differencing result different from GMAT (greater than 1 mm/s)."
     );
 

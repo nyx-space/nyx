@@ -61,7 +61,7 @@ impl Mnvr {
         Self {
             start,
             end,
-            thrust_lvl: 1.0,
+            thrust_lvl,
             alpha_inplane: CommonPolynomial::Constant(alpha),
             beta_outofplane: CommonPolynomial::Constant(beta),
         }
@@ -84,53 +84,104 @@ impl Mnvr {
             return Err(NyxError::CtrlExistsButNoThrusterAvail);
         }
 
-        // // Clone the dynamics
-        // let mut prop = prop.clone();
-        // // Propagate to the dv epoch
-        // prop.dynamics = prop.dynamics.without_ctrl();
-        // let sc_at_dv_epoch = prop.with(spacecraft).until_epoch(epoch)?;
-        // // Calculate the u, dot u (=0) and ddot u from this state
-        // let u = dv / dv.norm();
-        // let r = sc_at_dv_epoch.orbit.radius();
-        // let rmag = sc_at_dv_epoch.orbit.rmag();
-        // let u_ddot = (3.0 * sc_at_dv_epoch.orbit.frame.gm() / rmag.powi(5))
-        //     * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
-        // // Compute the control rates
+        // Clone the dynamics
+        let mut prop = prop.clone();
+        // Propagate to the dv epoch
+        prop.dynamics = prop.dynamics.without_ctrl();
+        let sc_at_dv_epoch = prop.with(spacecraft).until_epoch(epoch)?;
+        // Calculate the u, dot u (=0) and ddot u from this state
+        let u = dv / dv.norm();
+        let r = sc_at_dv_epoch.orbit.radius();
+        let rmag = sc_at_dv_epoch.orbit.rmag();
+        let u_ddot = (3.0 * sc_at_dv_epoch.orbit.frame.gm() / rmag.powi(5))
+            * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
+        // Compute the control rates at the time of the impulsive maneuver (tdv)
+        let (alpha_tdv, beta_tdv) = plane_angles_from_unit_vector(u);
+        let (alpha_ddot_tdv, beta_ddot_tdv) = plane_angles_from_unit_vector(u_ddot);
+        // Build the maneuver polynomial angles from these
+        let alpha_inplane = CommonPolynomial::Quadratic(alpha_ddot_tdv, 0.0, alpha_tdv);
+        let beta_outofplane = CommonPolynomial::Quadratic(beta_ddot_tdv, 0.0, beta_tdv);
 
-        // // Compute a few thruster parameters
-        // let thruster = spacecraft.thruster.as_ref().unwrap();
-        // let c = thruster.exhaust_velocity();
+        // Compute a few thruster parameters
+        let thruster = spacecraft.thruster.as_ref().unwrap();
+        let c = thruster.exhaust_velocity();
 
-        // let mut delta_tfb =
-        //     ((c * spacecraft.mass_kg()) / thruster.thrust) * (1.0 - (-dv.norm() / c).exp());
+        let mut delta_tfb =
+            ((c * spacecraft.mass_kg()) / thruster.thrust) * (1.0 - (-dv.norm() / c).exp());
 
-        // // Start iteration
-        // let max_iter = 25;
-        // let mut converged = false;
+        // Build the estimated maneuver
+        let mut mnvr_guess = Self {
+            start: epoch - delta_tfb * TimeUnit::Second,
+            end: epoch + delta_tfb * TimeUnit::Second,
+            thrust_lvl: 1.0,
+            alpha_inplane,
+            beta_outofplane,
+        };
 
-        // for _ in 0..max_iter {
-        //     let fb_guess = FiniteBurns {
-        //         mnvrs: vec![Self {
-        //             start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
-        //             end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
-        //             thrust_lvl: 1.0,
-        //             vector: u,
-        //         }],
-        //         frame: spacecraft.orbit.frame,
-        //     };
-        //     // Set
+        // Start iteration
+        let max_iter = 25;
+        let mut converged = false;
 
-        //     prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
-        // }
+        for _ in 0..max_iter {
+            // Start by propagating the dynamics back to the estimated start of the maneuver without thrust.
+            prop.dynamics = prop.dynamics.without_ctrl();
+            let sc_start = prop
+                .with(sc_at_dv_epoch)
+                .for_duration(-0.5 * delta_tfb * TimeUnit::Second)?;
+            // Propagate for the duration of the burn without maneuver enabled to compute the baseline
+            let sc_post_no_mnvr = prop
+                .with(sc_start)
+                .for_duration(delta_tfb * TimeUnit::Second)?;
 
-        // if !converged {
-        //     return Err(NyxError::MaxIterReached(format!(
-        //         "Finite burn failed to converge after {} iterations.",
-        //         max_iter
-        //     )));
-        // }
+            // Build the finite burn
+            let fb_guess = FiniteBurns {
+                mnvrs: vec![mnvr_guess],
+                frame: spacecraft.orbit.frame,
+            };
 
-        todo!()
+            // Propagate for the duration of the burn
+            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
+            let sc_post_mnvr = prop
+                .with(sc_start)
+                .for_duration(delta_tfb * TimeUnit::Second)?;
+            // Compute the applied delta-v
+            let accumulated_dv = sc_post_mnvr.orbit.velocity() - sc_post_no_mnvr.orbit.velocity();
+            println!(
+                "Wanted {}\nGot {}\nError = {:.3} m/s",
+                dv / dv.norm(),
+                accumulated_dv / accumulated_dv.norm(),
+                (accumulated_dv - dv).norm() * 1e3
+            );
+            if (accumulated_dv - dv).norm() * 1e3 < 10.0 {
+                // Less than 10cm/s error, we're good
+                converged = true;
+                break;
+            } else {
+                if accumulated_dv.norm() > dv.norm() {
+                    // Burn was too long let's decrease the burn duration
+                    delta_tfb = 0.25 * delta_tfb;
+                } else {
+                    // Burn was too short, let's icnrease burn duration
+                    delta_tfb = 1.25 * delta_tfb;
+                }
+                // Update the maneuver
+                mnvr_guess = Self {
+                    start: epoch - delta_tfb * TimeUnit::Second,
+                    end: epoch + delta_tfb * TimeUnit::Second,
+                    thrust_lvl: 1.0,
+                    alpha_inplane,
+                    beta_outofplane,
+                };
+            }
+        }
+
+        if !converged {
+            return Err(NyxError::MaxIterReached(format!(
+                "Finite burn failed to converge after {} iterations.",
+                max_iter
+            )));
+        }
+        Ok(mnvr_guess)
     }
 
     /// Return the thrust vector computed at the provided epoch

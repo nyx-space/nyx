@@ -584,6 +584,11 @@ impl Orbit {
         me
     }
 
+    /// Returns the SMA altitude in km
+    pub fn sma_altitude(&self) -> f64 {
+        self.sma() - self.frame.equatorial_radius()
+    }
+
     /// Returns the period in seconds
     pub fn period(&self) -> Duration {
         match self.frame {
