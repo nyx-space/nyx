@@ -150,7 +150,7 @@ fn hermite_sine_test() {
     let tol = 1e-10;
     let poly = hermite::<16>(&xs, &ys, &derivs).unwrap();
 
-    println!("{}", poly);
+    println!("{:x}", poly);
 
     let mut max_eval_err: f64 = 0.0;
     let mut max_deriv_err: f64 = 0.0;
@@ -162,6 +162,37 @@ fn hermite_sine_test() {
         max_eval_err = max_eval_err.max(eval_err);
 
         let deriv_err = (deriv - -x.sin()).abs();
+        assert!(deriv_err < tol);
+        max_deriv_err = max_eval_err.max(eval_err);
+    }
+
+    println!(
+        "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
+        max_eval_err, max_deriv_err
+    );
+}
+
+#[test]
+fn hermite_constant_test() {
+    let xs: Vec<_> = (0..8).map(|i| i as f64).collect();
+    let ys: Vec<_> = xs.iter().map(|_| 2.0159).collect();
+    let derivs: Vec<_> = xs.iter().map(|_| 0.0).collect();
+
+    let tol = 1e-10;
+    let poly = hermite::<16>(&xs, &ys, &derivs).unwrap();
+
+    println!("{:x}", poly);
+
+    let mut max_eval_err: f64 = 0.0;
+    let mut max_deriv_err: f64 = 0.0;
+
+    for x in xs {
+        let (eval, deriv) = poly.eval_n_deriv(x);
+        let eval_err = (eval - 2.0159).abs();
+        assert!(eval_err < tol);
+        max_eval_err = max_eval_err.max(eval_err);
+
+        let deriv_err = (deriv).abs();
         assert!(deriv_err < tol);
         max_deriv_err = max_eval_err.max(eval_err);
     }

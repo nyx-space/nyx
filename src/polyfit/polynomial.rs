@@ -18,6 +18,7 @@
 
 /* NOTE: This code is effectively a clone of bacon-sci, MIT License, by Wyatt Campbell. */
 
+use std::f64::EPSILON;
 use std::fmt;
 use std::ops;
 
@@ -138,8 +139,13 @@ impl<const SIZE: usize> ops::AddAssign<f64> for Polynomial<SIZE> {
 impl<const SIZE: usize> fmt::Display for Polynomial<SIZE> {
     /// Prints the polynomial with the least significant coefficients first
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Ok(for (i, c) in self.coefficients.iter().enumerate() {
-            if c.abs() > 100.0 {
+        write!(f, "P(t) = ")?;
+        Ok(for (i, c) in self.coefficients.iter().rev().enumerate() {
+            if c.abs() <= EPSILON {
+                continue;
+            }
+
+            if c.abs() > 100.0 || c.abs() < 0.01 {
                 // Use scientific notation
                 write!(f, "{:e} ", c)?;
             } else {
@@ -152,7 +158,7 @@ impl<const SIZE: usize> fmt::Display for Polynomial<SIZE> {
                 1 => write!(f, "t")?,
                 _ => write!(f, "t^{}", p)?,
             }
-            if i < self.coefficients.len() - 1 {
+            if i < self.coefficients.len() {
                 if *c > 0.0 {
                     write!(f, " ")?;
                 } else {
@@ -166,7 +172,11 @@ impl<const SIZE: usize> fmt::Display for Polynomial<SIZE> {
 impl<const SIZE: usize> fmt::LowerHex for Polynomial<SIZE> {
     /// Prints the polynomial with the least significant coefficients first
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Ok(for (i, c) in self.coefficients.iter().enumerate() {
+        write!(f, "P(x) = ")?;
+        Ok(for (i, c) in self.coefficients.iter().rev().enumerate() {
+            if c.abs() <= EPSILON {
+                continue;
+            }
             if c.abs() > 100.0 {
                 // Use scientific notation
                 write!(f, "{:e} ", c)?;
@@ -180,7 +190,7 @@ impl<const SIZE: usize> fmt::LowerHex for Polynomial<SIZE> {
                 1 => write!(f, "x")?,
                 _ => write!(f, "x^{}", p)?,
             }
-            if i < self.coefficients.len() - 1 {
+            if i < self.coefficients.len() {
                 if *c > 0.0 {
                     write!(f, " ")?;
                 } else {

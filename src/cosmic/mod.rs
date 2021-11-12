@@ -58,6 +58,9 @@ where
     type Size: DimName;
     type VecLength: DimName;
 
+    /// The number of samples needed for building an interpolation of this
+    const INTERPOLATION_SAMPLES: usize = 8;
+
     /// Initialize an empty state
     /// By default, this is not implemented. This function must be implemented when filtering on this state.
     fn zeros() -> Self {
