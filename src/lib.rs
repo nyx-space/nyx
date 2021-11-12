@@ -46,7 +46,7 @@ pub mod io;
 pub mod od;
 
 /// Navigation submodule, relevant to both ground based navigation (orbit determination) and onboard navigation (part of the Guidance, Navigation and Control subsystem)
-pub mod nav;
+// pub mod nav;
 
 /// All of the mission design and mission analysis tools and functions
 pub mod md;

@@ -19,11 +19,9 @@
 use super::{plane_angles_from_unit_vector, unit_vector_from_plane_angles, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::linalg::Vector3;
-use crate::md::ui::{Propagator, SpacecraftDynamics};
 use crate::polyfit::CommonPolynomial;
-use crate::propagators::ErrorCtrl;
 use crate::time::{Epoch, TimeUnit};
-use crate::{NyxError, State};
+use crate::State;
 use std::fmt;
 use std::sync::Arc;
 
@@ -89,12 +87,18 @@ impl Mnvr {
     /// Convergence criteria:
     ///     1. If the change in the duration of the burn is less than 1 seconds; or
     ///     2. If the magnitude of the thrust vector matches the impulsive maneuver to less than 1 mm/s
+    #[cfg(feature = "broken-donotuse")]
     pub fn impulsive_to_finite<'a, E: ErrorCtrl>(
         epoch: Epoch,
         dv: Vector3<f64>,
         spacecraft: Spacecraft,
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
     ) -> Result<Self, NyxError> {
+        // Imports specific to this broken feature
+        use crate::md::ui::{Propagator, SpacecraftDynamics};
+        use crate::propagators::ErrorCtrl;
+        use crate::NyxError;
+
         if spacecraft.thruster.is_none() {
             // Can't do any conversion to finite burns without a thruster
             return Err(NyxError::CtrlExistsButNoThrusterAvail);
@@ -297,6 +301,7 @@ impl GuidanceLaw for FiniteBurns {
     }
 }
 
+#[cfg(feature = "broken-donotuse")]
 #[test]
 fn name_impulsive_to_finite() {
     use crate::cosmic::Cosm;

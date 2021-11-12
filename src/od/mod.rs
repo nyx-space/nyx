@@ -45,7 +45,7 @@ pub mod residual;
 pub mod ui;
 
 /// Provides all of the measurements functionality, including measurement simulation
-pub mod msr;
+// pub mod msr;
 
 /// Provides all state noise compensation functionality
 pub mod snc;

@@ -51,6 +51,9 @@ rand_pcg = "0.3"
 yaserde = "0.7.0"
 yaserde_derive = "0.7.0"
 
+[features]
+broken-donotuse = []
+
 [profile.dev]
 opt-level = 0
 debug = true

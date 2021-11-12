@@ -1,7 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::dynamics::guidance::{Mnvr, Thruster};
-use nyx::linalg::Vector3;
+use nyx::dynamics::guidance::Thruster;
 use nyx::md::ui::*;
 use nyx::opti::multishoot::*;
 
@@ -166,14 +165,6 @@ fn orbit_raising() {
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
     );
-
-    // Build the finite burn maneuvers from the impulsive maneuvers
-    for (i, sol) in multishoot_sol.solutions.iter().enumerate() {
-        let dv = Vector3::new(sol.correction[0], sol.correction[1], sol.correction[2]);
-        let m = Mnvr::impulsive_to_finite(sol.corrected_state.epoch(), dv, sc, &prop).unwrap();
-        println!("{}", m);
-        break;
-    }
 
     for (i, traj) in multishoot_sol
         .build_trajectories(&prop)
