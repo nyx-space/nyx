@@ -1,5 +1,7 @@
 extern crate nyx_space as nyx;
 
+use nyx::dynamics::guidance::{Mnvr, Thruster};
+use nyx::linalg::Vector3;
 use nyx::md::ui::*;
 use nyx::opti::multishoot::*;
 
@@ -16,6 +18,14 @@ fn orbit_raising() {
     /* Build the spacecraft -- really only the mass is needed here */
     let sc = Spacecraft {
         orbit: start,
+        dry_mass_kg: 100.0,
+        fuel_mass_kg: 500.0,
+        thruster: Some(Thruster {
+            thrust: 150.0,
+            isp: 300.0,
+        }),
+        mode: GuidanceMode::Thrust,
+
         ..Default::default()
     };
 
@@ -156,4 +166,26 @@ fn orbit_raising() {
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
     );
+
+    // Build the finite burn maneuvers from the impulsive maneuvers
+    for (i, sol) in multishoot_sol.solutions.iter().enumerate() {
+        let dv = Vector3::new(sol.correction[0], sol.correction[1], sol.correction[2]);
+        let m = Mnvr::impulsive_to_finite(sol.corrected_state.epoch(), dv, sc, &prop).unwrap();
+        println!("{}", m);
+        break;
+    }
+
+    for (i, traj) in multishoot_sol
+        .build_trajectories(&prop)
+        .unwrap()
+        .iter()
+        .enumerate()
+    {
+        traj.to_csv_with_step(
+            &format!("multishoot_to_node_{}.csv", i),
+            2 * TimeUnit::Second,
+            cosm.clone(),
+        )
+        .unwrap();
+    }
 }

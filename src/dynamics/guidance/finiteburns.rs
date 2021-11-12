@@ -24,6 +24,7 @@ use crate::polyfit::CommonPolynomial;
 use crate::propagators::ErrorCtrl;
 use crate::time::{Epoch, TimeUnit};
 use crate::{NyxError, State};
+use std::fmt;
 use std::sync::Arc;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
@@ -40,6 +41,21 @@ pub struct Mnvr {
     pub alpha_inplane: CommonPolynomial,
     /// The interpolation polynomial for the out-of-plane angle
     pub beta_outofplane: CommonPolynomial,
+}
+
+impl fmt::Display for Mnvr {
+    /// Prints the polynomial with the least significant coefficients first
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.end - self.start >= 1 * TimeUnit::Millisecond {
+            write!(f, "Finite burn maneuver @ {} for {}\n\tin-plane angle a(t)={}\n\tin-plane angle a(t)={}", self.start, self.end-self.start, self.alpha_inplane, self.beta_outofplane)
+        } else {
+            write!(
+                f,
+                "Impulsive maneuver @ {}\n\tin-plane angle a(t)={}\n\tout-plane angle b(t)={}",
+                self.start, self.alpha_inplane, self.beta_outofplane
+            )
+        }
+    }
 }
 
 impl Mnvr {
@@ -104,15 +120,16 @@ impl Mnvr {
 
         // Compute a few thruster parameters
         let thruster = spacecraft.thruster.as_ref().unwrap();
-        let c = thruster.exhaust_velocity();
+        let c_km_s = thruster.exhaust_velocity() * 1e-3;
 
-        let mut delta_tfb =
-            ((c * spacecraft.mass_kg()) / thruster.thrust) * (1.0 - (-dv.norm() / c).exp());
+        let mut delta_tfb = 1000.0
+            * ((c_km_s * spacecraft.mass_kg()) / thruster.thrust)
+            * (1.0 - (-dv.norm() / c_km_s).exp());
 
         // Build the estimated maneuver
         let mut mnvr_guess = Self {
-            start: epoch - delta_tfb * TimeUnit::Second,
-            end: epoch + delta_tfb * TimeUnit::Second,
+            start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
+            end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
             thrust_lvl: 1.0,
             alpha_inplane,
             beta_outofplane,
@@ -123,33 +140,35 @@ impl Mnvr {
         let mut converged = false;
 
         for _ in 0..max_iter {
+            println!("{}", mnvr_guess);
             // Start by propagating the dynamics back to the estimated start of the maneuver without thrust.
             prop.dynamics = prop.dynamics.without_ctrl();
             let sc_start = prop
-                .with(sc_at_dv_epoch)
-                .for_duration(-0.5 * delta_tfb * TimeUnit::Second)?;
+                .with(sc_at_dv_epoch.with_guidance_mode(GuidanceMode::Coast))
+                .for_duration(-(1.0 + delta_tfb) * TimeUnit::Second)?;
             // Propagate for the duration of the burn without maneuver enabled to compute the baseline
-            let sc_post_no_mnvr = prop
-                .with(sc_start)
-                .for_duration(delta_tfb * TimeUnit::Second)?;
+            let sc_post_no_mnvr = prop.with(sc_start).until_epoch(mnvr_guess.end)?;
 
             // Build the finite burn
             let fb_guess = FiniteBurns {
                 mnvrs: vec![mnvr_guess],
-                frame: spacecraft.orbit.frame,
+                frame: Frame::Inertial,
             };
 
             // Propagate for the duration of the burn
+            prop.set_max_step(mnvr_guess.end - mnvr_guess.start);
             prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
             let sc_post_mnvr = prop
-                .with(sc_start)
-                .for_duration(delta_tfb * TimeUnit::Second)?;
+                .with(sc_start.with_guidance_mode(GuidanceMode::Custom(0)))
+                .until_epoch(mnvr_guess.end)?;
             // Compute the applied delta-v
             let accumulated_dv = sc_post_mnvr.orbit.velocity() - sc_post_no_mnvr.orbit.velocity();
             println!(
-                "Wanted {}\nGot {}\nError = {:.3} m/s",
-                dv / dv.norm(),
-                accumulated_dv / accumulated_dv.norm(),
+                "Wanted {:.3} m/s {}\nGot {:.3} m/s {}\nError = {:.3} m/s",
+                dv.norm() * 1e3,
+                dv,
+                accumulated_dv.norm() * 1e3,
+                accumulated_dv,
                 (accumulated_dv - dv).norm() * 1e3
             );
             if (accumulated_dv - dv).norm() * 1e3 < 10.0 {
@@ -276,4 +295,41 @@ impl GuidanceLaw for FiniteBurns {
             }
         }
     }
+}
+
+#[test]
+fn name_impulsive_to_finite() {
+    use crate::cosmic::Cosm;
+    use crate::dynamics::guidance::Thruster;
+    use crate::dynamics::OrbitalDynamics;
+    use crate::Orbit;
+
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+
+    /* Define the parking orbit */
+    let epoch = Epoch::from_gregorian_utc_at_noon(2022, 03, 04);
+    let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
+
+    /* Build the spacecraft -- really only the mass is needed here */
+    let sc = Spacecraft {
+        orbit: start,
+        dry_mass_kg: 1000.0,
+        fuel_mass_kg: 2000.0,
+        thruster: Some(Thruster {
+            thrust: 3000.0,
+            isp: 300.0,
+        }),
+        mode: GuidanceMode::Thrust,
+
+        ..Default::default()
+    };
+
+    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+
+    let epoch = Epoch::from_gregorian_utc_hms(2022, 03, 04, 12, 00, 00);
+    let dv = Vector3::new(-0.002, -0.011, 0.001);
+
+    let m = Mnvr::impulsive_to_finite(epoch, dv, sc, &prop).unwrap();
+    println!("{}", m);
 }

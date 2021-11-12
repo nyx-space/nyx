@@ -205,12 +205,20 @@ impl Spacecraft {
         me
     }
 
+    /// Returns a copy of the state with a new orbit
     pub fn with_orbit(self, orbit: Orbit) -> Self {
         let mut me = self;
         me.orbit = orbit;
         me.stm = orbit
             .stm
             .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity());
+        me
+    }
+
+    /// Returns a copy of the state with the provided guidance mode
+    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
+        let mut me = self;
+        me.mode = mode;
         me
     }
 

@@ -75,8 +75,11 @@ where
         self.opts.tolerance = tol;
     }
 
-    /// Set the maximum step size for the propagator
+    /// Set the maximum step size for the propagator and sets the initial step to that value if currently greater
     pub fn set_max_step(&mut self, step: Duration) {
+        if self.opts.init_step > step {
+            self.opts.init_step = step;
+        }
         self.opts.max_step = step;
     }
 

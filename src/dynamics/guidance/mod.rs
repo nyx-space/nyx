@@ -29,7 +29,9 @@ pub use ruggiero::Ruggiero;
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[derive(Copy, Clone, Debug)]
 pub struct Thruster {
+    /// The thrust is to be provided in Newtons
     pub thrust: f64,
+    /// The Isp is to be provided in seconds
     pub isp: f64,
 }
 
