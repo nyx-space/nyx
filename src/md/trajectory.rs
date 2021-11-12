@@ -30,6 +30,7 @@ use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::utils::normalize;
 use crate::State;
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::fmt;
 use std::iter::Iterator;
 use std::sync::mpsc::{channel, Receiver};
@@ -41,7 +42,7 @@ const INTERP_TOLERANCE: f64 = 1e-10;
 
 /// Stores a segment of an interpolation
 #[derive(Clone)]
-pub struct Segment<S: State>
+pub struct Spline<S: State>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -52,6 +53,56 @@ where
     end_state: S,
 }
 
+impl TryFrom<Vec<Orbit>> for Spline<Orbit> {
+    type Error = NyxError;
+
+    fn try_from(this_wdn: Vec<Orbit>) -> Result<Self, Self::Error> {
+        // Generate interpolation and flush.
+        let start_win_epoch = this_wdn[0].epoch();
+        let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
+        let window_duration = end_win_epoch - start_win_epoch;
+        let mut ts = Vec::with_capacity(this_wdn.len());
+        let mut values = Vec::with_capacity(42);
+        let mut coefficients = Vec::with_capacity(42);
+        // Initialize the vector of values and coefficients.
+        for _ in 0..42 {
+            values.push(Vec::with_capacity(this_wdn.len()));
+            coefficients.push(Vec::with_capacity(this_wdn.len()));
+        }
+        for state in &this_wdn {
+            let t_prime = normalize(
+                (state.epoch() - start_win_epoch).in_seconds(),
+                0.0,
+                window_duration.in_seconds(),
+            );
+            ts.push(t_prime);
+            for (pos, val) in state.as_vector().as_ref().unwrap().iter().enumerate() {
+                values[pos].push(*val);
+            }
+        }
+
+        // Generate the polynomials
+        for (pos, these_values) in values.iter().enumerate() {
+            match lagrange(&ts, these_values, INTERP_TOLERANCE) {
+                Ok(polyn) => coefficients[pos] = polyn.get_coefficients(),
+                Err(e) => {
+                    return Err(NyxError::InvalidInterpolationData(format!(
+                        "Interpolation failed: {}",
+                        e
+                    )))
+                }
+            };
+        }
+
+        Ok(Spline {
+            start_epoch: start_win_epoch,
+            duration: window_duration,
+            coefficients,
+            end_state: this_wdn[this_wdn.len() - 1],
+        })
+    }
+}
+
 /// Store a trajectory of any State.
 #[derive(Clone)]
 pub struct Traj<S: State>
@@ -59,15 +110,15 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    /// Segments are organized as a binary tree map whose index is the
+    /// Splines are organized as a binary tree map whose index is the
     /// number of seconds since the start of this ephemeris rounded down
-    pub segments: BTreeMap<i32, Segment<S>>,
+    pub segments: BTreeMap<i32, Spline<S>>,
     /// Timeout is used to stop listening to new state (default is 50ms, should work well in release and debug mode).
     pub timeout_ms: u64,
-    start_state: S,
-    max_offset: i32,
+    pub(crate) start_state: S,
+    pub(crate) max_offset: i32,
     /// Store the items per segment to convert to another frame.
-    items_per_segments: usize,
+    pub(crate) items_per_segments: usize,
 }
 
 pub struct TrajIterator<'a, S: State>
@@ -80,7 +131,7 @@ where
     pub traj: &'a Traj<S>,
 }
 
-impl<S: State> Segment<S>
+impl<S: State> Spline<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -162,7 +213,7 @@ where
                 if window_states.len() == items_per_segments {
                     let this_wdn = window_states.clone();
                     children.push(
-                        s.spawn(move |_| -> Result<Segment<S>, NyxError> { interpolate(this_wdn) }),
+                        s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(this_wdn) }),
                     );
                     // Copy the last state as the first state of the next window
                     let last_wdn_state = window_states[items_per_segments - 1];
@@ -173,7 +224,7 @@ where
             }
             // And interpolate the remaining states too, even if the buffer is not full!
             children.push(
-                s.spawn(move |_| -> Result<Segment<S>, NyxError> { interpolate(window_states) }),
+                s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(window_states) }),
             );
 
             // Reduce
@@ -188,7 +239,7 @@ where
         .unwrap()
     }
 
-    fn append_segment(&mut self, segment: Segment<S>) {
+    pub(crate) fn append_segment(&mut self, segment: Spline<S>) {
         // Compute the number of seconds since start of trajectory
         let offset_s = ((segment.start_epoch - self.start_state.epoch())
             .in_seconds()
@@ -827,7 +878,7 @@ where
     }
 }
 
-fn interpolate<S: State>(this_wdn: Vec<S>) -> Result<Segment<S>, NyxError>
+pub(crate) fn interpolate<S: State>(this_wdn: Vec<S>) -> Result<Spline<S>, NyxError>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -869,7 +920,7 @@ where
         };
     }
 
-    Ok(Segment {
+    Ok(Spline {
         start_epoch: start_win_epoch,
         duration: window_duration,
         coefficients,

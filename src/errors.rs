@@ -82,6 +82,8 @@ pub enum NyxError {
     CCSDS(String),
     /// Returned if the targeter for `node_no` has failed
     MultipleShootingTargeter(usize, Box<NyxError>),
+    /// Returned when the trajectory could not be created
+    TrajectoryCreationError,
     /// Some custom error for new dynamics
     CustomError(String),
 }

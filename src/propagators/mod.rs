@@ -17,6 +17,7 @@
 */
 
 extern crate crossbeam;
+extern crate rayon;
 use std::fmt;
 
 /// Provides different methods for controlling the error computation of the integrator.

@@ -16,20 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::crossbeam::thread;
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
+use super::rayon::iter::ParallelBridge;
+use super::rayon::prelude::ParallelIterator;
 use super::{IntegrationDetails, RK, RK89};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
-use crate::md::trajectory::Traj;
+use crate::md::trajectory::{interpolate, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::State;
+use std::collections::BTreeMap;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
+use std::time::Duration as StdDur;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
@@ -225,24 +228,131 @@ where
     pub fn for_duration_with_traj(
         &mut self,
         duration: Duration,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
-        thread::scope(|s| {
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    {
+        let start_state = self.state;
+        let end_state;
+
+        let rx = {
+            // Channels that have the states in a bucket of the correct length
+            let (tx_bucket, rx_bucket) = channel();
+
+            // Channels that have a single state for the propagator
             let (tx, rx) = channel();
             self.tx_chan = Some(tx);
-            let start_state = self.state;
-            // The trajectory must always be generated on its own thread.
-            let traj_thread = s.spawn(move |_| Traj::new(start_state, rx));
-            let end_state = self.for_duration(duration)?;
+            // Propagate the dynamics
+            end_state = self.for_duration(duration)?;
 
-            let traj = traj_thread.join().unwrap_or_else(|_| {
-                Err(NyxError::NoInterpolationData(
-                    "Could not generate trajectory".to_string(),
-                ))
-            })?;
+            /* *** */
+            /* Map: bucket the states and send on a channel */
+            /* *** */
 
-            Ok((end_state, traj))
-        })
-        .unwrap()
+            let items_per_segments = 8;
+            let mut window_states = Vec::with_capacity(items_per_segments);
+            // Push the initial state
+            window_states.push(start_state);
+
+            // Note that we're using the typical map+reduce pattern
+            // Start receiving states on a blocking call (map)
+            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(100)) {
+                if window_states.len() == items_per_segments {
+                    let this_wdn = window_states.clone();
+                    tx_bucket
+                        .send(this_wdn)
+                        .map_err(|_| NyxError::TrajectoryCreationError)?;
+                    // children.push(
+                    //     s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(this_wdn) }),
+                    // );
+                    // Copy the last state as the first state of the next window
+                    let last_wdn_state = window_states[items_per_segments - 1];
+                    window_states.clear();
+                    window_states.push(last_wdn_state);
+                }
+                window_states.push(state);
+            }
+            // And interpolate the remaining states too, even if the buffer is not full!
+            tx_bucket
+                .send(window_states)
+                .map_err(|_| NyxError::TrajectoryCreationError)?;
+            // children.push(
+            //     s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(window_states) }),
+            // );
+
+            // Return the rx channel for these buckets
+            rx_bucket
+        };
+
+        /* *** */
+        /* Reduce: Build an interpolation of each of the segments */
+        /* *** */
+        println!("Reducing");
+        let splines: Vec<_> = rx
+            .into_iter()
+            .par_bridge()
+            .map(|window_states| interpolate(window_states))
+            .collect();
+
+        println!("Traj");
+        // Finally, build the whole trajectory
+        let mut traj = Traj {
+            segments: BTreeMap::new(),
+            start_state,
+            timeout_ms: 100,
+            max_offset: 0,
+            items_per_segments: 8,
+        };
+
+        println!("Appending");
+        for maybe_spline in splines {
+            let spline = maybe_spline?;
+            traj.append_segment(spline);
+        }
+
+        Ok((end_state, traj))
+
+        // rayon::scope(
+        //     |s| -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+        //         let (tx, rx) = channel();
+        //         self.tx_chan = Some(tx);
+        //         let start_state = self.state;
+        //         // Initialize the trajectory
+        //         let mut traj = Traj {
+        //             segments: BTreeMap::new(),
+        //             start_state,
+        //             timeout_ms: 100,
+        //             max_offset: 0,
+        //             items_per_segments: 8,
+        //         };
+
+        //         // Propagate the dynamics
+        //         // s.spawn(|_| rslt = self.for_duration(duration));
+        //         let rslt = self.for_duration(duration);
+        //         match rslt {
+        //             Err(e) => Err(e),
+        //             Ok(end) => Ok((end, traj)),
+        //         }
+        //     },
+        // )
+
+        // thread::scope(|s| {
+        //     let (tx, rx) = channel();
+        //     self.tx_chan = Some(tx);
+        //     let start_state = self.state;
+        //     // The trajectory must always be generated on its own thread.
+        //     let traj_thread = s.spawn(move |_| Traj::new(start_state, rx));
+        //     let end_state = self.for_duration(duration)?;
+
+        //     let traj = traj_thread.join().unwrap_or_else(|_| {
+        //         Err(NyxError::NoInterpolationData(
+        //             "Could not generate trajectory".to_string(),
+        //         ))
+        //     })?;
+
+        //     Ok((end_state, traj))
+        // })
+        // .unwrap()
     }
 
     /// Propagates the provided Dynamics until the provided epoch and generate the trajectory of these dynamics on its own thread.
@@ -251,7 +361,10 @@ where
     pub fn until_epoch_with_traj(
         &mut self,
         end_time: Epoch,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration_with_traj(duration)
     }
@@ -263,7 +376,10 @@ where
         max_duration: Duration,
         event: &F,
         trigger: usize,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    {
         info!("Searching for {}", event);
 
         let (_, traj) = self.for_duration_with_traj(max_duration)?;
