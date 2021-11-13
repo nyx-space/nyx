@@ -249,7 +249,7 @@ where
             /* Map: bucket the states and send on a channel */
             /* *** */
 
-            let items_per_segments = 8;
+            let items_per_segments = D::StateType::INTERPOLATION_SAMPLES;
             let mut window_states = Vec::with_capacity(items_per_segments);
             // Push the initial state
             window_states.push(start_state);
@@ -262,9 +262,6 @@ where
                     tx_bucket
                         .send(this_wdn)
                         .map_err(|_| NyxError::TrajectoryCreationError)?;
-                    // children.push(
-                    //     s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(this_wdn) }),
-                    // );
                     // Copy the last state as the first state of the next window
                     let last_wdn_state = window_states[items_per_segments - 1];
                     window_states.clear();
@@ -276,9 +273,6 @@ where
             tx_bucket
                 .send(window_states)
                 .map_err(|_| NyxError::TrajectoryCreationError)?;
-            // children.push(
-            //     s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(window_states) }),
-            // );
 
             // Return the rx channel for these buckets
             rx_bucket
@@ -287,14 +281,12 @@ where
         /* *** */
         /* Reduce: Build an interpolation of each of the segments */
         /* *** */
-        println!("Reducing");
         let splines: Vec<_> = rx
             .into_iter()
             .par_bridge()
             .map(|window_states| interpolate(window_states))
             .collect();
 
-        println!("Traj");
         // Finally, build the whole trajectory
         let mut traj = Traj {
             segments: BTreeMap::new(),
@@ -304,55 +296,12 @@ where
             items_per_segments: 8,
         };
 
-        println!("Appending");
         for maybe_spline in splines {
             let spline = maybe_spline?;
-            traj.append_segment(spline);
+            traj.append_spline(spline);
         }
 
         Ok((end_state, traj))
-
-        // rayon::scope(
-        //     |s| -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
-        //         let (tx, rx) = channel();
-        //         self.tx_chan = Some(tx);
-        //         let start_state = self.state;
-        //         // Initialize the trajectory
-        //         let mut traj = Traj {
-        //             segments: BTreeMap::new(),
-        //             start_state,
-        //             timeout_ms: 100,
-        //             max_offset: 0,
-        //             items_per_segments: 8,
-        //         };
-
-        //         // Propagate the dynamics
-        //         // s.spawn(|_| rslt = self.for_duration(duration));
-        //         let rslt = self.for_duration(duration);
-        //         match rslt {
-        //             Err(e) => Err(e),
-        //             Ok(end) => Ok((end, traj)),
-        //         }
-        //     },
-        // )
-
-        // thread::scope(|s| {
-        //     let (tx, rx) = channel();
-        //     self.tx_chan = Some(tx);
-        //     let start_state = self.state;
-        //     // The trajectory must always be generated on its own thread.
-        //     let traj_thread = s.spawn(move |_| Traj::new(start_state, rx));
-        //     let end_state = self.for_duration(duration)?;
-
-        //     let traj = traj_thread.join().unwrap_or_else(|_| {
-        //         Err(NyxError::NoInterpolationData(
-        //             "Could not generate trajectory".to_string(),
-        //         ))
-        //     })?;
-
-        //     Ok((end_state, traj))
-        // })
-        // .unwrap()
     }
 
     /// Propagates the provided Dynamics until the provided epoch and generate the trajectory of these dynamics on its own thread.

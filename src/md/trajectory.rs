@@ -231,7 +231,7 @@ where
             for child in children {
                 // collect each child thread's return-value
                 let segment = child.join().unwrap()?;
-                me.append_segment(segment);
+                me.append_spline(segment);
             }
 
             Ok(me)
@@ -239,7 +239,7 @@ where
         .unwrap()
     }
 
-    pub(crate) fn append_segment(&mut self, segment: Spline<S>) {
+    pub(crate) fn append_spline(&mut self, segment: Spline<S>) {
         // Compute the number of seconds since start of trajectory
         let offset_s = ((segment.start_epoch - self.start_state.epoch())
             .in_seconds()
