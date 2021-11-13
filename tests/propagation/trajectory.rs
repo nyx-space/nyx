@@ -246,7 +246,7 @@ fn traj_spacecraft() {
     let (tx, rx) = channel();
     std::thread::spawn(move || {
         let mut prop = setup.with(start_state).with_tx(tx);
-        prop.for_duration(prop_time).unwrap();
+        prop.until_epoch(end_state.epoch()).unwrap();
     });
 
     // Evaluate the first time of the trajectory to make sure that one is there too.
