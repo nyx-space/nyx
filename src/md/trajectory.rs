@@ -545,15 +545,15 @@ impl Traj<Orbit> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     /// This is super slow.
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
-        thread::scope(|s| {
-            let start_time = Instant::now();
+        let start_instant = Instant::now();
+        let start_state = cosm.frame_chg(&self.first(), new_frame);
+
+        let rx = {
+            // Channels that have the states in a bucket of the correct length
+            let (tx_bucket, rx_bucket) = channel();
+
+            // Channels that have a single state for the propagator
             let (tx, rx) = channel();
-
-            let start_state = cosm.frame_chg(&self.first(), new_frame);
-            // The trajectory must always be generated on its own thread.
-            let traj_thread = s.spawn(move |_| Self::new(start_state, rx));
-            // And start sampling, converting, and flushing into the new trajectory.
-
             // Nyquist–Shannon sampling theorem
             let sample_rate =
                 1.0 / (((self.items_per_segments * 2 + 1) * self.segments.len()) as f64);
@@ -564,22 +564,70 @@ impl Traj<Orbit> {
                 tx.send(converted_state).unwrap();
             }
 
-            let traj = traj_thread.join().unwrap_or_else(|_| {
-                Err(NyxError::NoInterpolationData(
-                    "Could not generate trajectory".to_string(),
-                ))
-            })?;
+            /* *** */
+            /* Map: bucket the states and send on a channel */
+            /* *** */
 
-            info!(
-                "Converted trajectory from {} to {} in {} ms",
-                self.first().frame,
-                new_frame,
-                (Instant::now() - start_time).as_millis()
-            );
+            let items_per_segments = <Orbit as State>::INTERPOLATION_SAMPLES;
+            let mut window_states = Vec::with_capacity(items_per_segments);
+            // Push the initial state
+            window_states.push(start_state);
 
-            Ok(traj)
-        })
-        .unwrap()
+            // Note that we're using the typical map+reduce pattern
+            // Start receiving states on a blocking call (map)
+            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(100)) {
+                if window_states.len() == items_per_segments {
+                    let this_wdn = window_states.clone();
+                    tx_bucket
+                        .send(this_wdn)
+                        .map_err(|_| NyxError::TrajectoryCreationError)?;
+                    // Copy the last state as the first state of the next window
+                    let last_wdn_state = window_states[items_per_segments - 1];
+                    window_states.clear();
+                    window_states.push(last_wdn_state);
+                }
+                window_states.push(state);
+            }
+            // And interpolate the remaining states too, even if the buffer is not full!
+            tx_bucket
+                .send(window_states)
+                .map_err(|_| NyxError::TrajectoryCreationError)?;
+
+            // Return the rx channel for these buckets
+            rx_bucket
+        };
+
+        /* *** */
+        /* Reduce: Build an interpolation of each of the segments */
+        /* *** */
+        let splines: Vec<_> = rx
+            .into_iter()
+            .par_bridge()
+            .map(|window_states| interpolate(window_states))
+            .collect();
+
+        // Finally, build the whole trajectory
+        let mut traj = Traj {
+            segments: BTreeMap::new(),
+            start_state,
+            timeout_ms: 100,
+            max_offset: 0,
+            items_per_segments: 8,
+        };
+
+        for maybe_spline in splines {
+            let spline = maybe_spline?;
+            traj.append_spline(spline);
+        }
+
+        info!(
+            "Converted trajectory from {} to {} in {} ms",
+            self.first().frame,
+            new_frame,
+            (Instant::now() - start_instant).as_millis()
+        );
+
+        Ok(traj)
     }
 
     /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
@@ -690,26 +738,28 @@ impl Traj<Spacecraft> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     /// This is super slow.
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
-        thread::scope(|s| {
+        let start_instant = Instant::now();
+
+        let mut start_state = self.first();
+        let start_orbit = cosm.frame_chg(&start_state.orbit, new_frame);
+        // Update the orbit component and the frame
+        start_state.orbit.x = start_orbit.x;
+        start_state.orbit.y = start_orbit.y;
+        start_state.orbit.z = start_orbit.z;
+        start_state.orbit.vx = start_orbit.vx;
+        start_state.orbit.vy = start_orbit.vy;
+        start_state.orbit.vz = start_orbit.vz;
+        start_state.orbit.frame = start_orbit.frame;
+
+        let rx = {
+            // Channels that have the states in a bucket of the correct length
+            let (tx_bucket, rx_bucket) = channel();
+
+            // Channels that have a single state for the propagator
             let (tx, rx) = channel();
-
-            let mut start_state = self.first();
-            let start_orbit = cosm.frame_chg(&start_state.orbit, new_frame);
-            // Update the orbit component and the frame
-            start_state.orbit.x = start_orbit.x;
-            start_state.orbit.y = start_orbit.y;
-            start_state.orbit.z = start_orbit.z;
-            start_state.orbit.vx = start_orbit.vx;
-            start_state.orbit.vy = start_orbit.vy;
-            start_state.orbit.vz = start_orbit.vz;
-            start_state.orbit.frame = start_orbit.frame;
-
-            // The trajectory must always be generated on its own thread.
-            let traj_thread = s.spawn(move |_| Self::new(start_state, rx));
-            // And start sampling, converting, and flushing into the new trajectory.
-
             // Nyquist–Shannon sampling theorem
-            let sample_rate = 1.0 / (((16 * 2 + 1) * self.segments.len()) as f64);
+            let sample_rate =
+                1.0 / (((self.items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
 
             for state in self.every(step) {
@@ -727,15 +777,70 @@ impl Traj<Spacecraft> {
                 tx.send(converted_state).unwrap();
             }
 
-            let traj = traj_thread.join().unwrap_or_else(|_| {
-                Err(NyxError::NoInterpolationData(
-                    "Could not generate trajectory".to_string(),
-                ))
-            })?;
+            /* *** */
+            /* Map: bucket the states and send on a channel */
+            /* *** */
 
-            Ok(traj)
-        })
-        .unwrap()
+            let items_per_segments = <Orbit as State>::INTERPOLATION_SAMPLES;
+            let mut window_states = Vec::with_capacity(items_per_segments);
+            // Push the initial state
+            window_states.push(start_state);
+
+            // Note that we're using the typical map+reduce pattern
+            // Start receiving states on a blocking call (map)
+            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(100)) {
+                if window_states.len() == items_per_segments {
+                    let this_wdn = window_states.clone();
+                    tx_bucket
+                        .send(this_wdn)
+                        .map_err(|_| NyxError::TrajectoryCreationError)?;
+                    // Copy the last state as the first state of the next window
+                    let last_wdn_state = window_states[items_per_segments - 1];
+                    window_states.clear();
+                    window_states.push(last_wdn_state);
+                }
+                window_states.push(state);
+            }
+            // And interpolate the remaining states too, even if the buffer is not full!
+            tx_bucket
+                .send(window_states)
+                .map_err(|_| NyxError::TrajectoryCreationError)?;
+
+            // Return the rx channel for these buckets
+            rx_bucket
+        };
+
+        /* *** */
+        /* Reduce: Build an interpolation of each of the segments */
+        /* *** */
+        let splines: Vec<_> = rx
+            .into_iter()
+            .par_bridge()
+            .map(|window_states| interpolate(window_states))
+            .collect();
+
+        // Finally, build the whole trajectory
+        let mut traj = Traj {
+            segments: BTreeMap::new(),
+            start_state,
+            timeout_ms: 100,
+            max_offset: 0,
+            items_per_segments: 8,
+        };
+
+        for maybe_spline in splines {
+            let spline = maybe_spline?;
+            traj.append_spline(spline);
+        }
+
+        info!(
+            "Converted trajectory from {} to {} in {} ms",
+            self.first().orbit.frame,
+            new_frame,
+            (Instant::now() - start_instant).as_millis()
+        );
+
+        Ok(traj)
     }
 
     /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
