@@ -94,6 +94,16 @@ impl<const SIZE: usize> Polynomial<SIZE> {
             }
         }
     }
+
+    /// Returns true if any of the coefficients are NaN
+    pub fn is_nan(&self) -> bool {
+        for c in self.coefficients {
+            if c.is_nan() {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 /// In-place multiplication of a polynomial with an f64

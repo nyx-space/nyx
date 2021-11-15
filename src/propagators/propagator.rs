@@ -24,7 +24,7 @@ use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
-use crate::md::trajectory::{interpolate, Traj};
+use crate::md::trajectory::{interpolate, InterpState, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::State;
@@ -259,6 +259,7 @@ where
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
     {
         let start_state = self.state;
         let end_state;
@@ -343,6 +344,7 @@ where
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
     {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration_with_traj(duration)
@@ -358,6 +360,7 @@ where
     ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
     where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
     {
         info!("Searching for {}", event);
 

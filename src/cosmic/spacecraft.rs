@@ -325,7 +325,6 @@ impl fmt::UpperHex for Spacecraft {
 impl State for Spacecraft {
     type Size = Const<9>;
     type VecLength = Const<90>;
-    const INTERPOLATION_SAMPLES: usize = 6;
 
     fn reset_stm(&mut self) {
         self.orbit.reset_stm();

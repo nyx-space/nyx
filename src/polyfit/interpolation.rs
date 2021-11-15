@@ -23,70 +23,16 @@
 use crate::polyfit::polynomial::{multiply, Polynomial};
 use crate::NyxError;
 
-// mod spline;
-// pub use spline::*;
-
-/// Create a Lagrange interpolating polynomial.
-///
-/// Create an nth degree polynomial matching the n points (xs[i], ys[i])
-/// using Neville's iterated method for Lagrange polynomials. The result will
-/// match no derivatives.
-///
-/// # Examples
-/// ```
-/// use bacon_sci::interp::lagrange;
-/// use bacon_sci::polynomial::Polynomial;
-/// fn example() {
-///     let xs: Vec<_> = (0..10).map(|i| i as f64).collect();
-///     let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
-///     let poly = lagrange(&xs, &ys, 1e-6).unwrap();
-///     for x in xs {
-///         assert!((x.cos() - poly.evaluate(x)).abs() < 0.00001);
-///     }
-/// }
-/// ```
-// pub fn lagrange<const DEGREE: usize>(
-//     xs: &[N],
-//     ys: &[N],
-//     tol: N::RealField,
-// ) -> Result<Polynomial<DEGREE>, String> {
-//     if xs.len() != ys.len() {
-//         return Err("lagrange: slices have mismatched dimension".to_owned());
-//     }
-
-//     let mut qs = vec![Polynomial::with_tolerance(tol)?; xs.len() * xs.len()];
-//     for (ind, y) in ys.iter().enumerate() {
-//         qs[ind] = polynomial![*y];
-//     }
-
-//     for i in 1..xs.len() {
-//         let mut poly_2 = polynomial![N::one(), -xs[i]];
-//         poly_2.set_tolerance(tol)?;
-//         for j in 1..=i {
-//             let mut poly_1 = polynomial![N::one(), -xs[i - j]];
-//             poly_1.set_tolerance(tol)?;
-//             let idenom = N::one() / (xs[i] - xs[i - j]);
-//             let numer =
-//                 &poly_1 * &qs[i + xs.len() * (j - 1)] - &poly_2 * &qs[(i - 1) + xs.len() * (j - 1)];
-//             qs[i + xs.len() * j] = numer * idenom;
-//         }
-//     }
-
-//     for i in 0..=qs[xs.len() * xs.len() - 1].order() {
-//         if qs[xs.len() * xs.len() - 1].get_coefficient(i).abs() < tol {
-//             qs[xs.len() * xs.len() - 1].purge_coefficient(i);
-//         }
-//     }
-
-//     qs[xs.len() * xs.len() - 1].purge_leading();
-//     Ok(qs[xs.len() * xs.len() - 1].clone())
-// }
-
 pub fn hermite<const DEGREE: usize>(
     xs: &[f64],
     ys: &[f64],
     derivs: &[f64],
 ) -> Result<Polynomial<DEGREE>, NyxError> {
+    if xs.len() == 0 {
+        return Err(NyxError::InvalidInterpolationData(
+            "No X data to interpolate".to_owned(),
+        ));
+    }
     if xs.len() != ys.len() {
         return Err(NyxError::InvalidInterpolationData(
             "Lengths of X and Y data differ".to_owned(),
@@ -137,6 +83,14 @@ pub fn hermite<const DEGREE: usize>(
         hermite = multiply::<DEGREE, 2, DEGREE>(hermite, new_poly);
     }
     hermite += qs[0];
+
+    if hermite.is_nan() {
+        dbg!(xs, ys, derivs);
+        return Err(NyxError::InvalidInterpolationData(format!(
+            "Invalid interpolation {:x}",
+            hermite
+        )));
+    }
 
     Ok(hermite)
 }
@@ -195,6 +149,65 @@ fn hermite_constant_test() {
         let deriv_err = (deriv).abs();
         assert!(deriv_err < tol);
         max_deriv_err = max_eval_err.max(eval_err);
+    }
+
+    println!(
+        "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
+        max_eval_err, max_deriv_err
+    );
+}
+
+#[test]
+fn hermite_ephem_spline_test() {
+    let ts = [
+        -1.0,
+        -0.7142321608948587,
+        -0.4284548929983568,
+        -0.14272281352821248,
+        0.1430009063036013,
+        0.4286973024022658,
+        0.714367019041751,
+        1.0,
+    ];
+    let values = [
+        -1200.6957374089038,
+        -1649.3350718512218,
+        -2088.1291193578113,
+        -2514.3714789070427,
+        -2925.5702772667646,
+        -3319.240151300038,
+        -3693.030156393982,
+        -4044.695271513933,
+    ];
+    let values_dt = [
+        -5.450221271198159,
+        -5.3475633589540585,
+        -5.212915678573803,
+        -5.0471031201910135,
+        -4.851091887968967,
+        -4.626059429784994,
+        -4.373345524123602,
+        -4.094465775216765,
+    ];
+
+    let tol = 2e-7;
+    let tol_deriv = 3e-6;
+    let poly = hermite::<16>(&ts, &values, &values_dt).unwrap();
+
+    println!("{:x}", poly);
+
+    let mut max_eval_err: f64 = 0.0;
+    let mut max_deriv_err: f64 = 0.0;
+
+    for (i, t) in ts.iter().enumerate() {
+        let (eval, deriv) = poly.eval_n_deriv(*t);
+        let eval_err = (eval - values[i]).abs();
+        assert!(dbg!(eval_err) < tol);
+        max_eval_err = max_eval_err.max(eval_err);
+
+        let deriv_err = (deriv - values_dt[i]).abs();
+        assert!(dbg!(deriv_err) < tol_deriv);
+        max_deriv_err = max_deriv_err.max(deriv_err);
     }
 
     println!(

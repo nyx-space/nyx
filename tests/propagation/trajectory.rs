@@ -86,15 +86,15 @@ fn traj_ephem() {
         max_err
     );
 
-    // Allow for up to micrometer error
+    // Allow for up to millimeter error
     assert!(
-        max_pos_err < 1e-9,
+        max_pos_err < 1e-6,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to micrometer per second error
+    // Allow for up to three millimeters per second error
     assert!(
-        max_vel_err < 1e-9,
+        max_vel_err < 3e-6,
         "Maximum orbit velocity in interpolation is too high!"
     );
 
@@ -110,6 +110,7 @@ fn traj_ephem() {
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
 
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
+    println!("AT START: {}", conv_state);
     let mut max_pos_err = (eval_state.radius() - conv_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
     let mut max_err = (eval_state.as_vector().unwrap() - conv_state.as_vector().unwrap()).norm();
@@ -119,6 +120,9 @@ fn traj_ephem() {
 
         let pos_err = (eval_state.radius() - conv_state.radius()).norm();
         if pos_err > max_pos_err {
+            if pos_err.is_nan() {
+                println!("{} is Nan: {}", conv_state.epoch(), conv_state);
+            }
             max_pos_err = pos_err;
         }
         let vel_err = (eval_state.velocity() - conv_state.velocity()).norm();

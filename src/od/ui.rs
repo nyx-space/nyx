@@ -18,7 +18,7 @@
 
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
-use crate::md::trajectory::Traj;
+use crate::md::trajectory::{InterpState, Traj};
 
 pub use super::estimate::*;
 pub use super::kalman::*;
@@ -648,18 +648,20 @@ where
     pub fn to_traj(&self) -> Result<Traj<S>, NyxError>
     where
         DefaultAllocator: Allocator<f64, <S as State>::VecLength>,
+        S: InterpState,
     {
         if self.estimates.is_empty() {
             Err(NyxError::NoStateData(
                 "No navigation trajectory to generate: run the OD process first".to_string(),
             ))
         } else {
-            let (tx, rx) = channel();
-            let start_state = self.estimates[0].state();
-            for estimate in &self.estimates {
-                tx.send(estimate.state()).unwrap();
-            }
-            Traj::new(start_state, rx)
+            todo!();
+            // let (tx, rx) = channel();
+            // let start_state = self.estimates[0].state();
+            // for estimate in &self.estimates {
+            //     tx.send(estimate.state()).unwrap();
+            // }
+            // Traj::new(start_state, rx)
         }
     }
 }

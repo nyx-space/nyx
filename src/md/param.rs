@@ -39,6 +39,10 @@ pub enum StateParameter {
     BLTOF,
     /// C_3 in (km/s)^2
     C3,
+    /// Coefficient of drag
+    Cd,
+    /// Coefficient of reflectivity
+    Cr,
     /// Declination (deg)
     Declination,
     /// The epoch of the state
@@ -188,6 +192,8 @@ impl FromStr for StateParameter {
             "aol" => Ok(Self::AoL),
             "aop" => Ok(Self::AoP),
             "c3" => Ok(Self::C3),
+            "cd" => Ok(Self::Cd),
+            "cr" => Ok(Self::Cr),
             "declin" => Ok(Self::Declination),
             "apoapsis_radius" => Ok(Self::ApoapsisRadius),
             "ea" => Ok(Self::EccentricAnomaly),

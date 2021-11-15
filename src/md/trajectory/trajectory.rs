@@ -16,21 +16,26 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::bacon_sci::interp::lagrange;
-use super::bacon_sci::polynomial::Polynomial;
-use super::crossbeam::thread;
-use super::rayon::prelude::*;
+extern crate bacon_sci;
+extern crate crossbeam;
+extern crate rayon;
+
+use self::crossbeam::thread;
+use self::rayon::prelude::*;
+use super::spline::Spline;
+use super::traj_it::TrajIterator;
+use super::InterpState;
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, OVector};
+use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
+use crate::polyfit::hermite;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::utils::normalize;
 use crate::State;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::fmt;
 use std::iter::Iterator;
 use std::sync::mpsc::{channel, Receiver};
@@ -38,74 +43,9 @@ use std::sync::Arc;
 use std::time::Duration as StdDur;
 use std::time::Instant;
 
-const INTERP_TOLERANCE: f64 = 1e-10;
-
-/// Stores a segment of an interpolation
-#[derive(Clone)]
-pub struct Spline<S: State>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    start_epoch: Epoch,
-    duration: Duration,
-    coefficients: Vec<Vec<f64>>,
-    end_state: S,
-}
-
-impl TryFrom<Vec<Orbit>> for Spline<Orbit> {
-    type Error = NyxError;
-
-    fn try_from(this_wdn: Vec<Orbit>) -> Result<Self, Self::Error> {
-        // Generate interpolation and flush.
-        let start_win_epoch = this_wdn[0].epoch();
-        let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
-        let window_duration = end_win_epoch - start_win_epoch;
-        let mut ts = Vec::with_capacity(this_wdn.len());
-        let mut values = Vec::with_capacity(42);
-        let mut coefficients = Vec::with_capacity(42);
-        // Initialize the vector of values and coefficients.
-        for _ in 0..42 {
-            values.push(Vec::with_capacity(this_wdn.len()));
-            coefficients.push(Vec::with_capacity(this_wdn.len()));
-        }
-        for state in &this_wdn {
-            let t_prime = normalize(
-                (state.epoch() - start_win_epoch).in_seconds(),
-                0.0,
-                window_duration.in_seconds(),
-            );
-            ts.push(t_prime);
-            for (pos, val) in state.as_vector().as_ref().unwrap().iter().enumerate() {
-                values[pos].push(*val);
-            }
-        }
-
-        // Generate the polynomials
-        for (pos, these_values) in values.iter().enumerate() {
-            match lagrange(&ts, these_values, INTERP_TOLERANCE) {
-                Ok(polyn) => coefficients[pos] = polyn.get_coefficients(),
-                Err(e) => {
-                    return Err(NyxError::InvalidInterpolationData(format!(
-                        "Interpolation failed: {}",
-                        e
-                    )))
-                }
-            };
-        }
-
-        Ok(Spline {
-            start_epoch: start_win_epoch,
-            duration: window_duration,
-            coefficients,
-            end_state: this_wdn[this_wdn.len() - 1],
-        })
-    }
-}
-
 /// Store a trajectory of any State.
 #[derive(Clone)]
-pub struct Traj<S: State>
+pub struct Traj<S: InterpState>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -121,59 +61,7 @@ where
     pub(crate) items_per_segments: usize,
 }
 
-pub struct TrajIterator<'a, S: State>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    pub time_series: TimeSeries,
-    /// A shared pointer to the original trajectory.
-    pub traj: &'a Traj<S>,
-}
-
-impl<S: State> Spline<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    /// Evaluate a specific segment at the provided Epoch, requires an initial state as a "template"
-    pub fn evaluate(&self, from: S, epoch: Epoch) -> Result<S, NyxError> {
-        // Compute the normalized time
-        let dur_into_window = epoch - self.start_epoch;
-        if dur_into_window > self.duration {
-            return Err(NyxError::OutOfInterpolationWindow(format!(
-                "Requested trajectory at time {} but that is past the final interpolation window by {}",
-                epoch, dur_into_window
-            )));
-        } else if dur_into_window.in_seconds() < -1.0 {
-            // We should not be in this window, but in the next one
-            // We allow for a delta of one second because of the rounding of the indexing.
-            return Err(NyxError::InvalidInterpolationData(format!(
-                "Bug: should be in next window: {}",
-                dur_into_window
-            )));
-        }
-
-        let t_prime = normalize(
-            dur_into_window.in_seconds(),
-            0.0,
-            self.duration.in_seconds(),
-        );
-
-        let mut state = from;
-
-        // Rebuild the polynominals
-        let mut state_vec = OVector::<f64, S::VecLength>::zeros();
-        for (cno, coeffs) in self.coefficients.iter().enumerate() {
-            state_vec[cno] = Polynomial::from_slice(coeffs).evaluate(t_prime)
-        }
-        state.set(epoch, &state_vec)?;
-
-        Ok(state)
-    }
-}
-
-impl<S: State> Traj<S>
+impl<S: InterpState> Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -571,14 +459,13 @@ impl Traj<Orbit> {
             /* Map: bucket the states and send on a channel */
             /* *** */
 
-            let items_per_segments = <Orbit as State>::INTERPOLATION_SAMPLES;
+            let items_per_segments = <Orbit as InterpState>::INTERPOLATION_SAMPLES;
             let mut window_states = Vec::with_capacity(items_per_segments);
             // Push the initial state
             window_states.push(start_state);
 
             // Note that we're using the typical map+reduce pattern
             for original_state in self.every(step) {
-                println!("{}", original_state);
                 let state = cosm.frame_chg(&original_state, new_frame);
                 if window_states.len() == items_per_segments {
                     let this_wdn = window_states.clone();
@@ -591,16 +478,17 @@ impl Traj<Orbit> {
                 }
                 window_states.push(state);
             }
-            if window_states.len() < 3 {
-                // Add more states or the interpolation will fail
-                window_states.clear();
-                for original_state in
-                    self.every_between(step, self.last().epoch() - 4 * step, self.last().epoch())
-                {
-                    let state = cosm.frame_chg(&original_state, new_frame);
-                    window_states.push(state)
-                }
-            }
+            // if window_states.len() < 3 {
+            //     // Add more states or the interpolation will fail
+            //     window_states.clear();
+            //     for original_state in
+            //         self.every_between(step, self.last().epoch() - 4 * step, self.last().epoch())
+            //     {
+            //         let state = cosm.frame_chg(&original_state, new_frame);
+            //         window_states.push(state)
+            //     }
+            //     dbg!(window_states.len());
+            // }
             // And interpolate the remaining states too, even if the buffer is not full!
             tx.send(window_states)
                 .map_err(|_| NyxError::TrajectoryCreationError)?;
@@ -615,7 +503,15 @@ impl Traj<Orbit> {
         let splines: Vec<_> = rx
             .into_iter()
             .par_bridge()
-            .map(|window_states| interpolate(window_states))
+            .map(|window_states| {
+                let rslt = interpolate(window_states.clone());
+                if rslt.is_err() {
+                    for s in window_states {
+                        println!("{}", s);
+                    }
+                }
+                rslt
+            })
             .collect();
 
         // Finally, build the whole trajectory
@@ -793,7 +689,7 @@ impl Traj<Spacecraft> {
             /* Map: bucket the states and send on a channel */
             /* *** */
 
-            let items_per_segments = <Orbit as State>::INTERPOLATION_SAMPLES;
+            let items_per_segments = <Orbit as InterpState>::INTERPOLATION_SAMPLES;
             let mut window_states = Vec::with_capacity(items_per_segments);
             // Push the initial state
             window_states.push(start_state);
@@ -959,28 +855,7 @@ impl Traj<Spacecraft> {
     }
 }
 
-impl<S: State> Iterator for TrajIterator<'_, S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    type Item = S;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.time_series.next() {
-            Some(next_epoch) => {
-                println!("next_epoch = {}", next_epoch);
-                match self.traj.at(next_epoch) {
-                    Ok(item) => Some(item),
-                    _ => None,
-                }
-            }
-            None => None,
-        }
-    }
-}
-
-impl<S: State> fmt::Display for Traj<S>
+impl<S: InterpState> fmt::Display for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
@@ -998,12 +873,12 @@ where
     }
 }
 
-pub(crate) fn interpolate<S: State>(this_wdn: Vec<S>) -> Result<Spline<S>, NyxError>
+pub(crate) fn interpolate<S: InterpState>(this_wdn: Vec<S>) -> Result<Spline<S>, NyxError>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    if this_wdn.len() < 2 {
+    if this_wdn.len() == 0 {
         return Err(NyxError::NoInterpolationData(format!(
             "Cannot interpolate with only {} items",
             this_wdn.len()
@@ -1014,12 +889,14 @@ where
     let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
     let window_duration = end_win_epoch - start_win_epoch;
     let mut ts = Vec::with_capacity(this_wdn.len());
-    let mut values = Vec::with_capacity(S::VecLength::dim());
-    let mut coefficients = Vec::with_capacity(S::VecLength::dim());
+    let mut values = Vec::with_capacity(S::params().len());
+    let mut values_dt = Vec::with_capacity(S::params().len());
+    let mut polynomials = Vec::with_capacity(S::params().len());
+
     // Initialize the vector of values and coefficients.
-    for _ in 0..S::VecLength::dim() {
+    for _ in 0..S::params().len() {
         values.push(Vec::with_capacity(this_wdn.len()));
-        coefficients.push(Vec::with_capacity(this_wdn.len()));
+        values_dt.push(Vec::with_capacity(this_wdn.len()));
     }
     for state in &this_wdn {
         let t_prime = normalize(
@@ -1028,28 +905,23 @@ where
             window_duration.in_seconds(),
         );
         ts.push(t_prime);
-        for (pos, val) in state.as_vector().as_ref().unwrap().iter().enumerate() {
-            values[pos].push(*val);
+        for (pos, param) in S::params().iter().enumerate() {
+            let (value, value_dt) = state.value_and_deriv(param)?;
+            values[pos].push(value);
+            values_dt[pos].push(value_dt);
         }
     }
 
     // Generate the polynomials
-    for (pos, these_values) in values.iter().enumerate() {
-        match lagrange(&ts, these_values, INTERP_TOLERANCE) {
-            Ok(polyn) => coefficients[pos] = polyn.get_coefficients(),
-            Err(e) => {
-                return Err(NyxError::InvalidInterpolationData(format!(
-                    "Interpolation failed: {}",
-                    e
-                )))
-            }
-        };
+    for pos in 0..values.len() {
+        let poly = hermite::<17>(&ts, &values[pos], &values_dt[pos])?;
+        polynomials.push(poly);
     }
 
     Ok(Spline {
         start_epoch: start_win_epoch,
         duration: window_duration,
-        coefficients,
+        polynomials,
         end_state: this_wdn[this_wdn.len() - 1],
     })
 }
