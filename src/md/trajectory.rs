@@ -558,7 +558,6 @@ impl Traj<Orbit> {
         let start_instant = Instant::now();
         let start_state = cosm.frame_chg(&self.first(), new_frame);
 
-        let mut cnt = 0;
         let rx = {
             // Channels that have the states in a bucket of the correct length
             let (tx, rx) = channel();
@@ -578,24 +577,17 @@ impl Traj<Orbit> {
             window_states.push(start_state);
 
             // Note that we're using the typical map+reduce pattern
-            println!(
-                "{} -> {} with {}",
-                self.first().epoch(),
-                self.last().epoch(),
-                step
-            );
             for original_state in self.every(step) {
                 println!("{}", original_state);
                 let state = cosm.frame_chg(&original_state, new_frame);
                 if window_states.len() == items_per_segments {
                     let this_wdn = window_states.clone();
-                    tx.send((cnt, this_wdn))
+                    tx.send(this_wdn)
                         .map_err(|_| NyxError::TrajectoryCreationError)?;
                     // Copy the last state as the first state of the next window
                     let last_wdn_state = window_states[items_per_segments - 1];
                     window_states.clear();
                     window_states.push(last_wdn_state);
-                    cnt += 1;
                 }
                 window_states.push(state);
             }
@@ -608,10 +600,9 @@ impl Traj<Orbit> {
                     let state = cosm.frame_chg(&original_state, new_frame);
                     window_states.push(state)
                 }
-                cnt += 1;
             }
             // And interpolate the remaining states too, even if the buffer is not full!
-            tx.send((cnt, window_states))
+            tx.send(window_states)
                 .map_err(|_| NyxError::TrajectoryCreationError)?;
 
             // Return the rx channel for these buckets
@@ -624,16 +615,7 @@ impl Traj<Orbit> {
         let splines: Vec<_> = rx
             .into_iter()
             .par_bridge()
-            .map(|data| {
-                let (tcnt, window_states) = data;
-                println!(
-                    "Handling {} of {} with {} items",
-                    tcnt,
-                    cnt,
-                    window_states.len()
-                );
-                interpolate(window_states)
-            })
+            .map(|window_states| interpolate(window_states))
             .collect();
 
         // Finally, build the whole trajectory
@@ -1021,7 +1003,7 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    if this_wdn.len() < 3 {
+    if this_wdn.len() < 2 {
         return Err(NyxError::NoInterpolationData(format!(
             "Cannot interpolate with only {} items",
             this_wdn.len()

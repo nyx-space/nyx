@@ -74,7 +74,11 @@ fn qlaw_as_ruggiero_case_a() {
     println!("[qlaw_as_ruggiero_case_a] fuel usage: {:.3} kg", fuel_usage);
     // Find all of the events
     for e in &events {
-        println!("[qlaw_as_ruggiero_case_a] {} => {:?}", e, traj.find_all(e));
+        println!(
+            "[qlaw_as_ruggiero_case_a] Found {} events of kind {}",
+            traj.find_all(e).unwrap().len(),
+            e
+        );
     }
 
     assert!(
