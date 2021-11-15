@@ -76,8 +76,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
     let mut prop = setup.with(sc_init_state);
-    prop.tx_chan = Some(truth_tx);
-    let final_truth = prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_sc_state) = truth_rx.try_recv() {

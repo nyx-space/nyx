@@ -32,7 +32,6 @@ use std::collections::BTreeMap;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
-use std::time::Duration as StdDur;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
@@ -100,8 +99,6 @@ where
         PropInstance {
             state,
             prop: self,
-            tx_chan: None,
-            prevent_tx: false,
             details: IntegrationDetails {
                 step: self.opts.init_step,
                 error: 0.0,
@@ -142,11 +139,8 @@ where
     pub state: D::StateType,
     /// The propagator setup (kind, stages, etc.)
     pub prop: &'a Propagator<'a, D, E>,
-    /// An output channel for all of the states computed by this propagator instance
-    pub tx_chan: Option<Sender<D::StateType>>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
-    prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
     step_size: Duration, // Stores the adapted step for the _next_ call
     fixed_step: bool,
     // Allows us to do pre-allocation of the ki vectors
@@ -166,15 +160,12 @@ where
         self.fixed_step = fixed;
     }
 
-    /// Set the output channel of the propagator. For example use this to generate an interpolated trajectory.
-    pub fn with_tx(mut self, tx: Sender<D::StateType>) -> Self {
-        self.tx_chan = Some(tx);
-        self
-    }
-
-    /// This method propagates the provided Dynamics for the provided duration.
     #[allow(clippy::erasing_op)]
-    pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
+    fn for_duration_channel_option(
+        &mut self,
+        duration: Duration,
+        maybe_tx_chan: Option<Sender<D::StateType>>,
+    ) -> Result<D::StateType, NyxError> {
         if duration == 0 * TimeUnit::Second {
             debug!("No propagation necessary");
             return Ok(self.state);
@@ -204,6 +195,13 @@ where
 
                 self.single_step()?;
 
+                // Publish to channel if provided
+                if let Some(ref chan) = maybe_tx_chan {
+                    if let Err(e) = chan.send(self.state) {
+                        warn!("could not publish to channel: {}", e)
+                    }
+                }
+
                 // Restore the step size for subsequent calls
                 self.set_step(prev_step_size, prev_step_kind);
                 if backprop {
@@ -212,14 +210,44 @@ where
                 return Ok(self.state);
             } else {
                 self.single_step()?;
+                // Publish to channel if provided
+                if let Some(ref chan) = maybe_tx_chan {
+                    if let Err(e) = chan.send(self.state) {
+                        warn!("could not publish to channel: {}", e)
+                    }
+                }
             }
         }
+    }
+
+    /// This method propagates the provided Dynamics for the provided duration.
+    pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
+        self.for_duration_channel_option(duration, None)
+    }
+
+    /// This method propagates the provided Dynamics for the provided duration and publishes each state on the channel.
+    pub fn for_duration_with_channel(
+        &mut self,
+        duration: Duration,
+        tx_chan: Sender<D::StateType>,
+    ) -> Result<D::StateType, NyxError> {
+        self.for_duration_channel_option(duration, Some(tx_chan))
     }
 
     /// Propagates the provided Dynamics until the provided epoch. Returns the end state.
     pub fn until_epoch(&mut self, end_time: Epoch) -> Result<D::StateType, NyxError> {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration(duration)
+    }
+
+    /// Propagates the provided Dynamics until the provided epoch and publishes states on the provided channel. Returns the end state.
+    pub fn until_epoch_with_channel(
+        &mut self,
+        end_time: Epoch,
+        tx_chan: Sender<D::StateType>,
+    ) -> Result<D::StateType, NyxError> {
+        let duration: Duration = end_time - self.state.epoch();
+        self.for_duration_with_channel(duration, tx_chan)
     }
 
     /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
@@ -239,11 +267,13 @@ where
             // Channels that have the states in a bucket of the correct length
             let (tx_bucket, rx_bucket) = channel();
 
-            // Channels that have a single state for the propagator
-            let (tx, rx) = channel();
-            self.tx_chan = Some(tx);
-            // Propagate the dynamics
-            end_state = self.for_duration(duration)?;
+            let rx = {
+                // Channels that have a single state for the propagator
+                let (tx, rx) = channel();
+                // Propagate the dynamics
+                end_state = self.for_duration_with_channel(duration, tx)?;
+                rx
+            };
 
             /* *** */
             /* Map: bucket the states and send on a channel */
@@ -256,7 +286,7 @@ where
 
             // Note that we're using the typical map+reduce pattern
             // Start receiving states on a blocking call (map)
-            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(100)) {
+            while let Ok(state) = rx.recv() {
                 if window_states.len() == items_per_segments {
                     let this_wdn = window_states.clone();
                     tx_bucket
@@ -346,13 +376,6 @@ where
         self.state.set(self.state.epoch() + t, &state_vec)?;
         self.state = self.prop.dynamics.finally(self.state)?;
 
-        if !self.prevent_tx {
-            if let Some(ref chan) = self.tx_chan {
-                if let Err(e) = chan.send(self.state) {
-                    warn!("could not publish to channel: {}", e)
-                }
-            }
-        }
         Ok(())
     }
 

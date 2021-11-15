@@ -49,8 +49,10 @@ fn traj_ephem() {
 
     let (tx, rx) = channel();
     std::thread::spawn(move || {
-        let mut prop = setup.with(start_state).with_tx(tx);
-        prop.for_duration(31 * TimeUnit::Day).unwrap();
+        setup
+            .with(start_state)
+            .for_duration_with_channel(31 * TimeUnit::Day, tx)
+            .unwrap();
     });
 
     // Evaluate the first time of the trajectory to make sure that one is there too.
@@ -245,8 +247,10 @@ fn traj_spacecraft() {
 
     let (tx, rx) = channel();
     std::thread::spawn(move || {
-        let mut prop = setup.with(start_state).with_tx(tx);
-        prop.until_epoch(end_state.epoch()).unwrap();
+        setup
+            .with(start_state)
+            .until_epoch_with_channel(end_state.epoch(), tx)
+            .unwrap();
     });
 
     // Evaluate the first time of the trajectory to make sure that one is there too.
@@ -397,8 +401,10 @@ fn traj_ephem_backward() {
 
     let (tx, rx) = channel();
     std::thread::spawn(move || {
-        let mut prop = setup.with(start_state).with_tx(tx);
-        prop.for_duration(31 * TimeUnit::Day).unwrap();
+        setup
+            .with(start_state)
+            .for_duration_with_channel(31 * TimeUnit::Day, tx)
+            .unwrap();
     });
 
     // Evaluate the first time of the trajectory to make sure that one is there too.

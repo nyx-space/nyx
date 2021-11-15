@@ -52,8 +52,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
     // Generate the truth data.
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    let final_truth = prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
@@ -187,8 +186,7 @@ fn multi_body_ckf_covar_map() {
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {

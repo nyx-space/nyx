@@ -1,6 +1,6 @@
 extern crate nalgebra as na;
-
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger;
 
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
@@ -84,6 +84,9 @@ fn stop_cond_3rd_peri() {
 
 #[test]
 fn stop_cond_nrho_apo() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
     use std::time::Instant;
     // The following test technically works, but the transformation of thousands of states
     // into another frame is quite slow...
@@ -117,21 +120,20 @@ fn stop_cond_nrho_apo() {
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-6, RSSCartesianStep {}),
     );
 
-    let mut prop = setup.with(state);
-
     // NOTE: Here, we will propagate for the maximum duration in the original frame
     // Then convert that trajectory into the other frame, and perform the search there.
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
-    let prop_time = 4 * state_luna.period();
+    let prop_time = 1.1 * state_luna.period();
     let start = Instant::now();
-    let (orbit, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+    let (orbit, traj) = setup.with(state).for_duration_with_traj(prop_time).unwrap();
 
     let end_prop = Instant::now();
     println!(
-        "Propagated for {} in {} ms:\n{:x}",
+        "Propagated for {} in {} ms:\n{:x}\n{}\n",
         prop_time,
         (end_prop - start).as_millis(),
         orbit,
+        traj
     );
 
     // Create the event
@@ -141,8 +143,20 @@ fn stop_cond_nrho_apo() {
     let traj_luna = traj.to_frame(luna, cosm).unwrap();
     let end_conv = Instant::now();
     println!(
-        "Converted EME2000 trajectory into Moon J2000 in {} ms",
-        (end_conv - end_prop).as_millis()
+        "Converted EME2000 trajectory into Moon J2000 in {} ms\nFrom: {}\nTo  : {}",
+        (end_conv - end_prop).as_millis(),
+        traj,
+        traj_luna
+    );
+    assert_eq!(
+        traj.first().epoch(),
+        traj_luna.first().epoch(),
+        "First epoch of converted trajectories do not match"
+    );
+    assert_eq!(
+        traj.last().epoch(),
+        traj_luna.last().epoch(),
+        "Last epoch of converted trajectories do not match"
     );
 
     // Now, find all of the requested events

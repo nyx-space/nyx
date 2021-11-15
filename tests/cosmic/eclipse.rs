@@ -27,10 +27,11 @@ fn leo_sun_earth_eclipses() {
     thread::spawn(move || {
         let dynamics = OrbitalDynamics::point_masses(&bodies, cosmc);
         let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
-        let mut prop = setup.with(leo);
 
-        prop.tx_chan = Some(truth_tx);
-        prop.for_duration(prop_time).unwrap();
+        setup
+            .with(leo)
+            .for_duration_with_channel(prop_time, truth_tx)
+            .unwrap();
     });
 
     // Initialize the EclipseLocator
@@ -79,10 +80,11 @@ fn geo_sun_earth_eclipses() {
         let cosm = Cosm::de438();
         let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
         let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(60.0));
-        let mut prop = setup.with(geo);
 
-        prop.tx_chan = Some(truth_tx);
-        prop.for_duration(prop_time).unwrap();
+        setup
+            .with(geo)
+            .for_duration_with_channel(prop_time, truth_tx)
+            .unwrap();
     });
 
     // Initialize the EclipseLocator

@@ -113,7 +113,7 @@ where
     /// Splines are organized as a binary tree map whose index is the
     /// number of seconds since the start of this ephemeris rounded down
     pub segments: BTreeMap<i32, Spline<S>>,
-    /// Timeout is used to stop listening to new state (default is 50ms, should work well in release and debug mode).
+    /// Timeout is used to stop listening to new state
     pub timeout_ms: u64,
     pub(crate) start_state: S,
     pub(crate) max_offset: i32,
@@ -413,6 +413,12 @@ where
     {
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
+        if start_epoch == end_epoch {
+            return Err(NyxError::NoInterpolationData(format!(
+                "Trajector of {} segments has identical start and end dates -- cannot search it",
+                self.segments.len()
+            )));
+        }
         let heuristic = (end_epoch - start_epoch) / 100;
         info!(
             "Searching for {} with initial heuristic of {}",
@@ -431,6 +437,10 @@ where
         let mut states: Vec<_> = receiver.iter().collect();
 
         if states.is_empty() {
+            warn!(
+                "Heuristic failed to find any {} event, using slower approach",
+                event
+            );
             // Crap, we didn't find the event.
             // Let's find the min and max of this event throughout the trajectory, and search around there.
             match self.find_minmax(event, TimeUnit::Second) {
@@ -548,21 +558,15 @@ impl Traj<Orbit> {
         let start_instant = Instant::now();
         let start_state = cosm.frame_chg(&self.first(), new_frame);
 
+        let mut cnt = 0;
         let rx = {
             // Channels that have the states in a bucket of the correct length
-            let (tx_bucket, rx_bucket) = channel();
-
-            // Channels that have a single state for the propagator
             let (tx, rx) = channel();
+
             // Nyquist–Shannon sampling theorem
             let sample_rate =
                 1.0 / (((self.items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
-
-            for state in self.every(step) {
-                let converted_state = cosm.frame_chg(&state, new_frame);
-                tx.send(converted_state).unwrap();
-            }
 
             /* *** */
             /* Map: bucket the states and send on a channel */
@@ -574,27 +578,44 @@ impl Traj<Orbit> {
             window_states.push(start_state);
 
             // Note that we're using the typical map+reduce pattern
-            // Start receiving states on a blocking call (map)
-            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(100)) {
+            println!(
+                "{} -> {} with {}",
+                self.first().epoch(),
+                self.last().epoch(),
+                step
+            );
+            for original_state in self.every(step) {
+                println!("{}", original_state);
+                let state = cosm.frame_chg(&original_state, new_frame);
                 if window_states.len() == items_per_segments {
                     let this_wdn = window_states.clone();
-                    tx_bucket
-                        .send(this_wdn)
+                    tx.send((cnt, this_wdn))
                         .map_err(|_| NyxError::TrajectoryCreationError)?;
                     // Copy the last state as the first state of the next window
                     let last_wdn_state = window_states[items_per_segments - 1];
                     window_states.clear();
                     window_states.push(last_wdn_state);
+                    cnt += 1;
                 }
                 window_states.push(state);
             }
+            if window_states.len() < 3 {
+                // Add more states or the interpolation will fail
+                window_states.clear();
+                for original_state in
+                    self.every_between(step, self.last().epoch() - 4 * step, self.last().epoch())
+                {
+                    let state = cosm.frame_chg(&original_state, new_frame);
+                    window_states.push(state)
+                }
+                cnt += 1;
+            }
             // And interpolate the remaining states too, even if the buffer is not full!
-            tx_bucket
-                .send(window_states)
+            tx.send((cnt, window_states))
                 .map_err(|_| NyxError::TrajectoryCreationError)?;
 
             // Return the rx channel for these buckets
-            rx_bucket
+            rx
         };
 
         /* *** */
@@ -603,7 +624,16 @@ impl Traj<Orbit> {
         let splines: Vec<_> = rx
             .into_iter()
             .par_bridge()
-            .map(|window_states| interpolate(window_states))
+            .map(|data| {
+                let (tcnt, window_states) = data;
+                println!(
+                    "Handling {} of {} with {} items",
+                    tcnt,
+                    cnt,
+                    window_states.len()
+                );
+                interpolate(window_states)
+            })
             .collect();
 
         // Finally, build the whole trajectory
@@ -956,10 +986,13 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.time_series.next() {
-            Some(next_epoch) => match self.traj.at(next_epoch) {
-                Ok(item) => Some(item),
-                _ => None,
-            },
+            Some(next_epoch) => {
+                println!("next_epoch = {}", next_epoch);
+                match self.traj.at(next_epoch) {
+                    Ok(item) => Some(item),
+                    _ => None,
+                }
+            }
             None => None,
         }
     }
@@ -988,6 +1021,12 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
+    if this_wdn.len() < 3 {
+        return Err(NyxError::NoInterpolationData(format!(
+            "Cannot interpolate with only {} items",
+            this_wdn.len()
+        )));
+    }
     // Generate interpolation and flush.
     let start_win_epoch = this_wdn[0].epoch();
     let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();

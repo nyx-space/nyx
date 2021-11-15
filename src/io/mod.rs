@@ -47,8 +47,6 @@ pub mod formatter;
 
 pub mod quantity;
 
-pub mod traj;
-
 pub mod ccsds;
 
 #[allow(clippy::upper_case_acronyms)]

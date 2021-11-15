@@ -28,7 +28,7 @@ use crate::md::ui::MDProcess;
 use crate::od::measurement::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
-use crate::od::{Measurement, MeasurementDevice};
+use crate::od::MeasurementDevice;
 use crate::propagators::Propagator;
 use crate::time::{Duration, TimeUnit};
 use crate::Orbit;
@@ -358,7 +358,6 @@ impl<'a> OdpScenario<'a> {
 
         // Set up the channels
         let (tx, rx) = channel();
-        truth_prop.tx_chan = Some(tx);
 
         let mut initial_state = Some(truth_prop.state);
 
@@ -368,7 +367,7 @@ impl<'a> OdpScenario<'a> {
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state);
 
-        truth_prop.for_duration(prop_time)?;
+        truth_prop.for_duration_with_channel(prop_time, tx)?;
 
         info!(
             "Final state (computed in {:.3} seconds):",

@@ -433,9 +433,10 @@ fn qlaw_as_ruggiero_case_f() {
         sc.clone(),
         PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
     );
-    let mut prop = setup.with(sc_state);
-    prop.tx_chan = Some(tx);
-    let final_state = prop.for_duration(prop_time).unwrap();
+    let final_state = setup
+        .with(sc_state)
+        .for_duration_with_channel(prop_time, tx)
+        .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_f] {:x}", final_state.orbit);
