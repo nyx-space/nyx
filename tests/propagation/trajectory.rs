@@ -33,7 +33,11 @@ fn traj_ephem() {
         cnt += 1.0;
         sum_sma += state.sma()
     }
-    println!("Average SMA: {:.3} km", sum_sma / cnt);
+    println!(
+        "Average SMA: {:.3} km\tShould be: {:.3}",
+        sum_sma / cnt,
+        start_state.sma()
+    );
 
     // === Below is the validation of the ephemeris == //
 
