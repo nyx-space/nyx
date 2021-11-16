@@ -35,7 +35,7 @@ where
         + Allocator<f64, Self::VecLength>,
 {
     /// The number of samples needed for building an interpolation of this
-    const INTERPOLATION_SAMPLES: usize = 4;
+    const INTERPOLATION_SAMPLES: usize = 8;
 
     /// Return the parameters in order
     /// TODO: Switch to a const parameters when rustc is cool with it

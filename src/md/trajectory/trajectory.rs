@@ -20,6 +20,7 @@ extern crate bacon_sci;
 extern crate crossbeam;
 extern crate rayon;
 
+use self::bacon_sci::interp::lagrange;
 use self::crossbeam::thread;
 use self::rayon::prelude::*;
 use super::spline::{Spline, SPLINE_DEGREE};
@@ -42,6 +43,8 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::time::Duration as StdDur;
 use std::time::Instant;
+
+const INTERP_TOLERANCE: f64 = 1e-10;
 
 /// Store a trajectory of any State.
 #[derive(Clone)]
@@ -446,6 +449,7 @@ impl Traj<Orbit> {
         let start_instant = Instant::now();
         let start_state = cosm.frame_chg(&self.first(), new_frame);
 
+        let mut cnt = 0;
         let rx = {
             // Channels that have the states in a bucket of the correct length
             let (tx, rx) = channel();
@@ -466,6 +470,7 @@ impl Traj<Orbit> {
 
             // Note that we're using the typical map+reduce pattern
             for original_state in self.every(step) {
+                println!("{}", original_state);
                 let state = cosm.frame_chg(&original_state, new_frame);
                 if window_states.len() == items_per_segments {
                     let this_wdn = window_states.clone();
@@ -475,6 +480,7 @@ impl Traj<Orbit> {
                     let last_wdn_state = window_states[items_per_segments - 1];
                     window_states.clear();
                     window_states.push(last_wdn_state);
+                    cnt += 1;
                 }
                 window_states.push(state);
             }
@@ -492,10 +498,11 @@ impl Traj<Orbit> {
             // And interpolate the remaining states too, even if the buffer is not full!
             tx.send(window_states)
                 .map_err(|_| NyxError::TrajectoryCreationError)?;
-
+            cnt += 1;
             // Return the rx channel for these buckets
             rx
         };
+        println!("Should have {} splines", cnt);
 
         /* *** */
         /* Reduce: Build an interpolation of each of the segments */
@@ -890,14 +897,12 @@ where
     let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
     let window_duration = end_win_epoch - start_win_epoch;
     let mut ts = Vec::with_capacity(this_wdn.len());
-    let mut values = Vec::with_capacity(S::params().len());
-    let mut values_dt = Vec::with_capacity(S::params().len());
-    let mut polynomials = Vec::with_capacity(S::params().len());
+    let mut values = Vec::with_capacity(S::VecLength::dim());
+    let mut polynomials = Vec::with_capacity(S::VecLength::dim());
 
     // Initialize the vector of values and coefficients.
-    for _ in 0..S::params().len() {
+    for _ in 0..S::VecLength::dim() {
         values.push(Vec::with_capacity(this_wdn.len()));
-        values_dt.push(Vec::with_capacity(this_wdn.len()));
     }
     for state in &this_wdn {
         let t_prime = if this_wdn.len() == 1 {
@@ -917,17 +922,22 @@ where
         }
 
         ts.push(t_prime);
-        for (pos, param) in S::params().iter().enumerate() {
-            let (value, value_dt) = state.value_and_deriv(param)?;
-            values[pos].push(value);
-            values_dt[pos].push(value_dt);
+        for (pos, val) in state.as_vector().as_ref().unwrap().iter().enumerate() {
+            values[pos].push(*val);
         }
     }
 
     // Generate the polynomials
-    for pos in 0..values.len() {
-        let poly = hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
-        polynomials.push(poly);
+    for (pos, these_values) in values.iter().enumerate() {
+        match lagrange(&ts, these_values, INTERP_TOLERANCE) {
+            Ok(polyn) => polynomials.push(polyn),
+            Err(e) => {
+                return Err(NyxError::InvalidInterpolationData(format!(
+                    "Interpolation failed: {}",
+                    e
+                )))
+            }
+        };
     }
 
     Ok(Spline {

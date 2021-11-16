@@ -16,12 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-// use bacon_sci::polynomial::Polynomial;
-use crate::polyfit::Polynomial;
+use bacon_sci::polynomial::Polynomial;
 
 use super::InterpState;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
+use crate::linalg::{DefaultAllocator, OVector};
 use crate::time::{Duration, Epoch};
 use crate::utils::normalize;
 use crate::NyxError;
@@ -38,7 +37,7 @@ where
     pub(crate) start_epoch: Epoch,
     pub(crate) duration: Duration,
     // TODO: When rustc is cool with more const generics, switch this to a [Poly<{S::DEGREE}>; S::CURVES]
-    pub(crate) polynomials: Vec<Polynomial<SPLINE_DEGREE>>,
+    pub(crate) polynomials: Vec<Polynomial<f64>>,
     pub(crate) end_state: S,
 }
 
@@ -74,12 +73,11 @@ where
         let mut state = from;
 
         // Rebuild the polynominals
-        for (i, param) in S::params().iter().enumerate() {
-            let (value, value_dt) = self.polynomials[i].eval_n_deriv(t_prime);
-            state.set_value_and_deriv(param, value, value_dt)?;
+        let mut state_vec = OVector::<f64, S::VecLength>::zeros();
+        for (cno, poly) in self.polynomials.iter().enumerate() {
+            state_vec[cno] = poly.evaluate(t_prime)
         }
-
-        state.set_epoch(epoch);
+        state.set(epoch, &state_vec)?;
 
         Ok(state)
     }
