@@ -322,9 +322,6 @@ where
         let mut traj = Traj {
             segments: BTreeMap::new(),
             start_state,
-            timeout_ms: 100,
-            max_offset: 0,
-            items_per_segments: 8,
         };
 
         for maybe_spline in splines {

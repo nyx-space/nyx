@@ -16,16 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use bacon_sci::polynomial::Polynomial;
+// use bacon_sci::polynomial::Polynomial;
 
 use super::InterpState;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
+use crate::polyfit::Polynomial;
 use crate::time::{Duration, Epoch};
 use crate::utils::normalize;
 use crate::NyxError;
 
-pub(crate) const SPLINE_DEGREE: usize = 8;
+pub(crate) const SPLINE_DEGREE: usize = 17;
 
 /// Stores a segment of an interpolation, a spline. Each spline is a polynomial of 16 coefficients
 #[derive(Clone)]
@@ -37,7 +38,7 @@ where
     pub(crate) start_epoch: Epoch,
     pub(crate) duration: Duration,
     // TODO: When rustc is cool with more const generics, switch this to a [Poly<{S::DEGREE}>; S::CURVES]
-    pub(crate) polynomials: Vec<Polynomial<f64>>,
+    pub(crate) polynomials: Vec<Polynomial<SPLINE_DEGREE>>,
     pub(crate) end_state: S,
 }
 
@@ -73,11 +74,17 @@ where
         let mut state = from;
 
         // Rebuild the polynominals
-        let mut state_vec = OVector::<f64, S::VecLength>::zeros();
-        for (cno, poly) in self.polynomials.iter().enumerate() {
-            state_vec[cno] = poly.evaluate(t_prime)
+        // let mut state_vec = OVector::<f64, S::VecLength>::zeros();
+        // for (cno, poly) in self.polynomials.iter().enumerate() {
+        //     state_vec[cno] = poly.evaluate(t_prime)
+        // }
+        // state.set(epoch, &state_vec)?;
+
+        for (i, param) in S::params().iter().enumerate() {
+            let (value, value_dt) = self.polynomials[i].eval_n_deriv(t_prime);
+            state.set_value_and_deriv(param, value, value_dt)?;
         }
-        state.set(epoch, &state_vec)?;
+        state.set_epoch(epoch);
 
         Ok(state)
     }

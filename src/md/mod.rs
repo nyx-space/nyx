@@ -17,7 +17,6 @@
 */
 
 extern crate bacon_sci;
-extern crate crossbeam;
 extern crate csv;
 extern crate rayon;
 

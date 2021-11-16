@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate crossbeam;
 extern crate rayon;
 use std::fmt;
 

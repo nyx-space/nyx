@@ -17,11 +17,8 @@
 */
 
 extern crate bacon_sci;
-extern crate crossbeam;
 extern crate rayon;
 
-use self::bacon_sci::interp::lagrange;
-use self::crossbeam::thread;
 use self::rayon::prelude::*;
 use super::spline::{Spline, SPLINE_DEGREE};
 use super::traj_it::TrajIterator;
@@ -30,7 +27,7 @@ use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName};
+use crate::linalg::DefaultAllocator;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
 use crate::polyfit::hermite;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
@@ -39,7 +36,7 @@ use crate::State;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::Iterator;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Duration as StdDur;
 use std::time::Instant;
@@ -56,12 +53,7 @@ where
     /// Splines are organized as a binary tree map whose index is the
     /// number of seconds since the start of this ephemeris rounded down
     pub segments: BTreeMap<i32, Spline<S>>,
-    /// Timeout is used to stop listening to new state
-    pub timeout_ms: u64,
     pub(crate) start_state: S,
-    pub(crate) max_offset: i32,
-    /// Store the items per segment to convert to another frame.
-    pub(crate) items_per_segments: usize,
 }
 
 impl<S: InterpState> Traj<S>
@@ -69,76 +61,12 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    /// Creates a new trajectory with the provided starting state (used as a template) and a receiving channel.
-    /// The trajectories are always generated on a separate thread.
-    pub fn new(state: S, rx: Receiver<S>) -> Result<Self, NyxError> {
-        // Bug? With a spacecraft, we need more interpolation windows than just an orbit.
-        // I've spent 12h trying to understand why, but I can't, so screw it for it.
-        Self::new_bucket_as(state, if S::VecLength::dim() == 90 { 6 } else { 32 }, rx)
-    }
-
-    /// Creates a new trajectory but specifies the number of items per segment
-    pub fn new_bucket_as(
-        state: S,
-        items_per_segments: usize,
-        rx: Receiver<S>,
-    ) -> Result<Self, NyxError> {
-        thread::scope(|s| {
-            // Initialize the interpolator
-            let mut me = Self {
-                segments: BTreeMap::new(),
-                start_state: state,
-                timeout_ms: 100,
-                max_offset: 0,
-                items_per_segments,
-            };
-
-            let mut children = vec![];
-            let mut window_states: Vec<S> = Vec::with_capacity(items_per_segments);
-            // Push the initial state
-            window_states.push(state);
-
-            // Note that we're using the typical map+reduce pattern
-            // Start receiving states on a blocking call (map)
-            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(me.timeout_ms)) {
-                if window_states.len() == items_per_segments {
-                    let this_wdn = window_states.clone();
-                    children.push(
-                        s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(this_wdn) }),
-                    );
-                    // Copy the last state as the first state of the next window
-                    let last_wdn_state = window_states[items_per_segments - 1];
-                    window_states.clear();
-                    window_states.push(last_wdn_state);
-                }
-                window_states.push(state);
-            }
-            // And interpolate the remaining states too, even if the buffer is not full!
-            children.push(
-                s.spawn(move |_| -> Result<Spline<S>, NyxError> { interpolate(window_states) }),
-            );
-
-            // Reduce
-            for child in children {
-                // collect each child thread's return-value
-                let segment = child.join().unwrap()?;
-                me.append_spline(segment);
-            }
-
-            Ok(me)
-        })
-        .unwrap()
-    }
-
     pub(crate) fn append_spline(&mut self, segment: Spline<S>) {
         // Compute the number of seconds since start of trajectory
         let offset_s = ((segment.start_epoch - self.start_state.epoch())
             .in_seconds()
             .floor()) as i32;
         self.segments.insert(offset_s, segment);
-        if offset_s > self.max_offset {
-            self.max_offset = offset_s;
-        }
     }
 
     /// Evaluate the trajectory at this specific epoch.
@@ -149,7 +77,7 @@ where
         match self.segments.range(..=offset_s).rev().next() {
             None => {
                 // Let's see if this corresponds to the max offset value
-                let last_item = self.segments[&self.max_offset].end_state;
+                let last_item = self.last();
                 if last_item.epoch() == epoch {
                     Ok(last_item)
                 } else {
@@ -167,7 +95,7 @@ where
 
     /// Returns the last state in this ephemeris
     pub fn last(&self) -> S {
-        self.segments[&self.max_offset].end_state
+        self.segments[self.segments.keys().last().unwrap()].end_state
     }
 
     /// Creates an iterator through the trajectory by the provided step size
@@ -453,16 +381,16 @@ impl Traj<Orbit> {
             // Channels that have the states in a bucket of the correct length
             let (tx, rx) = channel();
 
+            let items_per_segments = <Orbit as InterpState>::INTERPOLATION_SAMPLES;
+
             // Nyquist–Shannon sampling theorem
-            let sample_rate =
-                1.0 / (((self.items_per_segments * 2 + 1) * self.segments.len()) as f64);
+            let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
 
             /* *** */
             /* Map: bucket the states and send on a channel */
             /* *** */
 
-            let items_per_segments = <Orbit as InterpState>::INTERPOLATION_SAMPLES;
             let mut window_states = Vec::with_capacity(items_per_segments);
             // Push the initial state
             window_states.push(start_state);
@@ -485,16 +413,29 @@ impl Traj<Orbit> {
                 // Add more states or the interpolation will fail
                 window_states.clear();
                 for original_state in
-                    self.every_between(step, self.last().epoch() - 4 * step, self.last().epoch())
+                    self.every_between(step, self.last().epoch() - 3 * step, self.last().epoch())
                 {
                     let state = cosm.frame_chg(&original_state, new_frame);
                     window_states.push(state)
                 }
             }
+
+            // And add the last state, will be removed by the interpolator if it is already there
+            if self.last().epoch() != window_states.last().unwrap().epoch() {
+                let state = cosm.frame_chg(&self.last(), new_frame);
+                window_states.push(state);
+            }
+
+            println!(
+                "Last state epoch {}\twindow last: {}",
+                self.last().epoch().as_gregorian_tai_str(),
+                window_states.last().unwrap().epoch().as_gregorian_tai_str()
+            );
             // And interpolate the remaining states too, even if the buffer is not full!
             tx.send(window_states)
                 .map_err(|_| NyxError::TrajectoryCreationError)?;
             // Return the rx channel for these buckets
+
             rx
         };
 
@@ -504,16 +445,13 @@ impl Traj<Orbit> {
         let splines: Vec<_> = rx
             .into_iter()
             .par_bridge()
-            .map(|window_states| interpolate(window_states.clone()))
+            .map(|window_states| interpolate(window_states))
             .collect();
 
         // Finally, build the whole trajectory
         let mut traj = Traj {
             segments: BTreeMap::new(),
             start_state,
-            timeout_ms: 100,
-            max_offset: 0,
-            items_per_segments: 8,
         };
 
         for maybe_spline in splines {
@@ -656,11 +594,12 @@ impl Traj<Spacecraft> {
             // Channels that have the states in a bucket of the correct length
             let (tx_bucket, rx_bucket) = channel();
 
+            let items_per_segments = <Spacecraft as InterpState>::INTERPOLATION_SAMPLES;
+
             // Channels that have a single state for the propagator
             let (tx, rx) = channel();
             // Nyquist–Shannon sampling theorem
-            let sample_rate =
-                1.0 / (((self.items_per_segments * 2 + 1) * self.segments.len()) as f64);
+            let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
 
             for state in self.every(step) {
@@ -682,7 +621,6 @@ impl Traj<Spacecraft> {
             /* Map: bucket the states and send on a channel */
             /* *** */
 
-            let items_per_segments = <Orbit as InterpState>::INTERPOLATION_SAMPLES;
             let mut window_states = Vec::with_capacity(items_per_segments);
             // Push the initial state
             window_states.push(start_state);
@@ -724,9 +662,6 @@ impl Traj<Spacecraft> {
         let mut traj = Traj {
             segments: BTreeMap::new(),
             start_state,
-            timeout_ms: 100,
-            max_offset: 0,
-            items_per_segments: 8,
         };
 
         for maybe_spline in splines {
@@ -883,12 +818,17 @@ where
     let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
     let window_duration = end_win_epoch - start_win_epoch;
     let mut ts = Vec::with_capacity(this_wdn.len());
-    let mut values = Vec::with_capacity(S::VecLength::dim());
-    let mut polynomials = Vec::with_capacity(S::VecLength::dim());
+    // let mut values = Vec::with_capacity(S::VecLength::dim());
+    // let mut polynomials = Vec::with_capacity(S::VecLength::dim());
+    let mut values = Vec::with_capacity(S::params().len());
+    let mut values_dt = Vec::with_capacity(S::params().len());
+    let mut polynomials = Vec::with_capacity(S::params().len());
 
     // Initialize the vector of values and coefficients.
-    for _ in 0..S::VecLength::dim() {
+    // for _ in 0..S::VecLength::dim() {
+    for _ in 0..S::params().len() {
         values.push(Vec::with_capacity(this_wdn.len()));
+        values_dt.push(Vec::with_capacity(this_wdn.len()));
     }
     for state in &this_wdn {
         let t_prime = if this_wdn.len() == 1 {
@@ -908,23 +848,34 @@ where
         }
 
         ts.push(t_prime);
-        for (pos, val) in state.as_vector().as_ref().unwrap().iter().enumerate() {
-            values[pos].push(*val);
+
+        for (pos, param) in S::params().iter().enumerate() {
+            let (value, value_dt) = state.value_and_deriv(param)?;
+            values[pos].push(value);
+            values_dt[pos].push(value_dt);
         }
+
+        // for (pos, val) in state.as_vector().as_ref().unwrap().iter().enumerate() {
+        //     values[pos].push(*val);
+        // }
     }
 
     // Generate the polynomials
-    for (pos, these_values) in values.iter().enumerate() {
-        match lagrange(&ts, these_values, INTERP_TOLERANCE) {
-            Ok(polyn) => polynomials.push(polyn),
-            Err(e) => {
-                return Err(NyxError::InvalidInterpolationData(format!(
-                    "Interpolation failed: {}",
-                    e
-                )))
-            }
-        };
+    for pos in 0..values.len() {
+        let poly = hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
+        polynomials.push(poly);
     }
+    // for (pos, these_values) in values.iter().enumerate() {
+    //     match lagrange(&ts, these_values, INTERP_TOLERANCE) {
+    //         Ok(polyn) => polynomials.push(polyn),
+    //         Err(e) => {
+    //             return Err(NyxError::InvalidInterpolationData(format!(
+    //                 "Interpolation failed: {}",
+    //                 e
+    //             )))
+    //         }
+    //     };
+    // }
 
     Ok(Spline {
         start_epoch: start_win_epoch,
