@@ -23,6 +23,20 @@
 use crate::polyfit::polynomial::{multiply, Polynomial};
 use crate::NyxError;
 
+/// Builds a polynomial interpolation using the Hermite method
+///
+/// ```
+/// use nyx_space::polyfit::hermite;
+///
+/// let xs: Vec<_> = (0..8).map(|i| i as f64).collect();
+/// let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
+/// let derivs: Vec<_> = xs.iter().map(|x| -x.sin()).collect();
+///
+/// let tol = 1e-10;
+/// let poly = hermite::<16>(&xs, &ys, &derivs).unwrap();
+///
+/// println!("{:x}", poly);
+/// ```
 pub fn hermite<const DEGREE: usize>(
     xs: &[f64],
     ys: &[f64],

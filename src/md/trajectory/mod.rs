@@ -35,7 +35,7 @@ where
         + Allocator<f64, Self::VecLength>,
 {
     /// The number of samples needed for building an interpolation of this
-    const INTERPOLATION_SAMPLES: usize = 4;
+    const INTERPOLATION_SAMPLES: usize = 6;
 
     /// Return the parameters in order
     /// TODO: Switch to a const parameters when rustc is cool with it
@@ -66,14 +66,15 @@ where
 }
 
 impl InterpState for Orbit {
+    const INTERPOLATION_SAMPLES: usize = 4;
     fn params() -> Vec<StateParameter> {
         vec![
             StateParameter::X,
             StateParameter::Y,
             StateParameter::Z,
-            StateParameter::VX,
-            StateParameter::VY,
-            StateParameter::VZ,
+            // StateParameter::VX,
+            // StateParameter::VY,
+            // StateParameter::VZ,
         ]
     }
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {

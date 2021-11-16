@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod interpolation;
+mod hermite;
 mod polynomial;
 
-pub use interpolation::hermite;
+pub use hermite::hermite;
 pub use polynomial::{CommonPolynomial, Polynomial};
