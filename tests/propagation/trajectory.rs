@@ -130,6 +130,7 @@ fn traj_ephem() {
             if pos_err.is_nan() {
                 println!("{} is Nan: {}", conv_state.epoch(), conv_state);
             }
+            println!("Eval: {}\nConv: {}", eval_state, conv_state);
             max_pos_err = pos_err;
         }
         let vel_err = (eval_state.velocity() - conv_state.velocity()).norm();

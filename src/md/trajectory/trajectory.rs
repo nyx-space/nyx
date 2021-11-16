@@ -423,11 +423,6 @@ impl Traj<Orbit> {
                 window_states.push(state);
             }
 
-            println!(
-                "Last state epoch {}\twindow last: {}",
-                self.last().epoch().as_gregorian_tai_str(),
-                window_states.last().unwrap().epoch().as_gregorian_tai_str()
-            );
             // And interpolate the remaining states too, even if the buffer is not full!
             tx.send(window_states)
                 .map_err(|_| NyxError::TrajectoryCreationError)?;

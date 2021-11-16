@@ -24,9 +24,9 @@ use crate::time::{Duration, Epoch};
 use crate::utils::normalize;
 use crate::NyxError;
 
-pub(crate) const SPLINE_DEGREE: usize = 17;
+pub(crate) const SPLINE_DEGREE: usize = 10;
 
-/// Stores a segment of an interpolation, a spline. Each spline is a polynomial of 16 coefficients
+/// Stores a segment of an interpolation, a spline. Each spline is a polynomial
 #[derive(Clone)]
 pub struct Spline<S: InterpState>
 where

@@ -123,7 +123,7 @@ fn stop_cond_nrho_apo() {
     // NOTE: Here, we will propagate for the maximum duration in the original frame
     // Then convert that trajectory into the other frame, and perform the search there.
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
-    let prop_time = 0.5 * state_luna.period();
+    let prop_time = 4 * state_luna.period();
     let start = Instant::now();
     let (orbit, traj) = setup.with(state).for_duration_with_traj(prop_time).unwrap();
 
