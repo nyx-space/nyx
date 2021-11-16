@@ -22,7 +22,7 @@ extern crate rayon;
 
 use self::crossbeam::thread;
 use self::rayon::prelude::*;
-use super::spline::Spline;
+use super::spline::{Spline, SPLINE_DEGREE};
 use super::traj_it::TrajIterator;
 use super::InterpState;
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
@@ -864,11 +864,12 @@ where
         let dur = self.last().epoch() - self.first().epoch();
         write!(
             f,
-            "Trajectory from {} to {} ({}, or {:.3} s)",
+            "Trajectory from {} to {} ({}, or {:.3} s) [{} splines]",
             self.first().epoch(),
             self.last().epoch(),
             dur,
-            dur.in_seconds()
+            dur.in_seconds(),
+            self.segments.len()
         )
     }
 }
@@ -899,11 +900,22 @@ where
         values_dt.push(Vec::with_capacity(this_wdn.len()));
     }
     for state in &this_wdn {
-        let t_prime = normalize(
-            (state.epoch() - start_win_epoch).in_seconds(),
-            0.0,
-            window_duration.in_seconds(),
-        );
+        let t_prime = if this_wdn.len() == 1 {
+            1.0
+        } else {
+            normalize(
+                (state.epoch() - start_win_epoch).in_seconds(),
+                0.0,
+                window_duration.in_seconds(),
+            )
+        };
+        // Deduplicate
+        if let Some(latest_t) = ts.last() {
+            if *latest_t == t_prime {
+                continue;
+            }
+        }
+
         ts.push(t_prime);
         for (pos, param) in S::params().iter().enumerate() {
             let (value, value_dt) = state.value_and_deriv(param)?;
@@ -914,7 +926,7 @@ where
 
     // Generate the polynomials
     for pos in 0..values.len() {
-        let poly = hermite::<17>(&ts, &values[pos], &values_dt[pos])?;
+        let poly = hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
         polynomials.push(poly);
     }
 

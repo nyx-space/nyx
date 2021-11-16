@@ -26,6 +26,8 @@ use crate::time::{Duration, Epoch};
 use crate::utils::normalize;
 use crate::NyxError;
 
+pub(crate) const SPLINE_DEGREE: usize = 8;
+
 /// Stores a segment of an interpolation, a spline. Each spline is a polynomial of 16 coefficients
 #[derive(Clone)]
 pub struct Spline<S: InterpState>
@@ -36,7 +38,7 @@ where
     pub(crate) start_epoch: Epoch,
     pub(crate) duration: Duration,
     // TODO: When rustc is cool with more const generics, switch this to a [Poly<{S::DEGREE}>; S::CURVES]
-    pub(crate) polynomials: Vec<Polynomial<17>>,
+    pub(crate) polynomials: Vec<Polynomial<SPLINE_DEGREE>>,
     pub(crate) end_state: S,
 }
 

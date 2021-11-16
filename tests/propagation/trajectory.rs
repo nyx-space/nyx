@@ -45,6 +45,8 @@ fn traj_ephem() {
         "Expected to be outside of interpolation window!"
     );
 
+    println!("Ephem: {}", ephem);
+
     // Now let's re-generate the truth data and ensure that each state we generate is in the ephemeris and matches the expected state within tolerance.
 
     let (tx, rx) = channel();
@@ -86,21 +88,21 @@ fn traj_ephem() {
         max_err
     );
 
-    // Allow for up to millimeter error
+    // Allow for up to micrometer error
     assert!(
-        max_pos_err < 1e-6,
+        max_pos_err < 1e-8,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to three millimeters per second error
+    // Allow for up to micrometers per second error
     assert!(
-        max_vel_err < 3e-6,
+        max_vel_err < 1e-8,
         "Maximum orbit velocity in interpolation is too high!"
     );
 
     // Check that the error in STM doesn't break everything
     assert!(
-        max_err < 1e-4,
+        max_err < 1e-10,
         "Maximum state in interpolation is too high!"
     );
 
@@ -108,6 +110,7 @@ fn traj_ephem() {
     let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
+    println!("Ephem back: {}", ephem_back_to_earth);
 
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
     println!("AT START: {}", conv_state);

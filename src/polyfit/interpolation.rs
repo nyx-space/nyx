@@ -215,3 +215,35 @@ fn hermite_ephem_spline_test() {
         max_eval_err, max_deriv_err
     );
 }
+
+#[test]
+fn hermite_duplication_test() {
+    let ts = [-1.0, 0.0, 1.0];
+    let values = [239213.98224426163, 239342.1452415863, 239492.31122918683];
+    let values_dt = [5.856883346456119, 1259.7108315572618, 737.5474327513627];
+
+    let tol = 2e-16;
+    let tol_deriv = 1e-11;
+    let poly = hermite::<8>(&ts, &values, &values_dt).unwrap();
+
+    println!("{:x}", poly);
+
+    let mut max_eval_err: f64 = 0.0;
+    let mut max_deriv_err: f64 = 0.0;
+
+    for (i, t) in ts.iter().enumerate() {
+        let (eval, deriv) = poly.eval_n_deriv(*t);
+        let eval_err = (eval - values[i]).abs();
+        assert!(dbg!(eval_err) < tol);
+        max_eval_err = max_eval_err.max(eval_err);
+
+        let deriv_err = (deriv - values_dt[i]).abs();
+        assert!(dbg!(deriv_err) < tol_deriv);
+        max_deriv_err = max_deriv_err.max(deriv_err);
+    }
+
+    println!(
+        "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
+        max_eval_err, max_deriv_err
+    );
+}
