@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate bacon_sci;
 extern crate rayon;
 
 use self::rayon::prelude::*;
@@ -40,8 +39,6 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Duration as StdDur;
 use std::time::Instant;
-
-const INTERP_TOLERANCE: f64 = 1e-10;
 
 /// Store a trajectory of any State.
 #[derive(Clone)]
@@ -818,14 +815,11 @@ where
     let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
     let window_duration = end_win_epoch - start_win_epoch;
     let mut ts = Vec::with_capacity(this_wdn.len());
-    // let mut values = Vec::with_capacity(S::VecLength::dim());
-    // let mut polynomials = Vec::with_capacity(S::VecLength::dim());
     let mut values = Vec::with_capacity(S::params().len());
     let mut values_dt = Vec::with_capacity(S::params().len());
     let mut polynomials = Vec::with_capacity(S::params().len());
 
     // Initialize the vector of values and coefficients.
-    // for _ in 0..S::VecLength::dim() {
     for _ in 0..S::params().len() {
         values.push(Vec::with_capacity(this_wdn.len()));
         values_dt.push(Vec::with_capacity(this_wdn.len()));
@@ -854,10 +848,6 @@ where
             values[pos].push(value);
             values_dt[pos].push(value_dt);
         }
-
-        // for (pos, val) in state.as_vector().as_ref().unwrap().iter().enumerate() {
-        //     values[pos].push(*val);
-        // }
     }
 
     // Generate the polynomials
@@ -865,17 +855,6 @@ where
         let poly = hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
         polynomials.push(poly);
     }
-    // for (pos, these_values) in values.iter().enumerate() {
-    //     match lagrange(&ts, these_values, INTERP_TOLERANCE) {
-    //         Ok(polyn) => polynomials.push(polyn),
-    //         Err(e) => {
-    //             return Err(NyxError::InvalidInterpolationData(format!(
-    //                 "Interpolation failed: {}",
-    //                 e
-    //             )))
-    //         }
-    //     };
-    // }
 
     Ok(Spline {
         start_epoch: start_win_epoch,

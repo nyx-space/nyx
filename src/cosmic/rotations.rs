@@ -21,7 +21,7 @@ extern crate meval;
 use self::meval::{Context, Expr};
 use crate::log::error;
 use crate::na::Matrix3;
-use crate::time::{Epoch, DAYS_PER_CENTURY, J2000_OFFSET, MJD_OFFSET};
+use crate::time::Epoch;
 use crate::utils::{r1, r2, r3};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -194,10 +194,8 @@ impl fmt::Debug for Euler3AxisDt {
 
 impl ParentRotation for Euler3AxisDt {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-        let jde_tdb_days = datetime.as_jde_tdb_days();
-
-        let days_d = jde_tdb_days - MJD_OFFSET - J2000_OFFSET;
-        let centuries_t = days_d / DAYS_PER_CENTURY;
+        let days_d = datetime.as_tdb_days_since_j2000();
+        let centuries_t = datetime.as_tdb_centuries_since_j2000();
         // Let's create a new context, add the time variables, and compute the rotation's context
         // Note: this will be resolved with Chi/racr files.
         let mut ctx = Context::default();
