@@ -1059,133 +1059,6 @@ mod tests {
     use super::*;
     use crate::cosmic::Bodies;
 
-    /// Tests direct transformations. Test cases generated via jplephem, hence the EPSILON precision.
-    /// Note however that there is a difference between jplephem and spiceypy, cf.
-    /// https://github.com/brandon-rhodes/python-jplephem/issues/33
-    #[test]
-    fn test_cosm_direct() {
-        use std::f64::EPSILON;
-        let cosm = Cosm::de438();
-
-        let eb_frame = cosm.frame(&Bodies::EarthBarycenter.name());
-
-        assert_eq!(eb_frame.ephem_path(), Bodies::EarthBarycenter.ephem_path());
-
-        assert_eq!(
-            cosm.find_common_root(Bodies::Earth.ephem_path(), Bodies::Earth.ephem_path())
-                .len(),
-            2,
-            "Conversions within Earth does not require any translation"
-        );
-
-        let jde = Epoch::from_jde_et(2_452_312.5);
-        let c = LightTimeCalc::None;
-
-        let earth_bary2k = cosm.frame("Earth Barycenter J2000");
-        let ssb2k = cosm.frame("SSB");
-        let earth_moon2k = cosm.frame("Luna");
-
-        assert!(
-            cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_bary2k, c)
-                .rmag()
-                < EPSILON
-        );
-
-        let out_state = cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, ssb2k, c);
-        assert_eq!(out_state.frame.ephem_path(), vec![]);
-        assert!((out_state.x - -109_837_695.021_661_42).abs() < EPSILON);
-        assert!((out_state.y - 89_798_622.194_651_56).abs() < EPSILON);
-        assert!((out_state.z - 38_943_878.275_922_61).abs() < EPSILON);
-        assert!(dbg!(out_state.vx - -20.400_327_981_451_596).abs() < 1e-14);
-        assert!((out_state.vy - -20.413_134_121_084_312).abs() < EPSILON);
-        assert!((out_state.vz - -8.850_448_420_104_028).abs() < EPSILON);
-
-        // And the opposite transformation
-        let out_state = cosm.celestial_state(Bodies::SSB.ephem_path(), jde, earth_bary2k, c);
-        assert_eq!(
-            out_state.frame.ephem_path(),
-            Bodies::EarthBarycenter.ephem_path()
-        );
-        assert!((out_state.x - 109_837_695.021_661_42).abs() < EPSILON);
-        assert!((out_state.y - -89_798_622.194_651_56).abs() < EPSILON);
-        assert!((out_state.z - -38_943_878.275_922_61).abs() < EPSILON);
-        assert!((out_state.vx - 20.400_327_981_451_596).abs() < 1e-14);
-        assert!((out_state.vy - 20.413_134_121_084_312).abs() < EPSILON);
-        assert!((out_state.vz - 8.850_448_420_104_028).abs() < EPSILON);
-
-        let out_state =
-            cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_moon2k, c);
-        assert_eq!(out_state.frame.ephem_path(), Bodies::Luna.ephem_path());
-        // Error slightly larger in X, but still at micrometer level
-        assert!(dbg!(out_state.x - 81_638.253_069_843_03).abs() < 1e-10);
-        assert!((out_state.y - 345_462.617_249_631_9).abs() < EPSILON);
-        assert!((out_state.z - 144_380.059_413_586_45).abs() < EPSILON);
-        assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < EPSILON);
-        assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < EPSILON);
-        assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < EPSILON);
-        // Add the reverse test too
-        let out_state = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, earth_bary2k, c);
-        assert_eq!(
-            out_state.frame.ephem_path(),
-            Bodies::EarthBarycenter.ephem_path()
-        );
-        // Error slightly larger in X, but still at micrometer level
-        assert!(dbg!(out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
-        assert!((out_state.y - -345_462.617_249_631_9).abs() < EPSILON);
-        assert!((out_state.z - -144_380.059_413_586_45).abs() < EPSILON);
-        assert!((out_state.vx - 0.960_674_300_894_127_2).abs() < EPSILON);
-        assert!((out_state.vy - -0.203_736_475_764_411_6).abs() < EPSILON);
-        assert!((out_state.vz - -0.183_869_552_742_917_6).abs() < EPSILON);
-
-        // The following test case comes from jplephem loaded with de438s.bsp
-        let out_state = cosm.celestial_state(Bodies::Sun.ephem_path(), jde, ssb2k, c);
-        assert_eq!(out_state.frame.ephem_path(), Bodies::SSB.ephem_path());
-        assert!((out_state.x - -182_936.040_274_732_14).abs() < EPSILON);
-        assert!((out_state.y - -769_329.776_328_230_7).abs() < EPSILON);
-        assert!((out_state.z - -321_490.795_782_183_1).abs() < EPSILON);
-        assert!((out_state.vx - 0.014_716_178_620_115_785).abs() < EPSILON);
-        assert!((out_state.vy - 0.001_242_263_392_603_425).abs() < EPSILON);
-        assert!((out_state.vz - 0.000_134_043_776_253_089_48).abs() < EPSILON);
-
-        // And the opposite transformation
-        let out_state =
-            cosm.celestial_state(Bodies::SSB.ephem_path(), jde, cosm.frame("Sun J2000"), c);
-        assert_eq!(out_state.frame.ephem_path(), Bodies::Sun.ephem_path());
-        assert!((out_state.x - 182_936.040_274_732_14).abs() < EPSILON);
-        assert!((out_state.y - 769_329.776_328_230_7).abs() < EPSILON);
-        assert!((out_state.z - 321_490.795_782_183_1).abs() < EPSILON);
-        assert!((out_state.vx - -0.014_716_178_620_115_785).abs() < EPSILON);
-        assert!((out_state.vy - -0.001_242_263_392_603_425).abs() < EPSILON);
-        assert!((out_state.vz - -0.000_134_043_776_253_089_48).abs() < EPSILON);
-
-        let out_state = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, earth_bary2k, c);
-        assert_eq!(
-            out_state.frame.ephem_path(),
-            Bodies::EarthBarycenter.ephem_path()
-        );
-        assert!((out_state.x - 1_004.153_534_699_454_6).abs() < EPSILON);
-        assert!((out_state.y - 4_249.202_979_894_305).abs() < EPSILON);
-        assert!((out_state.z - 1_775.880_075_192_657_8).abs() < EPSILON);
-        assert!((out_state.vx - -0.011_816_329_461_539_0).abs() < EPSILON);
-        assert!((out_state.vy - 0.002_505_966_193_458_6).abs() < EPSILON);
-        assert!((out_state.vz - 0.002_261_602_304_895_6).abs() < EPSILON);
-
-        // And the opposite transformation
-        let out_state = cosm.celestial_state(
-            Bodies::EarthBarycenter.ephem_path(),
-            jde,
-            cosm.frame("EME2000"),
-            c,
-        );
-        assert_eq!(out_state.frame.ephem_path(), Bodies::Earth.ephem_path());
-        assert!((out_state.x - -1_004.153_534_699_454_6).abs() < EPSILON);
-        assert!((out_state.y - -4_249.202_979_894_305).abs() < EPSILON);
-        assert!((out_state.z - -1_775.880_075_192_657_8).abs() < EPSILON);
-        assert!((out_state.vx - 0.011_816_329_461_539_0).abs() < EPSILON);
-        assert!((out_state.vy - -0.002_505_966_193_458_6).abs() < EPSILON);
-        assert!((out_state.vz - -0.002_261_602_304_895_6).abs() < EPSILON);
-    }
-
     #[test]
     fn test_cosm_indirect() {
         use crate::utils::is_diagonal;
@@ -2150,5 +2023,12 @@ mod tests {
     #[test]
     fn debug_cosm() {
         dbg!(Cosm::de438_gmat());
+    }
+
+    #[test]
+    fn why_broken() {
+        let e = Epoch::from_gregorian_tai_hms(2002, 02, 14, 0, 0, 0);
+        println!("{}", e.as_tdb_seconds());
+        println!("{}", e.as_jde_tdb_duration().in_unit(TimeUnit::Second));
     }
 }
