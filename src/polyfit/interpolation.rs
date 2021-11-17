@@ -20,8 +20,80 @@
  * SOURCE: bacon-sci, MIT licensed, Copyright (c) Wyatt Campbell.
  */
 
+use crate::linalg::{
+    allocator::Allocator, Const, DefaultAllocator, DimMin, DimMinimum, DimSub, OMatrix, OVector,
+    SVector,
+};
 use crate::polyfit::polynomial::{multiply, Polynomial};
 use crate::NyxError;
+
+/// Returns the pseudo-Vandermonde matrix of degree `deg` and sample points `xs`.
+/// Fully statically allocated.
+/// This is a translation from [numpy](https://github.com/numpy/numpy/blob/b235f9e701e14ed6f6f6dcba885f7986a833743f/numpy/polynomial/hermite.py#L1107)
+pub(crate) fn hermvander<const VALS: usize, const DEGREE: usize>(
+    xs: &[f64; VALS],
+    // ) -> SMatrix<f64, { VALS }, { DEGREE }> {
+) -> OMatrix<f64, Const<{ VALS }>, Const<{ DEGREE }>> {
+    let mut v = OMatrix::<f64, Const<{ VALS }>, Const<{ DEGREE }>>::zeros();
+    let x = SVector::<f64, { VALS }>::from_column_slice(xs);
+
+    // Set the first row to one
+    let mut one = SVector::<f64, { VALS }>::zeros();
+    for i in 0..VALS {
+        one[i] = 1.0;
+    }
+    v.set_column(0, &one);
+    if DEGREE > 0 {
+        let x2 = 2.0 * x;
+        v.set_column(1, &x2);
+        for i in 2..DEGREE {
+            let col =
+                v.column(i - 1).component_mul(&x2) - v.column(i - 2) * (2.0 * ((i as f64) - 1.0));
+            // v[i] = (v[i-1]*x2 - v[i-2]*(2*(i - 1)))
+            v.set_column(i, &col);
+        }
+    }
+    v
+}
+
+pub fn hermfit<const VALS: usize, const DEGREE: usize>(
+    xs: &[f64; VALS],
+    ys: &[f64; VALS],
+) -> Result<Polynomial<DEGREE>, NyxError>
+where
+    DefaultAllocator: Allocator<f64, Const<{ VALS }>, Const<{ DEGREE }>>
+        + Allocator<f64, Const<{ VALS }>>
+        + Allocator<f64, <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output>
+        + Allocator<f64, Const<{ VALS }>, <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output>
+        + Allocator<f64, <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output, Const<{ DEGREE }>>
+        + Allocator<f64, <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output, Const<{ VALS }>>
+        + Allocator<usize, <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output, Const<{ DEGREE }>>
+        + Allocator<
+            f64,
+            <<Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output as DimSub<Const<1>>>::Output,
+        >,
+    Const<{ VALS }>: DimMin<Const<{ DEGREE }>>,
+    DimMinimum<Const<{ VALS }>, Const<{ DEGREE }>>: DimSub<Const<1>>,
+{
+    let vand = hermvander::<VALS, DEGREE>(&xs);
+    let y = OVector::<f64, Const<{ VALS }>>::from_column_slice(ys);
+
+    // Normalize the vand matrix
+    // https://github.com/numpy/numpy/blob/b235f9e701e14ed6f6f6dcba885f7986a833743f/numpy/polynomial/polyutils.py#L652
+
+    match vand.svd(true, true).solve(&y, 1e-10) {
+        Ok(sol) => {
+            let mut coeffs = [0.0; DEGREE];
+            sol.iter().enumerate().for_each(|(i, x)| coeffs[i] = *x);
+            // Build the Polynomial
+            // Ok(Polynomial::from_most_significant(coeffs))
+            Ok(Polynomial {
+                coefficients: coeffs,
+            })
+        }
+        Err(e) => Err(NyxError::CustomError(e.to_string())),
+    }
+}
 
 pub fn hermite<const DEGREE: usize>(
     xs: &[f64],
@@ -246,4 +318,63 @@ fn hermite_duplication_test() {
         "Max eval error: {:.e}\tMax deriv error: {:.e}\t",
         max_eval_err, max_deriv_err
     );
+}
+
+#[test]
+fn hermvander_numpy_test() {
+    use crate::linalg::SMatrix;
+    let rslt = hermvander::<3, 4>(&[-1.0, 0.0, 1.0]);
+    let expect = SMatrix::<f64, 3, 4>::from_row_slice(&[
+        1.0, -2.0, 2.0, 4.0, 1.0, 0.0, -2.0, 0.0, 1.0, 2.0, 2.0, -4.0,
+    ]);
+    assert!(
+        (rslt - expect).norm() < 2e-16,
+        "hermvander returned a result different than numpy test"
+    );
+}
+
+#[test]
+fn hermfit_numpy_test() {
+    let xs = [-1., -0.75, -0.5, -0.25, 0., 0.25, 0.5, 0.75, 1.];
+    let ys = [
+        1.83541234,
+        0.07808521,
+        -1.06151568,
+        -0.67510267,
+        0.194533,
+        0.12639794,
+        -2.10571261,
+        1.30597704,
+        0.1143639,
+    ];
+    let poly = hermfit::<9, 8>(&xs, &ys).unwrap();
+    println!("{:x}", poly);
+
+    // Polynomial from numpy
+    // `herm2poly(hermfit(x, y, 8))`
+    let coeffs = [
+        0.194533,
+        3.61185323,
+        -6.13353243,
+        -37.53450715,
+        -29.24982842,
+        89.83425821,
+        123.05798117,
+        -56.77212851,
+        -86.89426521,
+    ];
+    let npoly = Polynomial {
+        coefficients: coeffs,
+    };
+
+    // Evaluate error
+    for (i, x) in xs.iter().enumerate() {
+        println!(
+            "P({}) = {}\t\terr = {:e}\t\tP1(x) err = {:e}",
+            x,
+            poly.eval(*x),
+            poly.eval(*x) - ys[i],
+            npoly.eval(*x) - ys[i]
+        );
+    }
 }
