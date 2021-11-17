@@ -27,12 +27,48 @@ use crate::linalg::{
 use crate::polyfit::polynomial::{multiply, Polynomial};
 use crate::NyxError;
 
+/// Stores a Hermite series
+pub struct HermiteSeries<const N: usize> {
+    coefficients: [f64; N],
+}
+
+impl<const N: usize> HermiteSeries<N> {
+    /// Convert a Hermite series to a Polynomial
+    pub fn to_polynomial(&self) -> Polynomial<N> {
+        let mut rtn = Polynomial {
+            coefficients: self.coefficients,
+        };
+        if N == 1 {
+            // Do nothing more
+            return rtn;
+        } else if N == 2 {
+            rtn.coefficients[1] *= 2.0;
+        } else {
+            let mut c0 = Polynomial::<N>::zeros();
+            let mut c1 = Polynomial::<N>::zeros();
+            c0.coefficients[0] = self.coefficients[self.coefficients.len() - 2];
+            c1.coefficients[0] = self.coefficients[self.coefficients.len() - 1];
+
+            for i in (2..self.coefficients.len()).rev() {
+                let tmp = c0;
+                let mut c_im2 = Polynomial::<N>::zeros();
+                c_im2.coefficients[0] = self.coefficients[i - 2];
+                c0 = c_im2 - c1 * (2 * (i - 1)) as f64;
+                c1.shift_by_one();
+                c1 = tmp + 2.0 * c1;
+            }
+            c1.shift_by_one();
+            rtn = c0 + 2.0 * c1;
+        }
+        rtn
+    }
+}
+
 /// Returns the pseudo-Vandermonde matrix of degree `deg` and sample points `xs`.
 /// Fully statically allocated.
 /// This is a translation from [numpy](https://github.com/numpy/numpy/blob/b235f9e701e14ed6f6f6dcba885f7986a833743f/numpy/polynomial/hermite.py#L1107)
-pub(crate) fn hermvander<const VALS: usize, const DEGREE: usize>(
+fn hermvander<const VALS: usize, const DEGREE: usize>(
     xs: &[f64; VALS],
-    // ) -> SMatrix<f64, { VALS }, { DEGREE }> {
 ) -> OMatrix<f64, Const<{ VALS }>, Const<{ DEGREE }>> {
     let mut v = OMatrix::<f64, Const<{ VALS }>, Const<{ DEGREE }>>::zeros();
     let x = SVector::<f64, { VALS }>::from_column_slice(xs);
@@ -85,11 +121,11 @@ where
         Ok(sol) => {
             let mut coeffs = [0.0; DEGREE];
             sol.iter().enumerate().for_each(|(i, x)| coeffs[i] = *x);
-            // Build the Polynomial
-            // Ok(Polynomial::from_most_significant(coeffs))
-            Ok(Polynomial {
+            // Build the Hermite Series and convert to a polynomial
+            let h = HermiteSeries {
                 coefficients: coeffs,
-            })
+            };
+            Ok(h.to_polynomial())
         }
         Err(e) => Err(NyxError::CustomError(e.to_string())),
     }
@@ -367,6 +403,8 @@ fn hermfit_numpy_test() {
         coefficients: coeffs,
     };
 
+    println!("{:x}", npoly);
+
     // Evaluate error
     for (i, x) in xs.iter().enumerate() {
         println!(
@@ -376,5 +414,43 @@ fn hermfit_numpy_test() {
             poly.eval(*x) - ys[i],
             npoly.eval(*x) - ys[i]
         );
+    }
+}
+
+#[test]
+fn herm2poly() {
+    let series = HermiteSeries {
+        coefficients: [
+            -364.319505276875,
+            -230.472812950625,
+            -817.857413263125,
+            -134.8289486859375,
+            -229.266493323125,
+            -15.82103409828125,
+            -17.08533955890625,
+            -0.443532253984375,
+            -0.3394307234765625,
+        ],
+    };
+    let expected = Polynomial {
+        coefficients: [
+            0.1945330000000354,
+            3.61185323000015,
+            -6.133532429999718,
+            -37.53450715000004,
+            -29.24982842000058,
+            89.83425820999997,
+            123.0579811700001,
+            -56.77212851,
+            -86.89426521,
+        ],
+    };
+    let poly = series.to_polynomial();
+    println!("{}", poly);
+    println!("{}", expected);
+    let delta = poly - expected;
+    println!("DELTA = {}", delta);
+    for c in delta.coefficients {
+        assert!(c.abs() < 1e-10);
     }
 }

@@ -104,6 +104,54 @@ impl<const SIZE: usize> Polynomial<SIZE> {
         }
         false
     }
+
+    /// Shifts all of the coefficients by one degree, dropping the largest degree.
+    /// For example:
+    /// P(x) = 10x^3 -6.13353243x^2 + 3.61185323x + 0.194533 .. becomes ...
+    /// P(x) = -6.13353243x^3 + 3.61185323x^2 + 0.194533x
+    pub(crate) fn shift_by_one(&mut self) {
+        let prev_coeff = self.coefficients.clone();
+        for i in 0..prev_coeff.len() - 1 {
+            self.coefficients[i + 1] = prev_coeff[i];
+        }
+        self.coefficients[0] = 0.0;
+    }
+
+    fn fmt_with_var(&self, f: &mut fmt::Formatter, var: String) -> fmt::Result {
+        write!(f, "P({}) = ", var)?;
+        let mut data = Vec::with_capacity(SIZE);
+
+        for (i, c) in self.coefficients.iter().enumerate().rev() {
+            if c.abs() <= EPSILON {
+                continue;
+            }
+
+            let mut d;
+            if c.abs() > 100.0 || c.abs() < 0.01 {
+                // Use scientific notation
+                if c > &0.0 {
+                    d = format!("+{:e}", c);
+                } else {
+                    d = format!("{:e}", c);
+                }
+            } else {
+                if c > &0.0 {
+                    d = format!("+{}", c);
+                } else {
+                    d = format!("{}", c);
+                }
+            }
+            // Add the power
+            let p = i;
+            match p {
+                0 => {} // Show nothing for zero
+                1 => d = format!("{}{}", d, var),
+                _ => d = format!("{}{}^{}", d, var, p),
+            }
+            data.push(d);
+        }
+        write!(f, "{}", data.join(" "))
+    }
 }
 
 /// In-place multiplication of a polynomial with an f64
@@ -147,67 +195,64 @@ impl<const SIZE: usize> ops::AddAssign<f64> for Polynomial<SIZE> {
 }
 
 impl<const SIZE: usize> fmt::Display for Polynomial<SIZE> {
-    /// Prints the polynomial with the least significant coefficients first
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "P(t) = ")?;
-        Ok(for (i, c) in self.coefficients.iter().rev().enumerate() {
-            if c.abs() <= EPSILON {
-                continue;
-            }
-
-            if c.abs() > 100.0 || c.abs() < 0.01 {
-                // Use scientific notation
-                write!(f, "{:e} ", c)?;
-            } else {
-                write!(f, "{}", c)?;
-            }
-            // Add the power
-            let p = self.coefficients.len() - i - 1;
-            match p {
-                0 => {} // Show nothing for zero
-                1 => write!(f, "t")?,
-                _ => write!(f, "t^{}", p)?,
-            }
-            if i < self.coefficients.len() {
-                if *c > 0.0 {
-                    write!(f, " ")?;
-                } else {
-                    write!(f, " + ")?;
-                }
-            }
-        })
+        self.fmt_with_var(f, "t".to_string())
     }
 }
 
 impl<const SIZE: usize> fmt::LowerHex for Polynomial<SIZE> {
-    /// Prints the polynomial with the least significant coefficients first
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "P(x) = ")?;
-        Ok(for (i, c) in self.coefficients.iter().rev().enumerate() {
-            if c.abs() <= EPSILON {
-                continue;
-            }
-            if c.abs() > 100.0 {
-                // Use scientific notation
-                write!(f, "{:e} ", c)?;
-            } else {
-                write!(f, "{}", c)?;
-            }
-            // Add the power
-            let p = self.coefficients.len() - i - 1;
-            match p {
-                0 => {} // Show nothing for zero
-                1 => write!(f, "x")?,
-                _ => write!(f, "x^{}", p)?,
-            }
-            if i < self.coefficients.len() {
-                if *c > 0.0 {
-                    write!(f, " ")?;
-                } else {
-                    write!(f, " + ")?;
-                }
-            }
-        })
+        self.fmt_with_var(f, "x".to_string())
+    }
+}
+
+pub(crate) fn add<const S1: usize, const S2: usize>(
+    p1: Polynomial<S1>,
+    p2: Polynomial<S2>,
+) -> Polynomial<S1> {
+    if S1 < S2 {
+        panic!();
+    }
+    let mut rtn = Polynomial::zeros();
+    for (i, c1) in p1.coefficients.iter().enumerate() {
+        rtn.coefficients[i] = match p2.coefficients.get(i) {
+            Some(c2) => c1 + c2,
+            None => *c1,
+        };
+    }
+    rtn
+}
+
+impl<const S1: usize, const S2: usize> ops::Add<Polynomial<S1>> for Polynomial<S2> {
+    type Output = Polynomial<S1>;
+    /// Add Self and Other, _IF_ S2 >= S1 (else panic!)
+    fn add(self, other: Polynomial<S1>) -> Self::Output {
+        add(other, self)
+    }
+}
+
+/// Subtracts p1 from p2 (p3 = p1 - p2)
+pub(crate) fn sub<const S1: usize, const S2: usize>(
+    p1: Polynomial<S1>,
+    p2: Polynomial<S2>,
+) -> Polynomial<S1> {
+    if S1 < S2 {
+        panic!();
+    }
+    let mut rtn = Polynomial::zeros();
+    for (i, c1) in p1.coefficients.iter().enumerate() {
+        rtn.coefficients[i] = match p2.coefficients.get(i) {
+            Some(c2) => c1 - c2,
+            None => *c1,
+        };
+    }
+    rtn
+}
+
+impl<const S1: usize, const S2: usize> ops::Sub<Polynomial<S2>> for Polynomial<S1> {
+    type Output = Polynomial<S1>;
+    fn sub(self, other: Polynomial<S2>) -> Self::Output {
+        sub(self, other)
     }
 }
 
@@ -366,6 +411,63 @@ fn poly_print() {
 }
 
 #[test]
+fn poly_add() {
+    let p1 = Polynomial {
+        coefficients: [4.0, -2.0, 3.0],
+    };
+    let p2 = Polynomial {
+        coefficients: [0.0, -5.0, 0.0, 2.0],
+    };
+    //      P(x) = (3x^2 - 2x + 4) + (2x^3 - 5x)
+    // <=>  P(x) = 2x^3 + 3x^2 -7x + 4
+    let p_expected = Polynomial {
+        coefficients: [4.0, -7.0, 3.0, 2.0],
+    };
+
+    // let p3 = add::<4, 3>(p2, p1);
+    let p3 = p1 + p2;
+    println!("p3 = {:x}\npe = {:x}", p3, p_expected);
+    assert_eq!(p3, p_expected);
+    // Check this is correct
+    for i in -100..=100 {
+        let x = i as f64;
+        let expect = p1.eval(x) + p2.eval(x);
+        assert!(
+            (p3.eval(x) - expect).abs() < 2e-16,
+            "Constant polynomial returned wrong value"
+        );
+    }
+}
+
+#[test]
+fn poly_sub() {
+    let p2 = Polynomial {
+        coefficients: [4.0, -2.0, 3.0],
+    };
+    let p1 = Polynomial {
+        coefficients: [0.0, -5.0, 0.0, 2.0],
+    };
+    //      P(x) = (3x^2 - 2x + 4) + (2x^3 - 5x)
+    // <=>  P(x) = 2x^3 + 3x^2 -7x + 4
+    let p_expected = Polynomial {
+        coefficients: [-4.0, -3.0, -3.0, 2.0],
+    };
+
+    let p3 = p1 - p2;
+    println!("p3 = {:x}\npe = {:x}", p3, p_expected);
+    assert_eq!(p3, p_expected);
+    // Check this is correct
+    for i in -100..=100 {
+        let x = i as f64;
+        let expect = p1.eval(x) - p2.eval(x);
+        assert!(
+            (p3.eval(x) - expect).abs() < 2e-16,
+            "Constant polynomial returned wrong value"
+        );
+    }
+}
+
+#[test]
 fn poly_multiply() {
     let p1 = Polynomial {
         coefficients: [4.0, -2.0, 3.0],
@@ -393,4 +495,20 @@ fn poly_multiply() {
             "Constant polynomial returned wrong value"
         );
     }
+}
+
+#[test]
+fn poly_shift_mulx() {
+    let mut p1 = Polynomial {
+        coefficients: [0.194533, 3.61185323, -6.13353243, 10.0],
+    };
+
+    let pe = Polynomial {
+        coefficients: [0.0, 0.194533, 3.61185323, -6.13353243],
+    };
+
+    println!("p1 = {:x}", p1);
+    p1.shift_by_one();
+    println!("p1 = {:x}\npe = {:x}", p1, pe);
+    assert_eq!(p1, pe);
 }
