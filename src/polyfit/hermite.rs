@@ -107,18 +107,42 @@ where
         + Allocator<
             f64,
             <<Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output as DimSub<Const<1>>>::Output,
-        >,
+        > + Allocator<f64, Const<{ DEGREE }>, <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output>
+        + Allocator<
+            f64,
+            <<Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output as DimSub<Const<1>>>::Output,
+        > + Allocator<f64, <Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output, Const<{ VALS }>>
+        + Allocator<f64, <Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output>
+        + Allocator<f64, Const<{ DEGREE }>, <Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output>,
     Const<{ VALS }>: DimMin<Const<{ DEGREE }>>,
+    Const<{ DEGREE }>: DimMin<Const<{ VALS }>>,
     DimMinimum<Const<{ VALS }>, Const<{ DEGREE }>>: DimSub<Const<1>>,
+    DimMinimum<Const<{ DEGREE }>, Const<{ VALS }>>: DimSub<Const<1>>,
 {
     let vand = hermvander::<VALS, DEGREE>(&xs);
     let y = OVector::<f64, Const<{ VALS }>>::from_column_slice(ys);
 
     // Normalize the vand matrix
-    // https://github.com/numpy/numpy/blob/b235f9e701e14ed6f6f6dcba885f7986a833743f/numpy/polynomial/polyutils.py#L652
+    let mut lhs = vand.transpose();
+    let mut scl = lhs.component_mul(&lhs).column_sum();
+    for c in scl.iter_mut() {
+        if c.abs() < 2e-16 {
+            *c = 1.0;
+        }
+        *c = c.sqrt();
+    }
 
-    match vand.svd(true, true).solve(&y, 1e-10) {
-        Ok(sol) => {
+    for mut col in lhs.column_iter_mut() {
+        col.component_div_assign(&scl);
+    }
+
+    // match vand.svd(true, true).solve(&y, 1e-10) {
+    match lhs.transpose().svd(true, true).solve(&y, 2e-16) {
+        Ok(mut sol) => {
+            for mut col in sol.column_iter_mut() {
+                col.component_div_assign(&scl);
+            }
+
             let mut coeffs = [0.0; DEGREE];
             sol.iter().enumerate().for_each(|(i, x)| coeffs[i] = *x);
             // Build the Hermite Series and convert to a polynomial
@@ -359,12 +383,12 @@ fn hermite_duplication_test() {
 #[test]
 fn hermvander_numpy_test() {
     use crate::linalg::SMatrix;
-    let rslt = hermvander::<3, 4>(&[-1.0, 0.0, 1.0]);
-    let expect = SMatrix::<f64, 3, 4>::from_row_slice(&[
-        1.0, -2.0, 2.0, 4.0, 1.0, 0.0, -2.0, 0.0, 1.0, 2.0, 2.0, -4.0,
+    let vand = hermvander::<3, 5>(&[-1.0, 0.0, 1.0]);
+    let expect = SMatrix::<f64, 3, 5>::from_row_slice(&[
+        1.0, -2.0, 2.0, 4.0, -20.0, 1.0, 0.0, -2.0, 0.0, 12.0, 1.0, 2.0, 2.0, -4.0, -20.0,
     ]);
     assert!(
-        (rslt - expect).norm() < 2e-16,
+        (vand - expect).norm() < 2e-16,
         "hermvander returned a result different than numpy test"
     );
 }
@@ -383,30 +407,34 @@ fn hermfit_numpy_test() {
         1.30597704,
         0.1143639,
     ];
-    let poly = hermfit::<9, 8>(&xs, &ys).unwrap();
+    let poly = hermfit::<9, 9>(&xs, &ys).unwrap();
     println!("{:x}", poly);
 
     // Polynomial from numpy
     // `herm2poly(hermfit(x, y, 8))`
-    let coeffs = [
-        0.194533,
-        3.61185323,
-        -6.13353243,
-        -37.53450715,
-        -29.24982842,
-        89.83425821,
-        123.05798117,
-        -56.77212851,
-        -86.89426521,
-    ];
     let npoly = Polynomial {
-        coefficients: coeffs,
+        coefficients: [
+            0.1945330000000354,
+            3.61185323000015,
+            -6.133532429999718,
+            -37.53450715000004,
+            -29.24982842000058,
+            89.83425820999997,
+            123.0579811700001,
+            -56.77212851,
+            -86.89426521,
+        ],
     };
 
     println!("{:x}", npoly);
 
     // Evaluate error
     for (i, x) in xs.iter().enumerate() {
+        assert!((poly.eval(*x) - ys[i]).abs() < 1e-11, "hermfit failed");
+        assert!(
+            (npoly.eval(*x) - ys[i]).abs() < 1e-7,
+            "check numpy data, it does not fit!"
+        );
         println!(
             "P({}) = {}\t\terr = {:e}\t\tP1(x) err = {:e}",
             x,

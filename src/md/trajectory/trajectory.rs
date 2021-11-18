@@ -847,7 +847,7 @@ where
 
     // Generate the polynomials
     for pos in 0..values.len() {
-        let poly = hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
+        let poly = hermite::hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
         polynomials.push(poly);
     }
 
