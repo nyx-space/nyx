@@ -383,52 +383,58 @@ impl Traj<Orbit> {
             // Nyquist–Shannon sampling theorem
             let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
+            println!("{}", step);
 
             /* *** */
             /* Map: bucket the states and send on a channel */
             /* *** */
 
-            let mut window_states = Vec::with_capacity(items_per_segments);
-            // Push the initial state
-            window_states.push(start_state);
+            let mut window_states = Vec::with_capacity(2 * items_per_segments);
 
             // Note that we're using the typical map+reduce pattern
             for original_state in self.every(step) {
                 let state = cosm.frame_chg(&original_state, new_frame);
-                if window_states.len() == items_per_segments {
-                    let this_wdn = window_states.clone();
+                window_states.push(state);
+                if window_states.len() % items_per_segments == 0 {
+                    // Publish the first items
+                    let this_wdn = window_states[..items_per_segments]
+                        .iter()
+                        .map(|&x| x)
+                        .collect::<Vec<Orbit>>();
+
                     tx.send(this_wdn)
                         .map_err(|_| NyxError::TrajectoryCreationError)?;
                     // Copy the last state as the first state of the next window
-                    let last_wdn_state = window_states[items_per_segments - 1];
-                    window_states.clear();
-                    window_states.push(last_wdn_state);
-                }
-                window_states.push(state);
-            }
-            if window_states.len() < items_per_segments {
-                // Add more states or the interpolation will fail
-                window_states.clear();
-                for original_state in self.every_between(
-                    step,
-                    self.last().epoch() - (items_per_segments as i32) * step,
-                    self.last().epoch(),
-                ) {
-                    let state = cosm.frame_chg(&original_state, new_frame);
-                    window_states.push(state)
+                    if window_states.len() == 2 * items_per_segments {
+                        // Now, let's remove the first states
+                        for _ in 0..items_per_segments - 1 {
+                            window_states.remove(0);
+                        }
+                    }
                 }
             }
-
-            // And add the last state, will be removed by the interpolator if it is already there
-            if self.last().epoch() != window_states.last().unwrap().epoch() {
-                let state = cosm.frame_chg(&self.last(), new_frame);
-                window_states.push(state);
-            }
-
             // And interpolate the remaining states too, even if the buffer is not full!
-            tx.send(window_states)
+            let mut start_idx = 0;
+            loop {
+                if window_states.is_empty() {
+                    break;
+                }
+                tx.send(
+                    window_states[start_idx..start_idx + items_per_segments]
+                        .iter()
+                        .map(|&x| x)
+                        .collect::<Vec<Orbit>>(),
+                )
                 .map_err(|_| NyxError::TrajectoryCreationError)?;
-            // Return the rx channel for these buckets
+                if start_idx > 0 {
+                    break;
+                }
+                start_idx = window_states.len() - items_per_segments;
+                if start_idx == 0 {
+                    // This means that the window states are exactly the correct size, break here
+                    break;
+                }
+            }
 
             rx
         };
@@ -808,18 +814,16 @@ where
         )));
     }
     // Generate interpolation and flush.
-    let start_win_epoch = this_wdn[0].epoch();
-    let end_win_epoch = this_wdn[this_wdn.len() - 1].epoch();
+    let start_win_epoch = this_wdn.first().unwrap().epoch();
+    let end_win_epoch = this_wdn.last().unwrap().epoch();
     let window_duration = end_win_epoch - start_win_epoch;
     let mut ts = Vec::with_capacity(this_wdn.len());
     let mut values = Vec::with_capacity(S::params().len());
-    let mut values_dt = Vec::with_capacity(S::params().len());
     let mut polynomials = Vec::with_capacity(S::params().len());
 
     // Initialize the vector of values and coefficients.
     for _ in 0..S::params().len() {
         values.push(Vec::with_capacity(this_wdn.len()));
-        values_dt.push(Vec::with_capacity(this_wdn.len()));
     }
     for state in &this_wdn {
         let t_prime = if this_wdn.len() == 1 {
@@ -841,16 +845,21 @@ where
         ts.push(t_prime);
 
         for (pos, param) in S::params().iter().enumerate() {
-            let (value, value_dt) = state.value_and_deriv(param)?;
+            let (value, _) = state.value_and_deriv(param)?;
             values[pos].push(value);
-            values_dt[pos].push(value_dt);
         }
     }
 
     // Generate the polynomials
     for pos in 0..values.len() {
-        // let poly = hermite::hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
-        let poly = hermite::hermfit::<8, SPLINE_DEGREE>(&ts, &values[pos])?;
+        if values[pos].len() != INTERPOLATION_SAMPLES {
+            let d = this_wdn
+                .iter()
+                .map(|&x| format!("{}", x.epoch()))
+                .collect::<Vec<String>>();
+            dbg!(d);
+        }
+        let poly = hermite::hermfit::<INTERPOLATION_SAMPLES, SPLINE_DEGREE>(&ts, &values[pos])?;
         polynomials.push(poly);
     }
 
@@ -858,6 +867,6 @@ where
         start_epoch: start_win_epoch,
         duration: window_duration,
         polynomials,
-        end_state: this_wdn[this_wdn.len() - 1],
+        end_state: *this_wdn.last().unwrap(),
     })
 }

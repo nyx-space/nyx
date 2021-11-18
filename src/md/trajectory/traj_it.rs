@@ -42,7 +42,17 @@ where
         match self.time_series.next() {
             Some(next_epoch) => match self.traj.at(next_epoch) {
                 Ok(item) => Some(item),
-                _ => None,
+                Err(e) => {
+                    if next_epoch >= self.traj.first().epoch()
+                        && next_epoch <= self.traj.last().epoch()
+                    {
+                        error!("[!!!] BUG [!!!]");
+                        error!("[!!!]\t{}\t[!!!]", e);
+                        error!("[!!!]\t{}\t[!!!]", self.traj);
+                        error!("[!!!]     [!!!]");
+                    }
+                    None
+                }
             },
             None => None,
         }

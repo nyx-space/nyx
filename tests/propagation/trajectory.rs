@@ -1,4 +1,5 @@
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger;
 
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{Achieve, GuidanceLaw, Ruggiero, Thruster};
@@ -11,6 +12,9 @@ use std::sync::mpsc::channel;
 #[allow(clippy::identity_op)]
 #[test]
 fn traj_ephem() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
     // Test that we can correctly interpolate a spacecraft orbit
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -38,6 +42,7 @@ fn traj_ephem() {
         sum_sma / cnt,
         start_state.sma()
     );
+    assert!(dbg!(sum_sma / cnt - start_state.sma()).abs() < 1e-6);
 
     // === Below is the validation of the ephemeris == //
 
@@ -114,12 +119,12 @@ fn traj_ephem() {
 
     // And let's convert into another frame and back to check the error
     let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
+    println!("ephem_luna {}", ephem_luna);
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
     println!("Ephem back: {}", ephem_back_to_earth);
 
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
-    println!("AT START: {}", conv_state);
     let mut max_pos_err = (eval_state.radius() - conv_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
     let mut max_err = (eval_state.as_vector().unwrap() - conv_state.as_vector().unwrap()).norm();
@@ -173,6 +178,9 @@ fn traj_ephem() {
 #[allow(clippy::identity_op)]
 #[test]
 fn traj_spacecraft() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
     // Test the interpolation of a spaceraft trajectory and of its fuel. Includes a demo of checking what the guidance mode _should_ be provided the state.
     // Note that we _do not_ attempt to interpolate the Guidance Mode.
     // This is based on the Ruggiero AOP correction
@@ -280,15 +288,18 @@ fn traj_spacecraft() {
 
         let pos_err = (eval_state.orbit.radius() - prop_state.orbit.radius()).norm();
         if pos_err > max_pos_err {
-            max_pos_err = dbg!(pos_err);
+            max_pos_err = pos_err;
+            println!("pos_err = {:.3e} m", pos_err * 1e3);
         }
         let vel_err = (eval_state.orbit.velocity() - prop_state.orbit.velocity()).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
+            println!("vel_err = {:.3e} m/s", vel_err * 1e3);
         }
         let fuel_err = eval_state.fuel_mass_kg - prop_state.fuel_mass_kg;
         if fuel_err > max_fuel_err {
             max_fuel_err = fuel_err;
+            println!("fuel_err = {:.3e} g", fuel_err * 1e3);
         }
         let err = (eval_state.as_vector().unwrap() - prop_state.as_vector().unwrap()).norm();
         if err > max_err {
@@ -316,7 +327,7 @@ fn traj_spacecraft() {
         "Maximum spacecraft velocity in interpolation is too high!"
     );
 
-    // Allow for up to 100 milligram error
+    // Allow for up to 0.1 gram error
     assert!(
         max_vel_err < 1e-4,
         "Maximum spacecraft fuel in interpolation is too high!"

@@ -303,7 +303,7 @@ where
                     // Copy the last state as the first state of the next window
                     if window_states.len() == 2 * items_per_segments {
                         // Now, let's remove the first states
-                        for _ in 0..items_per_segments {
+                        for _ in 0..items_per_segments - 1 {
                             window_states.remove(0);
                         }
                     }
@@ -324,6 +324,10 @@ where
                     break;
                 }
                 start_idx = window_states.len() - items_per_segments;
+                if start_idx == 0 {
+                    // This means that the window states are exactly the correct size, break here
+                    break;
+                }
             }
 
             // Return the rx channel for these buckets
