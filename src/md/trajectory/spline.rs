@@ -24,7 +24,8 @@ use crate::time::{Duration, Epoch};
 use crate::utils::normalize;
 use crate::NyxError;
 
-pub(crate) const SPLINE_DEGREE: usize = 10;
+pub(crate) const SPLINE_DEGREE: usize = 8;
+pub(crate) const INTERPOLATION_SAMPLES: usize = 8;
 
 /// Stores a segment of an interpolation, a spline. Each spline is a polynomial
 #[derive(Clone)]

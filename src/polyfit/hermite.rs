@@ -64,11 +64,11 @@ impl<const N: usize> HermiteSeries<N> {
     }
 }
 
-/// Returns the pseudo-Vandermonde matrix of degree `deg` and sample points `xs`.
-/// Fully statically allocated.
+/// Returns the pseudo-Vandermonde matrix of degree `DEGREE-1` and sample points `xs`.
+/// Fully statically allocated. **WARNING** Degree must be set to 9 for a hermite of size 8!
 /// This is a translation from [numpy](https://github.com/numpy/numpy/blob/b235f9e701e14ed6f6f6dcba885f7986a833743f/numpy/polynomial/hermite.py#L1107)
 fn hermvander<const VALS: usize, const DEGREE: usize>(
-    xs: &[f64; VALS],
+    xs: &[f64],
 ) -> OMatrix<f64, Const<{ VALS }>, Const<{ DEGREE }>> {
     let mut v = OMatrix::<f64, Const<{ VALS }>, Const<{ DEGREE }>>::zeros();
     let x = SVector::<f64, { VALS }>::from_column_slice(xs);
@@ -85,7 +85,6 @@ fn hermvander<const VALS: usize, const DEGREE: usize>(
         for i in 2..DEGREE {
             let col =
                 v.column(i - 1).component_mul(&x2) - v.column(i - 2) * (2.0 * ((i as f64) - 1.0));
-            // v[i] = (v[i-1]*x2 - v[i-2]*(2*(i - 1)))
             v.set_column(i, &col);
         }
     }
@@ -93,8 +92,8 @@ fn hermvander<const VALS: usize, const DEGREE: usize>(
 }
 
 pub fn hermfit<const VALS: usize, const DEGREE: usize>(
-    xs: &[f64; VALS],
-    ys: &[f64; VALS],
+    xs: &[f64],
+    ys: &[f64],
 ) -> Result<Polynomial<DEGREE>, NyxError>
 where
     DefaultAllocator: Allocator<f64, Const<{ VALS }>, Const<{ DEGREE }>>
@@ -119,7 +118,10 @@ where
     DimMinimum<Const<{ VALS }>, Const<{ DEGREE }>>: DimSub<Const<1>>,
     DimMinimum<Const<{ DEGREE }>, Const<{ VALS }>>: DimSub<Const<1>>,
 {
-    let vand = hermvander::<VALS, DEGREE>(&xs);
+    if xs.len() != VALS {
+        dbg!(xs.len(), VALS);
+    }
+    let vand = hermvander::<VALS, DEGREE>(xs);
     let y = OVector::<f64, Const<{ VALS }>>::from_column_slice(ys);
 
     // Normalize the vand matrix
@@ -136,7 +138,6 @@ where
         col.component_div_assign(&scl);
     }
 
-    // match vand.svd(true, true).solve(&y, 1e-10) {
     match lhs.transpose().svd(true, true).solve(&y, 2e-16) {
         Ok(mut sol) => {
             for mut col in sol.column_iter_mut() {
@@ -151,7 +152,7 @@ where
             };
             Ok(h.to_polynomial())
         }
-        Err(e) => Err(NyxError::CustomError(e.to_string())),
+        Err(e) => Err(NyxError::InvalidInterpolationData(e.to_string())),
     }
 }
 
@@ -426,7 +427,7 @@ fn hermfit_numpy_test() {
         ],
     };
 
-    println!("{:x}", npoly);
+    println!("{:x}\n", npoly);
 
     // Evaluate error
     for (i, x) in xs.iter().enumerate() {

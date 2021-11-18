@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod spline;
+pub(crate) mod spline;
 mod traj_it;
 mod trajectory;
 
@@ -34,11 +34,7 @@ where
         + Allocator<f64, Self::Size, Self::Size>
         + Allocator<f64, Self::VecLength>,
 {
-    /// The number of samples needed for building an interpolation of this
-    const INTERPOLATION_SAMPLES: usize = 6;
-
     /// Return the parameters in order
-    /// TODO: Switch to a const parameters when rustc is cool with it
     fn params() -> Vec<StateParameter>;
 
     /// Return the requested parameter and its time derivative
@@ -66,15 +62,14 @@ where
 }
 
 impl InterpState for Orbit {
-    const INTERPOLATION_SAMPLES: usize = 4;
     fn params() -> Vec<StateParameter> {
         vec![
             StateParameter::X,
             StateParameter::Y,
             StateParameter::Z,
-            // StateParameter::VX,
-            // StateParameter::VY,
-            // StateParameter::VZ,
+            StateParameter::VX,
+            StateParameter::VY,
+            StateParameter::VZ,
         ]
     }
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {

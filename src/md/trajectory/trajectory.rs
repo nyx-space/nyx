@@ -19,7 +19,7 @@
 extern crate rayon;
 
 use self::rayon::prelude::*;
-use super::spline::{Spline, SPLINE_DEGREE};
+use super::spline::{Spline, INTERPOLATION_SAMPLES, SPLINE_DEGREE};
 use super::traj_it::TrajIterator;
 use super::InterpState;
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
@@ -378,7 +378,7 @@ impl Traj<Orbit> {
             // Channels that have the states in a bucket of the correct length
             let (tx, rx) = channel();
 
-            let items_per_segments = <Orbit as InterpState>::INTERPOLATION_SAMPLES;
+            let items_per_segments = INTERPOLATION_SAMPLES;
 
             // Nyquist–Shannon sampling theorem
             let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
@@ -406,12 +406,14 @@ impl Traj<Orbit> {
                 }
                 window_states.push(state);
             }
-            if window_states.len() < 3 {
+            if window_states.len() < items_per_segments {
                 // Add more states or the interpolation will fail
                 window_states.clear();
-                for original_state in
-                    self.every_between(step, self.last().epoch() - 3 * step, self.last().epoch())
-                {
+                for original_state in self.every_between(
+                    step,
+                    self.last().epoch() - (items_per_segments as i32) * step,
+                    self.last().epoch(),
+                ) {
                     let state = cosm.frame_chg(&original_state, new_frame);
                     window_states.push(state)
                 }
@@ -586,7 +588,7 @@ impl Traj<Spacecraft> {
             // Channels that have the states in a bucket of the correct length
             let (tx_bucket, rx_bucket) = channel();
 
-            let items_per_segments = <Spacecraft as InterpState>::INTERPOLATION_SAMPLES;
+            let items_per_segments = INTERPOLATION_SAMPLES;
 
             // Channels that have a single state for the propagator
             let (tx, rx) = channel();
@@ -847,7 +849,8 @@ where
 
     // Generate the polynomials
     for pos in 0..values.len() {
-        let poly = hermite::hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
+        // let poly = hermite::hermite::<SPLINE_DEGREE>(&ts, &values[pos], &values_dt[pos])?;
+        let poly = hermite::hermfit::<8, SPLINE_DEGREE>(&ts, &values[pos])?;
         polynomials.push(poly);
     }
 

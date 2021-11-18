@@ -24,6 +24,7 @@ use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
+use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
 use crate::md::trajectory::{interpolate, InterpState, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeUnit};
@@ -280,30 +281,50 @@ where
             /* Map: bucket the states and send on a channel */
             /* *** */
 
-            let items_per_segments = D::StateType::INTERPOLATION_SAMPLES;
-            let mut window_states = Vec::with_capacity(items_per_segments);
+            let items_per_segments = INTERPOLATION_SAMPLES;
+            let mut window_states = Vec::with_capacity(2 * items_per_segments);
             // Push the initial state
             window_states.push(start_state);
 
             // Note that we're using the typical map+reduce pattern
-            // Start receiving states on a blocking call (map)
+            // Start receiving states on a blocking call
             while let Ok(state) = rx.recv() {
-                if window_states.len() == items_per_segments {
-                    let this_wdn = window_states.clone();
+                window_states.push(state);
+                if window_states.len() % items_per_segments == 0 {
+                    // Publish the first items
+                    let this_wdn = window_states[..items_per_segments]
+                        .iter()
+                        .map(|&x| x)
+                        .collect::<Vec<D::StateType>>();
+
                     tx_bucket
                         .send(this_wdn)
                         .map_err(|_| NyxError::TrajectoryCreationError)?;
                     // Copy the last state as the first state of the next window
-                    let last_wdn_state = window_states[items_per_segments - 1];
-                    window_states.clear();
-                    window_states.push(last_wdn_state);
+                    if window_states.len() == 2 * items_per_segments {
+                        // Now, let's remove the first states
+                        for _ in 0..items_per_segments {
+                            window_states.remove(0);
+                        }
+                    }
                 }
-                window_states.push(state);
             }
             // And interpolate the remaining states too, even if the buffer is not full!
-            tx_bucket
-                .send(window_states)
-                .map_err(|_| NyxError::TrajectoryCreationError)?;
+            let mut start_idx = 0;
+            loop {
+                tx_bucket
+                    .send(
+                        window_states[start_idx..start_idx + items_per_segments]
+                            .iter()
+                            .map(|&x| x)
+                            .collect::<Vec<D::StateType>>(),
+                    )
+                    .map_err(|_| NyxError::TrajectoryCreationError)?;
+                if start_idx > 0 {
+                    break;
+                }
+                start_idx = window_states.len() - items_per_segments;
+            }
 
             // Return the rx channel for these buckets
             rx_bucket

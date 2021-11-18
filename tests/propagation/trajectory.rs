@@ -74,10 +74,12 @@ fn traj_ephem() {
         let pos_err = (eval_state.radius() - prop_state.radius()).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
+            println!("pos_err = {:.3e} m", pos_err * 1e3);
         }
         let vel_err = (eval_state.velocity() - prop_state.velocity()).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
+            println!("vel_err = {:.3e} m/s", vel_err * 1e3);
         }
         let err = (eval_state.as_vector().unwrap() - prop_state.as_vector().unwrap()).norm();
         if err > max_err {
@@ -302,20 +304,21 @@ fn traj_spacecraft() {
         max_err
     );
 
-    // BUG: For some reason, the interpolation in this specific case is not great.
+    // Allow millimeter error
     assert!(
-        max_pos_err < 1e-3,
+        max_pos_err < 1e-6,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
+    // Allow centimeter per second error
     assert!(
         max_vel_err < 1e-5,
         "Maximum spacecraft velocity in interpolation is too high!"
     );
 
-    // Allow for up to microgram error
+    // Allow for up to 100 milligram error
     assert!(
-        max_vel_err < 1e-8,
+        max_vel_err < 1e-4,
         "Maximum spacecraft fuel in interpolation is too high!"
     );
 
