@@ -16,7 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;
+use std::convert::From;
 use std::error::Error;
 use std::fmt;
 
@@ -88,6 +90,8 @@ pub enum NyxError {
     TrajectoryCreationError,
     /// Some custom error for new dynamics
     CustomError(String),
+    /// Hifitime errors that rose upward
+    TimeError(TimeErrors),
 }
 
 impl fmt::Display for NyxError {
@@ -134,3 +138,9 @@ impl fmt::Display for NyxError {
 }
 
 impl Error for NyxError {}
+
+impl From<TimeErrors> for NyxError {
+    fn from(e: TimeErrors) -> Self {
+        NyxError::TimeError(e)
+    }
+}

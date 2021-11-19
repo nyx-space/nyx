@@ -119,6 +119,15 @@ impl Frame {
         }
     }
 
+    pub fn flattening_mut(&mut self, new_flattening: f64) {
+        match self {
+            Self::Geoid {
+                ref mut flattening, ..
+            } => *flattening = new_flattening,
+            _ => panic!("Frame is not Geoid in kind"),
+        }
+    }
+
     pub fn semi_major_radius(&self) -> f64 {
         match self {
             Frame::Geoid {
