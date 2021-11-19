@@ -4,7 +4,7 @@ use nyx::md::targeter::*;
 use nyx::md::ui::*;
 
 #[test]
-fn tgt_b_plane_earth_gravity_assist() {
+fn tgt_b_plane_earth_gravity_assist_no_propagation() {
     // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
 
     if pretty_env_logger::try_init().is_err() {

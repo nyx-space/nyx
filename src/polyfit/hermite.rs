@@ -118,9 +118,6 @@ where
     DimMinimum<Const<{ VALS }>, Const<{ DEGREE }>>: DimSub<Const<1>>,
     DimMinimum<Const<{ DEGREE }>, Const<{ VALS }>>: DimSub<Const<1>>,
 {
-    if xs.len() != VALS {
-        dbg!(xs.len(), VALS);
-    }
     let vand = hermvander::<VALS, DEGREE>(xs);
     let y = OVector::<f64, Const<{ VALS }>>::from_column_slice(ys);
 

@@ -309,18 +309,40 @@ where
                     }
                 }
             }
+            // If there aren't enough states, set the propagator step size to make sure there is at least that many states
+            if window_states.len() < items_per_segments {
+                let step_size =
+                    (end_state.epoch() - start_state.epoch()) / ((items_per_segments - 1) as f64);
+
+                self.state = start_state;
+                window_states.clear();
+                self.set_step(step_size, true);
+                let rx = {
+                    // Channels that have a single state for the propagator
+                    let (tx, rx) = channel();
+                    // Propagate the dynamics
+                    self.for_duration_with_channel(duration, tx)?;
+                    rx
+                };
+                window_states.push(start_state);
+                while let Ok(state) = rx.recv() {
+                    window_states.push(state);
+                }
+                println!("{} => Set step size to {}", window_states.len(), step_size);
+            }
             // And interpolate the remaining states too, even if the buffer is not full!
             let mut start_idx = 0;
             loop {
                 tx_bucket
                     .send(
-                        window_states[start_idx..start_idx + items_per_segments]
+                        window_states
+                            [start_idx..(start_idx + items_per_segments).min(window_states.len())]
                             .iter()
                             .map(|&x| x)
                             .collect::<Vec<D::StateType>>(),
                     )
                     .map_err(|_| NyxError::TrajectoryCreationError)?;
-                if start_idx > 0 {
+                if start_idx > 0 || window_states.len() < items_per_segments {
                     break;
                 }
                 start_idx = window_states.len() - items_per_segments;
