@@ -58,7 +58,7 @@ where
                             println!("[!!!]     [!!!]");
                         };
                     } else {
-                        println!("{} fpr {}", e, self.traj);
+                        println!("{} for {}", e, self.traj);
                     }
                     None
                 }
