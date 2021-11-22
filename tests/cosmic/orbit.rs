@@ -301,6 +301,31 @@ fn state_def_circ_eq() {
 }
 
 #[test]
+fn state_def_equatorial() {
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+
+    let dt = Epoch::from_mjd_tai(21_545.0);
+    let cart = Orbit::cartesian(
+        -7273.338970882,
+        253.990592670,
+        0.022164861,
+        -0.258285289,
+        -7.396322922,
+        -0.000645451,
+        dt,
+        eme2k,
+    );
+
+    f64_eq!(cart.sma(), 7278.136188379306, "sma");
+    f64_eq!(cart.ecc(), 4.99846643158263e-05, "ecc");
+    f64_eq!(cart.inc(), 0.005000000478594339, "inc");
+    f64_eq!(cart.raan(), 360.0, "raan");
+    f64_eq!(cart.aop(), 177.9999736473912, "aop");
+    f64_eq!(cart.ta(), 2.650826247094554e-05, "ta");
+}
+
+#[test]
 fn state_def_reciprocity() {
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");

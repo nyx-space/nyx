@@ -46,10 +46,19 @@ where
                     if next_epoch >= self.traj.first().epoch()
                         && next_epoch <= self.traj.last().epoch()
                     {
-                        error!("[!!!] BUG [!!!]");
-                        error!("[!!!]\t{}\t[!!!]", e);
-                        error!("[!!!]\t{}\t[!!!]", self.traj);
-                        error!("[!!!]     [!!!]");
+                        if log_enabled!(log::Level::Error) {
+                            error!("[!!!] BUG [!!!]");
+                            error!("[!!!]\t{}\t[!!!]", e);
+                            error!("[!!!]\t{}\t[!!!]", self.traj);
+                            error!("[!!!]     [!!!]");
+                        } else {
+                            println!("[!!!] BUG [!!!]");
+                            println!("[!!!]\t{}\t[!!!]", e);
+                            println!("[!!!]\t{}\t[!!!]", self.traj);
+                            println!("[!!!]     [!!!]");
+                        };
+                    } else {
+                        println!("{} fpr {}", e, self.traj);
                     }
                     None
                 }

@@ -1,6 +1,7 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use hifitime::TimeUnitHelper;
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{Achieve, GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
@@ -71,7 +72,6 @@ fn traj_ephem() {
 
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
-    let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.at(prop_state.dt).unwrap();
@@ -86,17 +86,12 @@ fn traj_ephem() {
             max_vel_err = vel_err;
             println!("vel_err = {:.3e} m/s", vel_err * 1e3);
         }
-        let err = (eval_state.as_vector().unwrap() - prop_state.as_vector().unwrap()).norm();
-        if err > max_err {
-            max_err = err;
-        }
     }
 
     println!(
-        "[traj_ephem] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfull state: {:.2e} (no unit)",
+        "[traj_ephem] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s",
         max_pos_err * 1e3,
         max_vel_err * 1e3,
-        max_err
     );
 
     // Allow for up to micrometer error
@@ -111,67 +106,67 @@ fn traj_ephem() {
         "Maximum orbit velocity in interpolation is too high!"
     );
 
-    // Check that the error in STM doesn't break everything
-    assert!(
-        max_err < 1e-10,
-        "Maximum state in interpolation is too high!"
-    );
-
     // And let's convert into another frame and back to check the error
     let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
     println!("ephem_luna {}", ephem_luna);
+    assert!(
+        (ephem.first().epoch() - ephem_luna.first().epoch()).abs() < 1.microseconds(),
+        "Start time differ!"
+    );
+    assert!(
+        (ephem.last().epoch() - ephem_luna.last().epoch()).abs() < 1.microseconds(),
+        "End time differ!"
+    );
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
     println!("Ephem back: {}", ephem_back_to_earth);
+    assert!(
+        (ephem.first().epoch() - ephem_back_to_earth.first().epoch()).abs() < 1.microseconds(),
+        "Start time differ after double conversion!"
+    );
+    assert!(
+        (ephem.last().epoch() - ephem_back_to_earth.last().epoch()).abs() < 1.microseconds(),
+        "End time differ after double conversion!"
+    );
 
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
     let mut max_pos_err = (eval_state.radius() - conv_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
-    let mut max_err = (eval_state.as_vector().unwrap() - conv_state.as_vector().unwrap()).norm();
 
     for conv_state in ephem_back_to_earth.every(5 * TimeUnit::Minute) {
         let eval_state = ephem.at(conv_state.dt).unwrap();
 
         let pos_err = (eval_state.radius() - conv_state.radius()).norm();
         if pos_err > max_pos_err {
-            if pos_err.is_nan() {
-                println!("{} is Nan: {}", conv_state.epoch(), conv_state);
-            }
-            println!("Eval: {}\nConv: {}", eval_state, conv_state);
+            println!(
+                "Eval: {}\nConv: {}\t{:.3} m",
+                eval_state,
+                conv_state,
+                pos_err * 1e3
+            );
             max_pos_err = pos_err;
         }
         let vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
         }
-        let err = (eval_state.as_vector().unwrap() - conv_state.as_vector().unwrap()).norm();
-        if err > max_err {
-            max_err = err;
-        }
     }
     println!(
-        "[traj_ephem] Maximum interpolation error after double conversion: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfull state: {:.2e} (no unit)",
+        "[traj_ephem] Maximum interpolation error after double conversion: pos: {:.2e} m\t\tvel: {:.2e} m/s",
         max_pos_err * 1e3,
         max_vel_err * 1e3,
-        max_err
     );
 
     // Allow for up to micrometer error
     assert!(
-        max_pos_err < 1e-9,
+        max_pos_err < 1e-8,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to micrometer per second error
+    // Allow for up to micrometers per second error
     assert!(
-        max_vel_err < 1e-9,
+        max_vel_err < 1e-8,
         "Maximum orbit velocity in interpolation is too high!"
-    );
-
-    // Check that the error in STM doesn't break everything
-    assert!(
-        max_err < 1e-4,
-        "Maximum state in interpolation is too high!"
     );
 }
 
@@ -256,7 +251,7 @@ fn traj_spacecraft() {
 
     // === Below is the validation of the ephemeris == //
 
-    // assert_eq!(traj.segments.len(), 3, "Wrong number of expected segments");
+    println!("{}", traj);
     assert_eq!(traj.first(), start_state, "Wrong initial state");
     assert_eq!(traj.last(), end_state, "Wrong final state");
     assert!(
@@ -289,17 +284,25 @@ fn traj_spacecraft() {
         let pos_err = (eval_state.orbit.radius() - prop_state.orbit.radius()).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
-            println!("pos_err = {:.3e} m", pos_err * 1e3);
+            println!("pos_err = {:.3e} m @ {}", pos_err * 1e3, prop_state.epoch());
         }
         let vel_err = (eval_state.orbit.velocity() - prop_state.orbit.velocity()).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
-            println!("vel_err = {:.3e} m/s", vel_err * 1e3);
+            println!(
+                "vel_err = {:.3e} m/s @ {}",
+                vel_err * 1e3,
+                prop_state.epoch()
+            );
         }
         let fuel_err = eval_state.fuel_mass_kg - prop_state.fuel_mass_kg;
         if fuel_err > max_fuel_err {
             max_fuel_err = fuel_err;
-            println!("fuel_err = {:.3e} g", fuel_err * 1e3);
+            println!(
+                "fuel_err = {:.3e} g @ {}",
+                fuel_err * 1e3,
+                prop_state.epoch()
+            );
         }
         let err = (eval_state.as_vector().unwrap() - prop_state.as_vector().unwrap()).norm();
         if err > max_err {

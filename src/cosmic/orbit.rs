@@ -257,7 +257,7 @@ impl Orbit {
     ) -> Self {
         match frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                if gm.abs() < std::f64::EPSILON {
+                if gm.abs() < EPSILON {
                     warn!(
                         "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
                         gm
@@ -701,10 +701,14 @@ impl Orbit {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
-                let aop = (n.dot(&self.evec()) / (n.norm() * self.ecc())).acos();
+                let cos_aop = n.dot(&self.evec()) / (n.norm() * self.ecc());
+                let aop = cos_aop.acos();
                 if aop.is_nan() {
-                    error!("AoP is NaN");
-                    0.0
+                    if cos_aop > 1.0 {
+                        180.0
+                    } else {
+                        0.0
+                    }
                 } else if self.evec()[2] < 0.0 {
                     (2.0 * PI - aop).to_degrees()
                 } else {
@@ -755,10 +759,14 @@ impl Orbit {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
-                let raan = (n[0] / n.norm()).acos();
+                let cos_raan = n[0] / n.norm();
+                let raan = cos_raan.acos();
                 if raan.is_nan() {
-                    warn!("RAAN is NaN");
-                    0.0
+                    if cos_raan > 1.0 {
+                        180.0
+                    } else {
+                        0.0
+                    }
                 } else if n[1] < 0.0 {
                     (2.0 * PI - raan).to_degrees()
                 } else {
@@ -818,23 +826,18 @@ impl Orbit {
                     );
                 }
                 let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag());
-                if (cos_nu.abs() - 1.0).abs() < EPSILON {
-                    // This bug drove me crazy when writing SMD in Go in 2017.
+                // If we're close the valid bounds, let's just do a sign check and return the true anomaly
+                let ta = cos_nu.acos();
+                if ta.is_nan() {
                     if cos_nu > 1.0 {
                         180.0
                     } else {
                         0.0
                     }
+                } else if self.radius().dot(&self.velocity()) < 0.0 {
+                    (2.0 * PI - ta).to_degrees()
                 } else {
-                    let ta = cos_nu.acos();
-                    if ta.is_nan() {
-                        warn!("TA is NaN");
-                        0.0
-                    } else if self.radius().dot(&self.velocity()) < 0.0 {
-                        (2.0 * PI - ta).to_degrees()
-                    } else {
-                        ta.to_degrees()
-                    }
+                    ta.to_degrees()
                 }
             }
             _ => panic!("true anomaly not defined in this frame"),

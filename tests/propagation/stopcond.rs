@@ -2,6 +2,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use hifitime::TimeUnitHelper;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::md::{Event, StateParameter};
@@ -123,7 +124,7 @@ fn stop_cond_nrho_apo() {
     // NOTE: Here, we will propagate for the maximum duration in the original frame
     // Then convert that trajectory into the other frame, and perform the search there.
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
-    let prop_time = 4 * state_luna.period();
+    let prop_time = 6 * state_luna.period();
     let start = Instant::now();
     let (orbit, traj) = setup.with(state).for_duration_with_traj(prop_time).unwrap();
 
@@ -148,14 +149,12 @@ fn stop_cond_nrho_apo() {
         traj,
         traj_luna
     );
-    assert_eq!(
-        traj.first().epoch(),
-        traj_luna.first().epoch(),
+    assert!(
+        (traj.first().epoch() - traj_luna.first().epoch()).abs() < 1.milliseconds(),
         "First epoch of converted trajectories do not match"
     );
-    assert_eq!(
-        traj.last().epoch(),
-        traj_luna.last().epoch(),
+    assert!(
+        (traj.last().epoch() - traj_luna.last().epoch()).abs() < 1.milliseconds(),
         "Last epoch of converted trajectories do not match"
     );
 

@@ -37,7 +37,6 @@ use std::fmt;
 use std::iter::Iterator;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
-use std::time::Duration as StdDur;
 use std::time::Instant;
 
 /// Store a trajectory of any State.
@@ -383,7 +382,6 @@ impl Traj<Orbit> {
             // Nyquist–Shannon sampling theorem
             let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
-            println!("{}", step);
 
             /* *** */
             /* Map: bucket the states and send on a channel */
@@ -395,8 +393,8 @@ impl Traj<Orbit> {
             for original_state in self.every(step) {
                 let state = cosm.frame_chg(&original_state, new_frame);
                 window_states.push(state);
-                if window_states.len() % items_per_segments == 0 {
-                    // Publish the first items
+                if window_states.len() == 2 * items_per_segments {
+                    // Publish the first items of this vector
                     let this_wdn = window_states[..items_per_segments]
                         .iter()
                         .map(|&x| x)
@@ -404,21 +402,26 @@ impl Traj<Orbit> {
 
                     tx.send(this_wdn)
                         .map_err(|_| NyxError::TrajectoryCreationError)?;
-                    // Copy the last state as the first state of the next window
-                    if window_states.len() == 2 * items_per_segments {
-                        // Now, let's remove the first states
-                        for _ in 0..items_per_segments - 1 {
-                            window_states.remove(0);
-                        }
+
+                    // Now, let's remove the first states
+                    for _ in 0..items_per_segments - 1 {
+                        window_states.remove(0);
                     }
                 }
             }
+            if window_states.last().unwrap().epoch() != self.last().epoch() {
+                // Our final step placed us out of the trajectory epochs, so let's add it
+                let state = cosm.frame_chg(&self.last(), new_frame);
+                window_states.push(state);
+            }
+
             // And interpolate the remaining states too, even if the buffer is not full!
             let mut start_idx = 0;
             loop {
                 if window_states.is_empty() {
                     break;
                 }
+
                 tx.send(
                     window_states[start_idx..start_idx + items_per_segments]
                         .iter()
@@ -592,19 +595,24 @@ impl Traj<Spacecraft> {
 
         let rx = {
             // Channels that have the states in a bucket of the correct length
-            let (tx_bucket, rx_bucket) = channel();
+            let (tx, rx) = channel();
 
             let items_per_segments = INTERPOLATION_SAMPLES;
 
-            // Channels that have a single state for the propagator
-            let (tx, rx) = channel();
             // Nyquist–Shannon sampling theorem
             let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
             let step = sample_rate * (self.last().epoch() - self.first().epoch());
 
-            for state in self.every(step) {
-                let converted_orbit = cosm.frame_chg(&state.orbit, new_frame);
-                let mut converted_state = state;
+            /* *** */
+            /* Map: bucket the states and send on a channel */
+            /* *** */
+
+            let mut window_states = Vec::with_capacity(2 * items_per_segments);
+
+            // Note that we're using the typical map+reduce pattern
+            for original_state in self.every(step) {
+                let converted_orbit = cosm.frame_chg(&original_state.orbit, new_frame);
+                let mut converted_state = original_state;
                 // Update the orbit component and the frame
                 converted_state.orbit.x = converted_orbit.x;
                 converted_state.orbit.y = converted_orbit.y;
@@ -614,39 +622,55 @@ impl Traj<Spacecraft> {
                 converted_state.orbit.vz = converted_orbit.vz;
                 converted_state.orbit.frame = converted_orbit.frame;
 
-                tx.send(converted_state).unwrap();
-            }
+                window_states.push(converted_state);
+                if window_states.len() == 2 * items_per_segments {
+                    // Publish the first items of this vector
+                    let this_wdn = window_states[..items_per_segments]
+                        .iter()
+                        .map(|&x| x)
+                        .collect::<Vec<Spacecraft>>();
 
-            /* *** */
-            /* Map: bucket the states and send on a channel */
-            /* *** */
-
-            let mut window_states = Vec::with_capacity(items_per_segments);
-            // Push the initial state
-            window_states.push(start_state);
-
-            // Note that we're using the typical map+reduce pattern
-            // Start receiving states on a blocking call (map)
-            while let Ok(state) = rx.recv_timeout(StdDur::from_millis(100)) {
-                if window_states.len() == items_per_segments {
-                    let this_wdn = window_states.clone();
-                    tx_bucket
-                        .send(this_wdn)
+                    tx.send(this_wdn)
                         .map_err(|_| NyxError::TrajectoryCreationError)?;
-                    // Copy the last state as the first state of the next window
-                    let last_wdn_state = window_states[items_per_segments - 1];
-                    window_states.clear();
-                    window_states.push(last_wdn_state);
-                }
-                window_states.push(state);
-            }
-            // And interpolate the remaining states too, even if the buffer is not full!
-            tx_bucket
-                .send(window_states)
-                .map_err(|_| NyxError::TrajectoryCreationError)?;
 
-            // Return the rx channel for these buckets
-            rx_bucket
+                    // Now, let's remove the first states
+                    for _ in 0..items_per_segments - 1 {
+                        window_states.remove(0);
+                    }
+                }
+            }
+            if window_states.last().unwrap().epoch() != self.last().epoch() {
+                let original_state = self.last();
+                // Our final step placed us out of the trajectory epochs, so let's add it
+                let converted_orbit = cosm.frame_chg(&original_state.orbit, new_frame);
+                window_states.push(original_state.with_orbit(converted_orbit));
+            }
+
+            // And interpolate the remaining states too, even if the buffer is not full!
+            let mut start_idx = 0;
+            loop {
+                if window_states.is_empty() {
+                    break;
+                }
+
+                tx.send(
+                    window_states[start_idx..start_idx + items_per_segments]
+                        .iter()
+                        .map(|&x| x)
+                        .collect::<Vec<Spacecraft>>(),
+                )
+                .map_err(|_| NyxError::TrajectoryCreationError)?;
+                if start_idx > 0 {
+                    break;
+                }
+                start_idx = window_states.len() - items_per_segments;
+                if start_idx == 0 {
+                    // This means that the window states are exactly the correct size, break here
+                    break;
+                }
+            }
+
+            rx
         };
 
         /* *** */
