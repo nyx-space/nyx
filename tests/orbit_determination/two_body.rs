@@ -504,12 +504,12 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let err_no_it_oom = dstate_no_iteration.rmag().log10().floor() as i32;
 
     println!(
-        "Difference in initial states radii without iterations: {} km (order of mangitude: {})",
+        "Difference in initial states radii without iterations: {} km (order of magnitude: {})",
         dstate_no_iteration.rmag(),
         err_no_it_oom
     );
     println!(
-        "Difference in initial states radii with iterations: {} km (order of mangitude: {})",
+        "Difference in initial states radii with iterations: {} km (order of magnitude: {})",
         dstate_iteration.rmag(),
         err_it_oom
     );

@@ -37,7 +37,6 @@ use std::default::Default;
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Add;
-use std::sync::mpsc::channel;
 
 /// Defines the stopping condition for the smoother
 #[derive(Clone, Copy, Debug)]
@@ -655,7 +654,8 @@ where
                 "No navigation trajectory to generate: run the OD process first".to_string(),
             ))
         } else {
-            todo!();
+            todo!("generating a navigation trajectory #199");
+            // use std::sync::mpsc::channel;
             // let (tx, rx) = channel();
             // let start_state = self.estimates[0].state();
             // for estimate in &self.estimates {

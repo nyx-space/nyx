@@ -143,3 +143,8 @@ coverage:
       - 'coverage'
     reports:
       cobertura: coverage.xml
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: manual

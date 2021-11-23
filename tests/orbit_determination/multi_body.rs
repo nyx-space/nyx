@@ -148,6 +148,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
     assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
 }
 
+#[ignore]
 #[allow(clippy::identity_op)]
 #[test]
 fn multi_body_ckf_covar_map() {
