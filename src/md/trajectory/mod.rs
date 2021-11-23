@@ -18,10 +18,10 @@
 
 pub(crate) mod spline;
 mod traj_it;
-mod trajectory;
+mod traj;
 
-pub(crate) use trajectory::interpolate;
-pub use trajectory::Traj;
+pub(crate) use traj::interpolate;
+pub use traj::Traj;
 
 use super::StateParameter;
 use crate::linalg::allocator::Allocator;
@@ -73,13 +73,13 @@ impl InterpState for Orbit {
         ]
     }
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        match param {
-            &StateParameter::X => Ok((self.x, self.vx)),
-            &StateParameter::Y => Ok((self.y, self.vy)),
-            &StateParameter::Z => Ok((self.z, self.vz)),
-            &StateParameter::VX => Ok((self.vx, 0.0)),
-            &StateParameter::VY => Ok((self.vy, 0.0)),
-            &StateParameter::VZ => Ok((self.vz, 0.0)),
+        match *param {
+            StateParameter::X => Ok((self.x, self.vx)),
+            StateParameter::Y => Ok((self.y, self.vy)),
+            StateParameter::Z => Ok((self.z, self.vz)),
+            StateParameter::VX => Ok((self.vx, 0.0)),
+            StateParameter::VY => Ok((self.vy, 0.0)),
+            StateParameter::VZ => Ok((self.vz, 0.0)),
             _ => Err(NyxError::ParameterUnavailableForType),
         }
     }
@@ -90,23 +90,23 @@ impl InterpState for Orbit {
         value: f64,
         _: f64,
     ) -> Result<(), NyxError> {
-        match param {
-            &StateParameter::X => {
+        match *param {
+            StateParameter::X => {
                 self.x = value;
             }
-            &StateParameter::Y => {
+            StateParameter::Y => {
                 self.y = value;
             }
-            &StateParameter::Z => {
+            StateParameter::Z => {
                 self.z = value;
             }
-            &StateParameter::VX => {
+            StateParameter::VX => {
                 self.vx = value;
             }
-            &StateParameter::VY => {
+            StateParameter::VY => {
                 self.vy = value;
             }
-            &StateParameter::VZ => {
+            StateParameter::VZ => {
                 self.vz = value;
             }
 
@@ -129,14 +129,14 @@ impl InterpState for Spacecraft {
         ]
     }
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        match param {
-            &StateParameter::X => Ok((self.orbit.x, self.orbit.vx)),
-            &StateParameter::Y => Ok((self.orbit.y, self.orbit.vy)),
-            &StateParameter::Z => Ok((self.orbit.z, self.orbit.vz)),
-            &StateParameter::VX => Ok((self.orbit.vx, 0.0)),
-            &StateParameter::VY => Ok((self.orbit.vy, 0.0)),
-            &StateParameter::VZ => Ok((self.orbit.vz, 0.0)),
-            &StateParameter::FuelMass => Ok((self.fuel_mass_kg, 0.0)),
+        match *param {
+            StateParameter::X => Ok((self.orbit.x, self.orbit.vx)),
+            StateParameter::Y => Ok((self.orbit.y, self.orbit.vy)),
+            StateParameter::Z => Ok((self.orbit.z, self.orbit.vz)),
+            StateParameter::VX => Ok((self.orbit.vx, 0.0)),
+            StateParameter::VY => Ok((self.orbit.vy, 0.0)),
+            StateParameter::VZ => Ok((self.orbit.vz, 0.0)),
+            StateParameter::FuelMass => Ok((self.fuel_mass_kg, 0.0)),
             _ => Err(NyxError::ParameterUnavailableForType),
         }
     }
@@ -147,28 +147,28 @@ impl InterpState for Spacecraft {
         value: f64,
         _: f64,
     ) -> Result<(), NyxError> {
-        match param {
-            &StateParameter::X => {
+        match *param {
+            StateParameter::X => {
                 self.orbit.x = value;
             }
-            &StateParameter::Y => {
+            StateParameter::Y => {
                 self.orbit.y = value;
             }
-            &StateParameter::Z => {
+            StateParameter::Z => {
                 self.orbit.z = value;
             }
-            &StateParameter::VX => {
+            StateParameter::VX => {
                 self.orbit.vx = value;
             }
-            &StateParameter::VY => {
+            StateParameter::VY => {
                 self.orbit.vy = value;
             }
-            &StateParameter::VZ => {
+            StateParameter::VZ => {
                 self.orbit.vz = value;
             }
-            &StateParameter::Cr => self.cr = value,
-            &StateParameter::Cd => self.cd = value,
-            &StateParameter::FuelMass => self.fuel_mass_kg = value,
+            StateParameter::Cr => self.cr = value,
+            StateParameter::Cd => self.cd = value,
+            StateParameter::FuelMass => self.fuel_mass_kg = value,
             _ => return Err(NyxError::ParameterUnavailableForType),
         }
         Ok(())

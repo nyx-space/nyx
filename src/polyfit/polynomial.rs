@@ -110,10 +110,9 @@ impl<const SIZE: usize> Polynomial<SIZE> {
     /// P(x) = 10x^3 -6.13353243x^2 + 3.61185323x + 0.194533 .. becomes ...
     /// P(x) = -6.13353243x^3 + 3.61185323x^2 + 0.194533x
     pub(crate) fn shift_by_one(&mut self) {
-        let prev_coeff = self.coefficients.clone();
-        for i in 0..prev_coeff.len() - 1 {
-            self.coefficients[i + 1] = prev_coeff[i];
-        }
+        let prev_coeff = self.coefficients;
+        self.coefficients[1..((prev_coeff.len() - 1) + 1)]
+            .clone_from_slice(&prev_coeff[..(prev_coeff.len() - 1)]);
         self.coefficients[0] = 0.0;
     }
 
@@ -134,12 +133,10 @@ impl<const SIZE: usize> Polynomial<SIZE> {
                 } else {
                     d = format!("{:e}", c);
                 }
+            } else if c > &0.0 {
+                d = format!("+{}", c);
             } else {
-                if c > &0.0 {
-                    d = format!("+{}", c);
-                } else {
-                    d = format!("{}", c);
-                }
+                d = format!("{}", c);
             }
             // Add the power
             let p = i;
@@ -171,7 +168,7 @@ impl<const SIZE: usize> ops::Mul<f64> for &Polynomial<SIZE> {
     type Output = Polynomial<SIZE>;
 
     fn mul(self, rhs: f64) -> Self::Output {
-        self.clone() * rhs
+        *self * rhs
     }
 }
 
@@ -180,7 +177,7 @@ impl<const SIZE: usize> ops::Mul<Polynomial<SIZE>> for f64 {
     type Output = Polynomial<SIZE>;
 
     fn mul(self, rhs: Polynomial<SIZE>) -> Self::Output {
-        let mut me = rhs.clone();
+        let mut me = rhs;
         for val in &mut me.coefficients {
             *val *= self;
         }
@@ -292,13 +289,13 @@ pub enum CommonPolynomial {
 
 impl CommonPolynomial {
     pub fn eval(&self, x: f64) -> f64 {
-        match self {
-            &Self::Constant(a) => Polynomial::<1> { coefficients: [a] }.eval(x),
-            &Self::Linear(a, b) => Polynomial::<2> {
+        match *self {
+            Self::Constant(a) => Polynomial::<1> { coefficients: [a] }.eval(x),
+            Self::Linear(a, b) => Polynomial::<2> {
                 coefficients: [b, a],
             }
             .eval(x),
-            &Self::Quadratic(a, b, c) => Polynomial::<3> {
+            Self::Quadratic(a, b, c) => Polynomial::<3> {
                 coefficients: [c, b, a],
             }
             .eval(x),
@@ -306,13 +303,13 @@ impl CommonPolynomial {
     }
 
     pub fn deriv(&self, x: f64) -> f64 {
-        match self {
-            &Self::Constant(a) => Polynomial::<1> { coefficients: [a] }.deriv(x),
-            &Self::Linear(a, b) => Polynomial::<2> {
+        match *self {
+            Self::Constant(a) => Polynomial::<1> { coefficients: [a] }.deriv(x),
+            Self::Linear(a, b) => Polynomial::<2> {
                 coefficients: [b, a],
             }
             .deriv(x),
-            &Self::Quadratic(a, b, c) => Polynomial::<3> {
+            Self::Quadratic(a, b, c) => Polynomial::<3> {
                 coefficients: [c, b, a],
             }
             .deriv(x),
@@ -323,16 +320,16 @@ impl CommonPolynomial {
 impl fmt::Display for CommonPolynomial {
     /// Prints the polynomial with the least significant coefficients first
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Self::Constant(a) => write!(f, "{}", Polynomial::<1> { coefficients: [a] }),
-            &Self::Linear(a, b) => write!(
+        match *self {
+            Self::Constant(a) => write!(f, "{}", Polynomial::<1> { coefficients: [a] }),
+            Self::Linear(a, b) => write!(
                 f,
                 "{}",
                 Polynomial::<2> {
                     coefficients: [b, a],
                 }
             ),
-            &Self::Quadratic(a, b, c) => write!(
+            Self::Quadratic(a, b, c) => write!(
                 f,
                 "{}",
                 Polynomial::<3> {

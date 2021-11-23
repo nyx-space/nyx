@@ -91,6 +91,7 @@ impl Node {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<NodeSerde> for Node {
     fn into(self) -> NodeSerde {
         NodeSerde {
@@ -103,6 +104,7 @@ impl Into<NodeSerde> for Node {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<NodeSerde> for &Node {
     fn into(self) -> NodeSerde {
         NodeSerde {

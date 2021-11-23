@@ -43,6 +43,7 @@ pub struct Mnvr {
 
 impl fmt::Display for Mnvr {
     /// Prints the polynomial with the least significant coefficients first
+    #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.end - self.start >= 1 * TimeUnit::Millisecond {
             write!(f, "Finite burn maneuver @ {} for {}\n\tin-plane angle a(t)={}\n\tin-plane angle a(t)={}", self.start, self.end-self.start, self.alpha_inplane, self.beta_outofplane)

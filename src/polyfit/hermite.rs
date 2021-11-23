@@ -158,7 +158,7 @@ pub fn hermite<const DEGREE: usize>(
     ys: &[f64],
     derivs: &[f64],
 ) -> Result<Polynomial<DEGREE>, NyxError> {
-    if xs.len() == 0 {
+    if xs.is_empty() {
         return Err(NyxError::InvalidInterpolationData(
             "No X data to interpolate".to_owned(),
         ));

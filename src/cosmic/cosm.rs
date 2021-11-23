@@ -625,6 +625,7 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,XB} file in the original frame
+    #[allow(clippy::comparison_chain)]
     pub fn raw_celestial_state(&self, path: &[usize], epoch: Epoch) -> Result<Orbit, NyxError> {
         if path.is_empty() {
             // This is the solar system barycenter, so we just return a state of zeros

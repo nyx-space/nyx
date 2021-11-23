@@ -1,7 +1,6 @@
 stages: 
   - build
   - test
-  - test-resrc-intense
   - quality
   - deploy
 
@@ -39,35 +38,34 @@ mission-design-integration-tests:
     - cargo test monte_carlo --release
 
 propulsion-integration-tests:
-  stage: test-resrc-intense
+  stage: test
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
   retry: 2
   script:
-    - cargo test closedloop_single --release -j2
-    - cargo test closedloop_multi --release -j2
-    - cargo test schedule --release -j2
+    - cargo test closedloop_single --release
+    - cargo test closedloop_multi --release
+    - cargo test schedule --release
 
 propagation-integration-tests:
-  stage: test-resrc-intense
+  stage: test
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
   retry: 2  # Trajectory generation sometimes messes up
   script:
-    - cargo test stopcond --release -j2
-    - cargo test stm --release -j2
-    - cargo test events --release -j2
-    - cargo test targeter --release -j2
-    - cargo test trajectory --release -j2
+    - cargo test stopcond --release
+    - cargo test stm --release
+    - cargo test events --release
+    - cargo test targeter --release
+    - cargo test trajectory --release
 
 orbit-determination-integration-tests:
   stage: test
   image: rust:1-bullseye
   variables:
     RUST_BACKTRACE: 1
-  retry: 2
   script:
     - cargo test orbit_determination --release
   allow_failure: true

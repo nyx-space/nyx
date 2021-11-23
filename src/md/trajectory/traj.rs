@@ -370,7 +370,7 @@ where
 
 impl Traj<Orbit> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
-    /// This is super slow.
+    #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
         let start_instant = Instant::now();
         let start_state = cosm.frame_chg(&self.first(), new_frame);
@@ -448,11 +448,7 @@ impl Traj<Orbit> {
         /* *** */
         /* Reduce: Build an interpolation of each of the segments */
         /* *** */
-        let splines: Vec<_> = rx
-            .into_iter()
-            .par_bridge()
-            .map(|window_states| interpolate(window_states))
-            .collect();
+        let splines: Vec<_> = rx.into_iter().par_bridge().map(interpolate).collect();
 
         // Finally, build the whole trajectory
         let mut traj = Traj {
@@ -581,7 +577,7 @@ impl Traj<Orbit> {
 
 impl Traj<Spacecraft> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
-    /// This is super slow.
+    #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
         let start_instant = Instant::now();
 
@@ -679,11 +675,7 @@ impl Traj<Spacecraft> {
         /* *** */
         /* Reduce: Build an interpolation of each of the segments */
         /* *** */
-        let splines: Vec<_> = rx
-            .into_iter()
-            .par_bridge()
-            .map(|window_states| interpolate(window_states))
-            .collect();
+        let splines: Vec<_> = rx.into_iter().par_bridge().map(interpolate).collect();
 
         // Finally, build the whole trajectory
         let mut traj = Traj {
@@ -834,7 +826,7 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    if this_wdn.len() == 0 {
+    if this_wdn.is_empty() {
         return Err(NyxError::NoInterpolationData(format!(
             "Cannot interpolate with only {} items",
             this_wdn.len()
@@ -867,7 +859,7 @@ where
         };
         // Deduplicate
         if let Some(latest_t) = ts.last() {
-            if *latest_t == t_prime {
+            if (*latest_t - t_prime) < std::f64::EPSILON {
                 continue;
             }
         }
@@ -890,9 +882,8 @@ where
             // println!("{:x}", p);
             let mut coefficients: [f64; SPLINE_DEGREE] = [0.0; SPLINE_DEGREE];
             // Rebuild the coeffs ignoring the highest power
-            for i in 0..SPLINE_DEGREE {
-                coefficients[i] = p.coefficients[i];
-            }
+            coefficients[..SPLINE_DEGREE].clone_from_slice(&p.coefficients[..SPLINE_DEGREE]);
+
             Polynomial { coefficients }
         } else {
             hermite::hermfit::<INTERPOLATION_SAMPLES, SPLINE_DEGREE>(&ts, &values[pos])?

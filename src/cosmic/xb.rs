@@ -139,6 +139,7 @@ pub struct Equation {
 /// numbering scheme.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, prost::Enumeration)]
 #[repr(i32)]
+#[allow(clippy::enum_variant_names)]
 pub enum Unit {
     Dimensionless = 0,
     /// Distance units
@@ -204,6 +205,7 @@ pub enum TimeSystem {
 /// Allow specifying the time representation used
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, prost::Enumeration)]
 #[repr(i32)]
+#[allow(clippy::enum_variant_names)]
 pub enum TimeRepr {
     /// Seconds past 01 January 1900 at MIDNIGHT (or TAI Epoch)
     SecondsJ1900 = 0,

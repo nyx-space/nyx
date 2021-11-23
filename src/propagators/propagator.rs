@@ -254,6 +254,7 @@ where
     /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
     /// Returns the end state and the trajectory.
     /// Known bug #190: Cannot generate a valid trajectory when propagating backward
+    #[allow(clippy::map_clone)]
     pub fn for_duration_with_traj(
         &mut self,
         duration: Duration,
@@ -356,11 +357,7 @@ where
         /* *** */
         /* Reduce: Build an interpolation of each of the segments */
         /* *** */
-        let splines: Vec<_> = rx
-            .into_iter()
-            .par_bridge()
-            .map(|window_states| interpolate(window_states))
-            .collect();
+        let splines: Vec<_> = rx.into_iter().par_bridge().map(interpolate).collect();
 
         // Finally, build the whole trajectory
         let mut traj = Traj {
