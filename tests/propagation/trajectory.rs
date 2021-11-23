@@ -79,12 +79,10 @@ fn traj_ephem() {
         let pos_err = (eval_state.radius() - prop_state.radius()).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
-            println!("pos_err = {:.3e} m", pos_err * 1e3);
         }
         let vel_err = (eval_state.velocity() - prop_state.velocity()).norm();
         if vel_err > max_vel_err {
             max_vel_err = vel_err;
-            println!("vel_err = {:.3e} m/s", vel_err * 1e3);
         }
     }
 
@@ -157,15 +155,15 @@ fn traj_ephem() {
         max_vel_err * 1e3,
     );
 
-    // Allow for up to micrometer error
+    // Allow for up to meter error after double conversion
     assert!(
-        max_pos_err < 1e-8,
+        max_pos_err < 1e-3,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to micrometers per second error
+    // Allow for up to millimeters per second error after double conversion
     assert!(
-        max_vel_err < 1e-8,
+        max_vel_err < 1e-6,
         "Maximum orbit velocity in interpolation is too high!"
     );
 }
@@ -363,15 +361,15 @@ fn traj_spacecraft() {
         max_vel_err * 1e3,
     );
 
-    // Allow for up to micrometer error
+    // Allow for up to meter error
     assert!(
-        max_pos_err < 1e-9,
+        max_pos_err < 1e-3,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to micrometer per second error
+    // Allow for up to millimeter per second error
     assert!(
-        max_vel_err < 1e-9,
+        max_vel_err < 1e-6,
         "Maximum orbit velocity in interpolation is too high!"
     );
 }

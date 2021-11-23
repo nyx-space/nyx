@@ -30,16 +30,17 @@ fn stop_cond_3rd_apo() {
     let mut prop = setup.with(state);
     // Propagate for at five orbital periods so we know we've passed the third one
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
-    let (third_apo, _) = prop.until_event(5 * period, &apo_event, 2).unwrap();
+    let (third_apo, _) = prop.until_event(5 * period, &apo_event, 3).unwrap();
 
-    println!("{}\t{}", start_dt + 2.0 * period, start_dt + 3.0 * period);
+    println!(
+        "{}\t{}\t\t{}",
+        start_dt + 2.0 * period,
+        start_dt + 3.0 * period,
+        third_apo
+    );
     // Confirm that this is the third apoapse event which is found
     assert!(
         (start_dt + 2.0 * period..start_dt + 3.0 * period).contains(&third_apo.dt),
-        "converged on the wrong apoapse"
-    );
-    assert!(
-        third_apo.dt - start_dt < 3.0 * period && third_apo.dt - start_dt >= 2.0 * period,
         "converged on the wrong apoapse"
     );
     assert!(

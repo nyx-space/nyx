@@ -28,7 +28,7 @@ use crate::io::formatter::StateFormatter;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
-use crate::polyfit::{hermite, Polynomial};
+use crate::polyfit::hermite;
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
 use crate::utils::normalize;
 use crate::State;
@@ -59,21 +59,17 @@ where
 {
     pub(crate) fn append_spline(&mut self, segment: Spline<S>) {
         // Compute the number of seconds since start of trajectory
-        let offset_s = ((segment.start_epoch - self.start_state.epoch())
-            .in_seconds()
-            .floor()) as i32;
+        let offset_s = (((100.0 * (segment.start_epoch - self.start_state.epoch()).in_seconds())
+            .floor()) as i32)
+            .max(0);
         self.segments.insert(offset_s, segment);
     }
 
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
-        let offset_s = if (epoch - self.start_state.epoch()).in_seconds().abs() < std::f64::EPSILON
-        {
-            // Durations are darn precise and converting a -2.6e-23 into an i32 will be -1
-            0
-        } else {
-            (epoch - self.start_state.epoch()).in_seconds() as i32
-        };
+        // Durations are darn precise and converting a -2.6e-23 into an i32 will be -1
+        let offset_s =
+            (((100.0 * (epoch - self.start_state.epoch()).in_seconds()).floor()) as i32).max(0);
 
         // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
@@ -848,15 +844,14 @@ where
     let start_win_epoch = this_wdn.first().unwrap().epoch();
     let end_win_epoch = this_wdn.last().unwrap().epoch();
     let window_duration = end_win_epoch - start_win_epoch;
+
     let mut ts = Vec::with_capacity(this_wdn.len());
     let mut values = Vec::with_capacity(S::params().len());
-    let mut values_dt = Vec::with_capacity(S::params().len());
     let mut polynomials = Vec::with_capacity(S::params().len());
 
     // Initialize the vector of values and coefficients.
     for _ in 0..S::params().len() {
         values.push(Vec::with_capacity(this_wdn.len()));
-        values_dt.push(Vec::with_capacity(this_wdn.len()));
     }
     for state in &this_wdn {
         let t_prime = if this_wdn.len() == 1 {
@@ -878,28 +873,14 @@ where
         ts.push(t_prime);
 
         for (pos, param) in S::params().iter().enumerate() {
-            let (value, deriv) = state.value_and_deriv(param)?;
+            let value = state.value(param)?;
             values[pos].push(value);
-            values_dt[pos].push(deriv);
         }
     }
 
     // Generate the polynomials
     for pos in 0..values.len() {
-        let poly = if values[pos].len() != INTERPOLATION_SAMPLES {
-            // Do not fit the data, just build the polynomials for these values
-            let p =
-                hermite::hermite::<{ 2 * SPLINE_DEGREE + 1 }>(&ts, &values[pos], &values_dt[pos])?;
-            // println!("{:x}", p);
-            let mut coefficients: [f64; SPLINE_DEGREE] = [0.0; SPLINE_DEGREE];
-            // Rebuild the coeffs ignoring the highest power
-            for i in 0..SPLINE_DEGREE {
-                coefficients[i] = p.coefficients[i];
-            }
-            Polynomial { coefficients }
-        } else {
-            hermite::hermfit::<INTERPOLATION_SAMPLES, SPLINE_DEGREE>(&ts, &values[pos])?
-        };
+        let poly = hermite::hermfit::<INTERPOLATION_SAMPLES, SPLINE_DEGREE>(&ts, &values[pos])?;
         polynomials.push(poly);
     }
 
