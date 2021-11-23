@@ -124,7 +124,7 @@ fn stop_cond_nrho_apo() {
     // NOTE: Here, we will propagate for the maximum duration in the original frame
     // Then convert that trajectory into the other frame, and perform the search there.
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
-    let prop_time = 6 * state_luna.period();
+    let prop_time = 0.5 * state_luna.period();
     let start = Instant::now();
     let (orbit, traj) = setup.with(state).for_duration_with_traj(prop_time).unwrap();
 
@@ -138,7 +138,7 @@ fn stop_cond_nrho_apo() {
     );
 
     // Create the event
-    let apo_event = Event::apoapsis(); // Special event shortcut!
+    let near_apo_event = Event::new(StateParameter::TrueAnomaly, 172.0);
 
     // Convert this trajectory into the Luna frame
     let traj_luna = traj.to_frame(luna, cosm).unwrap();
@@ -159,16 +159,16 @@ fn stop_cond_nrho_apo() {
     );
 
     // Now, find all of the requested events
-    let events = traj_luna.find_all(&apo_event).unwrap();
+    let events = traj_luna.find_all(&near_apo_event).unwrap();
     println!(
         "Found all {} events in {} ms",
-        apo_event,
+        near_apo_event,
         (Instant::now() - end_conv).as_millis()
     );
     for event_state in &events {
         let delta_t = event_state.epoch() - dt;
         println!("{} after start:\n{:x}", delta_t, event_state);
-        assert!((event_state.ta() - 180.0).abs() < 0.1);
+        assert!((event_state.ta() - 172.0).abs() < near_apo_event.value_precision);
     }
 }
 

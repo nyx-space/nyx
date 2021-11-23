@@ -71,6 +71,14 @@ pub struct Event {
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.parameter)?;
+        if self.parameter != StateParameter::Apoapsis && self.parameter != StateParameter::Periapsis
+        {
+            if self.desired_value.abs() > 1e3 {
+                write!(f, " = {:e}", self.desired_value)?;
+            } else {
+                write!(f, " = {}", self.desired_value,)?;
+            }
+        }
         if let Some((frame, _)) = self.in_frame {
             write!(f, "in frame {}", frame)?;
         }

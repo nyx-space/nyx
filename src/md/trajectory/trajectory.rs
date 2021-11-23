@@ -67,7 +67,13 @@ where
 
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
-        let offset_s = ((epoch - self.start_state.epoch()).in_seconds().floor()) as i32;
+        let offset_s = if (epoch - self.start_state.epoch()).in_seconds().abs() < std::f64::EPSILON
+        {
+            // Durations are darn precise and converting a -2.6e-23 into an i32 will be -1
+            0
+        } else {
+            (epoch - self.start_state.epoch()).in_seconds() as i32
+        };
 
         // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
@@ -409,6 +415,7 @@ impl Traj<Orbit> {
                     }
                 }
             }
+
             if window_states.last().unwrap().epoch() != self.last().epoch() {
                 // Our final step placed us out of the trajectory epochs, so let's add it
                 let state = cosm.frame_chg(&self.last(), new_frame);

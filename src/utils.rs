@@ -137,7 +137,7 @@ pub fn kronecker<T: Real>(a: T, b: T) -> T {
 
 /// Returns a rotation about the X axis. The angle must be provided in radians.
 /// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
-/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system. 
+/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
 /// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
 pub fn r1(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
@@ -146,7 +146,7 @@ pub fn r1(angle: f64) -> Matrix3<f64> {
 
 /// Returns a rotation about the Y axis. The angle must be provided in radians.
 /// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
-/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system. 
+/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
 /// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
 pub fn r2(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
@@ -155,7 +155,7 @@ pub fn r2(angle: f64) -> Matrix3<f64> {
 
 /// Returns a rotation about the Z axis. The angle must be provided in radians.
 /// WARNING: this is a COORDINATE SYSTEM rotation by x radians; this matrix, when applied to a vector, rotates the vector by -x  radians, not x radians.
-/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system. 
+/// Applying the matrix to a vector yields the vector's representation relative to the rotated coordinate system.
 /// Source: https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/cspice/eul2xf_c.html
 pub fn r3(angle: f64) -> Matrix3<f64> {
     let (s, c) = angle.sin_cos();
@@ -286,6 +286,16 @@ pub(crate) fn pseudo_inverse(mat: &DMatrix<f64>, err: NyxError) -> Result<DMatri
         };
         Ok(m2_inv * mat.transpose())
     }
+}
+
+/// Returns the order of mangitude of the provided value
+/// ```
+/// use nyx_space::utils::mag_order;
+/// assert_eq!(mag_order(1000.0), 3);
+/// assert_eq!(mag_order(-5000.0), 3);
+/// ```
+pub fn mag_order(value: f64) -> i32 {
+    value.abs().log10().floor() as i32
 }
 
 #[test]
