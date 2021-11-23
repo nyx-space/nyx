@@ -859,7 +859,8 @@ where
         };
         // Deduplicate
         if let Some(latest_t) = ts.last() {
-            if (*latest_t - t_prime) < std::f64::EPSILON {
+            let delta_t: f64 = *latest_t - t_prime;
+            if delta_t.abs() < std::f64::EPSILON {
                 continue;
             }
         }
@@ -883,7 +884,6 @@ where
             let mut coefficients: [f64; SPLINE_DEGREE] = [0.0; SPLINE_DEGREE];
             // Rebuild the coeffs ignoring the highest power
             coefficients[..SPLINE_DEGREE].clone_from_slice(&p.coefficients[..SPLINE_DEGREE]);
-
             Polynomial { coefficients }
         } else {
             hermite::hermfit::<INTERPOLATION_SAMPLES, SPLINE_DEGREE>(&ts, &values[pos])?
