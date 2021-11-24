@@ -38,7 +38,7 @@ fn val_b_plane_gmat() {
         .until_event(0.5 * TimeUnit::Day, &Event::periapsis(), 0)
         .unwrap();
 
-    println!("{}\n{:o}", out, out);
+    println!("{}\n{:x}", out, out);
 
     // Convert into the Moon J2000 frame -- Maybe bug, cf #190
     // let moon_traj = traj
@@ -136,9 +136,9 @@ fn val_b_plane_gmat() {
     let luna = cosm.frame("Luna");
     for data in &datum {
         // let state = moon_traj.evaluate(data.epoch).unwrap(); // Cf #190
-        let eme2k_state = traj.evaluate(data.epoch).unwrap();
+        let eme2k_state = traj.at(data.epoch).unwrap();
         let state = cosm.frame_chg(&eme2k_state, luna);
-        println!("{}\n{:o}", state, state);
+        println!("{}\n{:x}", state, state);
         assert!(
             (eme2k_state.c3() - data.c3).abs() < 5e-6,
             "invalid c3 at {}",
@@ -169,7 +169,7 @@ fn val_b_plane_gmat() {
     }
 
     // Check some stuff for the first b plane
-    let eme2k_state = traj.evaluate(datum[0].epoch).unwrap();
+    let eme2k_state = traj.at(datum[0].epoch).unwrap();
     let state = cosm.frame_chg(&eme2k_state, luna);
     let b_plane = state.b_plane().unwrap();
     println!("{}\n{}", b_plane, b_plane.jacobian());

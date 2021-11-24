@@ -18,10 +18,10 @@
 
 extern crate hyperdual;
 
-use self::hyperdual::{hyperspace_from_vector, Hyperdual, Owned};
+use self::hyperdual::{Hyperdual, Owned};
 use crate::cosmic::{Orbit, Spacecraft};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3, U7};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
 
 use std::fmt;
@@ -47,8 +47,8 @@ pub use self::orbital::*;
 pub mod spacecraft;
 pub use self::spacecraft::*;
 
-/// Defines a few examples of thrust controllers.
-pub mod thrustctrl;
+/// Defines a few examples of guidance laws.
+pub mod guidance;
 
 /// Defines some velocity change controllers.
 pub mod deltavctrl;
@@ -65,12 +65,17 @@ pub use self::drag::*;
 pub mod sph_harmonics;
 pub use self::sph_harmonics::*;
 
+/// Defines the Exponentially Correlated Random Variable dynamics
+// pub mod ecrv;
+// pub use self::ecrv::*;
+
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
 /// Its design is such that several of the provided dynamics can be combined fairly easily. However,
 /// when combining the dynamics (e.g. integrating both the attitude of a spaceraft and its orbital
 ///  parameters), it is up to the implementor to handle time and state organization correctly.
 /// For time management, I highly recommend using `hifitime` which is thoroughly validated.
+#[allow(clippy::type_complexity)]
 pub trait Dynamics: Clone + Sync + Send
 where
     DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>
@@ -100,9 +105,8 @@ where
     /// then the dynamics should prevent initialization with a context which has an STM defined.
     fn dual_eom(
         &self,
-        delta_t: f64,
-        state_vec: &OVector<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
-        state_ctx: &Self::StateType,
+        _delta_t: f64,
+        _osculating_state: &Self::StateType,
     ) -> Result<
         (
             OVector<f64, <Self::StateType as State>::Size>,
@@ -115,36 +119,9 @@ where
             + Allocator<f64, <Self::StateType as State>::Size>
             + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
             + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
-        Owned<f64, Self::HyperdualSize>: Copy;
-
-    /// Computes both the state and the gradient of the dynamics. This function is pre-implemented.
-    fn eom_grad(
-        &self,
-        delta_t_s: f64,
-        state_vec: &OVector<f64, <Self::StateType as State>::Size>,
-        state_ctx: &Self::StateType,
-    ) -> Result<
-        (
-            OVector<f64, <Self::StateType as State>::Size>,
-            OMatrix<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
-        ),
-        NyxError,
-    >
-    where
-        DefaultAllocator: Allocator<f64, <Self::StateType as State>::Size>
-            + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
-            + Allocator<f64, Self::HyperdualSize>
-            + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy,
     {
-        let hyperstate: OVector<
-            Hyperdual<f64, Self::HyperdualSize>,
-            <Self::StateType as State>::Size,
-        > = hyperspace_from_vector(&state_vec);
-
-        let (state, grad) = self.dual_eom(delta_t_s, &hyperstate, &state_ctx)?;
-
-        Ok((state, grad))
+        unimplemented!()
     }
 
     /// Optionally performs some final changes after each successful integration of the equations of motion.
@@ -163,14 +140,10 @@ pub trait ForceModel: Send + Sync + fmt::Display {
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    fn dual_eom(
-        &self,
-        radius: &Vector3<Hyperdual<f64, U7>>,
-        osc_ctx: &Spacecraft,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(&self, osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
 
-/// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Celestial Dynamics for example.
+/// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.
 ///
 /// Examples include spherical harmonics, i.e. accelerations which do not need to save the current state, only act on it.
 pub trait AccelModel: Send + Sync + fmt::Display {
@@ -179,9 +152,5 @@ pub trait AccelModel: Send + Sync + fmt::Display {
 
     /// Acceleration models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM.
-    fn dual_eom(
-        &self,
-        radius: &Vector3<Hyperdual<f64, U7>>,
-        osc_ctx: &Orbit,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(&self, osc_ctx: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }

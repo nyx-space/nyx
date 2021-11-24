@@ -159,7 +159,7 @@ fn main() -> Result<(), ParsingError> {
             match OdpScenario::try_from_scenario(&scenario, seq_name.to_string(), (*COSM).clone()) {
                 Ok(odp) => odp.execute()?,
                 Err(e) => match e {
-                    ParsingError::UseMdInstead => {
+                    ParsingError::UseMdInstead | ParsingError::SequenceNotFound(_) => {
                         // Build the MDP
                         match MDProcess::try_from_scenario(
                             &scenario,

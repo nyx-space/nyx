@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="fdsxml-1.0-master.xsd"
+     id="CCSDS_TDM_VERS" version="1.0">
+  <header>
+    <COMMENT>TDM example created by yyyyy-nnnA Nav Team (NASA/JPL)</COMMENT>
+    <COMMENT>StarTrek 1-way data, Ka band down</COMMENT>
+    <CREATION_DATE>2005-06-09T20:15:00.000</CREATION_DATE>
+    <ORIGINATOR>NASA/JPL</ORIGINATOR>
+  </header>
+  <body>
+    <segment>
+      <metadata>
+        <COMMENT>This is a meta-data comment</COMMENT>
+        <TIME_SYSTEM>UTC</TIME_SYSTEM>
+        <START_TIME>2005-06-08T17:41:00.000</START_TIME>
+        <STOP_TIME>2005-06-08T17:41:40.000</STOP_TIME>
+        <PARTICIPANT_1>DSS-25</PARTICIPANT_1>
+        <PARTICIPANT_2>yyyy-nnnA</PARTICIPANT_2>
+        <MODE>SEQUENTIAL</MODE>
+        <PATH>2,1</PATH>
+        <INTEGRATION_INTERVAL>1.0</INTEGRATION_INTERVAL>
+        <INTEGRATION_REF>MIDDLE</INTEGRATION_REF>
+        <FREQ_OFFSET>3.20210352E10</FREQ_OFFSET>
+        <TRANSMIT_DELAY_1>7.7E-5</TRANSMIT_DELAY_1>
+        <RECEIVE_DELAY_1>7.7E-5</RECEIVE_DELAY_1>
+        <DATA_QUALITY>RAW</DATA_QUALITY>
+      </metadata>
+      <data>
+        <COMMENT>This is a data comment</COMMENT>
+        <observation>
+          <TRANSMIT_FREQ_2>3.2023442781733E10</TRANSMIT_FREQ_2>
+        </observation>
+        <observation>
+          <EPOCH>2005-06-08T17:41:00.000</EPOCH>
+          <RECEIVE_FREQ_1>-409.2735</RECEIVE_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2005-06-08T17:41:01.000</EPOCH>
+          <RECEIVE_FREQ_1>-371.1568</RECEIVE_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2005-06-08T17:41:02.000</EPOCH>
+          <RECEIVE_FREQ_1>-333.0551</RECEIVE_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2005-06-08T17:41:03.000</EPOCH>
+          <RECEIVE_FREQ_1>-294.9673</RECEIVE_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2005-06-08T17:41:04.000</EPOCH>
+          <RECEIVE_FREQ_1>-256.9054</RECEIVE_FREQ_1>
+        </observation>
+        <observation>
+          <EPOCH>2005-06-08T17:41:05.000</EPOCH>
+          <RECEIVE_FREQ_1>-218.7951</RECEIVE_FREQ_1>
+        </observation>
+      </data>
+    </segment>
+  </body>
+</tdm>

@@ -53,7 +53,7 @@ pub const SUN_GM: f64 = 132_712_440_041.939_38;
 /// Enable or not light time correction for the computation of the celestial states
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
-pub enum LTCorr {
+pub enum LightTimeCalc {
     /// No correction, i.e. assumes instantaneous propagation of photons
     None,
     /// Accounts for light-time correction. This is corresponds to CN in SPICE.
@@ -625,6 +625,7 @@ impl Cosm {
     }
 
     /// Returns the celestial state as computed from a de4xx.{FXB,XB} file in the original frame
+    #[allow(clippy::comparison_chain)]
     pub fn raw_celestial_state(&self, path: &[usize], epoch: Epoch) -> Result<Orbit, NyxError> {
         if path.is_empty() {
             // This is the solar system barycenter, so we just return a state of zeros
@@ -678,6 +679,11 @@ impl Cosm {
         if index == exb_states.position.len() {
             index -= 1;
             offset = interval_length;
+        } else if index > exb_states.position.len() {
+            return Err(NyxError::NoInterpolationData(format!(
+                "No interpolation data for date {}",
+                epoch
+            )));
         }
         let pos_coeffs = &exb_states.position[index];
 
@@ -743,29 +749,34 @@ impl Cosm {
         target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
-        correction: LTCorr,
+        correction: LightTimeCalc,
     ) -> Result<Orbit, NyxError> {
         let target_frame = self.frame_from_ephem_path(target_ephem);
         match correction {
-            LTCorr::None => {
+            LightTimeCalc::None => {
                 let state = Orbit::cartesian(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime, target_frame);
                 Ok(-self.try_frame_chg(&state, frame)?)
             }
-            LTCorr::LightTime | LTCorr::Abberation => {
+            LightTimeCalc::LightTime | LightTimeCalc::Abberation => {
                 // Get the geometric states as seen from SSB
                 let ssb2k = self.frame_root.frame;
 
-                let obs =
-                    self.try_celestial_state(&frame.ephem_path(), datetime, ssb2k, LTCorr::None)?;
+                let obs = self.try_celestial_state(
+                    &frame.ephem_path(),
+                    datetime,
+                    ssb2k,
+                    LightTimeCalc::None,
+                )?;
                 let mut tgt =
-                    self.try_celestial_state(target_ephem, datetime, ssb2k, LTCorr::None)?;
+                    self.try_celestial_state(target_ephem, datetime, ssb2k, LightTimeCalc::None)?;
                 // It will take less than three iterations to converge
                 for _ in 0..3 {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
                     let lt_dt = datetime - lt * TimeUnit::Second;
-                    tgt = self.try_celestial_state(target_ephem, lt_dt, ssb2k, LTCorr::None)?;
+                    tgt =
+                        self.try_celestial_state(target_ephem, lt_dt, ssb2k, LightTimeCalc::None)?;
                 }
                 // Compute the correct state
                 let mut state = Orbit::cartesian(
@@ -788,7 +799,7 @@ impl Cosm {
                 state.vy = tgt.vy * (1.0 - dltdt) - obs.vy;
                 state.vz = tgt.vz * (1.0 - dltdt) - obs.vz;
 
-                if correction == LTCorr::Abberation {
+                if correction == LightTimeCalc::Abberation {
                     // Get a unit vector that points in the direction of the object
                     let r_hat = state.r_hat();
                     // Get the velocity vector (of the observer) scaled with respect to the speed of light
@@ -823,7 +834,7 @@ impl Cosm {
         target_ephem: &[usize],
         datetime: Epoch,
         frame: Frame,
-        correction: LTCorr,
+        correction: LightTimeCalc,
     ) -> Orbit {
         self.try_celestial_state(target_ephem, datetime, frame, correction)
             .unwrap()
@@ -897,6 +908,24 @@ impl Cosm {
         Ok(dcm_finite_differencing(pre_r_dcm, r_dcm, post_r_dcm))
     }
 
+    /// Return the position and velocity DCM (two 3x3 matrices) to go from the `from` frame to the `to` frame
+    #[allow(clippy::identity_op)]
+    pub fn try_dcm_from_to_in_parts(
+        &self,
+        from: &Frame,
+        to: &Frame,
+        dt: Epoch,
+    ) -> Result<(Matrix3<f64>, Matrix3<f64>), NyxError> {
+        let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
+        // Compute the dRdt DCM with finite differencing
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+
+        let drdt = 0.5 * post_r_dcm - 0.5 * pre_r_dcm;
+
+        Ok((r_dcm, drdt))
+    }
+
     /// Attempts to only perform a translation without rotation between two frames.
     /// You really shouldn't be using this unless you know exactly what you're doing.
     /// Typically, you want to use `try_frame_chg`.
@@ -930,13 +959,13 @@ impl Cosm {
                 for i in (e_common_path.len()..state_ephem_path.len()).rev() {
                     let next_state =
                         self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
-                    new_state = new_state + next_state;
+                    new_state += next_state;
                 }
 
                 // Walk forward from the destination state
                 for i in (e_common_path.len()..new_ephem_path.len()).rev() {
                     let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
-                    new_state = new_state - next_state;
+                    new_state -= next_state;
                 }
 
                 new_state
@@ -948,10 +977,10 @@ impl Cosm {
                     let next_state = self.raw_celestial_state(&new_ephem_path[0..=i], state.dt)?;
                     if new_ephem_path.len() < state_ephem_path.len() && i == e_common_path.len() {
                         // We just crossed the common point going forward, so let's add the opposite of this state
-                        new_state = new_state - next_state;
+                        new_state -= next_state;
                         negated_fwd = true;
                     } else {
-                        new_state = new_state + next_state;
+                        new_state += next_state;
                     }
                 }
                 // Walk backward from current state up to common node
@@ -960,9 +989,9 @@ impl Cosm {
                         self.raw_celestial_state(&state_ephem_path[0..=i], state.dt)?;
                     if !negated_fwd && i == e_common_path.len() {
                         // We just crossed the common point (and haven't passed it going forward), so let's negate this state
-                        new_state = new_state - next_state;
+                        new_state -= next_state;
                     } else {
-                        new_state = new_state + next_state;
+                        new_state += next_state;
                     }
                 }
 
@@ -1030,133 +1059,6 @@ impl Cosm {
 mod tests {
     use super::*;
     use crate::cosmic::Bodies;
-
-    /// Tests direct transformations. Test cases generated via jplephem, hence the EPSILON precision.
-    /// Note however that there is a difference between jplephem and spiceypy, cf.
-    /// https://github.com/brandon-rhodes/python-jplephem/issues/33
-    #[test]
-    fn test_cosm_direct() {
-        use std::f64::EPSILON;
-        let cosm = Cosm::de438();
-
-        let eb_frame = cosm.frame(&Bodies::EarthBarycenter.name());
-
-        assert_eq!(eb_frame.ephem_path(), Bodies::EarthBarycenter.ephem_path());
-
-        assert_eq!(
-            cosm.find_common_root(Bodies::Earth.ephem_path(), Bodies::Earth.ephem_path())
-                .len(),
-            2,
-            "Conversions within Earth does not require any translation"
-        );
-
-        let jde = Epoch::from_jde_et(2_452_312.5);
-        let c = LTCorr::None;
-
-        let earth_bary2k = cosm.frame("Earth Barycenter J2000");
-        let ssb2k = cosm.frame("SSB");
-        let earth_moon2k = cosm.frame("Luna");
-
-        assert!(
-            cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_bary2k, c)
-                .rmag()
-                < EPSILON
-        );
-
-        let out_state = cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, ssb2k, c);
-        assert_eq!(out_state.frame.ephem_path(), vec![]);
-        assert!((out_state.x - -109_837_695.021_661_42).abs() < EPSILON);
-        assert!((out_state.y - 89_798_622.194_651_56).abs() < EPSILON);
-        assert!((out_state.z - 38_943_878.275_922_61).abs() < EPSILON);
-        assert!(dbg!(out_state.vx - -20.400_327_981_451_596).abs() < 1e-14);
-        assert!((out_state.vy - -20.413_134_121_084_312).abs() < EPSILON);
-        assert!((out_state.vz - -8.850_448_420_104_028).abs() < EPSILON);
-
-        // And the opposite transformation
-        let out_state = cosm.celestial_state(Bodies::SSB.ephem_path(), jde, earth_bary2k, c);
-        assert_eq!(
-            out_state.frame.ephem_path(),
-            Bodies::EarthBarycenter.ephem_path()
-        );
-        assert!((out_state.x - 109_837_695.021_661_42).abs() < EPSILON);
-        assert!((out_state.y - -89_798_622.194_651_56).abs() < EPSILON);
-        assert!((out_state.z - -38_943_878.275_922_61).abs() < EPSILON);
-        assert!((out_state.vx - 20.400_327_981_451_596).abs() < 1e-14);
-        assert!((out_state.vy - 20.413_134_121_084_312).abs() < EPSILON);
-        assert!((out_state.vz - 8.850_448_420_104_028).abs() < EPSILON);
-
-        let out_state =
-            cosm.celestial_state(Bodies::EarthBarycenter.ephem_path(), jde, earth_moon2k, c);
-        assert_eq!(out_state.frame.ephem_path(), Bodies::Luna.ephem_path());
-        // Error slightly larger in X, but still at micrometer level
-        assert!(dbg!(out_state.x - 81_638.253_069_843_03).abs() < 1e-10);
-        assert!((out_state.y - 345_462.617_249_631_9).abs() < EPSILON);
-        assert!((out_state.z - 144_380.059_413_586_45).abs() < EPSILON);
-        assert!((out_state.vx - -0.960_674_300_894_127_2).abs() < EPSILON);
-        assert!((out_state.vy - 0.203_736_475_764_411_6).abs() < EPSILON);
-        assert!((out_state.vz - 0.183_869_552_742_917_6).abs() < EPSILON);
-        // Add the reverse test too
-        let out_state = cosm.celestial_state(Bodies::Luna.ephem_path(), jde, earth_bary2k, c);
-        assert_eq!(
-            out_state.frame.ephem_path(),
-            Bodies::EarthBarycenter.ephem_path()
-        );
-        // Error slightly larger in X, but still at micrometer level
-        assert!(dbg!(out_state.x - -81_638.253_069_843_03).abs() < 1e-10);
-        assert!((out_state.y - -345_462.617_249_631_9).abs() < EPSILON);
-        assert!((out_state.z - -144_380.059_413_586_45).abs() < EPSILON);
-        assert!((out_state.vx - 0.960_674_300_894_127_2).abs() < EPSILON);
-        assert!((out_state.vy - -0.203_736_475_764_411_6).abs() < EPSILON);
-        assert!((out_state.vz - -0.183_869_552_742_917_6).abs() < EPSILON);
-
-        // The following test case comes from jplephem loaded with de438s.bsp
-        let out_state = cosm.celestial_state(Bodies::Sun.ephem_path(), jde, ssb2k, c);
-        assert_eq!(out_state.frame.ephem_path(), Bodies::SSB.ephem_path());
-        assert!((out_state.x - -182_936.040_274_732_14).abs() < EPSILON);
-        assert!((out_state.y - -769_329.776_328_230_7).abs() < EPSILON);
-        assert!((out_state.z - -321_490.795_782_183_1).abs() < EPSILON);
-        assert!((out_state.vx - 0.014_716_178_620_115_785).abs() < EPSILON);
-        assert!((out_state.vy - 0.001_242_263_392_603_425).abs() < EPSILON);
-        assert!((out_state.vz - 0.000_134_043_776_253_089_48).abs() < EPSILON);
-
-        // And the opposite transformation
-        let out_state =
-            cosm.celestial_state(Bodies::SSB.ephem_path(), jde, cosm.frame("Sun J2000"), c);
-        assert_eq!(out_state.frame.ephem_path(), Bodies::Sun.ephem_path());
-        assert!((out_state.x - 182_936.040_274_732_14).abs() < EPSILON);
-        assert!((out_state.y - 769_329.776_328_230_7).abs() < EPSILON);
-        assert!((out_state.z - 321_490.795_782_183_1).abs() < EPSILON);
-        assert!((out_state.vx - -0.014_716_178_620_115_785).abs() < EPSILON);
-        assert!((out_state.vy - -0.001_242_263_392_603_425).abs() < EPSILON);
-        assert!((out_state.vz - -0.000_134_043_776_253_089_48).abs() < EPSILON);
-
-        let out_state = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, earth_bary2k, c);
-        assert_eq!(
-            out_state.frame.ephem_path(),
-            Bodies::EarthBarycenter.ephem_path()
-        );
-        assert!((out_state.x - 1_004.153_534_699_454_6).abs() < EPSILON);
-        assert!((out_state.y - 4_249.202_979_894_305).abs() < EPSILON);
-        assert!((out_state.z - 1_775.880_075_192_657_8).abs() < EPSILON);
-        assert!((out_state.vx - -0.011_816_329_461_539_0).abs() < EPSILON);
-        assert!((out_state.vy - 0.002_505_966_193_458_6).abs() < EPSILON);
-        assert!((out_state.vz - 0.002_261_602_304_895_6).abs() < EPSILON);
-
-        // And the opposite transformation
-        let out_state = cosm.celestial_state(
-            Bodies::EarthBarycenter.ephem_path(),
-            jde,
-            cosm.frame("EME2000"),
-            c,
-        );
-        assert_eq!(out_state.frame.ephem_path(), Bodies::Earth.ephem_path());
-        assert!((out_state.x - -1_004.153_534_699_454_6).abs() < EPSILON);
-        assert!((out_state.y - -4_249.202_979_894_305).abs() < EPSILON);
-        assert!((out_state.z - -1_775.880_075_192_657_8).abs() < EPSILON);
-        assert!((out_state.vx - 0.011_816_329_461_539_0).abs() < EPSILON);
-        assert!((out_state.vy - -0.002_505_966_193_458_6).abs() < EPSILON);
-        assert!((out_state.vz - -0.002_261_602_304_895_6).abs() < EPSILON);
-    }
 
     #[test]
     fn test_cosm_indirect() {
@@ -1229,7 +1131,7 @@ mod tests {
             "Conversion to Sun IAU from Venus J2k requires one rotation"
         );
 
-        let c = LTCorr::None;
+        let c = LightTimeCalc::None;
 
         /*
         # Preceed all of the following python examples with
@@ -1470,7 +1372,7 @@ mod tests {
             Bodies::EarthBarycenter.ephem_path(),
             jde,
             mars2k,
-            LTCorr::LightTime,
+            LightTimeCalc::LightTime,
         );
 
         // Note that the following data comes from SPICE (via spiceypy).
@@ -1496,7 +1398,7 @@ mod tests {
             Bodies::EarthBarycenter.ephem_path(),
             jde,
             mars2k,
-            LTCorr::Abberation,
+            LightTimeCalc::Abberation,
         );
 
         assert!(dbg!(out_state.x - -2.577_231_712_700_484_4e8).abs() < 1e-3);
@@ -1518,16 +1420,17 @@ mod tests {
 
         let sun2k = cosm.frame("Sun J2000");
         let sun_iau = cosm.frame("IAU Sun");
-        let ear_sun_2k = cosm.celestial_state(Bodies::Earth.ephem_path(), jde, sun2k, LTCorr::None);
+        let ear_sun_2k =
+            cosm.celestial_state(Bodies::Earth.ephem_path(), jde, sun2k, LightTimeCalc::None);
         let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
         let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
 
         assert!(
-            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 1e-6,
+            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 2e-16,
             "a single rotation changes rmag"
         );
         assert!(
-            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-6,
+            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-7,
             "reverse rotation does not match initial state"
         );
 
@@ -1536,43 +1439,75 @@ mod tests {
         let eme2k = cosm.frame("EME2000");
         let earth_iau = cosm.frame("IAU Earth");
         println!("{:?}\n{:?}", eme2k, earth_iau);
-        let dt = Epoch::from_gregorian_tai_at_noon(2000, 1, 1);
 
+        let dt = Epoch::from_gregorian_utc(2023, 11, 16, 06, 11, 19, 146200000);
+
+        // Case 1: Initialize from EME2000
         let state_eme2k = Orbit::cartesian(
-            5_946.673_548_288_958,
-            1_656.154_606_023_661,
-            2_259.012_129_598_249,
-            -3.098_683_050_943_824,
-            4.579_534_132_135_011,
-            6.246_541_551_539_432,
+            2196.260617879428,
+            5161.156645108604,
+            3026.122639999121,
+            -0.376262062797,
+            0.159851964260,
+            0.000983174100,
             dt,
             eme2k,
         );
-        let state_ecef = cosm.frame_chg(&state_eme2k, earth_iau);
-        println!("{}\n{}", state_eme2k, state_ecef);
-        let delta_state = cosm.frame_chg(&state_ecef, eme2k) - state_eme2k;
+
+        let state_iau_earth = Orbit::cartesian(
+            925.651012109672,
+            -5529.343261192083,
+            3031.179663596684,
+            0.000032603895,
+            -0.000229009865,
+            0.000108943879,
+            dt,
+            earth_iau,
+        );
+
+        let state_iau_earth_computed = cosm.frame_chg(&state_eme2k, earth_iau);
+        let delta_state = cosm.frame_chg(&state_iau_earth_computed, eme2k) - state_eme2k;
+
         assert!(
-            delta_state.rmag().abs() < 1e-9,
+            delta_state.rmag().abs() < 1e-11,
             "Inverse rotation is broken"
         );
         assert!(
-            delta_state.vmag().abs() < 1e-9,
+            delta_state.vmag().abs() < 1e-11,
             "Inverse rotation is broken"
         );
-        // Monte validation
-        // EME2000 state:
-        // State (km, km/sec)
-        // 'Earth' -> 'test' in 'EME2000' at '01-JAN-2000 12:00:00.0000 TAI'
-        // Pos:  5.946673548288958e+03  1.656154606023661e+03  2.259012129598249e+03
-        // Vel: -3.098683050943824e+00  4.579534132135011e+00  6.246541551539432e+00Earth Body Fixed state:
-        // State (km, km/sec)
-        // 'Earth' -> 'test' in 'Earth Body Fixed' at '01-JAN-2000 12:00:00.0000 TAI'
-        // Pos: -5.681756320398799e+02  6.146783778323857e+03  2.259012130187828e+03
-        // Vel: -4.610834400780483e+00 -2.190121576903486e+00  6.246541569551255e+00
-        assert!(dbg!(state_ecef.x - -5.681_756_320_398_799e2).abs() < 1e-5);
-        assert!(dbg!(state_ecef.y - 6.146_783_778_323_857e3).abs() < 1e-5);
-        assert!(dbg!(state_ecef.z - 2.259_012_130_187_828e3).abs() < 1e-5);
-        // TODO: Fix the velocity computation
+
+        // Check the state matches
+        let dcm = cosm
+            .try_position_dcm_from_to(&cosm.frame("EME2000"), &cosm.frame("IAU_Moon"), dt)
+            .unwrap();
+        // The DCM matches SPICE very well
+
+        let spice_dcm = Matrix3::new(
+            -0.0517208410530453,
+            0.9259079323890239,
+            0.3741917360656812,
+            -0.9986038252635100,
+            -0.0439204209304354,
+            -0.0293495620815480,
+            -0.0107403337867543,
+            -0.3751872830525792,
+            0.9268868042354325,
+        );
+        assert!(
+            (dcm - spice_dcm).norm() < 1e-9,
+            "DCM EME2000 -> IAU Moon error too large"
+        );
+
+        let (pos_rss, vel_rss) = state_iau_earth.rss(&state_iau_earth_computed);
+        dbg!(pos_rss, vel_rss);
+
+        assert!(
+            state_iau_earth.eq_within(&state_iau_earth_computed, 1e-4, 1e-4),
+            "EME2000 -> IAU Earth failed\nComputed: {}\nExpected: {}",
+            state_iau_earth_computed,
+            state_iau_earth,
+        );
 
         // Case 2
         // Earth Body Fixed state:
@@ -1647,7 +1582,7 @@ mod tests {
     #[test]
     fn test_cosm_rotation_spiceypy_pos_dcm() {
         // These validation tests are from tests/spiceypy/rotations.py
-        use crate::dimensions::{Matrix3, Vector3};
+        use crate::linalg::{Matrix3, Vector3};
         use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
@@ -1657,7 +1592,7 @@ mod tests {
             Bodies::Luna.ephem_path(),
             et0,
             cosm.frame("EME2000"),
-            LTCorr::None,
+            LightTimeCalc::None,
         );
         println!("{}", out_state);
         let sp_ex = Vector3::new(341456.50984349, -123580.72487638, -87633.23833676);
@@ -1677,7 +1612,7 @@ mod tests {
             Bodies::Luna.ephem_path(),
             et0,
             cosm.frame("IAU Earth"),
-            LTCorr::None,
+            LightTimeCalc::None,
         );
         println!("{}", out_state);
         let sp_ex = Vector3::new(-7239.63398824, 363242.64460769, -86871.72713248);
@@ -1756,7 +1691,7 @@ mod tests {
     #[test]
     fn test_cosm_rotation_spiceypy_dcm() {
         // These validation tests are from tests/spiceypy/rotations.py
-        use crate::dimensions::Matrix6;
+        use crate::linalg::Matrix6;
         let cosm = Cosm::de438();
 
         let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);
@@ -2084,5 +2019,17 @@ mod tests {
             (moon_into_eme2k - sp_state_in_eme2k).vmag() < 1e-6,
             "error greater than expected"
         );
+    }
+
+    #[test]
+    fn debug_cosm() {
+        dbg!(Cosm::de438_gmat());
+    }
+
+    #[test]
+    fn why_broken() {
+        let e = Epoch::from_gregorian_tai_hms(2002, 02, 14, 0, 0, 0);
+        println!("{}", e.as_tdb_seconds());
+        println!("{}", e.as_jde_tdb_duration().in_unit(TimeUnit::Second));
     }
 }

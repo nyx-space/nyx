@@ -5,7 +5,7 @@ fn event_tracker_true_anomaly() {
     use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
     use nyx::md::ui::*;
     use nyx::md::EventEvaluator; // Only needed because we're manually calling e.eval
-    use nyx::od::ranging::GroundStation;
+    use nyx::od::measurement::GroundStation;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -35,7 +35,7 @@ fn event_tracker_true_anomaly() {
         let found_events = traj.find_all(e).unwrap();
         let pretty = found_events
             .iter()
-            .map(|orbit| format!("{:o}\tevent value: {}\n", orbit, e.eval(orbit)))
+            .map(|orbit| format!("{:x}\tevent value: {}\n", orbit, e.eval(orbit)))
             .collect::<String>();
         println!("[ta_tracker] {} =>\n{}", e, pretty);
     }
@@ -65,12 +65,12 @@ fn event_tracker_true_anomaly() {
     for state in traj.every(10 * TimeUnit::Second) {
         let new_e_state = e_loc.compute(&state);
         if e_state != new_e_state {
-            println!("{:o}\t{}", state, new_e_state);
+            println!("{:x}\t{}", state, new_e_state);
             e_state = new_e_state;
         }
 
         // Compute the elevation
-        let (elevation, _) = gc.elevation_of(&state);
+        let (elevation, _, _) = gc.elevation_of(&state);
         if elevation > max_el {
             max_el = elevation;
             max_dt = state.epoch();
@@ -92,19 +92,11 @@ fn event_tracker_true_anomaly() {
         .iter()
         .map(|orbit| {
             format!(
-                "{:o}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() - 10 * TimeUnit::Second)
-                        .unwrap()
-                ),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() + 10 * TimeUnit::Second)
-                        .unwrap()
-                )
+                &e_loc.compute(&traj.at(orbit.epoch() - 10 * TimeUnit::Second).unwrap()),
+                &e_loc.compute(&traj.at(orbit.epoch() + 10 * TimeUnit::Second).unwrap())
             )
         })
         .collect::<String>();
@@ -117,19 +109,11 @@ fn event_tracker_true_anomaly() {
         .iter()
         .map(|orbit| {
             format!(
-                "{:o}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
+                "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() - 10 * TimeUnit::Second)
-                        .unwrap()
-                ),
-                &e_loc.compute(
-                    &traj
-                        .evaluate(orbit.epoch() + 10 * TimeUnit::Second)
-                        .unwrap()
-                )
+                &e_loc.compute(&traj.at(orbit.epoch() - 10 * TimeUnit::Second).unwrap()),
+                &e_loc.compute(&traj.at(orbit.epoch() + 10 * TimeUnit::Second).unwrap())
             )
         })
         .collect::<String>();

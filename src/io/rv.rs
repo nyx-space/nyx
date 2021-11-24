@@ -73,4 +73,5 @@ fn test_deser_distr_multi() {
         r#"rvs = { one = { normal = { mean = 0.0, std_dev = 0.2 } }, two = { poisson = { lambda = 10.0 } } }"#,
     )
     .unwrap();
+    println!("{:?}", _as_map.rvs.keys());
 }

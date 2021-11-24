@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dimensions::Vector3;
 use crate::errors::NyxError;
+use crate::linalg::Vector3;
 use std::f64::consts::PI;
 
 const TAU: f64 = 2.0 * PI;

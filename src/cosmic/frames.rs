@@ -47,6 +47,8 @@ pub enum Frame {
     RCN,
     /// Radial, in-track, normal
     RIC,
+    /// SEZ or topocentric frame. The positive horizontal vector S is due south , the positive horizontal vector E is east, and the vector Z normal to the surface of the earth (up) is the third axis.
+    SEZ,
     /// Used as a placeholder only
     Inertial,
 }
@@ -117,6 +119,15 @@ impl Frame {
         }
     }
 
+    pub fn flattening_mut(&mut self, new_flattening: f64) {
+        match self {
+            Self::Geoid {
+                ref mut flattening, ..
+            } => *flattening = new_flattening,
+            _ => panic!("Frame is not Geoid in kind"),
+        }
+    }
+
     pub fn semi_major_radius(&self) -> f64 {
         match self {
             Frame::Geoid {
@@ -159,6 +170,11 @@ impl Frame {
             _ => unimplemented!(),
         }
     }
+
+    /// Returns whether this frame is body fixed or not
+    pub fn is_body_fixed(&self) -> bool {
+        self.frame_path().len() == 2 || self.frame_path().len() == 3
+    }
 }
 
 impl fmt::Display for Frame {
@@ -186,7 +202,7 @@ impl fmt::Display for Frame {
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => {
+            Frame::Celestial { gm, .. } => {
                 write!(
                     f,
                     "{} {} (μ = {:.06} km^3/s^2)",
@@ -197,12 +213,34 @@ impl fmt::Debug for Frame {
                         3 => "IAU Poles Fixed".to_string(),
                         _ => "Custom".to_string(),
                     },
-                    self.gm()
+                    gm,
+                )
+            }
+            Frame::Geoid {
+                gm,
+                equatorial_radius,
+                flattening,
+                ..
+            } => {
+                write!(
+                    f,
+                    "{} {} (μ = {:.06} km^3/s^2 , r = {:.06} km, f = {:.09})",
+                    Bodies::try_from(self.ephem_path()).unwrap().name(),
+                    match self.frame_path().len() {
+                        0 | 1 => "J2000".to_string(),
+                        2 => "IAU Fixed".to_string(),
+                        3 => "IAU Poles Fixed".to_string(),
+                        _ => "Custom".to_string(),
+                    },
+                    gm,
+                    equatorial_radius,
+                    flattening,
                 )
             }
             Frame::VNC => write!(f, "VNC"),
             Frame::RCN => write!(f, "RCN"),
             Frame::RIC => write!(f, "RIC"),
+            Frame::SEZ => write!(f, "SEZ"),
             Frame::Inertial => write!(f, "Inertial"),
         }
     }

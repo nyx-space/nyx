@@ -17,8 +17,8 @@
 */
 
 use crate::cosmic::Frame;
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector, U3, U6};
 use crate::time::{Duration, Epoch};
 
 use std::fmt;
@@ -54,37 +54,26 @@ where
     DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut fmt_cov = Vec::with_capacity(A::dim());
         if let Some(decay) = &self.decay_diag {
-            let mut fmt_cov = Vec::with_capacity(A::dim());
             for (i, dv) in decay.iter().enumerate() {
                 fmt_cov.push(format!("{:.1e} × exp(- {:.1e} × t)", self.diag[i], dv));
             }
-            write!(
-                f,
-                "SNC: diag({}) {}",
-                fmt_cov.join(", "),
-                if let Some(start) = self.start_time {
-                    format!("starting at {}", start.as_gregorian_utc_str())
-                } else {
-                    "".to_string()
-                }
-            )
         } else {
-            let mut fmt_cov = Vec::with_capacity(A::dim());
             for i in 0..A::dim() {
                 fmt_cov.push(format!("{:.1e}", self.diag[i]));
             }
-            write!(
-                f,
-                "SNC: diag({}) {}",
-                fmt_cov.join(", "),
-                if let Some(start) = self.start_time {
-                    format!("starting at {}", start.as_gregorian_utc_str())
-                } else {
-                    "".to_string()
-                }
-            )
         }
+        write!(
+            f,
+            "SNC: diag({}) {}",
+            fmt_cov.join(", "),
+            if let Some(start) = self.start_time {
+                format!("starting at {}", start.as_gregorian_utc_str())
+            } else {
+                "".to_string()
+            }
+        )
     }
 }
 

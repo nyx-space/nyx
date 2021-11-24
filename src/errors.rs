@@ -16,6 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use crate::time::Errors as TimeErrors;
+use crate::Spacecraft;
+use std::convert::From;
 use std::error::Error;
 use std::fmt;
 
@@ -24,7 +27,8 @@ pub enum NyxError {
     /// STM is singular, check the automatic differentiation function and file a bug
     SingularStateTransitionMatrix,
     /// Fuel exhausted error, try running without fuel depletion, and then adding it.
-    FuelExhausted,
+    /// Parameter is the state at which the fuel has exhaused
+    FuelExhausted(Box<Spacecraft>),
     /// Propagation event not triggered withinin the max propagation time
     ConditionNeverTriggered,
     /// Propagation event not hit enough times (requested, found).
@@ -33,8 +37,6 @@ pub enum NyxError {
     MaxIterReached(String),
     /// Event not in braket
     EventNotInEpochBraket(String, String),
-    /// The STM was not updated prior to requesting a filter update
-    StateTransitionMatrixNotUpdated,
     /// The operation was expecting the state to have an STM, but it isn't present.
     StateTransitionMatrixUnset,
     /// The sensitivity matrix was not updated prior to requesting a filter measurement update
@@ -43,11 +45,15 @@ pub enum NyxError {
     SingularKalmanGain,
     /// Covariance is singular
     SingularCovarianceMatrix,
+    /// Jacobian of some optimization problem is singular
+    SingularJacobian,
     TargetsTooClose,
     LambertNotReasonablePhi,
     LambertMultiRevNotSupported,
     /// Returns this error if the partials for this model are not defined, thereby preventing the computation of the STM
     PartialsUndefined,
+    /// Returned if trying to set a parameter for something which does not have that parameter.
+    ParameterUnavailableForType,
     LoadingError(String),
     FileUnreadable(String),
     ObjectNotFound(String),
@@ -76,17 +82,22 @@ pub enum NyxError {
     TargetError(String),
     /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
     UnderdeterminedProblem,
+    /// Returned if CCSDS encountered an error
+    CCSDS(String),
+    /// Returned if the targeter for `node_no` has failed
+    MultipleShootingTargeter(usize, Box<NyxError>),
+    /// Returned when the trajectory could not be created
+    TrajectoryCreationError,
     /// Some custom error for new dynamics
     CustomError(String),
+    /// Hifitime errors that rose upward
+    TimeError(TimeErrors),
 }
 
 impl fmt::Display for NyxError {
     // Prints the Keplerian orbital elements with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Self::StateTransitionMatrixNotUpdated => {
-                write!(f, "STM was not updated prior to time or measurement update")
-            }
+        match self {
             Self::SensitivityNotUpdated => write!(
                 f,
                 "The measurement matrix H_tilde was not updated prior to measurement update"
@@ -102,9 +113,10 @@ impl fmt::Display for NyxError {
             Self::SingularCovarianceMatrix => {
                 write!(f, "Covariance is singular, smoothing cannot proceed")
             }
-            Self::FuelExhausted => write!(
+            Self::FuelExhausted(sc) => write!(
                 f,
-                "Spacecraft fuel exhausted, disable fuel depletion and place maneuvers"
+                "Spacecraft fuel exhausted, disable fuel depletion and place maneuvers\n{}",
+                sc
             ),
             Self::ConditionNeverTriggered => write!(
                 f,
@@ -117,9 +129,18 @@ impl fmt::Display for NyxError {
             Self::LambertNotReasonablePhi => {
                 write!(f, "No reasonable phi found to connect both radii")
             }
+            Self::MultipleShootingTargeter(n, e) => {
+                write!(f, "Multiple shooting failed on node {} with {}", n, e)
+            }
             _ => write!(f, "{:?}", self),
         }
     }
 }
 
 impl Error for NyxError {}
+
+impl From<TimeErrors> for NyxError {
+    fn from(e: TimeErrors) -> Self {
+        NyxError::TimeError(e)
+    }
+}

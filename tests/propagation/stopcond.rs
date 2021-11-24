@@ -1,14 +1,15 @@
 extern crate nalgebra as na;
-
 extern crate nyx_space as nyx;
+extern crate pretty_env_logger;
 
+use hifitime::TimeUnitHelper;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, J2000_OFFSET};
-use nyx::TimeTagged;
+use nyx::State;
 
 #[test]
 fn stop_cond_3rd_apo() {
@@ -29,16 +30,17 @@ fn stop_cond_3rd_apo() {
     let mut prop = setup.with(state);
     // Propagate for at five orbital periods so we know we've passed the third one
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
-    let (third_apo, _) = prop.until_event(5 * period, &apo_event, 2).unwrap();
+    let (third_apo, _) = prop.until_event(5 * period, &apo_event, 3).unwrap();
 
-    println!("{}\t{}", start_dt + 2.0 * period, start_dt + 3.0 * period);
+    println!(
+        "{}\t{}\t\t{}",
+        start_dt + 2.0 * period,
+        start_dt + 3.0 * period,
+        third_apo
+    );
     // Confirm that this is the third apoapse event which is found
     assert!(
         (start_dt + 2.0 * period..start_dt + 3.0 * period).contains(&third_apo.dt),
-        "converged on the wrong apoapse"
-    );
-    assert!(
-        third_apo.dt - start_dt < 3.0 * period && third_apo.dt - start_dt >= 2.0 * period,
         "converged on the wrong apoapse"
     );
     assert!(
@@ -69,7 +71,7 @@ fn stop_cond_3rd_peri() {
     // which the event finder will find.
     let (third_peri, _) = prop.until_event(5 * period, &peri_event, 4).unwrap();
 
-    println!("{:o}", third_peri);
+    println!("{:x}", third_peri);
     // Confirm that this is the third periapse event which is found
     // Again, the initial state is at periapse, so we don't check a N number of orbit forward.
     assert!(
@@ -84,6 +86,9 @@ fn stop_cond_3rd_peri() {
 
 #[test]
 fn stop_cond_nrho_apo() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
     use std::time::Instant;
     // The following test technically works, but the transformation of thousands of states
     // into another frame is quite slow...
@@ -117,45 +122,54 @@ fn stop_cond_nrho_apo() {
         PropOpts::with_adaptive_step_s(1.0, 60.0, 1e-6, RSSCartesianStep {}),
     );
 
-    let mut prop = setup.with(state);
-
     // NOTE: Here, we will propagate for the maximum duration in the original frame
     // Then convert that trajectory into the other frame, and perform the search there.
     // We can only do that for spacecraft and orbit trajectories since those have a frame.
-    let prop_time = 4 * state_luna.period();
+    let prop_time = 0.5 * state_luna.period();
     let start = Instant::now();
-    let (orbit, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+    let (orbit, traj) = setup.with(state).for_duration_with_traj(prop_time).unwrap();
 
     let end_prop = Instant::now();
     println!(
-        "Propagated for {} in {} ms:\n{:o}",
+        "Propagated for {} in {} ms:\n{:x}\n{}\n",
         prop_time,
         (end_prop - start).as_millis(),
         orbit,
+        traj
     );
 
     // Create the event
-    let apo_event = Event::apoapsis(); // Special event shortcut!
+    let near_apo_event = Event::new(StateParameter::TrueAnomaly, 172.0);
 
     // Convert this trajectory into the Luna frame
     let traj_luna = traj.to_frame(luna, cosm).unwrap();
     let end_conv = Instant::now();
     println!(
-        "Converted EME2000 trajectory into Moon J2000 in {} ms",
-        (end_conv - end_prop).as_millis()
+        "Converted EME2000 trajectory into Moon J2000 in {} ms\nFrom: {}\nTo  : {}",
+        (end_conv - end_prop).as_millis(),
+        traj,
+        traj_luna
+    );
+    assert!(
+        (traj.first().epoch() - traj_luna.first().epoch()).abs() < 1.milliseconds(),
+        "First epoch of converted trajectories do not match"
+    );
+    assert!(
+        (traj.last().epoch() - traj_luna.last().epoch()).abs() < 1.milliseconds(),
+        "Last epoch of converted trajectories do not match"
     );
 
     // Now, find all of the requested events
-    let events = traj_luna.find_all(&apo_event).unwrap();
+    let events = traj_luna.find_all(&near_apo_event).unwrap();
     println!(
         "Found all {} events in {} ms",
-        apo_event,
+        near_apo_event,
         (Instant::now() - end_conv).as_millis()
     );
     for event_state in &events {
         let delta_t = event_state.epoch() - dt;
-        println!("{} after start:\n{:o}", delta_t, event_state);
-        assert!((event_state.ta() - 180.0).abs() < 0.1);
+        println!("{} after start:\n{:x}", delta_t, event_state);
+        assert!((event_state.ta() - 172.0).abs() < near_apo_event.value_precision);
     }
 }
 
@@ -177,7 +191,7 @@ fn line_of_nodes() {
     let mut prop = setup.with(state);
     let (lon_state, _) = prop.until_event(3 * period, &lon_event, 0).unwrap();
     println!(
-        "{:o} => longitude = {} degrees",
+        "{:x} => longitude = {} degrees",
         lon_state,
         lon_state.geodetic_longitude()
     );
@@ -206,7 +220,7 @@ fn latitude() {
     let mut prop = setup.with(state);
     let (lon_state, _) = prop.until_event(3 * period, &lat_event, 0).unwrap();
     println!(
-        "{:o} => latitude = {} degrees",
+        "{:x} => latitude = {} degrees",
         lon_state,
         lon_state.geodetic_latitude()
     );

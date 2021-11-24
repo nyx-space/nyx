@@ -163,6 +163,24 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug integration test 'landing_demo'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "landing_demo"
+                ],
+                "filter": {
+                    "name": "lib",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug integration test 'propagators'",
             "cargo": {
                 "args": [

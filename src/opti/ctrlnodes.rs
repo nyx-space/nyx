@@ -16,99 +16,147 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{Bodies, Cosm, Orbit};
-use crate::dimensions::Vector3;
-use crate::dynamics::orbital::OrbitalDynamics;
-use crate::errors::NyxError;
-use crate::propagators::{PropOpts, Propagator};
-use crate::time::Duration;
-use crate::tools::lambert::{standard, TransferKind};
-use std::sync::mpsc::channel;
+extern crate serde;
+extern crate serde_derive;
+
+use self::serde_derive::{Deserialize, Serialize};
+use crate::cosmic::{Cosm, Frame};
+use crate::md::targeter::Objective;
+use crate::md::ui::StateParameter;
+use crate::time::Epoch;
+use crate::NyxError;
+use std::convert::Into;
+use std::str::FromStr;
+use std::sync::Arc;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct NodesSerde {
+    pub nodes: Vec<NodeSerde>,
+}
+
+impl NodesSerde {
+    pub fn to_node_vec(&self, cosm: Arc<Cosm>) -> Result<Vec<Node>, NyxError> {
+        let mut rtn = Vec::with_capacity(self.nodes.len());
+        for n in &self.nodes {
+            rtn.push(n.to_node(cosm.clone())?)
+        }
+        Ok(rtn)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct NodeSerde {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub epoch: String,
+    pub frame: String,
+}
+
+impl NodeSerde {
+    pub fn to_node(&self, cosm: Arc<Cosm>) -> Result<Node, NyxError> {
+        let frame = cosm.try_frame(self.frame.as_str())?;
+        let epoch = Epoch::from_str(&self.epoch)?;
+
+        Ok(Node {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            frame,
+            epoch,
+        })
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Node {
-    pub orbit: Orbit,
-    pub ctrl: Vector3<f64>,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub epoch: Epoch,
+    pub frame: Frame,
 }
 
-/// This trait determines the initial control nodes for direct multiple shooting.
-pub trait Heuristic {
-    fn nodes(&self, start: Orbit, end: Orbit) -> Result<Vec<Node>, NyxError>;
+impl Node {
+    pub fn to_targeter_objective(&self) -> Vec<Objective> {
+        return vec![
+            Objective::new(StateParameter::X, self.x),
+            Objective::new(StateParameter::Y, self.y),
+            Objective::new(StateParameter::Z, self.z),
+        ];
+    }
+
+    pub fn rmag(&self) -> f64 {
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+    }
 }
 
-/// Lambert heuristic uses a Lambert transfer to find the shortest path between two nodes.
-/// TODO: It will then use mesh refinement combined with a z-score to adequately place the control nodes.
-/// NOTE: This is very likely a bad heuristic. The propagator tolerance is to the meter accuracy.
-pub struct LambertHeuristic {
-    pub tof: Duration,
-}
-
-impl Heuristic for LambertHeuristic {
-    fn nodes(&self, start: Orbit, end: Orbit) -> Result<Vec<Node>, NyxError> {
-        // Start by solving the Lambert solution between these nodes.
-        let sol = standard(
-            start.radius(),
-            end.radius(),
-            self.tof.in_seconds(),
-            start.frame.gm(),
-            TransferKind::Auto,
-        )?;
-
-        // Get into the transfer orbit.
-        let mut start_tf = start;
-        start_tf.vx = sol.v_init[0];
-        start_tf.vy = sol.v_init[1];
-        start_tf.vz = sol.v_init[2];
-
-        // Propagate for the TOF
-        let cosm = Cosm::de438();
-        let bodies = vec![Bodies::Luna, Bodies::SSB, Bodies::JupiterBarycenter];
-        let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
-
-        // Create the channel to receive all of the details.
-        let (tx, rx) = channel();
-        let prop_setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-3));
-        let mut prop = prop_setup.with(start_tf);
-        prop.tx_chan = Some(tx);
-        prop.for_duration(self.tof)?;
-
-        let mut node_states = Vec::new();
-        while let Ok(state) = rx.try_recv() {
-            node_states.push(state);
+#[allow(clippy::from_over_into)]
+impl Into<NodeSerde> for Node {
+    fn into(self) -> NodeSerde {
+        NodeSerde {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            frame: self.frame.to_string(),
+            epoch: self.epoch.to_string(),
         }
+    }
+}
 
-        // Now that we have the nodes, let's compute the direction of each control
-        let mut nodes = Vec::new();
-        for i in 0..node_states.len() - 1 {
-            let this = &node_states[i];
-            let next = &node_states[i + 1];
-            let delta = next.radius() - this.radius();
-            let ctrl = delta / delta.norm();
-            nodes.push(Node { orbit: *this, ctrl });
+#[allow(clippy::from_over_into)]
+impl Into<NodeSerde> for &Node {
+    fn into(self) -> NodeSerde {
+        NodeSerde {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            frame: self.frame.to_string(),
+            epoch: self.epoch.to_string(),
         }
-
-        Ok(nodes)
     }
 }
 
 #[test]
-fn lambert_heuristic() {
-    use crate::time::Epoch;
-    let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
-    let dest_dt = Epoch::from_gregorian_utc_at_noon(2020, 1, 1);
-    let delta_t = dest_dt - orig_dt;
-    println!("{}", delta_t);
+fn test_nodeserde() {
+    extern crate toml;
 
-    let h = LambertHeuristic { tof: delta_t };
+    let str_nodes = r#"[[nodes]]
+x = -394.37164017582654
+y = -80.02184491079583
+z = -1702.1160791417442
+epoch = "2023-11-25T14:11:46.789000034 UTC"
+frame = "Moon J2000"
+
+[[nodes]]
+x = -381.68254116206856
+y = -48.21573534985666
+z = -1705.829637126235
+epoch = "2023-11-25T14:12:06.789000034 UTC"
+frame = "Moon J2000"
+
+[[nodes]]
+x = -368.8474537620047
+y = -16.401929604226403
+z = -1708.8692139449731
+epoch = "2023-11-25T14:12:26.789000034 UTC"
+frame = "Moon J2000"
+"#;
+
+    let toml_nodes: NodesSerde = toml::from_str(str_nodes).unwrap();
 
     let cosm = Cosm::de438();
-    let eme2k = cosm.frame("EME2000");
 
-    let end = Orbit::keplerian(24_000.0, 0.1, 36.0, 60.0, 60.0, 180.0, dest_dt, eme2k);
+    let nodes = toml_nodes.to_node_vec(cosm).unwrap();
 
-    let start = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 180.0, orig_dt, eme2k);
+    dbg!(&nodes);
 
-    let nodes = h.nodes(start, end).unwrap();
+    let v = NodesSerde {
+        nodes: nodes.iter().map(|n| n.into()).collect::<Vec<NodeSerde>>(),
+    };
+    let toml_ser = toml::to_string(&v).unwrap();
 
-    println!("{}", nodes.len());
+    println!("GOT\n{}\n\nWANTED:{}", toml_ser, str_nodes);
+
+    assert_eq!(toml_ser, str_nodes);
 }

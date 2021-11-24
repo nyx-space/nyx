@@ -1,5 +1,5 @@
 use super::{Distribution, Normal, Rng, Uniform};
-use crate::dimensions::Vector3;
+use crate::linalg::Vector3;
 use crate::NyxError;
 
 /// Returns a unit vector from a normal distribution.

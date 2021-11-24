@@ -16,17 +16,20 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::crossbeam::thread;
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
+use super::rayon::iter::ParallelBridge;
+use super::rayon::prelude::ParallelIterator;
 use super::{IntegrationDetails, RK, RK89};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, OVector};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
-use crate::md::trajectory::Traj;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, OVector};
+use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
+use crate::md::trajectory::{interpolate, InterpState, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeUnit};
-use crate::{State, TimeTagged};
+use crate::State;
+use std::collections::BTreeMap;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
@@ -39,6 +42,7 @@ pub struct Propagator<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     pub dynamics: Arc<D>, // Stores the dynamics used. *Must* use this to get the latest values
@@ -54,6 +58,7 @@ impl<'a, D: Dynamics, E: ErrorCtrl> Propagator<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
@@ -61,10 +66,10 @@ where
         Self {
             dynamics,
             opts,
-            stages: T::stages(),
-            order: T::order(),
-            a_coeffs: T::a_coeffs(),
-            b_coeffs: T::b_coeffs(),
+            stages: T::STAGES,
+            order: T::ORDER,
+            a_coeffs: T::A_COEFFS,
+            b_coeffs: T::B_COEFFS,
         }
     }
 
@@ -73,8 +78,11 @@ where
         self.opts.tolerance = tol;
     }
 
-    /// Set the maximum step size for the propagator
+    /// Set the maximum step size for the propagator and sets the initial step to that value if currently greater
     pub fn set_max_step(&mut self, step: Duration) {
+        if self.opts.init_step > step {
+            self.opts.init_step = step;
+        }
         self.opts.max_step = step;
     }
 
@@ -84,8 +92,6 @@ where
     }
 
     pub fn with(&'a self, state: D::StateType) -> PropInstance<'a, D, E> {
-        // let init_time = state.epoch();
-        // let init_state_vec = dynamics.state_vector();
         // Pre-allocate the k used in the propagator
         let mut k = Vec::with_capacity(self.stages + 1);
         for _ in 0..self.stages {
@@ -93,9 +99,7 @@ where
         }
         PropInstance {
             state,
-            prop: Arc::new(self),
-            tx_chan: None,
-            prevent_tx: false,
+            prop: self,
             details: IntegrationDetails {
                 step: self.opts.init_step,
                 error: 0.0,
@@ -103,7 +107,6 @@ where
             },
             step_size: self.opts.init_step,
             fixed_step: self.opts.fixed_step,
-            // init_time,
             k,
         }
     }
@@ -113,6 +116,7 @@ impl<'a, D: Dynamics> Propagator<'a, D, RSSCartesianStep>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
@@ -129,21 +133,17 @@ pub struct PropInstance<'a, D: Dynamics, E: ErrorCtrl>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// The state of this propagator instance
     pub state: D::StateType,
     /// The propagator setup (kind, stages, etc.)
-    pub prop: Arc<&'a Propagator<'a, D, E>>,
-    /// An output channel for all of the states computed by this propagator instance
-    pub tx_chan: Option<Sender<D::StateType>>,
+    pub prop: &'a Propagator<'a, D, E>,
     /// Stores the details of the previous integration step
     pub details: IntegrationDetails,
-    prevent_tx: bool, // Allows preventing publishing to channel even if channel is set
     step_size: Duration, // Stores the adapted step for the _next_ call
     fixed_step: bool,
-    // init_time: Epoch,
-    // init_state_vec: OVector<f64, <D::StateType as State>::Size>,
     // Allows us to do pre-allocation of the ki vectors
     k: Vec<OVector<f64, <D::StateType as State>::VecLength>>,
 }
@@ -152,6 +152,7 @@ impl<'a, D: Dynamics, E: ErrorCtrl> PropInstance<'a, D, E>
 where
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Allows setting the step size of the propagator
@@ -160,35 +161,25 @@ where
         self.fixed_step = fixed;
     }
 
-    /// Set the output channel of the propagator. For example use this to generate an interpolated trajectory.
-    pub fn with_tx(mut self, tx: Sender<D::StateType>) -> Self {
-        self.tx_chan = Some(tx);
-        self
-    }
-
-    /// Returns the state of the propagation
-    ///
-    /// WARNING: Do not use the dynamics to get the state, it will be the initial value!
-    pub fn state_vector(&self) -> OVector<f64, <D::StateType as State>::VecLength> {
-        self.state.as_vector().unwrap()
-    }
-
-    /// This method propagates the provided Dynamics for the provided duration.
     #[allow(clippy::erasing_op)]
-    pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
+    fn for_duration_channel_option(
+        &mut self,
+        duration: Duration,
+        maybe_tx_chan: Option<Sender<D::StateType>>,
+    ) -> Result<D::StateType, NyxError> {
         if duration == 0 * TimeUnit::Second {
             debug!("No propagation necessary");
             return Ok(self.state);
         }
+        let stop_time = self.state.epoch() + duration;
         if duration > 2 * TimeUnit::Minute || duration < -2 * TimeUnit::Minute {
-            // Prevent the print spam for EKF orbit determination cases
-            info!("Propagating for {}", duration);
+            // Prevent the print spam for orbit determination cases
+            info!("Propagating for {} until {}", duration, stop_time);
         }
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
-        let stop_time = self.state.epoch() + duration;
         loop {
             let dt = self.state.epoch();
             if (!backprop && dt + self.step_size > stop_time)
@@ -202,36 +193,46 @@ where
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
                 self.set_step(stop_time - dt, true);
-                let (t, state_vec) = self.derive()?;
-                self.state.set(self.state.epoch() + t, &state_vec)?;
-                self.state = self.prop.dynamics.finally(self.state)?;
-                // Restore the step size for subsequent calls
-                self.set_step(prev_step_size, prev_step_kind);
-                if !self.prevent_tx {
-                    if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send(self.state) {
-                            warn!("could not publish to channel: {}", e)
-                        }
+
+                self.single_step()?;
+
+                // Publish to channel if provided
+                if let Some(ref chan) = maybe_tx_chan {
+                    if let Err(e) = chan.send(self.state) {
+                        warn!("could not publish to channel: {}", e)
                     }
                 }
+
+                // Restore the step size for subsequent calls
+                self.set_step(prev_step_size, prev_step_kind);
                 if backprop {
                     self.step_size = -self.step_size; // Restore to a positive step size
                 }
                 return Ok(self.state);
             } else {
-                let (t, state_vec) = self.derive()?;
-
-                self.state.set(self.state.epoch() + t, &state_vec)?;
-                self.state = self.prop.dynamics.finally(self.state)?;
-                if !self.prevent_tx {
-                    if let Some(ref chan) = self.tx_chan {
-                        if let Err(e) = chan.send(self.state) {
-                            warn!("could not publish to channel: {}", e)
-                        }
+                self.single_step()?;
+                // Publish to channel if provided
+                if let Some(ref chan) = maybe_tx_chan {
+                    if let Err(e) = chan.send(self.state) {
+                        warn!("could not publish to channel: {}", e)
                     }
                 }
             }
         }
+    }
+
+    /// This method propagates the provided Dynamics for the provided duration.
+    pub fn for_duration(&mut self, duration: Duration) -> Result<D::StateType, NyxError> {
+        self.for_duration_channel_option(duration, None)
+    }
+
+    /// This method propagates the provided Dynamics for the provided duration and publishes each state on the channel.
+    pub fn for_duration_with_channel(
+        &mut self,
+        duration: Duration,
+        tx_chan: Sender<D::StateType>,
+    ) -> Result<D::StateType, NyxError> {
+        self.for_duration_channel_option(duration, Some(tx_chan))
     }
 
     /// Propagates the provided Dynamics until the provided epoch. Returns the end state.
@@ -240,30 +241,136 @@ where
         self.for_duration(duration)
     }
 
+    /// Propagates the provided Dynamics until the provided epoch and publishes states on the provided channel. Returns the end state.
+    pub fn until_epoch_with_channel(
+        &mut self,
+        end_time: Epoch,
+        tx_chan: Sender<D::StateType>,
+    ) -> Result<D::StateType, NyxError> {
+        let duration: Duration = end_time - self.state.epoch();
+        self.for_duration_with_channel(duration, tx_chan)
+    }
+
     /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
     /// Returns the end state and the trajectory.
     /// Known bug #190: Cannot generate a valid trajectory when propagating backward
+    #[allow(clippy::map_clone)]
     pub fn for_duration_with_traj(
         &mut self,
         duration: Duration,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
-        thread::scope(|s| {
-            let (tx, rx) = channel();
-            self.tx_chan = Some(tx);
-            let start_state = self.state;
-            // The trajectory must always be generated on its own thread.
-            let traj_thread = s.spawn(move |_| Traj::new(start_state, rx));
-            let end_state = self.for_duration(duration)?;
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
+    {
+        let start_state = self.state;
+        let end_state;
 
-            let traj = traj_thread.join().unwrap_or_else(|_| {
-                Err(NyxError::NoInterpolationData(
-                    "Could not generate trajectory".to_string(),
-                ))
-            })?;
+        let rx = {
+            // Channels that have the states in a bucket of the correct length
+            let (tx_bucket, rx_bucket) = channel();
 
-            Ok((end_state, traj))
-        })
-        .unwrap()
+            let rx = {
+                // Channels that have a single state for the propagator
+                let (tx, rx) = channel();
+                // Propagate the dynamics
+                end_state = self.for_duration_with_channel(duration, tx)?;
+                rx
+            };
+
+            /* *** */
+            /* Map: bucket the states and send on a channel */
+            /* *** */
+
+            let items_per_segments = INTERPOLATION_SAMPLES;
+            let mut window_states = Vec::with_capacity(2 * items_per_segments);
+            // Push the initial state
+            window_states.push(start_state);
+
+            // Note that we're using the typical map+reduce pattern
+            // Start receiving states on a blocking call
+            while let Ok(state) = rx.recv() {
+                window_states.push(state);
+                if window_states.len() == 2 * items_per_segments {
+                    // Publish the first items
+                    let this_wdn = window_states[..items_per_segments]
+                        .iter()
+                        .map(|&x| x)
+                        .collect::<Vec<D::StateType>>();
+
+                    tx_bucket
+                        .send(this_wdn)
+                        .map_err(|_| NyxError::TrajectoryCreationError)?;
+
+                    // Now, let's remove the first states
+                    for _ in 0..items_per_segments - 1 {
+                        window_states.remove(0);
+                    }
+                }
+            }
+            // If there aren't enough states, set the propagator step size to make sure there is at least that many states
+            if window_states.len() < items_per_segments {
+                let step_size =
+                    (end_state.epoch() - start_state.epoch()) / ((items_per_segments - 1) as f64);
+
+                self.state = start_state;
+                window_states.clear();
+                self.set_step(step_size, true);
+                let rx = {
+                    // Channels that have a single state for the propagator
+                    let (tx, rx) = channel();
+                    // Propagate the dynamics
+                    self.for_duration_with_channel(duration, tx)?;
+                    rx
+                };
+                window_states.push(start_state);
+                while let Ok(state) = rx.recv() {
+                    window_states.push(state);
+                }
+            }
+            // And interpolate the remaining states too, even if the buffer is not full!
+            let mut start_idx = 0;
+            loop {
+                tx_bucket
+                    .send(
+                        window_states
+                            [start_idx..(start_idx + items_per_segments).min(window_states.len())]
+                            .iter()
+                            .map(|&x| x)
+                            .collect::<Vec<D::StateType>>(),
+                    )
+                    .map_err(|_| NyxError::TrajectoryCreationError)?;
+                if start_idx > 0 || window_states.len() < items_per_segments {
+                    break;
+                }
+                start_idx = window_states.len() - items_per_segments;
+                if start_idx == 0 {
+                    // This means that the window states are exactly the correct size, break here
+                    break;
+                }
+            }
+
+            // Return the rx channel for these buckets
+            rx_bucket
+        };
+
+        /* *** */
+        /* Reduce: Build an interpolation of each of the segments */
+        /* *** */
+        let splines: Vec<_> = rx.into_iter().par_bridge().map(interpolate).collect();
+
+        // Finally, build the whole trajectory
+        let mut traj = Traj {
+            segments: BTreeMap::new(),
+            start_state,
+        };
+
+        for maybe_spline in splines {
+            let spline = maybe_spline?;
+            traj.append_spline(spline);
+        }
+
+        Ok((end_state, traj))
     }
 
     /// Propagates the provided Dynamics until the provided epoch and generate the trajectory of these dynamics on its own thread.
@@ -272,7 +379,11 @@ where
     pub fn until_epoch_with_traj(
         &mut self,
         end_time: Epoch,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
+    {
         let duration: Duration = end_time - self.state.epoch();
         self.for_duration_with_traj(duration)
     }
@@ -284,7 +395,11 @@ where
         max_duration: Duration,
         event: &F,
         trigger: usize,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError> {
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
+    {
         info!("Searching for {}", event);
 
         let (_, traj) = self.for_duration_with_traj(max_duration)?;
@@ -296,6 +411,15 @@ where
         }
     }
 
+    /// Take a single propagator step and emit the result on the TX channel (if enabled)
+    pub fn single_step(&mut self) -> Result<(), NyxError> {
+        let (t, state_vec) = self.derive()?;
+        self.state.set(self.state.epoch() + t, &state_vec)?;
+        self.state = self.prop.dynamics.finally(self.state)?;
+
+        Ok(())
+    }
+
     /// This method integrates whichever function is provided as `d_xdt`. Everything passed to this function is in **seconds**.
     ///
     /// This function returns the step sized used (as a Duration) and the new state as y_{n+1} = y_n + \frac{dy_n}{dt}.
@@ -303,7 +427,7 @@ where
     fn derive(
         &mut self,
     ) -> Result<(Duration, OVector<f64, <D::StateType as State>::VecLength>), NyxError> {
-        let state = &self.state_vector();
+        let state = &self.state.as_vector()?;
         let ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
@@ -353,7 +477,7 @@ where
                 return Ok(((self.details.step), next_state));
             } else {
                 // Compute the error estimate.
-                self.details.error = E::estimate(&error_est, &next_state, &state);
+                self.details.error = E::estimate(&error_est, &next_state, state);
                 if self.details.error <= self.prop.opts.tolerance
                     || step_size <= self.prop.opts.min_step.in_seconds()
                     || self.details.attempts >= self.prop.opts.attempts

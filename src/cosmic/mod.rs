@@ -20,15 +20,90 @@ extern crate hyperdual;
 extern crate nalgebra as na;
 extern crate prost;
 
-use std::convert::TryFrom;
+pub use self::xb::Xb;
+use self::xb::{Ephemeris, Epoch as XbEpoch};
+pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
+pub use crate::errors::NyxError;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::time::{Duration, Epoch, TimeUnit, SECONDS_PER_DAY};
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::time::Instant;
 
-pub use self::xb::Xb;
-use self::xb::{Ephemeris, Epoch as XbEpoch};
-pub use crate::errors::NyxError;
-use crate::time::{Epoch, TimeUnit, SECONDS_PER_DAY};
+/// A trait allowing for something to have an epoch
+pub trait TimeTagged {
+    /// Retrieve the Epoch
+    fn epoch(&self) -> Epoch;
+    /// Set the Epoch
+    fn set_epoch(&mut self, epoch: Epoch);
+
+    /// Shift this epoch by a duration (can be negative)
+    fn shift_by(&mut self, duration: Duration) {
+        self.set_epoch(self.epoch() + duration);
+    }
+}
+
+/// A trait for generate propagation and estimation state.
+/// The first parameter is the size of the state, the second is the size of the propagated state including STM and extra items.
+pub trait State: Copy + PartialEq + fmt::Display + fmt::LowerExp + Send + Sync
+where
+    Self: Sized,
+    DefaultAllocator: Allocator<f64, Self::Size>
+        + Allocator<f64, Self::Size, Self::Size>
+        + Allocator<f64, Self::VecLength>,
+{
+    /// Size of the state and its STM
+    type Size: DimName;
+    type VecLength: DimName;
+
+    /// Initialize an empty state
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn zeros() -> Self {
+        unimplemented!()
+    }
+
+    /// Return this state as a vector for the propagation/estimation
+    fn as_vector(&self) -> Result<OVector<f64, Self::VecLength>, NyxError>;
+
+    /// Return this state as a vector for the propagation/estimation
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn stm(&self) -> Result<OMatrix<f64, Self::Size, Self::Size>, NyxError> {
+        unimplemented!()
+    }
+
+    /// Return this state as a vector for the propagation/estimation
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn reset_stm(&mut self) {
+        unimplemented!()
+    }
+
+    /// Set this state
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
+        -> Result<(), NyxError>;
+
+    /// Reconstruct a new State from the provided delta time in seconds compared to the current state
+    /// and with the provided vector.
+    fn set_with_delta_seconds(self, delta_t_s: f64, vector: &OVector<f64, Self::VecLength>) -> Self
+    where
+        DefaultAllocator: Allocator<f64, Self::VecLength>,
+    {
+        let mut me = self;
+        me.set(me.epoch() + delta_t_s, vector).unwrap();
+        me
+    }
+
+    /// Retrieve the Epoch
+    fn epoch(&self) -> Epoch;
+    /// Set the Epoch
+    fn set_epoch(&mut self, epoch: Epoch);
+
+    /// By default, this is not implemented. This function must be implemented when filtering on this state.
+    fn add(self, _other: OVector<f64, Self::Size>) -> Self {
+        unimplemented!()
+    }
+}
 
 impl XbEpoch {
     /// Returns the epoch as a raw f64, allows for speed ups if you know what is the stored time system
@@ -107,7 +182,7 @@ impl Xb {
             None => Err(NyxError::ObjectNotFound("not ephemeris root".to_string())),
             Some(root) => {
                 if path.is_empty() {
-                    return Ok(&root);
+                    return Ok(root);
                 }
                 for pos in path {
                     if root.children.get(*pos).is_none() {
@@ -167,7 +242,7 @@ impl Xb {
                     Ok(Vec::new())
                 } else {
                     let mut path = Vec::new();
-                    Self::ephemeris_seek_by_name(&name, &mut path, &root)
+                    Self::ephemeris_seek_by_name(&name, &mut path, root)
                 }
             }
         }
@@ -183,7 +258,7 @@ impl Xb {
     pub fn ephemeris_get_names(&self) -> Vec<String> {
         let mut names = Vec::new();
         if let Some(root) = &self.ephemeris_root {
-            Self::ephemeris_names(&mut names, &root);
+            Self::ephemeris_names(&mut names, root);
         }
         names
     }
@@ -195,123 +270,9 @@ pub mod orientations {
     pub const J2000: i32 = 1;
 }
 
-/// Defines the default celestial bodies in the provided de438 XB.
-#[derive(Copy, Clone, Debug)]
-#[allow(clippy::upper_case_acronyms)]
-pub enum Bodies {
-    SSB,
-    Sun,
-    MercuryBarycenter,
-    Mercury,
-    VenusBarycenter,
-    Venus,
-    EarthBarycenter,
-    Earth,
-    Luna,
-    MarsBarycenter,
-    JupiterBarycenter,
-    SaturnBarycenter,
-    UranusBarycenter,
-    NeptuneBarycenter,
-    PlutoBarycenter,
-}
-
-impl Bodies {
-    /// Returns the path in the standard de438 XB
-    pub fn ephem_path(&self) -> &'static [usize] {
-        match *self {
-            Self::SSB => &[],
-            Self::Sun => &[0],
-            Self::MercuryBarycenter => &[1],
-            Self::Mercury => &[1],
-            Self::VenusBarycenter => &[2],
-            Self::Venus => &[2],
-            Self::EarthBarycenter => &[3],
-            Self::Earth => &[3, 0],
-            Self::Luna => &[3, 1],
-            Self::MarsBarycenter => &[4],
-            Self::JupiterBarycenter => &[5],
-            Self::SaturnBarycenter => &[6],
-            Self::UranusBarycenter => &[7],
-            Self::NeptuneBarycenter => &[8],
-            Self::PlutoBarycenter => &[9],
-        }
-    }
-
-    /// Returns the human name
-    pub fn name(&self) -> String {
-        match *self {
-            Self::SSB => "Solar System Barycenter".to_string(),
-            Self::Sun => "Sun".to_string(),
-            Self::MercuryBarycenter => "Mercury".to_string(),
-            Self::Mercury => "Mercury".to_string(),
-            Self::VenusBarycenter => "Venus".to_string(),
-            Self::Venus => "Venus".to_string(),
-            Self::EarthBarycenter => "Earth Moon Barycenter".to_string(),
-            Self::Earth => "Earth".to_string(),
-            Self::Luna => "Moon".to_string(),
-            Self::MarsBarycenter => "Mars".to_string(),
-            Self::JupiterBarycenter => "Jupiter Barycenter".to_string(),
-            Self::SaturnBarycenter => "Saturn Barycenter".to_string(),
-            Self::UranusBarycenter => "Uranus Barycenter".to_string(),
-            Self::NeptuneBarycenter => "Neptune Barycenter".to_string(),
-            Self::PlutoBarycenter => "Pluto Barycenter".to_string(),
-        }
-    }
-}
-
-impl TryFrom<String> for Bodies {
-    type Error = NyxError;
-
-    fn try_from(name: String) -> Result<Self, Self::Error> {
-        match name.to_lowercase().as_str() {
-            "solar system barycenter" | "ssb" => Ok(Self::SSB),
-            "sun" => Ok(Self::Sun),
-            "mercury" => Ok(Self::Mercury),
-            "venus" => Ok(Self::Venus),
-            "earth moon barycenter" => Ok(Self::EarthBarycenter),
-            "earth" => Ok(Self::Earth),
-            "moon" | "luna" => Ok(Self::Luna),
-            "mars" | "mars barycenter" => Ok(Self::MarsBarycenter),
-            "jupiter" | "jupiter barycenter" => Ok(Self::JupiterBarycenter),
-            "saturn" | "saturn barycenter" => Ok(Self::SaturnBarycenter),
-            "uranus" | "uranus barycenter" => Ok(Self::UranusBarycenter),
-            "neptune" | "neptune barycenter" => Ok(Self::NeptuneBarycenter),
-            "pluto" | "pluto barycenter" => Ok(Self::PlutoBarycenter),
-            _ => Err(NyxError::ObjectNotFound(name)),
-        }
-    }
-}
-
-impl TryFrom<Vec<usize>> for Bodies {
-    type Error = NyxError;
-
-    fn try_from(ephem_path: Vec<usize>) -> Result<Self, Self::Error> {
-        match ephem_path.len() {
-            0 => Ok(Self::SSB),
-            1 => match ephem_path[0] {
-                0 => Ok(Self::Sun),
-                1 => Ok(Self::Mercury),
-                2 => Ok(Self::Venus),
-                3 => Ok(Self::EarthBarycenter),
-                4 => Ok(Self::MarsBarycenter),
-                5 => Ok(Self::JupiterBarycenter),
-                6 => Ok(Self::SaturnBarycenter),
-                7 => Ok(Self::UranusBarycenter),
-                8 => Ok(Self::NeptuneBarycenter),
-                9 => Ok(Self::PlutoBarycenter),
-                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
-            },
-            2 if ephem_path[0] == 3 => match ephem_path[1] {
-                // This only support the Earth system
-                0 => Ok(Self::Earth),
-                1 => Ok(Self::Luna),
-                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
-            },
-            _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
-        }
-    }
-}
+// Re-Export bodies
+mod bodies;
+pub use self::bodies::*;
 
 // Re-Export orbit
 mod orbit;
@@ -350,3 +311,6 @@ pub const SPEED_OF_LIGHT_KMS: f64 = SPEED_OF_LIGHT / 1000.0;
 
 /// Astronomical unit, in kilometers, according to the [IAU](https://www.iau.org/public/themes/measuring/).
 pub const AU: f64 = 149_597_870.700;
+
+/// From NIST special publication 330, 2008 edition, in meters per second squared
+pub const STD_GRAVITY: f64 = 9.80665;

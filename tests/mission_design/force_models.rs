@@ -1,8 +1,8 @@
 extern crate nyx_space as nyx;
 
 use nyx::cosmic::{Cosm, Orbit, Spacecraft};
-use nyx::dimensions::Vector6;
 use nyx::dynamics::{Drag, OrbitalDynamics, SolarPressure, SpacecraftDynamics};
+use nyx::linalg::Vector6;
 use nyx::propagators::Propagator;
 use nyx::time::{Epoch, TimeUnit};
 use nyx::utils::rss_orbit_vec_errors;
@@ -26,7 +26,7 @@ fn srp_earth_full_vis() {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -76,7 +76,7 @@ fn srp_earth_leo() {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -109,6 +109,7 @@ fn srp_earth_leo() {
 
 #[test]
 fn srp_earth_meo_ecc_inc() {
+    use std::env::var as envvar;
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
@@ -126,7 +127,7 @@ fn srp_earth_meo_ecc_inc() {
 
     // Create a spacecraft with SRP model
     let sc_dyn = SpacecraftDynamics::from_model(OrbitalDynamics::two_body(), srp);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 16.0);
 
@@ -155,6 +156,47 @@ fn srp_earth_meo_ecc_inc() {
     );
     assert!(err_r < 5e-2, "position error too large for SRP");
     assert!(err_v < 2e-5, "velocity error too large for SRP");
+
+    // Compare the case with the hyperdual EOMs (computation uses another part of the code)
+    let mut prop = setup.with(sc.with_stm());
+    let final_state_dual = prop.for_duration(prop_time).unwrap();
+
+    let (err_r, err_v) = rss_orbit_vec_errors(
+        &final_state.orbit.to_cartesian_vec(),
+        &final_state_dual.orbit.to_cartesian_vec(),
+    );
+    println!(
+        "Error between reals and duals accumulated over {} : {:.3e} m \t{:.3e} m/s",
+        prop_time,
+        err_r * 1e3,
+        err_v * 1e3
+    );
+    // This should be zero ... but I'm guessing that a successive set of rounding leads to the small accumulation we see
+    // So we're allowing for 20 micrometers of difference over 24 days, or less than 1 picometer per second of integration time
+    match envvar("CI") {
+        Ok(_) => {
+            // We're running on Gitlab. It seems to have more rounding error than my computer...
+            assert!(
+                err_r < 1e-3,
+                "Error between reals and duals too large for SRP for CI"
+            );
+            assert!(
+                err_v < 1e-6,
+                "Error between reals and duals too large for SRP for CI"
+            );
+        }
+        Err(_) => {
+            // Running on a better machine, allow less error
+            assert!(
+                err_r < 2e-8,
+                "Error between reals and duals too large for SRP"
+            );
+            assert!(
+                err_v < 1e-11,
+                "Error between reals and duals too large for SRP"
+            );
+        }
+    }
 }
 
 #[test]
@@ -177,7 +219,7 @@ fn exp_drag_earth() {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
@@ -210,7 +252,7 @@ fn std_atm_drag_earth() {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 
@@ -265,7 +307,7 @@ fn std_atm_drag_earth_low() {
 
     // Build a spacecraft with SRP and Drag enabled.
     let sc_dyn = SpacecraftDynamics::from_models(OrbitalDynamics::two_body(), vec![srp, drag]);
-    println!("{:o}", orbit);
+    println!("{:x}", orbit);
 
     let sc = Spacecraft::from_srp_defaults(orbit, dry_mass, 1.0).with_drag(1.0, 2.0);
 

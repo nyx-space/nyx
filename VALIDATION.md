@@ -1,4 +1,6 @@
 # Validation
+**WARNING:** This document is outdated. Please refer to the [MathSpec on nyxspace.com](https://nyxspace.com/MathSpec/) for the latest validation information.
+
 The validation process ensures that the dynamics are correctly implemented.
 
 Many of the features of this library are validated against [GMAT](https://software.nasa.gov/software/GSC-17177-1) ([wiki](http://gmatcentral.org/display/GW/GMAT+Wiki+Home)), version 2017a.

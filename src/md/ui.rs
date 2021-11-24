@@ -23,11 +23,9 @@ use self::rayon::prelude::*;
 use super::MdHdlr;
 pub use super::{targeter::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
 pub use crate::cosmic::{
-    try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode, LTCorr, Orbit,
-    OrbitDual,
+    try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode, LightTimeCalc,
+    Orbit, OrbitDual,
 };
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, U6};
 pub use crate::dynamics::{
     Drag, Harmonics, OrbitalDynamics, PointMasses, SolarPressure, SpacecraftDynamics,
 };
@@ -37,6 +35,8 @@ pub use crate::io::gravity::HarmonicsMem;
 use crate::io::quantity::ParsingError;
 use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, U6};
 pub use crate::propagators::{PropOpts, Propagator};
 pub use crate::time::{Duration, Epoch, TimeUnit};
 pub use crate::Spacecraft;
@@ -221,27 +221,17 @@ where
                     }
 
                     orbital_dyn.add_model(PointMasses::new(&bodies, cosm.clone()));
-
-                    init_sc = Spacecraft::new(
-                        init_state,
-                        spacecraft.dry_mass,
-                        spacecraft.fuel_mass.unwrap_or(0.0),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                    );
-                } else {
-                    init_sc = Spacecraft::new(
-                        init_state,
-                        spacecraft.dry_mass,
-                        spacecraft.fuel_mass.unwrap_or(0.0),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                    );
                 }
+
+                init_sc = Spacecraft::new(
+                    init_state,
+                    spacecraft.dry_mass,
+                    spacecraft.fuel_mass.unwrap_or(0.0),
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                );
 
                 sc_dyn = SpacecraftDynamics::new_raw(Arc::new(orbital_dyn));
 

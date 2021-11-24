@@ -21,9 +21,9 @@ extern crate rand;
 extern crate rand_distr;
 extern crate serde;
 
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 pub use crate::dynamics::{Dynamics, NyxError};
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
 pub use crate::{State, TimeTagged};
 
@@ -33,7 +33,7 @@ use crate::io::{CovarFormat, EpochFormat};
 pub mod kalman;
 
 /// Provides a range and range rate measuring models.
-pub mod ranging;
+pub mod measurement;
 
 /// Provides Estimate handling functionalities.
 pub mod estimate;
@@ -43,6 +43,9 @@ pub mod residual;
 
 /// Provides some helper for filtering.
 pub mod ui;
+
+/// Provides all of the measurements functionality, including measurement simulation
+// pub mod msr;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
@@ -71,10 +74,6 @@ where
 
     /// Set the previous estimate
     fn set_previous_estimate(&mut self, est: &Self::Estimate);
-
-    /// Update the State Transition Matrix (STM). This function **must** be called in between each
-    /// call to `time_update` or `measurement_update`.
-    fn update_stm(&mut self, new_stm: OMatrix<f64, <T as State>::Size, <T as State>::Size>);
 
     /// Update the sensitivity matrix (or "H tilde"). This function **must** be called prior to each
     /// call to `measurement_update`.
@@ -113,10 +112,13 @@ pub trait Measurement: TimeTagged
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
-        + Allocator<f64, Self::MeasurementSize, Self::StateSize>,
+        + Allocator<f64, <Self::State as State>::Size>
+        + Allocator<f64, <Self::State as State>::Size, <Self::State as State>::Size>
+        + Allocator<f64, <Self::State as State>::VecLength>
+        + Allocator<f64, Self::MeasurementSize, <Self::State as State>::Size>,
 {
     /// Defines the state size of the estimated state
-    type StateSize: DimName;
+    type State: State;
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;
 
@@ -126,9 +128,9 @@ where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, Self::StateSize>
+    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
     where
-        DefaultAllocator: Allocator<f64, Self::StateSize, Self::MeasurementSize>;
+        DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
 
     /// Returns whether the transmitter and receiver where in line of sight.
     fn visible(&self) -> bool;
@@ -139,9 +141,11 @@ pub trait MeasurementDevice<MsrIn, Msr>
 where
     Self: Sized,
     Msr: Measurement,
-    DefaultAllocator: Allocator<f64, Msr::StateSize>
+    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, Msr::StateSize>,
+        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
 {
     /// Returns the measurement if the device and generate one, else returns None
     fn measure(&self, input: &MsrIn) -> Option<Msr>;
@@ -157,6 +161,6 @@ where
         + Allocator<f64, Self::VecLength>
         + Allocator<f64, Self::Size, Self::Size>,
 {
-    fn extract(from: &O) -> Self;
-    fn add_dev(to: &O, dev: OVector<f64, Self::Size>) -> O;
+    /// From the state extract the state to be estimated
+    fn extract(from: O) -> Self;
 }

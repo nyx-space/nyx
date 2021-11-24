@@ -39,6 +39,10 @@ pub enum StateParameter {
     BLTOF,
     /// C_3 in (km/s)^2
     C3,
+    /// Coefficient of drag
+    Cd,
+    /// Coefficient of reflectivity
+    Cr,
     /// Declination (deg)
     Declination,
     /// The epoch of the state
@@ -87,6 +91,8 @@ pub enum StateParameter {
     Rmag,
     /// Semi parameter (km)
     SemiParameter,
+    /// Computes the slant angle by returning the arccos of the dot product between state's radius vector and the provided vector coordinates. The vector will be normalized if needed.
+    SlantAngle { x: f64, y: f64, z: f64 },
     /// Semi major axis (km)
     SMA,
     /// Semi minor axis (km)
@@ -139,6 +145,7 @@ impl StateParameter {
             | Self::MeanAnomaly
             | Self::EccentricAnomaly
             | Self::HyperbolicAnomaly
+            | Self::SlantAngle { .. }
             | Self::TrueAnomaly => 1e-3,
 
             // Distances
@@ -185,6 +192,8 @@ impl FromStr for StateParameter {
             "aol" => Ok(Self::AoL),
             "aop" => Ok(Self::AoP),
             "c3" => Ok(Self::C3),
+            "cd" => Ok(Self::Cd),
+            "cr" => Ok(Self::Cr),
             "declin" => Ok(Self::Declination),
             "apoapsis_radius" => Ok(Self::ApoapsisRadius),
             "ea" => Ok(Self::EccentricAnomaly),

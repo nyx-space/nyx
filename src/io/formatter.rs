@@ -21,8 +21,8 @@ use super::serde::{Serialize, Serializer};
 use super::serde_derive::Deserialize;
 use super::EpochFormat;
 use crate::cosmic::{Cosm, Frame, Orbit};
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::DefaultAllocator;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::od::estimate::NavSolution;
 use crate::{NyxError, State};
@@ -206,6 +206,12 @@ pub enum NavSolutionHeader {
     Cz_dot_y_dot { frame: Option<String> },
     /// Covariance matrix [6,6]
     Cz_dot_z_dot { frame: Option<String> },
+    /// Boolean specifying whether this is a prediction or not
+    Prediction,
+    /// Norm of the position items of the covariance (Cx_x, Cy_y, Cz_z)
+    Covar_pos,
+    /// Norm of the velocity items of the covartiance (Cx_dot_x_dot, Cy_dot_y_dot, Cz_dot_z_dot)
+    Covar_vel,
 }
 
 impl fmt::Display for NavSolutionHeader {
@@ -379,6 +385,9 @@ impl fmt::Display for NavSolutionHeader {
                     write!(fh, "cz_dot_z_dot")
                 }
             }
+            NavSolutionHeader::Prediction => write!(fh, "prediction"),
+            NavSolutionHeader::Covar_pos => write!(fh, "covar_position"),
+            NavSolutionHeader::Covar_vel => write!(fh, "covar_velocity"),
         }
     }
 }
@@ -531,7 +540,7 @@ impl StateFormatter {
             };
             mapped.insert(name.to_lowercase(), mapped_orbit);
         }
-        let mut formatted = Vec::new();
+        let mut formatted = Vec::with_capacity(self.headers.len());
 
         for hdr in &self.headers {
             // Grab the state in the other frame if needed
@@ -701,6 +710,9 @@ impl NavSolutionFormatter {
                 "cz_dot_x_dot" => hdrs.push(NavSolutionHeader::Cz_dot_x_dot { frame: frame_name }),
                 "cz_dot_y_dot" => hdrs.push(NavSolutionHeader::Cz_dot_y_dot { frame: frame_name }),
                 "cz_dot_z_dot" => hdrs.push(NavSolutionHeader::Cz_dot_z_dot { frame: frame_name }),
+                "prediction" => hdrs.push(NavSolutionHeader::Prediction),
+                "covar_position" => hdrs.push(NavSolutionHeader::Covar_pos),
+                "covar_velocity" => hdrs.push(NavSolutionHeader::Covar_vel),
                 "estimate" | "nominal" => {
                     let param = StateParameter::from_str(splt[1].to_lowercase().as_str())
                         .expect("Unknown paramater");
@@ -777,6 +789,7 @@ impl NavSolutionFormatter {
                 NavSolutionHeader::Cy_dot_y_dot { frame: None },
                 NavSolutionHeader::Cz_dot_z_dot { frame: None },
                 NavSolutionHeader::EstimatedState(est_hdrs.clone()),
+                NavSolutionHeader::Prediction,
             ],
             nominal_headers: StateFormatter {
                 filename: "file_should_not_exist".to_owned(),
@@ -1020,6 +1033,21 @@ impl NavSolutionFormatter {
                     }
                     None => formatted.push(format!("{:.16e}", sol.covar_ij(5, 5))),
                 },
+                NavSolutionHeader::Prediction => formatted.push(format!("{}", sol.predicted())),
+                NavSolutionHeader::Covar_pos => formatted.push(format!(
+                    "{:.16e}",
+                    (sol.covar_ij(0, 0).powi(2)
+                        + sol.covar_ij(1, 1).powi(2)
+                        + sol.covar_ij(2, 2).powi(2))
+                    .sqrt()
+                )),
+                NavSolutionHeader::Covar_vel => formatted.push(format!(
+                    "{:.16e}",
+                    (sol.covar_ij(3, 3).powi(2)
+                        + sol.covar_ij(4, 4).powi(2)
+                        + sol.covar_ij(5, 5).powi(2))
+                    .sqrt()
+                )),
             };
         }
 

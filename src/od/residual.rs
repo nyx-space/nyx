@@ -19,9 +19,9 @@
 use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::EpochFormat;
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OVector};
 use crate::hifitime::Epoch;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OVector};
 use std::fmt;
 
 /// Stores an Estimate, as the result of a `time_update` or `measurement_update`.

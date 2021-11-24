@@ -21,9 +21,9 @@ use super::serde::{Serialize, Serializer};
 use super::{CovarFormat, EpochFormat};
 use super::{EstimateFrom, State};
 use crate::cosmic::Orbit;
-use crate::dimensions::allocator::Allocator;
-use crate::dimensions::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::hifitime::Epoch;
+use crate::linalg::allocator::Allocator;
+use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::Spacecraft;
 use std::cmp::PartialEq;
 use std::fmt;
@@ -165,7 +165,7 @@ where
             covar: covar.clone(),
             covar_bar: covar,
             predicted: true,
-            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
@@ -187,7 +187,7 @@ where
             covar: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             covar_bar: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
             predicted: true,
-            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::zeros(),
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
             epoch_fmt: EpochFormat::GregorianUtc,
             covar_fmt: CovarFormat::Sqrt,
         }
@@ -354,21 +354,19 @@ impl NavSolution<Orbit> for KfEstimate<Orbit> {
 }
 
 impl EstimateFrom<Spacecraft> for Orbit {
-    fn extract(from: &Spacecraft) -> Self {
+    fn extract(from: Spacecraft) -> Self {
         from.orbit
-    }
-
-    fn add_dev(to: &Spacecraft, dev: OVector<f64, Self::Size>) -> Spacecraft {
-        *to + dev
     }
 }
 
 impl EstimateFrom<Orbit> for Orbit {
-    fn extract(from: &Orbit) -> Self {
-        *from
+    fn extract(from: Orbit) -> Self {
+        from
     }
+}
 
-    fn add_dev(to: &Orbit, dev: OVector<f64, Self::Size>) -> Orbit {
-        *to + dev
+impl EstimateFrom<Spacecraft> for Spacecraft {
+    fn extract(from: Spacecraft) -> Self {
+        from
     }
 }

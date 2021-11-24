@@ -45,6 +45,9 @@ pub mod io;
 /// All the orbital determination and spacecraft navigation tools and functions.
 pub mod od;
 
+/// Navigation submodule, relevant to both ground based navigation (orbit determination) and onboard navigation (part of the Guidance, Navigation and Control subsystem)
+// pub mod nav;
+
 /// All of the mission design and mission analysis tools and functions
 pub mod md;
 
@@ -56,6 +59,9 @@ pub mod opti;
 
 /// Monte Carlo module
 pub mod mc;
+
+/// Polynomial and fitting module
+pub mod polyfit;
 
 #[macro_use]
 extern crate log;
@@ -69,11 +75,9 @@ pub mod time {
 }
 
 /// Re-export nalgebra
-pub mod dimensions {
+pub mod linalg {
     pub use na::base::*;
 }
 
 /// Re-export some useful things
-mod state;
-pub use self::cosmic::{Orbit, Spacecraft};
-pub use self::state::{State, TimeTagged};
+pub use self::cosmic::{Orbit, Spacecraft, State, TimeTagged};

@@ -17,9 +17,10 @@
 */
 
 use crate::cosmic::{Frame, Orbit};
-use crate::dimensions::Vector3;
+use crate::linalg::Vector3;
+use crate::State;
 
-pub use super::thrustctrl::Mnvr;
+pub use super::guidance::Mnvr;
 
 /// The `DeltaVctrl` trait handles control laws, optimizations, and other such methods for
 /// controlling the change in velocity of a point mass during a mission arc (`MissionArc`).
@@ -55,7 +56,7 @@ impl DeltaVctrl for ImpulsiveBurns {
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
             if next_mnvr.start <= state.dt && next_mnvr.end >= state.dt {
-                state.dcm_from_traj_frame(Frame::VNC).unwrap() * next_mnvr.vector
+                state.dcm_from_traj_frame(Frame::VNC).unwrap() * next_mnvr.vector(state.epoch())
             } else {
                 Vector3::zeros()
             }

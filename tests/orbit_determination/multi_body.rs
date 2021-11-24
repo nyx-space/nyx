@@ -6,14 +6,14 @@ use self::nyx::md::ui::*;
 use self::nyx::od::ui::*;
 
 // Extra testing imports
-use self::nyx::dimensions::{Matrix2, Matrix6, Vector2, Vector6};
+use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::propagators::RK4Fixed;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
 #[allow(clippy::identity_op)]
 #[test]
-fn multi_body_ckf_perfect_stations() {
+fn od_val_multi_body_ckf_perfect_stations() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -52,8 +52,7 @@ fn multi_body_ckf_perfect_stations() {
     // Generate the truth data.
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
@@ -90,7 +89,7 @@ fn multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -112,7 +111,7 @@ fn multi_body_ckf_perfect_stations() {
             );
         }
         assert!(
-            est.state_deviation().norm() < 1e-3,
+            est.state_deviation().norm() < 2e-16,
             "estimate error should be very good (perfect dynamics) ({:e})",
             est.state_deviation().norm()
         );
@@ -128,19 +127,28 @@ fn multi_body_ckf_perfect_stations() {
 
     for res in &odp.residuals {
         assert!(
-            res.postfit.norm() < 1e-5,
+            res.postfit.norm() < 2e-16,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );
     }
 
-    // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
-    // The filter in multibody dynamics has been validated against JPL tools using a proprietary scenario.
     let est = last_est.unwrap();
-    assert!(est.state_deviation().norm() < 5e-5);
+    assert!(est.state_deviation().norm() < 2e-16);
     assert!(est.covar.norm() < 1e-5);
+
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
 }
 
+#[ignore]
 #[allow(clippy::identity_op)]
 #[test]
 fn multi_body_ckf_covar_map() {
@@ -179,8 +187,7 @@ fn multi_body_ckf_covar_map() {
     let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
-    prop.tx_chan = Some(truth_tx);
-    prop.for_duration(prop_time).unwrap();
+    prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
@@ -217,11 +224,10 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, false, measurements.len());
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
 
     odp.process_measurements(&measurements).unwrap();
 
-    let mut last_est = None;
     let mut num_pred = 0_u32;
     for est in odp.estimates.iter() {
         if est.predicted {
@@ -229,7 +235,7 @@ fn multi_body_ckf_covar_map() {
         } else {
             // Only check that the covariance is low IF this isn't a predicted estimate
             assert!(
-                est.state_deviation().norm() < 1e-3,
+                est.state_deviation().norm() < 2e-16,
                 "estimate error should be zero (perfect dynamics) ({:e})",
                 est.state_deviation().norm()
             );
@@ -242,13 +248,12 @@ fn multi_body_ckf_covar_map() {
                 i
             );
         }
-        last_est = Some(est);
     }
 
     // Note that we check the residuals separately from the estimates because we have many predicted estimates which do not have any associated residuals.
     for res in odp.residuals.iter() {
         assert!(
-            res.postfit.norm() < 1e-5,
+            res.postfit.norm() < 2e-16,
             "postfit should be zero (perfect dynamics) ({:e})",
             res
         );
@@ -256,9 +261,7 @@ fn multi_body_ckf_covar_map() {
 
     assert!(num_pred > 0, "no predicted estimates");
 
-    // NOTE: We do not check whether the covariance has deflated because it is possible that it inflates before deflating.
-    // The filter in multibody dynamics has been validated against JPL Monte using a proprietary scenario.
-    let est = last_est.unwrap();
+    let est = odp.estimates.last().unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     wtr.serialize(est.clone())
@@ -267,14 +270,11 @@ fn multi_body_ckf_covar_map() {
     println!("{:.2e}", est.state_deviation().norm());
     println!("{:.2e}", est.covar.norm());
 
-    assert!(est.state_deviation().norm() < 5e-5);
-    assert!(est.covar.norm() < 1e-4);
-
     // Test that we can generate a navigation trajectory and search it
-    let nav_traj = odp.to_nav_traj().unwrap();
+    let nav_traj = odp.to_traj().unwrap();
     let aop_event = Event::apoapsis();
     for found_event in nav_traj.find_all(&aop_event).unwrap() {
-        println!("{:o}", found_event);
+        println!("{:x}", found_event);
         assert!((found_event.ta() - 180.0).abs() < 1e-2)
     }
 }

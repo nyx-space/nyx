@@ -19,10 +19,8 @@
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
 use super::{AccelModel, Dynamics, NyxError};
-use crate::cosmic::{Bodies, Cosm, Frame, LTCorr, Orbit};
-use crate::dimensions::{
-    DimName, Matrix3, Matrix6, OVector, Vector3, Vector6, U3, U36, U4, U42, U6, U7,
-};
+use crate::cosmic::{Bodies, Cosm, Frame, LightTimeCalc, Orbit};
+use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
 use crate::State;
 use std::f64;
 use std::fmt;
@@ -90,35 +88,25 @@ impl<'a> fmt::Display for OrbitalDynamics<'a> {
 }
 
 impl<'a> Dynamics for OrbitalDynamics<'a> {
-    type HyperdualSize = U7;
+    type HyperdualSize = Const<7>;
     type StateType = Orbit;
 
     fn eom(
         &self,
         delta_t_s: f64,
-        state: &OVector<f64, U42>,
+        state: &OVector<f64, Const<42>>,
         ctx: &Orbit,
-    ) -> Result<OVector<f64, U42>, NyxError> {
+    ) -> Result<OVector<f64, Const<42>>, NyxError> {
+        let osc = ctx.set_with_delta_seconds(delta_t_s, state);
         let (new_state, new_stm) = if ctx.stm.is_some() {
-            // Then call the dual_eom with the correct state size
-            let pos_vel = state.fixed_rows::<6>(0).into_owned();
-            let (state, grad) = self.eom_grad(delta_t_s, &pos_vel, ctx)?;
-            let stm_dt = ctx.stm() * grad;
+            let (state, grad) = self.dual_eom(delta_t_s, &osc)?;
+
+            let stm_dt = ctx.stm()? * grad;
             // Rebuild the STM as a vector.
-            let mut stm_as_vec = OVector::<f64, U36>::zeros();
-            let mut stm_idx = 0;
-            for i in 0..U6::dim() {
-                for j in 0..U6::dim() {
-                    stm_as_vec[(stm_idx, 0)] = stm_dt[(i, j)];
-                    stm_idx += 1;
-                }
-            }
+            let stm_as_vec = OVector::<f64, Const<36>>::from_column_slice(stm_dt.as_slice());
             (state, stm_as_vec)
         } else {
             // Still return something of size 42, but the STM will be zeros.
-
-            let osc = ctx.ctor_from(delta_t_s, state);
-            // TODO: Speed check this with the PointMasses only, including the integration frame point mass
             let body_acceleration = (-osc.frame.gm() / osc.rmag().powi(3)) * osc.radius();
             let mut d_x = Vector6::from_iterator(
                 osc.velocity()
@@ -135,9 +123,9 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
                 }
             }
 
-            (d_x, OVector::<f64, U36>::zeros())
+            (d_x, OVector::<f64, Const<36>>::zeros())
         };
-        Ok(OVector::<f64, U42>::from_iterator(
+        Ok(OVector::<f64, Const<42>>::from_iterator(
             new_state.iter().chain(new_stm.iter()).cloned(),
         ))
     }
@@ -145,28 +133,31 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
     fn dual_eom(
         &self,
         _delta_t_s: f64,
-        state: &OVector<Hyperdual<f64, U7>, U6>,
-        ctx: &Orbit,
+        osc: &Orbit,
     ) -> Result<(Vector6<f64>, Matrix6<f64>), NyxError> {
         // Extract data from hyperspace
+        // Build full state vector with partials in the right position (hence building with all six components)
+        let state: Vector6<Hyperdual<f64, Const<7>>> =
+            hyperspace_from_vector(&osc.to_cartesian_vec());
+
         let radius = state.fixed_rows::<3>(0).into_owned();
         let velocity = state.fixed_rows::<3>(3).into_owned();
 
         // Code up math as usual
         let rmag = norm(&radius);
         let body_acceleration =
-            radius * (Hyperdual::<f64, U7>::from_real(-ctx.frame.gm()) / rmag.powi(3));
+            radius * (Hyperdual::<f64, Const<7>>::from_real(-osc.frame.gm()) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
-        let mut fx = Vector6::zeros();
+        let mut dx = Vector6::zeros();
         let mut grad = Matrix6::zeros();
-        for i in 0..U6::dim() {
-            fx[i] = if i < 3 {
+        for i in 0..6 {
+            dx[i] = if i < 3 {
                 velocity[i].real()
             } else {
                 body_acceleration[i - 3].real()
             };
-            for j in 1..U7::dim() {
+            for j in 1..7 {
                 grad[(i, j - 1)] = if i < 3 {
                     velocity[i][j]
                 } else {
@@ -177,16 +168,19 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
 
         // Apply the acceleration models
         for model in &self.accel_models {
-            let (model_acc, model_grad) = model.dual_eom(&radius, ctx)?;
-            for i in 0..U3::dim() {
-                fx[i + 3] += model_acc[i];
-                for j in 1..U4::dim() {
+            // let (model_acc, model_grad) = model.dual_eom(&radius, osc)?;
+            let (model_acc, model_grad) = model.dual_eom(osc)?;
+            for i in 0..3 {
+                dx[i + 3] += model_acc[i];
+                for j in 1..4 {
                     grad[(i + 3, j - 1)] += model_grad[(i, j - 1)];
                 }
             }
         }
 
-        Ok((fx, grad))
+        // This function returns the time derivative of each function. The propagator will add this to the state vector (which has the previous STM).
+        // This is why we don't multiply the gradient (A matrix) with the previous STM
+        Ok((dx, grad))
     }
 }
 
@@ -196,21 +190,21 @@ pub struct PointMasses {
     /// Optional point to a Cosm, needed if extra point masses are needed
     pub cosm: Arc<Cosm>,
     /// Light-time correction computation if extra point masses are needed
-    pub correction: LTCorr,
+    pub correction: LightTimeCalc,
 }
 
 impl PointMasses {
     /// Initializes the multibody point mass dynamics with the provided list of bodies
     pub fn new(bodies: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
-        Arc::new(Self::with_correction(bodies, cosm, LTCorr::None))
+        Arc::new(Self::with_correction(bodies, cosm, LightTimeCalc::None))
     }
 
     /// Initializes the multibody point mass dynamics with the provided list of bodies, and accounting for some light time correction
-    pub fn with_correction(bodies: &[Bodies], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
-        let mut refs = Vec::new();
+    pub fn with_correction(bodies: &[Bodies], cosm: Arc<Cosm>, correction: LightTimeCalc) -> Self {
+        let mut refs = Vec::with_capacity(bodies.len());
         // Check that these celestial bodies exist and build their references
         for body in bodies {
-            refs.push(cosm.frame_from_ephem_path(&body.ephem_path()));
+            refs.push(cosm.frame_from_ephem_path(body.ephem_path()));
         }
 
         Self {
@@ -221,8 +215,8 @@ impl PointMasses {
     }
 
     /// Allows using bodies by name, defined in the non-default XB
-    pub fn specific(body_names: &[String], cosm: Arc<Cosm>, correction: LTCorr) -> Self {
-        let mut refs = Vec::new();
+    pub fn specific(body_names: &[String], cosm: Arc<Cosm>, correction: LightTimeCalc) -> Self {
+        let mut refs = Vec::with_capacity(body_names.len());
         // Check that these celestial bodies exist and build their references
         for body in body_names {
             refs.push(cosm.frame(body));
@@ -269,13 +263,9 @@ impl AccelModel for PointMasses {
         Ok(d_x)
     }
 
-    fn dual_eom(
-        &self,
-        state: &OVector<Hyperdual<f64, U7>, U3>,
-        osc: &Orbit,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
-        // Extract data from hyperspace
-        let radius = state.fixed_rows::<3>(0).into_owned();
+    fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+        // Build the hyperdual space of the radius vector
+        let radius: Vector3<Hyperdual<f64, Const<7>>> = hyperspace_from_vector(&osc.radius());
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector3::zeros();
         let mut grad = Matrix3::zeros();
@@ -286,7 +276,7 @@ impl AccelModel for PointMasses {
                 // Ignore the contribution of the integration frame, that's handled by OrbitalDynamics
                 continue;
             }
-            let gm_d = Hyperdual::<f64, U7>::from_real(-third_body.gm());
+            let gm_d = Hyperdual::<f64, Const<7>>::from_real(-third_body.gm());
 
             // Orbit of j-th body as seen from primary body
             let st_ij = self.cosm.celestial_state(
@@ -296,8 +286,8 @@ impl AccelModel for PointMasses {
                 self.correction,
             );
 
-            let r_ij: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&st_ij.radius());
-            let r_ij3 = norm(&r_ij).powi(3) / gm_d; // Dividing the future divisor
+            let r_ij: Vector3<Hyperdual<f64, Const<7>>> = hyperspace_from_vector(&st_ij.radius());
+            let r_ij3 = norm(&r_ij).powi(3);
 
             // The difference leads to the dual parts nulling themselves out, so let's fix that.
             let mut r_j = radius - r_ij; // sc as seen from 3rd body
@@ -305,10 +295,14 @@ impl AccelModel for PointMasses {
             r_j[1][2] = 1.0;
             r_j[2][3] = 1.0;
 
-            let r_j3 = norm(&r_j).powi(3) / gm_d; // Dividing the future divisor
-            let third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
+            let r_j3 = norm(&r_j).powi(3);
+            let mut third_body_acc_d = r_j / r_j3 + r_ij / r_ij3;
+            third_body_acc_d[0] *= gm_d;
+            third_body_acc_d[1] *= gm_d;
+            third_body_acc_d[2] *= gm_d;
 
-            let (fxp, gradp) = extract_jacobian_and_result::<_, U3, U3, _>(&third_body_acc_d);
+            let (fxp, gradp) =
+                extract_jacobian_and_result::<_, Const<3>, Const<3>, _>(&third_body_acc_d);
             fx += fxp;
             grad += gradp;
         }

@@ -19,16 +19,16 @@
 extern crate csv;
 
 pub use crate::cosmic::*;
-use crate::dimensions::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
 use crate::io::quantity::{parse_duration, ParsingError};
 use crate::io::scenario::ScenarioSerde;
+use crate::linalg::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::md::ui::MDProcess;
-use crate::od::ranging::GroundStation;
+use crate::od::measurement::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
-use crate::od::{Measurement, MeasurementDevice};
+use crate::od::MeasurementDevice;
 use crate::propagators::Propagator;
 use crate::time::{Duration, TimeUnit};
 use crate::Orbit;
@@ -100,7 +100,7 @@ impl<'a> OdpScenario<'a> {
             // Get the measurement generation
             match all_measurements.get(&odp_seq.measurements.to_lowercase()) {
                 None => unimplemented!("{}", &odp_seq.measurements),
-                Some(ref msr) => {
+                Some(msr) => {
                     // Get the IAU Earth frame
                     let iau_earth = cosm.frame("IAU Earth");
                     // Build the stations
@@ -328,7 +328,7 @@ impl<'a> OdpScenario<'a> {
             }
         }
 
-        Err(ParsingError::OD("sequence not found".to_string()))
+        Err(ParsingError::SequenceNotFound(seq_name))
     }
 
     /// Will generate the measurements and run the filter.
@@ -358,7 +358,6 @@ impl<'a> OdpScenario<'a> {
 
         // Set up the channels
         let (tx, rx) = channel();
-        truth_prop.tx_chan = Some(tx);
 
         let mut initial_state = Some(truth_prop.state);
 
@@ -368,13 +367,14 @@ impl<'a> OdpScenario<'a> {
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state);
 
-        truth_prop.for_duration(prop_time)?;
+        truth_prop.for_duration_with_channel(prop_time, tx)?;
 
         info!(
-            "Final state:   {} (computed in {:.3} seconds)",
-            truth_prop.state,
+            "Final state (computed in {:.3} seconds):",
             (Instant::now() - start).as_secs_f64()
         );
+        info!("\t\t{}", truth_prop.state);
+        info!("\t\t{:x}", truth_prop.state);
 
         let mut sim_measurements = Vec::with_capacity(10000);
         let start = Instant::now();
@@ -413,15 +413,14 @@ impl<'a> OdpScenario<'a> {
         let mut prop_setup = Propagator::default(self.nav.sc_dyn);
         prop_setup.set_tolerance(self.nav.prop_tol);
         // Make sure to set the STM
-        let mut init_state = self.nav.init_state;
-        init_state.orbit.stm_identity();
+        let init_state = self.nav.init_state.with_stm();
         let mut nav = prop_setup.with(init_state);
 
         nav.set_step(10.0 * TimeUnit::Second, true);
 
         let kf = self.kf;
         let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
-        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), false, 100_000, trig);
+        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), trig);
 
         odp.process_measurements(&sim_measurements)?;
 

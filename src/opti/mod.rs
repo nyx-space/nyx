@@ -17,3 +17,14 @@
 */
 
 pub mod ctrlnodes;
+
+pub mod multishoot;
+
+/// Built-in cost functions to minimize
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum CostFunction {
+    /// J = ∫ \vec{u}^T\vec{u} dt
+    MinimumEnergy,
+    /// J = ∫ |\vec{u}| dt -- Warning, this may lead to loads to bang-coast-bang solutions
+    MinimumFuel,
+}

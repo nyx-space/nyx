@@ -24,9 +24,8 @@ use super::serde::ser::SerializeSeq;
 use super::serde::{Serialize, Serializer};
 use super::{Measurement, MeasurementDevice, TimeTagged};
 use crate::cosmic::{Cosm, Frame, Orbit};
-use crate::dimensions::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
+use crate::linalg::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
 use crate::time::Epoch;
-use crate::utils::{r2, r3};
 use crate::Spacecraft;
 use std::fmt;
 use std::sync::Arc;
@@ -149,39 +148,52 @@ impl GroundStation {
     }
 
     /// Computes the elevation of the provided object seen from this ground station.
-    /// Also returns the ground station's orbit in the frame of the spacecraft
-    pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit) {
-        use std::f64::consts::PI;
-        // Convert the station to the state's frame
+    /// Also returns the ground station's orbit in the frame of the receiver
+    pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit, Orbit) {
+        // Start by converting the receiver spacecraft into the ground station frame.
+        let rx_gs_frame = self.cosm.frame_chg(rx, self.frame);
+
         let dt = rx.dt;
-        let station_state =
-            Orbit::from_geodesic(self.latitude, self.longitude, self.height, dt, self.frame);
-        // Convert the station into the rx frame.
-        let tx = self.cosm.frame_chg(&station_state, rx.frame);
-        // Let's start by computing the range and range rate
-        let rho_tx_frame = rx.radius() - tx.radius();
+        // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
+        let tx_gs_frame = self.to_orbit(dt);
+        // Note: we're only looking at the radis so we don't need to apply the transport theorem here.
+        let dcm_topo2fixed = tx_gs_frame.dcm_from_traj_frame(Frame::SEZ).unwrap();
 
-        // Convert to SEZ to compute elevation
-        let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
-            * r3(self.longitude.to_radians())
-            * rho_tx_frame;
+        // Now, rotate the spacecraft in the SEZ frame to compute its elevation as seen from the ground station.
+        // We transpose the DCM so that it's the fixed to topocentric rotation.
+        let rx_sez = rx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
+        let tx_sez = tx_gs_frame.with_position_rotated_by(dcm_topo2fixed.transpose());
+        // Now, let's compute the range ρ.
+        let rho_sez = rx_sez - tx_sez;
 
-        // Return elevation in degrees and tx
-        (
-            (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees(),
-            tx,
+        // Finally, compute the elevation (math is the same as declination)
+        let elevation = rho_sez.declination();
+
+        // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
+        (elevation, *rx, self.cosm.frame_chg(&tx_gs_frame, rx.frame))
+    }
+
+    /// Return this ground station as an orbit in its current frame
+    pub fn to_orbit(&self, epoch: Epoch) -> Orbit {
+        Orbit::from_geodesic(
+            self.latitude,
+            self.longitude,
+            self.height,
+            epoch,
+            self.frame,
         )
     }
 }
+
 impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
-        let (elevation, tx) = self.elevation_of(rx);
+        let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx);
 
         Some(StdMeasurement::new(
             rx.dt,
-            tx,
-            *rx,
+            tx_rxf,
+            rx_rxf,
             elevation >= self.elevation_mask,
             &self.range_noise,
             &self.range_rate_noise,
@@ -192,43 +204,16 @@ impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
 impl MeasurementDevice<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure(&self, sc_rx: &Spacecraft) -> Option<StdMeasurement> {
-        let rx = &sc_rx.orbit;
-        match rx.frame {
-            Frame::Geoid { .. } => {
-                use std::f64::consts::PI;
-                // Convert the station to the state's frame
-                let dt = rx.dt;
-                let station_state = Orbit::from_geodesic(
-                    self.latitude,
-                    self.longitude,
-                    self.height,
-                    dt,
-                    self.frame,
-                );
-                let tx = self.cosm.frame_chg(&station_state, rx.frame);
-                // Let's start by computing the range and range rate
-                let rho_tx_frame = rx.radius() - tx.radius();
+        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit);
 
-                // Convert to SEZ to compute elevation
-                let rho_sez = r2(PI / 2.0 - self.latitude.to_radians())
-                    * r3(self.longitude.to_radians())
-                    * rho_tx_frame;
-                let elevation = (rho_sez[(2, 0)] / rho_tx_frame.norm()).asin().to_degrees();
-
-                Some(StdMeasurement::new(
-                    dt,
-                    tx,
-                    *rx,
-                    elevation >= self.elevation_mask,
-                    &self.range_noise,
-                    &self.range_rate_noise,
-                ))
-            }
-            _ => {
-                error!("Receiver is not on a geoid");
-                None
-            }
-        }
+        Some(StdMeasurement::new(
+            rx_ssb.dt,
+            tx_ssb,
+            rx_ssb,
+            elevation >= self.elevation_mask,
+            &self.range_noise,
+            &self.range_rate_noise,
+        ))
     }
 }
 
@@ -353,7 +338,7 @@ impl StdMeasurement {
 }
 
 impl Measurement for StdMeasurement {
-    type StateSize = U6;
+    type State = Orbit;
     type MeasurementSize = U2;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -449,7 +434,7 @@ impl RangeMsr {
 }
 
 impl Measurement for RangeMsr {
-    type StateSize = U6;
+    type State = Orbit;
     type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -545,7 +530,7 @@ impl DopplerMsr {
 }
 
 impl Measurement for DopplerMsr {
-    type StateSize = U6;
+    type State = Orbit;
     type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate

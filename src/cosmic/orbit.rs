@@ -24,10 +24,12 @@ use self::approx::{abs_diff_eq, relative_eq};
 use self::serde::ser::SerializeStruct;
 use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
+use super::State;
 use super::{BPlane, Frame};
+use crate::linalg::{Const, OVector};
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
-use crate::{NyxError, TimeTagged};
+use crate::NyxError;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
@@ -76,17 +78,6 @@ pub fn assert_orbit_eq_or_rel<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg
     }
 }
 
-/// Defines the kind of state transition matrix stored in the orbit.
-#[derive(Copy, Clone, Debug)]
-pub enum StmKind {
-    /// For navigation (default): Corresponds to the linearization between the previous step of the propagator and the new step ($\Phi_k$)
-    Step,
-    /// For trajectory optimization: Corresponds to the linearization between from the first state until the current state ($\Phi_{k\to0}$)
-    Traj,
-    /// For propagation: no STM is set
-    Unset,
-}
-
 /// Orbit defines an orbital state
 ///
 /// Unless noted otherwise, algorithms are from GMAT 2016a [StateConversionUtil.cpp](https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/util/StateConversionUtil.cpp).
@@ -111,9 +102,8 @@ pub struct Orbit {
     pub dt: Epoch,
     /// Frame contains everything we need to compute state information
     pub frame: Frame,
-    /// Optionally stores an STM
+    /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
     pub stm: Option<Matrix6<f64>>,
-    pub stm_kind: StmKind,
 }
 
 impl Orbit {
@@ -140,7 +130,6 @@ impl Orbit {
             dt,
             frame,
             stm: None,
-            stm_kind: StmKind::Unset,
         }
     }
 
@@ -174,7 +163,6 @@ impl Orbit {
             dt,
             frame,
             stm: None,
-            stm_kind: StmKind::Unset,
         }
     }
 
@@ -193,7 +181,6 @@ impl Orbit {
             dt,
             frame,
             stm: None,
-            stm_kind: StmKind::Unset,
         }
     }
 
@@ -270,7 +257,7 @@ impl Orbit {
     ) -> Self {
         match frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                if gm.abs() < std::f64::EPSILON {
+                if gm.abs() < EPSILON {
                     warn!(
                         "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
                         gm
@@ -355,7 +342,6 @@ impl Orbit {
                     dt,
                     frame,
                     stm: None,
-                    stm_kind: StmKind::Unset,
                 }
             }
             _ => panic!("Frame is not Celestial or Geoid in kind"),
@@ -545,7 +531,7 @@ impl Orbit {
         self.hvec().norm()
     }
 
-    /// Returns the specific mechanical energy
+    /// Returns the specific mechanical energy in km^2/s^2
     pub fn energy(&self) -> f64 {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
@@ -596,6 +582,11 @@ impl Orbit {
         let mut me = self;
         me.set_sma(me.sma() + delta_sma);
         me
+    }
+
+    /// Returns the SMA altitude in km
+    pub fn sma_altitude(&self) -> f64 {
+        self.sma() - self.frame.equatorial_radius()
     }
 
     /// Returns the period in seconds
@@ -710,10 +701,14 @@ impl Orbit {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
-                let aop = (n.dot(&self.evec()) / (n.norm() * self.ecc())).acos();
+                let cos_aop = n.dot(&self.evec()) / (n.norm() * self.ecc());
+                let aop = cos_aop.acos();
                 if aop.is_nan() {
-                    error!("AoP is NaN");
-                    0.0
+                    if cos_aop > 1.0 {
+                        180.0
+                    } else {
+                        0.0
+                    }
                 } else if self.evec()[2] < 0.0 {
                     (2.0 * PI - aop).to_degrees()
                 } else {
@@ -764,10 +759,14 @@ impl Orbit {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
-                let raan = (n[0] / n.norm()).acos();
+                let cos_raan = n[0] / n.norm();
+                let raan = cos_raan.acos();
                 if raan.is_nan() {
-                    warn!("RAAN is NaN");
-                    0.0
+                    if cos_raan > 1.0 {
+                        180.0
+                    } else {
+                        0.0
+                    }
                 } else if n[1] < 0.0 {
                     (2.0 * PI - raan).to_degrees()
                 } else {
@@ -827,23 +826,18 @@ impl Orbit {
                     );
                 }
                 let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag());
-                if (cos_nu.abs() - 1.0).abs() < EPSILON {
-                    // This bug drove me crazy when writing SMD in Go in 2017.
+                // If we're close the valid bounds, let's just do a sign check and return the true anomaly
+                let ta = cos_nu.acos();
+                if ta.is_nan() {
                     if cos_nu > 1.0 {
                         180.0
                     } else {
                         0.0
                     }
+                } else if self.radius().dot(&self.velocity()) < 0.0 {
+                    (2.0 * PI - ta).to_degrees()
                 } else {
-                    let ta = cos_nu.acos();
-                    if ta.is_nan() {
-                        warn!("TA is NaN");
-                        0.0
-                    } else if self.radius().dot(&self.velocity()) < 0.0 {
-                        (2.0 * PI - ta).to_degrees()
-                    } else {
-                        ta.to_degrees()
-                    }
+                    ta.to_degrees()
                 }
             }
             _ => panic!("true anomaly not defined in this frame"),
@@ -1075,6 +1069,9 @@ impl Orbit {
                 semi_major_radius,
                 ..
             } => {
+                if !self.frame.is_body_fixed() {
+                    warn!("Computation of geodetic latitude must be done in a body fixed frame and {} is not one!", self.frame);
+                }
                 let eps = 1e-12;
                 let max_attempts = 20;
                 let mut attempt_no = 0;
@@ -1112,6 +1109,9 @@ impl Orbit {
                 semi_major_radius,
                 ..
             } => {
+                if !self.frame.is_body_fixed() {
+                    warn!("Computation of geodetic height must be done in a body fixed frame and {} is not one!", self.frame);
+                }
                 let e2 = flattening * (2.0 - flattening);
                 let latitude = self.geodetic_latitude().to_radians();
                 let sin_lat = latitude.sin();
@@ -1201,7 +1201,7 @@ impl Orbit {
         }
     }
 
-    /// Returns the direct cosine rotation matrix to convert to this inertial state.
+    /// Returns the direct cosine rotation matrix to convert to this state's frame (inertial or otherwise).
     /// ## Example
     /// let dcm_vnc2inertial = orbit.dcm_from_traj_frame(Frame::VNC)?;
     /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
@@ -1221,6 +1221,33 @@ impl Orbit {
                 let n = self.hvec() / self.hmag();
                 let c = n.cross(&r);
                 Ok(Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose())
+            }
+            Frame::SEZ => {
+                // From the GMAT MathSpec, page 30 section 2.6.9 and from `Calculate_RFT` in `TopocentricAxes.cpp`, this returns the
+                // rotation matrix from the topocentric frame (SEZ) to body fixed frame.
+                // In the GMAT MathSpec notation, R_{IF} is the DCM from body fixed to inertial. Similarly, R{FT} is from topocentric
+                // to body fixed.
+                if !self.frame.is_body_fixed() {
+                    warn!("Computation of SEZ rotation matrix must be done in a body fixed frame and {} is not one!", self.frame);
+                }
+                if (self.x.powi(2) + self.y.powi(2)).sqrt() < 1e-3 {
+                    warn!("SEZ frame ill-defined when close to the poles");
+                }
+                let phi = self.geodetic_latitude().to_radians();
+                let lambda = self.geodetic_longitude().to_radians();
+                let z_hat = Vector3::new(
+                    phi.cos() * lambda.cos(),
+                    phi.cos() * lambda.sin(),
+                    phi.sin(),
+                );
+                // y_hat MUST be renormalized otherwise it's about 0.76 and therefore the rotation looses the norms conservation property.
+                let mut y_hat = Vector3::new(0.0, 0.0, 1.0).cross(&z_hat);
+                y_hat /= y_hat.norm();
+                let x_hat = y_hat.cross(&z_hat);
+                Ok(Matrix3::new(
+                    x_hat[0], y_hat[0], z_hat[0], x_hat[1], y_hat[1], z_hat[1], x_hat[2], y_hat[2],
+                    z_hat[2],
+                ))
             }
             _ => Err(NyxError::CustomError(
                 "did not provide a local frame".to_string(),
@@ -1304,19 +1331,11 @@ impl Orbit {
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.stm = Some(Matrix6::identity());
-        self.stm_kind = StmKind::Step;
-    }
-
-    /// Sets the STM of this state of identity, which also enables computation of the STM for trajectory optimization
-    pub fn enable_traj_stm(&mut self) {
-        self.stm = Some(Matrix6::identity());
-        self.stm_kind = StmKind::Traj;
     }
 
     /// Disable the STM of this state
     pub fn disable_stm(&mut self) {
         self.stm = None;
-        self.stm_kind = StmKind::Unset;
     }
 
     /// Copies the current state but sets the STM to identity
@@ -1333,45 +1352,36 @@ impl Orbit {
         me
     }
 
-    /// Sets the STM of this state of identity
-    pub fn stm_identity(&mut self) {
-        self.stm = Some(Matrix6::identity());
-    }
-
-    /// Unwraps this STM, or panics if unset.
-    pub fn stm(&self) -> Matrix6<f64> {
-        self.stm.unwrap()
-    }
-
     /// Returns the root sum square error between this state and the other, in kilometers for the position and kilometers per second in velocity
     pub fn rss(&self, other: &Self) -> (f64, f64) {
-        rss_orbit_errors(&self, other)
-    }
-}
-
-impl TimeTagged for Orbit {
-    fn epoch(&self) -> Epoch {
-        self.dt
+        rss_orbit_errors(self, other)
     }
 
-    fn set_epoch(&mut self, epoch: Epoch) {
-        self.dt = epoch
+    /// Returns whether this orbit and another are equal within the specified radial and velocity absolute tolerances
+    pub fn eq_within(&self, other: &Self, radial_tol: f64, velocity_tol: f64) -> bool {
+        self.dt == other.dt
+            && (self.x - other.x).abs() < radial_tol
+            && (self.y - other.y).abs() < radial_tol
+            && (self.z - other.z).abs() < radial_tol
+            && (self.vx - other.vx).abs() < velocity_tol
+            && (self.vy - other.vy).abs() < velocity_tol
+            && (self.vz - other.vz).abs() < velocity_tol
+            && self.frame == other.frame
+            && self.stm.is_some() == other.stm.is_some()
+            && if self.stm.is_some() {
+                self.stm.unwrap() == other.stm.unwrap()
+            } else {
+                true
+            }
     }
 }
 
 impl PartialEq for Orbit {
     /// Two states are equal if their position are equal within one centimeter and their velocities within one centimeter per second.
     fn eq(&self, other: &Orbit) -> bool {
-        let distance_tol = 1e-5; // centimeter
+        let radial_tol = 1e-5; // centimeter
         let velocity_tol = 1e-5; // centimeter per second
-        self.dt == other.dt
-            && (self.x - other.x).abs() < distance_tol
-            && (self.y - other.y).abs() < distance_tol
-            && (self.z - other.z).abs() < distance_tol
-            && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol
-            && (self.vz - other.vz).abs() < velocity_tol
-            && self.frame == other.frame
+        self.eq_within(other, radial_tol, velocity_tol)
     }
 }
 
@@ -1390,7 +1400,6 @@ impl Add for Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
-            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1410,7 +1419,6 @@ impl Sub for Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
-            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1430,7 +1438,6 @@ impl Neg for Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
-            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1450,7 +1457,6 @@ impl Add for &Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
-            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1476,7 +1482,6 @@ impl Sub for &Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
-            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1502,7 +1507,6 @@ impl Neg for &Orbit {
             dt: self.dt,
             frame: self.frame,
             stm: self.stm,
-            stm_kind: self.stm_kind,
         }
     }
 }
@@ -1526,40 +1530,195 @@ impl Serialize for Orbit {
 }
 
 impl fmt::Display for Orbit {
-    // Prints the Keplerian orbital elements with units
+    // Prints as Cartesian in floating point with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "[{}] {}\tposition = [{:.6}, {:.6}, {:.6}] km\tvelocity = [{:.6}, {:.6}, {:.6}] km/s",
-            self.frame, self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
+            "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
+            self.frame,
+            self.dt.as_gregorian_utc_str(),
+            format!("{:.*}", decimals, self.x),
+            format!("{:.*}", decimals, self.y),
+            format!("{:.*}", decimals, self.z),
+            format!("{:.*}", decimals, self.vx),
+            format!("{:.*}", decimals, self.vy),
+            format!("{:.*}", decimals, self.vz)
         )
     }
 }
 
 impl fmt::LowerExp for Orbit {
+    // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "[{}] {}\tposition = [{:e}, {:e}, {:e}] km\tvelocity = [{:e}, {:e}, {:e}] km/s",
-            self.frame, self.dt, self.x, self.y, self.z, self.vx, self.vy, self.vz
+            "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
+            self.frame,
+            self.dt.as_gregorian_utc_str(),
+            format!("{:.*e}", decimals, self.x),
+            format!("{:.*e}", decimals, self.y),
+            format!("{:.*e}", decimals, self.z),
+            format!("{:.*e}", decimals, self.vx),
+            format!("{:.*e}", decimals, self.vy),
+            format!("{:.*e}", decimals, self.vz)
         )
     }
 }
 
-impl fmt::Octal for Orbit {
-    // Prints the Keplerian orbital elements with units
+impl fmt::UpperExp for Orbit {
+    // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "[{}] {}\tsma = {:.6} km\tecc = {:.6}\tinc = {:.6} deg\traan = {:.6} deg\taop = {:.6} deg\tta = {:.6} deg",
+            "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
-            self.dt,
-            self.sma(),
-            self.ecc(),
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta()
+            self.dt.as_gregorian_utc_str(),
+            format!("{:.*E}", decimals, self.x),
+            format!("{:.*E}", decimals, self.y),
+            format!("{:.*E}", decimals, self.z),
+            format!("{:.*E}", decimals, self.vx),
+            format!("{:.*E}", decimals, self.vy),
+            format!("{:.*E}", decimals, self.vz)
         )
+    }
+}
+
+impl fmt::LowerHex for Orbit {
+    // Prints the Keplerian orbital elements in floating point with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
+        write!(
+            f,
+            "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
+            self.frame,
+            self.dt.as_gregorian_utc_str(),
+            format!("{:.*}", decimals, self.sma()),
+            format!("{:.*}", decimals, self.ecc()),
+            format!("{:.*}", decimals, self.inc()),
+            format!("{:.*}", decimals, self.raan()),
+            format!("{:.*}", decimals, self.aop()),
+            format!("{:.*}", decimals, self.ta()),
+        )
+    }
+}
+
+impl fmt::UpperHex for Orbit {
+    // Prints the Keplerian orbital elements in scientific notation with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let decimals = f.precision().unwrap_or(6);
+        write!(
+            f,
+            "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
+            self.frame,
+            self.dt.as_gregorian_utc_str(),
+            format!("{:.*e}", decimals, self.sma()),
+            format!("{:.*e}", decimals, self.ecc()),
+            format!("{:.*e}", decimals, self.inc()),
+            format!("{:.*e}", decimals, self.raan()),
+            format!("{:.*e}", decimals, self.aop()),
+            format!("{:.*e}", decimals, self.ta()),
+        )
+    }
+}
+
+/// Implementation of Orbit as a State for orbital dynamics with STM
+impl State for Orbit {
+    type Size = Const<6>;
+    type VecLength = Const<42>;
+
+    fn reset_stm(&mut self) {
+        self.stm = Some(Matrix6::identity());
+    }
+
+    /// Returns a state whose position, velocity and frame are zero, and STM is I_{6x6}.
+    fn zeros() -> Self {
+        let frame = Frame::Celestial {
+            gm: 1.0,
+            ephem_path: [None, None, None],
+            frame_path: [None, None, None],
+        };
+
+        Self {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            vx: 0.0,
+            vy: 0.0,
+            vz: 0.0,
+            dt: Epoch::from_tai_seconds(0.0),
+            frame,
+            stm: Some(Matrix6::identity()),
+        }
+    }
+
+    fn as_vector(&self) -> Result<OVector<f64, Const<42>>, NyxError> {
+        let mut as_vec = OVector::<f64, Const<42>>::zeros();
+        as_vec[0] = self.x;
+        as_vec[1] = self.y;
+        as_vec[2] = self.z;
+        as_vec[3] = self.vx;
+        as_vec[4] = self.vy;
+        as_vec[5] = self.vz;
+        if let Some(stm) = self.stm {
+            for (idx, stm_val) in stm.as_slice().iter().enumerate() {
+                as_vec[idx + 6] = *stm_val;
+            }
+        }
+        Ok(as_vec)
+    }
+
+    fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) -> Result<(), NyxError> {
+        self.set_epoch(epoch);
+        self.x = vector[0];
+        self.y = vector[1];
+        self.z = vector[2];
+        self.vx = vector[3];
+        self.vy = vector[4];
+        self.vz = vector[5];
+        // And update the STM if applicable
+        if self.stm.is_some() {
+            let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
+            self.stm = Some(stm_k_to_0);
+        }
+        Ok(())
+    }
+
+    fn stm(&self) -> Result<Matrix6<f64>, NyxError> {
+        match self.stm {
+            Some(stm) => Ok(stm),
+            None => Err(NyxError::StateTransitionMatrixUnset),
+        }
+    }
+
+    fn epoch(&self) -> Epoch {
+        self.dt
+    }
+
+    fn set_epoch(&mut self, epoch: Epoch) {
+        self.dt = epoch
+    }
+
+    fn add(self, other: OVector<f64, Self::Size>) -> Self {
+        self + other
+    }
+}
+
+impl Add<OVector<f64, Const<6>>> for Orbit {
+    type Output = Self;
+
+    /// Adds the provided state deviation to this orbit
+    fn add(self, other: OVector<f64, Const<6>>) -> Self {
+        let mut me = self;
+        me.x += other[0];
+        me.y += other[1];
+        me.z += other[2];
+        me.vx += other[3];
+        me.vy += other[4];
+        me.vz += other[5];
+
+        me
     }
 }

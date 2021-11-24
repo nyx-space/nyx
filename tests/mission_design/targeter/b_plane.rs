@@ -4,7 +4,7 @@ use nyx::md::targeter::*;
 use nyx::md::ui::*;
 
 #[test]
-fn tgt_b_plane_earth_gravity_assist() {
+fn tgt_b_plane_earth_gravity_assist_no_propagation() {
     // Rebuild the "in-place" targeting from the B-Plane test of `try_achieve`
 
     if pretty_env_logger::try_init().is_err() {
@@ -37,7 +37,7 @@ fn tgt_b_plane_earth_gravity_assist() {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
-    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
+    let tgt = Targeter::delta_v(&prop, b_plane_tgt.to_objectives());
 
     let sol = tgt.try_achieve_from(spacecraft, epoch, epoch).unwrap();
 
@@ -56,7 +56,7 @@ fn tgt_b_plane_earth_gravity_assist() {
         "Finite differencing result different from GMAT by over 1 m/s"
     );
 
-    tgt.apply(sol).unwrap();
+    tgt.apply(&sol).unwrap();
 }
 
 #[allow(clippy::identity_op)]
@@ -108,7 +108,7 @@ fn tgt_b_plane_lunar_transfer() {
     // GMAT truth with forward differencing: 1.33490412071, -0.5447988683, 1.77697094604 (approach currently in Nyx)
 
     let tgt = Targeter::in_frame(
-        Arc::new(&prop),
+        &prop,
         vec![
             Variable {
                 component: Vary::VelocityX,
@@ -163,7 +163,7 @@ fn tgt_b_plane_lunar_transfer() {
     );
 
     // Check that the solution works with the same dynamics.
-    tgt.apply(sol).unwrap();
+    tgt.apply(&sol).unwrap();
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
-    let tgt = Targeter::delta_v(Arc::new(&prop), b_plane_tgt.to_objectives());
+    let tgt = Targeter::delta_v(&prop, b_plane_tgt.to_objectives());
 
     let sol = tgt
         .try_achieve_from(prior_sc, prior_sc.epoch(), epoch)
@@ -213,7 +213,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
     println!("{}", sol);
 
     // As expected, the further out we are, the better the less delta-V is needed to match a B-Plane
-    assert!((sol.correction.norm() - 225.309e-3).abs() < 1e-6);
+    assert!(sol.correction.norm() <= 225.309e-3);
 
-    tgt.apply(sol).unwrap();
+    tgt.apply(&sol).unwrap();
 }
