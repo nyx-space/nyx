@@ -15,15 +15,24 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+extern crate rayon;
 
 use super::{plane_angles_from_unit_vector, unit_vector_from_plane_angles, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
-use crate::linalg::Vector3;
+use crate::linalg::{DMatrix, Vector3, Vector6};
+use crate::md::trajectory::InterpState;
+use crate::md::ui::{Objective, Propagator, SpacecraftDynamics};
+use crate::md::StateParameter;
 use crate::polyfit::CommonPolynomial;
+use crate::propagators::ErrorCtrl;
 use crate::time::{Epoch, TimeUnit};
+use crate::utils::pseudo_inverse;
+use crate::NyxError;
 use crate::State;
+use rayon::prelude::*;
 use std::fmt;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
 /// It may be used with a maneuver scheduler.
@@ -46,11 +55,11 @@ impl fmt::Display for Mnvr {
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.end - self.start >= 1 * TimeUnit::Millisecond {
-            write!(f, "Finite burn maneuver @ {} for {}\n\tin-plane angle a(t)={}\n\tin-plane angle a(t)={}", self.start, self.end-self.start, self.alpha_inplane, self.beta_outofplane)
+            write!(f, "Finite burn maneuver @ {} for {}\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.alpha_inplane, self.beta_outofplane)
         } else {
             write!(
                 f,
-                "Impulsive maneuver @ {}\n\tin-plane angle a(t)={}\n\tout-plane angle b(t)={}",
+                "Impulsive maneuver @ {}\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}",
                 self.start, self.alpha_inplane, self.beta_outofplane
             )
         }
@@ -88,28 +97,28 @@ impl Mnvr {
     /// Convergence criteria:
     ///     1. If the change in the duration of the burn is less than 1 seconds; or
     ///     2. If the magnitude of the thrust vector matches the impulsive maneuver to less than 1 mm/s
-    #[cfg(feature = "broken-donotuse")]
     pub fn impulsive_to_finite<'a, E: ErrorCtrl>(
         epoch: Epoch,
         dv: Vector3<f64>,
         spacecraft: Spacecraft,
+
         prop: &'a Propagator<'a, SpacecraftDynamics, E>,
     ) -> Result<Self, NyxError> {
-        // Imports specific to this broken feature
-        use crate::md::ui::{Propagator, SpacecraftDynamics};
-        use crate::propagators::ErrorCtrl;
-        use crate::NyxError;
-
         if spacecraft.thruster.is_none() {
             // Can't do any conversion to finite burns without a thruster
             return Err(NyxError::CtrlExistsButNoThrusterAvail);
         }
 
+        // Grab the spacecraft at the epoch of the impulsive maneuver.
         // Clone the dynamics
         let mut prop = prop.clone();
         // Propagate to the dv epoch
         prop.dynamics = prop.dynamics.without_ctrl();
         let sc_at_dv_epoch = prop.with(spacecraft).until_epoch(epoch)?;
+
+        /* *** */
+        /* Compute the initial guess */
+        /* *** */
         // Calculate the u, dot u (=0) and ddot u from this state
         let u = dv / dv.norm();
         let r = sc_at_dv_epoch.orbit.radius();
@@ -127,12 +136,11 @@ impl Mnvr {
         let thruster = spacecraft.thruster.as_ref().unwrap();
         let c_km_s = thruster.exhaust_velocity() * 1e-3;
 
-        let mut delta_tfb = 1000.0
-            * ((c_km_s * spacecraft.mass_kg()) / thruster.thrust)
+        let delta_tfb = ((c_km_s * spacecraft.mass_kg()) / thruster.thrust)
             * (1.0 - (-dv.norm() / c_km_s).exp());
 
         // Build the estimated maneuver
-        let mut mnvr_guess = Self {
+        let mut mnvr = Self {
             start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
             end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
             thrust_lvl: 1.0,
@@ -140,72 +148,187 @@ impl Mnvr {
             beta_outofplane,
         };
 
-        // Start iteration
-        let max_iter = 25;
-        let mut converged = false;
+        let target_state = prop
+            .with(spacecraft)
+            .until_epoch(epoch - 0.5 * delta_tfb * TimeUnit::Second)?;
 
-        for _ in 0..max_iter {
-            println!("{}", mnvr_guess);
-            // Start by propagating the dynamics back to the estimated start of the maneuver without thrust.
-            prop.dynamics = prop.dynamics.without_ctrl();
-            let sc_start = prop
-                .with(sc_at_dv_epoch.with_guidance_mode(GuidanceMode::Coast))
-                .for_duration(-(1.0 + delta_tfb) * TimeUnit::Second)?;
-            // Propagate for the duration of the burn without maneuver enabled to compute the baseline
-            let sc_post_no_mnvr = prop.with(sc_start).until_epoch(mnvr_guess.end)?;
+        println!("INIT  \t{}", spacecraft);
+        println!("TARGET\t{}", target_state);
 
+        /* *** */
+        /* With the finite burn maneuver, let's target the nominal state without the maneuver enabled. */
+        /* The main difference with the targeter is that this is purely statically allocated */
+        /* *** */
+
+        // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
+        let mut prev_err_norm = std::f64::INFINITY;
+        let objectives = [
+            Objective::new(StateParameter::X, target_state.orbit.x),
+            Objective::new(StateParameter::Y, target_state.orbit.y),
+            Objective::new(StateParameter::Z, target_state.orbit.z),
+        ];
+
+        // Determine padding in debugging info
+        // For the width, we find the largest desired values and multiply it by the order of magnitude of its tolerance
+        let max_obj_val = objectives
+            .iter()
+            .map(|obj| {
+                (obj.desired_value.abs().ceil() as i32
+                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)) as i32
+            })
+            .max()
+            .unwrap();
+
+        let max_obj_tol = objectives
+            .iter()
+            .map(|obj| obj.tolerance.log10().abs().ceil() as usize)
+            .max()
+            .unwrap();
+
+        let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
+
+        let start_instant = Instant::now();
+        let xi = sc_at_dv_epoch;
+        let achievement_epoch = target_state.epoch();
+        for it in 0..=25 {
             // Build the finite burn
             let fb_guess = FiniteBurns {
-                mnvrs: vec![mnvr_guess],
+                mnvrs: vec![mnvr],
                 frame: Frame::Inertial,
             };
 
             // Propagate for the duration of the burn
-            prop.set_max_step(mnvr_guess.end - mnvr_guess.start);
+            prop.set_max_step(mnvr.end - mnvr.start);
             prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
-            let sc_post_mnvr = prop
-                .with(sc_start.with_guidance_mode(GuidanceMode::Custom(0)))
-                .until_epoch(mnvr_guess.end)?;
-            // Compute the applied delta-v
-            let accumulated_dv = sc_post_mnvr.orbit.velocity() - sc_post_no_mnvr.orbit.velocity();
-            println!(
-                "Wanted {:.3} m/s {}\nGot {:.3} m/s {}\nError = {:.3} m/s",
-                dv.norm() * 1e3,
-                dv,
-                accumulated_dv.norm() * 1e3,
-                accumulated_dv,
-                (accumulated_dv - dv).norm() * 1e3
-            );
-            if (accumulated_dv - dv).norm() * 1e3 < 10.0 {
-                // Less than 10cm/s error, we're good
-                converged = true;
-                break;
-            } else {
-                if accumulated_dv.norm() > dv.norm() {
-                    // Burn was too long let's decrease the burn duration
-                    delta_tfb = 0.25 * delta_tfb;
-                } else {
-                    // Burn was too short, let's icnrease burn duration
-                    delta_tfb = 1.25 * delta_tfb;
+            let xf = prop
+                .with(xi.with_guidance_mode(GuidanceMode::Custom(0)))
+                .until_epoch(achievement_epoch)?
+                .orbit;
+
+            // Build the error vector
+            let mut param_errors = [0.0; 3];
+            let mut converged = true;
+
+            // Build debugging information
+            let mut objmsg = Vec::with_capacity(objectives.len());
+
+            // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
+            // As such, it includes the STM of that variable for the whole propagation arc.
+            let mut jac = DMatrix::from_element(3, 6, 0.0);
+            // let mut jac = SMatrix::<f64, 3, 6>::zeros();
+
+            for (i, obj) in objectives.iter().enumerate() {
+                let achieved = xf.value(&obj.parameter)?;
+
+                let (ok, param_err) = obj.assess_raw(achieved);
+                if !ok {
+                    converged = false;
                 }
-                // Update the maneuver
-                mnvr_guess = Self {
-                    start: epoch - delta_tfb * TimeUnit::Second,
-                    end: epoch + delta_tfb * TimeUnit::Second,
-                    thrust_lvl: 1.0,
-                    alpha_inplane,
-                    beta_outofplane,
-                };
+                param_errors[i] = param_err;
+
+                objmsg.push(format!(
+                    "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t scaled error = {:>width$.prec$}",
+                    obj.parameter,
+                    achieved,
+                    obj.desired_value,
+                    param_err, width=width, prec=max_obj_tol
+                ));
+
+                let mut pert_calc: Vec<_> = (0..6).map(|i| (i, 0.0_f64)).collect();
+
+                pert_calc.par_iter_mut().for_each(|(i, jac_val)| {
+                    let this_xi = xi;
+                    let perturbation = 0.001;
+                    let mut this_mnvr = mnvr;
+                    let mut prop = prop.clone();
+
+                    // Change the relevant component of the polynomial which defines this maneuver
+                    if *i < 3 {
+                        this_mnvr.alpha_inplane = this_mnvr
+                            .alpha_inplane
+                            .add_val_in_order(perturbation, *i)
+                            .unwrap();
+                    } else {
+                        this_mnvr.beta_outofplane = this_mnvr
+                            .beta_outofplane
+                            .add_val_in_order(perturbation, *i - 3)
+                            .unwrap();
+                    }
+
+                    // Build the finite burn
+                    let fb_guess = FiniteBurns {
+                        mnvrs: vec![this_mnvr],
+                        frame: Frame::Inertial,
+                    };
+
+                    // Propagate for the duration of the burn
+                    prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
+
+                    let this_xf = prop
+                        .clone()
+                        .with(this_xi)
+                        .until_epoch(achievement_epoch)
+                        .unwrap()
+                        .orbit;
+
+                    let this_achieved = this_xf.value(&obj.parameter).unwrap();
+                    *jac_val = (this_achieved - achieved) / perturbation;
+                });
+
+                for (j, jac_val) in &pert_calc {
+                    jac[(i, *j)] = *jac_val;
+                }
             }
+
+            for obj in &objmsg {
+                info!("{}", obj);
+            }
+
+            if converged {
+                return Ok(mnvr);
+            }
+
+            // We haven't converged yet, so let's build the error vector
+            let err_vector = Vector3::from_row_slice(&param_errors);
+            if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
+                return Err(NyxError::CorrectionIneffective(
+                    "No change in objective errors".to_string(),
+                ));
+            }
+            prev_err_norm = err_vector.norm();
+
+            debug!("Jacobian {}", jac);
+
+            // Perform the pseudo-inverse if needed, else just inverse
+            let jac_inv = pseudo_inverse(&jac, NyxError::SingularJacobian)?;
+
+            debug!("Inverse Jacobian {}", jac_inv);
+
+            let delta = jac_inv * &err_vector;
+
+            debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
+
+            for (i, value) in delta.iter().enumerate() {
+                // Change the relevant component of the polynomial which defines this maneuver
+                if i < 3 {
+                    mnvr.alpha_inplane = mnvr.alpha_inplane.add_val_in_order(*value, i)?;
+                } else {
+                    mnvr.beta_outofplane = mnvr.beta_outofplane.add_val_in_order(*value, i - 3)?;
+                }
+            }
+
+            // Log progress to debug
+            debug!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
+            for obj in &objmsg {
+                debug!("{}", obj);
+            }
+            debug!("{}", mnvr);
         }
 
-        if !converged {
-            return Err(NyxError::MaxIterReached(format!(
-                "Finite burn failed to converge after {} iterations.",
-                max_iter
-            )));
-        }
-        Ok(mnvr_guess)
+        return Err(NyxError::MaxIterReached(format!(
+            "Failed after {} iterations:\nError: {}",
+            25, prev_err_norm
+        )));
     }
 
     /// Return the thrust vector computed at the provided epoch
@@ -283,7 +406,12 @@ impl GuidanceLaw for FiniteBurns {
                 if (mnvr_no as usize) < self.mnvrs.len() {
                     let cur_mnvr = self.mnvrs[mnvr_no as usize];
                     if sc.epoch() >= cur_mnvr.end {
-                        GuidanceMode::Custom(mnvr_no + 1)
+                        if mnvr_no as usize == self.mnvrs.len() - 1 {
+                            // No following maneuver, so let's coast from now on.
+                            GuidanceMode::Coast
+                        } else {
+                            GuidanceMode::Custom(mnvr_no + 1)
+                        }
                     } else {
                         // Stay on the current maneuver
                         GuidanceMode::Custom(mnvr_no)
@@ -300,42 +428,4 @@ impl GuidanceLaw for FiniteBurns {
             }
         }
     }
-}
-
-#[cfg(feature = "broken-donotuse")]
-#[test]
-fn name_impulsive_to_finite() {
-    use crate::cosmic::Cosm;
-    use crate::dynamics::guidance::Thruster;
-    use crate::dynamics::OrbitalDynamics;
-    use crate::Orbit;
-
-    let cosm = Cosm::de438_gmat();
-    let eme2k = cosm.frame("EME2000");
-
-    /* Define the parking orbit */
-    let epoch = Epoch::from_gregorian_utc_at_noon(2022, 03, 04);
-    let start = Orbit::keplerian_altitude(300.0, 0.01, 30.0, 90.0, 90.0, 60.0, epoch, eme2k);
-
-    /* Build the spacecraft -- really only the mass is needed here */
-    let sc = Spacecraft {
-        orbit: start,
-        dry_mass_kg: 1000.0,
-        fuel_mass_kg: 2000.0,
-        thruster: Some(Thruster {
-            thrust: 3000.0,
-            isp: 300.0,
-        }),
-        mode: GuidanceMode::Thrust,
-
-        ..Default::default()
-    };
-
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-
-    let epoch = Epoch::from_gregorian_utc_hms(2022, 03, 04, 12, 00, 00);
-    let dv = Vector3::new(-0.002, -0.011, 0.001);
-
-    let m = Mnvr::impulsive_to_finite(epoch, dv, sc, &prop).unwrap();
-    println!("{}", m);
 }

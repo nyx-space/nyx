@@ -22,6 +22,8 @@ use std::f64::EPSILON;
 use std::fmt;
 use std::ops;
 
+use crate::NyxError;
+
 /// Polynomial is a statically allocated polynomial.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Polynomial<const SIZE: usize> {
@@ -313,6 +315,52 @@ impl CommonPolynomial {
                 coefficients: [c, b, a],
             }
             .deriv(x),
+        }
+    }
+
+    pub fn with_val_in_order(self, new_val: f64, order: usize) -> Result<Self, NyxError> {
+        match self {
+            Self::Constant(_) => {
+                if order != 0 {
+                    Err(NyxError::PolynomialOrderError(new_val, order))
+                } else {
+                    Ok(Self::Constant(new_val))
+                }
+            }
+            Self::Linear(x, y) => match order {
+                0 => Ok(Self::Linear(new_val, y)),
+                1 => Ok(Self::Linear(x, new_val)),
+                _ => Err(NyxError::PolynomialOrderError(new_val, order)),
+            },
+            Self::Quadratic(x, y, z) => match order {
+                0 => Ok(Self::Quadratic(new_val, y, z)),
+                1 => Ok(Self::Quadratic(x, new_val, z)),
+                2 => Ok(Self::Quadratic(x, y, new_val)),
+                _ => Err(NyxError::PolynomialOrderError(new_val, order)),
+            },
+        }
+    }
+
+    pub fn add_val_in_order(self, new_val: f64, order: usize) -> Result<Self, NyxError> {
+        match self {
+            Self::Constant(x) => {
+                if order != 0 {
+                    Err(NyxError::PolynomialOrderError(new_val, order))
+                } else {
+                    Ok(Self::Constant(new_val + x))
+                }
+            }
+            Self::Linear(x, y) => match order {
+                0 => Ok(Self::Linear(new_val + x, y)),
+                1 => Ok(Self::Linear(x, new_val + y)),
+                _ => Err(NyxError::PolynomialOrderError(new_val, order)),
+            },
+            Self::Quadratic(x, y, z) => match order {
+                0 => Ok(Self::Quadratic(new_val + x, y, z)),
+                1 => Ok(Self::Quadratic(x, new_val + y, z)),
+                2 => Ok(Self::Quadratic(x, y, new_val + z)),
+                _ => Err(NyxError::PolynomialOrderError(new_val, order)),
+            },
         }
     }
 }

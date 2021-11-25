@@ -1,5 +1,9 @@
 extern crate nyx_space as nyx;
 
+use nyx::dynamics::guidance::FiniteBurns;
+use nyx::dynamics::guidance::Mnvr;
+use nyx::dynamics::guidance::Thruster;
+use nyx::linalg::Vector3;
 use nyx::md::targeter::*;
 use nyx::md::ui::*;
 
@@ -71,7 +75,18 @@ fn tgt_sma_ecc() {
 
     println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
 
-    let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
+    let spacecraft = Spacecraft {
+        orbit: xi_orig,
+        dry_mass_kg: 10.0,
+        fuel_mass_kg: 90.0,
+        thruster: Some(Thruster {
+            thrust: 150.0,
+            isp: 300.0,
+        }),
+        mode: GuidanceMode::Thrust,
+
+        ..Default::default()
+    };
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::default(dynamics);
@@ -106,8 +121,10 @@ fn tgt_sma_ecc() {
 
     println!("{}", tgt);
 
+    let achievement_epoch = orig_dt + target_delta_t;
+
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(spacecraft, orig_dt, achievement_epoch)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -124,6 +141,33 @@ fn tgt_sma_ecc() {
             || solution_fd.correction.norm() < gmat_sol,
         "Finite differencing result different from GMAT and greater!"
     );
+
+    /* *** */
+    /* Convert to a finite burn and make sure this converges */
+    /* *** */
+    let dv = Vector3::new(
+        solution_fd.correction[0],
+        solution_fd.correction[1],
+        solution_fd.correction[2],
+    );
+
+    let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let mnvr = Mnvr::impulsive_to_finite(orig_dt, dv, spacecraft, &setup).unwrap();
+    println!("{}", mnvr);
+    // And build the new dynamics
+    let fb_guess = FiniteBurns {
+        mnvrs: vec![mnvr],
+        frame: Frame::Inertial,
+    };
+
+    // Propagate for the duration of the burn
+    setup.set_max_step(mnvr.end - mnvr.start);
+    setup.dynamics = setup.dynamics.with_ctrl(Arc::new(fb_guess));
+    let xf = setup
+        .with(spacecraft.with_guidance_mode(GuidanceMode::Custom(0)))
+        .until_epoch(achievement_epoch)
+        .unwrap();
+    println!("{:x}", xf);
 }
 
 #[test]

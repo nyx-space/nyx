@@ -68,6 +68,8 @@ pub enum NyxError {
     CtrlNotAUnitVector(f64),
     /// The control throttle range must be between 0.0 and 1.0 (both included) as it represents a percentage.
     CtrlThrottleRangeErr(f64),
+    /// Happens when trying to modify a polynomial's (error.1)-th error but the polynomial has less orders than that
+    PolynomialOrderError(f64, usize),
     /// An objective based analysis or control was attempted, but no objective was defined.
     NoObjectiveDefined,
     /// Error when exporting data
