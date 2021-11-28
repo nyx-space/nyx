@@ -19,16 +19,17 @@ extern crate rayon;
 
 use super::{plane_angles_from_unit_vector, unit_vector_from_plane_angles, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
-use crate::linalg::{DMatrix, Vector3, Vector6};
+use crate::linalg::{DMatrix, SVector, Vector3};
 use crate::md::trajectory::InterpState;
 use crate::md::ui::{Objective, Propagator, SpacecraftDynamics};
-use crate::md::StateParameter;
+use crate::md::{StateParameter, Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::ErrorCtrl;
 use crate::time::{Epoch, TimeUnit};
 use crate::utils::pseudo_inverse;
 use crate::NyxError;
 use crate::State;
+use hifitime::{Duration, TimeUnitHelper};
 use rayon::prelude::*;
 use std::fmt;
 use std::sync::Arc;
@@ -115,6 +116,7 @@ impl Mnvr {
         // Propagate to the dv epoch
         prop.dynamics = prop.dynamics.without_ctrl();
         let sc_at_dv_epoch = prop.with(spacecraft).until_epoch(epoch)?;
+        let xi = sc_at_dv_epoch;
 
         /* *** */
         /* Compute the initial guess */
@@ -148,12 +150,79 @@ impl Mnvr {
             beta_outofplane,
         };
 
-        let target_state = prop
-            .with(spacecraft)
-            .until_epoch(epoch - 0.5 * delta_tfb * TimeUnit::Second)?;
+        let x0_epoch = mnvr.start;
+        let xf_epoch = mnvr.end;
 
-        println!("INIT  \t{}", spacecraft);
-        println!("TARGET\t{}", target_state);
+        // Build pre-dv and post-dv trajectories so we can update the objectives at each iteration
+        // HACK: Cannot yet build trajectories with a backward prop, so we go backward and generate the traj forward only
+        let sc_init = prop
+            .with(spacecraft)
+            .until_epoch(x0_epoch - 15.0.minutes())?;
+        let (_, pre_traj) = prop
+            .with(sc_init)
+            .until_epoch_with_traj(spacecraft.epoch())?;
+        let (_, post_traj) = prop
+            .with(spacecraft)
+            .until_epoch_with_traj(xf_epoch + 15.0.minutes())?;
+
+        println!("{}\n{}", pre_traj, post_traj);
+
+        let mut x0_constraint = pre_traj.at(x0_epoch)?;
+        let mut xf_constraint = post_traj.at(xf_epoch)?;
+
+        // The variables in this targeter
+        let variables = [
+            Variable {
+                component: Vary::MnvrAlpha,
+                init_guess: alpha_tdv,
+                perturbation: 30.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::MnvrAlphaDot,
+                init_guess: 0.0,
+                perturbation: 10.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::MnvrAlphaDDot,
+                init_guess: alpha_ddot_tdv,
+                perturbation: 10.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::MnvrBeta,
+                perturbation: 30.0,
+                init_guess: beta_tdv,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::MnvrBetaDot,
+                init_guess: 0.0,
+                perturbation: 10.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::MnvrBetaDDot,
+                init_guess: beta_ddot_tdv,
+                perturbation: 10.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::StartEpoch,
+                perturbation: 10.0,
+                ..Default::default()
+            },
+            Variable {
+                component: Vary::Duration,
+                perturbation: 10.0,
+                ..Default::default()
+            },
+        ];
+
+        println!("INIT    \t{}", spacecraft);
+        println!("TARGET X0\t{}", x0_constraint);
+        println!("TARGET Xf\t{}", xf_constraint);
 
         /* *** */
         /* With the finite burn maneuver, let's target the nominal state without the maneuver enabled. */
@@ -162,11 +231,24 @@ impl Mnvr {
 
         // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
         let mut prev_err_norm = std::f64::INFINITY;
-        let objectives = [
-            Objective::new(StateParameter::X, target_state.orbit.x),
-            Objective::new(StateParameter::Y, target_state.orbit.y),
-            Objective::new(StateParameter::Z, target_state.orbit.z),
+        // The objectives are organized as initial state constraints first and final state last
+        let mut objectives = [
+            Objective::new(StateParameter::X, x0_constraint.orbit.x),
+            Objective::new(StateParameter::Y, x0_constraint.orbit.y),
+            Objective::new(StateParameter::Z, x0_constraint.orbit.z),
+            Objective::new(StateParameter::VX, x0_constraint.orbit.vx),
+            Objective::new(StateParameter::VY, x0_constraint.orbit.vy),
+            Objective::new(StateParameter::VZ, x0_constraint.orbit.vz),
+            // xf constraints
+            Objective::new(StateParameter::X, xf_constraint.orbit.x),
+            Objective::new(StateParameter::Y, xf_constraint.orbit.y),
+            Objective::new(StateParameter::Z, xf_constraint.orbit.z),
+            Objective::new(StateParameter::VX, xf_constraint.orbit.vx),
+            Objective::new(StateParameter::VY, xf_constraint.orbit.vy),
+            Objective::new(StateParameter::VZ, xf_constraint.orbit.vz),
         ];
+
+        const N_OBJ: usize = 12;
 
         // Determine padding in debugging info
         // For the width, we find the largest desired values and multiply it by the order of magnitude of its tolerance
@@ -188,9 +270,8 @@ impl Mnvr {
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
         let start_instant = Instant::now();
-        let xi = sc_at_dv_epoch;
-        let achievement_epoch = target_state.epoch();
-        for it in 0..=25 {
+        let max_iter = 25;
+        for it in 0..=max_iter {
             // Build the finite burn
             let fb_guess = FiniteBurns {
                 mnvrs: vec![mnvr],
@@ -200,13 +281,18 @@ impl Mnvr {
             // Propagate for the duration of the burn
             prop.set_max_step(mnvr.end - mnvr.start);
             prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
+            let x0 = prop
+                .with(xi.with_guidance_mode(GuidanceMode::Custom(0)))
+                .until_epoch(x0_epoch)?
+                .orbit;
+
             let xf = prop
                 .with(xi.with_guidance_mode(GuidanceMode::Custom(0)))
-                .until_epoch(achievement_epoch)?
+                .until_epoch(xf_epoch)?
                 .orbit;
 
             // Build the error vector
-            let mut param_errors = [0.0; 3];
+            let mut param_errors = [0.0; N_OBJ];
             let mut converged = true;
 
             // Build debugging information
@@ -214,11 +300,14 @@ impl Mnvr {
 
             // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
             // As such, it includes the STM of that variable for the whole propagation arc.
-            let mut jac = DMatrix::from_element(3, 6, 0.0);
-            // let mut jac = SMatrix::<f64, 3, 6>::zeros();
+            let mut jac = DMatrix::from_element(objectives.len(), 8, 0.0);
 
             for (i, obj) in objectives.iter().enumerate() {
-                let achieved = xf.value(&obj.parameter)?;
+                let achieved = if i < objectives.len() / 2 {
+                    x0.value(&obj.parameter)?
+                } else {
+                    xf.value(&obj.parameter)?
+                };
 
                 let (ok, param_err) = obj.assess_raw(achieved);
                 if !ok {
@@ -234,25 +323,34 @@ impl Mnvr {
                     param_err, width=width, prec=max_obj_tol
                 ));
 
-                let mut pert_calc: Vec<_> = (0..6).map(|i| (i, 0.0_f64)).collect();
+                let mut pert_calc: Vec<_> = variables
+                    .iter()
+                    .enumerate()
+                    .map(|(j, var)| (j, var, 0.0_f64))
+                    .collect();
 
-                pert_calc.par_iter_mut().for_each(|(i, jac_val)| {
+                pert_calc.par_iter_mut().for_each(|(j, var, jac_val)| {
                     let this_xi = xi;
-                    let perturbation = 0.001;
+                    let perturbation = var.perturbation;
                     let mut this_mnvr = mnvr;
                     let mut prop = prop.clone();
 
-                    // Change the relevant component of the polynomial which defines this maneuver
-                    if *i < 3 {
+                    // Perturb the maneuver
+                    if *j < 3 {
                         this_mnvr.alpha_inplane = this_mnvr
                             .alpha_inplane
-                            .add_val_in_order(perturbation, *i)
+                            .add_val_in_order(perturbation, *j)
                             .unwrap();
-                    } else {
+                    } else if *j < 6 {
                         this_mnvr.beta_outofplane = this_mnvr
                             .beta_outofplane
-                            .add_val_in_order(perturbation, *i - 3)
+                            .add_val_in_order(perturbation, *j - 3)
                             .unwrap();
+                    } else if var.component == Vary::StartEpoch {
+                        // Modification of the start epoch of the burn
+                        this_mnvr.start = this_mnvr.start + perturbation.seconds();
+                    } else if var.component == Vary::Duration {
+                        this_mnvr.end = this_mnvr.end + perturbation.seconds();
                     }
 
                     // Build the finite burn
@@ -261,35 +359,48 @@ impl Mnvr {
                         frame: Frame::Inertial,
                     };
 
-                    // Propagate for the duration of the burn
+                    // Build the dynamics for this perturbation
                     prop.dynamics = prop.dynamics.with_ctrl(Arc::new(fb_guess));
 
-                    let this_xf = prop
-                        .clone()
-                        .with(this_xi)
-                        .until_epoch(achievement_epoch)
-                        .unwrap()
-                        .orbit;
+                    // Propagate for the duration of the burn: backward if we're matching the initial state, and forward otherwise
+                    let this_x = if i < objectives.len() / 2 {
+                        prop.with(this_xi).until_epoch(x0_epoch).unwrap().orbit
+                    } else {
+                        prop.with(this_xi).until_epoch(xf_epoch).unwrap().orbit
+                    };
 
-                    let this_achieved = this_xf.value(&obj.parameter).unwrap();
+                    let this_achieved = this_x.value(&obj.parameter).unwrap();
                     *jac_val = (this_achieved - achieved) / perturbation;
                 });
 
-                for (j, jac_val) in &pert_calc {
+                for (j, _, jac_val) in &pert_calc {
                     jac[(i, *j)] = *jac_val;
                 }
             }
 
-            for obj in &objmsg {
-                info!("{}", obj);
-            }
-
             if converged {
+                let conv_dur = Instant::now() - start_instant;
+                if it == 1 {
+                    info!(
+                        "Targeter -- CONVERGED in 1 iteration ({:.3} seconds)",
+                        conv_dur.as_secs_f64()
+                    );
+                } else {
+                    info!(
+                        "Targeter -- CONVERGED in {} iterations ({:.3} seconds)",
+                        it,
+                        conv_dur.as_secs_f64()
+                    );
+                }
+                for obj in &objmsg {
+                    info!("{}", obj);
+                }
                 return Ok(mnvr);
             }
 
             // We haven't converged yet, so let's build the error vector
-            let err_vector = Vector3::from_row_slice(&param_errors);
+            let err_vector = SVector::<f64, N_OBJ>::from_row_slice(&param_errors);
+            // let err_vector = DVector::from(param_errors);
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
                 return Err(NyxError::CorrectionIneffective(
                     "No change in objective errors".to_string(),
@@ -308,26 +419,56 @@ impl Mnvr {
 
             debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
 
+            let mut update_objs = false;
             for (i, value) in delta.iter().enumerate() {
                 // Change the relevant component of the polynomial which defines this maneuver
                 if i < 3 {
                     mnvr.alpha_inplane = mnvr.alpha_inplane.add_val_in_order(*value, i)?;
-                } else {
+                } else if i < 6 {
                     mnvr.beta_outofplane = mnvr.beta_outofplane.add_val_in_order(*value, i - 3)?;
+                } else if i == 7 {
+                    // Modification of the start epoch of the burn
+                    mnvr.start = mnvr.start + value.seconds();
+                    update_objs = true;
+                } else if i == 8 {
+                    mnvr.end = mnvr.end + value.seconds();
+                    update_objs = true;
                 }
             }
 
             // Log progress to debug
-            debug!("Targeter -- Iteration #{} -- {}", it, achievement_epoch);
+            debug!("Targeter -- Iteration #{}", it);
             for obj in &objmsg {
                 debug!("{}", obj);
             }
             debug!("{}", mnvr);
+
+            // Update the objectives if we've changed the start or end time of the maneuver
+            if update_objs {
+                x0_constraint = pre_traj.at(mnvr.start)?;
+                xf_constraint = post_traj.at(mnvr.end)?;
+
+                objectives = [
+                    Objective::new(StateParameter::X, x0_constraint.orbit.x),
+                    Objective::new(StateParameter::Y, x0_constraint.orbit.y),
+                    Objective::new(StateParameter::Z, x0_constraint.orbit.z),
+                    Objective::new(StateParameter::VX, x0_constraint.orbit.vx),
+                    Objective::new(StateParameter::VY, x0_constraint.orbit.vy),
+                    Objective::new(StateParameter::VZ, x0_constraint.orbit.vz),
+                    // xf constraints
+                    Objective::new(StateParameter::X, xf_constraint.orbit.x),
+                    Objective::new(StateParameter::Y, xf_constraint.orbit.y),
+                    Objective::new(StateParameter::Z, xf_constraint.orbit.z),
+                    Objective::new(StateParameter::VX, xf_constraint.orbit.vx),
+                    Objective::new(StateParameter::VY, xf_constraint.orbit.vy),
+                    Objective::new(StateParameter::VZ, xf_constraint.orbit.vz),
+                ];
+            }
         }
 
         return Err(NyxError::MaxIterReached(format!(
             "Failed after {} iterations:\nError: {}",
-            25, prev_err_norm
+            max_iter, prev_err_norm
         )));
     }
 
@@ -337,6 +478,10 @@ impl Mnvr {
         let alpha = self.alpha_inplane.eval(t);
         let beta = self.beta_outofplane.eval(t);
         unit_vector_from_plane_angles(alpha, beta)
+    }
+
+    pub fn duration(&self) -> Duration {
+        self.end - self.start
     }
 }
 

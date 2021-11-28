@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::NyxError;
 use crate::cosmic::Frame;
+use crate::errors::{NyxError, TargetingError};
 use std::convert::TryFrom;
 use std::default::Default;
 
@@ -36,17 +36,37 @@ pub enum Vary {
     VelocityY,
     /// Vary velocity component Z
     VelocityZ,
+    /// Maneuver's in-plane alpha
+    MnvrAlpha,
+    /// Maneuver's in-plane alpha-dot
+    MnvrAlphaDot,
+    /// Maneuver's in-plane alpha double-dot
+    MnvrAlphaDDot,
+    /// Maneuver's out-of-plane beta
+    MnvrBeta,
+    /// Maneuver's out-of-plane beta dot
+    MnvrBetaDot,
+    /// Maneuver's out-of-plane beta double-dot
+    MnvrBetaDDot,
+    /// Start epoch difference in seconds
+    StartEpoch,
+    /// Burn duration difference in seconds
+    Duration,
+    /// End epoch difference in seconds
+    EndEpoch,
 }
 
 impl Vary {
     pub fn vec_index(&self) -> usize {
         match self {
-            Vary::PositionX => 0,
-            Vary::PositionY => 1,
-            Vary::PositionZ => 2,
-            Vary::VelocityX => 3,
-            Vary::VelocityY => 4,
-            Vary::VelocityZ => 5,
+            Self::PositionX | Self::MnvrAlpha => 0,
+            Self::PositionY | Self::MnvrAlphaDot => 1,
+            Self::PositionZ | Self::MnvrAlphaDDot => 2,
+            Self::VelocityX | Self::MnvrBeta => 3,
+            Self::VelocityY | Self::MnvrBetaDot => 4,
+            Self::VelocityZ | Self::MnvrBetaDDot => 5,
+            Self::StartEpoch => 6,
+            Self::Duration | Self::EndEpoch => 7,
         }
     }
 }
@@ -71,14 +91,14 @@ pub struct Variable {
 
 impl Variable {
     /// Returns whether the configuration of this variable is valid
-    pub fn valid(&self) -> Result<(), NyxError> {
+    pub fn valid(&self) -> Result<(), TargetingError> {
         if self.max_step < 0.0 {
             let msg = format!(
                 "{:?}: max step is negative: {}",
                 self.component, self.max_step
             );
             error!("{}", msg);
-            return Err(NyxError::TargetError(msg));
+            return Err(TargetingError::VariableError(msg));
         }
         if self.max_value < 0.0 {
             let msg = format!(
@@ -86,7 +106,7 @@ impl Variable {
                 self.component, self.max_value
             );
             error!("{}", msg);
-            return Err(NyxError::TargetError(msg));
+            return Err(TargetingError::VariableError(msg));
         }
         if self.min_value > self.max_value {
             let msg = format!(
@@ -94,7 +114,7 @@ impl Variable {
                 self.component, self.min_value, self.max_value
             );
             error!("{}", msg);
-            return Err(NyxError::TargetError(msg));
+            return Err(TargetingError::VariableError(msg));
         }
         Ok(())
     }
@@ -126,6 +146,29 @@ impl TryFrom<Vary> for Variable {
             | Vary::VelocityY
             | Vary::VelocityZ => Ok(Self {
                 component: vary,
+                ..Default::default()
+            }),
+            Vary::MnvrAlpha | Vary::MnvrBeta => Ok(Self {
+                component: vary,
+                perturbation: 10.0,
+                ..Default::default()
+            }),
+            Vary::MnvrAlphaDot | Vary::MnvrBetaDot => Ok(Self {
+                component: vary,
+                perturbation: 1.0,
+                ..Default::default()
+            }),
+            Vary::MnvrAlphaDDot | Vary::MnvrBetaDDot => Ok(Self {
+                component: vary,
+                perturbation: 0.1,
+                ..Default::default()
+            }),
+            Vary::StartEpoch | Vary::EndEpoch | Vary::Duration => Ok(Self {
+                component: vary,
+                perturbation: 0.1,
+                max_step: 60.0,
+                max_value: 600.0,
+                min_value: -600.0,
                 ..Default::default()
             }),
         }

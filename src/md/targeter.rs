@@ -19,6 +19,7 @@ use super::rayon::prelude::*;
 use super::StateParameter;
 pub use super::{Variable, Vary};
 use crate::cosmic::OrbitPartial;
+use crate::errors::TargetingError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector6};
 use crate::md::ui::*;
@@ -130,6 +131,10 @@ impl fmt::Display for TargeterSolution {
                 Vary::VelocityX | Vary::VelocityY | Vary::VelocityZ => {
                     is_only_position = false;
                     "m/s"
+                }
+                _ => {
+                    is_only_position = false;
+                    ""
                 }
             };
             corrmsg.push_str(&format!(
@@ -328,7 +333,7 @@ where
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
         if self.objectives.is_empty() {
-            return Err(NyxError::UnderdeterminedProblem);
+            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
         }
 
         let mut is_bplane_tgt = false;
@@ -369,7 +374,7 @@ where
                     var.component
                 );
                 error!("{}", msg);
-                return Err(NyxError::TargetError(msg));
+                return Err(NyxError::Targeter(TargetingError::FrameError(msg)));
             }
 
             state_correction[var.component.vec_index()] += var.init_guess;
@@ -664,7 +669,7 @@ where
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution, NyxError> {
         if self.objectives.is_empty() {
-            return Err(NyxError::UnderdeterminedProblem);
+            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
         }
 
         let mut is_bplane_tgt = false;
@@ -710,6 +715,11 @@ where
                 }
                 Vary::VelocityZ => {
                     xi.orbit.vz += var.init_guess;
+                }
+                _ => {
+                    return Err(NyxError::Targeter(TargetingError::UnsupportedVariable(
+                        *var,
+                    )))
                 }
             }
             total_correction[i] += var.init_guess;
@@ -847,6 +857,11 @@ where
                         Vary::VelocityX => state.orbit.vx += total_correction[i],
                         Vary::VelocityY => state.orbit.vy += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz += total_correction[i],
+                        _ => {
+                            return Err(NyxError::Targeter(TargetingError::UnsupportedVariable(
+                                *var,
+                            )))
+                        }
                     }
                 }
 
@@ -921,6 +936,11 @@ where
                     }
                     Vary::VelocityZ => {
                         xi.orbit.vz += delta[i];
+                    }
+                    _ => {
+                        return Err(NyxError::Targeter(TargetingError::UnsupportedVariable(
+                            *var,
+                        )))
                     }
                 }
             }
@@ -1006,7 +1026,7 @@ where
                     obj.parameter, param_errors[i], obj.desired_value, obj.tolerance
                 ));
             }
-            Err(NyxError::TargetError(objmsg))
+            Err(NyxError::Targeter(TargetingError::Verification(objmsg)))
         }
     }
 }

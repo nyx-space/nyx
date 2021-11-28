@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;
 use std::convert::From;
@@ -80,10 +81,6 @@ pub enum NyxError {
     CorrectionIneffective(String),
     /// When there is an error during a Monte Carlo or in the conditions starting a Monte Carlo run
     MonteCarlo(String),
-    /// Raised if the variables to be adjusted lead to an over-determined of the problem for the targeter
-    TargetError(String),
-    /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
-    UnderdeterminedProblem,
     /// Returned if CCSDS encountered an error
     CCSDS(String),
     /// Returned if the targeter for `node_no` has failed
@@ -94,6 +91,7 @@ pub enum NyxError {
     CustomError(String),
     /// Hifitime errors that rose upward
     TimeError(TimeErrors),
+    Targeter(TargetingError),
 }
 
 impl fmt::Display for NyxError {

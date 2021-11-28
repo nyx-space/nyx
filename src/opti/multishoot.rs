@@ -19,6 +19,7 @@
 pub use super::CostFunction;
 // use crate::dynamics::guidance::{FiniteBurns, Mnvr};
 use super::ctrlnodes::Node;
+use crate::errors::TargetingError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector3};
 use crate::md::targeter::Targeter;
@@ -73,7 +74,7 @@ where
     ) -> Result<Self, NyxError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::UnderdeterminedProblem);
+            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
         }
 
         // Compute the direction of the objective
@@ -131,13 +132,13 @@ where
     ) -> Result<Self, NyxError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::UnderdeterminedProblem);
+            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
         }
 
         if !body_frame.is_body_fixed() {
-            return Err(NyxError::TargetError(
+            return Err(NyxError::Targeter(TargetingError::FrameError(
                 "Body frame is not body fixed".to_string(),
-            ));
+            )));
         }
 
         let delta_t = xf.epoch() - x0.epoch();

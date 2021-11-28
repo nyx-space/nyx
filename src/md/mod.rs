@@ -22,6 +22,8 @@ extern crate rayon;
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
 use crate::{Orbit, Spacecraft};
+use std::error::Error;
+use std::fmt;
 use std::fs::File;
 
 pub mod ui;
@@ -80,5 +82,40 @@ impl MdHdlr<Orbit> for OrbitStateOutput {
         self.csv_out
             .serialize(self.fmtr.fmt(state))
             .expect("could not format state");
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum TargetingError {
+    /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
+    UnderdeterminedProblem,
+    /// Raised if the variables of the problem are incorrectly configured
+    VariableError(String),
+    /// Raised in case of a targeting frame error
+    FrameError(String),
+    /// Raised if the targeted was configured with a variable that isn't supported (e.g. a maneuver alpha variable in the multiple shooting)
+    UnsupportedVariable(Variable),
+    /// Raised when the verification of a solution has failed
+    Verification(String),
+}
+
+impl fmt::Display for TargetingError {
+    // Prints the Keplerian orbital elements with units
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::UnderdeterminedProblem => write!(f, "The variables to be adjusted lead to an under-determined of the problem for the targeter"),
+            Self::VariableError(e) => write!(f, "Incorrectly configured variable: {}", e),
+            Self::FrameError(e) => write!(f, "Frame error in targeter: {}", e),
+            Self::UnsupportedVariable(v) => write!(f, "Unsupported variable in problem: {:?}", v),
+            Self::Verification(e) => write!(f, "Verification of targeting solution failed: {}",e)
+        }
+    }
+}
+
+impl Error for TargetingError {}
+
+impl From<TargetingError> for NyxError {
+    fn from(e: TargetingError) -> Self {
+        NyxError::Targeter(e)
     }
 }

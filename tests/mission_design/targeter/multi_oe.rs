@@ -80,7 +80,7 @@ fn tgt_sma_ecc() {
         dry_mass_kg: 10.0,
         fuel_mass_kg: 90.0,
         thruster: Some(Thruster {
-            thrust: 150.0,
+            thrust: 50.0,
             isp: 300.0,
         }),
         mode: GuidanceMode::Thrust,
@@ -153,7 +153,7 @@ fn tgt_sma_ecc() {
 
     let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mnvr = Mnvr::impulsive_to_finite(orig_dt, dv, spacecraft, &setup).unwrap();
-    println!("{}", mnvr);
+    println!("CONVERGED ON {}", mnvr);
     // And build the new dynamics
     let fb_guess = FiniteBurns {
         mnvrs: vec![mnvr],
@@ -161,10 +161,16 @@ fn tgt_sma_ecc() {
     };
 
     // Propagate for the duration of the burn
-    setup.set_max_step(mnvr.end - mnvr.start);
     setup.dynamics = setup.dynamics.with_ctrl(Arc::new(fb_guess));
+    // Propagate until maneuver start
+    let pre_mnvr = setup
+        .with(spacecraft)
+        .until_epoch(mnvr.start - mnvr.duration())
+        .unwrap();
+    // Use a small step through the maneuver
+    setup.set_max_step(mnvr.end - mnvr.start);
     let xf = setup
-        .with(spacecraft.with_guidance_mode(GuidanceMode::Custom(0)))
+        .with(pre_mnvr.with_guidance_mode(GuidanceMode::Custom(0)))
         .until_epoch(achievement_epoch)
         .unwrap();
     println!("{:x}", xf);
