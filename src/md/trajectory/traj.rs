@@ -60,17 +60,15 @@ where
 {
     pub(crate) fn append_spline(&mut self, segment: Spline<S>) {
         // Compute the number of seconds since start of trajectory
-        let offset_s = (((100.0 * (segment.start_epoch - self.start_state.epoch()).in_seconds())
-            .floor()) as i32)
-            .max(0);
+        let offset_s = ((100.0 * (segment.start_epoch - self.start_state.epoch()).in_seconds())
+            .floor()) as i32;
         self.segments.insert(offset_s, segment);
     }
 
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
         // Durations are darn precise and converting a -2.6e-23 into an i32 will be -1
-        let offset_s =
-            (((100.0 * (epoch - self.start_state.epoch()).in_seconds()).floor()) as i32).max(0);
+        let offset_s = ((100.0 * (epoch - self.start_state.epoch()).in_seconds()).floor()) as i32;
 
         // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
@@ -87,14 +85,31 @@ where
         }
     }
 
+    /// Returns whether this trajectory was generated backward
+    fn backward(&self) -> bool {
+        self.segments.keys().last().unwrap() > self.segments.keys().next().unwrap()
+    }
+
     /// Returns the first state in this ephemeris
     pub fn first(&self) -> S {
-        self.start_state
+        if self.backward() {
+            self.segments[self.segments.keys().last().unwrap()].end_state
+        } else {
+            self.start_state
+        }
     }
 
     /// Returns the last state in this ephemeris
     pub fn last(&self) -> S {
-        self.segments[self.segments.keys().last().unwrap()].end_state
+        if self.backward() {
+            // Note that this trajectory's "start_state" is actually the first state received, so it's chronologically the last state of the first spline.
+            let spline = &self.segments[self.segments.keys().next().unwrap()];
+            spline
+                .evaluate(spline.end_state, spline.start_epoch)
+                .unwrap()
+        } else {
+            self.segments[self.segments.keys().last().unwrap()].end_state
+        }
     }
 
     /// Creates an iterator through the trajectory by the provided step size
@@ -903,8 +918,17 @@ where
         )));
     }
     // Generate interpolation and flush.
-    let start_win_epoch = this_wdn.first().unwrap().epoch();
-    let end_win_epoch = this_wdn.last().unwrap().epoch();
+    let mut start_win_epoch = this_wdn.first().unwrap().epoch();
+    let mut end_win_epoch = this_wdn.last().unwrap().epoch();
+    let mut end_state = this_wdn.last().unwrap();
+    if end_win_epoch < start_win_epoch {
+        // Backward propagation, swap times
+        let tmp = start_win_epoch;
+        start_win_epoch = end_win_epoch;
+        end_win_epoch = tmp;
+        // Swap end states
+        end_state = this_wdn.first().unwrap();
+    }
     let window_duration = end_win_epoch - start_win_epoch;
 
     let mut ts = Vec::with_capacity(this_wdn.len());
@@ -966,6 +990,6 @@ where
         start_epoch: start_win_epoch,
         duration: window_duration,
         polynomials,
-        end_state: *this_wdn.last().unwrap(),
+        end_state: *end_state,
     })
 }

@@ -55,13 +55,6 @@ where
                 "Requested trajectory at time {} but that is past the interpolation window by {} (window of {})",
                 epoch, dur_into_window, self.duration
             )));
-        } else if dur_into_window.in_seconds() < -1.0 {
-            // We should not be in this window, but in the next one
-            // We allow for a delta of one second because of the rounding of the indexing.
-            return Err(NyxError::InvalidInterpolationData(format!(
-                "Bug: should be in next window: {}",
-                dur_into_window
-            )));
         }
 
         let t_prime = normalize(
