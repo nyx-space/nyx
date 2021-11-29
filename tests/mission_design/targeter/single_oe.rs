@@ -52,9 +52,10 @@ fn tgt_sma_from_apo() {
 
     // Check that the solutions nearly match
     println!(
-        "GMAT validation - tgt_sma_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_sma_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
 }
 
@@ -101,9 +102,10 @@ fn tgt_sma_from_peri_fd() {
 
     let gmat_sol = 0.03550369448069638;
     println!(
-        "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
@@ -156,9 +158,10 @@ fn tgt_hd_sma_from_peri() {
 
     let gmat_sol = 0.03550369448069638;
     println!(
-        "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
@@ -275,9 +278,10 @@ fn tgt_ecc_from_apo() {
 
     let gmat_sol = 0.7721483022815125;
     println!(
-        "GMAT validation - tgt_ecc_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_ecc_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
@@ -345,9 +349,10 @@ fn tgt_ecc_from_peri() {
 
     let gmat_sol = 0.6926746704643234;
     println!(
-        "GMAT validation - tgt_ecc_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_ecc_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
@@ -396,9 +401,10 @@ fn tgt_raan_from_apo() {
 
     let gmat_sol = 0.30344716711198855;
     println!(
-        "GMAT validation - tgt_raan_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_raan_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
@@ -466,9 +472,10 @@ fn tgt_raan_from_peri() {
 
     let gmat_sol = 0.45110541873478793;
     println!(
-        "GMAT validation - tgt_raan_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_raan_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
@@ -517,9 +524,10 @@ fn tgt_aop_from_apo() {
 
     let gmat_sol = 0.11772316331182386;
     println!(
-        "GMAT validation - tgt_aop_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_aop_from_apo: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
@@ -567,9 +575,10 @@ fn tgt_aop_from_peri() {
 
     let gmat_sol = 0.12197875695918228;
     println!(
-        "GMAT validation - tgt_aop_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
+        "GMAT validation - tgt_aop_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s (better = {})",
         solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
+        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3,
+        solution_fd.correction.norm() < gmat_sol
     );
     // GMAT validation
     assert!(
