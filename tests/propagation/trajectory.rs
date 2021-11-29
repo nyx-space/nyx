@@ -374,7 +374,6 @@ fn traj_spacecraft() {
     );
 }
 
-#[ignore]
 #[allow(clippy::identity_op)]
 #[test]
 fn traj_ephem_backward() {
@@ -411,16 +410,22 @@ fn traj_ephem_backward() {
     // === Below is the validation of the ephemeris == //
 
     assert_eq!(
-        ephem.segments.len(),
-        1010,
-        "Wrong number of expected segments"
+        ephem.first(),
+        start_state,
+        "Wrong initial state\nGot:  {}\nWant: {}",
+        ephem.first(),
+        start_state
     );
-
-    assert_eq!(ephem.first(), start_state, "Wrong initial state");
-    assert_eq!(ephem.last(), end_state, "Wrong final state");
-    assert!(ephem.last().stm().unwrap().norm() > 0.0, "STM is not set!");
+    assert_eq!(
+        ephem.last(),
+        end_state,
+        "Wrong final state\nGot:  {}\nWant: {}",
+        ephem.last(),
+        end_state
+    );
+    assert!(ephem.last().stm().is_err(), "STM is set!");
     assert!(
-        ephem.at(end_state.dt + 1 * TimeUnit::Nanosecond).is_err(),
+        ephem.at(end_state.dt - 1 * TimeUnit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
     );
 
@@ -430,7 +435,7 @@ fn traj_ephem_backward() {
     std::thread::spawn(move || {
         setup
             .with(start_state)
-            .for_duration_with_channel(31 * TimeUnit::Day, tx)
+            .for_duration_with_channel(-31 * TimeUnit::Day, tx)
             .unwrap();
     });
 
@@ -440,6 +445,8 @@ fn traj_ephem_backward() {
     let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
     let mut max_err = (eval_state.as_vector().unwrap() - start_state.as_vector().unwrap()).norm();
+
+    println!("{}", ephem);
 
     while let Ok(prop_state) = rx.recv() {
         let eval_state = ephem.at(prop_state.dt).unwrap();

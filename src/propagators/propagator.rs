@@ -25,7 +25,7 @@ use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
-use crate::md::trajectory::{interpolate, InterpState, Traj};
+use crate::md::trajectory::{interpolate, InterpState, Traj, TrajError};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::State;
@@ -298,9 +298,11 @@ where
                         .map(|&x| x)
                         .collect::<Vec<D::StateType>>();
 
-                    tx_bucket
-                        .send(this_wdn)
-                        .map_err(|_| NyxError::TrajectoryCreationError)?;
+                    tx_bucket.send(this_wdn).map_err(|_| {
+                        NyxError::from(TrajError::CreationError(
+                            "could not send onto channel".to_string(),
+                        ))
+                    })?;
 
                     // Now, let's remove the first states
                     for _ in 0..items_per_segments - 1 {
@@ -339,7 +341,11 @@ where
                             .map(|&x| x)
                             .collect::<Vec<D::StateType>>(),
                     )
-                    .map_err(|_| NyxError::TrajectoryCreationError)?;
+                    .map_err(|_| {
+                        NyxError::from(TrajError::CreationError(
+                            "could not send onto channel".to_string(),
+                        ))
+                    })?;
                 if start_idx > 0 || window_states.len() < items_per_segments {
                     break;
                 }
@@ -363,11 +369,12 @@ where
         let mut traj = Traj {
             segments: BTreeMap::new(),
             start_state,
+            backward: false,
         };
 
         for maybe_spline in splines {
             let spline = maybe_spline?;
-            traj.append_spline(spline);
+            traj.append_spline(spline)?;
         }
 
         Ok((end_state, traj))

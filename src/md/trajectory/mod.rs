@@ -26,7 +26,49 @@ pub use traj::Traj;
 use super::StateParameter;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::time::{Duration, Epoch};
 use crate::{NyxError, Orbit, Spacecraft, State};
+
+use std::error::Error;
+use std::fmt;
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum TrajError {
+    EventNotFound {
+        start: Epoch,
+        end: Epoch,
+        event: String,
+    },
+    NoInterpolationData(Epoch),
+    CreationError(String),
+    OutOfSpline {
+        req_epoch: Epoch,
+        req_dur: Duration,
+        spline_dur: Duration,
+    },
+}
+
+impl fmt::Display for TrajError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::EventNotFound { start, end, event } => {
+                write!(f, "Event {} not found between {} and {}", event, start, end)
+            }
+            Self::CreationError(reason) => write!(f, "Failed to create trajectory: {}", reason),
+            Self::NoInterpolationData(e) => write!(f, "No interpolation data at {}", e),
+            Self::OutOfSpline {
+                req_epoch,
+                req_dur,
+                spline_dur,
+            } => {
+                write!(f, "Probable bug: Requested epoch {}, corresponding to an offset of {} in a spline of duration {}", req_epoch, req_dur, spline_dur)
+            }
+        }
+    }
+}
+
+impl Error for TrajError {}
+
 pub trait InterpState: State
 where
     Self: Sized,

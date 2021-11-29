@@ -21,7 +21,7 @@ extern crate rayon;
 use self::rayon::prelude::*;
 use super::spline::{Spline, INTERPOLATION_SAMPLES, SPLINE_DEGREE};
 use super::traj_it::TrajIterator;
-use super::InterpState;
+use super::{InterpState, TrajError};
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
@@ -35,6 +35,7 @@ use crate::State;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::Iterator;
+use std::ops;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant;
@@ -50,6 +51,7 @@ where
     /// number of seconds since the start of this ephemeris rounded down
     pub segments: BTreeMap<i32, Spline<S>>,
     pub(crate) start_state: S,
+    pub(crate) backward: bool,
 }
 
 impl<S: InterpState> Traj<S>
@@ -57,19 +59,27 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    pub(crate) fn append_spline(&mut self, segment: Spline<S>) {
+    pub(crate) fn append_spline(&mut self, segment: Spline<S>) -> Result<(), NyxError> {
         // Compute the number of seconds since start of trajectory
-        let offset_s = (((100.0 * (segment.start_epoch - self.start_state.epoch()).in_seconds())
-            .floor()) as i32)
-            .max(0);
+        let offset_s = ((100.0 * (segment.start_epoch - self.start_state.epoch()).in_seconds())
+            .floor()) as i32;
+        if offset_s.is_negative() {
+            if !self.segments.is_empty() && !self.backward {
+                return Err(NyxError::from(TrajError::CreationError(format!(
+                    "Offset = {} but traj is not backward",
+                    offset_s
+                ))));
+            }
+            self.backward = true;
+        }
         self.segments.insert(offset_s, segment);
+        Ok(())
     }
 
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
         // Durations are darn precise and converting a -2.6e-23 into an i32 will be -1
-        let offset_s =
-            (((100.0 * (epoch - self.start_state.epoch()).in_seconds()).floor()) as i32).max(0);
+        let offset_s = ((100.0 * (epoch - self.start_state.epoch()).in_seconds()).floor()) as i32;
 
         // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
@@ -79,7 +89,7 @@ where
                 if last_item.epoch() == epoch {
                     Ok(last_item)
                 } else {
-                    Err(NyxError::NoInterpolationData(format!("{}", epoch)))
+                    Err(NyxError::from(TrajError::NoInterpolationData(epoch)))
                 }
             }
             Some((_, segment)) => segment.evaluate(self.start_state, epoch),
@@ -88,12 +98,24 @@ where
 
     /// Returns the first state in this ephemeris
     pub fn first(&self) -> S {
-        self.start_state
+        if self.backward {
+            self.segments[self.segments.keys().last().unwrap()].end_state
+        } else {
+            self.start_state
+        }
     }
 
     /// Returns the last state in this ephemeris
     pub fn last(&self) -> S {
-        self.segments[self.segments.keys().last().unwrap()].end_state
+        if self.backward {
+            // Note that this trajectory's "start_state" is actually the first state received, so it's chronologically the last state of the first spline.
+            let spline = &self.segments[self.segments.keys().next().unwrap()];
+            spline
+                .evaluate(spline.end_state, spline.start_epoch)
+                .unwrap()
+        } else {
+            self.segments[self.segments.keys().last().unwrap()].end_state
+        }
     }
 
     /// Creates an iterator through the trajectory by the provided step size
@@ -160,10 +182,11 @@ where
             }
             if has_converged(xa, xb) {
                 // The event isn't in the bracket
-                return Err(NyxError::EventNotInEpochBraket(
-                    start.to_string(),
-                    end.to_string(),
-                ));
+                return Err(NyxError::from(TrajError::EventNotFound {
+                    start,
+                    end,
+                    event: format!("{}", event),
+                }));
             }
             let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
                 xa * yb * yc / ((ya - yb) * (ya - yc))
@@ -231,10 +254,11 @@ where
         let start_epoch = self.first().epoch();
         let end_epoch = self.last().epoch();
         if start_epoch == end_epoch {
-            return Err(NyxError::NoInterpolationData(format!(
-                "Trajector of {} segments has identical start and end dates -- cannot search it",
-                self.segments.len()
-            )));
+            return Err(NyxError::from(TrajError::EventNotFound {
+                start: start_epoch,
+                end: end_epoch,
+                event: format!("{}", event),
+            }));
         }
         let heuristic = (end_epoch - start_epoch) / 100;
         info!(
@@ -306,17 +330,19 @@ where
 
                     // If there still isn't any match, report that the event was not found
                     if states.is_empty() {
-                        return Err(NyxError::EventNotInEpochBraket(
-                            start_epoch.to_string(),
-                            end_epoch.to_string(),
-                        ));
+                        return Err(NyxError::from(TrajError::EventNotFound {
+                            start: start_epoch,
+                            end: end_epoch,
+                            event: format!("{}", event),
+                        }));
                     }
                 }
                 Err(_) => {
-                    return Err(NyxError::EventNotInEpochBraket(
-                        start_epoch.to_string(),
-                        end_epoch.to_string(),
-                    ))
+                    return Err(NyxError::from(TrajError::EventNotFound {
+                        start: start_epoch,
+                        end: end_epoch,
+                        event: format!("{}", event),
+                    }));
                 }
             };
         }
@@ -368,6 +394,76 @@ where
     }
 }
 
+impl<S: InterpState> ops::Add for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    type Output = Traj<S>;
+
+    /// Add one trajectory to another. If they do not overlap to within 10ms, a warning will be printed.
+    fn add(self, other: Traj<S>) -> Self::Output {
+        self + &other
+    }
+}
+
+impl<S: InterpState> ops::Add<&Traj<S>> for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    type Output = Traj<S>;
+
+    /// Add one trajectory to another. If they do not overlap to within 10ms, a warning will be printed.
+    fn add(self, other: &Traj<S>) -> Self::Output {
+        let (first, second) = if self.first().epoch() < other.first().epoch() {
+            (&self, other)
+        } else {
+            (other, &self)
+        };
+
+        if first.last().epoch() < second.first().epoch() {
+            let gap = second.first().epoch() - first.last().epoch();
+            warn!(
+                "Resulting merged trajectory will have a time-gap of {} starting at {}",
+                gap,
+                first.last().epoch()
+            );
+        }
+
+        let mut me = Self {
+            segments: first.segments.clone(),
+            start_state: first.start_state,
+            backward: false,
+        };
+        // Now start adding the other segments while correcting the index
+        for spline in second.segments.values() {
+            me.append_spline(spline.clone()).unwrap();
+        }
+        me
+    }
+}
+
+impl<S: InterpState> ops::AddAssign for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    fn add_assign(&mut self, rhs: Self) {
+        *self = self.clone() + rhs;
+    }
+}
+
+impl<S: InterpState> ops::AddAssign<&Traj<S>> for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    fn add_assign(&mut self, rhs: &Self) {
+        *self = self.clone() + rhs;
+    }
+}
+
 impl Traj<Orbit> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     #[allow(clippy::map_clone)]
@@ -402,8 +498,11 @@ impl Traj<Orbit> {
                         .map(|&x| x)
                         .collect::<Vec<Orbit>>();
 
-                    tx.send(this_wdn)
-                        .map_err(|_| NyxError::TrajectoryCreationError)?;
+                    tx.send(this_wdn).map_err(|_| {
+                        NyxError::from(TrajError::CreationError(
+                            "could not send onto channel".to_string(),
+                        ))
+                    })?;
 
                     // Now, let's remove the first states
                     for _ in 0..items_per_segments - 1 {
@@ -431,7 +530,11 @@ impl Traj<Orbit> {
                         .map(|&x| x)
                         .collect::<Vec<Orbit>>(),
                 )
-                .map_err(|_| NyxError::TrajectoryCreationError)?;
+                .map_err(|_| {
+                    NyxError::from(TrajError::CreationError(
+                        "could not send final window onto channel".to_string(),
+                    ))
+                })?;
                 if start_idx > 0 {
                     break;
                 }
@@ -454,11 +557,13 @@ impl Traj<Orbit> {
         let mut traj = Traj {
             segments: BTreeMap::new(),
             start_state,
+            backward: false,
         };
 
         for maybe_spline in splines {
             let spline = maybe_spline?;
-            traj.append_spline(spline);
+            // This shouldn't fail because we're progressing through the trajectory in a chronological fashion
+            traj.append_spline(spline).unwrap();
         }
 
         info!(
@@ -629,8 +734,11 @@ impl Traj<Spacecraft> {
                         .map(|&x| x)
                         .collect::<Vec<Spacecraft>>();
 
-                    tx.send(this_wdn)
-                        .map_err(|_| NyxError::TrajectoryCreationError)?;
+                    tx.send(this_wdn).map_err(|_| {
+                        NyxError::from(TrajError::CreationError(
+                            "could not send onto channel".to_string(),
+                        ))
+                    })?;
 
                     // Now, let's remove the first states
                     for _ in 0..items_per_segments - 1 {
@@ -658,7 +766,11 @@ impl Traj<Spacecraft> {
                         .map(|&x| x)
                         .collect::<Vec<Spacecraft>>(),
                 )
-                .map_err(|_| NyxError::TrajectoryCreationError)?;
+                .map_err(|_| {
+                    NyxError::from(TrajError::CreationError(
+                        "could not send final window onto channel".to_string(),
+                    ))
+                })?;
                 if start_idx > 0 {
                     break;
                 }
@@ -681,11 +793,13 @@ impl Traj<Spacecraft> {
         let mut traj = Traj {
             segments: BTreeMap::new(),
             start_state,
+            backward: false,
         };
 
         for maybe_spline in splines {
             let spline = maybe_spline?;
-            traj.append_spline(spline);
+            // This shouldn't fail because we're progressing through the trajectory in a chronological fashion
+            traj.append_spline(spline).unwrap();
         }
 
         info!(
@@ -827,14 +941,20 @@ where
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
     if this_wdn.is_empty() {
-        return Err(NyxError::NoInterpolationData(format!(
-            "Cannot interpolate with only {} items",
-            this_wdn.len()
+        return Err(NyxError::from(TrajError::CreationError(
+            "cannot interpolate with zero items".to_string(),
         )));
     }
     // Generate interpolation and flush.
-    let start_win_epoch = this_wdn.first().unwrap().epoch();
-    let end_win_epoch = this_wdn.last().unwrap().epoch();
+    let mut start_win_epoch = this_wdn.first().unwrap().epoch();
+    let mut end_win_epoch = this_wdn.last().unwrap().epoch();
+    let mut end_state = this_wdn.last().unwrap();
+    if end_win_epoch < start_win_epoch {
+        // Backward propagation, swap times
+        std::mem::swap(&mut start_win_epoch, &mut end_win_epoch);
+        // Swap end states
+        end_state = this_wdn.first().unwrap();
+    }
     let window_duration = end_win_epoch - start_win_epoch;
 
     let mut ts = Vec::with_capacity(this_wdn.len());
@@ -896,6 +1016,6 @@ where
         start_epoch: start_win_epoch,
         duration: window_duration,
         polynomials,
-        end_state: *this_wdn.last().unwrap(),
+        end_state: *end_state,
     })
 }
