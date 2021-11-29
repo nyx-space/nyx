@@ -35,6 +35,7 @@ use crate::State;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::Iterator;
+use std::ops;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant;
@@ -365,6 +366,75 @@ where
         }
 
         Ok((min_state, max_state))
+    }
+}
+
+impl<S: InterpState> ops::Add for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    type Output = Traj<S>;
+
+    /// Add one trajectory to another. If they do not overlap to within 10ms, a warning will be printed.
+    fn add(self, other: Traj<S>) -> Self::Output {
+        self + &other
+    }
+}
+
+impl<S: InterpState> ops::Add<&Traj<S>> for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    type Output = Traj<S>;
+
+    /// Add one trajectory to another. If they do not overlap to within 10ms, a warning will be printed.
+    fn add(self, other: &Traj<S>) -> Self::Output {
+        let (first, second) = if self.first().epoch() < other.first().epoch() {
+            (&self, other)
+        } else {
+            (other, &self)
+        };
+
+        if first.last().epoch() < second.first().epoch() {
+            let gap = second.first().epoch() - first.last().epoch();
+            warn!(
+                "Resulting merged trajectory will have a time-gap of {} starting at {}",
+                gap,
+                first.last().epoch()
+            );
+        }
+
+        let mut me = Self {
+            segments: first.segments.clone(),
+            start_state: first.start_state,
+        };
+        // Now start adding the other segments while correcting the index
+        for spline in second.segments.values() {
+            me.append_spline(spline.clone());
+        }
+        me
+    }
+}
+
+impl<S: InterpState> ops::AddAssign for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    fn add_assign(&mut self, rhs: Self) {
+        *self = self.clone() + rhs;
+    }
+}
+
+impl<S: InterpState> ops::AddAssign<&Traj<S>> for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    fn add_assign(&mut self, rhs: &Self) {
+        *self = self.clone() + rhs;
     }
 }
 
