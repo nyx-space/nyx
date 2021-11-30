@@ -120,7 +120,11 @@ where
 
     /// Creates an iterator through the trajectory by the provided step size
     pub fn every(&self, step: Duration) -> TrajIterator<S> {
-        self.every_between(step, self.first().epoch(), self.last().epoch())
+        if self.backward {
+            self.every_between(step, self.last().epoch(), self.first().epoch())
+        } else {
+            self.every_between(step, self.first().epoch(), self.last().epoch())
+        }
     }
 
     /// Creates an iterator through the trajectory by the provided step size between the provided bounds

@@ -236,22 +236,22 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
                     return Err(NyxError::CtrlExistsButNoThrusterAvail);
                 }
                 let thruster = osc_sc.thruster.unwrap();
-                let thrust_power = ctrl.throttle(&osc_sc);
-                if !(0.0..=1.0).contains(&thrust_power) {
-                    return Err(NyxError::CtrlThrottleRangeErr(thrust_power));
-                } else if thrust_power > 0.0 {
+                let thrust_throttle_lvl = ctrl.throttle(&osc_sc);
+                if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
+                    return Err(NyxError::CtrlThrottleRangeErr(thrust_throttle_lvl));
+                } else if thrust_throttle_lvl > 0.0 {
                     // Thrust arc
                     let thrust_inertial = ctrl.direction(&osc_sc);
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         return Err(NyxError::CtrlNotAUnitVector(thrust_inertial.norm()));
                     }
                     // Compute the thrust in Newtons and Isp
-                    let total_thrust = (thrust_power * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
+                    let total_thrust = (thrust_throttle_lvl * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
                     (
                         thrust_inertial * total_thrust,
                         if self.decrement_mass {
-                            let fuel_usage =
-                                thrust_power * thruster.thrust / (thruster.isp * STD_GRAVITY);
+                            let fuel_usage = thrust_throttle_lvl * thruster.thrust
+                                / (thruster.isp * STD_GRAVITY);
                             -fuel_usage
                         } else {
                             0.0

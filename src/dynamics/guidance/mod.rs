@@ -47,17 +47,17 @@ impl Thruster {
 /// tie the DeltaVctrl to a MissionArc.
 pub trait GuidanceLaw: Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, state: &Spacecraft) -> Vector3<f64>;
+    fn direction(&self, osc_state: &Spacecraft) -> Vector3<f64>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, state: &Spacecraft) -> f64;
+    fn throttle(&self, osc_state: &Spacecraft) -> f64;
 
     /// Prepares the controller for the next maneuver by returning the next guidance mode.
-    fn next(&self, state: &Spacecraft) -> GuidanceMode;
+    fn next(&self, next_state: &Spacecraft) -> GuidanceMode;
 
     /// Returns whether this thrust control has been achieved, if it has an objective
-    fn achieved(&self, _state: &Spacecraft) -> Result<bool, NyxError> {
+    fn achieved(&self, _osc_state: &Spacecraft) -> Result<bool, NyxError> {
         Err(NyxError::NoObjectiveDefined)
     }
 }
