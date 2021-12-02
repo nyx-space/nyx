@@ -550,9 +550,14 @@ impl StateFormatter {
                 orbit
             };
 
-            formatted.push(match orbit.value(&hdr.param) {
-                Ok(value) => format!("{:.16}", value),
-                Err(e) => unimplemented!("{:?} cannot yet be formatted (yet): {}", hdr.param, e),
+            formatted.push(match hdr.param {
+                StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(orbit.dt),
+                _ => match orbit.value(&hdr.param) {
+                    Ok(value) => format!("{:.16}", value),
+                    Err(e) => {
+                        unimplemented!("{:?} cannot yet be formatted (yet): {}", hdr.param, e)
+                    }
+                },
             });
         }
 

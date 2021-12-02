@@ -244,19 +244,26 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
                     let thrust_inertial = ctrl.direction(&osc_sc);
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         return Err(NyxError::CtrlNotAUnitVector(thrust_inertial.norm()));
+                    } else if thrust_inertial.norm().is_normal() {
+                        // Compute the thrust in Newtons and Isp
+                        let total_thrust = (thrust_throttle_lvl * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
+                        (
+                            thrust_inertial * total_thrust,
+                            if self.decrement_mass {
+                                let fuel_usage = thrust_throttle_lvl * thruster.thrust
+                                    / (thruster.isp * STD_GRAVITY);
+                                -fuel_usage
+                            } else {
+                                0.0
+                            },
+                        )
+                    } else {
+                        warn!(
+                            "Abnormal thrust direction vector\t|u| = {}",
+                            thrust_inertial.norm()
+                        );
+                        (Vector3::zeros(), 0.0)
                     }
-                    // Compute the thrust in Newtons and Isp
-                    let total_thrust = (thrust_throttle_lvl * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
-                    (
-                        thrust_inertial * total_thrust,
-                        if self.decrement_mass {
-                            let fuel_usage = thrust_throttle_lvl * thruster.thrust
-                                / (thruster.isp * STD_GRAVITY);
-                            -fuel_usage
-                        } else {
-                            0.0
-                        },
-                    )
                 } else {
                     (Vector3::zeros(), 0.0)
                 }
