@@ -20,6 +20,7 @@ use super::{Orbit, State};
 use crate::dynamics::guidance::Thruster;
 use crate::errors::NyxError;
 use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
+use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::utils::rss_orbit_errors;
 use std::default::Default;
@@ -417,6 +418,15 @@ impl State for Spacecraft {
 
     fn add(self, other: OVector<f64, Self::Size>) -> Self {
         self + other
+    }
+
+    fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
+        match *param {
+            StateParameter::Cd => Ok(self.cd),
+            StateParameter::Cr => Ok(self.cr),
+            StateParameter::FuelMass => Ok(self.fuel_mass_kg),
+            _ => self.orbit.value(param),
+        }
     }
 }
 

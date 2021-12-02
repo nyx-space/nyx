@@ -422,20 +422,19 @@ where
             cur_xi.enable_stm();
             let xf = self.prop.with(cur_xi).until_epoch(achievement_epoch)?.orbit;
 
-            let xf_dual_obj_frame = match &self.objective_frame {
-                Some((frame, cosm)) => {
-                    let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
-                    OrbitDual::from(orbit_obj_frame)
-                }
-                None => OrbitDual::from(xf),
-            };
-
             // Build the error vector
             let mut param_errors = Vec::with_capacity(self.objectives.len());
             let mut converged = true;
 
             // Build the B-Plane once, if needed, and always in the objective frame
             let b_plane = if is_bplane_tgt {
+                let xf_dual_obj_frame = match &self.objective_frame {
+                    Some((frame, cosm)) => {
+                        let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
+                        OrbitDual::from(orbit_obj_frame)
+                    }
+                    None => OrbitDual::from(xf),
+                };
                 Some(BPlane::from_dual(xf_dual_obj_frame)?)
             } else {
                 None
@@ -449,18 +448,16 @@ where
             let mut jac = DMatrix::from_element(self.objectives.len(), self.variables.len(), 0.0);
 
             for (i, obj) in self.objectives.iter().enumerate() {
-                let partial = if obj.parameter.is_b_plane() {
+                let achieved = if obj.parameter.is_b_plane() {
                     match obj.parameter {
-                        StateParameter::BdotR => b_plane.unwrap().b_r,
-                        StateParameter::BdotT => b_plane.unwrap().b_t,
-                        StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                        StateParameter::BdotR => b_plane.unwrap().b_r.real(),
+                        StateParameter::BdotT => b_plane.unwrap().b_t.real(),
+                        StateParameter::BLTOF => b_plane.unwrap().ltof_s.real(),
                         _ => unreachable!(),
                     }
                 } else {
-                    xf_dual_obj_frame.partial_for(&obj.parameter)?
+                    xf.value(&obj.parameter)?
                 };
-
-                let achieved = partial.real();
 
                 let (ok, param_err) = obj.assess_raw(achieved);
                 if !ok {
@@ -507,32 +504,25 @@ where
                         .unwrap()
                         .orbit;
 
-                    let xf_dual_obj_frame = match &self.objective_frame {
-                        Some((frame, cosm)) => {
-                            let orbit_obj_frame = cosm.frame_chg(&this_xf, *frame);
-                            OrbitDual::from(orbit_obj_frame)
-                        }
-                        None => OrbitDual::from(this_xf),
-                    };
-
-                    let b_plane = if is_bplane_tgt {
-                        Some(BPlane::from_dual(xf_dual_obj_frame).unwrap())
-                    } else {
-                        None
-                    };
-
-                    let partial = if obj.parameter.is_b_plane() {
+                    let this_achieved = if is_bplane_tgt {
+                        let xf_dual_obj_frame = match &self.objective_frame {
+                            Some((frame, cosm)) => {
+                                let orbit_obj_frame = cosm.frame_chg(&this_xf, *frame);
+                                OrbitDual::from(orbit_obj_frame)
+                            }
+                            None => OrbitDual::from(this_xf),
+                        };
+                        let b_plane = Some(BPlane::from_dual(xf_dual_obj_frame).unwrap());
                         match obj.parameter {
-                            StateParameter::BdotR => b_plane.unwrap().b_r,
-                            StateParameter::BdotT => b_plane.unwrap().b_t,
-                            StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                            StateParameter::BdotR => b_plane.unwrap().b_r.real(),
+                            StateParameter::BdotT => b_plane.unwrap().b_t.real(),
+                            StateParameter::BLTOF => b_plane.unwrap().ltof_s.real(),
                             _ => unreachable!(),
                         }
                     } else {
-                        xf_dual_obj_frame.partial_for(&obj.parameter).unwrap()
+                        this_xf.value(&obj.parameter).unwrap()
                     };
 
-                    let this_achieved = partial.real();
                     *jac_val = (this_achieved - achieved) / var.perturbation;
                 });
 

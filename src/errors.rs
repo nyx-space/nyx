@@ -132,6 +132,9 @@ impl fmt::Display for NyxError {
             Self::MultipleShootingTargeter(n, e) => {
                 write!(f, "Multiple shooting failed on node {} with {}", n, e)
             }
+            Self::MaxIterReached(e) => {
+                write!(f, "MaxIterReached: {}", e)
+            }
             _ => write!(f, "{:?}", self),
         }
     }

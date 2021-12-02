@@ -89,14 +89,14 @@ pub enum StateParameter {
     RAAN,
     /// Norm of the radius vector
     Rmag,
+    /// Semi minor axis (km)
+    SemiMinorAxis,
     /// Semi parameter (km)
     SemiParameter,
     /// Computes the slant angle by returning the arccos of the dot product between state's radius vector and the provided vector coordinates. The vector will be normalized if needed.
     SlantAngle { x: f64, y: f64, z: f64 },
     /// Semi major axis (km)
     SMA,
-    /// Semi minor axis (km)
-    SemiMinorAxis,
     /// True anomaly
     TrueAnomaly,
     /// True longitude
