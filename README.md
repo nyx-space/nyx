@@ -6,6 +6,7 @@ and portability to all platforms supported by [Rust](https://forge.rust-lang.org
 
 [![nyx-space on crates.io][cratesio-image]][cratesio]
 [![nyx-space on docs.rs][docsrs-image]][docsrs]
+[![LoC](https://tokei.rs/b1/gitlab/nyx-space/nyx?category=lines)](https://github.com/nyx-space/nyx).
 
 [cratesio-image]: https://img.shields.io/crates/v/nyx-space.svg
 [cratesio]: https://crates.io/crates/nyx-space

@@ -266,7 +266,7 @@ pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> 
 /// Compute the Moore Penrose pseudo-inverse if needed, else the real inverse
 /// Warning: if this is a square matrix, it will be cloned prior to being inversed
 #[allow(clippy::comparison_chain)]
-pub(crate) fn pseudo_inverse(mat: &DMatrix<f64>, err: NyxError) -> Result<DMatrix<f64>, NyxError> {
+pub fn pseudo_inverse(mat: &DMatrix<f64>, err: NyxError) -> Result<DMatrix<f64>, NyxError> {
     let (rows, cols) = mat.shape();
     if cols == rows {
         match mat.clone().try_inverse() {
