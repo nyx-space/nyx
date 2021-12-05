@@ -177,52 +177,14 @@ impl Mnvr {
 
         // The variables in this targeter
         let variables = [
-            Variable {
-                component: Vary::MnvrAlpha,
-                init_guess: alpha_tdv,
-                perturbation: 30.0,
-                ..Default::default()
-            },
-            Variable {
-                component: Vary::MnvrAlphaDot,
-                init_guess: 0.0,
-                perturbation: 10.0,
-                ..Default::default()
-            },
-            Variable {
-                component: Vary::MnvrAlphaDDot,
-                init_guess: alpha_ddot_tdv,
-                perturbation: 10.0,
-                ..Default::default()
-            },
-            Variable {
-                component: Vary::MnvrBeta,
-                perturbation: 30.0,
-                init_guess: beta_tdv,
-                ..Default::default()
-            },
-            Variable {
-                component: Vary::MnvrBetaDot,
-                init_guess: 0.0,
-                perturbation: 10.0,
-                ..Default::default()
-            },
-            Variable {
-                component: Vary::MnvrBetaDDot,
-                init_guess: beta_ddot_tdv,
-                perturbation: 10.0,
-                ..Default::default()
-            },
-            Variable {
-                component: Vary::StartEpoch,
-                perturbation: 10.0,
-                ..Default::default()
-            },
-            Variable {
-                component: Vary::Duration,
-                perturbation: 10.0,
-                ..Default::default()
-            },
+            Variable::from(Vary::MnvrAlpha).with_initial_guess(alpha_tdv),
+            Variable::from(Vary::MnvrAlphaDot),
+            Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(alpha_ddot_tdv),
+            Variable::from(Vary::MnvrBeta).with_initial_guess(beta_tdv),
+            Variable::from(Vary::MnvrBetaDot),
+            Variable::from(Vary::MnvrBetaDDot).with_initial_guess(beta_ddot_tdv),
+            Variable::from(Vary::StartEpoch),
+            Variable::from(Vary::Duration),
         ];
 
         println!("INIT    \t{}", spacecraft);
@@ -238,19 +200,19 @@ impl Mnvr {
         let mut prev_err_norm = std::f64::INFINITY;
         // The objectives are organized as initial state constraints first and final state last
         let mut objectives = [
-            Objective::within_tolerance(StateParameter::X, x0_constraint.orbit.x, 1e-5),
-            Objective::within_tolerance(StateParameter::Y, x0_constraint.orbit.y, 1e-5),
-            Objective::within_tolerance(StateParameter::Z, x0_constraint.orbit.z, 1e-5),
-            Objective::within_tolerance(StateParameter::VX, x0_constraint.orbit.vx, 1e-5),
-            Objective::within_tolerance(StateParameter::VY, x0_constraint.orbit.vy, 1e-5),
-            Objective::within_tolerance(StateParameter::VZ, x0_constraint.orbit.vz, 1e-5),
+            Objective::within_tolerance(StateParameter::X, x0_constraint.orbit.x, 1e-3),
+            Objective::within_tolerance(StateParameter::Y, x0_constraint.orbit.y, 1e-3),
+            Objective::within_tolerance(StateParameter::Z, x0_constraint.orbit.z, 1e-3),
+            Objective::within_tolerance(StateParameter::VX, x0_constraint.orbit.vx, 1e-3),
+            Objective::within_tolerance(StateParameter::VY, x0_constraint.orbit.vy, 1e-3),
+            Objective::within_tolerance(StateParameter::VZ, x0_constraint.orbit.vz, 1e-3),
             // xf constraints
-            Objective::within_tolerance(StateParameter::X, xf_constraint.orbit.x, 1e-5),
-            Objective::within_tolerance(StateParameter::Y, xf_constraint.orbit.y, 1e-5),
-            Objective::within_tolerance(StateParameter::Z, xf_constraint.orbit.z, 1e-5),
-            Objective::within_tolerance(StateParameter::VX, xf_constraint.orbit.vx, 1e-5),
-            Objective::within_tolerance(StateParameter::VY, xf_constraint.orbit.vy, 1e-5),
-            Objective::within_tolerance(StateParameter::VZ, xf_constraint.orbit.vz, 1e-5),
+            Objective::within_tolerance(StateParameter::X, xf_constraint.orbit.x, 1e-3),
+            Objective::within_tolerance(StateParameter::Y, xf_constraint.orbit.y, 1e-3),
+            Objective::within_tolerance(StateParameter::Z, xf_constraint.orbit.z, 1e-3),
+            Objective::within_tolerance(StateParameter::VX, xf_constraint.orbit.vx, 1e-3),
+            Objective::within_tolerance(StateParameter::VY, xf_constraint.orbit.vy, 1e-3),
+            Objective::within_tolerance(StateParameter::VZ, xf_constraint.orbit.vz, 1e-3),
         ];
 
         const N_OBJ: usize = 12;
@@ -299,7 +261,7 @@ impl Mnvr {
 
             // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
             // As such, it includes the STM of that variable for the whole propagation arc.
-            let mut jac = DMatrix::from_element(objectives.len(), 8, 0.0);
+            let mut jac = DMatrix::from_element(objectives.len(), variables.len(), 0.0);
 
             for (i, obj) in objectives.iter().enumerate() {
                 let achieved = if i < objectives.len() / 2 {
@@ -346,10 +308,28 @@ impl Mnvr {
                             .add_val_in_order(perturbation, *j - 3)
                             .unwrap();
                     } else if var.component == Vary::StartEpoch {
+                        let prev_end = this_mnvr.start;
                         // Modification of the start epoch of the burn
-                        this_mnvr.start = this_mnvr.start + perturbation.seconds();
+                        this_mnvr.start = this_mnvr.start - perturbation.seconds();
+                        println!(
+                            "#({}, {}) START WAS {}\t\tNOW IS: {} (pert = {})",
+                            i,
+                            j,
+                            prev_end,
+                            this_mnvr.start,
+                            perturbation.seconds(),
+                        );
                     } else if var.component == Vary::Duration {
+                        let prev_end = this_mnvr.end;
                         this_mnvr.end = this_mnvr.end + perturbation.seconds();
+                        println!(
+                            "#({}, {}) END WAS {}\t\tNOW IS: {} (pert = {})",
+                            i,
+                            j,
+                            prev_end,
+                            this_mnvr.end,
+                            perturbation.seconds(),
+                        );
                     }
 
                     // Build the dynamics for this perturbation
@@ -367,6 +347,9 @@ impl Mnvr {
 
                     let this_achieved = this_x.value(&obj.parameter).unwrap();
                     *jac_val = (this_achieved - achieved) / perturbation;
+                    if var.component == Vary::StartEpoch || var.component == Vary::Duration {
+                        println!("#({}, {}) => {} ==> {}", i, j, this_mnvr, jac_val);
+                    }
                 });
 
                 for (j, _, jac_val) in &pert_calc {
@@ -374,6 +357,9 @@ impl Mnvr {
                 }
             }
 
+            for obj in &objmsg {
+                info!("{}", obj);
+            }
             if converged {
                 let conv_dur = Instant::now() - start_instant;
                 if it == 1 {
@@ -388,9 +374,6 @@ impl Mnvr {
                         conv_dur.as_secs_f64()
                     );
                 }
-                for obj in &objmsg {
-                    info!("{}", obj);
-                }
                 return Ok(mnvr);
             }
 
@@ -404,12 +387,12 @@ impl Mnvr {
             }
             prev_err_norm = err_vector.norm();
 
-            debug!("Jacobian {}", jac);
+            debug!("Jacobian {:.6}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
             let jac_inv = pseudo_inverse(&jac, NyxError::SingularJacobian)?;
 
-            debug!("Inverse Jacobian {}", jac_inv);
+            debug!("Inverse Jacobian {:.6}", jac_inv);
 
             let delta = jac_inv * &err_vector;
 
@@ -422,13 +405,15 @@ impl Mnvr {
                     mnvr.alpha_inplane = mnvr.alpha_inplane.add_val_in_order(*value, i)?;
                 } else if i < 6 {
                     mnvr.beta_outofplane = mnvr.beta_outofplane.add_val_in_order(*value, i - 3)?;
-                } else if i == 7 {
+                } else if i == 7 && value.abs() > 1e-6 {
                     // Modification of the start epoch of the burn
-                    mnvr.start = mnvr.start + value.seconds();
+                    mnvr.start = mnvr.start - value.seconds();
                     update_objs = true;
-                } else if i == 8 {
+                } else if i == 8 && value.abs() > 1e-5 {
                     mnvr.end = mnvr.end + value.seconds();
                     update_objs = true;
+                } else {
+                    println!("{} => {}", i, value);
                 }
             }
 
@@ -445,21 +430,20 @@ impl Mnvr {
                 xf_constraint = post_traj.at(mnvr.end)?;
 
                 objectives = [
-                    Objective::new(StateParameter::X, x0_constraint.orbit.x),
-                    Objective::new(StateParameter::Y, x0_constraint.orbit.y),
-                    Objective::new(StateParameter::Z, x0_constraint.orbit.z),
-                    Objective::new(StateParameter::VX, x0_constraint.orbit.vx),
-                    Objective::new(StateParameter::VY, x0_constraint.orbit.vy),
-                    Objective::new(StateParameter::VZ, x0_constraint.orbit.vz),
+                    Objective::within_tolerance(StateParameter::X, x0_constraint.orbit.x, 1e-3),
+                    Objective::within_tolerance(StateParameter::Y, x0_constraint.orbit.y, 1e-3),
+                    Objective::within_tolerance(StateParameter::Z, x0_constraint.orbit.z, 1e-3),
+                    Objective::within_tolerance(StateParameter::VX, x0_constraint.orbit.vx, 1e-3),
+                    Objective::within_tolerance(StateParameter::VY, x0_constraint.orbit.vy, 1e-3),
+                    Objective::within_tolerance(StateParameter::VZ, x0_constraint.orbit.vz, 1e-3),
                     // xf constraints
-                    Objective::new(StateParameter::X, xf_constraint.orbit.x),
-                    Objective::new(StateParameter::Y, xf_constraint.orbit.y),
-                    Objective::new(StateParameter::Z, xf_constraint.orbit.z),
-                    Objective::new(StateParameter::VX, xf_constraint.orbit.vx),
-                    Objective::new(StateParameter::VY, xf_constraint.orbit.vy),
-                    Objective::new(StateParameter::VZ, xf_constraint.orbit.vz),
+                    Objective::within_tolerance(StateParameter::X, xf_constraint.orbit.x, 1e-3),
+                    Objective::within_tolerance(StateParameter::Y, xf_constraint.orbit.y, 1e-3),
+                    Objective::within_tolerance(StateParameter::Z, xf_constraint.orbit.z, 1e-3),
+                    Objective::within_tolerance(StateParameter::VX, xf_constraint.orbit.vx, 1e-3),
+                    Objective::within_tolerance(StateParameter::VY, xf_constraint.orbit.vy, 1e-3),
+                    Objective::within_tolerance(StateParameter::VZ, xf_constraint.orbit.vz, 1e-3),
                 ];
-                debug!("mew obj\n{:?}", objectives)
             }
         }
 

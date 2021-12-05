@@ -17,8 +17,7 @@
 */
 
 use crate::cosmic::Frame;
-use crate::errors::{NyxError, TargetingError};
-use std::convert::TryFrom;
+use crate::errors::TargetingError;
 use std::default::Default;
 
 /// Defines the kind of correction to apply in the targeter
@@ -118,6 +117,12 @@ impl Variable {
         }
         Ok(())
     }
+
+    pub fn with_initial_guess(self, guess: f64) -> Self {
+        let mut me = self;
+        me.init_guess = guess;
+        me
+    }
 }
 
 impl Default for Variable {
@@ -134,43 +139,41 @@ impl Default for Variable {
     }
 }
 
-impl TryFrom<Vary> for Variable {
-    type Error = NyxError;
-
-    fn try_from(vary: Vary) -> Result<Self, Self::Error> {
+impl From<Vary> for Variable {
+    fn from(vary: Vary) -> Self {
         match vary {
             Vary::PositionX
             | Vary::PositionY
             | Vary::PositionZ
             | Vary::VelocityX
             | Vary::VelocityY
-            | Vary::VelocityZ => Ok(Self {
+            | Vary::VelocityZ => Self {
                 component: vary,
                 ..Default::default()
-            }),
-            Vary::MnvrAlpha | Vary::MnvrBeta => Ok(Self {
+            },
+            Vary::MnvrAlpha | Vary::MnvrBeta => Self {
                 component: vary,
-                perturbation: 10.0,
+                perturbation: 2.0,
                 ..Default::default()
-            }),
-            Vary::MnvrAlphaDot | Vary::MnvrBetaDot => Ok(Self {
+            },
+            Vary::MnvrAlphaDot | Vary::MnvrBetaDot => Self {
                 component: vary,
-                perturbation: 10.0,
+                perturbation: 2.0,
                 ..Default::default()
-            }),
-            Vary::MnvrAlphaDDot | Vary::MnvrBetaDDot => Ok(Self {
+            },
+            Vary::MnvrAlphaDDot | Vary::MnvrBetaDDot => Self {
                 component: vary,
-                perturbation: 10.0,
+                perturbation: 2.0,
                 ..Default::default()
-            }),
-            Vary::StartEpoch | Vary::EndEpoch | Vary::Duration => Ok(Self {
+            },
+            Vary::StartEpoch | Vary::EndEpoch | Vary::Duration => Self {
                 component: vary,
                 perturbation: 10.0,
                 max_step: 60.0,
                 max_value: 600.0,
                 min_value: -600.0,
                 ..Default::default()
-            }),
+            },
         }
     }
 }

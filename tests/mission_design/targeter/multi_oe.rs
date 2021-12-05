@@ -1,6 +1,5 @@
 extern crate nyx_space as nyx;
 
-use nyx::dynamics::guidance::FiniteBurns;
 use nyx::dynamics::guidance::Mnvr;
 use nyx::dynamics::guidance::Thruster;
 use nyx::linalg::Vector3;

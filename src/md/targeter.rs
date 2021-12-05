@@ -377,23 +377,40 @@ where
                 return Err(NyxError::Targeter(TargetingError::FrameError(msg)));
             }
 
-            state_correction[var.component.vec_index()] += var.init_guess;
-            total_correction[i] += var.init_guess;
-        }
+            match var.component {
+                Vary::MnvrAlpha
+                | Vary::MnvrAlphaDot
+                | Vary::MnvrAlphaDDot
+                | Vary::MnvrBeta
+                | Vary::MnvrBetaDot
+                | Vary::MnvrBetaDDot => {
+                    // Check that a thruster is provided since we'll be changing that and the burn duration
+                    if xi_start.thruster.is_none() {
+                        // Can't do any conversion to finite burns without a thruster
+                        return Err(NyxError::CtrlExistsButNoThrusterAvail);
+                    }
+                }
+                _ => {
+                    state_correction[var.component.vec_index()] += var.init_guess;
+                    // Now, let's apply the correction to the initial state
+                    if let Some(frame) = self.correction_frame {
+                        // The following will error if the frame is not local
+                        let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame)?;
+                        let velocity_correction =
+                            dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
+                        xi.orbit.apply_dv(velocity_correction);
+                    } else {
+                        xi.orbit.x += state_correction[0];
+                        xi.orbit.y += state_correction[1];
+                        xi.orbit.z += state_correction[2];
+                        xi.orbit.vx += state_correction[3];
+                        xi.orbit.vy += state_correction[4];
+                        xi.orbit.vz += state_correction[5];
+                    }
+                }
+            }
 
-        // Now, let's apply the correction to the initial state
-        if let Some(frame) = self.correction_frame {
-            // The following will error if the frame is not local
-            let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame)?;
-            let velocity_correction = dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-            xi.orbit.apply_dv(velocity_correction);
-        } else {
-            xi.orbit.x += state_correction[0];
-            xi.orbit.y += state_correction[1];
-            xi.orbit.z += state_correction[2];
-            xi.orbit.vx += state_correction[3];
-            xi.orbit.vy += state_correction[4];
-            xi.orbit.vz += state_correction[5];
+            total_correction[i] += var.init_guess;
         }
 
         let mut prev_err_norm = std::f64::INFINITY;
