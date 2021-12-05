@@ -155,17 +155,17 @@ impl TryFrom<Vary> for Variable {
             }),
             Vary::MnvrAlphaDot | Vary::MnvrBetaDot => Ok(Self {
                 component: vary,
-                perturbation: 1.0,
+                perturbation: 10.0,
                 ..Default::default()
             }),
             Vary::MnvrAlphaDDot | Vary::MnvrBetaDDot => Ok(Self {
                 component: vary,
-                perturbation: 0.1,
+                perturbation: 10.0,
                 ..Default::default()
             }),
             Vary::StartEpoch | Vary::EndEpoch | Vary::Duration => Ok(Self {
                 component: vary,
-                perturbation: 0.1,
+                perturbation: 10.0,
                 max_step: 60.0,
                 max_value: 600.0,
                 min_value: -600.0,

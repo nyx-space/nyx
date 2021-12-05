@@ -21,7 +21,10 @@ use crate::errors::NyxError;
 use crate::linalg::Vector3;
 
 mod finiteburns;
-pub use finiteburns::{FiniteBurns, Mnvr};
+pub use finiteburns::FiniteBurns;
+
+mod mnvr;
+pub use mnvr::Mnvr;
 
 mod ruggiero;
 pub use ruggiero::Ruggiero;

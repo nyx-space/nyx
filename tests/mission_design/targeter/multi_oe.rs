@@ -152,16 +152,12 @@ fn tgt_sma_ecc() {
     );
 
     let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    let mnvr = Mnvr::impulsive_to_finite(orig_dt, dv, spacecraft, &setup).unwrap();
+    setup.set_tolerance(1e-3);
+    let mnvr = Mnvr::impulsive_to_finite(orig_dt, dv, spacecraft, &setup, Frame::Inertial).unwrap();
     println!("CONVERGED ON {}", mnvr);
-    // And build the new dynamics
-    let fb_guess = FiniteBurns {
-        mnvrs: vec![mnvr],
-        frame: Frame::Inertial,
-    };
 
     // Propagate for the duration of the burn
-    setup.dynamics = setup.dynamics.with_ctrl(Arc::new(fb_guess));
+    setup.dynamics = setup.dynamics.with_ctrl(Arc::new(mnvr));
     // Propagate until maneuver start
     let pre_mnvr = setup
         .with(spacecraft)
