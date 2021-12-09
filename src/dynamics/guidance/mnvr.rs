@@ -156,7 +156,7 @@ impl Mnvr {
             frame,
         };
 
-        println!("{}", mnvr);
+        println!("Estimate: {}", mnvr);
 
         let x0_epoch = mnvr.start;
         let xf_epoch = mnvr.end;
@@ -173,7 +173,7 @@ impl Mnvr {
             .with(spacecraft)
             .until_epoch_with_traj(xf_epoch + 15.0.minutes())?;
 
-        println!("{}\n{}", pre_traj, post_traj);
+        // println!("{}\n{}", pre_traj, post_traj);
 
         let mut x0_constraint = pre_traj.at(x0_epoch)?;
         let mut xf_constraint = post_traj.at(xf_epoch)?;
@@ -240,7 +240,7 @@ impl Mnvr {
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
         let start_instant = Instant::now();
-        let max_iter = 25;
+        let max_iter = 50;
         for it in 0..=max_iter {
             // Propagate for the duration of the burn
             prop.set_max_step(mnvr.end - mnvr.start);
@@ -314,25 +314,25 @@ impl Mnvr {
                         let prev_end = this_mnvr.start;
                         // Modification of the start epoch of the burn
                         this_mnvr.start = this_mnvr.start - perturbation.seconds();
-                        println!(
-                            "#({}, {}) START WAS {}\t\tNOW IS: {} (pert = {})",
-                            i,
-                            j,
-                            prev_end,
-                            this_mnvr.start,
-                            perturbation.seconds(),
-                        );
+                        // println!(
+                        //     "#({}, {}) START WAS {}\t\tNOW IS: {} (pert = {})",
+                        //     i,
+                        //     j,
+                        //     prev_end,
+                        //     this_mnvr.start,
+                        //     perturbation.seconds(),
+                        // );
                     } else if var.component == Vary::Duration {
                         let prev_end = this_mnvr.end;
                         this_mnvr.end = this_mnvr.end + perturbation.seconds();
-                        println!(
-                            "#({}, {}) END WAS {}\t\tNOW IS: {} (pert = {})",
-                            i,
-                            j,
-                            prev_end,
-                            this_mnvr.end,
-                            perturbation.seconds(),
-                        );
+                        // println!(
+                        //     "#({}, {}) END WAS {}\t\tNOW IS: {} (pert = {})",
+                        //     i,
+                        //     j,
+                        //     prev_end,
+                        //     this_mnvr.end,
+                        //     perturbation.seconds(),
+                        // );
                     }
 
                     // Build the dynamics for this perturbation
@@ -354,9 +354,9 @@ impl Mnvr {
 
                     let this_achieved = this_x.value(&obj.parameter).unwrap();
                     *jac_val = (this_achieved - achieved) / perturbation;
-                    if var.component == Vary::StartEpoch || var.component == Vary::Duration {
-                        println!("#({}, {}) => {} ==> {}", i, j, this_mnvr, jac_val);
-                    }
+                    // if var.component == Vary::StartEpoch || var.component == Vary::Duration {
+                    //     println!("#({}, {}) => {} ==> {}", i, j, this_mnvr, jac_val);
+                    // }
                 });
 
                 for (j, _, jac_val) in &pert_calc {
@@ -422,8 +422,6 @@ impl Mnvr {
                 } else if i == 8 && value.abs() > 1e-5 {
                     mnvr.end = mnvr.end + value.seconds();
                     update_objs = true;
-                } else {
-                    println!("{} => {}", i, value);
                 }
             }
 
@@ -432,7 +430,7 @@ impl Mnvr {
             for obj in &objmsg {
                 debug!("{}", obj);
             }
-            println!("NEW MNVR\n{}\n", mnvr);
+            info!("NEW MNVR\n{}\n", mnvr);
 
             // Update the objectives if we've changed the start or end time of the maneuver
             if update_objs {

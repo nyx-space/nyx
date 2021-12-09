@@ -42,13 +42,13 @@ fn fb_tgt_sma_ecc() {
 
     // The variables in this targeter
     let variables = [
-        Variable::from(Vary::MnvrAlpha).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrAlphaDot).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrBeta).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrBetaDot).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrBetaDDot).with_initial_guess(45.0),
-        Variable::from(Vary::Duration).with_initial_guess(5.0),
+        Variable::from(Vary::MnvrAlpha).with_initial_guess(-0.3021017411736592),
+        // Variable::from(Vary::MnvrAlphaDot).with_initial_guess(45.0),
+        Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(-2.1098425649685995),
+        Variable::from(Vary::MnvrBeta).with_initial_guess(0.3530352682197084),
+        // Variable::from(Vary::MnvrBetaDot).with_initial_guess(45.0),
+        Variable::from(Vary::MnvrBetaDDot).with_initial_guess(4.152947118658474e-7),
+        // Variable::from(Vary::Duration).with_initial_guess(5.0),
     ];
 
     let tgt = Targeter::new(&setup, variables.to_vec(), objectives);

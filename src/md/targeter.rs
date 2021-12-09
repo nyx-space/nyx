@@ -363,7 +363,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
         // Create a default maneuver that will only be used if a finite burn is being targeted
         let mut mnvr = Mnvr {
             start: correction_epoch,
-            end: correction_epoch,
+            end: correction_epoch + 5.seconds(),
             thrust_lvl: 1.0,
             alpha_inplane_degrees: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             beta_outofplane_degrees: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
@@ -414,6 +414,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
                     }
                     _ => unreachable!(),
                 }
+                info!("Initial maneuver guess: {}", mnvr);
             } else {
                 state_correction[var.component.vec_index()] += var.init_guess;
                 // Now, let's apply the correction to the initial state
@@ -755,7 +756,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
                     match var.component {
                         Vary::Duration => {
                             if corr.abs() > 1e-3 {
-                                mnvr.end = mnvr.start + corr.seconds()
+                                mnvr.end = mnvr.start + corr.abs().seconds();
                             }
                         }
                         Vary::EndEpoch => {

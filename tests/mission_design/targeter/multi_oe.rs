@@ -58,7 +58,7 @@ fn tgt_c3_decl() {
 }
 
 #[test]
-fn tgt_sma_ecc() {
+fn conv_tgt_sma_ecc() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
