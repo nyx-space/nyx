@@ -44,11 +44,12 @@ pub struct Mnvr {
     /// End epoch of the maneuver
     pub end: Epoch,
     /// Thrust level, if 1.0 use all thruster available at full power
+    /// TODO: Convert this to a common polynomial as well to optimize throttle, throttle rate (and accel?)
     pub thrust_lvl: f64,
     /// The interpolation polynomial for the in-plane angle
-    pub alpha_inplane: CommonPolynomial,
+    pub alpha_inplane_degrees: CommonPolynomial,
     /// The interpolation polynomial for the out-of-plane angle
-    pub beta_outofplane: CommonPolynomial,
+    pub beta_outofplane_degrees: CommonPolynomial,
     /// The frame in which the maneuvers are defined.
     pub frame: Frame,
 }
@@ -58,12 +59,12 @@ impl fmt::Display for Mnvr {
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.end - self.start >= 1 * TimeUnit::Millisecond {
-            write!(f, "Finite burn maneuver @ {} for {}\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.alpha_inplane, self.beta_outofplane)
+            write!(f, "Finite burn maneuver @ {} for {}\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.alpha_inplane_degrees, self.beta_outofplane_degrees)
         } else {
             write!(
                 f,
                 "Impulsive maneuver @ {}\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}",
-                self.start, self.alpha_inplane, self.beta_outofplane
+                self.start, self.alpha_inplane_degrees, self.beta_outofplane_degrees
             )
         }
     }
@@ -90,8 +91,8 @@ impl Mnvr {
             start,
             end,
             thrust_lvl,
-            alpha_inplane: CommonPolynomial::Constant(alpha),
-            beta_outofplane: CommonPolynomial::Constant(beta),
+            alpha_inplane_degrees: CommonPolynomial::Constant(alpha),
+            beta_outofplane_degrees: CommonPolynomial::Constant(beta),
             frame,
         }
     }
@@ -135,8 +136,8 @@ impl Mnvr {
         let (alpha_tdv, beta_tdv) = plane_angles_from_unit_vector(u);
         let (alpha_ddot_tdv, beta_ddot_tdv) = plane_angles_from_unit_vector(u_ddot);
         // Build the maneuver polynomial angles from these
-        let alpha_inplane = CommonPolynomial::Quadratic(alpha_ddot_tdv, 0.0, alpha_tdv);
-        let beta_outofplane = CommonPolynomial::Quadratic(beta_ddot_tdv, 0.0, beta_tdv);
+        let alpha_inplane_degrees = CommonPolynomial::Quadratic(alpha_ddot_tdv, 0.0, alpha_tdv);
+        let beta_outofplane_degrees = CommonPolynomial::Quadratic(beta_ddot_tdv, 0.0, beta_tdv);
 
         // Compute a few thruster parameters
         let thruster = spacecraft.thruster.as_ref().unwrap();
@@ -150,10 +151,12 @@ impl Mnvr {
             start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
             end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
             thrust_lvl: 1.0,
-            alpha_inplane,
-            beta_outofplane,
+            alpha_inplane_degrees,
+            beta_outofplane_degrees,
             frame,
         };
+
+        println!("{}", mnvr);
 
         let x0_epoch = mnvr.start;
         let xf_epoch = mnvr.end;
@@ -242,13 +245,13 @@ impl Mnvr {
             // Propagate for the duration of the burn
             prop.set_max_step(mnvr.end - mnvr.start);
             prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
-            let x0 = prop
+            let sc_x0 = prop
                 .with(xi.with_guidance_mode(GuidanceMode::Thrust))
-                .until_epoch(x0_epoch)?
-                .orbit;
+                .until_epoch(x0_epoch)?;
+            let x0 = sc_x0.orbit;
 
             let xf = prop
-                .with(xi.with_guidance_mode(GuidanceMode::Thrust))
+                .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                 .until_epoch(xf_epoch)?
                 .orbit;
 
@@ -298,13 +301,13 @@ impl Mnvr {
 
                     // Perturb the maneuver
                     if *j < 3 {
-                        this_mnvr.alpha_inplane = this_mnvr
-                            .alpha_inplane
+                        this_mnvr.alpha_inplane_degrees = this_mnvr
+                            .alpha_inplane_degrees
                             .add_val_in_order(perturbation, *j)
                             .unwrap();
                     } else if *j < 6 {
-                        this_mnvr.beta_outofplane = this_mnvr
-                            .beta_outofplane
+                        this_mnvr.beta_outofplane_degrees = this_mnvr
+                            .beta_outofplane_degrees
                             .add_val_in_order(perturbation, *j - 3)
                             .unwrap();
                     } else if var.component == Vary::StartEpoch {
@@ -342,7 +345,11 @@ impl Mnvr {
                             .unwrap()
                             .orbit
                     } else {
-                        prop.with(this_xi).until_epoch(this_mnvr.end).unwrap().orbit
+                        let xi_prime = prop.with(this_xi).until_epoch(this_mnvr.start).unwrap();
+                        prop.with(xi_prime)
+                            .until_epoch(this_mnvr.end)
+                            .unwrap()
+                            .orbit
                     };
 
                     let this_achieved = this_x.value(&obj.parameter).unwrap();
@@ -402,9 +409,12 @@ impl Mnvr {
             for (i, value) in delta.iter().enumerate() {
                 // Change the relevant component of the polynomial which defines this maneuver
                 if i < 3 {
-                    mnvr.alpha_inplane = mnvr.alpha_inplane.add_val_in_order(*value, i)?;
+                    mnvr.alpha_inplane_degrees =
+                        mnvr.alpha_inplane_degrees.add_val_in_order(*value, i)?;
                 } else if i < 6 {
-                    mnvr.beta_outofplane = mnvr.beta_outofplane.add_val_in_order(*value, i - 3)?;
+                    mnvr.beta_outofplane_degrees = mnvr
+                        .beta_outofplane_degrees
+                        .add_val_in_order(*value, i - 3)?;
                 } else if i == 7 && value.abs() > 1e-6 {
                     // Modification of the start epoch of the burn
                     mnvr.start = mnvr.start - value.seconds();
@@ -456,14 +466,9 @@ impl Mnvr {
     /// Return the thrust vector computed at the provided epoch
     pub fn vector(&self, epoch: Epoch) -> Vector3<f64> {
         let t = (epoch - self.start).in_seconds();
-        let alpha = self.alpha_inplane.eval(t);
-        let beta = self.beta_outofplane.eval(t);
-        let rtn = unit_vector_from_plane_angles(alpha, beta);
-        // println!(
-        //     "alpha({}) = {}\t\tbeta({})={}\t\t=>{}, {}, {}",
-        //     t, alpha, t, beta, rtn[0], rtn[1], rtn[2]
-        // );
-        rtn
+        let alpha = self.alpha_inplane_degrees.eval(t);
+        let beta = self.beta_outofplane_degrees.eval(t);
+        unit_vector_from_plane_angles(alpha.to_radians(), beta.to_radians())
     }
 
     pub fn duration(&self) -> Duration {

@@ -20,8 +20,7 @@ pub use super::CostFunction;
 // use crate::dynamics::guidance::{FiniteBurns, Mnvr};
 use super::ctrlnodes::Node;
 use crate::errors::TargetingError;
-use crate::linalg::allocator::Allocator;
-use crate::linalg::{DMatrix, DVector, DefaultAllocator, Vector3};
+use crate::linalg::{DMatrix, DVector,  Vector3};
 use crate::md::targeter::Targeter;
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
@@ -33,13 +32,10 @@ use std::fmt;
 
 /// Multiple shooting is an optimization method.
 /// Source of implementation: "Low Thrust Optimization in Cislunar and Translunar space", 2018 Nathan Re (Parrish)
-pub struct MultipleShooting<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl>
-where
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>,
-{
+pub struct MultipleShooting<'a, E: ErrorCtrl> {
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, D, E>,
+    // pub prop: &'a Propagator<'a, D, E>,
+    pub prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
     /// List of nodes of the optimal trajectory
     pub nodes: Vec<Node>,
     /// Starting point, must be a spacecraft equipped with a thruster
@@ -56,12 +52,7 @@ where
     pub all_dvs: Vec<Vector3<f64>>,
 }
 
-impl<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl> MultipleShooting<'a, D, E>
-where
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>
-        + Allocator<f64, <D::StateType as State>::Size>,
-{
+impl<'a, E: ErrorCtrl> MultipleShooting<'a, E> {
     /// Builds a multiple shooting structure assuming that the optimal trajectory is a straight line
     /// between the start and end points. The position of the nodes will be update at each iteration
     /// of the outer loop.
@@ -70,7 +61,7 @@ where
         x0: Spacecraft,
         xf: Orbit,
         node_count: usize,
-        prop: &'a Propagator<'a, D, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
     ) -> Result<Self, NyxError> {
         if node_count < 3 {
             error!("At least three nodes are needed for a multiple shooting optimization");
@@ -127,7 +118,7 @@ where
         xf: Orbit,
         node_count: usize,
         body_frame: Frame,
-        prop: &'a Propagator<'a, D, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         cosm: Arc<Cosm>,
     ) -> Result<Self, NyxError> {
         if node_count < 3 {
@@ -404,13 +395,7 @@ where
     }
 }
 
-impl<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl> fmt::Display
-    for MultipleShooting<'a, D, E>
-where
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>
-        + Allocator<f64, <D::StateType as State>::Size>,
-{
+impl<'a, E: ErrorCtrl> fmt::Display for MultipleShooting<'a, E> {
     #[allow(clippy::or_fun_call, clippy::clone_on_copy)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut nodemsg = String::from("");
@@ -470,14 +455,10 @@ impl fmt::Display for MultipleShootingSolution {
 impl MultipleShootingSolution {
     /// Allows building the trajectories between different nodes
     /// This will rebuild the targeters and apply the solutions sequentially
-    pub fn build_trajectories<'a, D: Dynamics<StateType = Spacecraft>, E: ErrorCtrl>(
+    pub fn build_trajectories<'a, E: ErrorCtrl>(
         &self,
-        prop: &'a Propagator<'a, D, E>,
-    ) -> Result<Vec<ScTraj>, NyxError>
-    where
-        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-            + Allocator<f64, <D::StateType as State>::VecLength>,
-    {
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
+    ) -> Result<Vec<ScTraj>, NyxError> {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
         for (i, node) in self.nodes.iter().enumerate() {

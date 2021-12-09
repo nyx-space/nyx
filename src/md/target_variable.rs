@@ -21,7 +21,7 @@ use crate::errors::TargetingError;
 use std::default::Default;
 
 /// Defines the kind of correction to apply in the targeter
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Vary {
     /// Vary position component X
     PositionX,
@@ -56,14 +56,26 @@ pub enum Vary {
 }
 
 impl Vary {
+    pub fn is_finite_burn(&self) -> bool {
+        *self == Self::MnvrAlpha
+            || *self == Self::MnvrAlphaDDot
+            || *self == Self::MnvrAlphaDDot
+            || *self == Self::MnvrBeta
+            || *self == Self::MnvrBetaDDot
+            || *self == Self::MnvrBetaDDot
+            || *self == Self::StartEpoch
+            || *self == Self::Duration
+            || *self == Self::EndEpoch
+    }
+
     pub fn vec_index(&self) -> usize {
         match self {
-            Self::PositionX | Self::MnvrAlpha => 0,
-            Self::PositionY | Self::MnvrAlphaDot => 1,
-            Self::PositionZ | Self::MnvrAlphaDDot => 2,
-            Self::VelocityX | Self::MnvrBeta => 3,
-            Self::VelocityY | Self::MnvrBetaDot => 4,
-            Self::VelocityZ | Self::MnvrBetaDDot => 5,
+            Self::PositionX | Self::MnvrAlpha | Self::MnvrBeta => 0,
+            Self::PositionY | Self::MnvrAlphaDot | Self::MnvrBetaDot => 1,
+            Self::PositionZ | Self::MnvrAlphaDDot | Self::MnvrBetaDDot => 2,
+            Self::VelocityX => 3,
+            Self::VelocityY => 4,
+            Self::VelocityZ => 5,
             Self::StartEpoch => 6,
             Self::Duration | Self::EndEpoch => 7,
         }
@@ -153,17 +165,26 @@ impl From<Vary> for Variable {
             },
             Vary::MnvrAlpha | Vary::MnvrBeta => Self {
                 component: vary,
-                perturbation: 2.0,
+                perturbation: 0.2,
+                max_step: 90.0,
+                max_value: 180.0,
+                min_value: -180.0,
                 ..Default::default()
             },
             Vary::MnvrAlphaDot | Vary::MnvrBetaDot => Self {
                 component: vary,
-                perturbation: 2.0,
+                perturbation: 0.2,
+                max_step: 90.0,
+                max_value: 180.0,
+                min_value: -180.0,
                 ..Default::default()
             },
             Vary::MnvrAlphaDDot | Vary::MnvrBetaDDot => Self {
                 component: vary,
-                perturbation: 2.0,
+                perturbation: 0.2,
+                max_step: 90.0,
+                max_value: 180.0,
+                min_value: -180.0,
                 ..Default::default()
             },
             Vary::StartEpoch | Vary::EndEpoch | Vary::Duration => Self {

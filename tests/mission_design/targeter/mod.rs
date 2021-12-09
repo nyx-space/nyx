@@ -4,3 +4,4 @@ mod b_plane;
 mod multi_oe;
 mod multi_oe_vnc;
 mod single_oe;
+mod finite_burns;
