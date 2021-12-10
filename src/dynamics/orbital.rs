@@ -36,30 +36,24 @@ pub struct OrbitalDynamics<'a> {
 
 impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(bodies: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn point_masses(bodies: &[Bodies], cosm: Arc<Cosm>) -> Self {
         // Create the point masses
         Self::new(vec![PointMasses::new(bodies, cosm)])
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
-    pub fn two_body() -> Arc<Self> {
+    pub fn two_body() -> Self {
         Self::new(vec![])
     }
 
     /// Initialize orbital dynamics with a list of acceleration models
-    pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Arc<Self> {
-        Arc::new(Self::new_raw(accel_models))
-    }
-
-    /// Initialize orbital dynamics with a list of acceleration models, _without_ encapsulating it in an Arc
-    /// Use this only if you need to mutate the dynamics as you'll need to wrap it in an Arc before propagation.
-    pub fn new_raw(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
+    pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
         Self { accel_models }
     }
 
     /// Initialize new orbital mechanics with the provided model.
     /// **Note:** Orbital dynamics _always_ include two body dynamics, these cannot be turned off.
-    pub fn from_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Arc<Self> {
+    pub fn from_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Self {
         Self::new(vec![accel_model])
     }
 
@@ -69,10 +63,10 @@ impl<'a> OrbitalDynamics<'a> {
     }
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Arc<Self> {
+    pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Self {
         let mut me = self.clone();
         me.add_model(accel_model);
-        Arc::new(me)
+        me
     }
 }
 

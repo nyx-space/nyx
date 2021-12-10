@@ -33,7 +33,7 @@ const NORM_ERR: f64 = 1e-12;
 
 #[derive(Clone)]
 pub struct SpacecraftDynamics<'a> {
-    pub orbital_dyn: Arc<OrbitalDynamics<'a>>,
+    pub orbital_dyn: OrbitalDynamics<'a>,
     pub force_models: Vec<Arc<dyn ForceModel + 'a>>,
     pub ctrl: Option<Arc<dyn GuidanceLaw + 'a>>,
     pub decrement_mass: bool,
@@ -42,40 +42,31 @@ pub struct SpacecraftDynamics<'a> {
 impl<'a> SpacecraftDynamics<'a> {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// By default, the mass of the vehicle will be decremented as propellant is consummed.
-    pub fn from_ctrl(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
-        ctrl: Arc<dyn GuidanceLaw + 'a>,
-    ) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn from_ctrl(orbital_dyn: OrbitalDynamics<'a>, ctrl: Arc<dyn GuidanceLaw + 'a>) -> Self {
+        Self {
             orbital_dyn,
             ctrl: Some(ctrl),
             force_models: Vec::new(),
             decrement_mass: true,
-        })
+        }
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// Will _not_ decrement the fuel mass as propellant is consummed.
     pub fn from_ctrl_no_decr(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
+        orbital_dyn: OrbitalDynamics<'a>,
         ctrl: Arc<dyn GuidanceLaw + 'a>,
-    ) -> Arc<Self> {
-        Arc::new(Self {
+    ) -> Self {
+        Self {
             orbital_dyn,
             ctrl: Some(ctrl),
             force_models: Vec::new(),
             decrement_mass: false,
-        })
+        }
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
-    pub fn new(orbital_dyn: Arc<OrbitalDynamics<'a>>) -> Arc<Self> {
-        Arc::new(Self::new_raw(orbital_dyn))
-    }
-
-    /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
-    pub fn new_raw(orbital_dyn: Arc<OrbitalDynamics<'a>>) -> Self {
-        // Set the dry mass of the propulsion system
+    pub fn new(orbital_dyn: OrbitalDynamics<'a>) -> Self {
         Self {
             orbital_dyn,
             ctrl: None,
@@ -86,22 +77,25 @@ impl<'a> SpacecraftDynamics<'a> {
 
     /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
     pub fn from_model(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
+        orbital_dyn: OrbitalDynamics<'a>,
         force_model: Arc<dyn ForceModel + 'a>,
-    ) -> Arc<Self> {
-        let mut me = Self::new_raw(orbital_dyn);
-        me.add_model(force_model);
-        Arc::new(me)
+    ) -> Self {
+        Self {
+            orbital_dyn,
+            ctrl: None,
+            force_models: vec![force_model],
+            decrement_mass: true,
+        }
     }
 
     /// Initialize new spacecraft dynamics with a vector of force models.
     pub fn from_models(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
+        orbital_dyn: OrbitalDynamics<'a>,
         force_models: Vec<Arc<dyn ForceModel + 'a>>,
-    ) -> Arc<Self> {
-        let mut me = Self::new_raw(orbital_dyn);
+    ) -> Self {
+        let mut me = Self::new(orbital_dyn);
         me.force_models = force_models;
-        Arc::new(me)
+        me
     }
 
     /// Add a model to the currently defined spacecraft dynamics
@@ -110,10 +104,10 @@ impl<'a> SpacecraftDynamics<'a> {
     }
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, force_model: Arc<dyn ForceModel + 'a>) -> Arc<Self> {
+    pub fn with_model(self, force_model: Arc<dyn ForceModel + 'a>) -> Self {
         let mut me = self.clone();
         me.add_model(force_model);
-        Arc::new(me)
+        me
     }
 
     /// A shortcut to spacecraft.ctrl if the control is defined
@@ -125,23 +119,23 @@ impl<'a> SpacecraftDynamics<'a> {
     }
 
     /// Clone these spacecraft dynamics and update the control to the one provided.
-    pub fn with_ctrl(&self, ctrl: Arc<dyn GuidanceLaw + 'a>) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn with_ctrl(&self, ctrl: Arc<dyn GuidanceLaw + 'a>) -> Self {
+        Self {
             orbital_dyn: self.orbital_dyn.clone(),
             ctrl: Some(ctrl),
             force_models: self.force_models.clone(),
             decrement_mass: self.decrement_mass,
-        })
+        }
     }
 
     /// Clone these spacecraft dynamics and remove any control model
-    pub fn without_ctrl(&self) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn without_ctrl(&self) -> Self {
+        Self {
             orbital_dyn: self.orbital_dyn.clone(),
             ctrl: None,
             force_models: self.force_models.clone(),
             decrement_mass: self.decrement_mass,
-        })
+        }
     }
 }
 

@@ -311,7 +311,7 @@ impl Mnvr {
                             .add_val_in_order(perturbation, *j - 3)
                             .unwrap();
                     } else if var.component == Vary::StartEpoch {
-                        let prev_end = this_mnvr.start;
+                        // let prev_end = this_mnvr.start;
                         // Modification of the start epoch of the burn
                         this_mnvr.start = this_mnvr.start - perturbation.seconds();
                         // println!(
@@ -323,7 +323,7 @@ impl Mnvr {
                         //     perturbation.seconds(),
                         // );
                     } else if var.component == Vary::Duration {
-                        let prev_end = this_mnvr.end;
+                        // let prev_end = this_mnvr.end;
                         this_mnvr.end = this_mnvr.end + perturbation.seconds();
                         // println!(
                         //     "#({}, {}) END WAS {}\t\tNOW IS: {} (pert = {})",
