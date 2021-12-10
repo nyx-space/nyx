@@ -33,16 +33,15 @@ pub mod trajectory;
 mod events;
 pub use events::{Event, EventEvaluator};
 
-pub mod targeter;
-
+pub mod opti;
+pub use opti::targeter;
 pub type ScTraj = trajectory::Traj<Spacecraft>;
 pub type Ephemeris = trajectory::Traj<Orbit>;
 
 mod param;
 pub use param::StateParameter;
 
-mod target_variable;
-pub use target_variable::{Variable, Vary};
+pub use opti::target_variable::{Variable, Vary};
 
 /// A Mission Design handler
 pub trait MdHdlr<StateType: Copy>: Send + Sync {

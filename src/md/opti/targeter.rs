@@ -17,14 +17,14 @@ use hifitime::TimeUnitHelper;
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use super::rayon::prelude::*;
-use super::StateParameter;
-pub use super::{Variable, Vary};
 use crate::cosmic::OrbitPartial;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, DVector, Vector6};
+use crate::md::rayon::prelude::*;
 use crate::md::ui::*;
+use crate::md::StateParameter;
+pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::utils::{are_eigenvalues_stable, pseudo_inverse};

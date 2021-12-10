@@ -1,8 +1,8 @@
 extern crate nyx_space as nyx;
 
 use nyx::dynamics::guidance::Thruster;
+use nyx::md::opti::multishoot::*;
 use nyx::md::ui::*;
-use nyx::opti::multishoot::*;
 
 #[test]
 fn orbit_raising() {

@@ -77,7 +77,7 @@ where
                 #[allow(unused_assignments)]
                 let mut sc_dyn: SpacecraftDynamics;
                 #[allow(unused_assignments)]
-                let mut orbital_dyn: OrbitalDynamics = OrbitalDynamics::raw(vec![]);
+                let mut orbital_dyn: OrbitalDynamics = OrbitalDynamics::new(vec![]);
                 let mut init_sc;
 
                 // Validate the output
@@ -233,7 +233,7 @@ where
                     0.0,
                 );
 
-                sc_dyn = SpacecraftDynamics::raw(orbital_dyn);
+                sc_dyn = SpacecraftDynamics::new(orbital_dyn);
 
                 // Add the force models
                 if let Some(force_models) = &spacecraft.force_models {

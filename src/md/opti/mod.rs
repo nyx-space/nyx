@@ -17,8 +17,9 @@
 */
 
 pub mod ctrlnodes;
-
 pub mod multishoot;
+pub mod target_variable;
+pub mod targeter;
 
 /// Built-in cost functions to minimize
 #[derive(Copy, Clone, Debug, PartialEq)]
