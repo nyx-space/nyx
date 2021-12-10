@@ -26,9 +26,8 @@ use crate::md::{StateParameter, Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::ErrorCtrl;
 use crate::time::{Epoch, TimeUnit};
-use crate::utils::pseudo_inverse;
-use crate::NyxError;
 use crate::State;
+use crate::{pseudo_inverse, NyxError};
 use hifitime::{Duration, TimeUnitHelper};
 use rayon::prelude::*;
 use std::fmt;
@@ -397,7 +396,7 @@ impl Mnvr {
             debug!("Jacobian {:.6}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = pseudo_inverse(&jac, NyxError::SingularJacobian)?;
+            let jac_inv = pseudo_inverse!(&jac)?;
 
             debug!("Inverse Jacobian {:.6}", jac_inv);
 

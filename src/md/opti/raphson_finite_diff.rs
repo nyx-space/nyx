@@ -27,7 +27,7 @@ use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
-use crate::utils::pseudo_inverse;
+use crate::pseudo_inverse;
 use hifitime::TimeUnitHelper;
 use std::time::Instant;
 
@@ -426,7 +426,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             debug!("Jacobian {}", jac);
 
             // Perform the pseudo-inverse if needed, else just inverse
-            let jac_inv = pseudo_inverse(&jac, NyxError::SingularJacobian)?;
+            let jac_inv = pseudo_inverse!(&jac)?;
 
             debug!("Inverse Jacobian {}", jac_inv);
 

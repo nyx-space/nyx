@@ -25,7 +25,7 @@ use crate::linalg::{DMatrix, DVector, Vector3};
 use crate::md::optimizer::Optimizer;
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
-use crate::utils::pseudo_inverse;
+use crate::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
 use std::sync::Arc;
 
@@ -370,7 +370,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E> {
 
             prev_cost = new_cost;
             // 2. Solve for the next position of the nodes using a pseudo inverse.
-            let inv_jac = match pseudo_inverse(&outer_jacobian, NyxError::SingularJacobian) {
+            let inv_jac = match pseudo_inverse!(&outer_jacobian) {
                 Ok(inv_jac) => inv_jac,
                 Err(e) => {
                     error!("Singular Jacobian {:.3}", outer_jacobian);
