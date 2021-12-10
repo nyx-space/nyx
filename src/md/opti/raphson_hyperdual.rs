@@ -16,8 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::solution::TargeterSolution;
 use crate::errors::TargetingError;
-use crate::linalg::{DMatrix, DVector};
+use crate::linalg::{DMatrix, SVector};
 use crate::md::ui::*;
 use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
@@ -25,7 +26,7 @@ use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::utils::{are_eigenvalues_stable, pseudo_inverse};
 use std::time::Instant;
 
-impl<'a, E: ErrorCtrl> Targeter<'a, E> {
+impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     /// Differential correction using hyperdual numbers for the objectives
     #[allow(clippy::comparison_chain)]
     pub fn try_achieve_dual(
@@ -33,7 +34,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
-    ) -> Result<TargeterSolution, NyxError> {
+    ) -> Result<TargeterSolution<V, O>, NyxError> {
         if self.objectives.is_empty() {
             return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
         }
@@ -58,8 +59,8 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
 
         let mut xi = xi_start;
 
-        // Store the total correction in Vector3
-        let mut total_correction = DVector::from_element(self.variables.len(), 0.0);
+        // Store the total correction in a static vector
+        let mut total_correction = SVector::<f64, V>::zeros();
 
         // Apply the initial guess
         for (i, var) in self.variables.iter().enumerate() {
@@ -140,7 +141,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
             };
 
             // Build the error vector
-            let mut param_errors = Vec::new();
+            let mut err_vector = SVector::<f64, O>::zeros();
             let mut converged = true;
 
             // Build the B-Plane once, if needed, and always in the objective frame
@@ -175,7 +176,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
                 if !ok {
                     converged = false;
                 }
-                param_errors.push(param_err);
+                err_vector[i] = param_err;
 
                 objmsg.push(format!(
                     "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t scaled error = {:>width$.prec$}",
@@ -237,7 +238,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
                     correction: total_correction,
                     computation_dur: conv_dur,
                     variables: self.variables.clone(),
-                    achieved_errors: param_errors,
+                    achieved_errors: err_vector,
                     achieved_objectives: self.objectives.clone(),
                     iterations: it,
                 };
@@ -249,7 +250,6 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
             }
 
             // We haven't converged yet, so let's build the error vector
-            let err_vector = DVector::from(param_errors);
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
                 return Err(NyxError::CorrectionIneffective(
                     "No change in objective errors".to_string(),

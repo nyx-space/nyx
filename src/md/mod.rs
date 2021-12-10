@@ -35,7 +35,7 @@ pub use events::{Event, EventEvaluator};
 
 pub mod objective;
 pub mod opti;
-pub use opti::targeter;
+pub use opti::optimizer;
 pub type ScTraj = trajectory::Traj<Spacecraft>;
 pub type Ephemeris = trajectory::Traj<Orbit>;
 

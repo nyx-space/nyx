@@ -21,7 +21,7 @@ extern crate rayon;
 
 use self::rayon::prelude::*;
 use super::MdHdlr;
-pub use super::{targeter::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
+pub use super::{optimizer::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
 pub use crate::cosmic::{
     try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode, LightTimeCalc,
     Orbit, OrbitDual,

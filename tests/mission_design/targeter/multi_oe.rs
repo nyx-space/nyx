@@ -3,7 +3,7 @@ extern crate nyx_space as nyx;
 use nyx::dynamics::guidance::Mnvr;
 use nyx::dynamics::guidance::Thruster;
 use nyx::linalg::Vector3;
-use nyx::md::targeter::*;
+use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
 #[test]
@@ -29,12 +29,12 @@ fn tgt_c3_decl() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Declination, 5.0, 0.1),
         Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
     ];
 
-    let tgt = Targeter::delta_v(&setup, objectives);
+    let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -91,14 +91,14 @@ fn conv_tgt_sma_ecc() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Targeter::new(
+    let tgt = Optimizer::new(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 0.5,
@@ -144,31 +144,31 @@ fn conv_tgt_sma_ecc() {
     /* *** */
     /* Convert to a finite burn and make sure this converges */
     /* *** */
-    let dv = Vector3::new(
-        solution_fd.correction[0],
-        solution_fd.correction[1],
-        solution_fd.correction[2],
-    );
+    // let dv = Vector3::new(
+    //     solution_fd.correction[0],
+    //     solution_fd.correction[1],
+    //     solution_fd.correction[2],
+    // );
 
-    let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
-    setup.set_tolerance(1e-3);
-    let mnvr = Mnvr::impulsive_to_finite(orig_dt, dv, spacecraft, &setup, Frame::Inertial).unwrap();
-    println!("CONVERGED ON {}", mnvr);
+    // let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    // setup.set_tolerance(1e-3);
+    // let mnvr = Mnvr::impulsive_to_finite(orig_dt, dv, spacecraft, &setup, Frame::Inertial).unwrap();
+    // println!("CONVERGED ON {}", mnvr);
 
-    // Propagate for the duration of the burn
-    setup.dynamics = setup.dynamics.with_ctrl(Arc::new(mnvr));
-    // Propagate until maneuver start
-    let pre_mnvr = setup
-        .with(spacecraft)
-        .until_epoch(mnvr.start - mnvr.duration())
-        .unwrap();
-    // Use a small step through the maneuver
-    setup.set_max_step(mnvr.end - mnvr.start);
-    let xf = setup
-        .with(pre_mnvr.with_guidance_mode(GuidanceMode::Custom(0)))
-        .until_epoch(achievement_epoch)
-        .unwrap();
-    println!("{:x}", xf);
+    // // Propagate for the duration of the burn
+    // setup.dynamics = setup.dynamics.with_ctrl(Arc::new(mnvr));
+    // // Propagate until maneuver start
+    // let pre_mnvr = setup
+    //     .with(spacecraft)
+    //     .until_epoch(mnvr.start - mnvr.duration())
+    //     .unwrap();
+    // // Use a small step through the maneuver
+    // setup.set_max_step(mnvr.end - mnvr.start);
+    // let xf = setup
+    //     .with(pre_mnvr.with_guidance_mode(GuidanceMode::Custom(0)))
+    //     .until_epoch(achievement_epoch)
+    //     .unwrap();
+    // println!("{:x}", xf);
 }
 
 #[test]
@@ -192,14 +192,14 @@ fn tgt_hd_sma_ecc() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Targeter::new(
+    let tgt = Optimizer::new(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 0.5,

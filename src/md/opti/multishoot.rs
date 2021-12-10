@@ -19,9 +19,10 @@
 pub use super::CostFunction;
 // use crate::dynamics::guidance::{FiniteBurns, Mnvr};
 use super::ctrlnodes::Node;
+use super::solution::TargeterSolution;
 use crate::errors::TargetingError;
-use crate::linalg::{DMatrix, DVector,  Vector3};
-use crate::md::targeter::Targeter;
+use crate::linalg::{DMatrix, DVector, Vector3};
+use crate::md::optimizer::Optimizer;
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::utils::pseudo_inverse;
@@ -201,7 +202,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E> {
                 /* ***
                  ** 1. Solve the delta-v differential corrector between each node
                  ** *** */
-                let tgt = Targeter::delta_v(self.prop, self.nodes[i].to_targeter_objective());
+                let tgt = Optimizer::delta_v(self.prop, self.nodes[i].to_targeter_objective());
                 let sol = match tgt.try_achieve_dual(
                     initial_states[i],
                     initial_states[i].epoch(),
@@ -240,7 +241,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E> {
                      ** is the initial state to reach the i-th node.
                      ** *** */
 
-                    let inner_tgt_a = Targeter::delta_v(self.prop, next_node.to_vec());
+                    let inner_tgt_a = Optimizer::delta_v(self.prop, next_node);
                     let inner_sol_a = match inner_tgt_a.try_achieve_dual(
                         initial_states[i],
                         initial_states[i].epoch(),
@@ -267,7 +268,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E> {
                      ** 2.C. Rerun the targeter from the new state at the perturbed node to the next unpertubed node
                      ** *** */
                     let inner_tgt_b =
-                        Targeter::delta_v(self.prop, self.nodes[i + 1].to_targeter_objective());
+                        Optimizer::delta_v(self.prop, self.nodes[i + 1].to_targeter_objective());
                     let inner_sol_b = inner_tgt_b.try_achieve_dual(
                         inner_sol_a.achieved_state,
                         inner_sol_a.achieved_state.epoch(),
@@ -354,7 +355,7 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E> {
 
                 for (i, node) in self.nodes.iter().enumerate() {
                     // Run the unpertubed targeter
-                    let tgt = Targeter::delta_v(self.prop, node.to_targeter_objective());
+                    let tgt = Optimizer::delta_v(self.prop, node.to_targeter_objective());
                     let sol = tgt.try_achieve_dual(
                         initial_states[i],
                         initial_states[i].epoch(),
@@ -440,7 +441,7 @@ pub struct MultipleShootingSolution {
     pub x0: Spacecraft,
     pub xf: Orbit,
     pub nodes: Vec<Node>,
-    pub solutions: Vec<TargeterSolution>,
+    pub solutions: Vec<TargeterSolution<3, 3>>,
 }
 
 impl fmt::Display for MultipleShootingSolution {
@@ -462,7 +463,7 @@ impl MultipleShootingSolution {
         let mut trajz = Vec::with_capacity(self.nodes.len());
 
         for (i, node) in self.nodes.iter().enumerate() {
-            let (_, traj) = Targeter::delta_v(prop, node.to_targeter_objective())
+            let (_, traj) = Optimizer::delta_v(prop, node.to_targeter_objective())
                 .apply_with_traj(&self.solutions[i])?;
             trajz.push(traj);
         }

@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::md::targeter::*;
+use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
 #[test]
@@ -37,7 +37,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation() {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
-    let tgt = Targeter::delta_v(&prop, b_plane_tgt.to_objectives());
+    let tgt = Optimizer::delta_v(&prop, b_plane_tgt.to_objectives());
 
     let sol = tgt.try_achieve_from(spacecraft, epoch, epoch).unwrap();
 
@@ -107,9 +107,9 @@ fn tgt_b_plane_lunar_transfer() {
     // GMAT truth with central differencing: 1.15740867962, -0.576350387399, 0.632247251449
     // GMAT truth with forward differencing: 1.33490412071, -0.5447988683, 1.77697094604 (approach currently in Nyx)
 
-    let tgt = Targeter::in_frame(
+    let tgt = Optimizer::in_frame(
         &prop,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 min_value: -3.0,
@@ -204,7 +204,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);
 
-    let tgt = Targeter::delta_v(&prop, b_plane_tgt.to_objectives());
+    let tgt = Optimizer::delta_v(&prop, b_plane_tgt.to_objectives());
 
     let sol = tgt
         .try_achieve_from(prior_sc, prior_sc.epoch(), epoch)

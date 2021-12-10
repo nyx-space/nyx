@@ -16,10 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::targeter::{Targeter, TargeterSolution};
+use super::optimizer::Optimizer;
+use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
-use crate::linalg::{DMatrix, DVector, Vector6};
+use crate::linalg::{DMatrix, SVector, Vector6};
 use crate::md::rayon::prelude::*;
 use crate::md::ui::*;
 use crate::md::StateParameter;
@@ -30,7 +31,7 @@ use crate::utils::pseudo_inverse;
 use hifitime::TimeUnitHelper;
 use std::time::Instant;
 
-impl<'a, E: ErrorCtrl> Targeter<'a, E> {
+impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     /// Differential correction using finite differencing
     #[allow(clippy::comparison_chain)]
     pub fn try_achieve_fd(
@@ -38,7 +39,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
-    ) -> Result<TargeterSolution, NyxError> {
+    ) -> Result<TargeterSolution<V, O>, NyxError> {
         if self.objectives.is_empty() {
             return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
         }
@@ -66,7 +67,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
         let mut state_correction = Vector6::<f64>::zeros();
 
         // Store the total correction in Vector3
-        let mut total_correction = DVector::from_element(self.variables.len(), 0.0);
+        let mut total_correction = SVector::<f64, V>::zeros();
 
         // Create a default maneuver that will only be used if a finite burn is being targeted
         let mut mnvr = Mnvr {
@@ -202,7 +203,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
             };
 
             // Build the error vector
-            let mut param_errors = Vec::with_capacity(self.objectives.len());
+            let mut err_vector = SVector::<f64, O>::zeros();
             let mut converged = true;
 
             // Build the B-Plane once, if needed, and always in the objective frame
@@ -237,7 +238,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
                 if !ok {
                     converged = false;
                 }
-                param_errors.push(param_err);
+                err_vector[i] = param_err;
 
                 objmsg.push(format!(
                     "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t scaled error = {:>width$.prec$}",
@@ -398,7 +399,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
                     correction: total_correction,
                     computation_dur: conv_dur,
                     variables: self.variables.clone(),
-                    achieved_errors: param_errors,
+                    achieved_errors: err_vector,
                     achieved_objectives: self.objectives.clone(),
                     iterations: it,
                 };
@@ -414,8 +415,7 @@ impl<'a, E: ErrorCtrl> Targeter<'a, E> {
                 return Ok(sol);
             }
 
-            // We haven't converged yet, so let's build the error vector
-            let err_vector = DVector::from(param_errors);
+            // We haven't converged yet, so let's build t
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
                 return Err(NyxError::CorrectionIneffective(
                     "No change in objective errors".to_string(),

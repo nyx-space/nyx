@@ -1,9 +1,10 @@
 extern crate nyx_space as nyx;
 
 use nyx::dynamics::guidance::Thruster;
-use nyx::md::targeter::*;
+use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
+#[ignore]
 #[test]
 fn fb_tgt_sma_ecc() {
     if pretty_env_logger::try_init().is_err() {
@@ -35,7 +36,7 @@ fn fb_tgt_sma_ecc() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
@@ -51,7 +52,7 @@ fn fb_tgt_sma_ecc() {
         // Variable::from(Vary::Duration).with_initial_guess(5.0),
     ];
 
-    let tgt = Targeter::new(&setup, variables.to_vec(), objectives);
+    let tgt = Optimizer::new(&setup, variables, objectives);
 
     println!("{}", tgt);
 

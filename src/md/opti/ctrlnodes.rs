@@ -78,8 +78,8 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn to_targeter_objective(&self) -> Vec<Objective> {
-        return vec![
+    pub fn to_targeter_objective(&self) -> [Objective; 3] {
+        return [
             Objective::new(StateParameter::X, self.x),
             Objective::new(StateParameter::Y, self.y),
             Objective::new(StateParameter::Z, self.z),
