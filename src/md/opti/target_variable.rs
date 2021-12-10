@@ -165,7 +165,7 @@ impl From<Vary> for Variable {
             },
             Vary::MnvrAlpha | Vary::MnvrBeta => Self {
                 component: vary,
-                perturbation: 2.0e-2,
+                perturbation: 2.0e2,
                 max_step: 180.0,
                 max_value: 180.0,
                 min_value: -180.0,
@@ -173,7 +173,7 @@ impl From<Vary> for Variable {
             },
             Vary::MnvrAlphaDot | Vary::MnvrBetaDot => Self {
                 component: vary,
-                perturbation: 2.0e-2,
+                perturbation: 2.0e2,
                 max_step: 180.0,
                 max_value: 180.0,
                 min_value: -180.0,
@@ -181,15 +181,23 @@ impl From<Vary> for Variable {
             },
             Vary::MnvrAlphaDDot | Vary::MnvrBetaDDot => Self {
                 component: vary,
-                perturbation: 2.0e-2,
+                perturbation: 2.0e2,
                 max_step: 180.0,
                 max_value: 180.0,
                 min_value: -180.0,
                 ..Default::default()
             },
-            Vary::StartEpoch | Vary::EndEpoch | Vary::Duration => Self {
+            Vary::StartEpoch | Vary::EndEpoch => Self {
                 component: vary,
                 perturbation: 10.0,
+                max_step: 60.0,
+                max_value: 600.0,
+                min_value: -600.0,
+                ..Default::default()
+            },
+            Vary::Duration => Self {
+                component: vary,
+                perturbation: 2.0,
                 max_step: 60.0,
                 max_value: 600.0,
                 min_value: -600.0,

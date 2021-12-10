@@ -4,7 +4,6 @@ use nyx::dynamics::guidance::Thruster;
 use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
-#[ignore]
 #[test]
 fn fb_tgt_sma_ecc() {
     if pretty_env_logger::try_init().is_err() {
@@ -25,7 +24,7 @@ fn fb_tgt_sma_ecc() {
         dry_mass_kg: 10.0,
         fuel_mass_kg: 90.0,
         thruster: Some(Thruster {
-            thrust: 50.0,
+            thrust: 500.0,
             isp: 300.0,
         }),
         mode: GuidanceMode::Thrust,
@@ -43,12 +42,14 @@ fn fb_tgt_sma_ecc() {
 
     // The variables in this targeter
     let variables = [
-        Variable::from(Vary::MnvrAlpha).with_initial_guess(-0.3021017411736592),
+        Variable::from(Vary::MnvrAlpha).with_initial_guess(-0.3021017411736592_f64.to_radians()),
         // Variable::from(Vary::MnvrAlphaDot).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(-2.1098425649685995),
-        Variable::from(Vary::MnvrBeta).with_initial_guess(0.3530352682197084),
+        Variable::from(Vary::MnvrAlphaDDot)
+            .with_initial_guess(-2.1098425649685995_f64.to_radians()),
+        Variable::from(Vary::MnvrBeta).with_initial_guess(0.3530352682197084_f64.to_radians()),
         // Variable::from(Vary::MnvrBetaDot).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrBetaDDot).with_initial_guess(4.152947118658474e-7),
+        Variable::from(Vary::MnvrBetaDDot)
+            .with_initial_guess(4.152947118658474e-7_f64.to_radians()),
         // Variable::from(Vary::Duration).with_initial_guess(5.0),
     ];
 

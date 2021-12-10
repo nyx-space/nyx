@@ -1,8 +1,7 @@
 extern crate nyx_space as nyx;
 
-use nyx::dynamics::guidance::Mnvr;
+// use nyx::dynamics::guidance::Mnvr;
 use nyx::dynamics::guidance::Thruster;
-use nyx::linalg::Vector3;
 use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
@@ -79,7 +78,7 @@ fn conv_tgt_sma_ecc() {
         dry_mass_kg: 10.0,
         fuel_mass_kg: 90.0,
         thruster: Some(Thruster {
-            thrust: 50.0,
+            thrust: 500.0,
             isp: 300.0,
         }),
         mode: GuidanceMode::Thrust,
@@ -144,11 +143,7 @@ fn conv_tgt_sma_ecc() {
     /* *** */
     /* Convert to a finite burn and make sure this converges */
     /* *** */
-    // let dv = Vector3::new(
-    //     solution_fd.correction[0],
-    //     solution_fd.correction[1],
-    //     solution_fd.correction[2],
-    // );
+    // let dv = solution_fd.correction;
 
     // let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     // setup.set_tolerance(1e-3);
