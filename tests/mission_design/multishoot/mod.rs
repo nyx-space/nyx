@@ -81,19 +81,34 @@ fn orbit_raising() {
         );
     }
 
-    for (i, traj) in multishoot_sol
-        .build_trajectories(&prop)
-        .unwrap()
-        .iter()
-        .enumerate()
-    {
+    let all_trajectories = multishoot_sol.build_trajectories(&prop).unwrap();
+
+    let mut full_traj = all_trajectories[0].clone();
+
+    for (i, traj) in all_trajectories.iter().enumerate() {
         traj.to_csv_with_step(
             &format!("multishoot_to_node_{}.csv", i),
             2 * TimeUnit::Second,
             cosm.clone(),
         )
         .unwrap();
+        if i > 0 {
+            full_traj += traj;
+        }
     }
+
+    assert_eq!(
+        full_traj.first().epoch(),
+        all_trajectories[0].first().epoch(),
+        "Initial epochs differ"
+    );
+    assert_eq!(
+        full_traj.last().epoch(),
+        all_trajectories.last().unwrap().last().epoch(),
+        "Final epochs differ: {} != {}",
+        full_traj.last().epoch(),
+        all_trajectories.last().unwrap().last().epoch(),
+    );
 
     let solution = &multishoot_sol.solutions[node_count - 1];
     let sc_sol = solution.achieved_state;
@@ -106,7 +121,7 @@ fn orbit_raising() {
         dv_ms += sol.correction.norm() * 1e3;
     }
     println!(
-        "Multiple shooting solution requires a total of {} m/s",
+        "Multiple shooting solution requires a total of {:.3} m/s",
         dv_ms
     );
 

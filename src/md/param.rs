@@ -150,6 +150,8 @@ impl StateParameter {
 
             // Distances
             Self::ApoapsisRadius
+            | Self::BdotR
+            | Self::BdotT
             | Self::GeodeticHeight
             | Self::Hmag
             | Self::HX

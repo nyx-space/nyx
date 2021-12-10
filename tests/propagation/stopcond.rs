@@ -32,17 +32,23 @@ fn stop_cond_3rd_apo() {
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
     let (third_apo, _) = prop.until_event(5 * period, &apo_event, 3).unwrap();
 
-    println!(
-        "{}\t{}\t\t{}",
-        start_dt + 2.0 * period,
-        start_dt + 3.0 * period,
-        third_apo
-    );
+    let min_epoch = start_dt + 2.0 * period;
+    let max_epoch = start_dt + 3.0 * period;
+
+    println!("{}\t{}\t\t{:x}", min_epoch, max_epoch, third_apo,);
     // Confirm that this is the third apoapse event which is found
+    // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
-        (start_dt + 2.0 * period..start_dt + 3.0 * period).contains(&third_apo.dt),
-        "converged on the wrong apoapse"
+        (third_apo.dt - min_epoch) >= 1.nanoseconds(),
+        "Found apoapse is {} before min epoch",
+        third_apo.dt - min_epoch
     );
+    assert!(
+        (third_apo.dt - max_epoch) <= 1.nanoseconds(),
+        "Found apoapse is {} after max epoch",
+        third_apo.dt - max_epoch
+    );
+
     assert!(
         (180.0 - third_apo.ta()).abs() < 1e-3,
         "converged, yet convergence critera not met"

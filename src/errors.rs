@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::md::trajectory::TrajError;
 pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;
@@ -60,7 +61,6 @@ pub enum NyxError {
     ObjectNotFound(String),
     NoInterpolationData(String),
     InvalidInterpolationData(String),
-    OutOfInterpolationWindow(String),
     NoStateData(String),
     DisjointFrameOrientations(String, String),
     /// When there is a controller but there isn't any thruster available
@@ -92,6 +92,7 @@ pub enum NyxError {
     /// Hifitime errors that rose upward
     TimeError(TimeErrors),
     Targeter(TargetingError),
+    Trajectory(TrajError),
 }
 
 impl fmt::Display for NyxError {
@@ -142,5 +143,11 @@ impl Error for NyxError {}
 impl From<TimeErrors> for NyxError {
     fn from(e: TimeErrors) -> Self {
         NyxError::TimeError(e)
+    }
+}
+
+impl From<TrajError> for NyxError {
+    fn from(e: TrajError) -> Self {
+        NyxError::Trajectory(e)
     }
 }

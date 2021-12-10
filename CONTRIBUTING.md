@@ -1,4 +1,4 @@
-# Contributing to nyx
+# Contributing to Nyx
 
 First off, thanks for considering contributing nyx! :tada::+1:
 
@@ -31,8 +31,6 @@ Finally, also for traceability, please try to sign at least the final commit of 
 
 ### Validation of changes
 If the proposed changes are related to the dynamics or the propagation models, please include both a relevant test case and a relevant GMAT script for future reference, and detail which version of GMAT was used to validate this result (e.g. `2017a`).
-
-Further, you should add an entry in the `VALIDATION.md` file corresponding to the test case and the difference between the result found in nyx and what GMAT reported.
 
 The test will be automatically executed on Travis-CI.
 
