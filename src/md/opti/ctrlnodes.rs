@@ -21,7 +21,7 @@ extern crate serde_derive;
 
 use self::serde_derive::{Deserialize, Serialize};
 use crate::cosmic::{Cosm, Frame};
-use crate::md::targeter::Objective;
+use crate::md::objective::Objective;
 use crate::md::ui::StateParameter;
 use crate::time::Epoch;
 use crate::NyxError;

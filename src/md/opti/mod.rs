@@ -18,6 +18,8 @@
 
 pub mod ctrlnodes;
 pub mod multishoot;
+pub mod raphson_finite_diff;
+pub mod raphson_hyperdual;
 pub mod target_variable;
 pub mod targeter;
 

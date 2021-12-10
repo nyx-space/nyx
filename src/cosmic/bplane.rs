@@ -20,7 +20,7 @@ use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, Hyperdual};
 use super::{Frame, Orbit, OrbitDual, OrbitPartial};
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
-use crate::md::targeter::Objective;
+use crate::md::objective::Objective;
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::between_pm_180;

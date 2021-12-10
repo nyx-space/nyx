@@ -41,6 +41,7 @@ pub use crate::propagators::{PropOpts, Propagator};
 pub use crate::time::{Duration, Epoch, TimeUnit};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
+pub use crate::md::objective::Objective;
 use std::convert::TryFrom;
 use std::str::FromStr;
 pub use std::sync::Arc;
