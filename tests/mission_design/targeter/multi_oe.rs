@@ -143,11 +143,19 @@ fn conv_tgt_sma_ecc() {
     /* *** */
     /* Convert to a finite burn and make sure this converges */
     /* *** */
-    // let dv = solution_fd.correction;
+
+    Optimizer::convert_impulsive_mnvr(solution_fd.corrected_state, solution_fd.correction, &setup);
 
     // let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     // setup.set_tolerance(1e-3);
-    // let mnvr = Mnvr::impulsive_to_finite(orig_dt, dv, spacecraft, &setup, Frame::Inertial).unwrap();
+    // let mnvr = Mnvr::impulsive_to_finite(
+    //     orig_dt,
+    //     solution_fd.correction,
+    //     spacecraft,
+    //     &setup,
+    //     Frame::Inertial,
+    // )
+    // .unwrap();
     // println!("CONVERGED ON {}", mnvr);
 
     // // Propagate for the duration of the burn

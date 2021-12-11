@@ -46,9 +46,9 @@ pub struct Mnvr {
     /// TODO: Convert this to a common polynomial as well to optimize throttle, throttle rate (and accel?)
     pub thrust_lvl: f64,
     /// The interpolation polynomial for the in-plane angle
-    pub alpha_inplane_degrees: CommonPolynomial,
+    pub alpha_inplane_radians: CommonPolynomial,
     /// The interpolation polynomial for the out-of-plane angle
-    pub beta_outofplane_degrees: CommonPolynomial,
+    pub beta_outofplane_radians: CommonPolynomial,
     /// The frame in which the maneuvers are defined.
     pub frame: Frame,
 }
@@ -58,12 +58,12 @@ impl fmt::Display for Mnvr {
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.end - self.start >= 1 * TimeUnit::Millisecond {
-            write!(f, "Finite burn maneuver @ {} for {} (ending on {})\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.end, self.alpha_inplane_degrees, self.beta_outofplane_degrees)
+            write!(f, "Finite burn maneuver @ {} for {} (ending on {})\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.end, self.alpha_inplane_radians, self.beta_outofplane_radians)
         } else {
             write!(
                 f,
                 "Impulsive maneuver @ {}\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}",
-                self.start, self.alpha_inplane_degrees, self.beta_outofplane_degrees
+                self.start, self.alpha_inplane_radians, self.beta_outofplane_radians
             )
         }
     }
@@ -90,8 +90,8 @@ impl Mnvr {
             start,
             end,
             thrust_lvl,
-            alpha_inplane_degrees: CommonPolynomial::Constant(alpha),
-            beta_outofplane_degrees: CommonPolynomial::Constant(beta),
+            alpha_inplane_radians: CommonPolynomial::Constant(alpha),
+            beta_outofplane_radians: CommonPolynomial::Constant(beta),
             frame,
         }
     }
@@ -140,18 +140,18 @@ impl Mnvr {
 
         // Compute a few thruster parameters
         let thruster = spacecraft.thruster.as_ref().unwrap();
-        let c_km_s = thruster.exhaust_velocity() * 1e-3;
+        let c_km_s = thruster.exhaust_velocity();
 
         let delta_tfb = ((c_km_s * spacecraft.mass_kg()) / thruster.thrust)
-            * (1.0 - (-dv.norm() / c_km_s).exp());
+            * (1.0 - (-dv.norm() * 1e3 / c_km_s).exp());
 
         // Build the estimated maneuver
         let mut mnvr = Self {
             start: epoch - 0.5 * delta_tfb * TimeUnit::Second,
             end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
             thrust_lvl: 1.0,
-            alpha_inplane_degrees,
-            beta_outofplane_degrees,
+            alpha_inplane_radians: alpha_inplane_degrees,
+            beta_outofplane_radians: beta_outofplane_degrees,
             frame,
         };
 
@@ -272,39 +272,39 @@ impl Mnvr {
                     // Change the relevant component of the polynomial which defines this maneuver
                     match var {
                         Vary::MnvrAlpha => {
-                            this_mnvr.alpha_inplane_degrees = mnvr
-                                .alpha_inplane_degrees
+                            this_mnvr.alpha_inplane_radians = mnvr
+                                .alpha_inplane_radians
                                 .add_val_in_order(perturbation, 0)
                                 .unwrap();
                         }
                         Vary::MnvrAlphaDot => {
-                            this_mnvr.alpha_inplane_degrees = mnvr
-                                .alpha_inplane_degrees
+                            this_mnvr.alpha_inplane_radians = mnvr
+                                .alpha_inplane_radians
                                 .add_val_in_order(perturbation, 1)
                                 .unwrap();
                         }
                         Vary::MnvrAlphaDDot => {
-                            this_mnvr.alpha_inplane_degrees = mnvr
-                                .alpha_inplane_degrees
+                            this_mnvr.alpha_inplane_radians = mnvr
+                                .alpha_inplane_radians
                                 .add_val_in_order(perturbation, 2)
                                 .unwrap();
                         }
 
                         Vary::MnvrBeta => {
-                            this_mnvr.beta_outofplane_degrees = mnvr
-                                .beta_outofplane_degrees
+                            this_mnvr.beta_outofplane_radians = mnvr
+                                .beta_outofplane_radians
                                 .add_val_in_order(perturbation, 0)
                                 .unwrap();
                         }
                         Vary::MnvrBetaDot => {
-                            this_mnvr.beta_outofplane_degrees = mnvr
-                                .beta_outofplane_degrees
+                            this_mnvr.beta_outofplane_radians = mnvr
+                                .beta_outofplane_radians
                                 .add_val_in_order(perturbation, 1)
                                 .unwrap();
                         }
                         Vary::MnvrBetaDDot => {
-                            this_mnvr.beta_outofplane_degrees = mnvr
-                                .beta_outofplane_degrees
+                            this_mnvr.beta_outofplane_radians = mnvr
+                                .beta_outofplane_radians
                                 .add_val_in_order(perturbation, 2)
                                 .unwrap();
                         }
@@ -405,29 +405,29 @@ impl Mnvr {
                 // Change the relevant component of the polynomial which defines this maneuver
                 match var {
                     Vary::MnvrAlpha => {
-                        mnvr.alpha_inplane_degrees =
-                            mnvr.alpha_inplane_degrees.add_val_in_order(*value, 0)?;
+                        mnvr.alpha_inplane_radians =
+                            mnvr.alpha_inplane_radians.add_val_in_order(*value, 0)?;
                     }
                     Vary::MnvrAlphaDot => {
-                        mnvr.alpha_inplane_degrees =
-                            mnvr.alpha_inplane_degrees.add_val_in_order(*value, 1)?;
+                        mnvr.alpha_inplane_radians =
+                            mnvr.alpha_inplane_radians.add_val_in_order(*value, 1)?;
                     }
                     Vary::MnvrAlphaDDot => {
-                        mnvr.alpha_inplane_degrees =
-                            mnvr.alpha_inplane_degrees.add_val_in_order(*value, 2)?;
+                        mnvr.alpha_inplane_radians =
+                            mnvr.alpha_inplane_radians.add_val_in_order(*value, 2)?;
                     }
 
                     Vary::MnvrBeta => {
-                        mnvr.beta_outofplane_degrees =
-                            mnvr.beta_outofplane_degrees.add_val_in_order(*value, 0)?;
+                        mnvr.beta_outofplane_radians =
+                            mnvr.beta_outofplane_radians.add_val_in_order(*value, 0)?;
                     }
                     Vary::MnvrBetaDot => {
-                        mnvr.beta_outofplane_degrees =
-                            mnvr.beta_outofplane_degrees.add_val_in_order(*value, 1)?;
+                        mnvr.beta_outofplane_radians =
+                            mnvr.beta_outofplane_radians.add_val_in_order(*value, 1)?;
                     }
                     Vary::MnvrBetaDDot => {
-                        mnvr.beta_outofplane_degrees =
-                            mnvr.beta_outofplane_degrees.add_val_in_order(*value, 2)?;
+                        mnvr.beta_outofplane_radians =
+                            mnvr.beta_outofplane_radians.add_val_in_order(*value, 2)?;
                     }
 
                     Vary::StartEpoch => {
@@ -487,8 +487,8 @@ impl Mnvr {
     /// Return the thrust vector computed at the provided epoch
     pub fn vector(&self, epoch: Epoch) -> Vector3<f64> {
         let t = (epoch - self.start).in_seconds();
-        let alpha = self.alpha_inplane_degrees.eval(t);
-        let beta = self.beta_outofplane_degrees.eval(t);
+        let alpha = self.alpha_inplane_radians.eval(t);
+        let beta = self.beta_outofplane_radians.eval(t);
         unit_vector_from_plane_angles(alpha, beta)
     }
 

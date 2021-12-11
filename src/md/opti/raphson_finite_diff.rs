@@ -74,8 +74,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             start: correction_epoch,
             end: correction_epoch + 5.seconds(),
             thrust_lvl: 1.0,
-            alpha_inplane_degrees: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            beta_outofplane_degrees: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            beta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             frame: Frame::RCN,
         };
 
@@ -110,14 +110,14 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     Vary::EndEpoch => mnvr.end = mnvr.end + var.init_guess.seconds(),
                     Vary::StartEpoch => mnvr.start = mnvr.start + var.init_guess.seconds(),
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                        mnvr.alpha_inplane_degrees = mnvr
-                            .alpha_inplane_degrees
+                        mnvr.alpha_inplane_radians = mnvr
+                            .alpha_inplane_radians
                             .add_val_in_order(var.init_guess, var.component.vec_index())
                             .unwrap();
                     }
                     Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                        mnvr.beta_outofplane_degrees = mnvr
-                            .beta_outofplane_degrees
+                        mnvr.beta_outofplane_radians = mnvr
+                            .beta_outofplane_radians
                             .add_val_in_order(var.init_guess, var.component.vec_index())
                             .unwrap();
                     }
@@ -282,14 +282,14 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 }
                             }
                             Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                                this_mnvr.alpha_inplane_degrees = mnvr
-                                    .alpha_inplane_degrees
+                                this_mnvr.alpha_inplane_radians = mnvr
+                                    .alpha_inplane_radians
                                     .add_val_in_order(pert, var.component.vec_index())
                                     .unwrap();
                             }
                             Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                                this_mnvr.beta_outofplane_degrees = mnvr
-                                    .beta_outofplane_degrees
+                                this_mnvr.beta_outofplane_radians = mnvr
+                                    .beta_outofplane_radians
                                     .add_val_in_order(pert, var.component.vec_index())
                                     .unwrap();
                             }
@@ -478,14 +478,14 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             }
                         }
                         Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
-                            mnvr.alpha_inplane_degrees = mnvr
-                                .alpha_inplane_degrees
+                            mnvr.alpha_inplane_radians = mnvr
+                                .alpha_inplane_radians
                                 .add_val_in_order(corr, var.component.vec_index())
                                 .unwrap();
                         }
                         Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                            mnvr.beta_outofplane_degrees = mnvr
-                                .beta_outofplane_degrees
+                            mnvr.beta_outofplane_radians = mnvr
+                                .beta_outofplane_radians
                                 .add_val_in_order(corr, var.component.vec_index())
                                 .unwrap();
                         }

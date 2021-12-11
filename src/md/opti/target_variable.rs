@@ -70,9 +70,9 @@ impl Vary {
 
     pub fn vec_index(&self) -> usize {
         match self {
-            Self::PositionX | Self::MnvrAlpha | Self::MnvrBeta => 0,
+            Self::PositionX | Self::MnvrAlphaDDot | Self::MnvrBetaDDot => 0,
             Self::PositionY | Self::MnvrAlphaDot | Self::MnvrBetaDot => 1,
-            Self::PositionZ | Self::MnvrAlphaDDot | Self::MnvrBetaDDot => 2,
+            Self::PositionZ | Self::MnvrAlpha | Self::MnvrBeta => 2,
             Self::VelocityX => 3,
             Self::VelocityY => 4,
             Self::VelocityZ => 5,

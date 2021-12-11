@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub mod convert_impulsive;
 pub mod ctrlnodes;
 pub mod multishoot;
 pub mod optimizer;
