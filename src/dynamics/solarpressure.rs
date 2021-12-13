@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::{hyperspace_from_vector, linalg::norm, Float, Hyperdual};
+use super::hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use super::ForceModel;
 use crate::cosmic::eclipse::EclipseLocator;
 use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
@@ -90,23 +90,23 @@ impl ForceModel for SolarPressure {
             .frame_chg(osc, self.e_loc.light_source)
             .radius();
 
-        let r_sun_d: Vector3<Hyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
+        let r_sun_d: Vector3<OHyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
         // Compute the shaddowing factor.
         let k: f64 = self.e_loc.compute(osc).into();
 
         let r_sun_au = norm(&r_sun_d) / AU;
-        let inv_r_sun_au = Hyperdual::<f64, Const<9>>::from_real(1.0) / (r_sun_au);
+        let inv_r_sun_au = OHyperdual::<f64, Const<9>>::from_real(1.0) / (r_sun_au);
         let inv_r_sun_au_p2 = inv_r_sun_au.powi(2);
         // in N/(m^2)
         let flux_pressure =
-            Hyperdual::<f64, Const<9>>::from_real(k * self.phi / SPEED_OF_LIGHT) * inv_r_sun_au_p2;
+            OHyperdual::<f64, Const<9>>::from_real(k * self.phi / SPEED_OF_LIGHT) * inv_r_sun_au_p2;
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         let dual_force_scalar =
-            Hyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.cr * ctx.srp_area_m2);
-        let mut dual_force: Vector3<Hyperdual<f64, Const<9>>> = Vector3::zeros();
+            OHyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.cr * ctx.srp_area_m2);
+        let mut dual_force: Vector3<OHyperdual<f64, Const<9>>> = Vector3::zeros();
         dual_force[0] = dual_force_scalar * flux_pressure * r_sun_unit[0];
         dual_force[1] = dual_force_scalar * flux_pressure * r_sun_unit[1];
         dual_force[2] = dual_force_scalar * flux_pressure * r_sun_unit[2];

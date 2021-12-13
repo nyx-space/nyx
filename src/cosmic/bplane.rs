@@ -17,7 +17,7 @@
 */
 
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{Float, Hyperdual};
+use super::hyperdual::{Float, OHyperdual};
 use super::{Frame, Orbit, OrbitDual, OrbitPartial};
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::objective::Objective;
@@ -54,8 +54,8 @@ impl BPlane {
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
             ))
         } else {
-            let one = Hyperdual::from(1.0);
-            let zero = Hyperdual::from(0.0);
+            let one = OHyperdual::from(1.0);
+            let zero = OHyperdual::from(0.0);
 
             let e_hat = orbit.evec() / orbit.ecc().dual;
             let h_hat = orbit.hvec() / orbit.hmag().dual;

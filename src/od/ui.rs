@@ -331,8 +331,11 @@ where
         let mut sum = 0.0;
         for residual in &self.residuals {
             // sum += residual.prefit.dot(&residual.prefit);
-            let mut msr_noise_item_inv = self.kf.measurement_noise(residual.dt).diagonal().clone();
-            msr_noise_item_inv.apply(|m| 1.0 / m);
+            let mut msr_noise_item_inv: OVector<f64, Msr::MeasurementSize> =
+                self.kf.measurement_noise(residual.dt).diagonal().clone();
+            for i in 0..msr_noise_item_inv.len() {
+                msr_noise_item_inv[i] = 1.0 / msr_noise_item_inv[i];
+            }
             sum += residual.prefit.dot(&msr_noise_item_inv).powi(2);
         }
         (sum / (self.estimates.len() as f64)).sqrt()

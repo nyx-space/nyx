@@ -8,7 +8,7 @@ use crate::nav::state::*;
 use crate::time::Epoch;
 use crate::{NyxError, Orbit, State};
 use hyperdual::linalg::norm;
-use hyperdual::{hyperspace_from_vector, Hyperdual};
+use hyperdual::{hyperspace_from_vector, OHyperdual};
 
 /// Simulates one way range, returns the observation in kilometers (km)
 pub struct OneWayRange {
@@ -73,7 +73,7 @@ where
 //     }
 
 //     fn compute_sensitivity(
-//         state: &OVector<Hyperdual<f64, Const<7>>, Const<6>>,
+//         state: &OVector<OHyperdual<f64, Const<7>>, Const<6>>,
 //         range_noise: f64,
 //         range_rate_noise: f64,
 //     ) -> (Vector2<f64>, Matrix2x6<f64>) {
@@ -83,8 +83,8 @@ where
 
 //         // Code up math as usual
 //         let delta_v_vec = velocity_vec / norm(&range_vec);
-//         let range = norm(&range_vec) + Hyperdual::from(range_noise);
-//         let range_rate = range_vec.dot(&delta_v_vec) + Hyperdual::from(range_rate_noise);
+//         let range = norm(&range_vec) + OHyperdual::from(range_noise);
+//         let range_rate = range_vec.dot(&delta_v_vec) + OHyperdual::from(range_rate_noise);
 
 //         // Extract result into Vector2 and Matrix2x6
 //         let mut fx = Vector2::zeros();
