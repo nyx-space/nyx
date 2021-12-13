@@ -37,3 +37,11 @@ pub enum CostFunction {
     /// J = ∫ |\vec{u}| dt -- Warning, this may lead to loads to bang-coast-bang solutions
     MinimumFuel,
 }
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum DiffMethod {
+    /// Slower, but more commonly used
+    FiniteDiff,
+    /// Significantly faster, but requires the automatic differentiation to be coded
+    AutoDiff,
+}

@@ -90,12 +90,12 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         // Pre-traj is the trajectory _before_ the impulsive maneuver
         let pre_sc = prop
             .with(spacecraft)
-            .for_duration(-2.0 * delta_tfb * TimeUnit::Second)?;
+            .for_duration(-60.0 * TimeUnit::Minute)?;
         let (_, pre_traj) = prop.with(pre_sc).until_epoch_with_traj(impulse_epoch)?;
         // Post-traj is the trajectory _after_ the impulsive maneuver
         let (_, post_traj) = prop
             .with(spacecraft.with_dv(dv))
-            .for_duration_with_traj(2.0 * delta_tfb * TimeUnit::Second)?;
+            .for_duration_with_traj(60.0 * TimeUnit::Minute)?;
 
         println!("{}", pre_traj);
         println!("{}", post_traj);
@@ -345,13 +345,13 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
                         mnvr.alpha_inplane_radians = mnvr
                             .alpha_inplane_radians
-                            .add_val_in_order(corr, var.component.vec_index())
+                            .add_val_in_order(corr % 3.1415, var.component.vec_index())
                             .unwrap();
                     }
                     Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
                         mnvr.beta_outofplane_radians = mnvr
                             .beta_outofplane_radians
-                            .add_val_in_order(corr, var.component.vec_index())
+                            .add_val_in_order(corr % 3.1415, var.component.vec_index())
                             .unwrap();
                     }
                     _ => unreachable!(),

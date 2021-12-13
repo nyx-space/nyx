@@ -144,7 +144,8 @@ fn conv_tgt_sma_ecc() {
     /* Convert to a finite burn and make sure this converges */
     /* *** */
 
-    Optimizer::convert_impulsive_mnvr(solution_fd.corrected_state, solution_fd.correction, &setup);
+    Optimizer::convert_impulsive_mnvr(solution_fd.corrected_state, solution_fd.correction, &setup)
+        .unwrap();
 
     // let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     // setup.set_tolerance(1e-3);
