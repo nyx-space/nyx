@@ -19,7 +19,7 @@
 use rayon::prelude::*;
 
 use crate::dynamics::guidance::{plane_angles_from_unit_vector, Mnvr};
-use crate::errors::TargetingError;
+// use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
 use crate::md::trajectory::InterpState;
@@ -30,10 +30,10 @@ use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::time::TimeUnitHelper;
-use std::convert::TryInto;
-use std::fmt;
+// use std::convert::TryInto;
+// use std::fmt;
 
-use super::solution::TargeterSolution;
+// use super::solution::TargeterSolution;
 
 impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
@@ -100,10 +100,6 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         println!("{}", pre_traj);
         println!("{}", post_traj);
 
-        // Now, we want the state _after_ the maneuver is completed to back-propagate to the state at the start of the maneuver
-        let sc_x0 = pre_traj.at(mnvr.start)?;
-        let sc_xf_desired = post_traj.at(mnvr.end)?;
-
         // Now let's setup the optimizer.
         let variables = [
             Variable::from(Vary::MnvrAlpha).with_initial_guess(alpha_tdv),
@@ -119,6 +115,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
         let mut prev_err_norm = std::f64::INFINITY;
         // The objectives will be updated if the duration of the maneuver is changed
+        let mut sc_x0 = pre_traj.at(mnvr.start)?;
+        let mut sc_xf_desired = post_traj.at(mnvr.end)?;
         let mut objectives = [
             Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x, 1e-3),
             Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y, 1e-3),
@@ -151,9 +149,10 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let max_iter = 5;
 
         for it in 0..=max_iter {
+            dbg!(it);
             // Propagate with the estimated maneuver until the end of the maneuver
             let mut prop = prop.clone();
-            prop.set_tolerance(1e-6);
+            prop.set_tolerance(1e-3);
             prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
             let sc_xf_achieved = prop
                 .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
@@ -172,7 +171,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
             // As such, it includes the STM of that variable for the whole propagation arc.
-            let mut jac = SMatrix::<f64, 6, 3>::zeros();
+            let mut jac = SMatrix::<f64, 6, 8>::zeros();
 
             // For each objective, we'll perturb the variables to compute the Jacobian with finite differencing.
             for (i, obj) in objectives.iter().enumerate() {
@@ -227,15 +226,11 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                     // Grab the nominal start time from the pre_dv trajectory
                     let this_sc_x0 = pre_traj.at(this_mnvr.start).unwrap();
 
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(mnvr));
+                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
                     let this_sc_xf_achieved = this_prop
                         .with(this_sc_x0.with_guidance_mode(GuidanceMode::Thrust))
-                        .until_epoch(mnvr.end)
+                        .until_epoch(this_mnvr.end)
                         .unwrap();
-
-                    // HERE!!!
-                    // XXX
-                    // Suspicious! jac_val is zero. Also, the (i,j) indexing below is out of matrix bounds. Like, how?!
 
                     let this_achieved = this_sc_xf_achieved
                         .value_and_deriv(&obj.parameter)
@@ -244,9 +239,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                     *jac_val = (this_achieved - achieved) / var.perturbation;
                 });
 
-                println!("{}", jac);
                 for (j, _, jac_val) in &pert_calc {
-                    dbg!(i, *j, *jac_val);
                     jac[(i, *j)] = *jac_val;
                 }
             }
@@ -296,6 +289,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                 // return Ok(sol);
             }
 
+            dbg!(converged);
             // We haven't converged yet, so let's build t
             if (err_vector.norm() - prev_err_norm).abs() < 1e-10 {
                 return Err(NyxError::CorrectionIneffective(
@@ -316,6 +310,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
 
             // And finally apply it to the maneuver
+            let mut update_obj = false;
             for (i, var) in variables.iter().enumerate() {
                 // Choose the minimum step between the provided max step and the correction.
                 if delta[i].abs() > var.max_step.abs() {
@@ -326,7 +321,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                     delta[i] = var.min_value;
                 }
 
-                debug!(
+                println!(
                     "Correction {:?} (element {}): {}",
                     var.component, i, delta[i]
                 );
@@ -337,9 +332,16 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                 match var.component {
                     Vary::Duration => {
                         mnvr.end = mnvr.start + corr.seconds();
+                        update_obj = true;
                     }
-                    Vary::EndEpoch => mnvr.end = mnvr.end + corr.seconds(),
-                    Vary::StartEpoch => mnvr.start = mnvr.start + corr.seconds(),
+                    Vary::EndEpoch => {
+                        mnvr.end = mnvr.end + corr.seconds();
+                        update_obj = true;
+                    }
+                    Vary::StartEpoch => {
+                        mnvr.start = mnvr.start + corr.seconds();
+                        update_obj = true;
+                    }
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
                         mnvr.alpha_inplane_radians = mnvr
                             .alpha_inplane_radians
@@ -359,7 +361,21 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             // Log progress to debug
             info!("Targeter -- Iteration #{}", it);
             for obj in &objmsg {
-                info!("{}", obj);
+                println!("{}", obj);
+            }
+
+            println!("New mnvr {}", mnvr);
+            if update_obj {
+                sc_x0 = pre_traj.at(mnvr.start)?;
+                sc_xf_desired = post_traj.at(mnvr.end)?;
+                objectives = [
+                    Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x, 1e-3),
+                    Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y, 1e-3),
+                    Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z, 1e-3),
+                    Objective::within_tolerance(StateParameter::VX, sc_xf_desired.orbit.vx, 1e-3),
+                    Objective::within_tolerance(StateParameter::VY, sc_xf_desired.orbit.vy, 1e-3),
+                    Objective::within_tolerance(StateParameter::VZ, sc_xf_desired.orbit.vz, 1e-3),
+                ];
             }
         }
 
