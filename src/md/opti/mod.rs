@@ -19,7 +19,7 @@
 pub mod convert_impulsive;
 pub mod ctrlnodes;
 /// Uses a Levenberg Marquardt minimizer to solve the damped least squares problem.
-// pub mod minimize_lm;
+pub mod minimize_lm;
 pub mod multishoot;
 pub mod optimizer;
 /// Uses a [Newton Raphson](https://en.wikipedia.org/wiki/Newton%27s_method_in_optimization) method where the Jacobian is computed via finite differencing.

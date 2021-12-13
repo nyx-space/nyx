@@ -64,16 +64,17 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> LeastSquaresProblem<f64, 
     type JacobianStorage = Owned<f64, Const<O>, Const<V>>;
 
     fn set_params(&mut self, p: &SVector<f64, V>) {
-        self.p.copy_from(p);
+        todo!()
         // do common calculations for residuals and the Jacobian here
     }
 
     fn params(&self) -> SVector<f64, V> {
-        self.p
+        // self.p
+        todo!()
     }
 
     fn residuals(&self) -> Option<SVector<f64, O>> {
-        let [x, y] = [self.p.x, self.p.y];
+        // let [x, y] = [self.p.x, self.p.y];
 
         // 0.26*(x*x+y*y)-0.48*x*y
 
