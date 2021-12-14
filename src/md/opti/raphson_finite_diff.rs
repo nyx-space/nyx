@@ -115,14 +115,16 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             .add_val_in_order(var.init_guess, var.component.vec_index())
                             .unwrap();
                     }
-                    Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
+                    Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                         mnvr.delta_outofplane_radians = mnvr
                             .delta_outofplane_radians
                             .add_val_in_order(var.init_guess, var.component.vec_index())
                             .unwrap();
                     }
                     Vary::Tx | Vary::Ty | Vary::Tz => {
-                        println!("Cannot set initial guess for all Tx, Ty, and Tz");
+                        let mut vector = mnvr.vector(correction_epoch);
+                        vector[var.component.vec_index()] += var.perturbation;
+                        mnvr.set_direction(vector);
                     }
                     _ => unreachable!(),
                 }
@@ -290,7 +292,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                     .add_val_in_order(pert, var.component.vec_index())
                                     .unwrap();
                             }
-                            Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
+                            Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                                 this_mnvr.delta_outofplane_radians = mnvr
                                     .delta_outofplane_radians
                                     .add_val_in_order(pert, var.component.vec_index())
@@ -327,7 +329,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         let pre_mnvr = this_prop.with(cur_xi).until_epoch(this_mnvr.start).unwrap();
                         // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
                         let prop_opts = this_prop.opts;
-                        println!("Adding {}", this_mnvr);
                         this_prop.set_max_step(this_mnvr.duration());
                         this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
                         let post_mnvr = this_prop
@@ -496,7 +497,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 .add_val_in_order(corr, var.component.vec_index())
                                 .unwrap();
                         }
-                        Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
+                        Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                             mnvr.delta_outofplane_radians = mnvr
                                 .delta_outofplane_radians
                                 .add_val_in_order(corr, var.component.vec_index())
@@ -506,7 +507,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             let mut vector = mnvr.vector(correction_epoch);
                             vector[var.component.vec_index()] += corr;
                             mnvr.set_direction(vector);
-                            println!("New thrust vector = {}", vector);
                         }
                         Vary::ThrustLevel => {
                             mnvr.thrust_lvl += var.perturbation;

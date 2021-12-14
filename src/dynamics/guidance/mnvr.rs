@@ -176,9 +176,9 @@ impl Mnvr {
             Variable::from(Vary::MnvrAlpha).with_initial_guess(alpha_tdv),
             Variable::from(Vary::MnvrAlphaDot),
             Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(alpha_ddot_tdv),
-            Variable::from(Vary::MnvrBeta).with_initial_guess(delta_tdv),
-            Variable::from(Vary::MnvrBetaDot),
-            Variable::from(Vary::MnvrBetaDDot).with_initial_guess(delta_ddot_tdv),
+            Variable::from(Vary::MnvrDelta).with_initial_guess(delta_tdv),
+            Variable::from(Vary::MnvrDeltaDot),
+            Variable::from(Vary::MnvrDeltaDDot).with_initial_guess(delta_ddot_tdv),
             Variable::from(Vary::StartEpoch),
             Variable::from(Vary::Duration),
         ];
@@ -298,19 +298,19 @@ impl Mnvr {
                                 .unwrap();
                         }
 
-                        Vary::MnvrBeta => {
+                        Vary::MnvrDelta => {
                             this_mnvr.delta_outofplane_radians = mnvr
                                 .delta_outofplane_radians
                                 .add_val_in_order(perturbation, 0)
                                 .unwrap();
                         }
-                        Vary::MnvrBetaDot => {
+                        Vary::MnvrDeltaDot => {
                             this_mnvr.delta_outofplane_radians = mnvr
                                 .delta_outofplane_radians
                                 .add_val_in_order(perturbation, 1)
                                 .unwrap();
                         }
-                        Vary::MnvrBetaDDot => {
+                        Vary::MnvrDeltaDDot => {
                             this_mnvr.delta_outofplane_radians = mnvr
                                 .delta_outofplane_radians
                                 .add_val_in_order(perturbation, 2)
@@ -425,15 +425,15 @@ impl Mnvr {
                             mnvr.alpha_inplane_radians.add_val_in_order(*value, 2)?;
                     }
 
-                    Vary::MnvrBeta => {
+                    Vary::MnvrDelta => {
                         mnvr.delta_outofplane_radians =
                             mnvr.delta_outofplane_radians.add_val_in_order(*value, 0)?;
                     }
-                    Vary::MnvrBetaDot => {
+                    Vary::MnvrDeltaDot => {
                         mnvr.delta_outofplane_radians =
                             mnvr.delta_outofplane_radians.add_val_in_order(*value, 1)?;
                     }
-                    Vary::MnvrBetaDDot => {
+                    Vary::MnvrDeltaDDot => {
                         mnvr.delta_outofplane_radians =
                             mnvr.delta_outofplane_radians.add_val_in_order(*value, 2)?;
                     }

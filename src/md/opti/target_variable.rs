@@ -19,6 +19,7 @@
 use crate::cosmic::Frame;
 use crate::errors::TargetingError;
 use std::default::Default;
+use std::f64::consts::{FRAC_PI_2, FRAC_PI_8, PI};
 
 /// Defines the kind of correction to apply in the targeter
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -42,11 +43,11 @@ pub enum Vary {
     /// Maneuver's in-plane alpha double-dot
     MnvrAlphaDDot,
     /// Maneuver's out-of-plane beta
-    MnvrBeta,
+    MnvrDelta,
     /// Maneuver's out-of-plane beta dot
-    MnvrBetaDot,
+    MnvrDeltaDot,
     /// Maneuver's out-of-plane beta double-dot
-    MnvrBetaDDot,
+    MnvrDeltaDDot,
     /// Start epoch difference in seconds
     StartEpoch,
     /// Burn duration difference in seconds
@@ -68,9 +69,9 @@ impl Vary {
         *self == Self::MnvrAlpha
             || *self == Self::MnvrAlphaDDot
             || *self == Self::MnvrAlphaDDot
-            || *self == Self::MnvrBeta
-            || *self == Self::MnvrBetaDDot
-            || *self == Self::MnvrBetaDDot
+            || *self == Self::MnvrDelta
+            || *self == Self::MnvrDeltaDDot
+            || *self == Self::MnvrDeltaDDot
             || *self == Self::StartEpoch
             || *self == Self::Duration
             || *self == Self::EndEpoch
@@ -82,9 +83,9 @@ impl Vary {
 
     pub fn vec_index(&self) -> usize {
         match self {
-            Self::PositionX | Self::Tx | Self::MnvrAlphaDDot | Self::MnvrBetaDDot => 0,
-            Self::PositionY | Self::Ty | Self::MnvrAlphaDot | Self::MnvrBetaDot => 1,
-            Self::PositionZ | Self::Tz | Self::MnvrAlpha | Self::MnvrBeta => 2,
+            Self::PositionX | Self::Tx | Self::MnvrAlphaDDot | Self::MnvrDeltaDDot => 0,
+            Self::PositionY | Self::Ty | Self::MnvrAlphaDot | Self::MnvrDeltaDot => 1,
+            Self::PositionZ | Self::Tz | Self::MnvrAlpha | Self::MnvrDelta => 2,
             Self::VelocityX | Self::ThrustLevel => 3,
             Self::VelocityY => 4,
             Self::VelocityZ => 5,
@@ -175,28 +176,20 @@ impl From<Vary> for Variable {
                 component: vary,
                 ..Default::default()
             },
-            Vary::MnvrAlpha | Vary::MnvrBeta => Self {
+            Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => Self {
                 component: vary,
-                perturbation: 0.01_f64.to_radians(),
-                max_step: 45.0_f64.to_radians(),
-                max_value: 360.0_f64.to_radians(),
-                min_value: -360.0_f64.to_radians(),
+                perturbation: 0.1 * PI,
+                max_step: FRAC_PI_8,
+                max_value: PI,
+                min_value: 0.0,
                 ..Default::default()
             },
-            Vary::MnvrAlphaDot | Vary::MnvrBetaDot => Self {
+            Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => Self {
                 component: vary,
-                perturbation: 0.01_f64.to_radians(),
-                max_step: 45.0_f64.to_radians(),
-                max_value: 360.0_f64.to_radians(),
-                min_value: -360.0_f64.to_radians(),
-                ..Default::default()
-            },
-            Vary::MnvrAlphaDDot | Vary::MnvrBetaDDot => Self {
-                component: vary,
-                perturbation: 0.01_f64.to_radians(),
-                max_step: 45.0_f64.to_radians(),
-                max_value: 360.0_f64.to_radians(),
-                min_value: -360.0_f64.to_radians(),
+                perturbation: 0.1 * PI,
+                max_step: FRAC_PI_8,
+                max_value: FRAC_PI_2,
+                min_value: -FRAC_PI_2,
                 ..Default::default()
             },
             Vary::StartEpoch | Vary::EndEpoch => Self {

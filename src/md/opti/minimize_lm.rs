@@ -157,7 +157,7 @@ where
                             .add_val_in_order(attempted_control[i], var.component.vec_index())
                             .unwrap();
                     }
-                    Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
+                    Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                         mnvr.delta_outofplane_radians = mnvr
                             .delta_outofplane_radians
                             .add_val_in_order(attempted_control[i], var.component.vec_index())
@@ -324,7 +324,7 @@ where
                                 .add_val_in_order(pert, var.component.vec_index())
                                 .unwrap();
                         }
-                        Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
+                        Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                             this_mnvr.delta_outofplane_radians = mnvr
                                 .delta_outofplane_radians
                                 .add_val_in_order(pert, var.component.vec_index())

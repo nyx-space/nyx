@@ -18,7 +18,7 @@
 
 use rayon::prelude::*;
 
-use crate::dynamics::guidance::{plane_angles_from_unit_vector, Mnvr};
+use crate::dynamics::guidance::{ra_dec_from_unit_vector, Mnvr};
 // use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
@@ -58,8 +58,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let u_ddot = (3.0 * spacecraft.orbit.frame.gm() / rmag.powi(5))
             * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
         // Compute the control rates at the time of the impulsive maneuver (tdv)
-        let (alpha_tdv, beta_tdv) = plane_angles_from_unit_vector(u);
-        let (alpha_ddot_tdv, beta_ddot_tdv) = plane_angles_from_unit_vector(u_ddot);
+        let (alpha_tdv, delta_tdv) = ra_dec_from_unit_vector(u);
+        let (alpha_ddot_tdv, delta_ddot_tdv) = ra_dec_from_unit_vector(u_ddot);
         // Build the maneuver polynomial angles from these
         let alpha_inplane_radians = CommonPolynomial::Quadratic(0.0, 0.0, alpha_tdv);
         let beta_outofplane_radians = CommonPolynomial::Quadratic(0.0, 0.0, 0.0);
@@ -105,9 +105,9 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             Variable::from(Vary::MnvrAlpha).with_initial_guess(alpha_tdv),
             Variable::from(Vary::MnvrAlphaDot),
             Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(alpha_ddot_tdv),
-            Variable::from(Vary::MnvrBeta).with_initial_guess(beta_tdv),
-            Variable::from(Vary::MnvrBetaDot),
-            Variable::from(Vary::MnvrBetaDDot).with_initial_guess(beta_ddot_tdv),
+            Variable::from(Vary::MnvrDelta).with_initial_guess(delta_tdv),
+            Variable::from(Vary::MnvrDeltaDot),
+            Variable::from(Vary::MnvrDeltaDDot).with_initial_guess(delta_ddot_tdv),
             // Variable::from(Vary::StartEpoch),
             // Variable::from(Vary::Duration),
         ];
@@ -253,7 +253,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                                 .add_val_in_order(pert, var.component.vec_index())
                                 .unwrap();
                         }
-                        Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
+                        Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                             this_mnvr.delta_outofplane_radians = mnvr
                                 .delta_outofplane_radians
                                 .add_val_in_order(pert, var.component.vec_index())
@@ -388,7 +388,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                             .add_val_in_order(corr % (2.0 * 3.1415), var.component.vec_index())
                             .unwrap();
                     }
-                    Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
+                    Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                         mnvr.delta_outofplane_radians = mnvr
                             .delta_outofplane_radians
                             .add_val_in_order(corr % (2.0 * 3.1415), var.component.vec_index())
