@@ -72,10 +72,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         // Create a default maneuver that will only be used if a finite burn is being targeted
         let mut mnvr = Mnvr {
             start: correction_epoch,
-            end: correction_epoch + 5.seconds(),
+            end: achievement_epoch,
             thrust_lvl: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            beta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             frame: Frame::RCN,
         };
 
@@ -116,10 +116,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             .unwrap();
                     }
                     Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                        mnvr.beta_outofplane_radians = mnvr
-                            .beta_outofplane_radians
+                        mnvr.delta_outofplane_radians = mnvr
+                            .delta_outofplane_radians
                             .add_val_in_order(var.init_guess, var.component.vec_index())
                             .unwrap();
+                    }
+                    Vary::Tx | Vary::Ty | Vary::Tz => {
+                        println!("Cannot set initial guess for all Tx, Ty, and Tz");
                     }
                     _ => unreachable!(),
                 }
@@ -172,7 +175,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         let start_instant = Instant::now();
 
         for it in 0..=self.iterations {
-            // Modify each variable by the desired perturbatino, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
+            // Modify each variable by the desired perturbation, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
             let cur_xi = xi;
 
             // If we are targeting a finite burn, let's set propagate in several steps to make sure we don't miss the burn
@@ -182,7 +185,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 let prop_opts = prop.opts;
                 let pre_mnvr = prop.with(cur_xi).until_epoch(mnvr.start)?;
                 prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
-                prop.set_max_step(mnvr.end - mnvr.start);
+                prop.set_max_step(mnvr.duration());
                 let post_mnvr = prop
                     .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
                     .until_epoch(mnvr.end)?;
@@ -288,14 +291,21 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                     .unwrap();
                             }
                             Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                                this_mnvr.beta_outofplane_radians = mnvr
-                                    .beta_outofplane_radians
+                                this_mnvr.delta_outofplane_radians = mnvr
+                                    .delta_outofplane_radians
                                     .add_val_in_order(pert, var.component.vec_index())
                                     .unwrap();
                             }
+                            Vary::Tx | Vary::Ty | Vary::Tz => {
+                                let mut vector = this_mnvr.vector(correction_epoch);
+                                vector[var.component.vec_index()] += var.perturbation;
+                                this_mnvr.set_direction(vector);
+                            }
+                            Vary::ThrustLevel => {
+                                this_mnvr.thrust_lvl += var.perturbation;
+                            }
                             _ => unreachable!(),
                         }
-                        this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
                     } else {
                         let mut state_correction = Vector6::<f64>::zeros();
                         state_correction[var.component.vec_index()] += var.perturbation;
@@ -313,10 +323,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     }
 
                     let this_xf = if finite_burn_target {
-                        let prop_opts = this_prop.opts;
+                        // Propagate normally until start of maneuver
                         let pre_mnvr = this_prop.with(cur_xi).until_epoch(this_mnvr.start).unwrap();
+                        // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
+                        let prop_opts = this_prop.opts;
+                        println!("Adding {}", this_mnvr);
+                        this_prop.set_max_step(this_mnvr.duration());
                         this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
-                        this_prop.set_max_step(this_mnvr.end - this_mnvr.start);
                         let post_mnvr = this_prop
                             .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
                             .until_epoch(this_mnvr.end)
@@ -484,10 +497,19 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 .unwrap();
                         }
                         Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                            mnvr.beta_outofplane_radians = mnvr
-                                .beta_outofplane_radians
+                            mnvr.delta_outofplane_radians = mnvr
+                                .delta_outofplane_radians
                                 .add_val_in_order(corr, var.component.vec_index())
                                 .unwrap();
+                        }
+                        Vary::Tx | Vary::Ty | Vary::Tz => {
+                            let mut vector = mnvr.vector(correction_epoch);
+                            vector[var.component.vec_index()] += corr;
+                            mnvr.set_direction(vector);
+                            println!("New thrust vector = {}", vector);
+                        }
+                        Vary::ThrustLevel => {
+                            mnvr.thrust_lvl += var.perturbation;
                         }
                         _ => unreachable!(),
                     }

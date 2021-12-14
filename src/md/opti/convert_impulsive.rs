@@ -78,7 +78,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             end: impulse_epoch + 0.5 * delta_tfb * TimeUnit::Second,
             thrust_lvl: 1.0,
             alpha_inplane_radians,
-            beta_outofplane_radians,
+            delta_outofplane_radians: beta_outofplane_radians,
             frame: Frame::Inertial,
         };
 
@@ -254,8 +254,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                                 .unwrap();
                         }
                         Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                            this_mnvr.beta_outofplane_radians = mnvr
-                                .beta_outofplane_radians
+                            this_mnvr.delta_outofplane_radians = mnvr
+                                .delta_outofplane_radians
                                 .add_val_in_order(pert, var.component.vec_index())
                                 .unwrap();
                         }
@@ -389,8 +389,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                             .unwrap();
                     }
                     Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                        mnvr.beta_outofplane_radians = mnvr
-                            .beta_outofplane_radians
+                        mnvr.delta_outofplane_radians = mnvr
+                            .delta_outofplane_radians
                             .add_val_in_order(corr % (2.0 * 3.1415), var.component.vec_index())
                             .unwrap();
                     }

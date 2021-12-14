@@ -19,7 +19,7 @@ fn fb_tgt_sma_ecc() {
 
     let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
-    let target_delta_t: Duration = xi_orig.period() / 2.0;
+    let target_delta_t = 30.seconds();
 
     let spacecraft = Spacecraft {
         orbit: xi_orig,
@@ -37,22 +37,17 @@ fn fb_tgt_sma_ecc() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = [
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
-        Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
-    ];
+    let objectives = [Objective::within_tolerance(
+        StateParameter::SMA,
+        8005.0,
+        0.1,
+    )];
 
     // The variables in this targeter
     let variables = [
-        Variable::from(Vary::MnvrAlpha).with_initial_guess(-0.3021017411736592_f64.to_radians()),
-        // Variable::from(Vary::MnvrAlphaDot).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrAlphaDDot)
-            .with_initial_guess(-2.1098425649685995_f64.to_radians()),
-        Variable::from(Vary::MnvrBeta).with_initial_guess(0.3530352682197084_f64.to_radians()),
-        // Variable::from(Vary::MnvrBetaDot).with_initial_guess(45.0),
-        Variable::from(Vary::MnvrBetaDDot)
-            .with_initial_guess(4.152947118658474e-7_f64.to_radians()),
-        // Variable::from(Vary::Duration).with_initial_guess(5.0),
+        Variable::from(Vary::Tx),
+        Variable::from(Vary::Ty),
+        Variable::from(Vary::Tz),
     ];
 
     let tgt = Optimizer::new(&setup, variables, objectives);
@@ -66,19 +61,6 @@ fn fb_tgt_sma_ecc() {
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
-
-    let gmat_sol = 3.1160765514523914;
-    println!(
-        "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",
-        solution_fd.correction.norm() * 1e3,
-        (solution_fd.correction.norm() - gmat_sol).abs() * 1e3
-    );
-    // GMAT validation
-    assert!(
-        (solution_fd.correction.norm() - gmat_sol).abs() < 1e-6
-            || solution_fd.correction.norm() < gmat_sol,
-        "Finite differencing result different from GMAT and greater!"
-    );
 }
 
 #[test]

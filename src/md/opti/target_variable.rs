@@ -53,6 +53,14 @@ pub enum Vary {
     Duration,
     /// End epoch difference in seconds
     EndEpoch,
+    /// Thrust direction in X
+    Tx,
+    /// Thrust direction in Y
+    Ty,
+    /// Thrust direction in Z
+    Tz,
+    /// Thrust level during the burn
+    ThrustLevel,
 }
 
 impl Vary {
@@ -66,14 +74,18 @@ impl Vary {
             || *self == Self::StartEpoch
             || *self == Self::Duration
             || *self == Self::EndEpoch
+            || *self == Self::Tx
+            || *self == Self::Ty
+            || *self == Self::Tz
+            || *self == Self::ThrustLevel
     }
 
     pub fn vec_index(&self) -> usize {
         match self {
-            Self::PositionX | Self::MnvrAlphaDDot | Self::MnvrBetaDDot => 0,
-            Self::PositionY | Self::MnvrAlphaDot | Self::MnvrBetaDot => 1,
-            Self::PositionZ | Self::MnvrAlpha | Self::MnvrBeta => 2,
-            Self::VelocityX => 3,
+            Self::PositionX | Self::Tx | Self::MnvrAlphaDDot | Self::MnvrBetaDDot => 0,
+            Self::PositionY | Self::Ty | Self::MnvrAlphaDot | Self::MnvrBetaDot => 1,
+            Self::PositionZ | Self::Tz | Self::MnvrAlpha | Self::MnvrBeta => 2,
+            Self::VelocityX | Self::ThrustLevel => 3,
             Self::VelocityY => 4,
             Self::VelocityZ => 5,
             Self::StartEpoch => 6,
@@ -201,6 +213,19 @@ impl From<Vary> for Variable {
                 max_step: 60.0,
                 max_value: 600.0,
                 min_value: 0.0,
+                ..Default::default()
+            },
+            Vary::Tx | Vary::Ty | Vary::Tz => Self {
+                component: vary,
+                max_value: 1.0,
+                min_value: -1.0,
+                ..Default::default()
+            },
+            Vary::ThrustLevel => Self {
+                component: vary,
+                min_value: 0.0,
+                max_value: 1.0,
+                init_guess: 1.0,
                 ..Default::default()
             },
         }

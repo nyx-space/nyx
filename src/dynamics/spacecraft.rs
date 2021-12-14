@@ -128,6 +128,16 @@ impl<'a> SpacecraftDynamics<'a> {
         }
     }
 
+    /// Clone these spacecraft dynamics and update the control to the one provided.
+    pub fn with_ctrl_no_decr(&self, ctrl: Arc<dyn GuidanceLaw + 'a>) -> Self {
+        Self {
+            orbital_dyn: self.orbital_dyn.clone(),
+            ctrl: Some(ctrl),
+            force_models: self.force_models.clone(),
+            decrement_mass: false,
+        }
+    }
+
     /// Clone these spacecraft dynamics and remove any control model
     pub fn without_ctrl(&self) -> Self {
         Self {

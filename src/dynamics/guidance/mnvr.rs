@@ -17,8 +17,9 @@
 */
 extern crate rayon;
 
-use super::{plane_angles_from_unit_vector, unit_vector_from_plane_angles, GuidanceLaw};
+use super::{ra_dec_from_unit_vector, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
+use crate::dynamics::guidance::unit_vector_from_ra_dec;
 use crate::linalg::{DMatrix, SVector, Vector3};
 use crate::md::trajectory::InterpState;
 use crate::md::ui::{Objective, Propagator, SpacecraftDynamics};
@@ -48,7 +49,7 @@ pub struct Mnvr {
     /// The interpolation polynomial for the in-plane angle
     pub alpha_inplane_radians: CommonPolynomial,
     /// The interpolation polynomial for the out-of-plane angle
-    pub beta_outofplane_radians: CommonPolynomial,
+    pub delta_outofplane_radians: CommonPolynomial,
     /// The frame in which the maneuvers are defined.
     pub frame: Frame,
 }
@@ -58,12 +59,19 @@ impl fmt::Display for Mnvr {
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.end - self.start >= 1 * TimeUnit::Millisecond {
-            write!(f, "Finite burn maneuver @ {} for {} (ending on {})\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.end, self.alpha_inplane_radians, self.beta_outofplane_radians)
+            let start_vec = self.vector(self.start);
+            let end_vec = self.vector(self.end);
+            write!(f, "Finite burn maneuver @ {} for {} (ending on {})\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.end, self.alpha_inplane_radians, self.delta_outofplane_radians)?;
+            write!(
+                f,
+                "\n\tinitial dir: [{:.6}, {:.6}, {:.6}]\n\tfinal dir  : [{:.6}, {:.6}, {:.6}]",
+                start_vec[0], start_vec[1], start_vec[2], end_vec[0], end_vec[1], end_vec[2]
+            )
         } else {
             write!(
                 f,
                 "Impulsive maneuver @ {}\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}",
-                self.start, self.alpha_inplane_radians, self.beta_outofplane_radians
+                self.start, self.alpha_inplane_radians, self.delta_outofplane_radians
             )
         }
     }
@@ -85,13 +93,13 @@ impl Mnvr {
         frame: Frame,
     ) -> Self {
         // Convert to angles
-        let (alpha, beta) = plane_angles_from_unit_vector(vector);
+        let (alpha, delta) = ra_dec_from_unit_vector(vector);
         Self {
             start,
             end,
             thrust_lvl,
             alpha_inplane_radians: CommonPolynomial::Constant(alpha),
-            beta_outofplane_radians: CommonPolynomial::Constant(beta),
+            delta_outofplane_radians: CommonPolynomial::Constant(delta),
             frame,
         }
     }
@@ -132,11 +140,11 @@ impl Mnvr {
         let u_ddot = (3.0 * sc_at_dv_epoch.orbit.frame.gm() / rmag.powi(5))
             * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
         // Compute the control rates at the time of the impulsive maneuver (tdv)
-        let (alpha_tdv, beta_tdv) = plane_angles_from_unit_vector(u);
-        let (alpha_ddot_tdv, beta_ddot_tdv) = plane_angles_from_unit_vector(u_ddot);
+        let (alpha_tdv, delta_tdv) = ra_dec_from_unit_vector(u);
+        let (alpha_ddot_tdv, delta_ddot_tdv) = ra_dec_from_unit_vector(u_ddot);
         // Build the maneuver polynomial angles from these
         let alpha_inplane_degrees = CommonPolynomial::Quadratic(alpha_ddot_tdv, 0.0, alpha_tdv);
-        let beta_outofplane_degrees = CommonPolynomial::Quadratic(beta_ddot_tdv, 0.0, beta_tdv);
+        let delta_outofplane_degrees = CommonPolynomial::Quadratic(delta_ddot_tdv, 0.0, delta_tdv);
 
         // Compute a few thruster parameters
         let thruster = spacecraft.thruster.as_ref().unwrap();
@@ -151,7 +159,7 @@ impl Mnvr {
             end: epoch + 0.5 * delta_tfb * TimeUnit::Second,
             thrust_lvl: 1.0,
             alpha_inplane_radians: alpha_inplane_degrees,
-            beta_outofplane_radians: beta_outofplane_degrees,
+            delta_outofplane_radians: delta_outofplane_degrees,
             frame,
         };
 
@@ -168,9 +176,9 @@ impl Mnvr {
             Variable::from(Vary::MnvrAlpha).with_initial_guess(alpha_tdv),
             Variable::from(Vary::MnvrAlphaDot),
             Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(alpha_ddot_tdv),
-            Variable::from(Vary::MnvrBeta).with_initial_guess(beta_tdv),
+            Variable::from(Vary::MnvrBeta).with_initial_guess(delta_tdv),
             Variable::from(Vary::MnvrBetaDot),
-            Variable::from(Vary::MnvrBetaDDot).with_initial_guess(beta_ddot_tdv),
+            Variable::from(Vary::MnvrBetaDDot).with_initial_guess(delta_ddot_tdv),
             Variable::from(Vary::StartEpoch),
             Variable::from(Vary::Duration),
         ];
@@ -291,20 +299,20 @@ impl Mnvr {
                         }
 
                         Vary::MnvrBeta => {
-                            this_mnvr.beta_outofplane_radians = mnvr
-                                .beta_outofplane_radians
+                            this_mnvr.delta_outofplane_radians = mnvr
+                                .delta_outofplane_radians
                                 .add_val_in_order(perturbation, 0)
                                 .unwrap();
                         }
                         Vary::MnvrBetaDot => {
-                            this_mnvr.beta_outofplane_radians = mnvr
-                                .beta_outofplane_radians
+                            this_mnvr.delta_outofplane_radians = mnvr
+                                .delta_outofplane_radians
                                 .add_val_in_order(perturbation, 1)
                                 .unwrap();
                         }
                         Vary::MnvrBetaDDot => {
-                            this_mnvr.beta_outofplane_radians = mnvr
-                                .beta_outofplane_radians
+                            this_mnvr.delta_outofplane_radians = mnvr
+                                .delta_outofplane_radians
                                 .add_val_in_order(perturbation, 2)
                                 .unwrap();
                         }
@@ -418,16 +426,16 @@ impl Mnvr {
                     }
 
                     Vary::MnvrBeta => {
-                        mnvr.beta_outofplane_radians =
-                            mnvr.beta_outofplane_radians.add_val_in_order(*value, 0)?;
+                        mnvr.delta_outofplane_radians =
+                            mnvr.delta_outofplane_radians.add_val_in_order(*value, 0)?;
                     }
                     Vary::MnvrBetaDot => {
-                        mnvr.beta_outofplane_radians =
-                            mnvr.beta_outofplane_radians.add_val_in_order(*value, 1)?;
+                        mnvr.delta_outofplane_radians =
+                            mnvr.delta_outofplane_radians.add_val_in_order(*value, 1)?;
                     }
                     Vary::MnvrBetaDDot => {
-                        mnvr.beta_outofplane_radians =
-                            mnvr.beta_outofplane_radians.add_val_in_order(*value, 2)?;
+                        mnvr.delta_outofplane_radians =
+                            mnvr.delta_outofplane_radians.add_val_in_order(*value, 2)?;
                     }
 
                     Vary::StartEpoch => {
@@ -488,12 +496,18 @@ impl Mnvr {
     pub fn vector(&self, epoch: Epoch) -> Vector3<f64> {
         let t = (epoch - self.start).in_seconds();
         let alpha = self.alpha_inplane_radians.eval(t);
-        let beta = self.beta_outofplane_radians.eval(t);
-        unit_vector_from_plane_angles(alpha, beta)
+        let delta = self.delta_outofplane_radians.eval(t);
+        unit_vector_from_ra_dec(alpha, delta)
     }
 
     pub fn duration(&self) -> Duration {
         self.end - self.start
+    }
+
+    pub fn set_direction(&mut self, vector: Vector3<f64>) {
+        let (alpha, delta) = ra_dec_from_unit_vector(vector);
+        self.alpha_inplane_radians = CommonPolynomial::Constant(alpha);
+        self.delta_outofplane_radians = CommonPolynomial::Constant(delta);
     }
 }
 

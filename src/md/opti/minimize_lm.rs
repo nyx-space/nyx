@@ -22,7 +22,7 @@ use super::optimizer::Optimizer;
 use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
-use crate::linalg::{storage::Owned, Const, DMatrix, SMatrix, SVector, Vector6};
+use crate::linalg::{storage::Owned, Const, SMatrix, SVector, Vector6};
 use crate::linalg::{DimMax, DimMin, ToTypenum};
 use crate::md::rayon::prelude::*;
 use crate::md::ui::*;
@@ -30,9 +30,8 @@ use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
-use crate::pseudo_inverse;
 use hifitime::TimeUnitHelper;
-use levenberg_marquardt::{LeastSquaresProblem, LevenbergMarquardt};
+use levenberg_marquardt::{ LeastSquaresProblem, LevenbergMarquardt};
 use std::time::Instant;
 
 /// N: number of variables; M: number of objectives
@@ -40,7 +39,6 @@ pub struct OptimizerInstance<'a, E: ErrorCtrl, const N: usize, const M: usize>
 where
     Const<N>: ToTypenum,
     Const<M>: ToTypenum,
-    // Const<V>: DimMin<Const<O>, Output = Const<O>> + DimMax<Const<O>, Output = Const<O>>,
     Const<M>: DimMin<Const<N>, Output = Const<N>> + DimMax<Const<N>, Output = Const<N>>,
 {
     /// The propagator setup (kind, stages, etc.)
@@ -74,7 +72,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> LeastSquaresProblem<f64, 
 where
     Const<V>: ToTypenum,
     Const<O>: ToTypenum,
-    // Const<V>: DimMin<Const<O>, Output = Const<O>> + DimMax<Const<O>, Output = Const<O>>,
     Const<O>: DimMin<Const<V>, Output = Const<V>> + DimMax<Const<V>, Output = Const<V>>,
 {
     type ResidualStorage = Owned<f64, Const<O>>;
@@ -119,7 +116,7 @@ where
             end: self.correction_epoch + 5.seconds(),
             thrust_lvl: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
-            beta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             frame: Frame::RCN,
         };
 
@@ -161,8 +158,8 @@ where
                             .unwrap();
                     }
                     Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                        mnvr.beta_outofplane_radians = mnvr
-                            .beta_outofplane_radians
+                        mnvr.delta_outofplane_radians = mnvr
+                            .delta_outofplane_radians
                             .add_val_in_order(attempted_control[i], var.component.vec_index())
                             .unwrap();
                     }
@@ -190,8 +187,6 @@ where
 
             total_correction[i] += attempted_control[i];
         }
-
-        // let mut prev_err_norm = std::f64::INFINITY;
 
         // Determine padding in debugging info
         // For the width, we find the largest desired values and multiply it by the order of magnitude of its tolerance
@@ -223,7 +218,7 @@ where
             let mut prop = self.prop.clone();
             let prop_opts = prop.opts;
             let pre_mnvr = prop.with(cur_xi).until_epoch(mnvr.start).unwrap();
-            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+            prop.dynamics = prop.dynamics.with_ctrl_no_decr(Arc::new(mnvr));
             prop.set_max_step(mnvr.end - mnvr.start);
             let post_mnvr = prop
                 .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
@@ -330,14 +325,14 @@ where
                                 .unwrap();
                         }
                         Vary::MnvrBeta | Vary::MnvrBetaDot | Vary::MnvrBetaDDot => {
-                            this_mnvr.beta_outofplane_radians = mnvr
-                                .beta_outofplane_radians
+                            this_mnvr.delta_outofplane_radians = mnvr
+                                .delta_outofplane_radians
                                 .add_val_in_order(pert, var.component.vec_index())
                                 .unwrap();
                         }
                         _ => unreachable!(),
                     }
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
+                    this_prop.dynamics = this_prop.dynamics.with_ctrl_no_decr(Arc::new(this_mnvr));
                 } else {
                     let mut state_correction = Vector6::<f64>::zeros();
                     state_correction[var.component.vec_index()] += var.perturbation;
@@ -356,7 +351,7 @@ where
                 let this_xf = if finite_burn_target {
                     let prop_opts = this_prop.opts;
                     let pre_mnvr = this_prop.with(cur_xi).until_epoch(this_mnvr.start).unwrap();
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
+                    this_prop.dynamics = this_prop.dynamics.with_ctrl_no_decr(Arc::new(this_mnvr));
                     this_prop.set_max_step(this_mnvr.end - this_mnvr.start);
                     let post_mnvr = this_prop
                         .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
@@ -407,7 +402,11 @@ where
                 *jac_val = (this_achieved - achieved) / var.perturbation;
             });
 
-            for (j, _, jac_val) in &pert_calc {
+            for (j, var, jac_val) in &pert_calc {
+                println!(
+                    "jac[({}, {})] = {} for {:?} and {:?}",
+                    i, *j, jac_val, var, obj
+                );
                 self.jacobian[(i, *j)] = *jac_val;
             }
         }
@@ -433,7 +432,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O>
 where
     Const<V>: ToTypenum,
     Const<O>: ToTypenum,
-    // Const<V>: DimMin<Const<O>, Output = Const<O>> + DimMax<Const<O>, Output = Const<O>>,
     Const<O>: DimMin<Const<V>, Output = Const<V>> + DimMax<Const<V>, Output = Const<V>>,
 {
     /// Differential correction using finite differencing
@@ -483,7 +481,7 @@ where
         instance.set_params(&initial_control);
         println!("Init resid: {}", instance.residuals);
         let (result, report) = LevenbergMarquardt::new()
-            .with_patience(500)
+            .with_patience(2)
             .minimize(instance);
 
         println!("{:?}", report);
