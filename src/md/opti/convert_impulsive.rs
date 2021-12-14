@@ -68,10 +68,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let thruster = spacecraft.thruster.as_ref().unwrap();
         let v_exhaust_m_s = thruster.exhaust_velocity();
 
-        // let delta_tfb = ((v_exhaust_m_s * spacecraft.mass_kg()) / thruster.thrust)
-        //     * (1.0 - (-dv.norm() * 1e3 / v_exhaust_m_s).exp());
-
-        let delta_tfb = 50.0 * 60.0;
+        let delta_tfb = ((v_exhaust_m_s * spacecraft.mass_kg()) / thruster.thrust)
+            * (1.0 - (-dv.norm() * 1e3 / v_exhaust_m_s).exp());
 
         let impulse_epoch = spacecraft.epoch();
         // Build the estimated maneuver
@@ -105,16 +103,16 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         // Now let's setup the optimizer.
         let variables = [
             Variable::from(Vary::MnvrAlpha).with_initial_guess(alpha_tdv),
-            // Variable::from(Vary::MnvrAlphaDot),
-            // Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(alpha_ddot_tdv),
-            // Variable::from(Vary::MnvrBeta).with_initial_guess(0.0),
-            // Variable::from(Vary::MnvrBetaDot),
-            // Variable::from(Vary::MnvrBetaDDot).with_initial_guess(beta_ddot_tdv),
+            Variable::from(Vary::MnvrAlphaDot),
+            Variable::from(Vary::MnvrAlphaDDot).with_initial_guess(alpha_ddot_tdv),
+            Variable::from(Vary::MnvrBeta).with_initial_guess(beta_tdv),
+            Variable::from(Vary::MnvrBetaDot),
+            Variable::from(Vary::MnvrBetaDDot).with_initial_guess(beta_ddot_tdv),
             // Variable::from(Vary::StartEpoch),
             // Variable::from(Vary::Duration),
         ];
 
-        const num_variables: usize = 1;
+        const num_variables: usize = 6;
 
         // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
         let mut prev_err_norm = std::f64::INFINITY;
@@ -187,7 +185,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
         // let start_instant = Instant::now();
-        let max_iter = 2;
+        let max_iter = 10;
 
         for it in 0..=max_iter {
             dbg!(it);
@@ -286,7 +284,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             }
 
             if converged {
-                panic!("I can't believe we converged");
+                print!("\n\nI can't believe we converged\n\n");
+                return Ok(mnvr);
                 // let conv_dur = Instant::now() - start_instant;
                 // let mut corrected_state = xi_start;
 

@@ -1,5 +1,6 @@
 extern crate nyx_space as nyx;
 
+use hifitime::TimeUnitHelper;
 use nyx::dynamics::guidance::{Mnvr, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::optimizer::*;
@@ -100,7 +101,7 @@ fn val_tgt_finite_burn() {
 
     // Define the thruster
     let monoprop = Thruster {
-        thrust: 10.0,
+        thrust: 5000.0,
         isp: 300.0,
     };
     let dry_mass = 1e3;
@@ -113,9 +114,7 @@ fn val_tgt_finite_burn() {
         GuidanceMode::Custom(0),
     );
 
-    let prop_time = 50.0 * TimeUnit::Minute;
-
-    let end_time = start_time + prop_time;
+    let prop_time = 15.0 * TimeUnit::Second;
 
     // Define the dynamics
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
@@ -125,26 +124,27 @@ fn val_tgt_finite_burn() {
 
     // Define the maneuver and its schedule
     let mnvr0 = Mnvr::from_time_invariant(
-        Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
-        end_time,
+        start_time + 1.seconds(),
+        start_time + prop_time - 1.seconds(),
         1.0, // Full thrust
         Vector3::new(1.0, 0.0, 0.0),
         Frame::Inertial,
     );
 
     // And create the spacecraft with that controller
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn.clone(), Arc::new(mnvr0));
+    let sc = SpacecraftDynamics::from_ctrl_no_decr(orbital_dyn.clone(), Arc::new(mnvr0));
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let prop = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    // let prop = Propagator::rk89(sc, PropOpts::with_fixed_step(5.0 * TimeUnit::Second));
+    let mut prop = Propagator::default(sc);
+    prop.set_max_step(mnvr0.duration());
     let sc_xf_desired = prop.with(sc_state).for_duration(prop_time).unwrap();
+    println!("started: {}\nended   :{}", sc_state, sc_xf_desired);
 
     // Build an impulsive targeter for this known solution
     let sc_no_thrust = SpacecraftDynamics::new(orbital_dyn);
-    let prop_no_thrust = Propagator::rk89(
-        sc_no_thrust,
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    );
+    let mut prop_no_thrust = Propagator::default(sc_no_thrust);
+    prop_no_thrust.set_max_step(mnvr0.duration());
     let impulsive_tgt = Optimizer::delta_v(
         &prop_no_thrust,
         [
@@ -160,5 +160,9 @@ fn val_tgt_finite_burn() {
     println!("\n\nKNOWN SOLUTION\n{}", mnvr0);
 
     // Solve for this known solution
-    Optimizer::convert_impulsive_mnvr(sc_state, impulsive_tgt.correction, &prop).unwrap();
+    let fb_mnvr =
+        Optimizer::convert_impulsive_mnvr(sc_state, impulsive_tgt.correction, &prop).unwrap();
+    println!("Solution ended being:\n{}\n", fb_mnvr);
+
+    // Test that this solution works.
 }
