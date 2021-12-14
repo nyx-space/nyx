@@ -29,9 +29,15 @@ fn tgt_levenberg_sma_from_apo() {
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
+    let xf_desired_ecc = 0.40;
+    let xf_desired_aop = 60.0;
 
     // Define the objective
-    let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
+    let objectives = [
+        Objective::new(StateParameter::SMA, xf_desired_sma),
+        Objective::new(StateParameter::Eccentricity, xf_desired_ecc),
+        Objective::new(StateParameter::AoP, xf_desired_aop),
+    ];
 
     let tgt = Optimizer::delta_v(&setup, objectives);
 

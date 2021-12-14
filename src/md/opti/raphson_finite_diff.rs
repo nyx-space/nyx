@@ -20,7 +20,7 @@ use super::optimizer::Optimizer;
 use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
-use crate::linalg::{DMatrix, SVector, Vector6};
+use crate::linalg::{SMatrix, SVector, Vector6};
 use crate::md::rayon::prelude::*;
 use crate::md::ui::*;
 use crate::md::StateParameter;
@@ -218,7 +218,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
             // As such, it includes the STM of that variable for the whole propagation arc.
-            let mut jac = DMatrix::from_element(self.objectives.len(), self.variables.len(), 0.0);
+            let mut jac = SMatrix::<f64, O, V>::zeros();
 
             for (i, obj) in self.objectives.iter().enumerate() {
                 let partial = if obj.parameter.is_b_plane() {

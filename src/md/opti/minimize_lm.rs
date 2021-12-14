@@ -35,28 +35,23 @@ use hifitime::TimeUnitHelper;
 use levenberg_marquardt::{LeastSquaresProblem, LevenbergMarquardt};
 use std::time::Instant;
 
-pub struct OptimizerInstance<'a, E: ErrorCtrl, const V: usize, const O: usize>
+/// N: number of variables; M: number of objectives
+pub struct OptimizerInstance<'a, E: ErrorCtrl, const N: usize, const M: usize>
 where
-    Const<V>: ToTypenum,
-    Const<O>: ToTypenum,
-    Const<O>: DimMin<Const<V>, Output = Const<V>> + DimMax<Const<V>, Output = Const<V>>,
-    // where
-    //     Const<V>: ToTypenum,
-    //     Const<O>: ToTypenum,
-    //     Const<V>: DimMin<Const<V>, Output = Const<V>>,
-    //     Const<O>: DimMin<Const<O>, Output = Const<O>>,
-    //     Const<V>: DimMax<Const<V>, Output = Const<V>>,
-    //     Const<O>: DimMax<Const<O>, Output = Const<O>>,
+    Const<N>: ToTypenum,
+    Const<M>: ToTypenum,
+    // Const<V>: DimMin<Const<O>, Output = Const<O>> + DimMax<Const<O>, Output = Const<O>>,
+    Const<M>: DimMin<Const<N>, Output = Const<N>> + DimMax<Const<N>, Output = Const<N>>,
 {
     /// The propagator setup (kind, stages, etc.)
     pub prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
     /// The list of objectives of this targeter
-    pub objectives: [Objective; O],
+    pub objectives: [Objective; M],
     /// An optional frame (and Cosm) to compute the objectives in.
     /// Needed if the propagation frame is separate from objectives frame (e.g. for B Plane targeting).
     pub objective_frame: Option<(Frame, Arc<Cosm>)>,
     /// The kind of correction to apply to achieve the objectives
-    pub variables: [Variable; V],
+    pub variables: [Variable; N],
     /// The frame in which the correction should be applied, must be either a local frame or inertial
     pub correction_frame: Option<Frame>,
     /// The starting state of the optimizer
@@ -67,9 +62,10 @@ where
     /// Epoch at which the trajectory is corrected
     pub correction_epoch: Epoch,
     /// The control solution to this problem.
-    pub control: SVector<f64, V>,
-    pub residuals: SVector<f64, O>,
-    pub jacobian: SMatrix<f64, O, V>,
+    pub control: SVector<f64, N>,
+    pub residuals: SVector<f64, M>,
+    // pub jacobian: SMatrix<f64, O, V>,
+    pub jacobian: SMatrix<f64, M, N>,
 }
 
 // We implement a trait for every problem we want to solve
@@ -78,6 +74,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> LeastSquaresProblem<f64, 
 where
     Const<V>: ToTypenum,
     Const<O>: ToTypenum,
+    // Const<V>: DimMin<Const<O>, Output = Const<O>> + DimMax<Const<O>, Output = Const<O>>,
     Const<O>: DimMin<Const<V>, Output = Const<V>> + DimMax<Const<V>, Output = Const<V>>,
 {
     type ResidualStorage = Owned<f64, Const<O>>;
@@ -87,6 +84,9 @@ where
     fn set_params(&mut self, attempted_control: &SVector<f64, V>) {
         // TODO: Switch methods based on whether the finite differencing is requested
         // do common calculations for residuals and the Jacobian here
+
+        println!("Ctrl: {}", attempted_control);
+        self.control = *attempted_control;
 
         let mut is_bplane_tgt = false;
         for obj in &self.objectives {
@@ -170,7 +170,7 @@ where
                 }
                 info!("Initial maneuver guess: {}", mnvr);
             } else {
-                state_correction[var.component.vec_index()] += attempted_control[i];
+                state_correction[var.component.vec_index()] -= attempted_control[i];
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
                     // The following will error if the frame is not local
@@ -215,7 +215,7 @@ where
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
         // Modify each variable by the desired perturbatino, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
-        let cur_xi = self.spacecraft;
+        let cur_xi = xi;
 
         // If we are targeting a finite burn, let's set propagate in several steps to make sure we don't miss the burn
         let xf = if finite_burn_target {
@@ -411,6 +411,8 @@ where
                 self.jacobian[(i, *j)] = *jac_val;
             }
         }
+
+        println!("resid: {}", self.residuals);
     }
 
     fn params(&self) -> SVector<f64, V> {
@@ -423,6 +425,7 @@ where
 
     fn jacobian(&self) -> Option<SMatrix<f64, O, V>> {
         Some(self.jacobian)
+        // Some(pseudo_inverse!(self.jacobian).unwrap())
     }
 }
 
@@ -430,6 +433,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O>
 where
     Const<V>: ToTypenum,
     Const<O>: ToTypenum,
+    // Const<V>: DimMin<Const<O>, Output = Const<O>> + DimMax<Const<O>, Output = Const<O>>,
     Const<O>: DimMin<Const<V>, Output = Const<V>> + DimMax<Const<V>, Output = Const<V>>,
 {
     /// Differential correction using finite differencing
@@ -460,7 +464,7 @@ where
 
             initial_control[i] = var.init_guess;
         }
-        let instance = OptimizerInstance {
+        let mut instance = OptimizerInstance {
             prop: &self.prop.clone(),
             objectives: self.objectives.clone(),
             objective_frame: self.objective_frame.clone(),
@@ -476,8 +480,11 @@ where
             jacobian: SMatrix::zeros(),
         };
 
-        // instance.solve();
-        let (result, report) = LevenbergMarquardt::new().minimize(instance);
+        instance.set_params(&initial_control);
+        println!("Init resid: {}", instance.residuals);
+        let (result, report) = LevenbergMarquardt::new()
+            .with_patience(500)
+            .minimize(instance);
 
         println!("{:?}", report);
 
