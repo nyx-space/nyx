@@ -165,7 +165,7 @@ impl From<Vary> for Variable {
             },
             Vary::MnvrAlpha | Vary::MnvrBeta => Self {
                 component: vary,
-                perturbation: 10.0,
+                perturbation: 0.0001,
                 max_step: 180.0,
                 max_value: 180.0,
                 min_value: -180.0,
@@ -197,10 +197,10 @@ impl From<Vary> for Variable {
             },
             Vary::Duration => Self {
                 component: vary,
-                perturbation: 2.0,
+                perturbation: 1.0,
                 max_step: 60.0,
                 max_value: 600.0,
-                min_value: -600.0,
+                min_value: 0.0,
                 ..Default::default()
             },
         }

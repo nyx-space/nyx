@@ -1,6 +1,7 @@
 extern crate nyx_space as nyx;
 
-use nyx::dynamics::guidance::Thruster;
+use nyx::dynamics::guidance::{Mnvr, Thruster};
+use nyx::linalg::Vector3;
 use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
@@ -77,4 +78,87 @@ fn fb_tgt_sma_ecc() {
             || solution_fd.correction.norm() < gmat_sol,
         "Finite differencing result different from GMAT and greater!"
     );
+}
+
+#[test]
+fn val_tgt_finite_burn() {
+    // In this test, we take a known finite burn solution and use the optimizer to solve for it.
+    // It should converge after 0 iterations.
+
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    let cosm = Cosm::de438_gmat();
+    let eme2k = cosm.frame("EME2000");
+
+    // Build the initial spacecraft state
+    let start_time = Epoch::from_gregorian_tai_at_midnight(2002, 1, 1);
+    let orbit = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_time, eme2k,
+    );
+
+    // Define the thruster
+    let monoprop = Thruster {
+        thrust: 10.0,
+        isp: 300.0,
+    };
+    let dry_mass = 1e3;
+    let fuel_mass = 756.0;
+    let sc_state = Spacecraft::from_thruster(
+        orbit,
+        dry_mass,
+        fuel_mass,
+        monoprop,
+        GuidanceMode::Custom(0),
+    );
+
+    let prop_time = 50.0 * TimeUnit::Minute;
+
+    let end_time = start_time + prop_time;
+
+    // Define the dynamics
+    let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+
+    // With 100% thrust: RSS errors:     pos = 3.14651e1 km      vel = 3.75245e-2 km/s
+
+    // Define the maneuver and its schedule
+    let mnvr0 = Mnvr::from_time_invariant(
+        Epoch::from_gregorian_tai_at_midnight(2002, 1, 1),
+        end_time,
+        1.0, // Full thrust
+        Vector3::new(1.0, 0.0, 0.0),
+        Frame::Inertial,
+    );
+
+    // And create the spacecraft with that controller
+    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn.clone(), Arc::new(mnvr0));
+    // Setup a propagator, and propagate for that duration
+    // NOTE: We specify the use an RK89 to match the GMAT setup.
+    let prop = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    let sc_xf_desired = prop.with(sc_state).for_duration(prop_time).unwrap();
+
+    // Build an impulsive targeter for this known solution
+    let sc_no_thrust = SpacecraftDynamics::new(orbital_dyn);
+    let prop_no_thrust = Propagator::rk89(
+        sc_no_thrust,
+        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+    );
+    let impulsive_tgt = Optimizer::delta_v(
+        &prop_no_thrust,
+        [
+            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x, 1e-5),
+            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y, 1e-5),
+            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z, 1e-5),
+        ],
+    )
+    .try_achieve_from(sc_state, sc_state.epoch(), sc_xf_desired.epoch())
+    .unwrap();
+
+    println!("{}", impulsive_tgt);
+    println!("\n\nKNOWN SOLUTION\n{}", mnvr0);
+
+    // Solve for this known solution
+    Optimizer::convert_impulsive_mnvr(sc_state, impulsive_tgt.correction, &prop).unwrap();
 }

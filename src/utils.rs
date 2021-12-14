@@ -266,11 +266,7 @@ macro_rules! pseudo_inverse {
     ($mat:expr) => {{
         use crate::NyxError;
         let (rows, cols) = $mat.shape();
-        if cols == rows {
-            Err(NyxError::CustomError(
-                "Use inverse instead of pseudo-inverse".to_string(),
-            ))
-        } else if rows < cols {
+        if rows < cols {
             match ($mat * $mat.transpose()).try_inverse() {
                 Some(m1_inv) => Ok($mat.transpose() * m1_inv),
                 None => Err(NyxError::SingularJacobian),
@@ -391,6 +387,12 @@ fn test_pseudo_inv() {
     mat[(0, 0)] = -1407.273208782421;
     mat[(1, 0)] = -2146.3100013104886;
     mat[(2, 0)] = 84.05022886527551;
+
+    println!("{}", pseudo_inverse!(&mat).unwrap());
+
+    // Compare a pseudo inverse with a true inverse
+    let mat = SMatrix::<f64, 2, 2>::new(3.0, 4.0, -2.0, 1.0);
+    println!("{}", mat.try_inverse().unwrap());
 
     println!("{}", pseudo_inverse!(&mat).unwrap());
 }
