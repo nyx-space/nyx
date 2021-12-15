@@ -139,7 +139,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
                 Variable::from(Vary::ThrustZ),
                 // Variable::from(Vary::ThrustLevel),
             ],
-            iterations: 100,
+            iterations: 10,
             objective_frame: None,
             correction_frame: None,
         }

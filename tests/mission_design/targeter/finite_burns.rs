@@ -38,8 +38,8 @@ fn thrust_dir_tgt_sma_aop_raan() {
 
     // Define the objective
     let objectives = [
-        Objective::within_tolerance(StateParameter::SMA, 8010.0, 0.1),
-        Objective::within_tolerance(StateParameter::AoP, 53.914544, 1e-3),
+        Objective::within_tolerance(StateParameter::SMA, 8012.176, 0.1),
+        Objective::within_tolerance(StateParameter::AoP, 53.939, 1e-3),
         Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
     ];
 
