@@ -124,7 +124,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
     }
 }
 
-impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
+impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 4, O> {
     /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
     pub fn thrust_dir(
         prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
@@ -137,9 +137,9 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
                 Variable::from(Vary::ThrustX),
                 Variable::from(Vary::ThrustY),
                 Variable::from(Vary::ThrustZ),
-                // Variable::from(Vary::ThrustLevel),
+                Variable::from(Vary::ThrustLevel),
             ],
-            iterations: 10,
+            iterations: 20,
             objective_frame: None,
             correction_frame: None,
         }

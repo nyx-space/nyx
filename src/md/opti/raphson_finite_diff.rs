@@ -530,15 +530,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                             let mut vector = mnvr.vector(correction_epoch);
                             vector[var.component.vec_index()] += corr;
+                            var.ensure_bounds(&mut vector[var.component.vec_index()]);
                             mnvr.set_direction(vector);
                         }
                         Vary::ThrustLevel => {
-                            mnvr.thrust_lvl += corr;
-                            if mnvr.thrust_lvl > 1.0 {
-                                mnvr.thrust_lvl = 1.0
-                            } else if mnvr.thrust_lvl < 0.0 {
-                                mnvr.thrust_lvl = 0.0
-                            }
+                            mnvr.thrust_lvl -= corr;
+                            var.ensure_bounds(&mut mnvr.thrust_lvl);
                         }
                         _ => unreachable!(),
                     }

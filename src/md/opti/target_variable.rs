@@ -61,7 +61,7 @@ pub enum Vary {
     ThrustY,
     /// Thrust direction in Z
     ThrustZ,
-    /// Thrust level during the burn
+    /// Thrust level during the burn.
     ThrustLevel,
 }
 
@@ -158,6 +158,15 @@ impl Variable {
             self.min_value
         } else {
             val
+        }
+    }
+
+    /// Ensure that `val` is within the variable bounds
+    pub fn ensure_bounds(&self, val: &mut f64) {
+        if *val > self.max_value {
+            *val = self.max_value;
+        } else if *val < self.min_value {
+            *val = self.min_value;
         }
     }
 }
