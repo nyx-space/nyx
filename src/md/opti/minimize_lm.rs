@@ -31,7 +31,7 @@ pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use hifitime::TimeUnitHelper;
-use levenberg_marquardt::{ LeastSquaresProblem, LevenbergMarquardt};
+use levenberg_marquardt::{LeastSquaresProblem, LevenbergMarquardt};
 use std::time::Instant;
 
 /// N: number of variables; M: number of objectives
@@ -113,7 +113,7 @@ where
         // Create a default maneuver that will only be used if a finite burn is being targeted
         let mut mnvr = Mnvr {
             start: self.correction_epoch,
-            end: self.correction_epoch + 5.seconds(),
+            end: self.achievement_epoch,
             thrust_lvl: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
@@ -162,6 +162,14 @@ where
                             .delta_outofplane_radians
                             .add_val_in_order(attempted_control[i], var.component.vec_index())
                             .unwrap();
+                    }
+                    Vary::Tx | Vary::Ty | Vary::Tz => {
+                        let mut vector = mnvr.vector(mnvr.start);
+                        vector[var.component.vec_index()] = attempted_control[i];
+                        mnvr.set_direction(vector);
+                    }
+                    Vary::ThrustLevel => {
+                        mnvr.thrust_lvl += attempted_control[i];
                     }
                     _ => unreachable!(),
                 }
@@ -330,9 +338,16 @@ where
                                 .add_val_in_order(pert, var.component.vec_index())
                                 .unwrap();
                         }
+                        Vary::Tx | Vary::Ty | Vary::Tz => {
+                            let mut vector = this_mnvr.vector(self.correction_epoch);
+                            vector[var.component.vec_index()] += pert;
+                            this_mnvr.set_direction(vector);
+                        }
+                        Vary::ThrustLevel => {
+                            this_mnvr.thrust_lvl += pert;
+                        }
                         _ => unreachable!(),
                     }
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl_no_decr(Arc::new(this_mnvr));
                 } else {
                     let mut state_correction = Vector6::<f64>::zeros();
                     state_correction[var.component.vec_index()] += var.perturbation;
@@ -349,10 +364,12 @@ where
                 }
 
                 let this_xf = if finite_burn_target {
-                    let prop_opts = this_prop.opts;
+                    // Propagate normally until start of maneuver
                     let pre_mnvr = this_prop.with(cur_xi).until_epoch(this_mnvr.start).unwrap();
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl_no_decr(Arc::new(this_mnvr));
-                    this_prop.set_max_step(this_mnvr.end - this_mnvr.start);
+                    // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
+                    let prop_opts = this_prop.opts;
+                    this_prop.set_max_step(this_mnvr.duration());
+                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
                     let post_mnvr = this_prop
                         .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
                         .until_epoch(this_mnvr.end)
@@ -481,7 +498,7 @@ where
         instance.set_params(&initial_control);
         println!("Init resid: {}", instance.residuals);
         let (result, report) = LevenbergMarquardt::new()
-            .with_patience(2)
+            .with_patience(10)
             .minimize(instance);
 
         println!("{:?}", report);

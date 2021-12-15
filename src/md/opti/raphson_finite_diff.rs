@@ -126,6 +126,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         vector[var.component.vec_index()] += var.perturbation;
                         mnvr.set_direction(vector);
                     }
+                    Vary::ThrustLevel => {
+                        mnvr.thrust_lvl += var.perturbation;
+                    }
                     _ => unreachable!(),
                 }
                 info!("Initial maneuver guess: {}", mnvr);

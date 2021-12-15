@@ -37,11 +37,11 @@ fn fb_tgt_sma_ecc() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = [Objective::within_tolerance(
-        StateParameter::SMA,
-        8005.0,
-        0.1,
-    )];
+    let objectives = [
+        Objective::within_tolerance(StateParameter::SMA, 8005.0, 0.1),
+        Objective::within_tolerance(StateParameter::AoP, 53.914544, 1e-3),
+        Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
+    ];
 
     // The variables in this targeter
     let variables = [
@@ -49,6 +49,10 @@ fn fb_tgt_sma_ecc() {
         Variable::from(Vary::Ty),
         Variable::from(Vary::Tz),
     ];
+    // let variables = [
+    //     Variable::from(Vary::MnvrAlpha),
+    //     Variable::from(Vary::MnvrDelta),
+    // ];
 
     let tgt = Optimizer::new(&setup, variables, objectives);
 
@@ -61,6 +65,9 @@ fn fb_tgt_sma_ecc() {
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
+
+    tgt.minimize(spacecraft, orig_dt, achievement_epoch)
+        .unwrap();
 }
 
 #[test]
