@@ -121,13 +121,18 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             .add_val_in_order(var.init_guess, var.component.vec_index())
                             .unwrap();
                     }
-                    Vary::Tx | Vary::Ty | Vary::Tz => {
+                    Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                         let mut vector = mnvr.vector(correction_epoch);
                         vector[var.component.vec_index()] += var.perturbation;
                         mnvr.set_direction(vector);
                     }
                     Vary::ThrustLevel => {
                         mnvr.thrust_lvl += var.perturbation;
+                        if mnvr.thrust_lvl > 1.0 {
+                            mnvr.thrust_lvl = 1.0
+                        } else if mnvr.thrust_lvl < 0.0 {
+                            mnvr.thrust_lvl = 0.0
+                        }
                     }
                     _ => unreachable!(),
                 }
@@ -301,13 +306,19 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                     .add_val_in_order(pert, var.component.vec_index())
                                     .unwrap();
                             }
-                            Vary::Tx | Vary::Ty | Vary::Tz => {
+                            Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                                 let mut vector = this_mnvr.vector(correction_epoch);
                                 vector[var.component.vec_index()] += var.perturbation;
                                 this_mnvr.set_direction(vector);
                             }
                             Vary::ThrustLevel => {
+                                // WARNING: For the thrust level, we apply the perturbation in the opposite way to make sure it stays below 1.0
                                 this_mnvr.thrust_lvl += var.perturbation;
+                                if this_mnvr.thrust_lvl > 1.0 {
+                                    this_mnvr.thrust_lvl = 1.0
+                                } else if this_mnvr.thrust_lvl < 0.0 {
+                                    this_mnvr.thrust_lvl = 0.0
+                                }
                             }
                             _ => unreachable!(),
                         }
@@ -383,8 +394,13 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     *jac_val = (this_achieved - achieved) / var.perturbation;
                 });
 
-                for (j, _, jac_val) in &pert_calc {
-                    jac[(i, *j)] = *jac_val;
+                for (j, var, jac_val) in &pert_calc {
+                    // If this is a thrust level, we oppose the value so that the correction can still be positive.
+                    jac[(i, *j)] = if var.component == Vary::ThrustLevel {
+                        -*jac_val
+                    } else {
+                        *jac_val
+                    };
                 }
             }
 
@@ -506,13 +522,18 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 .add_val_in_order(corr, var.component.vec_index())
                                 .unwrap();
                         }
-                        Vary::Tx | Vary::Ty | Vary::Tz => {
+                        Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                             let mut vector = mnvr.vector(correction_epoch);
                             vector[var.component.vec_index()] += corr;
                             mnvr.set_direction(vector);
                         }
                         Vary::ThrustLevel => {
-                            mnvr.thrust_lvl += var.perturbation;
+                            mnvr.thrust_lvl += corr;
+                            if mnvr.thrust_lvl > 1.0 {
+                                mnvr.thrust_lvl = 1.0
+                            } else if mnvr.thrust_lvl < 0.0 {
+                                mnvr.thrust_lvl = 0.0
+                            }
                         }
                         _ => unreachable!(),
                     }

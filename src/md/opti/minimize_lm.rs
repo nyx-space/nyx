@@ -163,7 +163,7 @@ where
                             .add_val_in_order(attempted_control[i], var.component.vec_index())
                             .unwrap();
                     }
-                    Vary::Tx | Vary::Ty | Vary::Tz => {
+                    Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                         let mut vector = mnvr.vector(mnvr.start);
                         vector[var.component.vec_index()] = attempted_control[i];
                         mnvr.set_direction(vector);
@@ -338,7 +338,7 @@ where
                                 .add_val_in_order(pert, var.component.vec_index())
                                 .unwrap();
                         }
-                        Vary::Tx | Vary::Ty | Vary::Tz => {
+                        Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                             let mut vector = this_mnvr.vector(self.correction_epoch);
                             vector[var.component.vec_index()] += pert;
                             this_mnvr.set_direction(vector);

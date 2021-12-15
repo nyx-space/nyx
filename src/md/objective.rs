@@ -18,6 +18,7 @@
 
 use super::StateParameter;
 use crate::cosmic::OrbitPartial;
+use std::fmt;
 
 /// Defines a state parameter event finder
 #[derive(Copy, Clone, Debug)]
@@ -69,5 +70,23 @@ impl Objective {
             self.multiplicative_factor * (self.desired_value - achieved) + self.additive_factor;
 
         (param_err.abs() <= self.tolerance, param_err)
+    }
+}
+
+impl fmt::Display for Objective {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        if self.tolerance.abs() < 1e-1 {
+            write!(
+                f,
+                "{:?} = {:.3} (± {:.1e})",
+                self.parameter, self.desired_value, self.tolerance
+            )
+        } else {
+            write!(
+                f,
+                "{:?} = {:.3} (± {:.2})",
+                self.parameter, self.desired_value, self.tolerance
+            )
+        }
     }
 }

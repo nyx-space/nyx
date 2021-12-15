@@ -7,7 +7,7 @@ use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
 #[test]
-fn fb_tgt_sma_ecc() {
+fn thrust_dir_tgt_sma_aop_raan() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -43,18 +43,7 @@ fn fb_tgt_sma_ecc() {
         Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
     ];
 
-    // The variables in this targeter
-    let variables = [
-        Variable::from(Vary::Tx),
-        Variable::from(Vary::Ty),
-        Variable::from(Vary::Tz),
-    ];
-    // let variables = [
-    //     Variable::from(Vary::MnvrAlpha),
-    //     Variable::from(Vary::MnvrDelta),
-    // ];
-
-    let tgt = Optimizer::new(&setup, variables, objectives);
+    let tgt = Optimizer::thrust_dir(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -65,9 +54,6 @@ fn fb_tgt_sma_ecc() {
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
-
-    tgt.minimize(spacecraft, orig_dt, achievement_epoch)
-        .unwrap();
 }
 
 #[test]

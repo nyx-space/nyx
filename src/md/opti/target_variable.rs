@@ -20,6 +20,7 @@ use crate::cosmic::Frame;
 use crate::errors::TargetingError;
 use std::default::Default;
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_8, PI};
+use std::fmt;
 
 /// Defines the kind of correction to apply in the targeter
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -55,11 +56,11 @@ pub enum Vary {
     /// End epoch difference in seconds
     EndEpoch,
     /// Thrust direction in X
-    Tx,
+    ThrustX,
     /// Thrust direction in Y
-    Ty,
+    ThrustY,
     /// Thrust direction in Z
-    Tz,
+    ThrustZ,
     /// Thrust level during the burn
     ThrustLevel,
 }
@@ -75,17 +76,17 @@ impl Vary {
             || *self == Self::StartEpoch
             || *self == Self::Duration
             || *self == Self::EndEpoch
-            || *self == Self::Tx
-            || *self == Self::Ty
-            || *self == Self::Tz
+            || *self == Self::ThrustX
+            || *self == Self::ThrustY
+            || *self == Self::ThrustZ
             || *self == Self::ThrustLevel
     }
 
     pub fn vec_index(&self) -> usize {
         match self {
-            Self::PositionX | Self::Tx | Self::MnvrAlphaDDot | Self::MnvrDeltaDDot => 0,
-            Self::PositionY | Self::Ty | Self::MnvrAlphaDot | Self::MnvrDeltaDot => 1,
-            Self::PositionZ | Self::Tz | Self::MnvrAlpha | Self::MnvrDelta => 2,
+            Self::PositionX | Self::ThrustX | Self::MnvrAlphaDDot | Self::MnvrDeltaDDot => 0,
+            Self::PositionY | Self::ThrustY | Self::MnvrAlphaDot | Self::MnvrDeltaDot => 1,
+            Self::PositionZ | Self::ThrustZ | Self::MnvrAlpha | Self::MnvrDelta => 2,
             Self::VelocityX | Self::ThrustLevel => 3,
             Self::VelocityY => 4,
             Self::VelocityZ => 5,
@@ -208,7 +209,7 @@ impl From<Vary> for Variable {
                 min_value: 0.0,
                 ..Default::default()
             },
-            Vary::Tx | Vary::Ty | Vary::Tz => Self {
+            Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => Self {
                 component: vary,
                 max_value: 1.0,
                 min_value: -1.0,
@@ -216,11 +217,30 @@ impl From<Vary> for Variable {
             },
             Vary::ThrustLevel => Self {
                 component: vary,
+                perturbation: -0.0001, // Perturb the thrust by -1%
                 min_value: 0.0,
                 max_value: 1.0,
                 init_guess: 1.0,
                 ..Default::default()
             },
         }
+    }
+}
+
+impl fmt::Display for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}{:?} = {} ± {:} ∈ [{}; {}]",
+            match self.frame {
+                Some(f) => format!("{}", f),
+                None => "".to_string(),
+            },
+            self.component,
+            self.init_guess,
+            self.perturbation,
+            self.min_value,
+            self.max_value
+        )
     }
 }

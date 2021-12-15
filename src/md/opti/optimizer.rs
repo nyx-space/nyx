@@ -49,16 +49,18 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> fmt::Display for Optimize
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut objmsg = String::from("");
         for obj in &self.objectives {
-            objmsg.push_str(&format!(
-                "{:?} = {:.3} (+/- {:.1e}) ",
-                obj.parameter, obj.desired_value, obj.tolerance
-            ));
+            objmsg.push_str(&format!("{}; ", obj));
+        }
+
+        let mut varmsg = String::from("");
+        for var in &self.variables {
+            varmsg.push_str(&format!("{}; ", var));
         }
 
         write!(
             f,
-            "Targeter:\n\tObjectives: {}\n\tCorrect: {:?}",
-            objmsg, self.variables
+            "Targeter:\n\tObjectives: {}\n\tCorrect: {}",
+            objmsg, varmsg
         )
     }
 }
@@ -118,6 +120,28 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
             iterations: 100,
             objective_frame: None,
             correction_frame: Some(Frame::VNC),
+        }
+    }
+}
+
+impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
+    /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
+    pub fn thrust_dir(
+        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        objectives: [Objective; O],
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables: [
+                Variable::from(Vary::ThrustX),
+                Variable::from(Vary::ThrustY),
+                Variable::from(Vary::ThrustZ),
+                // Variable::from(Vary::ThrustLevel),
+            ],
+            iterations: 100,
+            objective_frame: None,
+            correction_frame: None,
         }
     }
 }
@@ -246,7 +270,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             let mut objmsg = String::from("");
             for (i, obj) in self.objectives.iter().enumerate() {
                 objmsg.push_str(&format!(
-                    "{:?} = {:.3} BUT should be {:.3} (+/- {:.1e}) ",
+                    "{:?} = {:.3} BUT should be {:.3} (± {:.1e}) ",
                     obj.parameter, param_errors[i], obj.desired_value, obj.tolerance
                 ));
             }

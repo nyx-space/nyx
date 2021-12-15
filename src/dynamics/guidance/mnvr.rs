@@ -61,7 +61,19 @@ impl fmt::Display for Mnvr {
         if self.end - self.start >= 1 * TimeUnit::Millisecond {
             let start_vec = self.vector(self.start);
             let end_vec = self.vector(self.end);
-            write!(f, "Finite burn maneuver @ {} for {} (ending on {})\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}", self.start, self.end-self.start, self.end, self.alpha_inplane_radians, self.delta_outofplane_radians)?;
+            write!(
+                f,
+                "Finite burn maneuver @ {:.2}% on {} for {} (ending on {})",
+                100.0 * self.thrust_lvl,
+                self.start,
+                self.end - self.start,
+                self.end,
+            )?;
+            write!(
+                f,
+                "\n\tin-plane angle α: {}\n\tout-of-plane angle β: {}",
+                self.alpha_inplane_radians, self.delta_outofplane_radians
+            )?;
             write!(
                 f,
                 "\n\tinitial dir: [{:.6}, {:.6}, {:.6}]\n\tfinal dir  : [{:.6}, {:.6}, {:.6}]",

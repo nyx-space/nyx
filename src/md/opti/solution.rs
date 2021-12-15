@@ -49,7 +49,7 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
         let mut objmsg = String::from("");
         for (i, obj) in self.achieved_objectives.iter().enumerate() {
             objmsg.push_str(&format!(
-                "\n\t\t{:?} = {:.3} (wanted {:.3} +/- {:.1e})",
+                "\n\t\t{:?} = {:.3} (wanted {:.3} ± {:.1e})",
                 obj.parameter,
                 obj.desired_value + self.achieved_errors[i],
                 obj.desired_value,
