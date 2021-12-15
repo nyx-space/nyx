@@ -167,7 +167,6 @@ where
         maybe_tx_chan: Option<Sender<D::StateType>>,
     ) -> Result<D::StateType, NyxError> {
         if duration == 0 * TimeUnit::Second {
-            debug!("No propagation necessary");
             return Ok(self.state);
         }
         let stop_time = self.state.epoch() + duration;

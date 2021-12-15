@@ -122,9 +122,19 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             .unwrap();
                     }
                     Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
-                        let mut vector = mnvr.vector(correction_epoch);
+                        let mut vector = mnvr.direction();
                         vector[var.component.vec_index()] += var.perturbation;
                         mnvr.set_direction(vector);
+                    }
+                    Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
+                        let mut vector = mnvr.rate();
+                        vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                        mnvr.set_rate(vector);
+                    }
+                    Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
+                        let mut vector = mnvr.accel();
+                        vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                        mnvr.set_accel(vector);
                     }
                     Vary::ThrustLevel => {
                         mnvr.thrust_lvl += var.perturbation;
@@ -307,12 +317,21 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                     .unwrap();
                             }
                             Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
-                                let mut vector = this_mnvr.vector(correction_epoch);
+                                let mut vector = this_mnvr.direction();
                                 vector[var.component.vec_index()] += var.perturbation;
                                 this_mnvr.set_direction(vector);
                             }
+                            Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
+                                let mut vector = this_mnvr.rate();
+                                vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                                this_mnvr.set_rate(vector);
+                            }
+                            Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
+                                let mut vector = this_mnvr.accel();
+                                vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                                this_mnvr.set_accel(vector);
+                            }
                             Vary::ThrustLevel => {
-                                // WARNING: For the thrust level, we apply the perturbation in the opposite way to make sure it stays below 1.0
                                 this_mnvr.thrust_lvl += var.perturbation;
                                 if this_mnvr.thrust_lvl > 1.0 {
                                     this_mnvr.thrust_lvl = 1.0
@@ -409,8 +428,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 let mut corrected_state = xi_start;
 
                 let mut state_correction = Vector6::<f64>::zeros();
-                for (i, var) in self.variables.iter().enumerate() {
-                    state_correction[var.component.vec_index()] += total_correction[i];
+                if !finite_burn_target {
+                    for (i, var) in self.variables.iter().enumerate() {
+                        state_correction[var.component.vec_index()] += total_correction[i];
+                    }
                 }
                 // Now, let's apply the correction to the initial state
                 if let Some(frame) = self.correction_frame {
@@ -465,7 +486,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             let mut delta = jac_inv * &err_vector;
 
-            debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
+            debug!(
+                "Error vector (norm = {}): {}\nRaw correction: {}",
+                err_vector.norm(),
+                err_vector,
+                delta
+            );
 
             // And finally apply it to the xi
             let mut state_correction = Vector6::<f64>::zeros();
@@ -528,10 +554,20 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 .unwrap();
                         }
                         Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
-                            let mut vector = mnvr.vector(correction_epoch);
+                            let mut vector = mnvr.direction();
                             vector[var.component.vec_index()] += corr;
                             var.ensure_bounds(&mut vector[var.component.vec_index()]);
                             mnvr.set_direction(vector);
+                        }
+                        Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
+                            let mut vector = mnvr.rate();
+                            vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                            mnvr.set_rate(vector);
+                        }
+                        Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
+                            let mut vector = mnvr.accel();
+                            vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                            mnvr.set_accel(vector);
                         }
                         Vary::ThrustLevel => {
                             mnvr.thrust_lvl -= corr;

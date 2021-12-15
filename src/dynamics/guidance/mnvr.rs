@@ -512,14 +512,79 @@ impl Mnvr {
         unit_vector_from_ra_dec(alpha, delta)
     }
 
+    /// Return the duration of this maneuver
     pub fn duration(&self) -> Duration {
         self.end - self.start
     }
 
+    /// Returns the direction of the burn at the start of the burn, useful for setting new angles
+    pub fn direction(&self) -> Vector3<f64> {
+        let alpha = self.alpha_inplane_radians.coeff_in_order(0).unwrap();
+        let delta = self.delta_outofplane_radians.coeff_in_order(0).unwrap();
+        unit_vector_from_ra_dec(alpha, delta)
+    }
+
+    /// Set the time-invariant direction for this finite burn while keeping the other components as they are
     pub fn set_direction(&mut self, vector: Vector3<f64>) {
-        let (alpha, delta) = ra_dec_from_unit_vector(vector);
-        self.alpha_inplane_radians = CommonPolynomial::Constant(alpha);
-        self.delta_outofplane_radians = CommonPolynomial::Constant(delta);
+        self.set_direction_and_rates(vector, self.rate(), self.accel());
+    }
+
+    /// Returns the rate of direction of the burn at the start of the burn, useful for setting new angles
+    pub fn rate(&self) -> Vector3<f64> {
+        match self.alpha_inplane_radians.coeff_in_order(1) {
+            Ok(alpha) => {
+                let delta = self.delta_outofplane_radians.coeff_in_order(1).unwrap();
+                unit_vector_from_ra_dec(alpha, delta)
+            }
+            Err(_) => Vector3::zeros(),
+        }
+    }
+
+    /// Set the rate of direction for this finite burn while keeping the other components as they are
+    pub fn set_rate(&mut self, rate: Vector3<f64>) {
+        self.set_direction_and_rates(self.direction(), rate, self.accel());
+    }
+
+    /// Returns the acceleration of the burn at the start of the burn, useful for setting new angles
+    pub fn accel(&self) -> Vector3<f64> {
+        match self.alpha_inplane_radians.coeff_in_order(2) {
+            Ok(alpha) => {
+                let delta = self.delta_outofplane_radians.coeff_in_order(2).unwrap();
+                unit_vector_from_ra_dec(alpha, delta)
+            }
+            Err(_) => Vector3::zeros(),
+        }
+    }
+
+    /// Set the acceleration of the direction of this finite burn while keeping the other components as they are
+    pub fn set_accel(&mut self, accel: Vector3<f64>) {
+        self.set_direction_and_rates(self.direction(), self.rate(), accel);
+    }
+
+    /// Set the initial direction, direction rate, and direction acceleration for this finite burn
+    pub fn set_direction_and_rates(
+        &mut self,
+        dir: Vector3<f64>,
+        rate: Vector3<f64>,
+        accel: Vector3<f64>,
+    ) {
+        let (alpha, delta) = ra_dec_from_unit_vector(dir);
+        if rate.norm() < 2e-16 && accel.norm() < 2e-16 {
+            self.alpha_inplane_radians = CommonPolynomial::Constant(alpha);
+            self.delta_outofplane_radians = CommonPolynomial::Constant(delta);
+        } else {
+            let (alpha_dt, delta_dt) = ra_dec_from_unit_vector(rate);
+            if accel.norm() < 2e-16 {
+                self.alpha_inplane_radians = CommonPolynomial::Linear(alpha_dt, alpha);
+                self.delta_outofplane_radians = CommonPolynomial::Linear(delta_dt, delta);
+            } else {
+                let (alpha_ddt, delta_ddt) = ra_dec_from_unit_vector(accel);
+                self.alpha_inplane_radians =
+                    CommonPolynomial::Quadratic(alpha_ddt, alpha_dt, alpha);
+                self.delta_outofplane_radians =
+                    CommonPolynomial::Quadratic(delta_ddt, delta_dt, delta);
+            }
+        }
     }
 }
 

@@ -63,6 +63,18 @@ pub enum Vary {
     ThrustZ,
     /// Thrust level during the burn.
     ThrustLevel,
+    /// Thrust direction rate in X
+    ThrustRateX,
+    /// Thrust direction rate in Y
+    ThrustRateY,
+    /// Thrust direction rate in Z
+    ThrustRateZ,
+    /// Thrust direction acceleration in X
+    ThrustAccelX,
+    /// Thrust direction acceleration in Y
+    ThrustAccelY,
+    /// Thrust direction acceleration in Z
+    ThrustAccelZ,
 }
 
 impl Vary {
@@ -80,6 +92,12 @@ impl Vary {
             || *self == Self::ThrustY
             || *self == Self::ThrustZ
             || *self == Self::ThrustLevel
+            || *self == Self::ThrustRateX
+            || *self == Self::ThrustRateY
+            || *self == Self::ThrustRateZ
+            || *self == Self::ThrustAccelX
+            || *self == Self::ThrustAccelY
+            || *self == Self::ThrustAccelZ
     }
 
     pub fn vec_index(&self) -> usize {
@@ -87,11 +105,13 @@ impl Vary {
             Self::PositionX | Self::ThrustX | Self::MnvrAlphaDDot | Self::MnvrDeltaDDot => 0,
             Self::PositionY | Self::ThrustY | Self::MnvrAlphaDot | Self::MnvrDeltaDot => 1,
             Self::PositionZ | Self::ThrustZ | Self::MnvrAlpha | Self::MnvrDelta => 2,
-            Self::VelocityX | Self::ThrustLevel => 3,
-            Self::VelocityY => 4,
-            Self::VelocityZ => 5,
-            Self::StartEpoch => 6,
-            Self::Duration | Self::EndEpoch => 7,
+            Self::VelocityX | Self::ThrustRateX => 3,
+            Self::VelocityY | Self::ThrustRateY => 4,
+            Self::VelocityZ | Self::ThrustRateZ => 5,
+            Self::StartEpoch | Self::ThrustAccelX => 6,
+            Self::Duration | Self::EndEpoch | Self::ThrustAccelY => 7,
+            Self::ThrustAccelZ => 8,
+            _ => unreachable!(),
         }
     }
 }
@@ -230,6 +250,19 @@ impl From<Vary> for Variable {
                 ..Default::default()
             },
             Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => Self {
+                component: vary,
+                max_value: 1.0,
+                min_value: -1.0,
+                ..Default::default()
+            },
+            Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => Self {
+                component: vary,
+                perturbation: 1e-10,
+                max_value: 1.0,
+                min_value: -1.0,
+                ..Default::default()
+            },
+            Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => Self {
                 component: vary,
                 max_value: 1.0,
                 min_value: -1.0,
