@@ -470,15 +470,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             // And finally apply it to the xi
             let mut state_correction = Vector6::<f64>::zeros();
             for (i, var) in self.variables.iter().enumerate() {
-                // Choose the minimum step between the provided max step and the correction.
-                if delta[i].abs() > var.max_step.abs() {
-                    delta[i] = var.max_step.abs() * delta[i].signum();
-                } else if delta[i] > var.max_value {
-                    delta[i] = var.max_value;
-                } else if delta[i] < var.min_value {
-                    delta[i] = var.min_value;
-                }
-
                 debug!(
                     "Correction {:?}{} (element {}): {}",
                     var.component,
@@ -497,16 +488,30 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     match var.component {
                         Vary::Duration => {
                             if corr.abs() > 1e-3 {
-                                mnvr.end = mnvr.start + corr.abs().seconds();
+                                // Check that we are within the bounds
+                                let init_duration_s =
+                                    (correction_epoch - achievement_epoch).in_seconds();
+                                let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
+                                mnvr.end = mnvr.start + acceptable_corr;
                             }
                         }
                         Vary::EndEpoch => {
                             if corr.abs() > 1e-3 {
-                                mnvr.end = mnvr.end + corr.seconds()
+                                // Check that we are within the bounds
+                                let total_end_corr =
+                                    (mnvr.end + corr.seconds() - achievement_epoch).in_seconds();
+                                let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
+                                mnvr.end = mnvr.end + acceptable_corr;
                             }
                         }
                         Vary::StartEpoch => {
                             if corr.abs() > 1e-3 {
+                                // Check that we are within the bounds
+                                let total_start_corr =
+                                    (mnvr.start + corr.seconds() - correction_epoch).in_seconds();
+                                let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
+                                mnvr.end = mnvr.end + acceptable_corr;
+
                                 mnvr.start = mnvr.start + corr.seconds()
                             }
                         }
@@ -538,7 +543,15 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         _ => unreachable!(),
                     }
                 } else {
-                    state_correction[var.component.vec_index()] += corr;
+                    // Choose the minimum step between the provided max step and the correction.
+                    if delta[i].abs() > var.max_step.abs() {
+                        delta[i] = var.max_step.abs() * delta[i].signum();
+                    } else if delta[i] > var.max_value {
+                        delta[i] = var.max_value;
+                    } else if delta[i] < var.min_value {
+                        delta[i] = var.min_value;
+                    }
+                    state_correction[var.component.vec_index()] += delta[i];
                 }
             }
 

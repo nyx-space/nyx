@@ -43,6 +43,8 @@ fn tgt_c3_decl() {
 
     println!("Finite differencing solution: {}", solution_fd);
 
+    tgt.apply(&solution_fd).unwrap();
+
     let gmat_sol = 2.385704523944014;
     println!(
         "GMAT validation - tgt_sma_from_peri: Δv = {:.3} m/s\terr = {:.6} m/s",

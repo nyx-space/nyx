@@ -149,6 +149,17 @@ impl Variable {
         me.init_guess = guess;
         me
     }
+
+    /// Ensure that `val` is within the variable bounds
+    pub fn apply_bounds(&self, val: f64) -> f64 {
+        if val > self.max_value {
+            self.max_value
+        } else if val < self.min_value {
+            self.min_value
+        } else {
+            val
+        }
+    }
 }
 
 impl Default for Variable {
