@@ -171,6 +171,34 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 7, O> {
     }
 }
 
+impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 10, O> {
+    /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
+    pub fn thrust_profile(
+        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        objectives: [Objective; O],
+    ) -> Self {
+        Self {
+            prop,
+            objectives,
+            variables: [
+                Variable::from(Vary::ThrustX),
+                Variable::from(Vary::ThrustY),
+                Variable::from(Vary::ThrustZ),
+                Variable::from(Vary::ThrustLevel),
+                Variable::from(Vary::ThrustRateX),
+                Variable::from(Vary::ThrustRateY),
+                Variable::from(Vary::ThrustRateZ),
+                Variable::from(Vary::ThrustAccelX),
+                Variable::from(Vary::ThrustAccelY),
+                Variable::from(Vary::ThrustAccelZ),
+            ],
+            iterations: 50,
+            objective_frame: None,
+            correction_frame: None,
+        }
+    }
+}
+
 impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn new(

@@ -264,6 +264,7 @@ impl From<Vary> for Variable {
             },
             Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => Self {
                 component: vary,
+                perturbation: 1e-15,
                 max_value: 1.0,
                 min_value: -1.0,
                 ..Default::default()

@@ -108,6 +108,57 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
 
 #[ignore]
 #[test]
+fn thrust_profile_tgt_sma_aop_raan() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let orig_dt = Epoch::from_gregorian_utc_at_midnight(2020, 1, 1);
+
+    let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
+
+    let target_delta_t = 30.seconds();
+
+    let spacecraft = Spacecraft {
+        orbit: xi_orig,
+        dry_mass_kg: 10.0,
+        fuel_mass_kg: 90.0,
+        thruster: Some(Thruster {
+            thrust: 500.0,
+            isp: 300.0,
+        }),
+        mode: GuidanceMode::Thrust,
+        ..Default::default()
+    };
+
+    let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
+    let setup = Propagator::default(dynamics);
+
+    // Define the objective
+    let objectives = [
+        Objective::within_tolerance(StateParameter::SMA, 8012.176, 0.1),
+        Objective::within_tolerance(StateParameter::AoP, 53.939, 1e-3),
+        Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
+    ];
+
+    let tgt = Optimizer::thrust_profile(&setup, objectives);
+
+    println!("{}", tgt);
+
+    let achievement_epoch = orig_dt + target_delta_t;
+
+    let solution_fd = tgt
+        .try_achieve_from(spacecraft, orig_dt, achievement_epoch)
+        .unwrap();
+
+    println!("Finite differencing solution: {}", solution_fd);
+}
+
+#[ignore]
+#[test]
 fn val_tgt_finite_burn() {
     // In this test, we take a known finite burn solution and use the optimizer to solve for it.
     // It should converge after 0 iterations.
