@@ -16,23 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod convert_impulsive;
-pub mod multipleshooting;
-pub use multipleshooting::{ctrlnodes, multishoot};
-/// Uses a Levenberg Marquardt minimizer to solve the damped least squares problem.
-pub mod minimize_lm;
-pub mod optimizer;
-/// Uses a [Newton Raphson](https://en.wikipedia.org/wiki/Newton%27s_method_in_optimization) method where the Jacobian is computed via finite differencing.
-pub mod raphson_finite_diff;
-/// Uses a [Newton Raphson](https://en.wikipedia.org/wiki/Newton%27s_method_in_optimization) method where the Jacobian is computed via hyperdual numbers.
-pub mod raphson_hyperdual;
-pub mod solution;
-pub mod target_variable;
+pub mod ctrlnodes;
+pub mod multishoot;
+pub mod altitude_heuristic;
+pub mod equidistant_heuristic;
 
+/// Built-in cost functions to minimize
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum DiffMethod {
-    /// Slower, but more commonly used
-    FiniteDiff,
-    /// Significantly faster, but requires the automatic differentiation to be coded
-    AutoDiff,
+pub enum CostFunction {
+    /// J = ∫ \vec{u}^T\vec{u} dt
+    MinimumEnergy,
+    /// J = ∫ |\vec{u}| dt -- Warning, this may lead to loads to bang-coast-bang solutions
+    MinimumFuel,
 }

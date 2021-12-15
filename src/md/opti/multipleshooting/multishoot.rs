@@ -18,16 +18,13 @@
 
 pub use super::CostFunction;
 // use crate::dynamics::guidance::{FiniteBurns, Mnvr};
-use super::ctrlnodes::Node;
-use super::solution::TargeterSolution;
-use crate::errors::TargetingError;
 use crate::linalg::{DMatrix, DVector, Vector3};
+use crate::md::opti::solution::TargeterSolution;
 use crate::md::optimizer::Optimizer;
 use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::{Orbit, Spacecraft};
-use std::sync::Arc;
 
 use std::fmt;
 
@@ -69,7 +66,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
             let mut initial_states = Vec::with_capacity(self.targets.len());
             initial_states.push(self.x0);
             let mut outer_jacobian =
-                DMatrix::from_element(3 * self.targets.len(), 3 * (self.targets.len() - 1), 0.0);
+                DMatrix::from_element(3 * self.targets.len(), O * (self.targets.len() - 1), 0.0);
             let mut cost_vec = DVector::from_element(3 * self.targets.len(), 0.0);
 
             // Reset the all_dvs
@@ -128,15 +125,15 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
                     };
 
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * i, 3 * i + axis)] = (inner_sol_a.correction[0]
+                    outer_jacobian[(3 * i, O * i + axis)] = (inner_sol_a.correction[0]
                         - self.all_dvs[i][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * i + 1, 3 * i + axis)] = (inner_sol_a.correction[1]
+                    outer_jacobian[(3 * i + 1, O * i + axis)] = (inner_sol_a.correction[1]
                         - self.all_dvs[i][1])
                         / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * i + 2, 3 * i + axis)] = (inner_sol_a.correction[2]
+                    outer_jacobian[(3 * i + 2, O * i + axis)] = (inner_sol_a.correction[2]
                         - self.all_dvs[i][2])
                         / next_node[axis].tolerance;
 
@@ -152,15 +149,15 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
 
                     // Compute the partials wrt the next Δv
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * (i + 1), 3 * i + axis)] = (inner_sol_b.correction[0]
+                    outer_jacobian[(3 * (i + 1), O * i + axis)] = (inner_sol_b.correction[0]
                         - self.all_dvs[i + 1][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * (i + 1) + 1, 3 * i + axis)] = (inner_sol_b.correction[1]
+                    outer_jacobian[(3 * (i + 1) + 1, O * i + axis)] = (inner_sol_b.correction[1]
                         - self.all_dvs[i + 1][1])
                         / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * (i + 1) + 2, 3 * i + axis)] = (inner_sol_b.correction[2]
+                    outer_jacobian[(3 * (i + 1) + 2, O * i + axis)] = (inner_sol_b.correction[2]
                         - self.all_dvs[i + 1][2])
                         / next_node[axis].tolerance;
 
@@ -171,13 +168,13 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
                         let dv_ip1 = inner_sol_b.achieved_state.orbit.velocity()
                             - initial_states[i + 2].orbit.velocity();
                         // ∂Δv_x / ∂r_x
-                        outer_jacobian[(3 * (i + 2), 3 * i + axis)] =
+                        outer_jacobian[(3 * (i + 2), O * i + axis)] =
                             dv_ip1[0] / next_node[axis].tolerance;
                         // ∂Δv_y / ∂r_x
-                        outer_jacobian[(3 * (i + 2) + 1, 3 * i + axis)] =
+                        outer_jacobian[(3 * (i + 2) + 1, O * i + axis)] =
                             dv_ip1[1] / next_node[axis].tolerance;
                         // ∂Δv_z / ∂r_x
-                        outer_jacobian[(3 * (i + 2) + 2, 3 * i + axis)] =
+                        outer_jacobian[(3 * (i + 2) + 2, O * i + axis)] =
                             dv_ip1[2] / next_node[axis].tolerance;
                     }
                 }
@@ -257,145 +254,12 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
             let node_vector = -delta_r;
             for (i, val) in node_vector.iter().enumerate() {
                 let node_no = i / 3;
-                let component_no = i % 3;
+                let component_no = i % O;
                 self.targets[node_no].update_component(component_no, *val);
             }
             self.current_iteration += 1;
         }
         Err(NyxError::MaxIterReached(format!("{}", self.max_iterations)))
-    }
-}
-
-impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3> {
-    /// Builds a multiple shooting structure assuming that the optimal trajectory is a straight line
-    /// between the start and end points. The position of the nodes will be update at each iteration
-    /// of the outer loop.
-    /// NOTE: this may cause some nodes to be below the surface of a celestial object if in low orbit
-    pub fn equidistant_nodes(
-        x0: Spacecraft,
-        xf: Orbit,
-        node_count: usize,
-        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
-    ) -> Result<Self, NyxError> {
-        if node_count < 3 {
-            error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
-        }
-
-        // Compute the direction of the objective
-        let mut direction = xf.radius() - x0.orbit.radius();
-        if direction.norm() < 2e-16 {
-            return Err(NyxError::TargetsTooClose);
-        }
-        let distance_increment = direction.norm() / (node_count as f64);
-        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
-        direction /= direction.norm();
-
-        // Build each node successively (includes xf)
-        let mut nodes = Vec::with_capacity(node_count + 1);
-        let mut prev_node_radius = x0.orbit.radius();
-        let mut prev_node_epoch = x0.epoch();
-
-        for _ in 0..node_count {
-            // Compute the position we want.
-            let this_node = prev_node_radius + distance_increment * direction;
-            let this_epoch = prev_node_epoch + duration_increment;
-            nodes.push(Node {
-                x: this_node[0],
-                y: this_node[1],
-                z: this_node[2],
-                frame: x0.orbit.frame,
-                epoch: this_epoch,
-            });
-            prev_node_radius = this_node;
-            prev_node_epoch = this_epoch;
-        }
-        Ok(Self {
-            prop,
-            targets: nodes,
-            x0,
-            xf,
-            current_iteration: 0,
-            max_iterations: 50,
-            improvement_threshold: 0.01,
-            all_dvs: Vec::with_capacity(node_count),
-        })
-    }
-
-    /// Builds a multiple shooting structure assuming that the optimal trajectory is near a linear
-    /// heuristic in geodetic altitude and direction.
-    /// For example, if x0 has an altitude of 100 km and xf has an altitude
-    /// of 200 km, and 10 nodes are required over 10 minutes, then node 1 will be 110 km, node 2 220km, etc.
-    /// body_frame must be a body fixed frame
-    pub fn linear_altitude_heuristic(
-        x0: Spacecraft,
-        xf: Orbit,
-        node_count: usize,
-        body_frame: Frame,
-        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
-        cosm: Arc<Cosm>,
-    ) -> Result<Self, NyxError> {
-        if node_count < 3 {
-            error!("At least three nodes are needed for a multiple shooting optimization");
-            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
-        }
-
-        if !body_frame.is_body_fixed() {
-            return Err(NyxError::Targeter(TargetingError::FrameError(
-                "Body frame is not body fixed".to_string(),
-            )));
-        }
-
-        let delta_t = xf.epoch() - x0.epoch();
-        let xf_bf = cosm.frame_chg(&xf, body_frame);
-
-        let duration_increment = (xf.epoch() - x0.epoch()) / (node_count as f64);
-
-        let (_, traj) = prop.with(x0).for_duration_with_traj(delta_t)?;
-
-        // Build each node successively (includes xf)
-        let mut nodes = Vec::with_capacity(node_count + 1);
-        let mut prev_node_epoch = x0.epoch();
-
-        let inertial_frame = x0.orbit.frame;
-        for i in 0..node_count {
-            // Compute the position we want.
-            let this_epoch = prev_node_epoch + duration_increment;
-            let orbit_point = traj.at(this_epoch)?.orbit;
-            // Convert this orbit into the body frame
-            let orbit_point_bf = cosm.frame_chg(&orbit_point, body_frame);
-            // Note that the altitude here might be different, so we scale the altitude change by the current altitude
-            let desired_alt_i = (xf_bf.geodetic_height() - orbit_point_bf.geodetic_height())
-                / ((node_count - i) as f64).sqrt();
-            // Build the node in the body frame and convert that to the original frame
-            let node_bf = Orbit::from_geodesic(
-                orbit_point_bf.geodetic_latitude(),
-                orbit_point_bf.geodetic_longitude(),
-                orbit_point_bf.geodetic_height() + desired_alt_i,
-                this_epoch,
-                body_frame,
-            );
-            // Convert that back into the inertial frame
-            let this_node = cosm.frame_chg(&node_bf, inertial_frame).radius();
-            nodes.push(Node {
-                x: this_node[0],
-                y: this_node[1],
-                z: this_node[2],
-                frame: inertial_frame,
-                epoch: this_epoch,
-            });
-            prev_node_epoch = this_epoch;
-        }
-        Ok(Self {
-            prop,
-            targets: nodes,
-            x0,
-            xf,
-            current_iteration: 0,
-            max_iterations: 100,
-            improvement_threshold: 0.01,
-            all_dvs: Vec::with_capacity(node_count),
-        })
     }
 }
 

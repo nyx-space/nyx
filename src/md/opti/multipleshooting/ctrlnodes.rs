@@ -51,6 +51,7 @@ pub struct NodeSerde {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    pub vmag: Option<f64>,
     pub epoch: String,
     pub frame: String,
 }
@@ -64,6 +65,7 @@ impl NodeSerde {
             x: self.x,
             y: self.y,
             z: self.z,
+            vmag: self.vmag.unwrap_or(0.0),
             frame,
             epoch,
         })
@@ -75,19 +77,12 @@ pub struct Node {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    pub vmag: f64,
     pub epoch: Epoch,
     pub frame: Frame,
 }
 
 impl Node {
-    pub fn to_targeter_objective(&self) -> [Objective; 3] {
-        return [
-            Objective::new(StateParameter::X, self.x),
-            Objective::new(StateParameter::Y, self.y),
-            Objective::new(StateParameter::Z, self.z),
-        ];
-    }
-
     pub fn rmag(&self) -> f64 {
         (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
     }
@@ -103,6 +98,7 @@ impl MultishootNode<3> for Node {
             0 => self.x += add_val,
             1 => self.y += add_val,
             2 => self.z += add_val,
+            3 => self.vmag += add_val,
             _ => unreachable!(),
         }
     }
@@ -119,6 +115,34 @@ impl Into<[Objective; 3]> for Node {
     }
 }
 
+impl MultishootNode<4> for Node {
+    fn epoch(&self) -> Epoch {
+        self.epoch
+    }
+
+    fn update_component(&mut self, component: usize, add_val: f64) {
+        match component {
+            0 => self.x += add_val,
+            1 => self.y += add_val,
+            2 => self.z += add_val,
+            3 => self.vmag += add_val,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<[Objective; 4]> for Node {
+    fn into(self) -> [Objective; 4] {
+        [
+            Objective::new(StateParameter::X, self.x),
+            Objective::new(StateParameter::Y, self.y),
+            Objective::new(StateParameter::Z, self.z),
+            Objective::new(StateParameter::Vmag, self.vmag),
+        ]
+    }
+}
+
 #[allow(clippy::from_over_into)]
 impl Into<NodeSerde> for Node {
     fn into(self) -> NodeSerde {
@@ -126,6 +150,7 @@ impl Into<NodeSerde> for Node {
             x: self.x,
             y: self.y,
             z: self.z,
+            vmag: Some(self.vmag),
             frame: self.frame.to_string(),
             epoch: self.epoch.to_string(),
         }
@@ -139,6 +164,7 @@ impl Into<NodeSerde> for &Node {
             x: self.x,
             y: self.y,
             z: self.z,
+            vmag: Some(self.z),
             frame: self.frame.to_string(),
             epoch: self.epoch.to_string(),
         }
