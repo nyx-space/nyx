@@ -29,6 +29,8 @@ use std::convert::Into;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use super::multishoot::MultishootNode;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodesSerde {
     pub nodes: Vec<NodeSerde>,
@@ -88,6 +90,32 @@ impl Node {
 
     pub fn rmag(&self) -> f64 {
         (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+    }
+}
+
+impl MultishootNode<3> for Node {
+    fn epoch(&self) -> Epoch {
+        self.epoch
+    }
+
+    fn update_component(&mut self, component: usize, add_val: f64) {
+        match component {
+            0 => self.x += add_val,
+            1 => self.y += add_val,
+            2 => self.z += add_val,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<[Objective; 3]> for Node {
+    fn into(self) -> [Objective; 3] {
+        [
+            Objective::new(StateParameter::X, self.x),
+            Objective::new(StateParameter::Y, self.y),
+            Objective::new(StateParameter::Z, self.z),
+        ]
     }
 }
 

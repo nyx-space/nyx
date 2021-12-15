@@ -56,7 +56,7 @@ fn orbit_raising() {
 
     // Check that all nodes are above the surface
     println!("Initial nodes\nNode no,X (km),Y (km),Z (km),Epoch:GregorianUtc");
-    for (i, node) in opti.nodes.iter().enumerate() {
+    for (i, node) in opti.targets.iter().enumerate() {
         println!(
             "{}, {}, {}, {}, '{}'",
             i,
@@ -70,7 +70,7 @@ fn orbit_raising() {
     let multishoot_sol = opti.solve(CostFunction::MinimumFuel).unwrap();
 
     println!("Final nodes\nNode no,X (km),Y (km),Z (km),Epoch:GregorianUtc");
-    for (i, node) in opti.nodes.iter().enumerate() {
+    for (i, node) in opti.targets.iter().enumerate() {
         println!(
             "{}, {}, {}, {}, '{}'",
             i,
@@ -124,6 +124,8 @@ fn orbit_raising() {
         "Multiple shooting solution requires a total of {:.3} m/s",
         dv_ms
     );
+
+    assert!((dv_ms - 735.9).abs() < 0.1, "Wrong total DV");
 
     // Propagate the initial orbit too
     prop.with(sc)
