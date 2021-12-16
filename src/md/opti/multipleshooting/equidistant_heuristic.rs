@@ -24,7 +24,7 @@ use crate::md::ui::*;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::{Orbit, Spacecraft};
 
-impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3> {
+impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
     /// Builds a multiple shooting structure assuming that the optimal trajectory is a straight line
     /// between the start and end points. The position of the nodes will be update at each iteration
     /// of the outer loop.
@@ -77,6 +77,11 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3> {
             current_iteration: 0,
             max_iterations: 50,
             improvement_threshold: 0.01,
+            variables: [
+                Vary::VelocityX.try_into().unwrap(),
+                Vary::VelocityY.try_into().unwrap(),
+                Vary::VelocityZ.try_into().unwrap(),
+            ],
             all_dvs: Vec::with_capacity(node_count),
         })
     }

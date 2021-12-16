@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 pub use super::solarpressure::SolarPressure;
 
-const NORM_ERR: f64 = 1e-12;
+const NORM_ERR: f64 = 1e-4;
 
 #[derive(Clone)]
 pub struct SpacecraftDynamics<'a> {

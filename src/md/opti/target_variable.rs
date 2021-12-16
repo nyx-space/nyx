@@ -170,6 +170,24 @@ impl Variable {
         me
     }
 
+    pub fn with_pert(self, pert: f64) -> Self {
+        let mut me = self;
+        me.perturbation = pert;
+        me
+    }
+
+    pub fn with_min(self, min_val: f64) -> Self {
+        let mut me = self;
+        me.min_value = min_val;
+        me
+    }
+
+    pub fn with_max(self, max_val: f64) -> Self {
+        let mut me = self;
+        me.max_value = max_val;
+        me
+    }
+
     /// Ensure that `val` is within the variable bounds
     pub fn apply_bounds(&self, val: f64) -> f64 {
         if val > self.max_value {
@@ -272,7 +290,7 @@ impl From<Vary> for Variable {
             Vary::ThrustLevel => Self {
                 component: vary,
                 perturbation: -0.0001, // Perturb the thrust by -1%
-                min_value: 0.0,
+                min_value: 0.0001,
                 max_value: 1.0,
                 init_guess: 1.0,
                 ..Default::default()

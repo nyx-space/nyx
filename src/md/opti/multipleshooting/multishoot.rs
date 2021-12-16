@@ -18,7 +18,7 @@
 
 pub use super::CostFunction;
 // use crate::dynamics::guidance::{FiniteBurns, Mnvr};
-use crate::linalg::{DMatrix, DVector, Vector3};
+use crate::linalg::{DMatrix, DVector, SVector};
 use crate::md::opti::solution::TargeterSolution;
 use crate::md::optimizer::Optimizer;
 use crate::md::ui::*;
@@ -35,8 +35,15 @@ pub trait MultishootNode<const O: usize>: Copy + Into<[Objective; O]> {
 
 /// Multiple shooting is an optimization method.
 /// Source of implementation: "Low Thrust Optimization in Cislunar and Translunar space", 2018 Nathan Re (Parrish)
-// pub struct MultipleShooting<'a, E: ErrorCtrl> {
-pub struct MultipleShooting<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> {
+/// OT: size of the objectives for each node (e.g. 3 if the objectives are X, Y, Z).
+/// VT: size of the variables for targeter node (e.g. 4 if the objectives are thrust direction (x,y,z) and thrust level).
+pub struct MultipleShooting<
+    'a,
+    E: ErrorCtrl,
+    T: MultishootNode<OT>,
+    const VT: usize,
+    const OT: usize,
+> {
     /// The propagator setup (kind, stages, etc.)
     pub prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
     /// List of nodes of the optimal trajectory
@@ -52,21 +59,25 @@ pub struct MultipleShooting<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usi
     /// e.g. 0.01 means that a 1% of less improvement in case between two iterations
     /// will stop the iterations.
     pub improvement_threshold: f64,
-    pub all_dvs: Vec<Vector3<f64>>,
+    /// The kind of correction to apply to achieve the objectives
+    pub variables: [Variable; VT],
+    pub all_dvs: Vec<SVector<f64, VT>>,
 }
 
-impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a, E, T, O> {
+impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
+    MultipleShooting<'a, E, T, VT, OT>
+{
     /// Solve the multiple shooting problem by finding the arrangement of nodes to minimize the cost function.
     pub fn solve(
         &mut self,
         cost: CostFunction,
-    ) -> Result<MultipleShootingSolution<T, O>, NyxError> {
+    ) -> Result<MultipleShootingSolution<T, OT>, NyxError> {
         let mut prev_cost = 1e12; // We don't use infinity because we compare a ratio of cost
         for it in 0..self.max_iterations {
             let mut initial_states = Vec::with_capacity(self.targets.len());
             initial_states.push(self.x0);
             let mut outer_jacobian =
-                DMatrix::from_element(3 * self.targets.len(), O * (self.targets.len() - 1), 0.0);
+                DMatrix::from_element(3 * self.targets.len(), OT * (self.targets.len() - 1), 0.0);
             let mut cost_vec = DVector::from_element(3 * self.targets.len(), 0.0);
 
             // Reset the all_dvs
@@ -76,7 +87,14 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
                 /* ***
                  ** 1. Solve the delta-v differential corrector between each node
                  ** *** */
-                let tgt = Optimizer::delta_v(self.prop, self.targets[i].into());
+                let tgt = Optimizer {
+                    prop: self.prop,
+                    objectives: self.targets[i].into(),
+                    variables: self.variables,
+                    iterations: 100,
+                    objective_frame: None,
+                    correction_frame: None,
+                };
                 let sol = match tgt.try_achieve_dual(
                     initial_states[i],
                     initial_states[i].epoch(),
@@ -102,7 +120,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
                  ** We don't perturb the endpoint node
                  ** *** */
 
-                for axis in 0..3 {
+                for axis in 0..OT {
                     /* ***
                      ** 2.A. Perturb the i-th node
                      ** *** */
@@ -113,7 +131,6 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
                      ** Note that because the first initial_state is x0, the i-th "initial state"
                      ** is the initial state to reach the i-th node.
                      ** *** */
-
                     let inner_tgt_a = Optimizer::delta_v(self.prop, next_node);
                     let inner_sol_a = match inner_tgt_a.try_achieve_dual(
                         initial_states[i],
@@ -125,15 +142,15 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
                     };
 
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * i, O * i + axis)] = (inner_sol_a.correction[0]
+                    outer_jacobian[(3 * i, OT * i + axis)] = (inner_sol_a.correction[0]
                         - self.all_dvs[i][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * i + 1, O * i + axis)] = (inner_sol_a.correction[1]
+                    outer_jacobian[(3 * i + 1, OT * i + axis)] = (inner_sol_a.correction[1]
                         - self.all_dvs[i][1])
                         / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * i + 2, O * i + axis)] = (inner_sol_a.correction[2]
+                    outer_jacobian[(3 * i + 2, OT * i + axis)] = (inner_sol_a.correction[2]
                         - self.all_dvs[i][2])
                         / next_node[axis].tolerance;
 
@@ -149,15 +166,15 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
 
                     // Compute the partials wrt the next Δv
                     // ∂Δv_x / ∂r_x
-                    outer_jacobian[(3 * (i + 1), O * i + axis)] = (inner_sol_b.correction[0]
+                    outer_jacobian[(3 * (i + 1), OT * i + axis)] = (inner_sol_b.correction[0]
                         - self.all_dvs[i + 1][0])
                         / next_node[axis].tolerance;
                     // ∂Δv_y / ∂r_x
-                    outer_jacobian[(3 * (i + 1) + 1, O * i + axis)] = (inner_sol_b.correction[1]
+                    outer_jacobian[(3 * (i + 1) + 1, OT * i + axis)] = (inner_sol_b.correction[1]
                         - self.all_dvs[i + 1][1])
                         / next_node[axis].tolerance;
                     // ∂Δv_z / ∂r_x
-                    outer_jacobian[(3 * (i + 1) + 2, O * i + axis)] = (inner_sol_b.correction[2]
+                    outer_jacobian[(3 * (i + 1) + 2, OT * i + axis)] = (inner_sol_b.correction[2]
                         - self.all_dvs[i + 1][2])
                         / next_node[axis].tolerance;
 
@@ -168,13 +185,13 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
                         let dv_ip1 = inner_sol_b.achieved_state.orbit.velocity()
                             - initial_states[i + 2].orbit.velocity();
                         // ∂Δv_x / ∂r_x
-                        outer_jacobian[(3 * (i + 2), O * i + axis)] =
+                        outer_jacobian[(3 * (i + 2), OT * i + axis)] =
                             dv_ip1[0] / next_node[axis].tolerance;
                         // ∂Δv_y / ∂r_x
-                        outer_jacobian[(3 * (i + 2) + 1, O * i + axis)] =
+                        outer_jacobian[(3 * (i + 2) + 1, OT * i + axis)] =
                             dv_ip1[1] / next_node[axis].tolerance;
                         // ∂Δv_z / ∂r_x
-                        outer_jacobian[(3 * (i + 2) + 2, O * i + axis)] =
+                        outer_jacobian[(3 * (i + 2) + 2, OT * i + axis)] =
                             dv_ip1[2] / next_node[axis].tolerance;
                     }
                 }
@@ -254,7 +271,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
             let node_vector = -delta_r;
             for (i, val) in node_vector.iter().enumerate() {
                 let node_no = i / 3;
-                let component_no = i % O;
+                let component_no = i % OT;
                 self.targets[node_no].update_component(component_no, *val);
             }
             self.current_iteration += 1;
@@ -263,8 +280,8 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> MultipleShooting<'a
     }
 }
 
-impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> fmt::Display
-    for MultipleShooting<'a, E, T, O>
+impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> fmt::Display
+    for MultipleShooting<'a, E, T, VT, OT>
 {
     #[allow(clippy::or_fun_call, clippy::clone_on_copy)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -284,23 +301,28 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<O>, const O: usize> fmt::Display
         ));
 
         for (i, node) in self.targets.iter().enumerate() {
-            let objectives: [Objective; O] = (*node).into();
+            let objectives: [Objective; OT] = (*node).into();
             let mut this_nodemsg = String::from("");
             for obj in &objectives {
                 this_nodemsg.push_str(&format!("{:.3}, ", obj.desired_value));
             }
+            let mut this_costmsg = String::from("");
             let dv = match self.all_dvs.get(i) {
                 Some(dv) => dv.clone(),
-                None => Vector3::zeros(),
+                None => SVector::<f64, VT>::zeros(),
             };
+            for val in &dv {
+                this_costmsg.push_str(&format!("{}, ", val));
+            }
+            if VT == 3 {
+                // Add the norm of the control
+                this_costmsg.push_str(&format!("{}, ", dv.norm()));
+            }
             nodemsg.push_str(&format!(
-                "[{}{}, {}, {}, {}, {}, {}],\n",
+                "[{}{}, {}{}],\n",
                 this_nodemsg,
                 self.current_iteration,
-                dv[0],
-                dv[1],
-                dv[2],
-                dv.norm(),
+                this_nodemsg,
                 i + 1
             ));
         }

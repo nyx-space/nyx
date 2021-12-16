@@ -161,8 +161,6 @@ fn thrust_profile_tgt_sma_aop_raan() {
 #[test]
 fn val_tgt_finite_burn() {
     // In this test, we take a known finite burn solution and use the optimizer to solve for it.
-    // It should converge after 0 iterations.
-
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
