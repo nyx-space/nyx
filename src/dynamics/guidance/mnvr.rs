@@ -625,12 +625,12 @@ impl GuidanceLaw for Mnvr {
         }
     }
 
-    fn next(&self, sc: &Spacecraft) -> GuidanceMode {
+    fn next(&self, sc: &mut Spacecraft) {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
         if sc.epoch() < self.start || sc.epoch() > self.end {
-            GuidanceMode::Coast
+            sc.mode = GuidanceMode::Coast;
         } else {
-            GuidanceMode::Thrust
+            sc.mode = GuidanceMode::Thrust;
         }
     }
 }

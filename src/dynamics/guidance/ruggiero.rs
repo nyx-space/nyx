@@ -212,17 +212,17 @@ impl GuidanceLaw for Ruggiero {
     }
 
     /// Update the state for the next iteration
-    fn next(&self, sc: &Spacecraft) -> GuidanceMode {
+    fn next(&self, sc: &mut Spacecraft) {
         if self.throttle(sc) > 0.0 {
             if sc.mode == GuidanceMode::Coast {
                 info!("enabling control: {:x}", sc.orbit);
             }
-            GuidanceMode::Thrust
+            sc.mode = GuidanceMode::Thrust;
         } else {
             if sc.mode == GuidanceMode::Thrust {
                 info!("disabling control: {:x}", sc.orbit);
             }
-            GuidanceMode::Coast
+            sc.mode = GuidanceMode::Coast;
         }
     }
 }

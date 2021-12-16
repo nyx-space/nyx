@@ -179,7 +179,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         if let Some(ctrl) = &self.ctrl {
             let mut state = next_state;
             // Update the control mode
-            state.mode = ctrl.next(&state);
+            ctrl.next(&mut state);
             Ok(state)
         } else {
             Ok(next_state)

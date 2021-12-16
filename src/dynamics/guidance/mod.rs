@@ -56,8 +56,8 @@ pub trait GuidanceLaw: Send + Sync {
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
     fn throttle(&self, osc_state: &Spacecraft) -> f64;
 
-    /// Prepares the controller for the next maneuver by returning the next guidance mode.
-    fn next(&self, next_state: &Spacecraft) -> GuidanceMode;
+    /// Updates the state of the spacecraft for the next maneuver, e.g. prepares the controller for the next maneuver
+    fn next(&self, next_state: &mut Spacecraft);
 
     /// Returns whether this thrust control has been achieved, if it has an objective
     fn achieved(&self, _osc_state: &Spacecraft) -> Result<bool, NyxError> {

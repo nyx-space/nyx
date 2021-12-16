@@ -76,7 +76,7 @@ impl GuidanceLaw for FiniteBurns {
         }
     }
 
-    fn next(&self, sc: &Spacecraft) -> GuidanceMode {
+    fn next(&self, sc: &mut Spacecraft) {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
         match sc.mode {
             GuidanceMode::Custom(mnvr_no) => {
@@ -85,23 +85,23 @@ impl GuidanceLaw for FiniteBurns {
                     if sc.epoch() >= cur_mnvr.end {
                         if mnvr_no as usize == self.mnvrs.len() - 1 {
                             // No following maneuver, so let's coast from now on.
-                            GuidanceMode::Coast
+                            sc.mode = GuidanceMode::Coast;
                         } else {
-                            GuidanceMode::Custom(mnvr_no + 1)
+                            sc.mode = GuidanceMode::Custom(mnvr_no + 1);
                         }
                     } else {
                         // Stay on the current maneuver
-                        GuidanceMode::Custom(mnvr_no)
+                        sc.mode = GuidanceMode::Custom(mnvr_no);
                     }
                 } else {
                     // We're done with all the maneuvers, so we can coast now
-                    GuidanceMode::Coast
+                    sc.mode = GuidanceMode::Coast;
                 }
             }
             _ => {
                 // If we haven't started the maneuvers yet, let's get ready to do so by switching to the mode
                 // which will start the first maneuver
-                GuidanceMode::Custom(0)
+                sc.mode = GuidanceMode::Custom(0);
             }
         }
     }
