@@ -54,9 +54,6 @@ pub mod md;
 /// Simple tools (e.g. Lambert solver)
 pub mod tools;
 
-/// Optimization module
-pub mod opti;
-
 /// Monte Carlo module
 pub mod mc;
 

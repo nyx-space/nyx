@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use nalgebra::Vector3;
+
 use super::{Orbit, State};
 use crate::dynamics::guidance::Thruster;
 use crate::errors::NyxError;
@@ -146,6 +148,12 @@ impl Spacecraft {
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
             ..Default::default()
         }
+    }
+
+    pub fn with_dv(self, dv: Vector3<f64>) -> Self {
+        let mut me = self;
+        me.orbit.apply_dv(dv);
+        me
     }
 
     /// Returns a copy of the state with a new dry mass

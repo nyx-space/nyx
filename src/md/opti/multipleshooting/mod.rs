@@ -17,8 +17,9 @@
 */
 
 pub mod ctrlnodes;
-
 pub mod multishoot;
+pub mod altitude_heuristic;
+pub mod equidistant_heuristic;
 
 /// Built-in cost functions to minimize
 #[derive(Copy, Clone, Debug, PartialEq)]

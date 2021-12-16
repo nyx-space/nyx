@@ -21,7 +21,7 @@ extern crate rayon;
 
 use self::rayon::prelude::*;
 use super::MdHdlr;
-pub use super::{targeter::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
+pub use super::{optimizer::*, trajectory::Traj, Ephemeris, Event, ScTraj, StateParameter};
 pub use crate::cosmic::{
     try_achieve_b_plane, BPlane, BPlaneTarget, Bodies, Cosm, Frame, GuidanceMode, LightTimeCalc,
     Orbit, OrbitDual,
@@ -41,6 +41,7 @@ pub use crate::propagators::{PropOpts, Propagator};
 pub use crate::time::{Duration, Epoch, TimeUnit};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
+pub use crate::md::objective::Objective;
 use std::convert::TryFrom;
 use std::str::FromStr;
 pub use std::sync::Arc;
@@ -52,7 +53,7 @@ pub struct MDProcess<'a>
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    pub sc_dyn: Arc<SpacecraftDynamics<'a>>,
+    pub sc_dyn: SpacecraftDynamics<'a>,
     pub init_state: Spacecraft,
     pub formatter: Option<StateFormatter>,
     pub prop_time: Option<Duration>,
@@ -77,7 +78,7 @@ where
                 #[allow(unused_assignments)]
                 let mut sc_dyn: SpacecraftDynamics;
                 #[allow(unused_assignments)]
-                let mut orbital_dyn: OrbitalDynamics = OrbitalDynamics::new_raw(vec![]);
+                let mut orbital_dyn: OrbitalDynamics = OrbitalDynamics::new(vec![]);
                 let mut init_sc;
 
                 // Validate the output
@@ -233,7 +234,7 @@ where
                     0.0,
                 );
 
-                sc_dyn = SpacecraftDynamics::new_raw(Arc::new(orbital_dyn));
+                sc_dyn = SpacecraftDynamics::new(orbital_dyn);
 
                 // Add the force models
                 if let Some(force_models) = &spacecraft.force_models {
@@ -303,7 +304,7 @@ where
 
                 Ok((
                     Self {
-                        sc_dyn: Arc::new(sc_dyn),
+                        sc_dyn: sc_dyn,
                         init_state: init_sc,
                         formatter: None,
                         prop_time,

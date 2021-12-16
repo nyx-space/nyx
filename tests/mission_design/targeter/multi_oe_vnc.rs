@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::md::targeter::*;
+use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
 #[test]
@@ -26,12 +26,12 @@ fn tgt_vnc_c3_decl() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Declination, 5.0, 0.1),
         Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
     ];
 
-    let tgt = Targeter::vnc(&setup, objectives);
+    let tgt = Optimizer::vnc(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -77,14 +77,14 @@ fn tgt_vnc_sma_ecc() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Targeter::vnc_with_components(
+    let tgt = Optimizer::vnc_with_components(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 0.5,

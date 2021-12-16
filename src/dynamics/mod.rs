@@ -18,7 +18,7 @@
 
 extern crate hyperdual;
 
-use self::hyperdual::{Hyperdual, Owned};
+use self::hyperdual::{OHyperdual, Owned};
 use crate::cosmic::{Orbit, Spacecraft};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
@@ -118,7 +118,7 @@ where
         DefaultAllocator: Allocator<f64, Self::HyperdualSize>
             + Allocator<f64, <Self::StateType as State>::Size>
             + Allocator<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>
-            + Allocator<Hyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
+            + Allocator<OHyperdual<f64, Self::HyperdualSize>, <Self::StateType as State>::Size>,
         Owned<f64, Self::HyperdualSize>: Copy,
     {
         unimplemented!()

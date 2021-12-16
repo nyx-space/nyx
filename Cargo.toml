@@ -19,14 +19,14 @@ maintenance = { status = "actively-developed" }
 gitlab = { repository = "nyx-space/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "0.27"
+nalgebra = "0.29"
 log = "0.4"
-hifitime = "2.3.1"
+hifitime = "2.3.2"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"
 csv = "1"
-hyperdual = "0.4.2"
+hyperdual = "0.5.2"
 bytes = "1.0"
 prost = "0.7"
 prost-derive = "0.7"
@@ -48,6 +48,7 @@ approx = "0.5"
 rand_pcg = "0.3"
 yaserde = "0.7.0"
 yaserde_derive = "0.7.0"
+levenberg-marquardt = "0.11"
 
 [features]
 broken-donotuse = []
