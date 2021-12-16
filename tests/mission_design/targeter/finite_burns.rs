@@ -29,7 +29,7 @@ fn thrust_dir_tgt_sma_aop_raan() {
             thrust: 500.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        extra: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -79,7 +79,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
             thrust: 500.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        extra: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -130,7 +130,7 @@ fn thrust_profile_tgt_sma_aop_raan() {
             thrust: 500.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        extra: GuidanceMode::Thrust,
         ..Default::default()
     };
 

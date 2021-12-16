@@ -29,6 +29,11 @@ use std::default::Default;
 use std::fmt;
 use std::ops::Add;
 
+/// Defines a spacecraft extension.
+/// This is useful for highly specialized control laws that need to store additional data in the spacecraft state.
+/// Most guidance laws can be implemented directly with the `Spacecraft` structure.
+pub trait SpacecraftExt: Clone + Copy + Default + fmt::Debug + Send + Sync {}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GuidanceMode {
     Coast,
@@ -36,9 +41,17 @@ pub enum GuidanceMode {
     Custom(u8),
 }
 
+impl Default for GuidanceMode {
+    fn default() -> Self {
+        Self::Coast
+    }
+}
+
+impl SpacecraftExt for GuidanceMode {}
+
 /// A spacecraft state
 #[derive(Clone, Copy, Debug)]
-pub struct Spacecraft {
+pub struct BaseSpacecraft<X: SpacecraftExt> {
     /// Initial orbit the vehicle is in
     pub orbit: Orbit,
     /// Dry mass, i.e. mass without fuel, in kg
@@ -54,13 +67,16 @@ pub struct Spacecraft {
     /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere).
     pub cd: f64,
     pub thruster: Option<Thruster>,
-    /// Guidance mode determines whether the thruster should fire or not
-    pub mode: GuidanceMode,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
+    /// Any extra information that is needed for specific control laws
+    pub extra: X,
 }
 
-impl Default for Spacecraft {
+/// A spacecraft state
+pub type Spacecraft = BaseSpacecraft<GuidanceMode>;
+
+impl<X: SpacecraftExt> Default for BaseSpacecraft<X> {
     fn default() -> Self {
         Self {
             orbit: Orbit::zeros(),
@@ -71,13 +87,13 @@ impl Default for Spacecraft {
             cr: 1.8,
             cd: 2.2,
             thruster: None,
-            mode: GuidanceMode::Coast,
             stm: None,
+            extra: X::default(),
         }
     }
 }
 
-impl Spacecraft {
+impl<X: SpacecraftExt> BaseSpacecraft<X> {
     /// Initialize a spacecraft state from all of its parameters
     pub fn new(
         orbit: Orbit,
@@ -122,27 +138,6 @@ impl Spacecraft {
             orbit,
             dry_mass_kg,
             drag_area_m2,
-            stm: orbit
-                .stm
-                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
-            ..Default::default()
-        }
-    }
-
-    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing control laws whilke ignoring drag and SRP.
-    pub fn from_thruster(
-        orbit: Orbit,
-        dry_mass_kg: f64,
-        fuel_mass_kg: f64,
-        thruster: Thruster,
-        init_mode: GuidanceMode,
-    ) -> Self {
-        Self {
-            orbit,
-            dry_mass_kg,
-            fuel_mass_kg,
-            thruster: Some(thruster),
-            mode: init_mode,
             stm: orbit
                 .stm
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
@@ -224,13 +219,6 @@ impl Spacecraft {
         me
     }
 
-    /// Returns a copy of the state with the provided guidance mode
-    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
-        let mut me = self;
-        me.mode = mode;
-        me
-    }
-
     /// Returns the root sum square error between this spacecraft and the other, in kilometers for the position, kilometers per second in velocity, and kilograms in fuel
     pub fn rss(&self, other: &Self) -> (f64, f64, f64) {
         let (p, v) = rss_orbit_errors(&self.orbit, &other.orbit);
@@ -260,8 +248,8 @@ impl Spacecraft {
     }
 }
 
-impl PartialEq for Spacecraft {
-    fn eq(&self, other: &Spacecraft) -> bool {
+impl<X: SpacecraftExt> PartialEq for BaseSpacecraft<X> {
+    fn eq(&self, other: &Self) -> bool {
         let mass_tol = 1e-6; // milligram
         self.orbit == other.orbit
             && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
@@ -271,7 +259,7 @@ impl PartialEq for Spacecraft {
     }
 }
 
-impl fmt::Display for Spacecraft {
+impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let decimals = f.precision().unwrap_or(6);
         write!(
@@ -283,7 +271,7 @@ impl fmt::Display for Spacecraft {
     }
 }
 
-impl fmt::LowerExp for Spacecraft {
+impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let decimals = f.precision().unwrap_or(6);
         write!(
@@ -295,7 +283,7 @@ impl fmt::LowerExp for Spacecraft {
     }
 }
 
-impl fmt::UpperExp for Spacecraft {
+impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let decimals = f.precision().unwrap_or(6);
         write!(
@@ -307,7 +295,7 @@ impl fmt::UpperExp for Spacecraft {
     }
 }
 
-impl fmt::LowerHex for Spacecraft {
+impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let decimals = f.precision().unwrap_or(6);
         write!(
@@ -319,7 +307,7 @@ impl fmt::LowerHex for Spacecraft {
     }
 }
 
-impl fmt::UpperHex for Spacecraft {
+impl<X: SpacecraftExt> fmt::UpperHex for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let decimals = f.precision().unwrap_or(6);
         write!(
@@ -331,7 +319,7 @@ impl fmt::UpperHex for Spacecraft {
     }
 }
 
-impl State for Spacecraft {
+impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
     type Size = Const<9>;
     type VecLength = Const<90>;
 
@@ -438,7 +426,7 @@ impl State for Spacecraft {
     }
 }
 
-impl Add<OVector<f64, Const<6>>> for Spacecraft {
+impl<X: SpacecraftExt> Add<OVector<f64, Const<6>>> for BaseSpacecraft<X> {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
@@ -455,7 +443,7 @@ impl Add<OVector<f64, Const<6>>> for Spacecraft {
     }
 }
 
-impl Add<OVector<f64, Const<9>>> for Spacecraft {
+impl<X: SpacecraftExt> Add<OVector<f64, Const<9>>> for BaseSpacecraft<X> {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
@@ -472,5 +460,43 @@ impl Add<OVector<f64, Const<9>>> for Spacecraft {
         me.fuel_mass_kg += other[8];
 
         me
+    }
+}
+
+impl Spacecraft {
+    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing control laws whilke ignoring drag and SRP.
+    pub fn from_thruster(
+        orbit: Orbit,
+        dry_mass_kg: f64,
+        fuel_mass_kg: f64,
+        thruster: Thruster,
+        init_mode: GuidanceMode,
+    ) -> Self {
+        Self {
+            orbit,
+            dry_mass_kg,
+            fuel_mass_kg,
+            thruster: Some(thruster),
+            extra: init_mode,
+            stm: orbit
+                .stm
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            ..Default::default()
+        }
+    }
+
+    /// Returns a copy of the state with the provided guidance mode
+    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
+        let mut me = self;
+        me.extra = mode;
+        me
+    }
+
+    pub fn mode(&self) -> GuidanceMode {
+        self.extra
+    }
+
+    pub fn mut_mode(&mut self, mode: GuidanceMode) {
+        self.extra = mode;
     }
 }

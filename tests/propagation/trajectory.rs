@@ -223,14 +223,14 @@ fn traj_spacecraft() {
     for mut sc_state in traj.every(1 * TimeUnit::Day) {
         // We need to evaluate the mode of this state because the trajectory does not store discrete information
         ruggiero_ctrl.next(&mut sc_state);
-        if sc_state.mode != prev_mode {
+        if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
                 prev_mode,
-                sc_state.mode,
+                sc_state.mode(),
                 sc_state.epoch()
             );
-            prev_mode = sc_state.mode;
+            prev_mode = sc_state.mode();
         }
     }
 
@@ -238,12 +238,14 @@ fn traj_spacecraft() {
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
         let mut sc_state = traj.at(epoch).unwrap();
         ruggiero_ctrl.next(&mut sc_state);
-        if sc_state.mode != prev_mode {
+        if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
-                prev_mode, sc_state.mode, epoch
+                prev_mode,
+                sc_state.mode(),
+                epoch
             );
-            prev_mode = sc_state.mode;
+            prev_mode = sc_state.mode();
         }
     }
 

@@ -592,7 +592,7 @@ impl GuidanceLaw for Mnvr {
     fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
-        match osc.mode {
+        match osc.mode() {
             GuidanceMode::Thrust => {
                 if self.start <= osc.epoch() {
                     if matches!(self.frame, Frame::Inertial) {
@@ -610,7 +610,7 @@ impl GuidanceLaw for Mnvr {
     }
 
     fn throttle(&self, osc: &Spacecraft) -> f64 {
-        match osc.mode {
+        match osc.mode() {
             GuidanceMode::Thrust => {
                 if osc.epoch() < self.start || osc.epoch() > self.end {
                     0.0
@@ -628,9 +628,9 @@ impl GuidanceLaw for Mnvr {
     fn next(&self, sc: &mut Spacecraft) {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
         if sc.epoch() < self.start || sc.epoch() > self.end {
-            sc.mode = GuidanceMode::Coast;
+            sc.mut_mode(GuidanceMode::Coast);
         } else {
-            sc.mode = GuidanceMode::Thrust;
+            sc.mut_mode(GuidanceMode::Thrust);
         }
     }
 }

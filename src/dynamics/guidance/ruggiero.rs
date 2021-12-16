@@ -76,9 +76,9 @@ impl GuidanceLaw for Ruggiero {
     }
 
     fn direction(&self, sc: &Spacecraft) -> Vector3<f64> {
-        if sc.mode == GuidanceMode::Coast {
+        if sc.mode() == GuidanceMode::Coast {
             Vector3::zeros()
-        } else if sc.mode == GuidanceMode::Thrust {
+        } else if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut ctrl = Vector3::zeros();
             for obj in self.objectives.iter().flatten() {
@@ -160,15 +160,15 @@ impl GuidanceLaw for Ruggiero {
             // Convert to inertial -- this whole control is computed in the RCN frame
             osc.dcm_from_traj_frame(Frame::RCN).unwrap() * ctrl
         } else {
-            panic!("Unsupported guidance mode {:?}", sc.mode);
+            panic!("Unsupported guidance mode {:?}", sc.mode());
         }
     }
 
     // Either thrust full power or not at all
     fn throttle(&self, sc: &Spacecraft) -> f64 {
-        if sc.mode == GuidanceMode::Coast {
+        if sc.mode() == GuidanceMode::Coast {
             0.0
-        } else if sc.mode == GuidanceMode::Thrust {
+        } else if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             for obj in self.objectives.iter().flatten() {
                 match *obj {
@@ -207,22 +207,22 @@ impl GuidanceLaw for Ruggiero {
             }
             0.0
         } else {
-            panic!("Unsupported guidance mode {:?}", sc.mode);
+            panic!("Unsupported guidance mode {:?}", sc.mode());
         }
     }
 
     /// Update the state for the next iteration
     fn next(&self, sc: &mut Spacecraft) {
         if self.throttle(sc) > 0.0 {
-            if sc.mode == GuidanceMode::Coast {
+            if sc.mode() == GuidanceMode::Coast {
                 info!("enabling control: {:x}", sc.orbit);
             }
-            sc.mode = GuidanceMode::Thrust;
+            sc.mut_mode(GuidanceMode::Thrust);
         } else {
-            if sc.mode == GuidanceMode::Thrust {
+            if sc.mode() == GuidanceMode::Thrust {
                 info!("disabling control: {:x}", sc.orbit);
             }
-            sc.mode = GuidanceMode::Coast;
+            sc.mut_mode(GuidanceMode::Coast);
         }
     }
 }
@@ -264,7 +264,7 @@ fn ruggiero_weight() {
 
     let mut osc_sc = Spacecraft::new(osc, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     // Must set the guidance mode to thrusting otherwise the direction will be set to zero.
-    osc_sc.mode = GuidanceMode::Thrust;
+    osc_sc.mut_mode(GuidanceMode::Thrust);
 
     let expected = Vector3::new(
         -0.017_279_636_133_108_3,

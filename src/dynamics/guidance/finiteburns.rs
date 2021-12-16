@@ -41,7 +41,7 @@ impl GuidanceLaw for FiniteBurns {
     fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
-        match osc.mode {
+        match osc.mode() {
             GuidanceMode::Custom(mnvr_no) => {
                 let next_mnvr = self.mnvrs[mnvr_no as usize];
                 if next_mnvr.start <= osc.epoch() {
@@ -60,7 +60,7 @@ impl GuidanceLaw for FiniteBurns {
     }
 
     fn throttle(&self, osc: &Spacecraft) -> f64 {
-        match osc.mode {
+        match osc.mode() {
             GuidanceMode::Custom(mnvr_no) => {
                 let next_mnvr = self.mnvrs[mnvr_no as usize];
                 if next_mnvr.start <= osc.epoch() {
@@ -78,30 +78,30 @@ impl GuidanceLaw for FiniteBurns {
 
     fn next(&self, sc: &mut Spacecraft) {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
-        match sc.mode {
+        match sc.mode() {
             GuidanceMode::Custom(mnvr_no) => {
                 if (mnvr_no as usize) < self.mnvrs.len() {
                     let cur_mnvr = self.mnvrs[mnvr_no as usize];
                     if sc.epoch() >= cur_mnvr.end {
                         if mnvr_no as usize == self.mnvrs.len() - 1 {
                             // No following maneuver, so let's coast from now on.
-                            sc.mode = GuidanceMode::Coast;
+                            sc.mut_mode(GuidanceMode::Coast);
                         } else {
-                            sc.mode = GuidanceMode::Custom(mnvr_no + 1);
+                            sc.mut_mode(GuidanceMode::Custom(mnvr_no + 1));
                         }
                     } else {
                         // Stay on the current maneuver
-                        sc.mode = GuidanceMode::Custom(mnvr_no);
+                        sc.mut_mode(GuidanceMode::Custom(mnvr_no));
                     }
                 } else {
                     // We're done with all the maneuvers, so we can coast now
-                    sc.mode = GuidanceMode::Coast;
+                    sc.mut_mode(GuidanceMode::Coast);
                 }
             }
             _ => {
                 // If we haven't started the maneuvers yet, let's get ready to do so by switching to the mode
                 // which will start the first maneuver
-                sc.mode = GuidanceMode::Custom(0);
+                sc.mut_mode(GuidanceMode::Custom(0));
             }
         }
     }
