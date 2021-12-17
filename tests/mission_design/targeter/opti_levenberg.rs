@@ -30,18 +30,23 @@ fn tgt_levenberg_sma_from_apo() {
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
     let xf_desired_ecc = 0.40;
-    let xf_desired_aop = 60.0;
+    let xf_desired_inc = 28.526111;
 
     // Define the objective
     let objectives = [
         Objective::new(StateParameter::SMA, xf_desired_sma),
-        Objective::new(StateParameter::AoP, xf_desired_aop),
         Objective::new(StateParameter::Eccentricity, xf_desired_ecc),
+        Objective::new(StateParameter::Inclination, xf_desired_inc),
     ];
 
     let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
+
+    let sol_fd = tgt
+        .try_achieve_fd(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .unwrap();
+    println!("FD: {}", sol_fd);
 
     tgt.minimize(spacecraft, orig_dt, orig_dt + target_delta_t)
         .unwrap();

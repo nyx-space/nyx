@@ -419,16 +419,15 @@ where
                 *jac_val = (this_achieved - achieved) / var.perturbation;
             });
 
-            for (j, var, jac_val) in &pert_calc {
-                println!(
-                    "jac[({}, {})] = {} for {:?} and {:?}",
-                    i, *j, jac_val, var, obj
-                );
+            for (j, _, jac_val) in &pert_calc {
                 self.jacobian[(i, *j)] = *jac_val;
             }
         }
 
-        println!("resid: {}", self.residuals);
+        // println!("resid: {}", self.residuals);
+        for obj in &objmsg {
+            info!("{}", obj);
+        }
     }
 
     fn params(&self) -> SVector<f64, V> {
@@ -498,7 +497,7 @@ where
         instance.set_params(&initial_control);
         println!("Init resid: {}", instance.residuals);
         let (result, report) = LevenbergMarquardt::new()
-            .with_patience(10)
+            .with_patience(50)
             .minimize(instance);
 
         println!("{:?}", report);

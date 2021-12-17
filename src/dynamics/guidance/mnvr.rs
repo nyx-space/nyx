@@ -58,7 +58,7 @@ impl fmt::Display for Mnvr {
     /// Prints the polynomial with the least significant coefficients first
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.end - self.start >= 1 * TimeUnit::Millisecond {
+        if (self.end - self.start).abs() >= 1 * TimeUnit::Millisecond {
             let start_vec = self.vector(self.start);
             let end_vec = self.vector(self.end);
             write!(
@@ -517,6 +517,11 @@ impl Mnvr {
         self.end - self.start
     }
 
+    /// Return whether this is an antichronological maneuver
+    pub fn antichronological(&self) -> bool {
+        self.duration().abs() > 1.microseconds() && self.duration() < 1.microseconds()
+    }
+
     /// Returns the direction of the burn at the start of the burn, useful for setting new angles
     pub fn direction(&self) -> Vector3<f64> {
         let alpha = self.alpha_inplane_radians.coeff_in_order(0).unwrap();
@@ -594,7 +599,9 @@ impl GuidanceLaw for Mnvr {
         // so we let that function handle starting and stopping of the maneuver.
         match osc.mode {
             GuidanceMode::Thrust => {
-                if self.start <= osc.epoch() {
+                if (self.start <= osc.epoch() && !self.antichronological())
+                    || (self.end <= osc.epoch() && self.antichronological())
+                {
                     if matches!(self.frame, Frame::Inertial) {
                         self.vector(osc.epoch())
                     } else {
@@ -612,7 +619,11 @@ impl GuidanceLaw for Mnvr {
     fn throttle(&self, osc: &Spacecraft) -> f64 {
         match osc.mode {
             GuidanceMode::Thrust => {
-                if osc.epoch() < self.start || osc.epoch() > self.end {
+                if ((osc.epoch() < self.start || osc.epoch() > self.end)
+                    && !self.antichronological())
+                    || ((osc.epoch() < self.end || osc.epoch() > self.start)
+                        && self.antichronological())
+                {
                     0.0
                 } else {
                     self.thrust_lvl
@@ -627,7 +638,9 @@ impl GuidanceLaw for Mnvr {
 
     fn next(&self, sc: &Spacecraft) -> GuidanceMode {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
-        if sc.epoch() < self.start || sc.epoch() > self.end {
+        if ((sc.epoch() < self.start || sc.epoch() > self.end) && !self.antichronological())
+            || ((sc.epoch() < self.end || sc.epoch() > self.start) && self.antichronological())
+        {
             GuidanceMode::Coast
         } else {
             GuidanceMode::Thrust

@@ -69,7 +69,6 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         // Store the total correction in Vector3
         let mut total_correction = SVector::<f64, V>::zeros();
 
-        // Create a default maneuver that will only be used if a finite burn is being targeted
         let mut mnvr = Mnvr {
             start: correction_epoch,
             end: achievement_epoch,

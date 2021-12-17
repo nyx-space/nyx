@@ -157,10 +157,8 @@ fn val_transfer_schedule_depl() {
     let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
-    let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
-        .with(sc_state)
-        .for_duration(prop_time)
-        .unwrap();
+    let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+    let final_state = setup.with(sc_state).for_duration(prop_time).unwrap();
 
     // Compute the errors
     let rslt = Orbit::cartesian(
@@ -198,4 +196,35 @@ fn val_transfer_schedule_depl() {
     let delta_fuel_mass = (final_state.fuel_mass_kg - rslt_fuel_mass).abs();
     println!("Absolute fuel mass error: {:.0e} kg", delta_fuel_mass);
     assert!(delta_fuel_mass < 2e-10, "incorrect fuel mass");
+
+    // Now, test that backward propagation of maneuvers also works.
+    let backward_state = setup.with(final_state).for_duration(-prop_time).unwrap();
+    println!("Reached: {}\nWanted:  {}", backward_state, sc_state);
+
+    let (err_r, err_v) = rss_orbit_vec_errors(
+        &backward_state.orbit.to_cartesian_vec(),
+        &sc_state.orbit.to_cartesian_vec(),
+    );
+    println!("Backprop Absolute errors");
+    let delta = backward_state.orbit.to_cartesian_vec() - sc_state.orbit.to_cartesian_vec();
+    for i in 0..6 {
+        print!("{:.0e}\t", delta[i].abs());
+    }
+    println!();
+
+    println!(
+        "RSS errors:\tpos = {:.5e} km\tvel = {:.5e} km/s",
+        err_r, err_v,
+    );
+
+    assert!(
+        err_r < 1.0,
+        "finite burn backprop position wrong: {:.5e}",
+        err_r
+    );
+    assert!(
+        err_v < 1e-3,
+        "finite burn backprop velocity wrong: {:.5e}",
+        err_v
+    );
 }
