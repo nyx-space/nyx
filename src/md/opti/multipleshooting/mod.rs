@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod ctrlnodes;
-pub mod multishoot;
 pub mod altitude_heuristic;
+pub mod ctrlnodes;
 pub mod equidistant_heuristic;
+pub mod multishoot;
 
 /// Built-in cost functions to minimize
 #[derive(Copy, Clone, Debug, PartialEq)]
