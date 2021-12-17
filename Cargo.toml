@@ -49,6 +49,7 @@ rand_pcg = "0.3"
 yaserde = "0.7.0"
 yaserde_derive = "0.7.0"
 levenberg-marquardt = "0.11"
+either = "1.6.1"
 
 [features]
 broken-donotuse = []

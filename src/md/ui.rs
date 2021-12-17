@@ -357,7 +357,7 @@ where
                     },
                 };
                 let (_, traj) =
-                    prop.until_event(max_duration, &event, prop_event.hits.unwrap_or(0))?;
+                    prop.until_nth_event(max_duration, &event, prop_event.hits.unwrap_or(0))?;
                 traj
             }
             None => {
