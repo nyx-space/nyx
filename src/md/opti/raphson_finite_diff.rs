@@ -560,12 +560,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         }
                         Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                             let mut vector = mnvr.rate();
-                            vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                            vector[(var.component.vec_index() - 1) % 3] += corr;
                             mnvr.set_rate(vector);
                         }
                         Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                             let mut vector = mnvr.accel();
-                            vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                            vector[(var.component.vec_index() - 1) % 3] += corr;
                             mnvr.set_accel(vector);
                         }
                         Vary::ThrustLevel => {

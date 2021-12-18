@@ -197,6 +197,8 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize>
                 }
             }
 
+            println!("{}", outer_jacobian);
+
             // Build the cost vector
             for i in 0..self.targets.len() {
                 for j in 0..3 {

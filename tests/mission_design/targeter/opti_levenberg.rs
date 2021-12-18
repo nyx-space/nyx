@@ -39,6 +39,8 @@ fn tgt_levenberg_sma_from_apo() {
         Objective::new(StateParameter::Inclination, xf_desired_inc),
     ];
 
+    println!("Init SC: {}", spacecraft);
+
     let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
@@ -48,8 +50,15 @@ fn tgt_levenberg_sma_from_apo() {
         .unwrap();
     println!("FD: {}", sol_fd);
 
-    tgt.minimize(spacecraft, orig_dt, orig_dt + target_delta_t)
-        .unwrap();
+    println!("Init SC: {}", spacecraft);
+
+    tgt.minimize(
+        spacecraft,
+        orig_dt,
+        orig_dt + target_delta_t,
+        sol_fd.correction,
+    )
+    .unwrap();
 
     // let gmat_sol = 0.05312024615278713;
     // // GMAT validation

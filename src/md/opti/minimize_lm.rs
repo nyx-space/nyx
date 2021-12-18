@@ -19,7 +19,6 @@
 extern crate levenberg_marquardt;
 
 use super::optimizer::Optimizer;
-use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
 use crate::linalg::{storage::Owned, Const, SMatrix, SVector, Vector6};
@@ -32,7 +31,6 @@ use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use hifitime::TimeUnitHelper;
 use levenberg_marquardt::{LeastSquaresProblem, LevenbergMarquardt};
-use std::time::Instant;
 
 /// N: number of variables; M: number of objectives
 pub struct OptimizerInstance<'a, E: ErrorCtrl, const N: usize, const M: usize>
@@ -62,8 +60,223 @@ where
     /// The control solution to this problem.
     pub control: SVector<f64, N>,
     pub residuals: SVector<f64, M>,
-    // pub jacobian: SMatrix<f64, O, V>,
     pub jacobian: SMatrix<f64, M, N>,
+}
+
+impl<'a, E: ErrorCtrl, const V: usize, const O: usize> OptimizerInstance<'a, E, V, O>
+where
+    Const<V>: ToTypenum,
+    Const<O>: ToTypenum,
+    Const<O>: DimMin<Const<V>, Output = Const<V>> + DimMax<Const<V>, Output = Const<V>>,
+{
+    /// Compute the residuals for the given control
+    pub fn residuals_for_ctrl(
+        &self,
+        attempted_control: &SVector<f64, V>,
+    ) -> Result<SVector<f64, O>, NyxError> {
+        // Start by applying the control to the initial spacecraft
+
+        // Create a maneuver in case we need it (finite burn targeting)
+        let mut mnvr = Mnvr {
+            start: self.correction_epoch,
+            end: self.achievement_epoch,
+            thrust_lvl: 1.0,
+            alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+            frame: Frame::RCN,
+        };
+
+        // Create a full state correction in case we need that too
+        let mut state_correction = Vector6::<f64>::zeros();
+        let mut finite_burn_target = false;
+
+        let mut delta = *attempted_control;
+        println!("ctrl = {}", attempted_control);
+        for (i, var) in self.variables.iter().enumerate() {
+            info!(
+                "Correction {:?}{} (element {}): {}",
+                var.component,
+                match self.correction_frame {
+                    Some(f) => format!(" in {:?}", f),
+                    None => format!(""),
+                },
+                i,
+                delta[i]
+            );
+
+            let corr = delta[i];
+
+            if var.component.is_finite_burn() {
+                finite_burn_target = true;
+                // Modify the maneuver, but do not change the epochs of the maneuver unless the change is greater than one millisecond
+                match var.component {
+                    Vary::Duration => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let init_duration_s =
+                                (self.correction_epoch - self.achievement_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
+                            mnvr.end = mnvr.start + acceptable_corr;
+                        }
+                    }
+                    Vary::EndEpoch => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let total_end_corr =
+                                (mnvr.end + corr.seconds() - self.achievement_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
+                            mnvr.end = mnvr.end + acceptable_corr;
+                        }
+                    }
+                    Vary::StartEpoch => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let total_start_corr =
+                                (mnvr.start + corr.seconds() - self.correction_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
+                            mnvr.end = mnvr.end + acceptable_corr;
+
+                            mnvr.start = mnvr.start + corr.seconds()
+                        }
+                    }
+                    Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
+                        mnvr.alpha_inplane_radians = mnvr
+                            .alpha_inplane_radians
+                            .add_val_in_order(corr, var.component.vec_index())
+                            .unwrap();
+                    }
+                    Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
+                        mnvr.delta_outofplane_radians = mnvr
+                            .delta_outofplane_radians
+                            .add_val_in_order(corr, var.component.vec_index())
+                            .unwrap();
+                    }
+                    Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
+                        let mut vector = mnvr.direction();
+                        vector[var.component.vec_index()] += corr;
+                        var.ensure_bounds(&mut vector[var.component.vec_index()]);
+                        mnvr.set_direction(vector);
+                    }
+                    Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
+                        let mut vector = mnvr.rate();
+                        vector[(var.component.vec_index() - 1) % 3] += corr;
+                        mnvr.set_rate(vector);
+                    }
+                    Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
+                        let mut vector = mnvr.accel();
+                        vector[(var.component.vec_index() - 1) % 3] += corr;
+                        mnvr.set_accel(vector);
+                    }
+                    Vary::ThrustLevel => {
+                        mnvr.thrust_lvl -= corr;
+                        var.ensure_bounds(&mut mnvr.thrust_lvl);
+                    }
+                    _ => unreachable!(),
+                }
+            } else {
+                state_correction[var.component.vec_index()] += delta[i];
+            }
+        }
+
+        let mut xi = self.spacecraft;
+
+        if !finite_burn_target {
+            xi.orbit = xi.orbit + state_correction;
+            println!("Corrected state: {}", xi);
+        }
+
+        // Now that we have updated the state or the finite burn, let's propagate until the achievement epoch.
+        let xf = if finite_burn_target {
+            info!("{}", mnvr);
+            let mut prop = self.prop.clone();
+            let prop_opts = prop.opts;
+            let pre_mnvr = prop.with(xi).until_epoch(mnvr.start)?;
+            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+            prop.set_max_step(mnvr.duration());
+            let post_mnvr = prop
+                .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
+                .until_epoch(mnvr.end)?;
+            // Reset the propagator options to their previous configuration
+            prop.opts = prop_opts;
+            // And propagate until the achievement epoch
+            prop.with(post_mnvr)
+                .until_epoch(self.achievement_epoch)?
+                .orbit
+        } else {
+            self.prop
+                .with(xi)
+                .until_epoch(self.achievement_epoch)?
+                .orbit
+        };
+
+        let xf_dual_obj_frame = match &self.objective_frame {
+            Some((frame, cosm)) => {
+                let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
+                OrbitDual::from(orbit_obj_frame)
+            }
+            None => OrbitDual::from(xf),
+        };
+
+        // Build the logging information
+        let max_obj_val = self
+            .objectives
+            .iter()
+            .map(|obj| {
+                (obj.desired_value.abs().ceil() as i32
+                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)) as i32
+            })
+            .max()
+            .unwrap();
+
+        let max_obj_tol = self
+            .objectives
+            .iter()
+            .map(|obj| obj.tolerance.log10().abs().ceil() as usize)
+            .max()
+            .unwrap();
+
+        let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
+
+        // Build the error vector
+        let mut residuals = SVector::<f64, O>::zeros();
+        let mut converged = true;
+
+        // Build debugging information
+        let mut objmsg = Vec::with_capacity(self.objectives.len());
+
+        for (i, obj) in self.objectives.iter().enumerate() {
+            let partial = if obj.parameter.is_b_plane() {
+                let b_plane = BPlane::from_dual(xf_dual_obj_frame)?;
+                match obj.parameter {
+                    StateParameter::BdotR => b_plane.b_r,
+                    StateParameter::BdotT => b_plane.b_t,
+                    StateParameter::BLTOF => b_plane.ltof_s,
+                    _ => unreachable!(),
+                }
+            } else {
+                xf_dual_obj_frame.partial_for(&obj.parameter)?
+            };
+
+            let achieved = partial.real();
+
+            let (ok, param_err) = obj.assess_raw(achieved);
+            if !ok {
+                converged = false;
+            }
+            residuals[i] = param_err;
+
+            objmsg.push(format!(
+                "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t scaled error = {:>width$.prec$}",
+                obj.parameter,
+                achieved,
+                obj.desired_value,
+                param_err, width=width, prec=max_obj_tol
+            ));
+        }
+
+        dbg!(converged);
+        Ok(residuals)
+    }
 }
 
 // We implement a trait for every problem we want to solve
@@ -79,10 +292,11 @@ where
     type JacobianStorage = Owned<f64, Const<O>, Const<V>>;
 
     fn set_params(&mut self, attempted_control: &SVector<f64, V>) {
+        self.residuals = self.residuals_for_ctrl(attempted_control).unwrap();
         // TODO: Switch methods based on whether the finite differencing is requested
         // do common calculations for residuals and the Jacobian here
 
-        println!("Ctrl: {}", attempted_control);
+        // println!("Ctrl: {}", attempted_control);
         self.control = *attempted_control;
 
         let mut is_bplane_tgt = false;
@@ -457,27 +671,8 @@ where
         initial_state: Spacecraft,
         correction_epoch: Epoch,
         achievement_epoch: Epoch,
+        initial_control: SVector<f64, V>,
     ) -> Result<(), NyxError> {
-        // Check the variables and builds the initial guess
-        let mut initial_control = SVector::<f64, V>::zeros();
-        // Apply the initial guess
-        for (i, var) in self.variables.iter().enumerate() {
-            // Check the validity (this function will report to log and raise an error)
-            var.valid()?;
-            // Check that there is no attempt to target a position in a local frame
-            if self.correction_frame.is_some() && var.component.vec_index() < 3 {
-                // Then this is a position correction, which is not allowed if a frame is provided!
-                let msg = format!(
-                    "Variable is in frame {} but that frame cannot be used for a {:?} correction",
-                    self.correction_frame.unwrap(),
-                    var.component
-                );
-                error!("{}", msg);
-                return Err(NyxError::Targeter(TargetingError::FrameError(msg)));
-            }
-
-            initial_control[i] = var.init_guess;
-        }
         let mut instance = OptimizerInstance {
             prop: &self.prop.clone(),
             objectives: self.objectives.clone(),
@@ -495,9 +690,15 @@ where
         };
 
         instance.set_params(&initial_control);
-        println!("Init resid: {}", instance.residuals);
+        println!("Init ctrl : {}", instance.control);
+        println!(
+            "Init resid: {}",
+            instance.residuals_for_ctrl(&initial_control).unwrap()
+        );
+
+        unreachable!();
         let (result, report) = LevenbergMarquardt::new()
-            .with_patience(50)
+            .with_patience(2)
             .minimize(instance);
 
         println!("{:?}", report);
