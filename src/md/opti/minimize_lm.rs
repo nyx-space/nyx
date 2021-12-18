@@ -292,39 +292,9 @@ where
     type JacobianStorage = Owned<f64, Const<O>, Const<V>>;
 
     fn set_params(&mut self, attempted_control: &SVector<f64, V>) {
-        self.residuals = self.residuals_for_ctrl(attempted_control).unwrap();
-        // TODO: Switch methods based on whether the finite differencing is requested
-        // do common calculations for residuals and the Jacobian here
+        // Start by applying the control to the initial spacecraft
 
-        // println!("Ctrl: {}", attempted_control);
-        self.control = *attempted_control;
-
-        let mut is_bplane_tgt = false;
-        for obj in &self.objectives {
-            if obj.parameter.is_b_plane() {
-                is_bplane_tgt = true;
-                break;
-            }
-        }
-
-        // Now we know that the problem is correctly defined, so let's propagate as is to the epoch
-        // where the correction should be applied.
-        let xi_start = self
-            .prop
-            .with(self.spacecraft)
-            .until_epoch(self.correction_epoch)
-            .unwrap();
-
-        debug!("xi_start = {}", xi_start);
-
-        let mut xi = xi_start;
-        // We'll store the initial state correction here.
-        let mut state_correction = Vector6::<f64>::zeros();
-
-        // Store the total correction in Vector3
-        let mut total_correction = SVector::<f64, V>::zeros();
-
-        // Create a default maneuver that will only be used if a finite burn is being targeted
+        // Create a maneuver in case we need it (finite burn targeting)
         let mut mnvr = Mnvr {
             start: self.correction_epoch,
             end: self.achievement_epoch,
@@ -334,84 +304,141 @@ where
             frame: Frame::RCN,
         };
 
+        // Create a full state correction in case we need that too
+        let mut state_correction = Vector6::<f64>::zeros();
         let mut finite_burn_target = false;
 
-        // Apply the initial guess
+        let mut delta = *attempted_control;
+        println!("ctrl = {}", attempted_control);
         for (i, var) in self.variables.iter().enumerate() {
-            // Check the validity (this function will report to log and raise an error)
-            var.valid().unwrap();
-            // Check that there is no attempt to target a position in a local frame
-            if self.correction_frame.is_some() && var.component.vec_index() < 3 {
-                // Then this is a position correction, which is not allowed if a frame is provided!
-                let msg = format!(
-                    "Variable is in frame {} but that frame cannot be used for a {:?} correction",
-                    self.correction_frame.unwrap(),
-                    var.component
-                );
-                error!("{}", msg);
-                panic!();
-            }
+            info!(
+                "Correction {:?}{} (element {}): {}",
+                var.component,
+                match self.correction_frame {
+                    Some(f) => format!(" in {:?}", f),
+                    None => format!(""),
+                },
+                i,
+                delta[i]
+            );
 
-            // Check that a thruster is provided since we'll be changing that and the burn duration
+            let corr = delta[i];
+
             if var.component.is_finite_burn() {
-                if xi_start.thruster.is_none() {
-                    // Can't do any conversion to finite burns without a thruster
-                    // return Err(NyxError::CtrlExistsButNoThrusterAvail);
-                    panic!();
-                }
                 finite_burn_target = true;
-                // Modify the default maneuver
+                // Modify the maneuver, but do not change the epochs of the maneuver unless the change is greater than one millisecond
                 match var.component {
-                    Vary::Duration => mnvr.end = mnvr.start + attempted_control[i].seconds(),
-                    Vary::EndEpoch => mnvr.end = mnvr.end + attempted_control[i].seconds(),
-                    Vary::StartEpoch => mnvr.start = mnvr.start + attempted_control[i].seconds(),
+                    Vary::Duration => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let init_duration_s =
+                                (self.correction_epoch - self.achievement_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
+                            mnvr.end = mnvr.start + acceptable_corr;
+                        }
+                    }
+                    Vary::EndEpoch => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let total_end_corr =
+                                (mnvr.end + corr.seconds() - self.achievement_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
+                            mnvr.end = mnvr.end + acceptable_corr;
+                        }
+                    }
+                    Vary::StartEpoch => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let total_start_corr =
+                                (mnvr.start + corr.seconds() - self.correction_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
+                            mnvr.end = mnvr.end + acceptable_corr;
+
+                            mnvr.start = mnvr.start + corr.seconds()
+                        }
+                    }
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
                         mnvr.alpha_inplane_radians = mnvr
                             .alpha_inplane_radians
-                            .add_val_in_order(attempted_control[i], var.component.vec_index())
+                            .add_val_in_order(corr, var.component.vec_index())
                             .unwrap();
                     }
                     Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                         mnvr.delta_outofplane_radians = mnvr
                             .delta_outofplane_radians
-                            .add_val_in_order(attempted_control[i], var.component.vec_index())
+                            .add_val_in_order(corr, var.component.vec_index())
                             .unwrap();
                     }
                     Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
-                        let mut vector = mnvr.vector(mnvr.start);
-                        vector[var.component.vec_index()] = attempted_control[i];
+                        let mut vector = mnvr.direction();
+                        vector[var.component.vec_index()] += corr;
+                        var.ensure_bounds(&mut vector[var.component.vec_index()]);
                         mnvr.set_direction(vector);
                     }
+                    Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
+                        let mut vector = mnvr.rate();
+                        vector[(var.component.vec_index() - 1) % 3] += corr;
+                        mnvr.set_rate(vector);
+                    }
+                    Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
+                        let mut vector = mnvr.accel();
+                        vector[(var.component.vec_index() - 1) % 3] += corr;
+                        mnvr.set_accel(vector);
+                    }
                     Vary::ThrustLevel => {
-                        mnvr.thrust_lvl += attempted_control[i];
+                        mnvr.thrust_lvl -= corr;
+                        var.ensure_bounds(&mut mnvr.thrust_lvl);
                     }
                     _ => unreachable!(),
                 }
-                info!("Initial maneuver guess: {}", mnvr);
             } else {
-                state_correction[var.component.vec_index()] -= attempted_control[i];
-                // Now, let's apply the correction to the initial state
-                if let Some(frame) = self.correction_frame {
-                    // The following will error if the frame is not local
-                    let dcm_vnc2inertial = xi.orbit.dcm_from_traj_frame(frame).unwrap();
-                    let velocity_correction =
-                        dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
-                    xi.orbit.apply_dv(velocity_correction);
-                } else {
-                    xi.orbit.x += state_correction[0];
-                    xi.orbit.y += state_correction[1];
-                    xi.orbit.z += state_correction[2];
-                    xi.orbit.vx += state_correction[3];
-                    xi.orbit.vy += state_correction[4];
-                    xi.orbit.vz += state_correction[5];
-                }
+                state_correction[var.component.vec_index()] += delta[i];
             }
-
-            total_correction[i] += attempted_control[i];
         }
 
-        // Determine padding in debugging info
-        // For the width, we find the largest desired values and multiply it by the order of magnitude of its tolerance
+        let mut xi = self.spacecraft;
+
+        if !finite_burn_target {
+            xi.orbit = xi.orbit + state_correction;
+            println!("Corrected state: {}", xi);
+        }
+
+        // Now that we have updated the state or the finite burn, let's propagate until the achievement epoch.
+        let xf = if finite_burn_target {
+            info!("{}", mnvr);
+            let mut prop = self.prop.clone();
+            let prop_opts = prop.opts;
+            let pre_mnvr = prop.with(xi).until_epoch(mnvr.start).unwrap();
+            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+            prop.set_max_step(mnvr.duration());
+            let post_mnvr = prop
+                .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
+                .until_epoch(mnvr.end)
+                .unwrap();
+            // Reset the propagator options to their previous configuration
+            prop.opts = prop_opts;
+            // And propagate until the achievement epoch
+            prop.with(post_mnvr)
+                .until_epoch(self.achievement_epoch)
+                .unwrap()
+                .orbit
+        } else {
+            self.prop
+                .with(xi)
+                .until_epoch(self.achievement_epoch)
+                .unwrap()
+                .orbit
+        };
+
+        let xf_dual_obj_frame = match &self.objective_frame {
+            Some((frame, cosm)) => {
+                let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
+                OrbitDual::from(orbit_obj_frame)
+            }
+            None => OrbitDual::from(xf),
+        };
+
+        // Build the logging information
         let max_obj_val = self
             .objectives
             .iter()
@@ -431,50 +458,9 @@ where
 
         let width = f64::from(max_obj_val).log10() as usize + 2 + max_obj_tol;
 
-        // Modify each variable by the desired perturbatino, propagate, compute the final parameter, and store how modifying that variable affects the final parameter
-        let cur_xi = xi;
-
-        // If we are targeting a finite burn, let's set propagate in several steps to make sure we don't miss the burn
-        let xf = if finite_burn_target {
-            info!("{}", mnvr);
-            let mut prop = self.prop.clone();
-            let prop_opts = prop.opts;
-            let pre_mnvr = prop.with(cur_xi).until_epoch(mnvr.start).unwrap();
-            prop.dynamics = prop.dynamics.with_ctrl_no_decr(Arc::new(mnvr));
-            prop.set_max_step(mnvr.end - mnvr.start);
-            let post_mnvr = prop
-                .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
-                .until_epoch(mnvr.end)
-                .unwrap();
-            // Reset the propagator options to their previous configuration
-            prop.opts = prop_opts;
-            // And propagate until the achievement epoch
-            prop.with(post_mnvr)
-                .until_epoch(self.achievement_epoch)
-                .unwrap()
-                .orbit
-        } else {
-            self.prop
-                .with(cur_xi)
-                .until_epoch(self.achievement_epoch)
-                .unwrap()
-                .orbit
-        };
-
-        let xf_dual_obj_frame = match &self.objective_frame {
-            Some((frame, cosm)) => {
-                let orbit_obj_frame = cosm.frame_chg(&xf, *frame);
-                OrbitDual::from(orbit_obj_frame)
-            }
-            None => OrbitDual::from(xf),
-        };
-
-        // Build the B-Plane once, if needed, and always in the objective frame
-        let b_plane = if is_bplane_tgt {
-            Some(BPlane::from_dual(xf_dual_obj_frame).unwrap())
-        } else {
-            None
-        };
+        // Build the error vector
+        let mut residuals = SVector::<f64, O>::zeros();
+        let mut converged = true;
 
         // Build debugging information
         let mut objmsg = Vec::with_capacity(self.objectives.len());
@@ -485,10 +471,11 @@ where
 
         for (i, obj) in self.objectives.iter().enumerate() {
             let partial = if obj.parameter.is_b_plane() {
+                let b_plane = BPlane::from_dual(xf_dual_obj_frame).unwrap();
                 match obj.parameter {
-                    StateParameter::BdotR => b_plane.unwrap().b_r,
-                    StateParameter::BdotT => b_plane.unwrap().b_t,
-                    StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                    StateParameter::BdotR => b_plane.b_r,
+                    StateParameter::BdotT => b_plane.b_t,
+                    StateParameter::BLTOF => b_plane.ltof_s,
                     _ => unreachable!(),
                 }
             } else {
@@ -497,14 +484,18 @@ where
 
             let achieved = partial.real();
 
-            self.residuals[i] = obj.assess_raw(achieved).1;
+            let (ok, param_err) = obj.assess_raw(achieved);
+            if !ok {
+                converged = false;
+            }
+            self.residuals[i] = param_err;
 
             objmsg.push(format!(
                 "\t{:?}: achieved = {:>width$.prec$}\t desired = {:>width$.prec$}\t scaled error = {:>width$.prec$}",
                 obj.parameter,
                 achieved,
                 obj.desired_value,
-                self.residuals[i], width=width, prec=max_obj_tol
+                param_err, width=width, prec=max_obj_tol
             ));
 
             let mut pert_calc: Vec<_> = self
@@ -579,7 +570,10 @@ where
 
                 let this_xf = if finite_burn_target {
                     // Propagate normally until start of maneuver
-                    let pre_mnvr = this_prop.with(cur_xi).until_epoch(this_mnvr.start).unwrap();
+                    let pre_mnvr = this_prop
+                        .with(this_xi)
+                        .until_epoch(this_mnvr.start)
+                        .unwrap();
                     // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
                     let prop_opts = this_prop.opts;
                     this_prop.set_max_step(this_mnvr.duration());
@@ -612,17 +606,12 @@ where
                     None => OrbitDual::from(this_xf),
                 };
 
-                let b_plane = if is_bplane_tgt {
-                    Some(BPlane::from_dual(xf_dual_obj_frame).unwrap())
-                } else {
-                    None
-                };
-
                 let partial = if obj.parameter.is_b_plane() {
+                    let b_plane = BPlane::from_dual(xf_dual_obj_frame).unwrap();
                     match obj.parameter {
-                        StateParameter::BdotR => b_plane.unwrap().b_r,
-                        StateParameter::BdotT => b_plane.unwrap().b_t,
-                        StateParameter::BLTOF => b_plane.unwrap().ltof_s,
+                        StateParameter::BdotR => b_plane.b_r,
+                        StateParameter::BdotT => b_plane.b_t,
+                        StateParameter::BLTOF => b_plane.ltof_s,
                         _ => unreachable!(),
                     }
                 } else {
@@ -642,6 +631,7 @@ where
         for obj in &objmsg {
             info!("{}", obj);
         }
+        dbg!(converged);
     }
 
     fn params(&self) -> SVector<f64, V> {
@@ -691,12 +681,8 @@ where
 
         instance.set_params(&initial_control);
         println!("Init ctrl : {}", instance.control);
-        println!(
-            "Init resid: {}",
-            instance.residuals_for_ctrl(&initial_control).unwrap()
-        );
+        println!("Init resid: {}", instance.residuals);
 
-        unreachable!();
         let (result, report) = LevenbergMarquardt::new()
             .with_patience(2)
             .minimize(instance);
