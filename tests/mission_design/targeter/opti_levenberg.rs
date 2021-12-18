@@ -1,5 +1,6 @@
 extern crate nyx_space as nyx;
 
+use nalgebra::Vector3;
 use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
@@ -56,7 +57,7 @@ fn tgt_levenberg_sma_from_apo() {
         spacecraft,
         orig_dt,
         orig_dt + target_delta_t,
-        sol_fd.correction,
+        Vector3::zeros(),
     )
     .unwrap();
 

@@ -684,7 +684,7 @@ where
         println!("Init resid: {}", instance.residuals);
 
         let (result, report) = LevenbergMarquardt::new()
-            .with_patience(2)
+            .with_patience(50)
             .minimize(instance);
 
         println!("{:?}", report);
