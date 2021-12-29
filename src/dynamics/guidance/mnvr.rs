@@ -90,6 +90,15 @@ impl fmt::Display for Mnvr {
 }
 
 impl Mnvr {
+    /// Determines whether this maneuver should be thrusting right now.
+    fn should_thrust(&self, epoch: Epoch) -> bool {
+        if !self.antichronological() {
+            self.start >= epoch && epoch <= self.end
+        } else {
+            self.end >= epoch && epoch <= self.start
+        }
+    }
+
     /// Creates an impulsive maneuver whose vector is the deltaV.
     /// TODO: This should use William's algorithm
     pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>, frame: Frame) -> Self {
@@ -609,24 +618,24 @@ impl GuidanceLaw for Mnvr {
                             * self.vector(osc.epoch())
                     }
                 } else {
+                    error!("Direction will be nil but lvl = {}", self.throttle(osc));
                     Vector3::zeros()
                 }
             }
-            _ => Vector3::zeros(),
+            _ => {
+                error!("Not thrusting");
+                Vector3::zeros()
+            }
         }
     }
 
     fn throttle(&self, osc: &Spacecraft) -> f64 {
         match osc.mode {
             GuidanceMode::Thrust => {
-                if ((osc.epoch() < self.start || osc.epoch() > self.end)
-                    && !self.antichronological())
-                    || ((osc.epoch() < self.end || osc.epoch() > self.start)
-                        && self.antichronological())
-                {
-                    0.0
-                } else {
+                if self.should_thrust(osc.epoch()) {
                     self.thrust_lvl
+                } else {
+                    0.0
                 }
             }
             _ => {
@@ -638,12 +647,10 @@ impl GuidanceLaw for Mnvr {
 
     fn next(&self, sc: &Spacecraft) -> GuidanceMode {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
-        if ((sc.epoch() < self.start || sc.epoch() > self.end) && !self.antichronological())
-            || ((sc.epoch() < self.end || sc.epoch() > self.start) && self.antichronological())
-        {
-            GuidanceMode::Coast
-        } else {
+        if self.should_thrust(sc.epoch()) {
             GuidanceMode::Thrust
+        } else {
+            GuidanceMode::Coast
         }
     }
 }
