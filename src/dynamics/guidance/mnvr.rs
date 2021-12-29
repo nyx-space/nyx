@@ -90,15 +90,6 @@ impl fmt::Display for Mnvr {
 }
 
 impl Mnvr {
-    /// Determines whether this maneuver should be thrusting right now.
-    fn should_thrust(&self, epoch: Epoch) -> bool {
-        if !self.antichronological() {
-            self.start >= epoch && epoch <= self.end
-        } else {
-            self.end >= epoch && epoch <= self.start
-        }
-    }
-
     /// Creates an impulsive maneuver whose vector is the deltaV.
     /// TODO: This should use William's algorithm
     pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>, frame: Frame) -> Self {
@@ -604,50 +595,36 @@ impl Mnvr {
 
 impl GuidanceLaw for Mnvr {
     fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
-        // NOTE: We do not increment the mnvr number here. The power function is called first,
-        // so we let that function handle starting and stopping of the maneuver.
-        match osc.mode {
+        match self.next(osc) {
             GuidanceMode::Thrust => {
-                if (self.start <= osc.epoch() && !self.antichronological())
-                    || (self.end <= osc.epoch() && self.antichronological())
-                {
-                    if matches!(self.frame, Frame::Inertial) {
-                        self.vector(osc.epoch())
-                    } else {
-                        osc.orbit.dcm_from_traj_frame(self.frame).unwrap()
-                            * self.vector(osc.epoch())
-                    }
+                if matches!(self.frame, Frame::Inertial) {
+                    self.vector(osc.epoch())
                 } else {
-                    error!("Direction will be nil but lvl = {}", self.throttle(osc));
-                    Vector3::zeros()
+                    osc.orbit.dcm_from_traj_frame(self.frame).unwrap() * self.vector(osc.epoch())
                 }
             }
-            _ => {
-                error!("Not thrusting");
-                Vector3::zeros()
-            }
+            _ => Vector3::zeros(),
         }
+        // if matches!(self.frame, Frame::Inertial) {
+        //     self.vector(osc.epoch())
+        // } else {
+        //     osc.orbit.dcm_from_traj_frame(self.frame).unwrap() * self.vector(osc.epoch())
+        // }
     }
 
     fn throttle(&self, osc: &Spacecraft) -> f64 {
-        match osc.mode {
-            GuidanceMode::Thrust => {
-                if self.should_thrust(osc.epoch()) {
-                    self.thrust_lvl
-                } else {
-                    0.0
-                }
-            }
+        match self.next(osc) {
+            GuidanceMode::Thrust => self.thrust_lvl,
             _ => {
                 // We aren't in maneuver mode, so return 0% throttle
                 0.0
             }
         }
+        // self.thrust_lvl
     }
 
     fn next(&self, sc: &Spacecraft) -> GuidanceMode {
-        // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
-        if self.should_thrust(sc.epoch()) {
+        if sc.epoch() >= self.start && sc.epoch() < self.end {
             GuidanceMode::Thrust
         } else {
             GuidanceMode::Coast
