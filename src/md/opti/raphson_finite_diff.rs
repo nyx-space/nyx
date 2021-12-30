@@ -283,6 +283,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     let mut this_prop = self.prop.clone();
                     let mut this_mnvr = mnvr;
 
+                    let mut opposed_pert = false;
+
                     if var.component.is_finite_burn() {
                         // Modify the burn itself
                         let pert = var.perturbation;
@@ -318,16 +320,39 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                                 let mut vector = this_mnvr.direction();
                                 vector[var.component.vec_index()] += var.perturbation;
+                                if !var.check_bounds(vector[var.component.vec_index()]).1 {
+                                    // Oops, bound was hit, go the other way
+                                    vector[var.component.vec_index()] -= 2.0 * var.perturbation;
+                                    opposed_pert = true;
+                                }
                                 this_mnvr.set_direction(vector).unwrap();
                             }
                             Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                                 let mut vector = this_mnvr.rate();
                                 vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                                if !var
+                                    .check_bounds(vector[(var.component.vec_index() - 1) % 3])
+                                    .1
+                                {
+                                    // Oops, bound was hit, go the other way
+                                    vector[(var.component.vec_index() - 1) % 3] -=
+                                        2.0 * var.perturbation;
+                                    opposed_pert = true;
+                                }
                                 this_mnvr.set_rate(vector).unwrap();
                             }
                             Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                                 let mut vector = this_mnvr.accel();
                                 vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
+                                if !var
+                                    .check_bounds(vector[(var.component.vec_index() - 1) % 3])
+                                    .1
+                                {
+                                    // Oops, bound was hit, go the other way
+                                    vector[(var.component.vec_index() - 1) % 3] -=
+                                        2.0 * var.perturbation;
+                                    opposed_pert = true;
+                                }
                                 this_mnvr.set_accel(vector).unwrap();
                             }
                             Vary::ThrustLevel => {
@@ -410,6 +435,10 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
                     let this_achieved = partial.real();
                     *jac_val = (this_achieved - achieved) / var.perturbation;
+                    if opposed_pert {
+                        // We opposed the perturbation to ensure we don't over step a min/max bound
+                        *jac_val = -*jac_val;
+                    }
                 });
 
                 for (j, var, jac_val) in &pert_calc {
