@@ -530,8 +530,8 @@ impl Mnvr {
     }
 
     /// Set the time-invariant direction for this finite burn while keeping the other components as they are
-    pub fn set_direction(&mut self, vector: Vector3<f64>) {
-        self.set_direction_and_rates(vector, self.rate(), self.accel());
+    pub fn set_direction(&mut self, vector: Vector3<f64>) -> Result<(), NyxError> {
+        self.set_direction_and_rates(vector, self.rate(), self.accel())
     }
 
     /// Returns the rate of direction of the burn at the start of the burn, useful for setting new angles
@@ -546,8 +546,8 @@ impl Mnvr {
     }
 
     /// Set the rate of direction for this finite burn while keeping the other components as they are
-    pub fn set_rate(&mut self, rate: Vector3<f64>) {
-        self.set_direction_and_rates(self.direction(), rate, self.accel());
+    pub fn set_rate(&mut self, rate: Vector3<f64>) -> Result<(), NyxError> {
+        self.set_direction_and_rates(self.direction(), rate, self.accel())
     }
 
     /// Returns the acceleration of the burn at the start of the burn, useful for setting new angles
@@ -562,8 +562,8 @@ impl Mnvr {
     }
 
     /// Set the acceleration of the direction of this finite burn while keeping the other components as they are
-    pub fn set_accel(&mut self, accel: Vector3<f64>) {
-        self.set_direction_and_rates(self.direction(), self.rate(), accel);
+    pub fn set_accel(&mut self, accel: Vector3<f64>) -> Result<(), NyxError> {
+        self.set_direction_and_rates(self.direction(), self.rate(), accel)
     }
 
     /// Set the initial direction, direction rate, and direction acceleration for this finite burn
@@ -572,24 +572,43 @@ impl Mnvr {
         dir: Vector3<f64>,
         rate: Vector3<f64>,
         accel: Vector3<f64>,
-    ) {
+    ) -> Result<(), NyxError> {
         let (alpha, delta) = ra_dec_from_unit_vector(dir);
+        if alpha.is_nan() || delta.is_nan() {
+            return Err(NyxError::MathDomain(format!(
+                "Invalid finite burn control direction u = [{}, {}, {}] => Alpha = {}, Delta = {}",
+                dir[0], dir[1], dir[2], alpha, delta,
+            )));
+        }
         if rate.norm() < 2e-16 && accel.norm() < 2e-16 {
             self.alpha_inplane_radians = CommonPolynomial::Constant(alpha);
             self.delta_outofplane_radians = CommonPolynomial::Constant(delta);
         } else {
             let (alpha_dt, delta_dt) = ra_dec_from_unit_vector(rate);
+            if alpha_dt.is_nan() || delta_dt.is_nan() {
+                return Err(NyxError::MathDomain(format!(
+                    "Invalid finite burn control rate dot u = [{}, {}, {}] => DotAlpha = {}, DotDelta = {}",
+                    rate[0], rate[1], rate[2], alpha_dt, delta_dt,
+                )));
+            }
             if accel.norm() < 2e-16 {
                 self.alpha_inplane_radians = CommonPolynomial::Linear(alpha_dt, alpha);
                 self.delta_outofplane_radians = CommonPolynomial::Linear(delta_dt, delta);
             } else {
                 let (alpha_ddt, delta_ddt) = ra_dec_from_unit_vector(accel);
+                if alpha_ddt.is_nan() || delta_ddt.is_nan() {
+                    return Err(NyxError::MathDomain(format!(
+                        "Invalid finite burn control acceleration ddot u = [{}, {}, {}] => DDotAlpha = {}, DDotDelta = {}",
+                        accel[0], accel[1], accel[2], alpha_ddt, delta_ddt,
+                    )));
+                }
                 self.alpha_inplane_radians =
                     CommonPolynomial::Quadratic(alpha_ddt, alpha_dt, alpha);
                 self.delta_outofplane_radians =
                     CommonPolynomial::Quadratic(delta_ddt, delta_dt, delta);
             }
         }
+        Ok(())
     }
 }
 

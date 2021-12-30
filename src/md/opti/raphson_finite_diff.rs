@@ -123,17 +123,17 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                         let mut vector = mnvr.direction();
                         vector[var.component.vec_index()] += var.perturbation;
-                        mnvr.set_direction(vector);
+                        mnvr.set_direction(vector)?;
                     }
                     Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                         let mut vector = mnvr.rate();
                         vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
-                        mnvr.set_rate(vector);
+                        mnvr.set_rate(vector)?;
                     }
                     Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                         let mut vector = mnvr.accel();
                         vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
-                        mnvr.set_accel(vector);
+                        mnvr.set_accel(vector)?;
                     }
                     Vary::ThrustLevel => {
                         mnvr.thrust_lvl += var.perturbation;
@@ -318,17 +318,17 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                                 let mut vector = this_mnvr.direction();
                                 vector[var.component.vec_index()] += var.perturbation;
-                                this_mnvr.set_direction(vector);
+                                this_mnvr.set_direction(vector).unwrap();
                             }
                             Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                                 let mut vector = this_mnvr.rate();
                                 vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
-                                this_mnvr.set_rate(vector);
+                                this_mnvr.set_rate(vector).unwrap();
                             }
                             Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                                 let mut vector = this_mnvr.accel();
                                 vector[(var.component.vec_index() - 1) % 3] += var.perturbation;
-                                this_mnvr.set_accel(vector);
+                                this_mnvr.set_accel(vector).unwrap();
                             }
                             Vary::ThrustLevel => {
                                 this_mnvr.thrust_lvl += var.perturbation;
@@ -556,17 +556,21 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             let mut vector = mnvr.direction();
                             vector[var.component.vec_index()] += corr;
                             var.ensure_bounds(&mut vector[var.component.vec_index()]);
-                            mnvr.set_direction(vector);
+                            mnvr.set_direction(vector)?;
                         }
                         Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                             let mut vector = mnvr.rate();
-                            vector[(var.component.vec_index() - 1) % 3] += corr;
-                            mnvr.set_rate(vector);
+                            let idx = (var.component.vec_index() - 1) % 3;
+                            vector[idx] += corr;
+                            var.ensure_bounds(&mut vector[idx]);
+                            mnvr.set_rate(vector)?;
                         }
                         Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
                             let mut vector = mnvr.accel();
-                            vector[(var.component.vec_index() - 1) % 3] += corr;
-                            mnvr.set_accel(vector);
+                            let idx = (var.component.vec_index() - 1) % 3;
+                            vector[idx] += corr;
+                            var.ensure_bounds(&mut vector[idx]);
+                            mnvr.set_accel(vector)?;
                         }
                         Vary::ThrustLevel => {
                             mnvr.thrust_lvl -= corr;

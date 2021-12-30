@@ -93,6 +93,8 @@ pub enum NyxError {
     TimeError(TimeErrors),
     Targeter(TargetingError),
     Trajectory(TrajError),
+    /// Some math domain error, e.g. the arcsin of a number that isn't within [-1; 1]
+    MathDomain(String),
 }
 
 impl fmt::Display for NyxError {
