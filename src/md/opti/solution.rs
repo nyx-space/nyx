@@ -16,10 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use hifitime::TimeUnitHelper;
+
+use crate::dynamics::guidance::Mnvr;
 use crate::linalg::SVector;
 use crate::md::objective::Objective;
 use crate::md::ui::*;
 pub use crate::md::{Variable, Vary};
+use crate::polyfit::CommonPolynomial;
 use std::fmt;
 use std::time::Duration;
 
@@ -42,6 +46,114 @@ pub struct TargeterSolution<const V: usize, const O: usize> {
     pub iterations: usize,
     /// Computation duration
     pub computation_dur: Duration,
+}
+
+impl<const V: usize, const O: usize> TargeterSolution<V, O> {
+    /// Returns whether this solution is a finite burn solution or not
+    pub fn is_finite_burn(&self) -> bool {
+        for var in &self.variables {
+            if var.component.is_finite_burn() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Returns a maneuver if targeter solution was a finite burn maneuver
+    pub fn to_mnvr(&self) -> Result<Mnvr, NyxError> {
+        if !self.is_finite_burn() {
+            Err(NyxError::CustomError(
+                "Not a finite burn solution".to_string(),
+            ))
+        } else {
+            let correction_epoch = self.corrected_state.epoch();
+            let achievement_epoch = self.achieved_state.epoch();
+            let mut mnvr = Mnvr {
+                start: correction_epoch,
+                end: achievement_epoch,
+                thrust_lvl: 1.0,
+                alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+                delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
+                frame: Frame::RCN,
+            };
+
+            for (i, var) in self.variables.iter().enumerate() {
+                let corr = self.correction[i];
+
+                // Modify the maneuver, but do not change the epochs of the maneuver unless the change is greater than one millisecond
+                match var.component {
+                    Vary::Duration => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let init_duration_s =
+                                (correction_epoch - achievement_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
+                            mnvr.end = mnvr.start + acceptable_corr;
+                        }
+                    }
+                    Vary::EndEpoch => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let total_end_corr =
+                                (mnvr.end + corr.seconds() - achievement_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
+                            mnvr.end = mnvr.end + acceptable_corr;
+                        }
+                    }
+                    Vary::StartEpoch => {
+                        if corr.abs() > 1e-3 {
+                            // Check that we are within the bounds
+                            let total_start_corr =
+                                (mnvr.start + corr.seconds() - correction_epoch).in_seconds();
+                            let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
+                            mnvr.end = mnvr.end + acceptable_corr;
+
+                            mnvr.start = mnvr.start + corr.seconds()
+                        }
+                    }
+                    Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
+                        mnvr.alpha_inplane_radians = mnvr
+                            .alpha_inplane_radians
+                            .add_val_in_order(corr, var.component.vec_index())
+                            .unwrap();
+                    }
+                    Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
+                        mnvr.delta_outofplane_radians = mnvr
+                            .delta_outofplane_radians
+                            .add_val_in_order(corr, var.component.vec_index())
+                            .unwrap();
+                    }
+                    Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
+                        let mut vector = mnvr.direction();
+                        vector[var.component.vec_index()] += corr;
+                        var.ensure_bounds(&mut vector[var.component.vec_index()]);
+                        mnvr.set_direction(vector)?;
+                    }
+                    Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
+                        let mut vector = mnvr.rate();
+                        let idx = (var.component.vec_index() - 1) % 3;
+                        vector[idx] += corr;
+                        var.ensure_bounds(&mut vector[idx]);
+                        mnvr.set_rate(vector)?;
+                    }
+                    Vary::ThrustAccelX | Vary::ThrustAccelY | Vary::ThrustAccelZ => {
+                        let mut vector = mnvr.accel();
+                        let idx = (var.component.vec_index() - 1) % 3;
+                        vector[idx] += corr;
+                        var.ensure_bounds(&mut vector[idx]);
+                        mnvr.set_accel(vector)?;
+                    }
+                    Vary::ThrustLevel => {
+                        mnvr.thrust_lvl -= corr;
+                        var.ensure_bounds(&mut mnvr.thrust_lvl);
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+            Ok(mnvr)
+        }
+    }
 }
 
 impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
@@ -75,6 +187,7 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
                 }
                 _ => {
                     is_only_position = false;
+                    is_only_velocity = false;
                     ""
                 }
             };
@@ -94,6 +207,9 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
                 "\n\t\t|Δv| = {:.3} m/s",
                 self.correction.norm() * 1e3
             ));
+        } else if self.is_finite_burn() {
+            let mnvr = self.to_mnvr().unwrap();
+            corrmsg.push_str(&format!("\n\t\t{}\n", mnvr));
         }
 
         writeln!(
