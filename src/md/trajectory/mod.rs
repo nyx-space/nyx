@@ -80,9 +80,7 @@ where
     fn params() -> Vec<StateParameter>;
 
     /// Return the requested parameter and its time derivative
-    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        Ok((self.value(param)?, self.deriv(param)?))
-    }
+    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError>;
 
     /// Return the requested parameter
     fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
