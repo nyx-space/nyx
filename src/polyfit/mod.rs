@@ -20,3 +20,5 @@ pub mod hermite;
 mod polynomial;
 
 pub use polynomial::{CommonPolynomial, Polynomial};
+
+pub mod taylor;
