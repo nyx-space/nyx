@@ -274,7 +274,7 @@ pub fn eclipse_state(
     assert!(light_source.is_geoid() || light_source.is_celestial());
     assert!(eclipsing_body.is_geoid());
 
-    if light_source.equatorial_radius() < std::f64::EPSILON {
+    if light_source.equatorial_radius() < f64::EPSILON {
         let observed = cosm.celestial_state(
             &light_source.ephem_path(),
             observer.dt,

@@ -31,7 +31,6 @@ use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
 use crate::NyxError;
 use std::f64::consts::PI;
-use std::f64::EPSILON;
 use std::fmt;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
@@ -257,7 +256,7 @@ impl Orbit {
     ) -> Self {
         match frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                if gm.abs() < EPSILON {
+                if gm.abs() < f64::EPSILON {
                     warn!(
                         "GM is near zero ({}): expect math errors in Keplerian to Cartesian conversion",
                         gm
@@ -283,7 +282,7 @@ impl Orbit {
                     // GMAT errors below one meter. Let's warn for below that, but not panic, might be useful for landing scenarios?
                     warn!("radius of periapsis is less than one meter");
                 }
-                if (1.0 - ecc).abs() < EPSILON {
+                if (1.0 - ecc).abs() < f64::EPSILON {
                     panic!("parabolic orbits have ill-defined Keplerian orbital elements");
                 }
                 if ecc > 1.0 {
@@ -307,7 +306,7 @@ impl Orbit {
                 let aop = aop.to_radians();
                 let ta = ta.to_radians();
                 let p = sma * (1.0 - ecc.powi(2));
-                if p.abs() < EPSILON {
+                if p.abs() < f64::EPSILON {
                     panic!("Semilatus rectum ~= 0.0: parabolic orbit");
                 }
                 // NOTE: At this point GMAT computes 1+ecc**2 and checks whether it's very small.

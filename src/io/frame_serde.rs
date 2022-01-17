@@ -110,9 +110,9 @@ fn test_deser_frame_toml() {
 
     let iau_sun = &frames.frames["iau_sun"];
 
-    assert!((iau_sun.gm - 132_712_440_041.939_38).abs() < std::f64::EPSILON);
-    assert!((iau_sun.equatorial_radius - 696_342.0).abs() < std::f64::EPSILON);
-    assert!((iau_sun.semi_major_radius - 696_342.0).abs() < std::f64::EPSILON);
+    assert!((iau_sun.gm - 132_712_440_041.939_38).abs() < f64::EPSILON);
+    assert!((iau_sun.equatorial_radius - 696_342.0).abs() < f64::EPSILON);
+    assert!((iau_sun.semi_major_radius - 696_342.0).abs() < f64::EPSILON);
 
     let iau_sun_rot = &iau_sun.rotation;
     assert_eq!(iau_sun_rot.right_asc, "289.13");
@@ -124,9 +124,9 @@ fn test_deser_frame_toml() {
     let iau_sun = &frames.frames["iau_sun2"];
 
     assert_eq!(iau_sun.inherit.as_ref().unwrap(), "Sun J2000");
-    assert!((iau_sun.gm - -1.0).abs() < std::f64::EPSILON);
-    assert!((iau_sun.equatorial_radius - -1.0).abs() < std::f64::EPSILON);
-    assert!((iau_sun.semi_major_radius - -1.0).abs() < std::f64::EPSILON);
+    assert!((iau_sun.gm - -1.0).abs() < f64::EPSILON);
+    assert!((iau_sun.equatorial_radius - -1.0).abs() < f64::EPSILON);
+    assert!((iau_sun.semi_major_radius - -1.0).abs() < f64::EPSILON);
 
     let iau_sun_rot = &iau_sun.rotation;
     assert_eq!(iau_sun_rot.right_asc, "289.13");

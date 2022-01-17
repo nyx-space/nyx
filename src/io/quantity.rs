@@ -48,7 +48,7 @@ impl Quantity {
 /// extern crate nyx_space as nyx;
 ///
 /// use nyx::io::quantity::parse_duration;
-/// use std::f64::EPSILON;
+/// use f64::EPSILON;
 ///
 /// assert!((parse_duration("1 * days").unwrap().v() - 86_400.0).abs() < EPSILON);
 /// assert!((parse_duration("1 days").unwrap().v() - 86_400.0).abs() < EPSILON);
@@ -94,7 +94,7 @@ pub fn parse_duration(duration: &str) -> Result<Quantity, ParsingError> {
 /// ```
 /// extern crate nyx_space as nyx;
 /// use nyx::io::quantity::parse_quantity;
-/// use std::f64::EPSILON;
+/// use f64::EPSILON;
 ///
 /// assert!((parse_quantity("1.0 km").unwrap().v() - 1.0).abs() < EPSILON);
 /// assert!((parse_quantity("-1.3 mm").unwrap().v() - -1.3e-6).abs() < EPSILON);

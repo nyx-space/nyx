@@ -674,20 +674,20 @@ fn test_options() {
     let opts = PropOpts::with_fixed_step_s(1e-1);
     assert_eq!(opts.min_step, 1e-1 * TimeUnit::Second);
     assert_eq!(opts.max_step, 1e-1 * TimeUnit::Second);
-    assert!(opts.tolerance.abs() < std::f64::EPSILON);
+    assert!(opts.tolerance.abs() < f64::EPSILON);
     assert!(opts.fixed_step);
 
     let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
     assert_eq!(opts.min_step, 1e-2 * TimeUnit::Second);
     assert_eq!(opts.max_step, 10.0 * TimeUnit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert!(!opts.fixed_step);
 
     let opts: PropOpts<RSSCartesianStep> = Default::default();
     assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
     assert_eq!(opts.min_step, 0.001 * TimeUnit::Second);
     assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert_eq!(opts.attempts, 50);
     assert!(!opts.fixed_step);
 }

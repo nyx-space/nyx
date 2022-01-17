@@ -814,7 +814,7 @@ impl Cosm {
                         /* If the magnitude of the vector H is zero, the observer is moving along the line
                         of sight to the object, and no correction is required. Otherwise, rotate the
                         position of the object by phi radians about H to obtain the apparent position. */
-                        if h_hat.norm() > std::f64::EPSILON {
+                        if h_hat.norm() > f64::EPSILON {
                             let phi = h_hat.norm().asin();
                             let ab_pos = rotv(&state.radius(), &h_hat, phi);
                             state.x = ab_pos[0];
@@ -1063,7 +1063,6 @@ mod tests {
     #[test]
     fn test_cosm_indirect() {
         use crate::utils::is_diagonal;
-        use std::f64::EPSILON;
 
         let jde = Epoch::from_gregorian_utc_at_midnight(2002, 2, 7);
 
@@ -1213,8 +1212,8 @@ mod tests {
         let sun_from_ssb = cosm.celestial_state(Bodies::Sun.ephem_path(), jde, ssb_frame, c);
         let delta_state = sun2ear_state + (-sun_from_ssb + emb_from_ssb + earth_from_emb);
 
-        assert!(delta_state.radius().norm() < EPSILON);
-        assert!(delta_state.velocity().norm() < EPSILON);
+        assert!(delta_state.radius().norm() < f64::EPSILON);
+        assert!(delta_state.velocity().norm() < f64::EPSILON);
 
         assert!(dbg!(sun2ear_state.x - 1.096_550_659_153_359_8e8).abs() < 1e-3);
         assert!(dbg!(sun2ear_state.y - -9.057_089_103_152_503e7).abs() < 1e-3);
@@ -1270,8 +1269,8 @@ mod tests {
         assert!(lro_moon_earth_delta.vmag() < 1e-5);
         // And the converse
         let lro_wrt_earth = cosm.frame_chg(&lro_wrt_moon, eme2k);
-        assert!((lro_wrt_earth - lro).rmag() < std::f64::EPSILON);
-        assert!((lro_wrt_earth - lro).vmag() < std::f64::EPSILON);
+        assert!((lro_wrt_earth - lro).rmag() < f64::EPSILON);
+        assert!((lro_wrt_earth - lro).vmag() < f64::EPSILON);
     }
 
     #[test]
@@ -1313,8 +1312,8 @@ mod tests {
         assert!(lro_moon_earth_delta.vmag() < 1e-5);
         // And the converse
         let lro_wrt_venus = cosm.frame_chg(&lro_wrt_moon, venus);
-        assert!((lro_wrt_venus - lro).rmag() < std::f64::EPSILON);
-        assert!((lro_wrt_venus - lro).vmag() < std::f64::EPSILON);
+        assert!((lro_wrt_venus - lro).rmag() < f64::EPSILON);
+        assert!((lro_wrt_venus - lro).vmag() < f64::EPSILON);
     }
 
     #[test]
@@ -1356,8 +1355,8 @@ mod tests {
         assert!(dbg!(lro_moon_earth_delta.vmag()) < 1e-5);
         // And the converse
         let lro_wrt_ssb = cosm.frame_chg(&lro_wrt_moon, ssb);
-        assert!((lro_wrt_ssb - lro).rmag() < std::f64::EPSILON);
-        assert!((lro_wrt_ssb - lro).vmag() < std::f64::EPSILON);
+        assert!((lro_wrt_ssb - lro).rmag() < f64::EPSILON);
+        assert!((lro_wrt_ssb - lro).vmag() < f64::EPSILON);
     }
 
     #[test]
@@ -1583,7 +1582,6 @@ mod tests {
     fn test_cosm_rotation_spiceypy_pos_dcm() {
         // These validation tests are from tests/spiceypy/rotations.py
         use crate::linalg::{Matrix3, Vector3};
-        use std::f64::EPSILON;
         let cosm = Cosm::de438();
 
         let et0 = Epoch::from_gregorian_utc_at_noon(2022, 11, 30);
@@ -1683,7 +1681,7 @@ mod tests {
             .try_position_dcm_from_to(&cosm.frame("iau mars"), &cosm.frame("iau_earth"), et0)
             .unwrap();
         assert!(
-            (dcm.transpose() - dcm_return).norm() < EPSILON,
+            (dcm.transpose() - dcm_return).norm() < f64::EPSILON,
             "Return DCM is not the transpose of the forward"
         );
     }

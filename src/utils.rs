@@ -25,7 +25,6 @@ use crate::cosmic::Orbit;
 use crate::linalg::{
     allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3, Vector6,
 };
-use std::f64::{self, EPSILON};
 
 /// Returns the tilde matrix from the provided Vector3.
 pub fn tilde_matrix(v: &Vector3<f64>) -> Matrix3<f64> {
@@ -293,7 +292,7 @@ pub fn mag_order(value: f64) -> i32 {
 
 /// Returns the unit vector of the moved input vector
 pub fn unitize(v: Vector3<f64>) -> Vector3<f64> {
-    if v.norm() < EPSILON {
+    if v.norm() < f64::EPSILON {
         v
     } else {
         v / v.norm()
@@ -372,8 +371,8 @@ fn test_projv() {
 
 #[test]
 fn test_angle_bounds() {
-    assert!((between_pm_180(181.0) - -179.0).abs() < std::f64::EPSILON);
-    assert!((between_0_360(-179.0) - 181.0).abs() < std::f64::EPSILON);
+    assert!((between_pm_180(181.0) - -179.0).abs() < f64::EPSILON);
+    assert!((between_0_360(-179.0) - 181.0).abs() < f64::EPSILON);
 }
 
 #[test]

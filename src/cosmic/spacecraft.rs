@@ -265,8 +265,8 @@ impl PartialEq for Spacecraft {
         self.orbit == other.orbit
             && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
             && (self.fuel_mass_kg - other.fuel_mass_kg).abs() < mass_tol
-            && (self.cr - other.cr).abs() < std::f64::EPSILON
-            && (self.cd - other.cd).abs() < std::f64::EPSILON
+            && (self.cr - other.cr).abs() < f64::EPSILON
+            && (self.cd - other.cd).abs() < f64::EPSILON
     }
 }
 

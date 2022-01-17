@@ -18,7 +18,6 @@
 
 /* NOTE: This code is effectively a clone of bacon-sci, MIT License, by Wyatt Campbell. */
 
-use std::f64::EPSILON;
 use std::fmt;
 use std::ops;
 
@@ -123,7 +122,7 @@ impl<const SIZE: usize> Polynomial<SIZE> {
         let mut data = Vec::with_capacity(SIZE);
 
         for (i, c) in self.coefficients.iter().enumerate().rev() {
-            if c.abs() <= EPSILON {
+            if c.abs() <= f64::EPSILON {
                 continue;
             }
 
@@ -263,13 +262,13 @@ pub(crate) fn multiply<const S1: usize, const S2: usize, const S3: usize>(
 ) -> Polynomial<S3> {
     let mut rslt = Polynomial::<S3>::zeros();
     for (exponent, val) in p2.coefficients.iter().enumerate() {
-        if (*val).abs() < std::f64::EPSILON {
+        if (*val).abs() < f64::EPSILON {
             // Skip any zeros to allow multiplying large polynomials with themselves.
             continue;
         }
         let if_was_scalar = *val * p1;
         for (pos, ival) in if_was_scalar.coefficients.iter().enumerate() {
-            if (*ival).abs() < std::f64::EPSILON {
+            if (*ival).abs() < f64::EPSILON {
                 // Skip any zeros to allow multiplying large polynomials with themselves.
                 continue;
             }

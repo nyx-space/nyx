@@ -28,7 +28,6 @@ use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::{NyxError, TimeTagged};
 use std::f64::consts::PI;
-use std::f64::EPSILON;
 use std::fmt;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
@@ -383,7 +382,7 @@ impl OrbitDual {
                     );
                 }
                 let cos_nu = self.evec().dot(&self.radius()) / (self.ecc().dual * self.rmag().dual);
-                if (cos_nu.real().abs() - 1.0).abs() < EPSILON {
+                if (cos_nu.real().abs() - 1.0).abs() < f64::EPSILON {
                     // This bug drove me crazy when writing SMD in Go in 2017.
                     if cos_nu > 1.0 {
                         OrbitPartial {

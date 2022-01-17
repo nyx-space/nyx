@@ -18,7 +18,7 @@
 
 // Dumb factorial, avoid using this for large numbers
 fn factorial(x: f64) -> f64 {
-    if (x - 1.0).abs() < std::f64::EPSILON {
+    if (x - 1.0).abs() < f64::EPSILON {
         1.0
     } else {
         x * factorial(x - 1.0)

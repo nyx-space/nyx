@@ -30,7 +30,7 @@ pub fn dv_pointing_error<R: Rng>(
     }
 
     let dv_mag = dv.norm();
-    if dv_mag < std::f64::EPSILON {
+    if dv_mag < f64::EPSILON {
         return Err(NyxError::MonteCarlo(format!(
             "Delta-v vector is nil, cannot apply a pointing error: {}",
             dv
@@ -90,7 +90,7 @@ fn test_dv_mag_fixed() {
         let dv = dv_point * dv_mag;
         let dv_w_err = dv_pointing_error(&orbit.velocity(), dv, 0.1, &mut thread_rng()).unwrap();
         assert!(
-            (dv_w_err.norm() - dv_mag) < std::f64::EPSILON,
+            (dv_w_err.norm() - dv_mag) < f64::EPSILON,
             "{:.1e}",
             (dv_w_err.norm() - dv_mag)
         );

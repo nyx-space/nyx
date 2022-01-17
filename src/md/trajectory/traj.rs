@@ -137,7 +137,6 @@ where
     where
         E: EventEvaluator<S>,
     {
-        use std::f64::EPSILON;
         let max_iter = 50;
 
         // Helper lambdas, for f64s only
@@ -188,7 +187,7 @@ where
                     event: format!("{}", event),
                 }));
             }
-            let mut s = if (ya - yc).abs() > EPSILON && (yb - yc).abs() > EPSILON {
+            let mut s = if (ya - yc).abs() > f64::EPSILON && (yb - yc).abs() > f64::EPSILON {
                 xa * yb * yc / ((ya - yb) * (ya - yc))
                     + xb * ya * yc / ((yb - ya) * (yb - yc))
                     + xc * ya * yb / ((yc - ya) * (yc - yb))
@@ -980,7 +979,7 @@ where
         // Deduplicate
         if let Some(latest_t) = ts.last() {
             let delta_t: f64 = *latest_t - t_prime;
-            if delta_t.abs() < std::f64::EPSILON {
+            if delta_t.abs() < f64::EPSILON {
                 continue;
             }
         }
