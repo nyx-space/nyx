@@ -23,6 +23,7 @@ fn cosmic(_py: Python, m: &PyModule) -> PyResult<()> {
 pub struct Bodies {
     pub inner: BodiesRs,
 }
+#[allow(non_snake_case)]
 #[pymethods]
 impl Bodies {
     #[classattr]
