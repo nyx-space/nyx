@@ -18,6 +18,8 @@ from nyx_space import cosmic
 
 # Initialize the cosm which stores the ephemeris
 cosm = cosmic.Cosm.de438()
+# print(cosm.frame("ecliptic"))
+print(cosm.frames_get_names())
 
 # # Grab the frames we'll use
 # eme2k = cosm.frame("EME2000")
@@ -78,19 +80,19 @@ cosm = cosmic.Cosm.de438()
 # #     .with(sat) \
 # #     .for_duration_sec(0.5 * 3_600 * 24) # Half a day
 
-from nyx_space import md
-from nyx_space import io
+# from nyx_space import md
+# from nyx_space import io
 
-import logging
+# import logging
 
-def init_logging():
-    FORMAT = '%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s'
-    logging.basicConfig(format=FORMAT)
-    logging.getLogger().setLevel(logging.INFO)
+# def init_logging():
+#     FORMAT = '%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s'
+#     logging.basicConfig(format=FORMAT)
+#     logging.getLogger().setLevel(logging.INFO)
 
-with open('data/simple-scenario.toml', 'r') as f:
-    scen_data = f.read()
+# with open('data/simple-scenario.toml', 'r') as f:
+#     scen_data = f.read()
 
-scenario = io.ScenarioSerde.from_toml_str(scen_data)
+# scenario = io.ScenarioSerde.from_toml_str(scen_data)
 
-md.MDProcess.execute_all_in_scenario(scenario, cosm)
+# md.MDProcess.execute_all_in_scenario(scenario, cosm)

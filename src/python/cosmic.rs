@@ -240,4 +240,11 @@ impl Cosm {
             inner: self.inner.frame(name),
         })
     }
+
+    pub fn frames_get_names(&self) -> PyResult<Vec<String>>
+    {
+        Ok(
+            self.inner.frames_get_names()
+        )
+    }
 }
