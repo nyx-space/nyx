@@ -59,7 +59,7 @@ python = ["pyo3"]
 broken-donotuse = []
 
 [dependencies.pyo3]
-version = "0.13.2"
+version = "0.15.1"
 features = ["extension-module"]
 optional = true
 
