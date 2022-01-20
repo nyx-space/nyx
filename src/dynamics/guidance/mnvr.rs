@@ -614,7 +614,6 @@ impl Mnvr {
 
 impl GuidanceLaw<GuidanceMode> for Mnvr {
     fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
-        // match self.next(&osc) {
         match osc.mode() {
             GuidanceMode::Thrust => {
                 if matches!(self.frame, Frame::Inertial) {
@@ -625,11 +624,6 @@ impl GuidanceLaw<GuidanceMode> for Mnvr {
             }
             _ => Vector3::zeros(),
         }
-        // if matches!(self.frame, Frame::Inertial) {
-        //     self.vector(osc.epoch())
-        // } else {
-        //     osc.orbit.dcm_from_traj_frame(self.frame).unwrap() * self.vector(osc.epoch())
-        // }
     }
 
     fn throttle(&self, osc: &Spacecraft) -> f64 {

@@ -125,7 +125,8 @@ where
     }
 
     /// Optionally performs some final changes after each successful integration of the equations of motion.
-    /// For example, this can be used to update the GNC mode.
+    /// For example, this can be used to update the Guidance mode.
+    /// NOTE: This function is also called just prior to very first integration step in order to update the initial state if needed.
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         Ok(next_state)
     }

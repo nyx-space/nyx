@@ -31,13 +31,8 @@ fn val_transfer_schedule_no_depl() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = Spacecraft::from_thruster(
-        orbit,
-        dry_mass,
-        fuel_mass,
-        monoprop,
-        GuidanceMode::Custom(0),
-    );
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, monoprop, GuidanceMode::Coast);
 
     let prop_time = 50.0 * TimeUnit::Minute;
 
@@ -124,13 +119,8 @@ fn val_transfer_schedule_depl() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = Spacecraft::from_thruster(
-        orbit,
-        dry_mass,
-        fuel_mass,
-        monoprop,
-        GuidanceMode::Custom(0),
-    );
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, monoprop, GuidanceMode::Coast);
 
     let prop_time = 50.0 * TimeUnit::Minute;
 
