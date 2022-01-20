@@ -37,11 +37,11 @@ use crate::io::scenario::ConditionSerde;
 use crate::io::scenario::ScenarioSerde;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, U6};
+pub use crate::md::objective::Objective;
 pub use crate::propagators::{PropOpts, Propagator};
 pub use crate::time::{Duration, Epoch, TimeUnit};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
-pub use crate::md::objective::Objective;
 use std::convert::TryFrom;
 use std::str::FromStr;
 pub use std::sync::Arc;
@@ -357,7 +357,7 @@ where
                     },
                 };
                 let (_, traj) =
-                    prop.until_event(max_duration, &event, prop_event.hits.unwrap_or(0))?;
+                    prop.until_nth_event(max_duration, &event, prop_event.hits.unwrap_or(0))?;
                 traj
             }
             None => {

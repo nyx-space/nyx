@@ -37,7 +37,7 @@ impl FiniteBurns {
     }
 }
 
-impl GuidanceLaw for FiniteBurns {
+impl GuidanceLaw<GuidanceMode> for FiniteBurns {
     fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
         // NOTE: We do not increment the mnvr number here. The power function is called first,
         // so we let that function handle starting and stopping of the maneuver.
@@ -78,31 +78,32 @@ impl GuidanceLaw for FiniteBurns {
 
     fn next(&self, sc: &mut Spacecraft) {
         // Here, we're using the Custom field of the mode to store the current maneuver number we're executing
-        match sc.mode() {
+        let next_mode = match sc.mode() {
             GuidanceMode::Custom(mnvr_no) => {
                 if (mnvr_no as usize) < self.mnvrs.len() {
                     let cur_mnvr = self.mnvrs[mnvr_no as usize];
                     if sc.epoch() >= cur_mnvr.end {
                         if mnvr_no as usize == self.mnvrs.len() - 1 {
                             // No following maneuver, so let's coast from now on.
-                            sc.mut_mode(GuidanceMode::Coast);
+                            GuidanceMode::Coast
                         } else {
-                            sc.mut_mode(GuidanceMode::Custom(mnvr_no + 1));
+                            GuidanceMode::Custom(mnvr_no + 1)
                         }
                     } else {
                         // Stay on the current maneuver
-                        sc.mut_mode(GuidanceMode::Custom(mnvr_no));
+                        GuidanceMode::Custom(mnvr_no)
                     }
                 } else {
                     // We're done with all the maneuvers, so we can coast now
-                    sc.mut_mode(GuidanceMode::Coast);
+                    GuidanceMode::Coast
                 }
             }
             _ => {
                 // If we haven't started the maneuvers yet, let's get ready to do so by switching to the mode
                 // which will start the first maneuver
-                sc.mut_mode(GuidanceMode::Custom(0));
+                GuidanceMode::Custom(0)
             }
-        }
+        };
+        sc.mut_mode(next_mode);
     }
 }

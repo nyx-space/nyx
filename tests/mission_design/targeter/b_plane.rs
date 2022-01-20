@@ -98,7 +98,7 @@ fn tgt_b_plane_lunar_transfer() {
     // Propagate to periapsis
     let periapse_spacecraft = prop
         .with(spacecraft)
-        .until_event(1 * orbit.period(), &Event::periapsis(), 1)
+        .until_nth_event(1 * orbit.period(), &Event::periapsis(), 1)
         .unwrap()
         .0;
 

@@ -30,7 +30,7 @@ use std::fmt;
 use std::ops::Add;
 
 /// Defines a spacecraft extension.
-/// This is useful for highly specialized control laws that need to store additional data in the spacecraft state.
+/// This is useful for highly specialized guidance laws that need to store additional data in the spacecraft state.
 /// Most guidance laws can be implemented directly with the `Spacecraft` structure.
 pub trait SpacecraftExt: Clone + Copy + Default + fmt::Debug + Send + Sync {}
 
@@ -69,7 +69,7 @@ pub struct BaseSpacecraft<X: SpacecraftExt> {
     pub thruster: Option<Thruster>,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
-    /// Any extra information that is needed for specific control laws
+    /// Any extra information that is needed for specific guidance laws
     pub extra: X,
 }
 
@@ -245,6 +245,23 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
     /// Returns the total mass in kilograms
     pub fn mass_kg(&self) -> f64 {
         self.dry_mass_kg + self.fuel_mass_kg
+    }
+
+    /// Allows the automatic conversion of a BaseSpacecraft into a standard spacecraft.
+    /// WARNING: This will IGNORE the `extra` of BaseSpacecraft
+    pub fn degrade_to_spacecraft(&self) -> Spacecraft {
+        Spacecraft {
+            orbit: self.orbit,
+            dry_mass_kg: self.dry_mass_kg,
+            fuel_mass_kg: self.fuel_mass_kg,
+            srp_area_m2: self.srp_area_m2,
+            drag_area_m2: self.drag_area_m2,
+            cr: self.cr,
+            cd: self.cd,
+            thruster: self.thruster,
+            stm: self.stm,
+            extra: GuidanceMode::Coast,
+        }
     }
 }
 
@@ -464,7 +481,7 @@ impl<X: SpacecraftExt> Add<OVector<f64, Const<9>>> for BaseSpacecraft<X> {
 }
 
 impl Spacecraft {
-    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing control laws whilke ignoring drag and SRP.
+    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing guidance laws whilke ignoring drag and SRP.
     pub fn from_thruster(
         orbit: Orbit,
         dry_mass_kg: f64,
