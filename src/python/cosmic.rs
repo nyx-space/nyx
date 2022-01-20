@@ -142,6 +142,23 @@ impl Orbit {
             inner: OrbitRs::cartesian(x, y, z, vx, vy, vz, dt.inner, frame.inner),
         }
     }
+    /// Creates a new Orbit and initializes its STM.
+    #[classmethod]
+    pub fn from_cartesian_stm(
+        _cls: &PyType,
+        x: f64,
+        y: f64,
+        z: f64,
+        vx: f64,
+        vy: f64,
+        vz: f64,
+        dt: PyRef<Epoch>,
+        frame: PyRef<Frame>
+    ) -> Self {
+        Self {
+            inner: OrbitRs::cartesian_stm(x, y, z, vx, vy, vz, dt.inner, frame.inner)
+        }
+    }
 }
 
 #[pyclass]
