@@ -81,6 +81,13 @@ cosm = cosmic.Cosm.de438()
 from nyx_space import md
 from nyx_space import io
 
+import logging
+
+def init_logging():
+    FORMAT = '%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s'
+    logging.basicConfig(format=FORMAT)
+    logging.getLogger().setLevel(logging.INFO)
+
 with open('data/simple-scenario.toml', 'r') as f:
     scen_data = f.read()
 

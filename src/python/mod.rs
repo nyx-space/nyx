@@ -32,6 +32,9 @@ impl std::convert::From<NyxError> for PyErr {
 
 #[pymodule]
 fn nyx_space(_py: Python, m: &PyModule) -> PyResult<()> {
+    // A good place to install the Rust -> Python logger.
+    pyo3_log::init();
+
     // m.add_wrapped(wrap_pymodule!(propagators))?;
     // m.add_wrapped(wrap_pymodule!(dynamics))?;
     m.add_wrapped(wrap_pymodule!(cosmic))?;
