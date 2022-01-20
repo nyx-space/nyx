@@ -123,8 +123,11 @@ pub struct Orbit {
 }
 #[pymethods]
 impl Orbit {
+    /// Creates a new Orbit in the provided frame at the provided Epoch.
+    ///
+    /// **Units:** km, km, km, km/s, km/s, km/s
     #[classmethod]
-    pub fn cartesian(
+    pub fn from_cartesian(
         _cls: &PyType,
         x: f64,
         y: f64,
