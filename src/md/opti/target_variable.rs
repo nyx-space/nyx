@@ -201,10 +201,17 @@ impl Variable {
 
     /// Ensure that `val` is within the variable bounds
     pub fn ensure_bounds(&self, val: &mut f64) {
-        if *val > self.max_value {
-            *val = self.max_value;
-        } else if *val < self.min_value {
-            *val = self.min_value;
+        *val = self.check_bounds(*val).0;
+    }
+
+    /// Returns the input value unless it is out of bounds, then it returns the bound, and whether the input value was OK
+    pub fn check_bounds(&self, val: f64) -> (f64, bool) {
+        if val > self.max_value {
+            (self.max_value, false)
+        } else if val < self.min_value {
+            (self.min_value, false)
+        } else {
+            (val, true)
         }
     }
 }
