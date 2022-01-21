@@ -602,7 +602,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             mnvr.set_accel(vector)?;
                         }
                         Vary::ThrustLevel => {
-                            mnvr.thrust_lvl -= corr;
+                            mnvr.thrust_lvl += corr;
                             var.ensure_bounds(&mut mnvr.thrust_lvl);
                         }
                         _ => unreachable!(),

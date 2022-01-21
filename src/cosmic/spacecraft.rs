@@ -69,8 +69,8 @@ pub struct BaseSpacecraft<X: SpacecraftExt> {
     pub thruster: Option<Thruster>,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
-    /// Any extra information that is needed for specific guidance laws
-    pub extra: X,
+    /// Any extra information or extension that is needed for specific guidance laws
+    pub ext: X,
 }
 
 /// A spacecraft state
@@ -88,7 +88,7 @@ impl<X: SpacecraftExt> Default for BaseSpacecraft<X> {
             cd: 2.2,
             thruster: None,
             stm: None,
-            extra: X::default(),
+            ext: X::default(),
         }
     }
 }
@@ -112,6 +112,27 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
             drag_area_m2,
             cr,
             cd,
+            stm: orbit
+                .stm
+                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
+            ..Default::default()
+        }
+    }
+
+    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing guidance laws whilke ignoring drag and SRP.
+    pub fn from_thruster(
+        orbit: Orbit,
+        dry_mass_kg: f64,
+        fuel_mass_kg: f64,
+        thruster: Thruster,
+        ext: X,
+    ) -> Self {
+        Self {
+            orbit,
+            dry_mass_kg,
+            fuel_mass_kg,
+            thruster: Some(thruster),
+            ext,
             stm: orbit
                 .stm
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
@@ -260,7 +281,7 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
             cd: self.cd,
             thruster: self.thruster,
             stm: self.stm,
-            extra: GuidanceMode::Coast,
+            ext: GuidanceMode::Coast,
         }
     }
 }
@@ -481,39 +502,18 @@ impl<X: SpacecraftExt> Add<OVector<f64, Const<9>>> for BaseSpacecraft<X> {
 }
 
 impl Spacecraft {
-    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing guidance laws whilke ignoring drag and SRP.
-    pub fn from_thruster(
-        orbit: Orbit,
-        dry_mass_kg: f64,
-        fuel_mass_kg: f64,
-        thruster: Thruster,
-        init_mode: GuidanceMode,
-    ) -> Self {
-        Self {
-            orbit,
-            dry_mass_kg,
-            fuel_mass_kg,
-            thruster: Some(thruster),
-            extra: init_mode,
-            stm: orbit
-                .stm
-                .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
-            ..Default::default()
-        }
-    }
-
     /// Returns a copy of the state with the provided guidance mode
     pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
         let mut me = self;
-        me.extra = mode;
+        me.ext = mode;
         me
     }
 
     pub fn mode(&self) -> GuidanceMode {
-        self.extra
+        self.ext
     }
 
     pub fn mut_mode(&mut self, mode: GuidanceMode) {
-        self.extra = mode;
+        self.ext = mode;
     }
 }

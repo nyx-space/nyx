@@ -83,7 +83,7 @@ fn conv_tgt_sma_ecc() {
             thrust: 500.0,
             isp: 300.0,
         }),
-        extra: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
 
         ..Default::default()
     };

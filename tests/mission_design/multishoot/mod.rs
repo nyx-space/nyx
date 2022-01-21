@@ -23,7 +23,7 @@ fn alt_orbit_raising() {
             thrust: 150.0,
             isp: 300.0,
         }),
-        extra: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
 
         ..Default::default()
     };
@@ -207,7 +207,7 @@ fn vmag_orbit_raising() {
             thrust: 150.0,
             isp: 300.0,
         }),
-        extra: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
 
         ..Default::default()
     };

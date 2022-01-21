@@ -273,11 +273,22 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         &self,
         solution: &TargeterSolution<V, O>,
     ) -> Result<(Spacecraft, Traj<Spacecraft>), NyxError> {
-        // Propagate until achievement epoch
-        let (xf, traj) = self
-            .prop
-            .with(solution.corrected_state)
-            .until_epoch_with_traj(solution.achieved_state.epoch())?;
+        let (xf, traj) = match solution.to_mnvr() {
+            Ok(mnvr) => {
+                println!("{}", mnvr);
+                let mut prop = self.prop.clone();
+                prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+                prop.with(solution.corrected_state)
+                    .until_epoch_with_traj(solution.achieved_state.epoch())?
+            }
+            Err(_) => {
+                // This isn't a finite burn maneuver, let's just apply the correction
+                // Propagate until achievement epoch
+                self.prop
+                    .with(solution.corrected_state)
+                    .until_epoch_with_traj(solution.achieved_state.epoch())?
+            }
+        };
 
         // Build the partials
         let xf_dual = OrbitDual::from(xf.orbit);
@@ -323,8 +334,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             let mut objmsg = String::from("");
             for (i, obj) in self.objectives.iter().enumerate() {
                 objmsg.push_str(&format!(
-                    "{:?} = {:.3} BUT should be {:.3} (± {:.1e}) ",
-                    obj.parameter, param_errors[i], obj.desired_value, obj.tolerance
+                    "{:?} = {:.3} BUT should be {:.3} (± {:.1e}) (error = {:.3})",
+                    obj.parameter,
+                    obj.desired_value + param_errors[i],
+                    obj.desired_value,
+                    obj.tolerance,
+                    param_errors[i]
                 ));
             }
             Err(NyxError::Targeter(TargetingError::Verification(objmsg)))

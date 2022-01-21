@@ -19,7 +19,7 @@
 extern crate hyperdual;
 
 use self::hyperdual::{OHyperdual, Owned};
-use crate::cosmic::{Orbit, Spacecraft};
+use crate::cosmic::Orbit;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;

@@ -144,7 +144,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                         mnvr.set_accel(vector)?;
                     }
                     Vary::ThrustLevel => {
-                        mnvr.thrust_lvl -= corr;
+                        mnvr.thrust_lvl += corr;
                         var.ensure_bounds(&mut mnvr.thrust_lvl);
                     }
                     _ => unreachable!(),
