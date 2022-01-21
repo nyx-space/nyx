@@ -21,7 +21,6 @@ use super::{ra_dec_from_unit_vector, GuidanceLaw};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::unit_vector_from_ra_dec;
 use crate::linalg::{DMatrix, SVector, Vector3};
-use crate::md::trajectory::InterpState;
 use crate::md::ui::{Objective, Propagator, SpacecraftDynamics};
 use crate::md::{StateParameter, Variable, Vary};
 use crate::polyfit::CommonPolynomial;

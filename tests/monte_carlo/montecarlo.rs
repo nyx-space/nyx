@@ -48,9 +48,6 @@ fn multi_thread_monte_carlo_demo() {
     // We need to wrap the propagator setup in an Arc to enable multithreading.
     let setup = Arc::new(Propagator::default(orbital_dyn));
 
-    let mut threads = vec![];
-    let mut final_states: Vec<Orbit> = vec![];
-
     // Around 1 km of error
     let sma_dist = Normal::new(0.0, 1.0).unwrap();
 
@@ -63,27 +60,16 @@ fn multi_thread_monte_carlo_demo() {
 
     let prop_time = 1 * TimeUnit::Day;
     let start = StdInstant::now();
-    for state in init_states {
-        let setp = setup.clone();
-        threads.push(std::thread::spawn(move || {
-            setp.with(state).for_duration(prop_time).unwrap()
-        }));
-    }
-
-    for t in threads {
-        final_states.push(t.join().unwrap());
-    }
+    let end_epoch = dt + prop_time;
+    init_states.par_iter().for_each_with(setup, |setup, state| {
+        let final_state = setup.with(*state).for_duration(prop_time).unwrap();
+        assert_eq!(end_epoch, final_state.epoch());
+    });
 
     let clock_time = StdInstant::now() - start;
     println!(
         "Propagated {} states in {} seconds",
-        final_states.len(),
+        init_states.len(),
         clock_time.as_secs_f64()
     );
-
-    // Check that they're all propagated until the end state
-    let end_epoch = dt + prop_time;
-    final_states.par_iter().for_each(|state| {
-        assert_eq!(state.epoch(), end_epoch);
-    });
 }
