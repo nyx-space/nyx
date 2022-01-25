@@ -299,60 +299,70 @@ impl<X: SpacecraftExt> PartialEq for BaseSpacecraft<X> {
 
 impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let decimals = f.precision().unwrap_or(6);
+        let mass_prec = f.precision().unwrap_or(3);
+        let orbit_prec = f.precision().unwrap_or(6);
         write!(
             f,
-            "total mass = {}kg  @  {}",
-            format!("{:.*}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
-            format!("{:.*}", decimals, self.orbit),
+            "total mass = {} kg @  {}  {:?}",
+            format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*}", orbit_prec, self.orbit),
+            self.ext,
         )
     }
 }
 
 impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let decimals = f.precision().unwrap_or(6);
+        let mass_prec = f.precision().unwrap_or(3);
+        let orbit_prec = f.precision().unwrap_or(6);
         write!(
             f,
-            "total mass = {}kg  @  {}",
-            format!("{:.*e}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
-            format!("{:.*e}", decimals, self.orbit),
+            "total mass = {} kg @  {}  {:?}",
+            format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*e}", orbit_prec, self.orbit),
+            self.ext,
         )
     }
 }
 
 impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let decimals = f.precision().unwrap_or(6);
+        let mass_prec = f.precision().unwrap_or(3);
+        let orbit_prec = f.precision().unwrap_or(6);
         write!(
             f,
-            "total mass = {}kg  @  {}",
-            format!("{:.*E}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
-            format!("{:.*E}", decimals, self.orbit),
+            "total mass = {} kg @  {}  {:?}",
+            format!("{:.*E}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*E}", orbit_prec, self.orbit),
+            self.ext,
         )
     }
 }
 
 impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let decimals = f.precision().unwrap_or(6);
+        let mass_prec = f.precision().unwrap_or(3);
+        let orbit_prec = f.precision().unwrap_or(6);
         write!(
             f,
-            "total mass = {}kg  @  {}",
-            format!("{:.*}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
-            format!("{:.*x}", decimals, self.orbit),
+            "total mass = {} kg @  {}  {:?}",
+            format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*x}", orbit_prec, self.orbit),
+            self.ext,
         )
     }
 }
 
 impl<X: SpacecraftExt> fmt::UpperHex for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let decimals = f.precision().unwrap_or(6);
+        let mass_prec = f.precision().unwrap_or(3);
+        let orbit_prec = f.precision().unwrap_or(6);
         write!(
             f,
-            "total mass = {}kg  @  {}",
-            format!("{:.*e}", decimals, self.dry_mass_kg + self.fuel_mass_kg),
-            format!("{:.*X}", decimals, self.orbit),
+            "total mass = {} kg @  {}  {:?}",
+            format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
+            format!("{:.*X}", orbit_prec, self.orbit),
+            self.ext,
         )
     }
 }
