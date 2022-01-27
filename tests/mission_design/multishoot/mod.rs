@@ -184,6 +184,7 @@ fn alt_orbit_raising() {
     );
 }
 
+#[ignore = "Does not have a valid test case yet"]
 #[test]
 fn vmag_orbit_raising() {
     if pretty_env_logger::try_init().is_err() {
