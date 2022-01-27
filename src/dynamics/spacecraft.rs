@@ -19,7 +19,7 @@
 use super::guidance::GuidanceLaw;
 use super::orbital::OrbitalDynamics;
 use super::{Dynamics, ForceModel};
-use crate::cosmic::{Spacecraft, STD_GRAVITY};
+pub use crate::cosmic::{BaseSpacecraft, GuidanceMode, Spacecraft, SpacecraftExt, STD_GRAVITY};
 use crate::errors::NyxError;
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 
@@ -29,53 +29,44 @@ use std::sync::Arc;
 
 pub use super::solarpressure::SolarPressure;
 
-const NORM_ERR: f64 = 1e-12;
+const NORM_ERR: f64 = 1e-4;
 
 #[derive(Clone)]
-pub struct SpacecraftDynamics<'a> {
-    pub orbital_dyn: Arc<OrbitalDynamics<'a>>,
-    pub force_models: Vec<Arc<dyn ForceModel + 'a>>,
-    pub ctrl: Option<Arc<dyn GuidanceLaw + 'a>>,
+pub struct BaseSpacecraftDynamics<'a, X: SpacecraftExt> {
+    pub orbital_dyn: OrbitalDynamics<'a>,
+    pub force_models: Vec<Arc<dyn ForceModel<X> + 'a>>,
+    pub ctrl: Option<Arc<dyn GuidanceLaw<X> + 'a>>,
     pub decrement_mass: bool,
 }
 
-impl<'a> SpacecraftDynamics<'a> {
+impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// By default, the mass of the vehicle will be decremented as propellant is consummed.
-    pub fn from_ctrl(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
-        ctrl: Arc<dyn GuidanceLaw + 'a>,
-    ) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn from_ctrl(orbital_dyn: OrbitalDynamics<'a>, ctrl: Arc<dyn GuidanceLaw<X> + 'a>) -> Self {
+        Self {
             orbital_dyn,
             ctrl: Some(ctrl),
             force_models: Vec::new(),
             decrement_mass: true,
-        })
+        }
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// Will _not_ decrement the fuel mass as propellant is consummed.
     pub fn from_ctrl_no_decr(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
-        ctrl: Arc<dyn GuidanceLaw + 'a>,
-    ) -> Arc<Self> {
-        Arc::new(Self {
+        orbital_dyn: OrbitalDynamics<'a>,
+        ctrl: Arc<dyn GuidanceLaw<X> + 'a>,
+    ) -> Self {
+        Self {
             orbital_dyn,
             ctrl: Some(ctrl),
             force_models: Vec::new(),
             decrement_mass: false,
-        })
+        }
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
-    pub fn new(orbital_dyn: Arc<OrbitalDynamics<'a>>) -> Arc<Self> {
-        Arc::new(Self::new_raw(orbital_dyn))
-    }
-
-    /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
-    pub fn new_raw(orbital_dyn: Arc<OrbitalDynamics<'a>>) -> Self {
-        // Set the dry mass of the propulsion system
+    pub fn new(orbital_dyn: OrbitalDynamics<'a>) -> Self {
         Self {
             orbital_dyn,
             ctrl: None,
@@ -86,38 +77,41 @@ impl<'a> SpacecraftDynamics<'a> {
 
     /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
     pub fn from_model(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
-        force_model: Arc<dyn ForceModel + 'a>,
-    ) -> Arc<Self> {
-        let mut me = Self::new_raw(orbital_dyn);
-        me.add_model(force_model);
-        Arc::new(me)
+        orbital_dyn: OrbitalDynamics<'a>,
+        force_model: Arc<dyn ForceModel<X> + 'a>,
+    ) -> Self {
+        Self {
+            orbital_dyn,
+            ctrl: None,
+            force_models: vec![force_model],
+            decrement_mass: true,
+        }
     }
 
     /// Initialize new spacecraft dynamics with a vector of force models.
     pub fn from_models(
-        orbital_dyn: Arc<OrbitalDynamics<'a>>,
-        force_models: Vec<Arc<dyn ForceModel + 'a>>,
-    ) -> Arc<Self> {
-        let mut me = Self::new_raw(orbital_dyn);
+        orbital_dyn: OrbitalDynamics<'a>,
+        force_models: Vec<Arc<dyn ForceModel<X> + 'a>>,
+    ) -> Self {
+        let mut me = Self::new(orbital_dyn);
         me.force_models = force_models;
-        Arc::new(me)
+        me
     }
 
     /// Add a model to the currently defined spacecraft dynamics
-    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel + 'a>) {
+    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel<X> + 'a>) {
         self.force_models.push(force_model);
     }
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, force_model: Arc<dyn ForceModel + 'a>) -> Arc<Self> {
+    pub fn with_model(self, force_model: Arc<dyn ForceModel<X> + 'a>) -> Self {
         let mut me = self.clone();
         me.add_model(force_model);
-        Arc::new(me)
+        me
     }
 
     /// A shortcut to spacecraft.ctrl if the control is defined
-    pub fn ctrl_achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
+    pub fn ctrl_achieved(&self, state: &BaseSpacecraft<X>) -> Result<bool, NyxError> {
         match &self.ctrl {
             Some(ctrl) => ctrl.achieved(state),
             None => Err(NyxError::NoObjectiveDefined),
@@ -125,27 +119,37 @@ impl<'a> SpacecraftDynamics<'a> {
     }
 
     /// Clone these spacecraft dynamics and update the control to the one provided.
-    pub fn with_ctrl(&self, ctrl: Arc<dyn GuidanceLaw + 'a>) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn with_ctrl(&self, ctrl: Arc<dyn GuidanceLaw<X> + 'a>) -> Self {
+        Self {
             orbital_dyn: self.orbital_dyn.clone(),
             ctrl: Some(ctrl),
             force_models: self.force_models.clone(),
             decrement_mass: self.decrement_mass,
-        })
+        }
+    }
+
+    /// Clone these spacecraft dynamics and update the control to the one provided.
+    pub fn with_ctrl_no_decr(&self, ctrl: Arc<dyn GuidanceLaw<X> + 'a>) -> Self {
+        Self {
+            orbital_dyn: self.orbital_dyn.clone(),
+            ctrl: Some(ctrl),
+            force_models: self.force_models.clone(),
+            decrement_mass: false,
+        }
     }
 
     /// Clone these spacecraft dynamics and remove any control model
-    pub fn without_ctrl(&self) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn without_ctrl(&self) -> Self {
+        Self {
             orbital_dyn: self.orbital_dyn.clone(),
             ctrl: None,
             force_models: self.force_models.clone(),
             decrement_mass: self.decrement_mass,
-        })
+        }
     }
 }
 
-impl<'a> fmt::Display for SpacecraftDynamics<'a> {
+impl<'a, X: SpacecraftExt> fmt::Display for BaseSpacecraftDynamics<'a, X> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let force_models: String = self
             .force_models
@@ -162,20 +166,22 @@ impl<'a> fmt::Display for SpacecraftDynamics<'a> {
     }
 }
 
-impl<'a> Dynamics for SpacecraftDynamics<'a> {
+impl<'a, X: SpacecraftExt> Dynamics for BaseSpacecraftDynamics<'a, X> {
     type HyperdualSize = Const<9>;
-    type StateType = Spacecraft;
+    type StateType = BaseSpacecraft<X>;
 
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
-            return Err(NyxError::FuelExhausted(Box::new(next_state)));
+            return Err(NyxError::FuelExhausted(Box::new(
+                next_state.degrade_to_spacecraft(),
+            )));
         }
 
         if let Some(ctrl) = &self.ctrl {
             let mut state = next_state;
             // Update the control mode
-            state.mode = ctrl.next(&state);
+            ctrl.next(&mut state);
             Ok(state)
         } else {
             Ok(next_state)
@@ -186,7 +192,7 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         &self,
         delta_t: f64,
         state: &OVector<f64, Const<90>>,
-        ctx: &Spacecraft,
+        ctx: &Self::StateType,
     ) -> Result<OVector<f64, Const<90>>, NyxError> {
         // Rebuild the osculating state for the EOM context.
         let osc_sc = ctx.set_with_delta_seconds(delta_t, state);
@@ -236,27 +242,34 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
                     return Err(NyxError::CtrlExistsButNoThrusterAvail);
                 }
                 let thruster = osc_sc.thruster.unwrap();
-                let thrust_power = ctrl.throttle(&osc_sc);
-                if !(0.0..=1.0).contains(&thrust_power) {
-                    return Err(NyxError::CtrlThrottleRangeErr(thrust_power));
-                } else if thrust_power > 0.0 {
+                let thrust_throttle_lvl = ctrl.throttle(&osc_sc);
+                if !(0.0..=1.0).contains(&thrust_throttle_lvl) {
+                    return Err(NyxError::CtrlThrottleRangeErr(thrust_throttle_lvl));
+                } else if thrust_throttle_lvl > 0.0 {
                     // Thrust arc
                     let thrust_inertial = ctrl.direction(&osc_sc);
                     if (thrust_inertial.norm() - 1.0).abs() > NORM_ERR {
                         return Err(NyxError::CtrlNotAUnitVector(thrust_inertial.norm()));
+                    } else if thrust_inertial.norm().is_normal() {
+                        // Compute the thrust in Newtons and Isp
+                        let total_thrust = (thrust_throttle_lvl * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
+                        (
+                            thrust_inertial * total_thrust,
+                            if self.decrement_mass {
+                                let fuel_usage = thrust_throttle_lvl * thruster.thrust
+                                    / (thruster.isp * STD_GRAVITY);
+                                -fuel_usage
+                            } else {
+                                0.0
+                            },
+                        )
+                    } else {
+                        warn!(
+                            "Abnormal thrust direction vector\t|u| = {}",
+                            thrust_inertial.norm()
+                        );
+                        (Vector3::zeros(), 0.0)
                     }
-                    // Compute the thrust in Newtons and Isp
-                    let total_thrust = (thrust_power * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
-                    (
-                        thrust_inertial * total_thrust,
-                        if self.decrement_mass {
-                            let fuel_usage =
-                                thrust_power * thruster.thrust / (thruster.isp * STD_GRAVITY);
-                            -fuel_usage
-                        } else {
-                            0.0
-                        },
-                    )
                 } else {
                     (Vector3::zeros(), 0.0)
                 }
@@ -314,3 +327,6 @@ impl<'a> Dynamics for SpacecraftDynamics<'a> {
         Ok((d_x, grad))
     }
 }
+
+/// A spaceraft dynamics that works in nearly all guidance law cases
+pub type SpacecraftDynamics<'a> = BaseSpacecraftDynamics<'a, GuidanceMode>;

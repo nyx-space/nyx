@@ -17,6 +17,7 @@
 */
 
 use super::NyxError;
+use core::fmt;
 use std::str::FromStr;
 
 /// Common state parameters
@@ -181,6 +182,54 @@ impl StateParameter {
     pub fn is_b_plane(self) -> bool {
         self == Self::BdotR || self == Self::BdotT || self == Self::BLTOF
     }
+
+    pub fn unit(self) -> &'static str {
+        match self {
+            // Angles
+            Self::AoL
+            | Self::AoP
+            | Self::Declination
+            | Self::GeodeticLatitude
+            | Self::GeodeticLongitude
+            | Self::FlightPathAngle
+            | Self::Inclination
+            | Self::RightAscension
+            | Self::RAAN
+            | Self::TrueLongitude
+            | Self::VelocityDeclination
+            | Self::Apoapsis
+            | Self::Periapsis
+            | Self::MeanAnomaly
+            | Self::EccentricAnomaly
+            | Self::HyperbolicAnomaly
+            | Self::SlantAngle { .. }
+            | Self::TrueAnomaly => "deg",
+
+            // Distances
+            Self::ApoapsisRadius
+            | Self::BdotR
+            | Self::BdotT
+            | Self::GeodeticHeight
+            | Self::Hmag
+            | Self::HX
+            | Self::HY
+            | Self::HZ
+            | Self::PeriapsisRadius
+            | Self::Rmag
+            | Self::SemiParameter
+            | Self::SMA
+            | Self::SemiMinorAxis
+            | Self::X
+            | Self::Y
+            | Self::Z => "km",
+
+            // Velocities
+            Self::C3 | Self::VX | Self::VY | Self::VZ | Self::Vmag => "km/s",
+
+            Self::FuelMass => "kg",
+            _ => "",
+        }
+    }
 }
 
 impl FromStr for StateParameter {
@@ -236,5 +285,57 @@ impl FromStr for StateParameter {
                 s
             ))),
         }
+    }
+}
+
+impl fmt::Display for StateParameter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let default = format!("{:?}", self);
+        let repr = match *self {
+            Self::Apoapsis => "apoapsis",
+            Self::Periapsis => "periapsis",
+            Self::AoL => "aol",
+            Self::AoP => "aop",
+            Self::C3 => "c3",
+            Self::Cd => "cd",
+            Self::Cr => "cr",
+            Self::Declination => "declin",
+            Self::ApoapsisRadius => "apoapsis_radius",
+            Self::EccentricAnomaly => "ea",
+            Self::Eccentricity => "ecc",
+            Self::Energy => "energy",
+            Self::FlightPathAngle => "fpa",
+            Self::FuelMass => "fuel_mass",
+            Self::GeodeticHeight => "geodetic_height",
+            Self::GeodeticLatitude => "geodetic_latitude",
+            Self::GeodeticLongitude => "geodetic_longitude",
+            Self::HyperbolicAnomaly => "ha",
+            Self::Hmag => "hmag",
+            Self::HX => "hx",
+            Self::HY => "hy",
+            Self::HZ => "hz",
+            Self::Inclination => "inc",
+            Self::MeanAnomaly => "ma",
+            Self::PeriapsisRadius => "periapsis_radius",
+            Self::Period => "period",
+            Self::RightAscension => "right_asc",
+            Self::RAAN => "raan",
+            Self::Rmag => "rmag",
+            Self::SemiParameter => "semi_parameter",
+            Self::SemiMinorAxis => "semi_minor",
+            Self::SMA => "sma",
+            Self::TrueAnomaly => "ta",
+            Self::TrueLongitude => "tlong",
+            Self::VelocityDeclination => "vdeclin",
+            Self::Vmag => "vmag",
+            Self::X => "x",
+            Self::Y => "y",
+            Self::Z => "z",
+            Self::VX => "vx",
+            Self::VY => "vy",
+            Self::VZ => "vz",
+            _ => &default,
+        };
+        write!(f, "{}", repr)
     }
 }

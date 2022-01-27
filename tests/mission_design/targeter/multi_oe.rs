@@ -1,6 +1,8 @@
 extern crate nyx_space as nyx;
 
-use nyx::md::targeter::*;
+// use nyx::dynamics::guidance::Mnvr;
+use nyx::dynamics::guidance::Thruster;
+use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
 #[test]
@@ -26,12 +28,12 @@ fn tgt_c3_decl() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Declination, 5.0, 0.1),
         Objective::within_tolerance(StateParameter::C3, -5.0, 0.5),
     ];
 
-    let tgt = Targeter::delta_v(&setup, objectives);
+    let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -40,6 +42,8 @@ fn tgt_c3_decl() {
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
+
+    tgt.apply(&solution_fd).unwrap();
 
     let gmat_sol = 2.385704523944014;
     println!(
@@ -55,7 +59,7 @@ fn tgt_c3_decl() {
 }
 
 #[test]
-fn tgt_sma_ecc() {
+fn conv_tgt_sma_ecc() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -71,20 +75,31 @@ fn tgt_sma_ecc() {
 
     println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
 
-    let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
+    let spacecraft = Spacecraft {
+        orbit: xi_orig,
+        dry_mass_kg: 10.0,
+        fuel_mass_kg: 90.0,
+        thruster: Some(Thruster {
+            thrust: 500.0,
+            isp: 300.0,
+        }),
+        ext: GuidanceMode::Thrust,
+
+        ..Default::default()
+    };
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Targeter::new(
+    let tgt = Optimizer::new(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 0.5,
@@ -106,8 +121,10 @@ fn tgt_sma_ecc() {
 
     println!("{}", tgt);
 
+    let achievement_epoch = orig_dt + target_delta_t;
+
     let solution_fd = tgt
-        .try_achieve_from(spacecraft, orig_dt, orig_dt + target_delta_t)
+        .try_achieve_from(spacecraft, orig_dt, achievement_epoch)
         .unwrap();
 
     println!("Finite differencing solution: {}", solution_fd);
@@ -124,6 +141,40 @@ fn tgt_sma_ecc() {
             || solution_fd.correction.norm() < gmat_sol,
         "Finite differencing result different from GMAT and greater!"
     );
+
+    /* *** */
+    /* Convert to a finite burn and make sure this converges */
+    /* *** */
+
+    // Optimizer::convert_impulsive_mnvr(solution_fd.corrected_state, solution_fd.correction, &setup)
+    //     .unwrap();
+
+    // let mut setup = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    // setup.set_tolerance(1e-3);
+    // let mnvr = Mnvr::impulsive_to_finite(
+    //     orig_dt,
+    //     solution_fd.correction,
+    //     spacecraft,
+    //     &setup,
+    //     Frame::Inertial,
+    // )
+    // .unwrap();
+    // println!("CONVERGED ON {}", mnvr);
+
+    // // Propagate for the duration of the burn
+    // setup.dynamics = setup.dynamics.with_ctrl(Arc::new(mnvr));
+    // // Propagate until maneuver start
+    // let pre_mnvr = setup
+    //     .with(spacecraft)
+    //     .until_epoch(mnvr.start - mnvr.duration())
+    //     .unwrap();
+    // // Use a small step through the maneuver
+    // setup.set_max_step(mnvr.end - mnvr.start);
+    // let xf = setup
+    //     .with(pre_mnvr.with_guidance_mode(GuidanceMode::Custom(0)))
+    //     .until_epoch(achievement_epoch)
+    //     .unwrap();
+    // println!("{:x}", xf);
 }
 
 #[test]
@@ -147,14 +198,14 @@ fn tgt_hd_sma_ecc() {
     let setup = Propagator::default(dynamics);
 
     // Define the objective
-    let objectives = vec![
+    let objectives = [
         Objective::within_tolerance(StateParameter::Eccentricity, 0.4, 1e-5),
         Objective::within_tolerance(StateParameter::SMA, 8100.0, 0.1),
     ];
 
-    let tgt = Targeter::new(
+    let tgt = Optimizer::new(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 0.5,

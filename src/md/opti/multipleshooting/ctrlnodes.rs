@@ -21,13 +21,15 @@ extern crate serde_derive;
 
 use self::serde_derive::{Deserialize, Serialize};
 use crate::cosmic::{Cosm, Frame};
-use crate::md::targeter::Objective;
+use crate::md::objective::Objective;
 use crate::md::ui::StateParameter;
 use crate::time::Epoch;
 use crate::NyxError;
 use std::convert::Into;
 use std::str::FromStr;
 use std::sync::Arc;
+
+use super::multishoot::MultishootNode;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodesSerde {
@@ -49,6 +51,7 @@ pub struct NodeSerde {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    pub vmag: Option<f64>,
     pub epoch: String,
     pub frame: String,
 }
@@ -62,6 +65,7 @@ impl NodeSerde {
             x: self.x,
             y: self.y,
             z: self.z,
+            vmag: self.vmag.unwrap_or(0.0),
             frame,
             epoch,
         })
@@ -73,21 +77,69 @@ pub struct Node {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    pub vmag: f64,
     pub epoch: Epoch,
     pub frame: Frame,
 }
 
 impl Node {
-    pub fn to_targeter_objective(&self) -> Vec<Objective> {
-        return vec![
+    pub fn rmag(&self) -> f64 {
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+    }
+}
+
+impl MultishootNode<3> for Node {
+    fn epoch(&self) -> Epoch {
+        self.epoch
+    }
+
+    fn update_component(&mut self, component: usize, add_val: f64) {
+        match component {
+            0 => self.x += add_val,
+            1 => self.y += add_val,
+            2 => self.z += add_val,
+            3 => self.vmag += add_val,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<[Objective; 3]> for Node {
+    fn into(self) -> [Objective; 3] {
+        [
             Objective::new(StateParameter::X, self.x),
             Objective::new(StateParameter::Y, self.y),
             Objective::new(StateParameter::Z, self.z),
-        ];
+        ]
+    }
+}
+
+impl MultishootNode<4> for Node {
+    fn epoch(&self) -> Epoch {
+        self.epoch
     }
 
-    pub fn rmag(&self) -> f64 {
-        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+    fn update_component(&mut self, component: usize, add_val: f64) {
+        match component {
+            0 => self.x += add_val,
+            1 => self.y += add_val,
+            2 => self.z += add_val,
+            3 => self.vmag += add_val,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<[Objective; 4]> for Node {
+    fn into(self) -> [Objective; 4] {
+        [
+            Objective::new(StateParameter::X, self.x),
+            Objective::new(StateParameter::Y, self.y),
+            Objective::new(StateParameter::Z, self.z),
+            Objective::new(StateParameter::Vmag, self.vmag),
+        ]
     }
 }
 
@@ -98,6 +150,7 @@ impl Into<NodeSerde> for Node {
             x: self.x,
             y: self.y,
             z: self.z,
+            vmag: Some(self.vmag),
             frame: self.frame.to_string(),
             epoch: self.epoch.to_string(),
         }
@@ -111,6 +164,7 @@ impl Into<NodeSerde> for &Node {
             x: self.x,
             y: self.y,
             z: self.z,
+            vmag: Some(self.vmag),
             frame: self.frame.to_string(),
             epoch: self.epoch.to_string(),
         }
@@ -125,6 +179,7 @@ fn test_nodeserde() {
 x = -394.37164017582654
 y = -80.02184491079583
 z = -1702.1160791417442
+vmag = 0.0
 epoch = "2023-11-25T14:11:46.789000034 UTC"
 frame = "Moon J2000"
 
@@ -132,6 +187,7 @@ frame = "Moon J2000"
 x = -381.68254116206856
 y = -48.21573534985666
 z = -1705.829637126235
+vmag = 0.0
 epoch = "2023-11-25T14:12:06.789000034 UTC"
 frame = "Moon J2000"
 
@@ -139,6 +195,7 @@ frame = "Moon J2000"
 x = -368.8474537620047
 y = -16.401929604226403
 z = -1708.8692139449731
+vmag = 0.0
 epoch = "2023-11-25T14:12:26.789000034 UTC"
 frame = "Moon J2000"
 "#;

@@ -30,7 +30,7 @@ fn stop_cond_3rd_apo() {
     let mut prop = setup.with(state);
     // Propagate for at five orbital periods so we know we've passed the third one
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
-    let (third_apo, _) = prop.until_event(5 * period, &apo_event, 3).unwrap();
+    let (third_apo, _) = prop.until_nth_event(5 * period, &apo_event, 3).unwrap();
 
     let min_epoch = start_dt + 2.0 * period;
     let max_epoch = start_dt + 3.0 * period;
@@ -75,7 +75,7 @@ fn stop_cond_3rd_peri() {
     // Propagate for at four orbital periods so we know we've passed the third one
     // NOTE: We're fetching the 3rd item because the initial state is actually at periapse,
     // which the event finder will find.
-    let (third_peri, _) = prop.until_event(5 * period, &peri_event, 4).unwrap();
+    let (third_peri, _) = prop.until_nth_event(5 * period, &peri_event, 4).unwrap();
 
     println!("{:x}", third_peri);
     // Confirm that this is the third periapse event which is found
@@ -195,7 +195,7 @@ fn line_of_nodes() {
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
-    let (lon_state, _) = prop.until_event(3 * period, &lon_event, 0).unwrap();
+    let (lon_state, _) = prop.until_event(3 * period, &lon_event).unwrap();
     println!(
         "{:x} => longitude = {} degrees",
         lon_state,
@@ -224,7 +224,7 @@ fn latitude() {
 
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
-    let (lon_state, _) = prop.until_event(3 * period, &lat_event, 0).unwrap();
+    let (lon_state, _) = prop.until_event(3 * period, &lat_event).unwrap();
     println!(
         "{:x} => latitude = {} degrees",
         lon_state,

@@ -220,30 +220,32 @@ fn traj_spacecraft() {
     // Note: _Because_ we need to use the trajectory below, we'll be cloning the trajectory
     // If you don't need the trajectory after you've iterated over it, don't clone it (rustc will tell you that).
 
-    for sc_state in traj.every(1 * TimeUnit::Day) {
+    for mut sc_state in traj.every(1 * TimeUnit::Day) {
         // We need to evaluate the mode of this state because the trajectory does not store discrete information
-        let mode_then = ruggiero_ctrl.next(&sc_state);
-        if mode_then != prev_mode {
+        ruggiero_ctrl.next(&mut sc_state);
+        if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
                 prev_mode,
-                mode_then,
+                sc_state.mode(),
                 sc_state.epoch()
             );
-            prev_mode = mode_then;
+            prev_mode = sc_state.mode();
         }
     }
 
     for epoch in TimeSeries::inclusive(start_dt, start_dt + prop_time, 1 * TimeUnit::Day) {
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
-        let sc_state = traj.at(epoch).unwrap();
-        let mode_then = ruggiero_ctrl.next(&sc_state);
-        if mode_then != prev_mode {
+        let mut sc_state = traj.at(epoch).unwrap();
+        ruggiero_ctrl.next(&mut sc_state);
+        if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
-                prev_mode, mode_then, epoch
+                prev_mode,
+                sc_state.mode(),
+                epoch
             );
-            prev_mode = mode_then;
+            prev_mode = sc_state.mode();
         }
     }
 

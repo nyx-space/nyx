@@ -221,7 +221,7 @@ fn qlaw_as_ruggiero_case_c() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
 fn qlaw_as_ruggiero_case_d() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089
@@ -295,7 +295,7 @@ fn qlaw_as_ruggiero_case_d() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "https://gitlab.com/chrisrabotin/nyx/issues/103"]
 fn qlaw_as_ruggiero_case_e() {
     // Broken: https://gitlab.com/chrisrabotin/nyx/issues/103
     // Source: AAS-2004-5089

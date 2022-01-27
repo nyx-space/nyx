@@ -17,6 +17,7 @@
 */
 
 use crate::md::trajectory::TrajError;
+pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;
 use std::convert::From;
@@ -68,6 +69,8 @@ pub enum NyxError {
     CtrlNotAUnitVector(f64),
     /// The control throttle range must be between 0.0 and 1.0 (both included) as it represents a percentage.
     CtrlThrottleRangeErr(f64),
+    /// Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that
+    PolynomialOrderError(usize),
     /// An objective based analysis or control was attempted, but no objective was defined.
     NoObjectiveDefined,
     /// Error when exporting data
@@ -78,10 +81,6 @@ pub enum NyxError {
     CorrectionIneffective(String),
     /// When there is an error during a Monte Carlo or in the conditions starting a Monte Carlo run
     MonteCarlo(String),
-    /// Raised if the variables to be adjusted lead to an over-determined of the problem for the targeter
-    TargetError(String),
-    /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
-    UnderdeterminedProblem,
     /// Returned if CCSDS encountered an error
     CCSDS(String),
     /// Returned if the targeter for `node_no` has failed
@@ -90,8 +89,11 @@ pub enum NyxError {
     CustomError(String),
     /// Hifitime errors that rose upward
     TimeError(TimeErrors),
+    Targeter(TargetingError),
     /// Trajectory related errors that rose upward
     Trajectory(TrajError),
+    /// Some math domain error, e.g. the arcsin of a number that isn't within [-1; 1]
+    MathDomain(String),
 }
 
 impl fmt::Display for NyxError {
@@ -131,6 +133,9 @@ impl fmt::Display for NyxError {
             }
             Self::MultipleShootingTargeter(n, e) => {
                 write!(f, "Multiple shooting failed on node {} with {}", n, e)
+            }
+            Self::MaxIterReached(e) => {
+                write!(f, "MaxIterReached: {}", e)
             }
             _ => write!(f, "{:?}", self),
         }

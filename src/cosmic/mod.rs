@@ -26,6 +26,7 @@ pub use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft};
 pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit, SECONDS_PER_DAY};
 use std::fmt;
 use std::fs::File;
@@ -102,6 +103,11 @@ where
     /// By default, this is not implemented. This function must be implemented when filtering on this state.
     fn add(self, _other: OVector<f64, Self::Size>) -> Self {
         unimplemented!()
+    }
+
+    /// Return the value of the parameter, returns an error by default
+    fn value(&self, _param: &StateParameter) -> Result<f64, NyxError> {
+        Err(NyxError::ParameterUnavailableForType)
     }
 }
 

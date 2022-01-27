@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use either::Either;
+
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::rayon::iter::ParallelBridge;
 use super::rayon::prelude::ParallelIterator;
@@ -32,7 +34,6 @@ use crate::State;
 use std::collections::BTreeMap;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::Arc;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
@@ -45,7 +46,7 @@ where
         + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
-    pub dynamics: Arc<D>, // Stores the dynamics used. *Must* use this to get the latest values
+    pub dynamics: D, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     order: u8,             // Order of the integrator
     stages: usize,         // Number of stages, i.e. how many times the derivatives will be called
@@ -62,7 +63,7 @@ where
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: Arc<D>, opts: PropOpts<E>) -> Self {
+    pub fn new<T: RK>(dynamics: D, opts: PropOpts<E>) -> Self {
         Self {
             dynamics,
             opts,
@@ -87,7 +88,7 @@ where
     }
 
     /// An RK89 propagator (the default) with custom propagator options.
-    pub fn rk89(dynamics: Arc<D>, opts: PropOpts<E>) -> Self {
+    pub fn rk89(dynamics: D, opts: PropOpts<E>) -> Self {
         Self::new::<RK89>(dynamics, opts)
     }
 
@@ -120,7 +121,7 @@ where
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
-    pub fn default(dynamics: Arc<D>) -> Self {
+    pub fn default(dynamics: D) -> Self {
         Self::new::<RK89>(dynamics, PropOpts::default())
     }
 }
@@ -168,7 +169,6 @@ where
         maybe_tx_chan: Option<Sender<D::StateType>>,
     ) -> Result<D::StateType, NyxError> {
         if duration == 0 * TimeUnit::Second {
-            debug!("No propagation necessary");
             return Ok(self.state);
         }
         let stop_time = self.state.epoch() + duration;
@@ -176,6 +176,9 @@ where
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
+        // Call `finally` on the current state to set anything up
+        self.state = self.prop.dynamics.finally(self.state)?;
+
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
@@ -395,9 +398,23 @@ where
         self.for_duration_with_traj(duration)
     }
 
-    /// Propagate until a specific event is found `trigger` times.
+    /// Propagate until a specific event is found once.
     /// Returns the state found and the trajectory until `max_duration`
     pub fn until_event<F: EventEvaluator<D::StateType>>(
+        &mut self,
+        max_duration: Duration,
+        event: &F,
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
+    {
+        self.until_nth_event(max_duration, event, 0)
+    }
+
+    /// Propagate until a specific event is found `trigger` times.
+    /// Returns the state found and the trajectory until `max_duration`
+    pub fn until_nth_event<F: EventEvaluator<D::StateType>>(
         &mut self,
         max_duration: Duration,
         event: &F,
@@ -415,6 +432,22 @@ where
         match events.get(trigger) {
             Some(event_state) => Ok((*event_state, traj)),
             None => Err(NyxError::UnsufficientTriggers(trigger, events.len())),
+        }
+    }
+
+    /// Propagate until a specific epoch or an event is found once.
+    /// Returns the state found and the trajectory
+    pub fn until<F: EventEvaluator<D::StateType>>(
+        &mut self,
+        cond: Either<Epoch, (Duration, &F)>,
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
+    {
+        match cond {
+            Either::Left(epoch) => self.until_epoch_with_traj(epoch),
+            Either::Right((max_duration, event)) => self.until_event(max_duration, event),
         }
     }
 
@@ -644,20 +677,20 @@ fn test_options() {
     let opts = PropOpts::with_fixed_step_s(1e-1);
     assert_eq!(opts.min_step, 1e-1 * TimeUnit::Second);
     assert_eq!(opts.max_step, 1e-1 * TimeUnit::Second);
-    assert!(opts.tolerance.abs() < std::f64::EPSILON);
+    assert!(opts.tolerance.abs() < f64::EPSILON);
     assert!(opts.fixed_step);
 
     let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
     assert_eq!(opts.min_step, 1e-2 * TimeUnit::Second);
     assert_eq!(opts.max_step, 10.0 * TimeUnit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert!(!opts.fixed_step);
 
     let opts: PropOpts<RSSCartesianStep> = Default::default();
     assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
     assert_eq!(opts.min_step, 0.001 * TimeUnit::Second);
     assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert_eq!(opts.attempts, 50);
     assert!(!opts.fixed_step);
 }

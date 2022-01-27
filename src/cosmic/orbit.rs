@@ -27,6 +27,7 @@ use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::State;
 use super::{BPlane, Frame};
 use crate::linalg::{Const, OVector};
+use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
 use crate::NyxError;
@@ -539,6 +540,24 @@ impl Orbit {
             }
             _ => panic!("orbital energy not defined in this frame"),
         }
+    }
+
+    /// Returns a copy of the state with a new radius
+    pub fn with_radius(self, new_radius: &Vector3<f64>) -> Self {
+        let mut me = self;
+        me.x = new_radius[0];
+        me.y = new_radius[1];
+        me.z = new_radius[2];
+        me
+    }
+
+    /// Returns a copy of the state with a new radius
+    pub fn with_velocity(self, new_velocity: &Vector3<f64>) -> Self {
+        let mut me = self;
+        me.vx = new_velocity[0];
+        me.vy = new_velocity[1];
+        me.vz = new_velocity[2];
+        me
     }
 
     /// Returns the semi-major axis in km
@@ -1703,6 +1722,58 @@ impl State for Orbit {
 
     fn add(self, other: OVector<f64, Self::Size>) -> Self {
         self + other
+    }
+
+    fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
+        match *param {
+            StateParameter::ApoapsisRadius => Ok(self.apoapsis()),
+            StateParameter::AoL => Ok(self.aol()),
+            StateParameter::AoP => Ok(self.aop()),
+            StateParameter::BdotR => Ok(BPlane::new(*self)?.b_r.real()),
+            StateParameter::BdotT => Ok(BPlane::new(*self)?.b_t.real()),
+            StateParameter::BLTOF => Ok(BPlane::new(*self)?.ltof_s.real()),
+            StateParameter::C3 => Ok(self.c3()),
+            StateParameter::Declination => Ok(self.declination()),
+            StateParameter::EccentricAnomaly => Ok(self.ea()),
+            StateParameter::Eccentricity => Ok(self.ecc()),
+            StateParameter::Energy => Ok(self.energy()),
+            StateParameter::FlightPathAngle => Ok(self.fpa()),
+            StateParameter::GeodeticHeight => Ok(self.geodetic_height()),
+            StateParameter::GeodeticLatitude => Ok(self.geodetic_latitude()),
+            StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude()),
+            StateParameter::Hmag => Ok(self.hmag()),
+            StateParameter::HX => Ok(self.hx()),
+            StateParameter::HY => Ok(self.hy()),
+            StateParameter::HZ => Ok(self.hz()),
+            StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly(),
+            StateParameter::Inclination => Ok(self.inc()),
+            StateParameter::MeanAnomaly => Ok(self.ma()),
+            StateParameter::PeriapsisRadius => Ok(self.periapsis()),
+            StateParameter::Period => Ok(self.period().in_seconds()),
+            StateParameter::RightAscension => Ok(self.right_ascension()),
+            StateParameter::RAAN => Ok(self.raan()),
+            StateParameter::Rmag => Ok(self.rmag()),
+            StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis()),
+            StateParameter::SemiParameter => Ok(self.semi_parameter()),
+            StateParameter::SlantAngle { x, y, z } => {
+                let mut tgt = Vector3::new(x, y, z);
+                tgt /= tgt.norm();
+
+                Ok(self.r_hat().dot(&tgt).acos().to_degrees())
+            }
+            StateParameter::SMA => Ok(self.sma()),
+            StateParameter::TrueAnomaly => Ok(self.ta()),
+            StateParameter::TrueLongitude => Ok(self.tlong()),
+            StateParameter::VelocityDeclination => Ok(self.velocity_declination()),
+            StateParameter::Vmag => Ok(self.vmag()),
+            StateParameter::X => Ok(self.x),
+            StateParameter::Y => Ok(self.y),
+            StateParameter::Z => Ok(self.z),
+            StateParameter::VX => Ok(self.vx),
+            StateParameter::VY => Ok(self.vy),
+            StateParameter::VZ => Ok(self.vz),
+            _ => Err(NyxError::ParameterUnavailableForType),
+        }
     }
 }
 

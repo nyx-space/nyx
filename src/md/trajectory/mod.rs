@@ -84,11 +84,6 @@ where
         Ok((self.value(param)?, self.deriv(param)?))
     }
 
-    /// Return the requested parameter
-    fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
-        Ok(self.value_and_deriv(param)?.0)
-    }
-
     /// Return the time derivative requested parameter
     fn deriv(&self, param: &StateParameter) -> Result<f64, NyxError> {
         Ok(self.value_and_deriv(param)?.1)
