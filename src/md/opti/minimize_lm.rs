@@ -19,7 +19,7 @@
 extern crate levenberg_marquardt;
 
 use super::optimizer::Optimizer;
-use super::solution::TargeterSolution;
+// use super::solution::TargeterSolution;
 use crate::dynamics::guidance::Mnvr;
 use crate::errors::TargetingError;
 use crate::linalg::{storage::Owned, Const, SMatrix, SVector, Vector6};
@@ -32,7 +32,7 @@ use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use hifitime::TimeUnitHelper;
 use levenberg_marquardt::{LeastSquaresProblem, LevenbergMarquardt};
-use std::time::Instant;
+// use std::time::Instant;
 
 /// N: number of variables; M: number of objectives
 pub struct OptimizerInstance<'a, E: ErrorCtrl, const N: usize, const M: usize>
@@ -149,8 +149,8 @@ where
                 // Modify the default maneuver
                 match var.component {
                     Vary::Duration => mnvr.end = mnvr.start + attempted_control[i].seconds(),
-                    Vary::EndEpoch => mnvr.end = mnvr.end + attempted_control[i].seconds(),
-                    Vary::StartEpoch => mnvr.start = mnvr.start + attempted_control[i].seconds(),
+                    Vary::EndEpoch => mnvr.end += attempted_control[i].seconds(),
+                    Vary::StartEpoch => mnvr.start += attempted_control[i].seconds(),
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
                         mnvr.alpha_inplane_radians = mnvr
                             .alpha_inplane_radians
@@ -166,7 +166,7 @@ where
                     Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                         let mut vector = mnvr.vector(mnvr.start);
                         vector[var.component.vec_index()] = attempted_control[i];
-                        mnvr.set_direction(vector);
+                        mnvr.set_direction(vector).unwrap();
                     }
                     Vary::ThrustLevel => {
                         mnvr.thrust_lvl += attempted_control[i];
@@ -341,7 +341,7 @@ where
                         Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                             let mut vector = this_mnvr.vector(self.correction_epoch);
                             vector[var.component.vec_index()] += pert;
-                            this_mnvr.set_direction(vector);
+                            this_mnvr.set_direction(vector).unwrap();
                         }
                         Vary::ThrustLevel => {
                             this_mnvr.thrust_lvl += pert;
@@ -481,13 +481,13 @@ where
         }
         let mut instance = OptimizerInstance {
             prop: &self.prop.clone(),
-            objectives: self.objectives.clone(),
+            objectives: self.objectives,
             objective_frame: self.objective_frame.clone(),
-            variables: self.variables.clone(),
-            correction_frame: self.correction_frame.clone(),
+            variables: self.variables,
+            correction_frame: self.correction_frame,
             spacecraft: initial_state,
-            achievement_epoch: achievement_epoch,
-            correction_epoch: correction_epoch,
+            achievement_epoch,
+            correction_epoch,
             control: initial_control,
             // residuals: self.residuals.clone(),
             // TODO: Need a `step` function to compute the residuals without any correction.

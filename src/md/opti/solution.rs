@@ -97,7 +97,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                             let total_end_corr =
                                 (mnvr.end + corr.seconds() - achievement_epoch).in_seconds();
                             let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
-                            mnvr.end = mnvr.end + acceptable_corr;
+                            mnvr.end += acceptable_corr;
                         }
                     }
                     Vary::StartEpoch => {
@@ -106,9 +106,9 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                             let total_start_corr =
                                 (mnvr.start + corr.seconds() - correction_epoch).in_seconds();
                             let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
-                            mnvr.end = mnvr.end + acceptable_corr;
+                            mnvr.end += acceptable_corr;
 
-                            mnvr.start = mnvr.start + corr.seconds()
+                            mnvr.start += corr.seconds()
                         }
                     }
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {

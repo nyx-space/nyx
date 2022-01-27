@@ -106,8 +106,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 // Modify the default maneuver
                 match var.component {
                     Vary::Duration => mnvr.end = mnvr.start + var.init_guess.seconds(),
-                    Vary::EndEpoch => mnvr.end = mnvr.end + var.init_guess.seconds(),
-                    Vary::StartEpoch => mnvr.start = mnvr.start + var.init_guess.seconds(),
+                    Vary::EndEpoch => mnvr.end += var.init_guess.seconds(),
+                    Vary::StartEpoch => mnvr.start += var.init_guess.seconds(),
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
                         mnvr.alpha_inplane_radians = mnvr
                             .alpha_inplane_radians
@@ -480,9 +480,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     achieved_state: xi_start.with_orbit(xf),
                     correction: total_correction,
                     computation_dur: conv_dur,
-                    variables: self.variables.clone(),
+                    variables: self.variables,
                     achieved_errors: err_vector,
-                    achieved_objectives: self.objectives.clone(),
+                    achieved_objectives: self.objectives,
                     iterations: it,
                 };
                 // Log success as info
@@ -512,7 +512,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             debug!("Inverse Jacobian {}", jac_inv);
 
-            let mut delta = jac_inv * &err_vector;
+            let mut delta = jac_inv * err_vector;
 
             debug!(
                 "Error vector (norm = {}): {}\nRaw correction: {}",
@@ -555,7 +555,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 let total_end_corr =
                                     (mnvr.end + corr.seconds() - achievement_epoch).in_seconds();
                                 let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
-                                mnvr.end = mnvr.end + acceptable_corr;
+                                mnvr.end += acceptable_corr;
                             }
                         }
                         Vary::StartEpoch => {
@@ -564,9 +564,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 let total_start_corr =
                                     (mnvr.start + corr.seconds() - correction_epoch).in_seconds();
                                 let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
-                                mnvr.end = mnvr.end + acceptable_corr;
+                                mnvr.end += acceptable_corr;
 
-                                mnvr.start = mnvr.start + corr.seconds()
+                                mnvr.start += corr.seconds()
                             }
                         }
                         Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {

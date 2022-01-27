@@ -99,7 +99,7 @@ fn unit_vector_from_plane_angles(alpha: f64, beta: f64) -> Vector3<f64> {
 }
 
 /// Converts the provided unit vector into in-plane and out-of-plane angles in the RCN frame, returned in radians
-pub(crate) fn plane_angles_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
+pub fn plane_angles_from_unit_vector(vhat: Vector3<f64>) -> (f64, f64) {
     (vhat[1].atan2(vhat[0]), vhat[2].asin())
 }
 

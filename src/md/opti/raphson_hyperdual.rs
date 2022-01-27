@@ -238,9 +238,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     achieved_state: xi_start.with_orbit(xf),
                     correction: total_correction,
                     computation_dur: conv_dur,
-                    variables: self.variables.clone(),
+                    variables: self.variables,
                     achieved_errors: err_vector,
-                    achieved_objectives: self.objectives.clone(),
+                    achieved_objectives: self.objectives,
                     iterations: it,
                 };
                 info!("Targeter -- CONVERGED in {} iterations", it);
@@ -265,7 +265,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
             debug!("Inverse Jacobian {}", jac_inv);
 
-            let mut delta = jac_inv * &err_vector;
+            let mut delta = jac_inv * err_vector;
 
             debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
 
