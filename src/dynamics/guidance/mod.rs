@@ -29,7 +29,7 @@ mod mnvr;
 pub use mnvr::Mnvr;
 
 mod ruggiero;
-pub use ruggiero::Ruggiero;
+pub use ruggiero::{Objective, Ruggiero, StateParameter};
 
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[derive(Copy, Clone, Debug)]
@@ -64,28 +64,6 @@ pub trait GuidanceLaw<X: SpacecraftExt>: Send + Sync {
     /// Returns whether this thrust control has been achieved, if it has an objective
     fn achieved(&self, _osc_state: &BaseSpacecraft<X>) -> Result<bool, NyxError> {
         Err(NyxError::NoObjectiveDefined)
-    }
-}
-
-/// Goals used for sub-optimal controls
-#[derive(Copy, Clone, Debug)]
-pub enum Achieve {
-    Sma { target: f64, tol: f64 },
-    Ecc { target: f64, tol: f64 },
-    Inc { target: f64, tol: f64 },
-    Raan { target: f64, tol: f64 },
-    Aop { target: f64, tol: f64 },
-}
-
-impl Achieve {
-    pub fn achieved(&self, state: &Orbit) -> bool {
-        match *self {
-            Achieve::Sma { target, tol } => (state.sma() - target).abs() < tol,
-            Achieve::Ecc { target, tol } => (state.ecc() - target).abs() < tol,
-            Achieve::Inc { target, tol } => (state.inc() - target).abs() < tol,
-            Achieve::Raan { target, tol } => (state.raan() - target).abs() < tol,
-            Achieve::Aop { target, tol } => (state.aop() - target).abs() < tol,
-        }
     }
 }
 

@@ -94,6 +94,8 @@ pub enum NyxError {
     Trajectory(TrajError),
     /// Some math domain error, e.g. the arcsin of a number that isn't within [-1; 1]
     MathDomain(String),
+    /// A guidance law is incorrectly configured
+    GuidanceConfigError(String),
 }
 
 impl fmt::Display for NyxError {

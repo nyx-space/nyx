@@ -36,8 +36,12 @@ pub trait SpacecraftExt: Clone + Copy + Default + fmt::Debug + Send + Sync {}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GuidanceMode {
+    /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     Coast,
+    /// Guidance is turned on and Guidance Law may switch mode to Coast for next call
     Thrust,
+    /// Guidance is turned off and Guidance Law may not change its mode (will need to be done externally to the guidance law).
+    Inhibit,
     Custom(u8),
 }
 

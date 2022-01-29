@@ -17,9 +17,12 @@
 */
 
 use super::{
-    unit_vector_from_plane_angles, Achieve, Frame, GuidanceLaw, GuidanceMode, NyxError, Orbit,
-    Spacecraft, Vector3,
+    unit_vector_from_plane_angles, Frame, GuidanceLaw, GuidanceMode, NyxError, Orbit, Spacecraft,
+    Vector3,
 };
+pub use crate::md::objective::Objective;
+pub use crate::md::StateParameter;
+use crate::State;
 use std::f64::consts::FRAC_PI_2 as half_pi;
 use std::sync::Arc;
 
@@ -27,7 +30,7 @@ use std::sync::Arc;
 #[derive(Copy, Clone, Debug)]
 pub struct Ruggiero {
     /// Stores the objectives
-    objectives: [Option<Achieve>; 5],
+    objectives: [Option<Objective>; 5],
     init_state: Orbit,
 }
 
@@ -36,15 +39,40 @@ pub struct Ruggiero {
 impl Ruggiero {
     /// Creates a new Ruggiero locally optimal control as an Arc
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
-    pub fn new(objectives: Vec<Achieve>, initial: Orbit) -> Arc<Self> {
-        let mut objs: [Option<Achieve>; 5] = [None, None, None, None, None];
+    pub fn new(objectives: &[Objective], initial: Orbit) -> Result<Arc<Self>, NyxError> {
+        let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
+        if objectives.len() > 5 || objectives.len() == 0 {
+            return Err(NyxError::GuidanceConfigError(format!(
+                "Must provide between 1 and 5 objectives (included), provided {}",
+                objectives.len()
+            )));
+        }
+
+        for (i, obj) in objectives.iter().enumerate() {
+            if [
+                StateParameter::SMA,
+                StateParameter::Eccentricity,
+                StateParameter::Inclination,
+                StateParameter::RAAN,
+                StateParameter::AoP,
+            ]
+            .contains(&obj.parameter)
+            {
+                objs[i] = Some(*obj);
+            } else {
+                return Err(NyxError::GuidanceConfigError(format!(
+                    "Objective {} not supported in Ruggerio",
+                    obj.parameter
+                )));
+            }
+        }
         for i in 0..objectives.len() {
             objs[i] = Some(objectives[i]);
         }
-        Arc::new(Self {
+        Ok(Arc::new(Self {
             objectives: objs,
             init_state: initial,
-        })
+        }))
     }
 
     fn weighting(init: f64, target: f64, osc: f64, tol: f64) -> f64 {
@@ -68,7 +96,7 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
     /// Returns whether the control law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         for obj in self.objectives.iter().flatten() {
-            if !obj.achieved(&state.orbit) {
+            if !obj.assess_raw(state.orbit.value(&obj.parameter)?).0 {
                 return Ok(false);
             }
         }
@@ -76,15 +104,18 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
     }
 
     fn direction(&self, sc: &Spacecraft) -> Vector3<f64> {
-        if sc.mode() == GuidanceMode::Coast {
-            Vector3::zeros()
-        } else if sc.mode() == GuidanceMode::Thrust {
+        if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut ctrl = Vector3::zeros();
             for obj in self.objectives.iter().flatten() {
-                match *obj {
-                    Achieve::Sma { target, tol } => {
-                        let weight = Self::weighting(self.init_state.sma(), target, osc.sma(), tol);
+                match obj.parameter {
+                    StateParameter::SMA => {
+                        let weight = Self::weighting(
+                            self.init_state.sma(),
+                            obj.desired_value,
+                            osc.sma(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             let num = osc.ecc() * osc.ta().to_radians().sin();
                             let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
@@ -92,8 +123,13 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                             ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         }
                     }
-                    Achieve::Ecc { target, tol } => {
-                        let weight = Self::weighting(self.init_state.ecc(), target, osc.ecc(), tol);
+                    StateParameter::Eccentricity => {
+                        let weight = Self::weighting(
+                            self.init_state.ecc(),
+                            obj.desired_value,
+                            osc.ecc(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             let num = osc.ta().to_radians().sin();
                             let denom = osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
@@ -101,26 +137,39 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                             ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         }
                     }
-                    Achieve::Inc { target, tol } => {
-                        let weight = Self::weighting(self.init_state.inc(), target, osc.inc(), tol);
+                    StateParameter::Inclination => {
+                        let weight = Self::weighting(
+                            self.init_state.inc(),
+                            obj.desired_value,
+                            osc.inc(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             let beta =
                                 half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
                             ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                         }
                     }
-                    Achieve::Raan { target, tol } => {
-                        // BUG: https://gitlab.com/chrisrabotin/nyx/issues/83
-                        let weight =
-                            Self::weighting(self.init_state.raan(), target, osc.raan(), tol);
+                    StateParameter::RAAN => {
+                        let weight = Self::weighting(
+                            self.init_state.raan(),
+                            obj.desired_value,
+                            osc.raan(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             let beta =
                                 half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
                             ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                         }
                     }
-                    Achieve::Aop { target, tol } => {
-                        let weight = Self::weighting(self.init_state.aop(), target, osc.aop(), tol);
+                    StateParameter::AoP => {
+                        let weight = Self::weighting(
+                            self.init_state.aop(),
+                            obj.desired_value,
+                            osc.aop(),
+                            obj.tolerance,
+                        );
                         let oe2 = 1.0 - osc.ecc().powi(2);
                         let e3 = osc.ecc().powi(3);
                         // Compute the optimal true anomaly for in-plane thrusting
@@ -149,6 +198,7 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                             ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                         };
                     }
+                    _ => unreachable!(),
                 }
             }
             // Return a normalized vector
@@ -160,69 +210,94 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
             // Convert to inertial -- this whole control is computed in the RCN frame
             osc.dcm_from_traj_frame(Frame::RCN).unwrap() * ctrl
         } else {
-            panic!("Unsupported guidance mode {:?}", sc.mode());
+            Vector3::zeros()
         }
     }
 
     // Either thrust full power or not at all
     fn throttle(&self, sc: &Spacecraft) -> f64 {
-        if sc.mode() == GuidanceMode::Coast {
-            0.0
-        } else if sc.mode() == GuidanceMode::Thrust {
+        if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             for obj in self.objectives.iter().flatten() {
-                match *obj {
-                    Achieve::Sma { target, tol } => {
-                        let weight = Self::weighting(self.init_state.sma(), target, osc.sma(), tol);
+                match obj.parameter {
+                    StateParameter::SMA => {
+                        let weight = Self::weighting(
+                            self.init_state.sma(),
+                            obj.desired_value,
+                            osc.sma(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             return 1.0;
                         }
                     }
-                    Achieve::Ecc { target, tol } => {
-                        let weight = Self::weighting(self.init_state.ecc(), target, osc.ecc(), tol);
+                    StateParameter::Eccentricity => {
+                        let weight = Self::weighting(
+                            self.init_state.ecc(),
+                            obj.desired_value,
+                            osc.ecc(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             return 1.0;
                         }
                     }
-                    Achieve::Inc { target, tol } => {
-                        let weight = Self::weighting(self.init_state.inc(), target, osc.inc(), tol);
+                    StateParameter::Inclination => {
+                        let weight = Self::weighting(
+                            self.init_state.inc(),
+                            obj.desired_value,
+                            osc.inc(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             return 1.0;
                         }
                     }
-                    Achieve::Raan { target, tol } => {
-                        let weight =
-                            Self::weighting(self.init_state.raan(), target, osc.raan(), tol);
+                    StateParameter::RAAN => {
+                        let weight = Self::weighting(
+                            self.init_state.raan(),
+                            obj.desired_value,
+                            osc.raan(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             return 1.0;
                         }
                     }
-                    Achieve::Aop { target, tol } => {
-                        let weight = Self::weighting(self.init_state.aop(), target, osc.aop(), tol);
+                    StateParameter::AoP => {
+                        let weight = Self::weighting(
+                            self.init_state.aop(),
+                            obj.desired_value,
+                            osc.aop(),
+                            obj.tolerance,
+                        );
                         if weight.abs() > 0.0 {
                             return 1.0;
                         }
                     }
+                    _ => unreachable!(),
                 }
             }
             0.0
         } else {
-            panic!("Unsupported guidance mode {:?}", sc.mode());
+            0.0
         }
     }
 
     /// Update the state for the next iteration
     fn next(&self, sc: &mut Spacecraft) {
-        if self.throttle(sc) > 0.0 {
-            if sc.mode() == GuidanceMode::Coast {
-                info!("enabling control: {:x}", sc.orbit);
+        if sc.mode() != GuidanceMode::Inhibit {
+            if self.throttle(sc) > 0.0 {
+                if sc.mode() == GuidanceMode::Coast {
+                    info!("enabling control: {:x}", sc.orbit);
+                }
+                sc.mut_mode(GuidanceMode::Thrust);
+            } else {
+                if sc.mode() == GuidanceMode::Thrust {
+                    info!("disabling control: {:x}", sc.orbit);
+                }
+                sc.mut_mode(GuidanceMode::Coast);
             }
-            sc.mut_mode(GuidanceMode::Thrust);
-        } else {
-            if sc.mode() == GuidanceMode::Thrust {
-                info!("disabling control: {:x}", sc.orbit);
-            }
-            sc.mut_mode(GuidanceMode::Coast);
         }
     }
 }
@@ -238,18 +313,12 @@ fn ruggiero_weight() {
     let orbit = Orbit::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
     // Define the objectives
-    let objectives = vec![
-        Achieve::Sma {
-            target: 42164.0,
-            tol: 1.0,
-        },
-        Achieve::Ecc {
-            target: 0.01,
-            tol: 5e-5,
-        },
+    let objectives = &[
+        Objective::within_tolerance(StateParameter::SMA, 42164.0, 1.0),
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero = Ruggiero::new(objectives, orbit);
+    let ruggiero = Ruggiero::new(objectives, orbit).unwrap();
     // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
     let osc = Orbit::cartesian(
         7_303.253_461_441_64f64,
