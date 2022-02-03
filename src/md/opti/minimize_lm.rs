@@ -226,7 +226,7 @@ where
             let mut prop = self.prop.clone();
             let prop_opts = prop.opts;
             let pre_mnvr = prop.with(cur_xi).until_epoch(mnvr.start).unwrap();
-            prop.dynamics = prop.dynamics.with_ctrl_no_decr(Arc::new(mnvr));
+            prop.dynamics = prop.dynamics.with_guidance_law_no_decr(Arc::new(mnvr));
             prop.set_max_step(mnvr.end - mnvr.start);
             let post_mnvr = prop
                 .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
@@ -369,7 +369,7 @@ where
                     // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
                     let prop_opts = this_prop.opts;
                     this_prop.set_max_step(this_mnvr.duration());
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
+                    this_prop.dynamics = this_prop.dynamics.with_guidance_law(Arc::new(this_mnvr));
                     let post_mnvr = this_prop
                         .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
                         .until_epoch(this_mnvr.end)

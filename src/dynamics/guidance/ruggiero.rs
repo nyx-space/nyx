@@ -24,6 +24,7 @@ pub use crate::md::objective::Objective;
 pub use crate::md::StateParameter;
 use crate::State;
 use std::f64::consts::FRAC_PI_2 as half_pi;
+use std::fmt;
 use std::sync::Arc;
 
 /// Ruggiero defines the closed loop control law from IEPC 2011-102
@@ -168,13 +169,13 @@ impl Ruggiero {
                 .abs()
         };
 
-        // if η >= η_threshold {
-        //     println!("{:.3} >= {:.3} => {} ", η, η_threshold, weight);
-        // } else {
-        //     println!("WARN {:.3} >= {:.3} => {} ", η, η_threshold, weight);
-        // }
-
         weight
+    }
+}
+
+impl fmt::Display for Ruggiero {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Ruggiero with {} objectives", self.objectives.len())
     }
 }
 
@@ -192,7 +193,7 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
     fn direction(&self, sc: &Spacecraft) -> Vector3<f64> {
         if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
-            let mut ctrl = Vector3::zeros();
+            let mut steering = Vector3::zeros();
             for (i, obj) in self.objectives.iter().flatten().enumerate() {
                 let weight = self.weighting(obj, &osc, self.ηthresholds[i]);
                 if weight.abs() <= 0.0 {
@@ -204,21 +205,21 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                         let num = osc.ecc() * osc.ta().to_radians().sin();
                         let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
                         let alpha = num.atan2(denom);
-                        ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
+                        steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Eccentricity => {
                         let num = osc.ta().to_radians().sin();
                         let denom = osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
                         let alpha = num.atan2(denom);
-                        ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
+                        steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Inclination => {
                         let beta = half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
-                        ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
+                        steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::RAAN => {
                         let beta = half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
-                        ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
+                        steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::AoP => {
                         let oe2 = 1.0 - osc.ecc().powi(2);
@@ -240,13 +241,13 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                             let p = osc.semi_parameter();
                             let (sin_ta, cos_ta) = osc.ta().to_radians().sin_cos();
                             let alpha = (-p * cos_ta).atan2((p + osc.rmag()) * sin_ta);
-                            ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
+                            steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         } else {
                             // Out of plane
                             let beta = half_pi
                                 .copysign(-(osc.ta().to_radians() + osc.aop().to_radians()).sin())
                                 * osc.inc().to_radians().cos();
-                            ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
+                            steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                         };
                     }
                     _ => unreachable!(),
@@ -254,13 +255,13 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
             }
 
             // Return a normalized vector
-            ctrl = if ctrl.norm() > 0.0 {
-                ctrl / ctrl.norm()
+            steering = if steering.norm() > 0.0 {
+                steering / steering.norm()
             } else {
-                ctrl
+                steering
             };
             // Convert to inertial -- this whole control is computed in the RCN frame
-            osc.dcm_from_traj_frame(Frame::RCN).unwrap() * ctrl
+            osc.dcm_from_traj_frame(Frame::RCN).unwrap() * steering
         } else {
             Vector3::zeros()
         }

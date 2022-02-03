@@ -31,6 +31,7 @@ pub use mnvr::Mnvr;
 mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
 
+use std::fmt;
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[derive(Copy, Clone, Debug)]
 pub struct Thruster {
@@ -50,7 +51,7 @@ impl Thruster {
 /// The `GuidanceLaw` trait handles guidance laws, optimizations, and other such methods for
 /// controlling the overall thrust direction when tied to a `Spacecraft`. For delta V control,
 /// tie the DeltaVctrl to a MissionArc.
-pub trait GuidanceLaw<X: SpacecraftExt>: Send + Sync {
+pub trait GuidanceLaw<X: SpacecraftExt>: fmt::Display + Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
     fn direction(&self, osc_state: &BaseSpacecraft<X>) -> Vector3<f64>;
 

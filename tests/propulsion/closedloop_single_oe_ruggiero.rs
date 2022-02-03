@@ -41,7 +41,7 @@ fn rugg_sma() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -57,7 +57,7 @@ fn rugg_sma() {
     println!("[rugg_sma] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 21.0).abs() < 1.0);
@@ -97,7 +97,7 @@ fn rugg_sma_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_sma_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -113,7 +113,7 @@ fn rugg_sma_decr() {
     println!("[rugg_sma_decr] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 21.0).abs() < 1.0);
@@ -155,7 +155,7 @@ fn rugg_inc() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -171,7 +171,7 @@ fn rugg_inc() {
     println!("[rugg_inc] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 25.0).abs() < 1.0);
@@ -212,7 +212,7 @@ fn rugg_inc_threshold() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -228,7 +228,7 @@ fn rugg_inc_threshold() {
     println!("[rugg_inc] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 17.0).abs() < 1.0);
@@ -270,7 +270,7 @@ fn rugg_inc_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_inc_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -286,7 +286,7 @@ fn rugg_inc_decr() {
     println!("[rugg_inc_decr] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 25.0).abs() < 1.0);
@@ -328,7 +328,7 @@ fn rugg_ecc() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -344,7 +344,7 @@ fn rugg_ecc() {
     println!("[rugg_ecc] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 10.37).abs() < 1.0);
@@ -386,7 +386,7 @@ fn rugg_ecc_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_ecc_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -402,7 +402,7 @@ fn rugg_ecc_decr() {
     println!("[rugg_ecc_decr] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 10.37).abs() < 1.0);
@@ -446,7 +446,7 @@ fn rugg_aop() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -462,7 +462,7 @@ fn rugg_aop() {
     println!("[rugg_aop] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 0.014).abs() < 1e-2);
@@ -505,7 +505,7 @@ fn rugg_aop_decr() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_aop_decr] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -521,7 +521,7 @@ fn rugg_aop_decr() {
     println!("[rugg_aop_decr] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 0.014).abs() < 1e-2);
@@ -560,7 +560,7 @@ fn rugg_raan() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[rugg_raan] {:x}", orbit);
 
     let setup = Propagator::new::<RK4Fixed>(
@@ -576,7 +576,7 @@ fn rugg_raan() {
     println!("[rugg_raan] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 22.189).abs() < 1.0);

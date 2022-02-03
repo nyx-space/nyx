@@ -21,8 +21,8 @@ use super::{GuidanceLaw, Mnvr};
 use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::linalg::Vector3;
 use crate::State;
+use std::fmt;
 use std::sync::Arc;
-
 /// A controller for a set of pre-determined maneuvers.
 #[derive(Clone, Debug)]
 pub struct FiniteBurns {
@@ -34,6 +34,12 @@ impl FiniteBurns {
     /// Builds a schedule from the vector of maneuvers, must be provided in chronological order.
     pub fn from_mnvrs(mnvrs: Vec<Mnvr>) -> Arc<Self> {
         Arc::new(Self { mnvrs })
+    }
+}
+
+impl fmt::Display for FiniteBurns {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FiniteBurns with {} maneuvers", self.mnvrs.len())
     }
 }
 
