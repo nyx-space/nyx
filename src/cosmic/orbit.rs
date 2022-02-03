@@ -1804,3 +1804,9 @@ impl Add<OVector<f64, Const<6>>> for Orbit {
         me
     }
 }
+
+impl Default for Orbit {
+    fn default() -> Self {
+        Self::zeros()
+    }
+}

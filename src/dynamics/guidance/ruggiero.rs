@@ -30,7 +30,9 @@ use std::sync::Arc;
 #[derive(Copy, Clone, Debug)]
 pub struct Ruggiero {
     /// Stores the objectives
-    objectives: [Option<Objective>; 5],
+    pub objectives: [Option<Objective>; 5],
+    /// Stores the minimum efficiency to correct a given orbital element, defaults to zero (i.e. always correct)
+    pub ηthresholds: [f64; 5],
     init_state: Orbit,
 }
 
@@ -40,11 +42,28 @@ impl Ruggiero {
     /// Creates a new Ruggiero locally optimal control as an Arc
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
     pub fn new(objectives: &[Objective], initial: Orbit) -> Result<Arc<Self>, NyxError> {
+        Self::with_ηthresholds(objectives, &[0.0; 5], initial)
+    }
+
+    /// Creates a new Ruggiero locally optimal control as an Arc
+    /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
+    pub fn with_ηthresholds(
+        objectives: &[Objective],
+        ηthresholds: &[f64],
+        initial: Orbit,
+    ) -> Result<Arc<Self>, NyxError> {
         let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
+        let mut eff: [f64; 5] = [0.0; 5];
         if objectives.len() > 5 || objectives.len() == 0 {
             return Err(NyxError::GuidanceConfigError(format!(
                 "Must provide between 1 and 5 objectives (included), provided {}",
                 objectives.len()
+            )));
+        } else if objectives.len() > ηthresholds.len() {
+            return Err(NyxError::GuidanceConfigError(format!(
+                "Must provide at least {} effeciency threshold values, provided {}",
+                objectives.len(),
+                ηthresholds.len()
             )));
         }
 
@@ -68,15 +87,74 @@ impl Ruggiero {
         }
         for i in 0..objectives.len() {
             objs[i] = Some(objectives[i]);
+            eff[i] = ηthresholds[i];
         }
         Ok(Arc::new(Self {
             objectives: objs,
             init_state: initial,
+            ηthresholds: eff,
         }))
     }
 
-    fn weighting(init: f64, target: f64, osc: f64, tol: f64) -> f64 {
-        if (osc - target).abs() < tol {
+    /// Computes the weight at which to correct this orbital element, will be zero if the current efficency is below the threshold
+    fn weighting(&self, obj: &Objective, osc_orbit: &Orbit, η_threshold: f64) -> f64 {
+        let init = self.init_state.value(&obj.parameter).unwrap();
+        let osc = osc_orbit.value(&obj.parameter).unwrap();
+        let target = obj.desired_value;
+        let tol = obj.tolerance;
+
+        // Calculate the effeciency of correcting this specific orbital element
+        let e = osc_orbit.ecc();
+        let η = match obj.parameter {
+            StateParameter::SMA => {
+                let a = osc_orbit.sma();
+                let μ = osc_orbit.frame.gm();
+                osc_orbit.vmag() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt()
+            }
+            StateParameter::Eccentricity => {
+                let ν_ta = osc_orbit.ta().to_radians();
+                let num = 1.0 + 2.0 * e * ν_ta.cos() + ν_ta.cos().powi(2);
+                let denom = 1.0 + e * ν_ta.cos();
+                2.0 * num / denom
+            }
+            StateParameter::Inclination => {
+                let ν_ta = osc_orbit.ta().to_radians();
+                let ω = osc_orbit.aop().to_radians();
+                let num = (ω + ν_ta).cos().abs()
+                    * ((1.0 - e.powi(2) * ω.sin().powi(2)).sqrt() - e * ω.cos().abs());
+                let denom = 1.0 + e * ν_ta.cos();
+                num / denom
+            }
+            StateParameter::RAAN => {
+                let ν_ta = osc_orbit.ta().to_radians();
+                let ω = osc_orbit.aop().to_radians();
+                let num = (ω + ν_ta).sin().abs()
+                    * ((1.0 - e.powi(2) * ω.cos().powi(2)).sqrt() - e * ω.sin().abs());
+                let denom = 1.0 + e * ν_ta.cos();
+                num / denom
+            }
+            StateParameter::AoP => {
+                // This one is a bit complicated. Let's start by calculating the most
+                // efficient true anomaly to correct for the argument of periapse
+                let eratio = (1.0 + e.powi(2)) / e.powi(3);
+                let ersqrt = (0.25 * eratio.powi(2) + 1.0 / 27.0).sqrt();
+                let cos_ν_ω_max = (eratio + ersqrt).powf(1.0 / 3.0)
+                    - (-eratio + ersqrt).powf(1.0 / 3.0)
+                    - 1.0 / e;
+                let ν_ω_max = cos_ν_ω_max.acos();
+                // Now calculate the efficiency at the current position
+
+                let ν_ta = osc_orbit.ta().to_radians();
+                let num = (1.0 + ν_ta.sin().powi(2)) * (1.0 + e * ν_ω_max.cos());
+                let denom = (1.0 + e * ν_ta.cos()) * (1.0 + ν_ω_max.sin().powi(2));
+                num / denom
+            }
+            _ => unreachable!(),
+        };
+
+        assert!(η > 0.0 && η < 1.0);
+
+        let weight = if (osc - target).abs() < tol || η < η_threshold {
             0.0
         } else {
             // Let's add the tolerance to the initial value if we want to keep a parameter fixed (i.e. target and initial are equal)
@@ -88,7 +166,15 @@ impl Ruggiero {
                         init
                     })
                 .abs()
-        }
+        };
+
+        // if η >= η_threshold {
+        //     println!("{:.3} >= {:.3} => {} ", η, η_threshold, weight);
+        // } else {
+        //     println!("WARN {:.3} >= {:.3} => {} ", η, η_threshold, weight);
+        // }
+
+        weight
     }
 }
 
@@ -107,69 +193,34 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
         if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
             let mut ctrl = Vector3::zeros();
-            for obj in self.objectives.iter().flatten() {
+            for (i, obj) in self.objectives.iter().flatten().enumerate() {
+                let weight = self.weighting(obj, &osc, self.ηthresholds[i]);
+                if weight.abs() <= 0.0 {
+                    continue;
+                }
+
                 match obj.parameter {
                     StateParameter::SMA => {
-                        let weight = Self::weighting(
-                            self.init_state.sma(),
-                            obj.desired_value,
-                            osc.sma(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            let num = osc.ecc() * osc.ta().to_radians().sin();
-                            let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
-                            let alpha = num.atan2(denom);
-                            ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
-                        }
+                        let num = osc.ecc() * osc.ta().to_radians().sin();
+                        let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
+                        let alpha = num.atan2(denom);
+                        ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Eccentricity => {
-                        let weight = Self::weighting(
-                            self.init_state.ecc(),
-                            obj.desired_value,
-                            osc.ecc(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            let num = osc.ta().to_radians().sin();
-                            let denom = osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
-                            let alpha = num.atan2(denom);
-                            ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
-                        }
+                        let num = osc.ta().to_radians().sin();
+                        let denom = osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
+                        let alpha = num.atan2(denom);
+                        ctrl += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Inclination => {
-                        let weight = Self::weighting(
-                            self.init_state.inc(),
-                            obj.desired_value,
-                            osc.inc(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            let beta =
-                                half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
-                            ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
-                        }
+                        let beta = half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
+                        ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::RAAN => {
-                        let weight = Self::weighting(
-                            self.init_state.raan(),
-                            obj.desired_value,
-                            osc.raan(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            let beta =
-                                half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
-                            ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
-                        }
+                        let beta = half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
+                        ctrl += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::AoP => {
-                        let weight = Self::weighting(
-                            self.init_state.aop(),
-                            obj.desired_value,
-                            osc.aop(),
-                            obj.tolerance,
-                        );
                         let oe2 = 1.0 - osc.ecc().powi(2);
                         let e3 = osc.ecc().powi(3);
                         // Compute the optimal true anomaly for in-plane thrusting
@@ -201,6 +252,7 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                     _ => unreachable!(),
                 }
             }
+
             // Return a normalized vector
             ctrl = if ctrl.norm() > 0.0 {
                 ctrl / ctrl.norm()
@@ -218,64 +270,10 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
     fn throttle(&self, sc: &Spacecraft) -> f64 {
         if sc.mode() == GuidanceMode::Thrust {
             let osc = sc.orbit;
-            for obj in self.objectives.iter().flatten() {
-                match obj.parameter {
-                    StateParameter::SMA => {
-                        let weight = Self::weighting(
-                            self.init_state.sma(),
-                            obj.desired_value,
-                            osc.sma(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            return 1.0;
-                        }
-                    }
-                    StateParameter::Eccentricity => {
-                        let weight = Self::weighting(
-                            self.init_state.ecc(),
-                            obj.desired_value,
-                            osc.ecc(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            return 1.0;
-                        }
-                    }
-                    StateParameter::Inclination => {
-                        let weight = Self::weighting(
-                            self.init_state.inc(),
-                            obj.desired_value,
-                            osc.inc(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            return 1.0;
-                        }
-                    }
-                    StateParameter::RAAN => {
-                        let weight = Self::weighting(
-                            self.init_state.raan(),
-                            obj.desired_value,
-                            osc.raan(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            return 1.0;
-                        }
-                    }
-                    StateParameter::AoP => {
-                        let weight = Self::weighting(
-                            self.init_state.aop(),
-                            obj.desired_value,
-                            osc.aop(),
-                            obj.tolerance,
-                        );
-                        if weight.abs() > 0.0 {
-                            return 1.0;
-                        }
-                    }
-                    _ => unreachable!(),
+            for (i, obj) in self.objectives.iter().flatten().enumerate() {
+                let weight = self.weighting(obj, &osc, self.ηthresholds[i]);
+                if weight.abs() > 0.0 {
+                    return 1.0;
                 }
             }
             0.0
@@ -287,7 +285,7 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
     /// Update the state for the next iteration
     fn next(&self, sc: &mut Spacecraft) {
         if sc.mode() != GuidanceMode::Inhibit {
-            if self.throttle(sc) > 0.0 {
+            if !self.achieved(sc).unwrap() {
                 if sc.mode() == GuidanceMode::Coast {
                     info!("enabling control: {:x}", sc.orbit);
                 }
@@ -298,6 +296,16 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                 }
                 sc.mut_mode(GuidanceMode::Coast);
             }
+        }
+    }
+}
+
+impl Default for Ruggiero {
+    fn default() -> Self {
+        Self {
+            objectives: Default::default(),
+            ηthresholds: Default::default(),
+            init_state: Default::default(),
         }
     }
 }

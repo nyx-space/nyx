@@ -104,8 +104,8 @@ fn ra_dec_from_vec() {
     let mut alpha = 0.0;
     loop {
         loop {
-            let v = unit_vector_from_ra_dec(alpha, delta);
-            let (alpha2, delta2) = ra_dec_from_unit_vector(v);
+            let unit_v = unit_vector_from_ra_dec(alpha, delta);
+            let (alpha2, delta2) = ra_dec_from_unit_vector(unit_v);
             assert!((alpha - alpha2).abs() < 2e-16);
             assert!((delta - delta2).abs() < 2e-16);
             alpha += TAU * 0.1; // Increment right ascension by one tenth of a circle
