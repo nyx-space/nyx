@@ -387,7 +387,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
                         let prop_opts = this_prop.opts;
                         this_prop.set_max_step(this_mnvr.duration());
-                        this_prop.dynamics = this_prop.dynamics.with_guidance_law(Arc::new(this_mnvr));
+                        this_prop.dynamics =
+                            this_prop.dynamics.with_guidance_law(Arc::new(this_mnvr));
                         let post_mnvr = this_prop
                             .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
                             .until_epoch(this_mnvr.end)
