@@ -1783,7 +1783,7 @@ impl State for Orbit {
             StateParameter::VX => Ok(self.vx),
             StateParameter::VY => Ok(self.vy),
             StateParameter::VZ => Ok(self.vz),
-            _ => Err(NyxError::ParameterUnavailableForType),
+            _ => Err(NyxError::StateParameterUnavailable),
         }
     }
 }

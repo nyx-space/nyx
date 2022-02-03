@@ -117,7 +117,7 @@ impl InterpState for Orbit {
             StateParameter::VX => Ok((self.vx, 0.0)),
             StateParameter::VY => Ok((self.vy, 0.0)),
             StateParameter::VZ => Ok((self.vz, 0.0)),
-            _ => Err(NyxError::ParameterUnavailableForType),
+            _ => Err(NyxError::StateParameterUnavailable),
         }
     }
 
@@ -147,7 +147,7 @@ impl InterpState for Orbit {
                 self.vz = value;
             }
 
-            _ => return Err(NyxError::ParameterUnavailableForType),
+            _ => return Err(NyxError::StateParameterUnavailable),
         }
         Ok(())
     }
@@ -174,7 +174,7 @@ impl InterpState for Spacecraft {
             StateParameter::VY => Ok((self.orbit.vy, 0.0)),
             StateParameter::VZ => Ok((self.orbit.vz, 0.0)),
             StateParameter::FuelMass => Ok((self.fuel_mass_kg, 0.0)),
-            _ => Err(NyxError::ParameterUnavailableForType),
+            _ => Err(NyxError::StateParameterUnavailable),
         }
     }
 
@@ -206,7 +206,7 @@ impl InterpState for Spacecraft {
             StateParameter::Cr => self.cr = value,
             StateParameter::Cd => self.cd = value,
             StateParameter::FuelMass => self.fuel_mass_kg = value,
-            _ => return Err(NyxError::ParameterUnavailableForType),
+            _ => return Err(NyxError::StateParameterUnavailable),
         }
         Ok(())
     }

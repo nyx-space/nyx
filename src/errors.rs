@@ -54,8 +54,8 @@ pub enum NyxError {
     LambertMultiRevNotSupported,
     /// Returns this error if the partials for this model are not defined, thereby preventing the computation of the STM
     PartialsUndefined,
-    /// Returned if trying to set a parameter for something which does not have that parameter.
-    ParameterUnavailableForType,
+    /// Returned if the requested state parameter cannot be used in this function
+    StateParameterUnavailable,
     LoadingError(String),
     FileUnreadable(String),
     ObjectNotFound(String),

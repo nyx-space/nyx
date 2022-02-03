@@ -98,20 +98,14 @@ impl Ruggiero {
         }))
     }
 
-    /// Computes the weight at which to correct this orbital element, will be zero if the current efficency is below the threshold
-    fn weighting(&self, obj: &Objective, osc_orbit: &Orbit, η_threshold: f64) -> f64 {
-        let init = self.init_state.value(&obj.parameter).unwrap();
-        let osc = osc_orbit.value(&obj.parameter).unwrap();
-        let target = obj.desired_value;
-        let tol = obj.tolerance;
-
-        // Calculate the efficiency of correcting this specific orbital element
+    /// Returns the efficency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
+    pub fn efficency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, NyxError> {
         let e = osc_orbit.ecc();
-        let η = match obj.parameter {
+        match parameter {
             StateParameter::SMA => {
                 let a = osc_orbit.sma();
                 let μ = osc_orbit.frame.gm();
-                osc_orbit.vmag() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt()
+                Ok(osc_orbit.vmag() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
             }
             StateParameter::Eccentricity => {
                 let ν_ta = osc_orbit.ta().to_radians();
@@ -120,7 +114,7 @@ impl Ruggiero {
                 // NOTE: There is a typo in IEPC 2011 102: the max of this efficiency function is at ν=0
                 // where it is equal to 2*(2+2e) / (1+e). Therefore, I think the correct formulation should be
                 // _divided_ by two, not multiplied by two.
-                num / (2.0 * denom)
+                Ok(num / (2.0 * denom))
             }
             StateParameter::Inclination => {
                 let ν_ta = osc_orbit.ta().to_radians();
@@ -128,7 +122,7 @@ impl Ruggiero {
                 let num = (ω + ν_ta).cos().abs()
                     * ((1.0 - e.powi(2) * ω.sin().powi(2)).sqrt() - e * ω.cos().abs());
                 let denom = 1.0 + e * ν_ta.cos();
-                num / denom
+                Ok(num / denom)
             }
             StateParameter::RAAN => {
                 let ν_ta = osc_orbit.ta().to_radians();
@@ -136,11 +130,22 @@ impl Ruggiero {
                 let num = (ω + ν_ta).sin().abs()
                     * ((1.0 - e.powi(2) * ω.cos().powi(2)).sqrt() - e * ω.sin().abs());
                 let denom = 1.0 + e * ν_ta.cos();
-                num / denom
+                Ok(num / denom)
             }
-            StateParameter::AoP => 1.0,
-            _ => unreachable!(),
-        };
+            StateParameter::AoP => Ok(1.0),
+            _ => Err(NyxError::StateParameterUnavailable),
+        }
+    }
+
+    /// Computes the weight at which to correct this orbital element, will be zero if the current efficency is below the threshold
+    fn weighting(&self, obj: &Objective, osc_orbit: &Orbit, η_threshold: f64) -> f64 {
+        let init = self.init_state.value(&obj.parameter).unwrap();
+        let osc = osc_orbit.value(&obj.parameter).unwrap();
+        let target = obj.desired_value;
+        let tol = obj.tolerance;
+
+        // Calculate the efficiency of correcting this specific orbital element
+        let η = Self::efficency(&obj.parameter, osc_orbit).unwrap();
 
         let weight = if (osc - target).abs() < tol || η < η_threshold {
             0.0
