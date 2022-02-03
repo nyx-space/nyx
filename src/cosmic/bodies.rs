@@ -2,7 +2,7 @@ use crate::NyxError;
 use std::convert::TryFrom;
 
 /// Defines the default celestial bodies in the provided de438 XB.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Bodies {
     SSB,

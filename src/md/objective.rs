@@ -75,18 +75,20 @@ impl Objective {
 
 impl fmt::Display for Objective {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let max_obj_tol = self.tolerance.log10().abs().ceil() as usize;
+
+        write!(
+            f,
+            "\t{:?} → {:.prec$} ",
+            self.parameter,
+            self.desired_value,
+            prec = max_obj_tol
+        )?;
+
         if self.tolerance.abs() < 1e-1 {
-            write!(
-                f,
-                "{:?} = {:.3} (± {:.1e})",
-                self.parameter, self.desired_value, self.tolerance
-            )
+            write!(f, "(± {:.1e})", self.tolerance)
         } else {
-            write!(
-                f,
-                "{:?} = {:.3} (± {:.2})",
-                self.parameter, self.desired_value, self.tolerance
-            )
+            write!(f, " (± {:.2})", self.tolerance)
         }
     }
 }
