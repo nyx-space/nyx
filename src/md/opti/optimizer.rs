@@ -277,7 +277,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             Ok(mnvr) => {
                 println!("{}", mnvr);
                 let mut prop = self.prop.clone();
-                prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+                prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
                 prop.with(solution.corrected_state)
                     .until_epoch_with_traj(solution.achieved_state.epoch())?
             }

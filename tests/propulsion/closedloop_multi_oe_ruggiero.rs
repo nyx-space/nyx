@@ -2,7 +2,7 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
-use self::nyx::dynamics::guidance::{Achieve, Ruggiero, Thruster};
+use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::{Event, StateParameter};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
@@ -34,16 +34,9 @@ fn qlaw_as_ruggiero_case_a() {
         isp: 3100.0,
     };
 
-    // Define the objectives
-    let objectives = vec![
-        Achieve::Sma {
-            target: 42000.0,
-            tol: 1.0,
-        },
-        Achieve::Ecc {
-            target: 0.01,
-            tol: 5e-5,
-        },
+    let objectives = &[
+        Objective::within_tolerance(StateParameter::SMA, 42_000.0, 1.0),
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
     // Events we will search later
@@ -52,7 +45,7 @@ fn qlaw_as_ruggiero_case_a() {
         Event::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
@@ -60,7 +53,7 @@ fn qlaw_as_ruggiero_case_a() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:x}", orbit);
 
     let setup = Propagator::new::<RK4Fixed>(
@@ -82,7 +75,7 @@ fn qlaw_as_ruggiero_case_a() {
     }
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
@@ -110,23 +103,13 @@ fn qlaw_as_ruggiero_case_b() {
         isp: 2000.0,
     };
 
-    // Define the objectives
-    let objectives = vec![
-        Achieve::Sma {
-            target: 42165.0,
-            tol: 20.0,
-        },
-        Achieve::Ecc {
-            target: 0.001,
-            tol: 5e-5,
-        },
-        Achieve::Inc {
-            target: 0.05,
-            tol: 5e-3,
-        },
+    let objectives = &[
+        Objective::within_tolerance(StateParameter::SMA, 42_165.0, 20.0),
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.001, 5e-5),
+        Objective::within_tolerance(StateParameter::Inclination, 0.05, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -134,7 +117,7 @@ fn qlaw_as_ruggiero_case_b() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -150,7 +133,7 @@ fn qlaw_as_ruggiero_case_b() {
     println!("[qlaw_as_ruggiero_case_b] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
@@ -178,19 +161,12 @@ fn qlaw_as_ruggiero_case_c() {
         isp: 3100.0,
     };
 
-    // Define the objectives
-    let objectives = vec![
-        Achieve::Sma {
-            target: 30000.0,
-            tol: 1.0,
-        },
-        Achieve::Ecc {
-            target: 0.7,
-            tol: 5e-5,
-        },
+    let objectives = &[
+        Objective::within_tolerance(StateParameter::SMA, 30_000.0, 1.0),
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     let fuel_mass = 299.9;
     let dry_mass = 0.1;
@@ -198,7 +174,7 @@ fn qlaw_as_ruggiero_case_c() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -214,7 +190,7 @@ fn qlaw_as_ruggiero_case_c() {
     println!("[qlaw_as_ruggiero_case_c] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
     assert!((fuel_usage - 41.742).abs() < 1.0);
@@ -243,27 +219,14 @@ fn qlaw_as_ruggiero_case_d() {
         isp: 1650.0,
     };
 
-    // Define the objectives
-    let objectives = vec![
-        Achieve::Sma {
-            target: 26500.0,
-            tol: 1.0,
-        },
-        Achieve::Inc {
-            target: 116.0,
-            tol: 5e-3,
-        },
-        Achieve::Ecc {
-            target: 0.7,
-            tol: 5e-5,
-        },
-        Achieve::Raan {
-            target: 360.0 - 90.0,
-            tol: 5e-3,
-        },
+    let objectives = &[
+        Objective::within_tolerance(StateParameter::SMA, 26_500.0, 1.0),
+        Objective::within_tolerance(StateParameter::Inclination, 116.0, 5e-3),
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
+        Objective::within_tolerance(StateParameter::RAAN, 360.0 - 90.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -271,7 +234,7 @@ fn qlaw_as_ruggiero_case_d() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -287,7 +250,7 @@ fn qlaw_as_ruggiero_case_d() {
     println!("[qlaw_as_ruggiero_case_d] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
@@ -317,31 +280,15 @@ fn qlaw_as_ruggiero_case_e() {
         isp: 1650.0,
     };
 
-    // Define the objectives
-    let objectives = vec![
-        Achieve::Sma {
-            target: 26500.0,
-            tol: 1.0,
-        },
-        Achieve::Ecc {
-            target: 0.7,
-            tol: 5e-5,
-        },
-        Achieve::Inc {
-            target: 116.0,
-            tol: 5e-3,
-        },
-        Achieve::Raan {
-            target: 270.0,
-            tol: 5e-3,
-        },
-        Achieve::Aop {
-            target: 180.0,
-            tol: 5e-3,
-        },
+    let objectives = &[
+        Objective::within_tolerance(StateParameter::SMA, 26_500.0, 1.0),
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.7, 5e-5),
+        Objective::within_tolerance(StateParameter::Inclination, 116.0, 5e-3),
+        Objective::within_tolerance(StateParameter::RAAN, 270.0, 5e-3),
+        Objective::within_tolerance(StateParameter::AoP, 180.0, 5e-3),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     let fuel_mass = 1999.9;
     let dry_mass = 0.1;
@@ -349,7 +296,7 @@ fn qlaw_as_ruggiero_case_e() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -365,7 +312,7 @@ fn qlaw_as_ruggiero_case_e() {
     println!("[qlaw_as_ruggiero_case_e] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
@@ -404,13 +351,9 @@ fn qlaw_as_ruggiero_case_f() {
         isp: 1650.0,
     };
 
-    // Define the objectives
-    let objectives = vec![Achieve::Ecc {
-        target: 0.15,
-        tol: 1e-5,
-    }];
+    let objectives = &[Objective::new(StateParameter::Eccentricity, 0.15)];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -418,7 +361,7 @@ fn qlaw_as_ruggiero_case_f() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_f] {:x}", orbit);
 
     let (tx, rx): (Sender<Spacecraft>, Receiver<Spacecraft>) = mpsc::channel();
@@ -447,7 +390,7 @@ fn qlaw_as_ruggiero_case_f() {
     println!("[qlaw_as_ruggiero_case_f] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 
@@ -475,23 +418,13 @@ fn ruggiero_iepc_2011_102() {
         isp: 1650.0,
     };
 
-    // Define the objectives
-    let objectives = vec![
-        Achieve::Sma {
-            target: 42164.0,
-            tol: 20.0,
-        },
-        Achieve::Inc {
-            target: 0.001,
-            tol: 5e-3,
-        },
-        Achieve::Ecc {
-            target: 0.001,
-            tol: 5e-5,
-        },
+    let objectives = &[
+        Objective::within_tolerance(StateParameter::SMA, 42_164.0, 20.0),
+        Objective::within_tolerance(StateParameter::Inclination, 0.001, 5e-3),
+        Objective::within_tolerance(StateParameter::Eccentricity, 0.011, 5e-5),
     ];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -499,7 +432,7 @@ fn ruggiero_iepc_2011_102() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:x}", orbit);
 
     let final_state = Propagator::new::<RK4Fixed>(
@@ -515,7 +448,7 @@ fn ruggiero_iepc_2011_102() {
     println!("[ruggiero_iepc_2011_102] fuel usage: {:.3} kg", fuel_usage);
 
     assert!(
-        sc.ctrl_achieved(&final_state).unwrap(),
+        sc.guidance_achieved(&final_state).unwrap(),
         "objective not achieved"
     );
 

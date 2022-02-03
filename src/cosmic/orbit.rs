@@ -27,6 +27,7 @@ use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::State;
 use super::{BPlane, Frame};
 use crate::linalg::{Const, OVector};
+use crate::md::ui::Objective;
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
@@ -1393,6 +1394,16 @@ impl Orbit {
                 true
             }
     }
+
+    /// Use the current orbit as a template to generate mission design objectives.
+    /// Note: this sets the objective tolerances to be quite tight, so consider modifying them.
+    pub fn to_objectives(&self, params: &[StateParameter]) -> Result<Vec<Objective>, NyxError> {
+        let mut rtn = Vec::with_capacity(params.len());
+        for parameter in params {
+            rtn.push(Objective::new(*parameter, self.value(parameter)?));
+        }
+        Ok(rtn)
+    }
 }
 
 impl PartialEq for Orbit {
@@ -1772,7 +1783,7 @@ impl State for Orbit {
             StateParameter::VX => Ok(self.vx),
             StateParameter::VY => Ok(self.vy),
             StateParameter::VZ => Ok(self.vz),
-            _ => Err(NyxError::ParameterUnavailableForType),
+            _ => Err(NyxError::StateParameterUnavailable),
         }
     }
 }
@@ -1791,5 +1802,11 @@ impl Add<OVector<f64, Const<6>>> for Orbit {
         me.vz += other[5];
 
         me
+    }
+}
+
+impl Default for Orbit {
+    fn default() -> Self {
+        Self::zeros()
     }
 }

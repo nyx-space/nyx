@@ -208,7 +208,7 @@ fn val_tgt_finite_burn() {
     );
 
     // And create the spacecraft with that controller
-    let sc = SpacecraftDynamics::from_ctrl_no_decr(orbital_dyn.clone(), Arc::new(mnvr0));
+    let sc = SpacecraftDynamics::from_guidance_law_no_decr(orbital_dyn.clone(), Arc::new(mnvr0));
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     // let prop = Propagator::rk89(sc, PropOpts::with_fixed_step(5.0 * TimeUnit::Second));

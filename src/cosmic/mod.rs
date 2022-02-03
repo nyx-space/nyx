@@ -107,7 +107,7 @@ where
 
     /// Return the value of the parameter, returns an error by default
     fn value(&self, _param: &StateParameter) -> Result<f64, NyxError> {
-        Err(NyxError::ParameterUnavailableForType)
+        Err(NyxError::StateParameterUnavailable)
     }
 }
 

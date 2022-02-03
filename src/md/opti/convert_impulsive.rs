@@ -193,7 +193,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             // Propagate with the estimated maneuver until the end of the maneuver
             let mut prop = prop.clone();
             prop.set_tolerance(1e-3);
-            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+            prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
             let sc_xf_achieved = prop
                 .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                 .until_epoch(mnvr.end)?;
@@ -266,7 +266,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                     // Grab the nominal start time from the pre_dv trajectory
                     let this_sc_x0 = pre_traj.at(this_mnvr.start).unwrap();
 
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
+                    this_prop.dynamics = this_prop.dynamics.with_guidance_law(Arc::new(this_mnvr));
                     let this_sc_xf_achieved = this_prop
                         .with(this_sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                         .until_epoch(this_mnvr.end)

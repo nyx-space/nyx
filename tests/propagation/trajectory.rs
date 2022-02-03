@@ -3,8 +3,10 @@ extern crate pretty_env_logger;
 
 use hifitime::TimeUnitHelper;
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
-use nyx::dynamics::guidance::{Achieve, GuidanceLaw, Ruggiero, Thruster};
+use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
+use nyx::md::ui::Objective;
+use nyx::md::StateParameter;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, TimeUnit};
 use nyx::State;
@@ -186,12 +188,13 @@ fn traj_spacecraft() {
     let orbit = Orbit::keplerian(sma, 5e-5, 5e-3, 0.0, 178.0, 0.0, start_dt, eme2k);
 
     // Define the objectives and the control law
-    let objectives = vec![Achieve::Aop {
-        target: 183.0,
-        tol: 5e-3,
-    }];
+    let objectives = &[Objective::within_tolerance(
+        StateParameter::AoP,
+        183.0,
+        5e-3,
+    )];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     // Build the spacecraft state
     let fuel_mass = 67.0;
@@ -205,7 +208,7 @@ fn traj_spacecraft() {
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc_dynamics =
-        SpacecraftDynamics::from_ctrl(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
+        SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
 
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * TimeUnit::Minute + 10 * TimeUnit::Second;
