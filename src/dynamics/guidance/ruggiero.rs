@@ -27,7 +27,7 @@ use std::f64::consts::FRAC_PI_2 as half_pi;
 use std::fmt;
 use std::sync::Arc;
 
-/// Ruggiero defines the closed loop control law from IEPC 2011-102
+/// Ruggiero defines the closed loop guidance law from IEPC 2011-102
 #[derive(Copy, Clone, Debug)]
 pub struct Ruggiero {
     /// Stores the objectives
@@ -37,7 +37,8 @@ pub struct Ruggiero {
     init_state: Orbit,
 }
 
-/// The Ruggiero is a locally optimal control of a state for specific osculating elements.
+/// The Ruggiero is a locally optimal guidance law of a state for specific osculating elements.
+/// NOTE: The efficency parameters for AoP is NOT implemented: the paper's formulation is broken.
 /// WARNING: Objectives must be in degrees!
 impl Ruggiero {
     /// Creates a new Ruggiero locally optimal control as an Arc
@@ -62,7 +63,7 @@ impl Ruggiero {
             )));
         } else if objectives.len() > ηthresholds.len() {
             return Err(NyxError::GuidanceConfigError(format!(
-                "Must provide at least {} effeciency threshold values, provided {}",
+                "Must provide at least {} efficiency threshold values, provided {}",
                 objectives.len(),
                 ηthresholds.len()
             )));
@@ -104,7 +105,7 @@ impl Ruggiero {
         let target = obj.desired_value;
         let tol = obj.tolerance;
 
-        // Calculate the effeciency of correcting this specific orbital element
+        // Calculate the efficiency of correcting this specific orbital element
         let e = osc_orbit.ecc();
         let η = match obj.parameter {
             StateParameter::SMA => {
@@ -116,7 +117,10 @@ impl Ruggiero {
                 let ν_ta = osc_orbit.ta().to_radians();
                 let num = 1.0 + 2.0 * e * ν_ta.cos() + ν_ta.cos().powi(2);
                 let denom = 1.0 + e * ν_ta.cos();
-                2.0 * num / denom
+                // NOTE: There is a typo in IEPC 2011 102: the max of this efficiency function is at ν=0
+                // where it is equal to 2*(2+2e) / (1+e). Therefore, I think the correct formulation should be
+                // _divided_ by two, not multiplied by two.
+                num / (2.0 * denom)
             }
             StateParameter::Inclination => {
                 let ν_ta = osc_orbit.ta().to_radians();
@@ -134,26 +138,9 @@ impl Ruggiero {
                 let denom = 1.0 + e * ν_ta.cos();
                 num / denom
             }
-            StateParameter::AoP => {
-                // This one is a bit complicated. Let's start by calculating the most
-                // efficient true anomaly to correct for the argument of periapse
-                let eratio = (1.0 + e.powi(2)) / e.powi(3);
-                let ersqrt = (0.25 * eratio.powi(2) + 1.0 / 27.0).sqrt();
-                let cos_ν_ω_max = (eratio + ersqrt).powf(1.0 / 3.0)
-                    - (-eratio + ersqrt).powf(1.0 / 3.0)
-                    - 1.0 / e;
-                let ν_ω_max = cos_ν_ω_max.acos();
-                // Now calculate the efficiency at the current position
-
-                let ν_ta = osc_orbit.ta().to_radians();
-                let num = (1.0 + ν_ta.sin().powi(2)) * (1.0 + e * ν_ω_max.cos());
-                let denom = (1.0 + e * ν_ta.cos()) * (1.0 + ν_ω_max.sin().powi(2));
-                num / denom
-            }
+            StateParameter::AoP => 1.0,
             _ => unreachable!(),
         };
-
-        assert!(η > 0.0 && η < 1.0);
 
         let weight = if (osc - target).abs() < tol || η < η_threshold {
             0.0
@@ -180,7 +167,7 @@ impl fmt::Display for Ruggiero {
 }
 
 impl GuidanceLaw<GuidanceMode> for Ruggiero {
-    /// Returns whether the control law has achieved all goals
+    /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         for obj in self.objectives.iter().flatten() {
             if !obj.assess_raw(state.orbit.value(&obj.parameter)?).0 {
@@ -260,7 +247,7 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
             } else {
                 steering
             };
-            // Convert to inertial -- this whole control is computed in the RCN frame
+            // Convert to inertial -- this whole guidance law is computed in the RCN frame
             osc.dcm_from_traj_frame(Frame::RCN).unwrap() * steering
         } else {
             Vector3::zeros()
@@ -288,12 +275,12 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
         if sc.mode() != GuidanceMode::Inhibit {
             if !self.achieved(sc).unwrap() {
                 if sc.mode() == GuidanceMode::Coast {
-                    info!("enabling control: {:x}", sc.orbit);
+                    info!("enabling steering: {:x}", sc.orbit);
                 }
                 sc.mut_mode(GuidanceMode::Thrust);
             } else {
                 if sc.mode() == GuidanceMode::Thrust {
-                    info!("disabling control: {:x}", sc.orbit);
+                    info!("disabling steering: {:x}", sc.orbit);
                 }
                 sc.mut_mode(GuidanceMode::Coast);
             }
