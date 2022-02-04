@@ -29,7 +29,7 @@ fn thrust_dir_tgt_sma_aop_raan() {
             thrust: 500.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -79,7 +79,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
             thrust: 500.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -89,7 +89,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
     // Define the objective
     let objectives = [
         Objective::within_tolerance(StateParameter::SMA, 8012.176, 0.1),
-        Objective::within_tolerance(StateParameter::AoP, 53.939, 1e-3),
+        Objective::within_tolerance(StateParameter::AoP, 53.939, 1e-2),
         Objective::within_tolerance(StateParameter::RAAN, 60.000182, 1e-3),
     ];
 
@@ -99,11 +99,12 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
 
     let achievement_epoch = orig_dt + target_delta_t;
 
-    let solution_fd = tgt
+    let solution = tgt
         .try_achieve_from(spacecraft, orig_dt, achievement_epoch)
         .unwrap();
 
-    println!("Finite differencing solution: {}", solution_fd);
+    println!("Finite differencing solution: {}", solution);
+    tgt.apply(&solution).unwrap();
 }
 
 #[ignore]
@@ -130,7 +131,7 @@ fn thrust_profile_tgt_sma_aop_raan() {
             thrust: 500.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -207,7 +208,7 @@ fn val_tgt_finite_burn() {
     );
 
     // And create the spacecraft with that controller
-    let sc = SpacecraftDynamics::from_ctrl_no_decr(orbital_dyn.clone(), Arc::new(mnvr0));
+    let sc = SpacecraftDynamics::from_guidance_law_no_decr(orbital_dyn.clone(), Arc::new(mnvr0));
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     // let prop = Propagator::rk89(sc, PropOpts::with_fixed_step(5.0 * TimeUnit::Second));

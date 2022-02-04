@@ -19,7 +19,7 @@
 extern crate hyperdual;
 
 use self::hyperdual::{OHyperdual, Owned};
-use crate::cosmic::{Orbit, Spacecraft};
+use crate::cosmic::Orbit;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, Matrix3, OMatrix, OVector, Vector3};
 use crate::State;
@@ -125,7 +125,8 @@ where
     }
 
     /// Optionally performs some final changes after each successful integration of the equations of motion.
-    /// For example, this can be used to update the GNC mode.
+    /// For example, this can be used to update the Guidance mode.
+    /// NOTE: This function is also called just prior to very first integration step in order to update the initial state if needed.
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         Ok(next_state)
     }
@@ -134,13 +135,16 @@ where
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel: Send + Sync + fmt::Display {
+pub trait ForceModel<X: SpacecraftExt>: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError>;
+    fn eom(&self, ctx: &BaseSpacecraft<X>) -> Result<Vector3<f64>, NyxError>;
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    fn dual_eom(&self, osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(
+        &self,
+        osc_ctx: &BaseSpacecraft<X>,
+    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.

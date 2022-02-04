@@ -61,7 +61,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation() {
 
 #[allow(clippy::identity_op)]
 #[test]
-#[ignore]
+#[ignore = "https://gitlab.com/nyx-space/nyx/-/issues/212"]
 fn tgt_b_plane_lunar_transfer() {
     // WARNING: This test is ignored until https://gitlab.com/nyx-space/nyx/-/issues/212
     if pretty_env_logger::try_init().is_err() {

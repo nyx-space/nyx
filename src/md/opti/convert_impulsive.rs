@@ -30,6 +30,7 @@ use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
 use crate::time::TimeUnitHelper;
+use core::f64::consts::TAU;
 // use std::convert::TryInto;
 // use std::fmt;
 
@@ -112,7 +113,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             // Variable::from(Vary::Duration),
         ];
 
-        const num_variables: usize = 6;
+        const NUM_VARIABLES: usize = 6;
 
         // The correction stores, in order, alpha_0, \dot{alpha_0}, \ddot{alpha_0}, beta_0, \dot{beta_0}, \ddot{beta_0}
         let mut prev_err_norm = std::f64::INFINITY;
@@ -163,7 +164,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                 multiplicative_factor: 1e-3,
             },
         ];
-        const num_obj: usize = 6;
+        const NUM_OBJ: usize = 6;
 
         // Determine padding in debugging info
         // For the width, we find the largest desired values and multiply it by the order of magnitude of its tolerance
@@ -192,7 +193,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             // Propagate with the estimated maneuver until the end of the maneuver
             let mut prop = prop.clone();
             prop.set_tolerance(1e-3);
-            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+            prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
             let sc_xf_achieved = prop
                 .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                 .until_epoch(mnvr.end)?;
@@ -203,14 +204,14 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             );
 
             // Build the error vector
-            let mut err_vector = SVector::<f64, num_obj>::zeros();
+            let mut err_vector = SVector::<f64, NUM_OBJ>::zeros();
             let mut converged = true;
             // Build debugging information
             let mut objmsg = Vec::with_capacity(objectives.len());
 
             // The Jacobian includes the sensitivity of each objective with respect to each variable for the whole trajectory.
             // As such, it includes the STM of that variable for the whole propagation arc.
-            let mut jac = SMatrix::<f64, num_obj, num_variables>::zeros();
+            let mut jac = SMatrix::<f64, NUM_OBJ, NUM_VARIABLES>::zeros();
 
             // For each objective, we'll perturb the variables to compute the Jacobian with finite differencing.
             for (i, obj) in objectives.iter().enumerate() {
@@ -265,7 +266,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                     // Grab the nominal start time from the pre_dv trajectory
                     let this_sc_x0 = pre_traj.at(this_mnvr.start).unwrap();
 
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
+                    this_prop.dynamics = this_prop.dynamics.with_guidance_law(Arc::new(this_mnvr));
                     let this_sc_xf_achieved = this_prop
                         .with(this_sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                         .until_epoch(this_mnvr.end)
@@ -345,7 +346,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             debug!("Inverse Jacobian {}", jac_inv);
 
-            let mut delta = jac_inv * &err_vector;
+            let mut delta = jac_inv * err_vector;
 
             debug!("Error vector: {}\nRaw correction: {}", err_vector, delta);
 
@@ -375,23 +376,23 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                         update_obj = true;
                     }
                     Vary::EndEpoch => {
-                        mnvr.end = mnvr.end + corr.seconds();
+                        mnvr.end += corr.seconds();
                         update_obj = true;
                     }
                     Vary::StartEpoch => {
-                        mnvr.start = mnvr.start + corr.seconds();
+                        mnvr.start += corr.seconds();
                         update_obj = true;
                     }
                     Vary::MnvrAlpha | Vary::MnvrAlphaDot | Vary::MnvrAlphaDDot => {
                         mnvr.alpha_inplane_radians = mnvr
                             .alpha_inplane_radians
-                            .add_val_in_order(corr % (2.0 * 3.1415), var.component.vec_index())
+                            .add_val_in_order(corr % TAU, var.component.vec_index())
                             .unwrap();
                     }
                     Vary::MnvrDelta | Vary::MnvrDeltaDot | Vary::MnvrDeltaDDot => {
                         mnvr.delta_outofplane_radians = mnvr
                             .delta_outofplane_radians
-                            .add_val_in_order(corr % (2.0 * 3.1415), var.component.vec_index())
+                            .add_val_in_order(corr % TAU, var.component.vec_index())
                             .unwrap();
                     }
                     _ => unreachable!(),

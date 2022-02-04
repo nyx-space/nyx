@@ -304,7 +304,7 @@ where
 
                 Ok((
                     Self {
-                        sc_dyn: sc_dyn,
+                        sc_dyn,
                         init_state: init_sc,
                         formatter: None,
                         prop_time,

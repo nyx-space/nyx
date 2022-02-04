@@ -176,6 +176,9 @@ where
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
+        // Call `finally` on the current state to set anything up
+        self.state = self.prop.dynamics.finally(self.state)?;
+
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size

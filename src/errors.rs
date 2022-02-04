@@ -54,8 +54,8 @@ pub enum NyxError {
     LambertMultiRevNotSupported,
     /// Returns this error if the partials for this model are not defined, thereby preventing the computation of the STM
     PartialsUndefined,
-    /// Returned if trying to set a parameter for something which does not have that parameter.
-    ParameterUnavailableForType,
+    /// Returned if the requested state parameter cannot be used in this function
+    StateParameterUnavailable,
     LoadingError(String),
     FileUnreadable(String),
     ObjectNotFound(String),
@@ -85,16 +85,17 @@ pub enum NyxError {
     CCSDS(String),
     /// Returned if the targeter for `node_no` has failed
     MultipleShootingTargeter(usize, Box<NyxError>),
-    /// Returned when the trajectory could not be created
-    TrajectoryCreationError,
     /// Some custom error for new dynamics
     CustomError(String),
     /// Hifitime errors that rose upward
     TimeError(TimeErrors),
     Targeter(TargetingError),
+    /// Trajectory related errors that rose upward
     Trajectory(TrajError),
     /// Some math domain error, e.g. the arcsin of a number that isn't within [-1; 1]
     MathDomain(String),
+    /// A guidance law is incorrectly configured
+    GuidanceConfigError(String),
 }
 
 impl fmt::Display for NyxError {
@@ -134,6 +135,9 @@ impl fmt::Display for NyxError {
             }
             Self::MultipleShootingTargeter(n, e) => {
                 write!(f, "Multiple shooting failed on node {} with {}", n, e)
+            }
+            Self::MaxIterReached(e) => {
+                write!(f, "MaxIterReached: {}", e)
             }
             _ => write!(f, "{:?}", self),
         }

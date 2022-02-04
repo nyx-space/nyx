@@ -31,13 +31,8 @@ fn val_transfer_schedule_no_depl() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = Spacecraft::from_thruster(
-        orbit,
-        dry_mass,
-        fuel_mass,
-        monoprop,
-        GuidanceMode::Custom(0),
-    );
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, monoprop, GuidanceMode::Coast);
 
     let prop_time = 50.0 * TimeUnit::Minute;
 
@@ -60,7 +55,7 @@ fn val_transfer_schedule_no_depl() {
 
     // And create the spacecraft with that controller
     // Disable fuel mass decrement
-    let sc = SpacecraftDynamics::from_ctrl_no_decr(orbital_dyn, schedule);
+    let sc = SpacecraftDynamics::from_guidance_law_no_decr(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let final_state = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second))
@@ -124,13 +119,8 @@ fn val_transfer_schedule_depl() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = Spacecraft::from_thruster(
-        orbit,
-        dry_mass,
-        fuel_mass,
-        monoprop,
-        GuidanceMode::Custom(0),
-    );
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, monoprop, GuidanceMode::Coast);
 
     let prop_time = 50.0 * TimeUnit::Minute;
 
@@ -154,7 +144,7 @@ fn val_transfer_schedule_depl() {
     let schedule = FiniteBurns::from_mnvrs(vec![mnvr0]);
 
     // And create the spacecraft with that controller
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, schedule);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, schedule);
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
@@ -277,13 +267,11 @@ fn val_transfer_single_maneuver_depl() {
     );
 
     // And create the spacecraft with that controller
-    let sc = SpacecraftDynamics::from_ctrl(orbital_dyn, Arc::new(mnvr0));
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, Arc::new(mnvr0));
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
     let setup = Propagator::rk89(sc, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
     let final_state = setup.with(sc_state).for_duration(prop_time).unwrap();
-
-    // Compute the errors
     let rslt = Orbit::cartesian(
         4_172.433_936_615_18,
         436.936_159_720_413,

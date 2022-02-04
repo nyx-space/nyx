@@ -23,7 +23,7 @@ fn alt_orbit_raising() {
             thrust: 150.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
 
         ..Default::default()
     };
@@ -182,22 +182,9 @@ fn alt_orbit_raising() {
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
     );
-
-    for (i, traj) in multishoot_sol
-        .build_trajectories(&prop)
-        .unwrap()
-        .iter()
-        .enumerate()
-    {
-        traj.to_csv_with_step(
-            &format!("multishoot_to_node_{}.csv", i),
-            2 * TimeUnit::Second,
-            cosm.clone(),
-        )
-        .unwrap();
-    }
 }
 
+#[ignore = "Does not have a valid test case yet"]
 #[test]
 fn vmag_orbit_raising() {
     if pretty_env_logger::try_init().is_err() {
@@ -221,7 +208,7 @@ fn vmag_orbit_raising() {
             thrust: 150.0,
             isp: 300.0,
         }),
-        mode: GuidanceMode::Thrust,
+        ext: GuidanceMode::Thrust,
 
         ..Default::default()
     };
@@ -239,7 +226,7 @@ fn vmag_orbit_raising() {
     );
 
     /* Define the multiple shooting parameters */
-    let node_count = 5;
+    let node_count = 300;
 
     let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut opti = MultipleShooting::equidistant_nodes(sc, target, node_count, &prop).unwrap();
@@ -287,6 +274,19 @@ fn vmag_orbit_raising() {
             full_traj += traj;
         }
     }
+
+    assert_eq!(
+        full_traj.first().epoch(),
+        all_trajectories[0].first().epoch(),
+        "Initial epochs differ"
+    );
+    assert_eq!(
+        full_traj.last().epoch(),
+        all_trajectories.last().unwrap().last().epoch(),
+        "Final epochs differ: {} != {}",
+        full_traj.last().epoch(),
+        all_trajectories.last().unwrap().last().epoch(),
+    );
 
     assert_eq!(
         full_traj.first().epoch(),

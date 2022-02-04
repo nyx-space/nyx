@@ -155,7 +155,6 @@ where
                         let mut vector = mnvr.direction();
                         vector[var.component.vec_index()] += corr;
                         var.ensure_bounds(&mut vector[var.component.vec_index()]);
-                        mnvr.set_direction(vector);
                     }
                     Vary::ThrustRateX | Vary::ThrustRateY | Vary::ThrustRateZ => {
                         let mut vector = mnvr.rate();
@@ -191,7 +190,7 @@ where
             let mut prop = self.prop.clone();
             let prop_opts = prop.opts;
             let pre_mnvr = prop.with(xi).until_epoch(mnvr.start)?;
-            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+            prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
             prop.set_max_step(mnvr.duration());
             let post_mnvr = prop
                 .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
@@ -409,7 +408,7 @@ where
             let mut prop = self.prop.clone();
             let prop_opts = prop.opts;
             let pre_mnvr = prop.with(xi).until_epoch(mnvr.start).unwrap();
-            prop.dynamics = prop.dynamics.with_ctrl(Arc::new(mnvr));
+            prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
             prop.set_max_step(mnvr.duration());
             let post_mnvr = prop
                 .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
@@ -546,7 +545,7 @@ where
                         Vary::ThrustX | Vary::ThrustY | Vary::ThrustZ => {
                             let mut vector = this_mnvr.vector(self.correction_epoch);
                             vector[var.component.vec_index()] += pert;
-                            this_mnvr.set_direction(vector);
+                            this_mnvr.set_direction(vector).unwrap();
                         }
                         Vary::ThrustLevel => {
                             this_mnvr.thrust_lvl += pert;
@@ -577,7 +576,7 @@ where
                     // Add this maneuver to the dynamics, make sure that we don't over-step this maneuver
                     let prop_opts = this_prop.opts;
                     this_prop.set_max_step(this_mnvr.duration());
-                    this_prop.dynamics = this_prop.dynamics.with_ctrl(Arc::new(this_mnvr));
+                    this_prop.dynamics = this_prop.dynamics.with_guidance_law(Arc::new(this_mnvr));
                     let post_mnvr = this_prop
                         .with(pre_mnvr.with_guidance_mode(GuidanceMode::Thrust))
                         .until_epoch(this_mnvr.end)
@@ -665,13 +664,13 @@ where
     ) -> Result<(), NyxError> {
         let mut instance = OptimizerInstance {
             prop: &self.prop.clone(),
-            objectives: self.objectives.clone(),
+            objectives: self.objectives,
             objective_frame: self.objective_frame.clone(),
-            variables: self.variables.clone(),
-            correction_frame: self.correction_frame.clone(),
+            variables: self.variables,
+            correction_frame: self.correction_frame,
             spacecraft: initial_state,
-            achievement_epoch: achievement_epoch,
-            correction_epoch: correction_epoch,
+            achievement_epoch,
+            correction_epoch,
             control: initial_control,
             // residuals: self.residuals.clone(),
             // TODO: Need a `step` function to compute the residuals without any correction.
