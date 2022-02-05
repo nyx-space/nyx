@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -27,3 +27,8 @@ pub use rand_pcg::Pcg64Mcg;
 pub use rayon::prelude::*;
 
 pub mod helpers;
+mod montecarlo;
+
+pub use montecarlo::MonteCarlo;
+
+// mod samplers;

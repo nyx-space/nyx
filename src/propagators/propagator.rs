@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -586,7 +586,7 @@ pub struct PropOpts<E: ErrorCtrl> {
     tolerance: f64,
     attempts: u8,
     fixed_step: bool,
-    errctrl: E,
+    _errctrl: E,
 }
 
 impl<E: ErrorCtrl> PropOpts<E> {
@@ -605,7 +605,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
             tolerance,
             attempts: 50,
             fixed_step: false,
-            errctrl,
+            _errctrl: errctrl,
         }
     }
 
@@ -638,7 +638,7 @@ impl PropOpts<RSSCartesianStep> {
             tolerance: 0.0,
             fixed_step: true,
             attempts: 0,
-            errctrl: RSSCartesianStep {},
+            _errctrl: RSSCartesianStep {},
         }
     }
 
@@ -665,7 +665,7 @@ impl Default for PropOpts<RSSCartesianStep> {
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
-            errctrl: RSSCartesianStep {},
+            _errctrl: RSSCartesianStep {},
         }
     }
 }
