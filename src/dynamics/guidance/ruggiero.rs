@@ -28,7 +28,7 @@ use std::fmt;
 use std::sync::Arc;
 
 /// Ruggiero defines the closed loop guidance law from IEPC 2011-102
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Ruggiero {
     /// Stores the objectives
     pub objectives: [Option<Objective>; 5],
@@ -56,7 +56,7 @@ impl Ruggiero {
     ) -> Result<Arc<Self>, NyxError> {
         let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
         let mut eff: [f64; 5] = [0.0; 5];
-        if objectives.len() > 5 || objectives.len() == 0 {
+        if objectives.len() > 5 || objectives.is_empty() {
             return Err(NyxError::GuidanceConfigError(format!(
                 "Must provide between 1 and 5 objectives (included), provided {}",
                 objectives.len()
@@ -147,7 +147,7 @@ impl Ruggiero {
         // Calculate the efficiency of correcting this specific orbital element
         let η = Self::efficency(&obj.parameter, osc_orbit).unwrap();
 
-        let weight = if (osc - target).abs() < tol || η < η_threshold {
+        if (osc - target).abs() < tol || η < η_threshold {
             0.0
         } else {
             // Let's add the tolerance to the initial value if we want to keep a parameter fixed (i.e. target and initial are equal)
@@ -159,9 +159,7 @@ impl Ruggiero {
                         init
                     })
                 .abs()
-        };
-
-        weight
+        }
     }
 }
 
@@ -289,16 +287,6 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                 }
                 sc.mut_mode(GuidanceMode::Coast);
             }
-        }
-    }
-}
-
-impl Default for Ruggiero {
-    fn default() -> Self {
-        Self {
-            objectives: Default::default(),
-            ηthresholds: Default::default(),
-            init_state: Default::default(),
         }
     }
 }

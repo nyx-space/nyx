@@ -1786,6 +1786,25 @@ impl State for Orbit {
             _ => Err(NyxError::StateParameterUnavailable),
         }
     }
+
+    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
+        match *param {
+            StateParameter::AoP => self.set_aop(val),
+            StateParameter::Eccentricity => self.set_ecc(val),
+            StateParameter::Inclination => self.set_inc(val),
+            StateParameter::RAAN => self.set_raan(val),
+            StateParameter::SMA => self.set_sma(val),
+            StateParameter::TrueAnomaly => self.set_ta(val),
+            StateParameter::X => self.x = val,
+            StateParameter::Y => self.y = val,
+            StateParameter::Z => self.z = val,
+            StateParameter::VX => self.vx = val,
+            StateParameter::VY => self.vy = val,
+            StateParameter::VZ => self.vz = val,
+            _ => return Err(NyxError::StateParameterUnavailable),
+        }
+        Ok(())
+    }
 }
 
 impl Add<OVector<f64, Const<6>>> for Orbit {

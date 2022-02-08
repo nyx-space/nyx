@@ -240,7 +240,3 @@ impl EventEvaluator<Spacecraft> for Event {
         self.value_precision
     }
 }
-
-/// Computes the elevation between a body fixed point and something else.
-#[derive(Clone, Debug)]
-pub struct ElevationEvent {}

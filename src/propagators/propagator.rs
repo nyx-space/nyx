@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use either::Either;
-
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::rayon::iter::ParallelBridge;
 use super::rayon::prelude::ParallelIterator;
@@ -432,22 +430,6 @@ where
         match events.get(trigger) {
             Some(event_state) => Ok((*event_state, traj)),
             None => Err(NyxError::UnsufficientTriggers(trigger, events.len())),
-        }
-    }
-
-    /// Propagate until a specific epoch or an event is found once.
-    /// Returns the state found and the trajectory
-    pub fn until<F: EventEvaluator<D::StateType>>(
-        &mut self,
-        cond: Either<Epoch, (Duration, &F)>,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
-    where
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-        D::StateType: InterpState,
-    {
-        match cond {
-            Either::Left(epoch) => self.until_epoch_with_traj(epoch),
-            Either::Right((max_duration, event)) => self.until_event(max_duration, event),
         }
     }
 

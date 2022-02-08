@@ -476,6 +476,16 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
             _ => self.orbit.value(param),
         }
     }
+
+    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
+        match *param {
+            StateParameter::Cd => self.cd = val,
+            StateParameter::Cr => self.cr = val,
+            StateParameter::FuelMass => self.fuel_mass_kg = val,
+            _ => return self.orbit.set_value(param, val),
+        }
+        Ok(())
+    }
 }
 
 impl<X: SpacecraftExt> Add<OVector<f64, Const<6>>> for BaseSpacecraft<X> {
