@@ -26,8 +26,8 @@ fn val_transfer_schedule_no_depl() {
 
     // Define the thruster
     let monoprop = Thruster {
-        thrust: 10.0,
-        isp: 300.0,
+        thrust_N: 10.0,
+        isp_s: 300.0,
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
@@ -114,8 +114,8 @@ fn val_transfer_schedule_depl() {
 
     // Define the thruster
     let monoprop = Thruster {
-        thrust: 10.0,
-        isp: 300.0,
+        thrust_N: 10.0,
+        isp_s: 300.0,
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
@@ -234,8 +234,8 @@ fn val_transfer_single_maneuver_depl() {
 
     // Define the thruster
     let monoprop = Thruster {
-        thrust: 10.0,
-        isp: 300.0,
+        thrust_N: 10.0,
+        isp_s: 300.0,
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;

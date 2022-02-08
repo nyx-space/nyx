@@ -76,6 +76,8 @@ pub enum StateParameter {
     HyperbolicAnomaly,
     /// Inclination (deg)
     Inclination,
+    /// Specific impulse (isp) in seconds
+    Isp,
     /// Mean anomaly (deg)
     MeanAnomaly,
     /// Periapsis, shortcut for TA == 0.0
@@ -98,6 +100,8 @@ pub enum StateParameter {
     SMA,
     /// Semi minor axis (km)
     SemiMinorAxis,
+    /// Thrust (Newtons)
+    Thrust,
     /// True anomaly
     TrueAnomaly,
     /// True longitude
@@ -227,6 +231,8 @@ impl StateParameter {
             Self::C3 | Self::VX | Self::VY | Self::VZ | Self::Vmag => "km/s",
 
             Self::FuelMass => "kg",
+            Self::Isp => "isp",
+            Self::Thrust => "N",
             _ => "",
         }
     }
@@ -261,6 +267,7 @@ impl FromStr for StateParameter {
             "hy" => Ok(Self::HY),
             "hz" => Ok(Self::HZ),
             "inc" => Ok(Self::Inclination),
+            "isp" => Ok(Self::Isp),
             "ma" => Ok(Self::MeanAnomaly),
             "periapsis_radius" => Ok(Self::PeriapsisRadius),
             "period" => Ok(Self::Period),
@@ -272,6 +279,7 @@ impl FromStr for StateParameter {
             "sma" => Ok(Self::SMA),
             "ta" => Ok(Self::TrueAnomaly),
             "tlong" => Ok(Self::TrueLongitude),
+            "thrust" => Ok(Self::Thrust),
             "vdeclin" => Ok(Self::VelocityDeclination),
             "vmag" => Ok(Self::Vmag),
             "x" => Ok(Self::X),
@@ -315,6 +323,7 @@ impl fmt::Display for StateParameter {
             Self::HY => "hy",
             Self::HZ => "hz",
             Self::Inclination => "inc",
+            Self::Isp => "isp",
             Self::MeanAnomaly => "ma",
             Self::PeriapsisRadius => "periapsis_radius",
             Self::Period => "period",
@@ -324,6 +333,7 @@ impl fmt::Display for StateParameter {
             Self::SemiParameter => "semi_parameter",
             Self::SemiMinorAxis => "semi_minor",
             Self::SMA => "sma",
+            Self::Thrust => "thrust",
             Self::TrueAnomaly => "ta",
             Self::TrueLongitude => "tlong",
             Self::VelocityDeclination => "vdeclin",

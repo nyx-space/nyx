@@ -473,6 +473,14 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
             StateParameter::Cd => Ok(self.cd),
             StateParameter::Cr => Ok(self.cr),
             StateParameter::FuelMass => Ok(self.fuel_mass_kg),
+            StateParameter::Isp => match self.thruster {
+                Some(thruster) => Ok(thruster.isp_s),
+                None => Err(NyxError::NoThrusterAvail),
+            },
+            StateParameter::Thrust => match self.thruster {
+                Some(thruster) => Ok(thruster.thrust_N),
+                None => Err(NyxError::NoThrusterAvail),
+            },
             _ => self.orbit.value(param),
         }
     }
@@ -482,6 +490,14 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
             StateParameter::Cd => self.cd = val,
             StateParameter::Cr => self.cr = val,
             StateParameter::FuelMass => self.fuel_mass_kg = val,
+            StateParameter::Isp => match self.thruster {
+                Some(ref mut thruster) => thruster.isp_s = val,
+                None => return Err(NyxError::NoThrusterAvail),
+            },
+            StateParameter::Thrust => match self.thruster {
+                Some(ref mut thruster) => thruster.thrust_N = val,
+                None => return Err(NyxError::NoThrusterAvail),
+            },
             _ => return self.orbit.set_value(param, val),
         }
         Ok(())

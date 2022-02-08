@@ -42,6 +42,8 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
 use std::time::Instant as StdInstant;
 
+// TODO: 1. Type with state generator; 2. Create a Results type for post processing and a serializer (no deserializer)
+
 pub struct MonteCarlo<'a, D: Dynamics, E: ErrorCtrl>
 where
     D::StateType: InterpState,

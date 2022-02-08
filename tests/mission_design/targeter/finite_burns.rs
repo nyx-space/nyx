@@ -26,8 +26,8 @@ fn thrust_dir_tgt_sma_aop_raan() {
         dry_mass_kg: 10.0,
         fuel_mass_kg: 90.0,
         thruster: Some(Thruster {
-            thrust: 500.0,
-            isp: 300.0,
+            thrust_N: 500.0,
+            isp_s: 300.0,
         }),
         ext: GuidanceMode::Thrust,
         ..Default::default()
@@ -76,8 +76,8 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
         dry_mass_kg: 10.0,
         fuel_mass_kg: 90.0,
         thruster: Some(Thruster {
-            thrust: 500.0,
-            isp: 300.0,
+            thrust_N: 500.0,
+            isp_s: 300.0,
         }),
         ext: GuidanceMode::Thrust,
         ..Default::default()
@@ -128,8 +128,8 @@ fn thrust_profile_tgt_sma_aop_raan() {
         dry_mass_kg: 10.0,
         fuel_mass_kg: 90.0,
         thruster: Some(Thruster {
-            thrust: 500.0,
-            isp: 300.0,
+            thrust_N: 500.0,
+            isp_s: 300.0,
         }),
         ext: GuidanceMode::Thrust,
         ..Default::default()
@@ -177,8 +177,8 @@ fn val_tgt_finite_burn() {
 
     // Define the thruster
     let monoprop = Thruster {
-        thrust: 5000.0,
-        isp: 300.0,
+        thrust_N: 5000.0,
+        isp_s: 300.0,
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;

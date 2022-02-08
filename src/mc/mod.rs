@@ -32,7 +32,4 @@ mod montecarlo;
 pub use montecarlo::MonteCarlo;
 
 mod generator;
-pub use generator::{
-    GaussianOrbitGenerator, GaussianSpacecraftGenerator, Generator, OrbitGenerator,
-    SpacecraftGenerator,
-};
+pub use generator::{GaussianGenerator, Generator};

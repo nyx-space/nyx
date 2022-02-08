@@ -201,8 +201,8 @@ fn traj_spacecraft() {
     let dry_mass = 300.0;
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
     let start_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);

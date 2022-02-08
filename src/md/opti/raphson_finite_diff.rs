@@ -100,7 +100,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             if var.component.is_finite_burn() {
                 if xi_start.thruster.is_none() {
                     // Can't do any conversion to finite burns without a thruster
-                    return Err(NyxError::CtrlExistsButNoThrusterAvail);
+                    return Err(NyxError::NoThrusterAvail);
                 }
                 finite_burn_target = true;
                 // Modify the default maneuver

@@ -245,7 +245,7 @@ impl<'a, X: SpacecraftExt> Dynamics for BaseSpacecraftDynamics<'a, X> {
         if let Some(guid_law) = &self.guid_law {
             let (thrust_force, fuel_rate) = {
                 if osc_sc.thruster.is_none() {
-                    return Err(NyxError::CtrlExistsButNoThrusterAvail);
+                    return Err(NyxError::NoThrusterAvail);
                 }
                 let thruster = osc_sc.thruster.unwrap();
                 let thrust_throttle_lvl = guid_law.throttle(&osc_sc);
@@ -258,12 +258,12 @@ impl<'a, X: SpacecraftExt> Dynamics for BaseSpacecraftDynamics<'a, X> {
                         return Err(NyxError::CtrlNotAUnitVector(thrust_inertial.norm()));
                     } else if thrust_inertial.norm().is_normal() {
                         // Compute the thrust in Newtons and Isp
-                        let total_thrust = (thrust_throttle_lvl * thruster.thrust) * 1e-3; // Convert m/s^-2 to km/s^-2
+                        let total_thrust = (thrust_throttle_lvl * thruster.thrust_N) * 1e-3; // Convert m/s^-2 to km/s^-2
                         (
                             thrust_inertial * total_thrust,
                             if self.decrement_mass {
-                                let fuel_usage = thrust_throttle_lvl * thruster.thrust
-                                    / (thruster.isp * STD_GRAVITY);
+                                let fuel_usage = thrust_throttle_lvl * thruster.thrust_N
+                                    / (thruster.isp_s * STD_GRAVITY);
                                 -fuel_usage
                             } else {
                                 0.0
