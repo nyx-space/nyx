@@ -15,16 +15,15 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-extern crate rand_distr;
 
+use super::rand_distr::{Distribution, Normal};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::{NyxError, State};
-use rand_distr::{Distribution, Normal};
 
 /// A state generator for Monte Carlo analyses.
-pub struct Generator<S: State, D: Distribution<f64> + Copy>
+pub struct Generator<S: State, Distr: Distribution<f64> + Copy>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -35,7 +34,7 @@ where
     pub template: S,
     /// The list of dispersions to be added to the template state
     /// Note that we can't use a HashMap here because StateParameter has a SlantAngle option comprised of f64s, and those neither have Hash nor Eq
-    pub dispersions: Vec<(StateParameter, D)>,
+    pub dispersions: Vec<(StateParameter, Distr)>,
 }
 
 impl<S: State, D: Distribution<f64> + Copy> Generator<S, D>

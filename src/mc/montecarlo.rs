@@ -17,34 +17,28 @@
 */
 extern crate indicatif;
 extern crate rand;
-extern crate rand_distr;
-use super::rayon::iter::ParallelBridge;
+use super::rand_distr::Distribution;
 use super::rayon::prelude::ParallelIterator;
-use super::Pcg64Mcg;
+use super::{Generator, Pcg64Mcg};
 use crate::dynamics::Dynamics;
-use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, OVector};
-use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
-use crate::md::trajectory::{interpolate, InterpState, Traj, TrajError};
+use crate::linalg::DefaultAllocator;
+use crate::md::trajectory::InterpState;
 use crate::md::EventEvaluator;
 use crate::propagators::{ErrorCtrl, Propagator};
 use crate::time::{Duration, Epoch, TimeUnit};
-use crate::{cosmic::Cosm, Orbit, State};
+use crate::State;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
-use rand::thread_rng;
-use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;
-use std::collections::BTreeMap;
 use std::f64;
 use std::fmt;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant as StdInstant;
 
-// TODO: 1. Type with state generator; 2. Create a Results type for post processing and a serializer (no deserializer)
+// TODO: 2. Create a Results type for post processing and a serializer to fit in any serialization (no deserializer)
 
-pub struct MonteCarlo<'a, D: Dynamics, E: ErrorCtrl>
+pub struct MonteCarlo<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy>
 where
     D::StateType: InterpState,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
@@ -57,12 +51,13 @@ where
     pub prop: Propagator<'a, D, E>,
     /// Seed of the [64bit PCG random number generator](https://www.pcg-random.org/index.html)
     pub seed: u64,
-    /// Set to True to disperse the initial state provided in the run
-    pub disperse_template: bool,
+    /// Generator of states for the Monte Carlo run
+    pub generator: Generator<D::StateType, Distr>,
+    /// Name of this run, will be reflected in the progress bar and in the output structure
     pub scenario: String,
 }
 
-impl<'a, D: Dynamics, E: ErrorCtrl> MonteCarlo<'a, D, E>
+impl<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy> MonteCarlo<'a, D, E, Distr>
 where
     D::StateType: InterpState,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
@@ -87,90 +82,92 @@ where
     /// Returns the state found and the trajectory until `max_duration`
     pub fn run_until_nth_event<F: EventEvaluator<D::StateType>>(
         self,
-        template: D::StateType,
         max_duration: Duration,
         event: &F,
         trigger: usize,
         num_runs: usize,
     ) {
-        let cosm = Cosm::de438();
-        let eme2k = cosm.frame("EME2000");
-        let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
-        let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
-
-        // Around 1 km of error
-        let sma_dist = Normal::new(0.0, 1.0).unwrap();
-
-        let start = StdInstant::now();
-
-        // Generate all 100 initial states
-        let init_states: Vec<Orbit> = sma_dist
-            .sample_iter(&mut thread_rng())
-            .take(num_runs)
-            .map(|delta_sma| state.with_sma(state.sma() + delta_sma))
-            .collect();
-
+        // Setup the RNG
+        let rng = Pcg64Mcg::new(self.seed.into());
+        // Setup the progress bar
         let pb = self.progress_bar(num_runs);
+        // Wrap the propagator in an Arc
         let arc_prop = Arc::new(self.prop);
 
-        init_states
-            .par_iter()
-            .progress_with(pb)
-            .for_each_with(arc_prop, |setup, state| {
-                let final_state =
-                    setup
-                        .with(template)
-                        .until_nth_event(max_duration, event, trigger);
-            });
+        // Setup the channels
+        let (tx, rx) = channel();
+
+        // Generate all states (must be done separately because the rng is not thread safe)
+        let start = StdInstant::now();
+
+        let init_states = self
+            .generator
+            .sample_iter(rng)
+            .take(num_runs)
+            .enumerate()
+            .collect::<Vec<(usize, D::StateType)>>();
+
+        // And propagate
+        init_states.par_iter().progress_with(pb).for_each_with(
+            (arc_prop, tx),
+            |(arc_prop, sender), (idx, state)| {
+                let rslt = arc_prop
+                    .with(*state)
+                    .until_nth_event(max_duration, event, trigger);
+                sender.send((*idx, rslt)).unwrap();
+            },
+        );
 
         let clock_time = StdInstant::now() - start;
         println!(
-            "Propagated {} states in {} seconds",
-            init_states.len(),
-            clock_time.as_secs_f64()
+            "Propagated {} states in {}",
+            num_runs,
+            clock_time.as_secs_f64() * TimeUnit::Second
         );
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     /// Returns the state found and the trajectory until `max_duration`
-    pub fn run_until_epoch(self, template: D::StateType, end_time: Epoch, num_runs: usize) {
-        let cosm = Cosm::de438();
-        let eme2k = cosm.frame("EME2000");
-        let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
-        let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
+    pub fn run_until_epoch(self, end_time: Epoch, num_runs: usize) {
+        // Setup the RNG
+        let rng = Pcg64Mcg::new(self.seed.into());
+        // Setup the progress bar
+        let pb = self.progress_bar(num_runs);
+        // Wrap the propagator in an Arc
+        let arc_prop = Arc::new(self.prop);
+        // Setup the channels
+        let (tx, rx) = channel();
 
-        // Around 1 km of error
-        let sma_dist = Normal::new(0.0, 1.0).unwrap();
-
+        // Generate all states (must be done separately because the rng is not thread safe)
         let start = StdInstant::now();
 
-        // Generate all 100 initial states
-        let init_states: Vec<Orbit> = sma_dist
-            .sample_iter(&mut thread_rng())
+        let init_states = self
+            .generator
+            .sample_iter(rng)
             .take(num_runs)
-            .map(|delta_sma| state.with_sma(state.sma() + delta_sma))
-            .collect();
+            .enumerate()
+            .collect::<Vec<(usize, D::StateType)>>();
 
-        let pb = self.progress_bar(num_runs);
-        let arc_prop = Arc::new(self.prop);
-
-        init_states
-            .par_iter()
-            .progress_with(pb)
-            .for_each_with(arc_prop, |setup, state| {
-                let final_state = setup.with(template).until_epoch(end_time);
-            });
+        // And propagate on the thread pool
+        init_states.par_iter().progress_with(pb).for_each_with(
+            (arc_prop, tx),
+            |(arc_prop, sender), (idx, state)| {
+                let rslt = arc_prop.with(*state).until_epoch_with_traj(end_time);
+                sender.send((*idx, rslt)).unwrap();
+            },
+        );
 
         let clock_time = StdInstant::now() - start;
         println!(
-            "Propagated {} states in {} seconds",
-            init_states.len(),
-            clock_time.as_secs_f64()
+            "Propagated {} states in {}",
+            num_runs,
+            clock_time.as_secs_f64() * TimeUnit::Second
         );
     }
 }
 
-impl<'a, D: Dynamics, E: ErrorCtrl> fmt::Display for MonteCarlo<'a, D, E>
+impl<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy> fmt::Display
+    for MonteCarlo<'a, D, E, Distr>
 where
     D::StateType: InterpState,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
@@ -189,28 +186,42 @@ where
 }
 
 #[test]
-fn test_mc_setup() {
+fn test_monte_carlo_epoch() {
+    use super::GaussianGenerator;
     use crate::cosmic::{Bodies, Cosm, Orbit};
     use crate::dynamics::{OrbitalDynamics, PointMasses};
+    use crate::md::StateParameter;
     let cosm = Cosm::de438();
-    let orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new(
-        &[Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
-        cosm.clone(),
-    )]);
-
-    // We need to wrap the propagator setup in an Arc to enable multithreading.
-    let prop = Propagator::default(orbital_dyn);
-
-    let my_mc = MonteCarlo {
-        prop,
-        seed: 0,
-        disperse_template: false,
-        scenario: "demo".to_string(),
-    };
+    // Build the state generator
 
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
-    my_mc.run_until_epoch(state, dt + 1.0_f64 * TimeUnit::Day, 100);
+    // 5% error on SMA and 5% on Eccentricity
+    let generator = GaussianGenerator::from_1σs_prct(
+        state,
+        &[
+            (StateParameter::SMA, 0.05),
+            (StateParameter::Eccentricity, 0.05),
+        ],
+    )
+    .unwrap();
+
+    // Set up the dynamics
+    let orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new(
+        &[Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
+        cosm.clone(),
+    )]);
+
+    let prop = Propagator::default(orbital_dyn);
+
+    let my_mc = MonteCarlo {
+        prop,
+        generator,
+        seed: 0,
+        scenario: "demo".to_string(),
+    };
+
+    my_mc.run_until_epoch(dt + 1.0_f64 * TimeUnit::Day, 100);
 }
