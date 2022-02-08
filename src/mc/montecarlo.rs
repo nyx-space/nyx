@@ -23,6 +23,7 @@ use super::{Generator, Pcg64Mcg};
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::mc::results::McResults;
 use crate::md::trajectory::InterpState;
 use crate::md::EventEvaluator;
 use crate::propagators::{ErrorCtrl, Propagator};
@@ -38,6 +39,8 @@ use std::time::Instant as StdInstant;
 
 // TODO: 2. Create a Results type for post processing and a serializer to fit in any serialization (no deserializer)
 
+/// A Monte Carlo framework, automatically running on all threads via a thread pool. This framework is targeted toward analysis of time-continuous variables.
+/// One caveat of the design is that the trajectory is used for post processing, not each individual state. This may prevent some event switching from being shown in GNC simulations.
 pub struct MonteCarlo<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy>
 where
     D::StateType: InterpState,
@@ -80,13 +83,14 @@ where
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     /// Returns the state found and the trajectory until `max_duration`
+    #[must_use = "Monte Carlo result must be used"]
     pub fn run_until_nth_event<F: EventEvaluator<D::StateType>>(
         self,
         max_duration: Duration,
         event: &F,
         trigger: usize,
         num_runs: usize,
-    ) {
+    ) -> McResults<D::StateType> {
         // Setup the RNG
         let rng = Pcg64Mcg::new(self.seed.into());
         // Setup the progress bar
@@ -124,11 +128,16 @@ where
             num_runs,
             clock_time.as_secs_f64() * TimeUnit::Second
         );
+
+        McResults {
+            data: rx.iter().collect(),
+        }
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     /// Returns the state found and the trajectory until `max_duration`
-    pub fn run_until_epoch(self, end_time: Epoch, num_runs: usize) {
+    #[must_use = "Monte Carlo result must be used"]
+    pub fn run_until_epoch(self, end_time: Epoch, num_runs: usize) -> McResults<D::StateType> {
         // Setup the RNG
         let rng = Pcg64Mcg::new(self.seed.into());
         // Setup the progress bar
@@ -163,6 +172,10 @@ where
             num_runs,
             clock_time.as_secs_f64() * TimeUnit::Second
         );
+
+        McResults {
+            data: rx.iter().collect(),
+        }
     }
 }
 
@@ -190,7 +203,9 @@ fn test_monte_carlo_epoch() {
     use super::GaussianGenerator;
     use crate::cosmic::{Bodies, Cosm, Orbit};
     use crate::dynamics::{OrbitalDynamics, PointMasses};
+    use crate::mc::results::Stats;
     use crate::md::StateParameter;
+    use crate::time::TimeUnitHelper;
     let cosm = Cosm::de438();
     // Build the state generator
 
@@ -223,5 +238,12 @@ fn test_monte_carlo_epoch() {
         scenario: "demo".to_string(),
     };
 
-    my_mc.run_until_epoch(dt + 1.0_f64 * TimeUnit::Day, 100);
+    let rslts = my_mc.run_until_epoch(dt + 1.0_f64 * TimeUnit::Day, 100);
+
+    let average_sma = rslts
+        .report_every(StateParameter::SMA, 5_i32.minutes(), None)
+        .amean()
+        .unwrap();
+
+    println!("Average SMA = {} km", average_sma);
 }

@@ -21,10 +21,9 @@ extern crate rand_distr;
 extern crate rand_pcg;
 extern crate rayon;
 
-pub use rand::prelude::*;
-pub use rand_distr::{Distribution, Normal, Uniform};
+use rand::prelude::*;
+use rand_distr::{Distribution, Normal, Uniform};
 pub use rand_pcg::Pcg64Mcg;
-pub use rayon::prelude::*;
 
 pub mod helpers;
 mod montecarlo;
@@ -33,3 +32,6 @@ pub use montecarlo::MonteCarlo;
 
 mod generator;
 pub use generator::{GaussianGenerator, Generator};
+
+mod results;
+pub use results::{McResults, Stats};
