@@ -25,6 +25,25 @@ use crate::time::{Duration, Epoch};
 use crate::NyxError;
 pub use rstats::Stats;
 
+use super::DispersedState;
+
+/// A structure storing the result of a single Monte Carlo run
+pub struct Run<S: InterpState>
+where
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<usize, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>,
+    <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
+{
+    /// The index of this run
+    pub index: usize,
+    /// The original dispersed state
+    pub dispersed_state: DispersedState<S>,
+    /// The result from this run
+    pub result: Result<(S, Traj<S>), NyxError>,
+}
+
 /// A structure of Monte Carlo results allowing for filtering
 pub struct McResults<S: InterpState>
 where
@@ -35,7 +54,9 @@ where
     <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
 {
     /// Raw data from each run
-    pub data: Vec<(usize, Result<(S, Traj<S>), NyxError>)>,
+    pub runs: Vec<Run<S>>,
+    /// Name of this scenario
+    pub scenario: String,
 }
 
 impl<S: InterpState> McResults<S>
@@ -48,25 +69,25 @@ where
 {
     /// Returns the value of the requested state parameter for all trajectories from `start` to `end` every `step` and
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
-    pub fn report_every_between(
+    pub fn every_value_of_between(
         &self,
-        param: StateParameter,
+        param: &StateParameter,
         step: Duration,
         start: Epoch,
         end: Epoch,
         value_if_run_failed: Option<f64>,
     ) -> Vec<f64> {
-        let mut report = Vec::with_capacity(self.data.len());
-        for (run_num, run) in &self.data {
-            match run {
+        let mut report = Vec::with_capacity(self.runs.len());
+        for run in &self.runs {
+            match &run.result {
                 Ok((_, traj)) => {
                     for state in traj.every_between(step, start, end) {
-                        match state.value(&param) {
+                        match state.value(param) {
                             Ok(val) => report.push(val),
                             Err(e) => match value_if_run_failed {
                                 Some(val) => report.push(val),
                                 None => {
-                                    warn!("run #{}: {}, skipping {} in report", run_num, e, param)
+                                    warn!("run #{}: {}, skipping {} in report", run.index, e, param)
                                 }
                             },
                         }
@@ -76,7 +97,7 @@ where
                     Some(val) => report.push(val),
                     None => warn!(
                         "run #{} failed with {}, skipping {} in report",
-                        run_num, e, param
+                        run.index, e, param
                     ),
                 },
             }
@@ -86,23 +107,23 @@ where
 
     /// Returns the value of the requested state parameter for all trajectories from the start to the end of each trajectory and
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
-    pub fn report_every(
+    pub fn every_value_of(
         &self,
-        param: StateParameter,
+        param: &StateParameter,
         step: Duration,
         value_if_run_failed: Option<f64>,
     ) -> Vec<f64> {
-        let mut report = Vec::with_capacity(self.data.len());
-        for (run_num, run) in &self.data {
-            match run {
+        let mut report = Vec::with_capacity(self.runs.len());
+        for run in &self.runs {
+            match &run.result {
                 Ok((_, traj)) => {
                     for state in traj.every(step) {
-                        match state.value(&param) {
+                        match state.value(param) {
                             Ok(val) => report.push(val),
                             Err(e) => match value_if_run_failed {
                                 Some(val) => report.push(val),
                                 None => {
-                                    warn!("run #{}: {}, skipping {} in report", run_num, e, param)
+                                    warn!("run #{}: {}, skipping {} in report", run.index, e, param)
                                 }
                             },
                         }
@@ -112,7 +133,7 @@ where
                     Some(val) => report.push(val),
                     None => warn!(
                         "run #{} failed with {}, skipping {} in report",
-                        run_num, e, param
+                        run.index, e, param
                     ),
                 },
             }
@@ -122,20 +143,20 @@ where
 
     /// Returns the value of the requested state parameter for the first state and
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
-    pub fn report_first(
+    pub fn first_values_of(
         &self,
-        param: StateParameter,
+        param: &StateParameter,
         value_if_run_failed: Option<f64>,
     ) -> Vec<f64> {
-        let mut report = Vec::with_capacity(self.data.len());
-        for (run_num, run) in &self.data {
-            match run {
-                Ok((_, traj)) => match traj.first().value(&param) {
+        let mut report = Vec::with_capacity(self.runs.len());
+        for run in &self.runs {
+            match &run.result {
+                Ok((_, traj)) => match traj.first().value(param) {
                     Ok(val) => report.push(val),
                     Err(e) => match value_if_run_failed {
                         Some(val) => report.push(val),
                         None => {
-                            warn!("run #{}: {}, skipping {} in report", run_num, e, param)
+                            warn!("run #{}: {}, skipping {} in report", run.index, e, param)
                         }
                     },
                 },
@@ -143,7 +164,7 @@ where
                     Some(val) => report.push(val),
                     None => warn!(
                         "run #{} failed with {}, skipping {} in report",
-                        run_num, e, param
+                        run.index, e, param
                     ),
                 },
             }
@@ -153,16 +174,20 @@ where
 
     /// Returns the value of the requested state parameter for the first state and
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
-    pub fn report_last(&self, param: StateParameter, value_if_run_failed: Option<f64>) -> Vec<f64> {
-        let mut report = Vec::with_capacity(self.data.len());
-        for (run_num, run) in &self.data {
-            match run {
-                Ok((_, traj)) => match traj.last().value(&param) {
+    pub fn last_values_of(
+        &self,
+        param: &StateParameter,
+        value_if_run_failed: Option<f64>,
+    ) -> Vec<f64> {
+        let mut report = Vec::with_capacity(self.runs.len());
+        for run in &self.runs {
+            match &run.result {
+                Ok((_, traj)) => match traj.last().value(param) {
                     Ok(val) => report.push(val),
                     Err(e) => match value_if_run_failed {
                         Some(val) => report.push(val),
                         None => {
-                            warn!("run #{}: {}, skipping {} in report", run_num, e, param)
+                            warn!("run #{}: {}, skipping {} in report", run.index, e, param)
                         }
                     },
                 },
@@ -170,11 +195,27 @@ where
                     Some(val) => report.push(val),
                     None => warn!(
                         "run #{} failed with {}, skipping {} in report",
-                        run_num, e, param
+                        run.index, e, param
                     ),
                 },
             }
         }
         report
+    }
+
+    /// Returns the dispersion values of the requested state parameter
+    pub fn dispersion_values_of(&self, param: &StateParameter) -> Result<Vec<f64>, NyxError> {
+        let mut report = Vec::with_capacity(self.runs.len());
+        'run_loop: for run in &self.runs {
+            for (dparam, val) in &run.dispersed_state.actual_dispersions {
+                if dparam == param {
+                    report.push(*val);
+                    continue 'run_loop;
+                }
+            }
+            // Oh, this parameter was not found!
+            return Err(NyxError::StateParameterUnavailable);
+        }
+        Ok(report)
     }
 }

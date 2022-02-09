@@ -39,7 +39,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, U6};
 pub use crate::md::objective::Objective;
 pub use crate::propagators::{PropOpts, Propagator};
-pub use crate::time::{Duration, Epoch, TimeUnit};
+pub use crate::time::{Duration, Epoch, TimeUnit, TimeUnitHelper};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
 use std::convert::TryFrom;

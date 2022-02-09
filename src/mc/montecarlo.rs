@@ -23,7 +23,8 @@ use super::{Generator, Pcg64Mcg};
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::mc::results::McResults;
+use crate::mc::results::{McResults, Run};
+use crate::mc::DispersedState;
 use crate::md::trajectory::InterpState;
 use crate::md::EventEvaluator;
 use crate::propagators::{ErrorCtrl, Propagator};
@@ -36,8 +37,6 @@ use std::fmt;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant as StdInstant;
-
-// TODO: 2. Create a Results type for post processing and a serializer to fit in any serialization (no deserializer)
 
 /// A Monte Carlo framework, automatically running on all threads via a thread pool. This framework is targeted toward analysis of time-continuous variables.
 /// One caveat of the design is that the trajectory is used for post processing, not each individual state. This may prevent some event switching from being shown in GNC simulations.
@@ -82,10 +81,21 @@ where
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
-    /// Returns the state found and the trajectory until `max_duration`
-    #[must_use = "Monte Carlo result must be used"]
     pub fn run_until_nth_event<F: EventEvaluator<D::StateType>>(
         self,
+        max_duration: Duration,
+        event: &F,
+        trigger: usize,
+        num_runs: usize,
+    ) -> McResults<D::StateType> {
+        self.resume_run_until_nth_event(0, max_duration, event, trigger, num_runs)
+    }
+
+    /// Generate states and propagate each independently until a specific event is found `trigger` times.
+    #[must_use = "Monte Carlo result must be used"]
+    pub fn resume_run_until_nth_event<F: EventEvaluator<D::StateType>>(
+        self,
+        skip: usize,
         max_duration: Duration,
         event: &F,
         trigger: usize,
@@ -107,18 +117,28 @@ where
         let init_states = self
             .generator
             .sample_iter(rng)
+            .skip(skip)
             .take(num_runs)
             .enumerate()
-            .collect::<Vec<(usize, D::StateType)>>();
+            .collect::<Vec<(usize, DispersedState<D::StateType>)>>();
 
         // And propagate
         init_states.par_iter().progress_with(pb).for_each_with(
             (arc_prop, tx),
-            |(arc_prop, sender), (idx, state)| {
-                let rslt = arc_prop
-                    .with(*state)
-                    .until_nth_event(max_duration, event, trigger);
-                sender.send((*idx, rslt)).unwrap();
+            |(arc_prop, sender), (index, dispersed_state)| {
+                let result = arc_prop.with(dispersed_state.state).until_nth_event(
+                    max_duration,
+                    event,
+                    trigger,
+                );
+
+                // Build a single run result
+                let run = Run {
+                    index: *index,
+                    dispersed_state: dispersed_state.clone(),
+                    result,
+                };
+                sender.send(run).unwrap();
             },
         );
 
@@ -130,14 +150,25 @@ where
         );
 
         McResults {
-            data: rx.iter().collect(),
+            runs: rx.iter().collect(),
+            scenario: self.scenario,
         }
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
-    /// Returns the state found and the trajectory until `max_duration`
     #[must_use = "Monte Carlo result must be used"]
     pub fn run_until_epoch(self, end_time: Epoch, num_runs: usize) -> McResults<D::StateType> {
+        self.resume_run_until_epoch(0, end_time, num_runs)
+    }
+
+    /// Resumes a Monte Carlo run by skipping the first `skip` items, generating states only after that, and propagate each independently until the specified epoch.
+    #[must_use = "Monte Carlo result must be used"]
+    pub fn resume_run_until_epoch(
+        self,
+        skip: usize,
+        end_time: Epoch,
+        num_runs: usize,
+    ) -> McResults<D::StateType> {
         // Setup the RNG
         let rng = Pcg64Mcg::new(self.seed.into());
         // Setup the progress bar
@@ -153,16 +184,26 @@ where
         let init_states = self
             .generator
             .sample_iter(rng)
+            .skip(skip)
             .take(num_runs)
             .enumerate()
-            .collect::<Vec<(usize, D::StateType)>>();
+            .collect::<Vec<(usize, DispersedState<D::StateType>)>>();
 
         // And propagate on the thread pool
         init_states.par_iter().progress_with(pb).for_each_with(
             (arc_prop, tx),
-            |(arc_prop, sender), (idx, state)| {
-                let rslt = arc_prop.with(*state).until_epoch_with_traj(end_time);
-                sender.send((*idx, rslt)).unwrap();
+            |(arc_prop, sender), (index, dispersed_state)| {
+                let result = arc_prop
+                    .with(dispersed_state.state)
+                    .until_epoch_with_traj(end_time);
+
+                // Build a single run result
+                let run = Run {
+                    index: *index,
+                    dispersed_state: dispersed_state.clone(),
+                    result,
+                };
+                sender.send(run).unwrap();
             },
         );
 
@@ -174,7 +215,8 @@ where
         );
 
         McResults {
-            data: rx.iter().collect(),
+            runs: rx.iter().collect(),
+            scenario: self.scenario,
         }
     }
 }
@@ -196,54 +238,4 @@ where
             self.scenario, self.seed
         )
     }
-}
-
-#[test]
-fn test_monte_carlo_epoch() {
-    use super::GaussianGenerator;
-    use crate::cosmic::{Bodies, Cosm, Orbit};
-    use crate::dynamics::{OrbitalDynamics, PointMasses};
-    use crate::mc::results::Stats;
-    use crate::md::StateParameter;
-    use crate::time::TimeUnitHelper;
-    let cosm = Cosm::de438();
-    // Build the state generator
-
-    let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
-    let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
-
-    // 5% error on SMA and 5% on Eccentricity
-    let generator = GaussianGenerator::from_1σs_prct(
-        state,
-        &[
-            (StateParameter::SMA, 0.05),
-            (StateParameter::Eccentricity, 0.05),
-        ],
-    )
-    .unwrap();
-
-    // Set up the dynamics
-    let orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new(
-        &[Bodies::Sun, Bodies::Luna, Bodies::JupiterBarycenter],
-        cosm.clone(),
-    )]);
-
-    let prop = Propagator::default(orbital_dyn);
-
-    let my_mc = MonteCarlo {
-        prop,
-        generator,
-        seed: 0,
-        scenario: "demo".to_string(),
-    };
-
-    let rslts = my_mc.run_until_epoch(dt + 1.0_f64 * TimeUnit::Day, 100);
-
-    let average_sma = rslts
-        .report_every(StateParameter::SMA, 5_i32.minutes(), None)
-        .amean()
-        .unwrap();
-
-    println!("Average SMA = {} km", average_sma);
 }

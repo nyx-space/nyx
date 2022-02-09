@@ -34,7 +34,27 @@ where
     pub template: S,
     /// The list of dispersions to be added to the template state
     /// Note that we can't use a HashMap here because StateParameter has a SlantAngle option comprised of f64s, and those neither have Hash nor Eq
-    pub dispersions: Vec<(StateParameter, Distr)>,
+    pub dispersions: Vec<Dispersion<Distr>>,
+}
+
+/// A dispersions configuration, allows specifying min/max bounds (by default, they are not set)
+#[derive(Copy, Clone)]
+pub struct Dispersion<Distr: Distribution<f64> + Copy> {
+    pub param: StateParameter,
+    pub distr: Distr,
+    pub bound_min: Option<f64>,
+    pub bound_max: Option<f64>,
+}
+
+impl<Distr: Distribution<f64> + Copy> Dispersion<Distr> {
+    pub fn new(param: StateParameter, distr: Distr) -> Self {
+        Self {
+            param,
+            distr,
+            bound_min: None,
+            bound_max: None,
+        }
+    }
 }
 
 impl<S: State, D: Distribution<f64> + Copy> Generator<S, D>
@@ -45,11 +65,11 @@ where
         + Allocator<f64, S::VecLength>,
 {
     /// Add a parameter dispersion to this Monte Carlo state generator.
-    pub fn add_dispersion(&mut self, param: StateParameter, dispersion: D) -> Result<(), NyxError> {
+    pub fn add_dispersion(&mut self, dispersion: Dispersion<D>) -> Result<(), NyxError> {
         // Try to set that parameter, and report an error on initialization if it fails
-        match self.template.clone().set_value(&param, 0.0) {
+        match self.template.clone().set_value(&dispersion.param, 0.0) {
             Ok(_) => {
-                self.dispersions.push((param, dispersion));
+                self.dispersions.push(dispersion);
                 Ok(())
             }
             Err(e) => Err(e),
@@ -57,26 +77,19 @@ where
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameters to disperse, and their respective dispersion probability density functions.
-    pub fn from_dispersions(
-        template: S,
-        dispersions: &[(StateParameter, D)],
-    ) -> Result<Self, NyxError> {
+    pub fn from_dispersions(template: S, dispersions: &[Dispersion<D>]) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
-        for (param, dispersion) in dispersions {
-            me.add_dispersion(*param, *dispersion)?;
+        for dispersion in dispersions {
+            me.add_dispersion(*dispersion)?;
         }
         Ok(me)
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameters to disperse, and their respective dispersion probability density functions.
-    pub fn from_dispersion(
-        template: S,
-        param: StateParameter,
-        dispersion: D,
-    ) -> Result<Self, NyxError> {
+    pub fn from_dispersion(template: S, dispersion: Dispersion<D>) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
 
-        me.add_dispersion(param, dispersion)?;
+        me.add_dispersion(dispersion)?;
 
         Ok(me)
     }
@@ -114,7 +127,7 @@ where
         match self.template.value(&param) {
             Ok(_) => {
                 self.dispersions
-                    .push((param, Normal::new(0.0, std_dev).unwrap()));
+                    .push(Dispersion::new(param, Normal::new(0.0, std_dev).unwrap()));
                 Ok(())
             }
             Err(e) => Err(e),
@@ -194,23 +207,46 @@ where
     }
 }
 
-impl<S: State, D: Distribution<f64> + Copy> Distribution<S> for Generator<S, D>
+/// A dispersed state
+#[derive(Clone)]
+pub struct DispersedState<S: State>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
         + Allocator<usize, S::Size, S::Size>
         + Allocator<f64, S::VecLength>,
 {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> S {
-        let mut me = self.template;
-        for (param, dispersion) in &self.dispersions {
+    /// The dispersed state
+    pub state: S,
+    /// The dispersions applied to the template state (template state + self.actual_dispersions = self.state)
+    pub actual_dispersions: Vec<(StateParameter, f64)>,
+}
+
+impl<S: State, D: Distribution<f64> + Copy> Distribution<DispersedState<S>> for Generator<S, D>
+where
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<usize, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>,
+{
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> DispersedState<S> {
+        let mut state = self.template;
+        let mut actual_dispersions = Vec::new();
+        for dispersion in &self.dispersions {
             // We know this state can return something for this param
-            let cur_value = me.value(param).unwrap();
+            let cur_value = state.value(&dispersion.param).unwrap();
             // Apply the dispersion
-            let delta = dispersion.sample(rng);
-            me.set_value(param, cur_value + delta).unwrap();
+            let delta = dispersion.distr.sample(rng);
+            actual_dispersions.push((dispersion.param, delta));
+            state
+                .set_value(&dispersion.param, cur_value + delta)
+                .unwrap();
         }
-        me
+
+        DispersedState {
+            state,
+            actual_dispersions,
+        }
     }
 }
 
@@ -239,8 +275,8 @@ fn generate_orbit() {
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
-        .map(|state| {
-            if (8_191.93 - state.sma()).abs() > 1.0 {
+        .map(|dispersed_state| {
+            if (8_191.93 - dispersed_state.state.sma()).abs() > 1.0 {
                 1
             } else {
                 0
@@ -297,14 +333,20 @@ fn generate_spacecraft() {
     let cnt_too_far: u16 = sc_generator
         .sample_iter(rng)
         .take(1000)
-        .map(|state| {
+        .map(|dispersed_state| {
             // Check out of bounds
-            let thrust_oob = (nominal_thrust - state.value(&StateParameter::Thrust).unwrap()).abs()
+            let thrust_oob = (nominal_thrust
+                - dispersed_state
+                    .state
+                    .value(&StateParameter::Thrust)
+                    .unwrap())
+            .abs()
                 / nominal_thrust
                 > 0.05;
-            let isp_oob = (nominal_isp - state.value(&StateParameter::Isp).unwrap()).abs()
-                / nominal_isp
-                > 0.01;
+            let isp_oob =
+                (nominal_isp - dispersed_state.state.value(&StateParameter::Isp).unwrap()).abs()
+                    / nominal_isp
+                    > 0.01;
             if thrust_oob || isp_oob {
                 1
             } else {
