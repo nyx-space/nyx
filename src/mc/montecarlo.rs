@@ -35,7 +35,6 @@ use rayon::prelude::*;
 use std::f64;
 use std::fmt;
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use std::time::Instant as StdInstant;
 
 /// A Monte Carlo framework, automatically running on all threads via a thread pool. This framework is targeted toward analysis of time-continuous variables.
@@ -94,43 +93,29 @@ where
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
     pub fn resume_run_until_nth_event<F: EventEvaluator<D::StateType>>(
-        self,
+        &self,
         skip: usize,
         max_duration: Duration,
         event: &F,
         trigger: usize,
         num_runs: usize,
     ) -> McResults<D::StateType> {
-        // Setup the RNG
-        let rng = Pcg64Mcg::new(self.seed.into());
+        // Generate the initial states
+        let init_states = self.generate_states(skip, num_runs);
         // Setup the progress bar
         let pb = self.progress_bar(num_runs);
-        // Wrap the propagator in an Arc
-        let arc_prop = Arc::new(self.prop);
-
-        // Setup the channels
+        // Setup the thread friendly communication
+        let prop = &self.prop;
         let (tx, rx) = channel();
 
         // Generate all states (must be done separately because the rng is not thread safe)
         let start = StdInstant::now();
-
-        let init_states = self
-            .generator
-            .sample_iter(rng)
-            .skip(skip)
-            .take(num_runs)
-            .enumerate()
-            .collect::<Vec<(usize, DispersedState<D::StateType>)>>();
-
-        // And propagate
         init_states.par_iter().progress_with(pb).for_each_with(
-            (arc_prop, tx),
-            |(arc_prop, sender), (index, dispersed_state)| {
-                let result = arc_prop.with(dispersed_state.state).until_nth_event(
-                    max_duration,
-                    event,
-                    trigger,
-                );
+            (prop, tx),
+            |(prop, tx), (index, dispersed_state)| {
+                let result =
+                    prop.with(dispersed_state.state)
+                        .until_nth_event(max_duration, event, trigger);
 
                 // Build a single run result
                 let run = Run {
@@ -138,7 +123,7 @@ where
                     dispersed_state: dispersed_state.clone(),
                     result,
                 };
-                sender.send(run).unwrap();
+                tx.send(run).unwrap();
             },
         );
 
@@ -155,7 +140,7 @@ where
 
         McResults {
             runs,
-            scenario: self.scenario,
+            scenario: self.scenario.clone(),
         }
     }
 
@@ -168,35 +153,24 @@ where
     /// Resumes a Monte Carlo run by skipping the first `skip` items, generating states only after that, and propagate each independently until the specified epoch.
     #[must_use = "Monte Carlo result must be used"]
     pub fn resume_run_until_epoch(
-        self,
+        &self,
         skip: usize,
         end_epoch: Epoch,
         num_runs: usize,
     ) -> McResults<D::StateType> {
-        // Setup the RNG
-        let rng = Pcg64Mcg::new(self.seed.into());
+        // Generate the initial states
+        let init_states = self.generate_states(skip, num_runs);
         // Setup the progress bar
         let pb = self.progress_bar(num_runs);
-        // Wrap the propagator in an Arc
-        let arc_prop = Arc::new(self.prop);
-        // Setup the channels
+        // Setup the thread friendly communication
+        let prop = &self.prop;
         let (tx, rx) = channel();
 
-        // Generate all states (must be done separately because the rng is not thread safe)
-        let start = StdInstant::now();
-
-        let init_states = self
-            .generator
-            .sample_iter(rng)
-            .skip(skip)
-            .take(num_runs)
-            .enumerate()
-            .collect::<Vec<(usize, DispersedState<D::StateType>)>>();
-
         // And propagate on the thread pool
+        let start = StdInstant::now();
         init_states.par_iter().progress_with(pb).for_each_with(
-            (arc_prop, tx),
-            |(arc_prop, sender), (index, dispersed_state)| {
+            (prop, tx),
+            |(arc_prop, tx), (index, dispersed_state)| {
                 let result = arc_prop
                     .with(dispersed_state.state)
                     .until_epoch_with_traj(end_epoch);
@@ -207,7 +181,7 @@ where
                     dispersed_state: dispersed_state.clone(),
                     result,
                 };
-                sender.send(run).unwrap();
+                tx.send(run).unwrap();
             },
         );
 
@@ -224,8 +198,27 @@ where
 
         McResults {
             runs,
-            scenario: self.scenario,
+            scenario: self.scenario.clone(),
         }
+    }
+
+    /// Set up the seed and generate the states. This is useful for checking the generated states before running a large scale Monte Carlo.
+    #[must_use = "Generated states for a Monte Carlo run must be used"]
+    pub fn generate_states(
+        &self,
+        skip: usize,
+        num_runs: usize,
+    ) -> Vec<(usize, DispersedState<D::StateType>)> {
+        // Setup the RNG
+        let rng = Pcg64Mcg::new(self.seed.into());
+
+        // Generate the states, forcing the borrow as specified in the `sample_iter` docs.
+        (&self.generator)
+            .sample_iter(rng)
+            .skip(skip)
+            .take(num_runs)
+            .enumerate()
+            .collect::<Vec<(usize, DispersedState<D::StateType>)>>()
     }
 }
 

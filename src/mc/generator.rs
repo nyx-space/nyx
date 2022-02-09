@@ -169,6 +169,12 @@ where
         param: StateParameter,
         prct: f64,
     ) -> Result<Self, NyxError> {
+        if prct < 0.0 || prct > 1.0 {
+            return Err(NyxError::MonteCarlo(format!(
+                "Generator dispersion percentages must be between 0 and 1, got {}",
+                prct
+            )));
+        }
         let mut me: Self = template.into();
 
         me.add_3std_dev(param, template.value(&param)? * prct)?;
@@ -184,6 +190,13 @@ where
         let mut me: Self = template.into();
 
         for (param, prct) in prcts {
+            if *prct < 0.0 || *prct > 1.0 {
+                return Err(NyxError::MonteCarlo(format!(
+                    "Generator dispersion percentages must be between 0 and 1, got {}",
+                    prct
+                )));
+            }
+
             me.add_3std_dev(*param, template.value(&param)? * prct)?;
         }
 
@@ -210,6 +223,13 @@ where
         let mut me: Self = template.into();
 
         for (param, prct) in prcts {
+            if *prct < 0.0 || *prct > 1.0 {
+                return Err(NyxError::MonteCarlo(format!(
+                    "Generator dispersion percentages must be between 0 and 1, got {}",
+                    prct
+                )));
+            }
+
             me.add_std_dev(*param, template.value(&param)? * prct)?;
         }
 
@@ -235,6 +255,13 @@ where
         param: StateParameter,
         prct: f64,
     ) -> Result<Self, NyxError> {
+        if prct < 0.0 || prct > 1.0 {
+            return Err(NyxError::MonteCarlo(format!(
+                "Generator dispersion percentages must be between 0 and 1, got {}",
+                prct
+            )));
+        }
+
         let mut me: Self = template.into();
 
         me.add_std_dev(param, template.value(&param)? * prct)?;
