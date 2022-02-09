@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -15,8 +15,6 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-
-use either::Either;
 
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::rayon::iter::ParallelBridge;
@@ -435,22 +433,6 @@ where
         }
     }
 
-    /// Propagate until a specific epoch or an event is found once.
-    /// Returns the state found and the trajectory
-    pub fn until<F: EventEvaluator<D::StateType>>(
-        &mut self,
-        cond: Either<Epoch, (Duration, &F)>,
-    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
-    where
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-        D::StateType: InterpState,
-    {
-        match cond {
-            Either::Left(epoch) => self.until_epoch_with_traj(epoch),
-            Either::Right((max_duration, event)) => self.until_event(max_duration, event),
-        }
-    }
-
     /// Take a single propagator step and emit the result on the TX channel (if enabled)
     pub fn single_step(&mut self) -> Result<(), NyxError> {
         let (t, state_vec) = self.derive()?;
@@ -586,7 +568,7 @@ pub struct PropOpts<E: ErrorCtrl> {
     tolerance: f64,
     attempts: u8,
     fixed_step: bool,
-    errctrl: E,
+    _errctrl: E,
 }
 
 impl<E: ErrorCtrl> PropOpts<E> {
@@ -605,7 +587,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
             tolerance,
             attempts: 50,
             fixed_step: false,
-            errctrl,
+            _errctrl: errctrl,
         }
     }
 
@@ -638,7 +620,7 @@ impl PropOpts<RSSCartesianStep> {
             tolerance: 0.0,
             fixed_step: true,
             attempts: 0,
-            errctrl: RSSCartesianStep {},
+            _errctrl: RSSCartesianStep {},
         }
     }
 
@@ -665,7 +647,7 @@ impl Default for PropOpts<RSSCartesianStep> {
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
-            errctrl: RSSCartesianStep {},
+            _errctrl: RSSCartesianStep {},
         }
     }
 }

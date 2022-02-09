@@ -102,7 +102,7 @@ pages:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: always
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
-      when: manual
+      when: never
 
 fmt_and_lint:
   stage: quality

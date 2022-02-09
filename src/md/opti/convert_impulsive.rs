@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -46,7 +46,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
     ) -> Result<Mnvr, NyxError> {
         if spacecraft.thruster.is_none() {
             // Can't do any conversion to finite burns without a thruster
-            return Err(NyxError::CtrlExistsButNoThrusterAvail);
+            return Err(NyxError::NoThrusterAvail);
         }
 
         /* ************************* */
@@ -69,7 +69,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let thruster = spacecraft.thruster.as_ref().unwrap();
         let v_exhaust_m_s = thruster.exhaust_velocity();
 
-        let delta_tfb = ((v_exhaust_m_s * spacecraft.mass_kg()) / thruster.thrust)
+        let delta_tfb = ((v_exhaust_m_s * spacecraft.mass_kg()) / thruster.thrust_N)
             * (1.0 - (-dv.norm() * 1e3 / v_exhaust_m_s).exp());
 
         let impulse_epoch = spacecraft.epoch();

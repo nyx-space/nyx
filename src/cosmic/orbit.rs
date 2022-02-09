@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -1785,6 +1785,25 @@ impl State for Orbit {
             StateParameter::VZ => Ok(self.vz),
             _ => Err(NyxError::StateParameterUnavailable),
         }
+    }
+
+    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
+        match *param {
+            StateParameter::AoP => self.set_aop(val),
+            StateParameter::Eccentricity => self.set_ecc(val),
+            StateParameter::Inclination => self.set_inc(val),
+            StateParameter::RAAN => self.set_raan(val),
+            StateParameter::SMA => self.set_sma(val),
+            StateParameter::TrueAnomaly => self.set_ta(val),
+            StateParameter::X => self.x = val,
+            StateParameter::Y => self.y = val,
+            StateParameter::Z => self.z = val,
+            StateParameter::VX => self.vx = val,
+            StateParameter::VY => self.vy = val,
+            StateParameter::VZ => self.vz = val,
+            _ => return Err(NyxError::StateParameterUnavailable),
+        }
+        Ok(())
     }
 }
 

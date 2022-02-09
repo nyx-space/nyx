@@ -30,8 +30,8 @@ fn qlaw_as_ruggiero_case_a() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 1.0,
-        isp: 3100.0,
+        thrust_N: 1.0,
+        isp_s: 3100.0,
     };
 
     let objectives = &[
@@ -99,8 +99,8 @@ fn qlaw_as_ruggiero_case_b() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 0.350,
-        isp: 2000.0,
+        thrust_N: 0.350,
+        isp_s: 2000.0,
     };
 
     let objectives = &[
@@ -157,8 +157,8 @@ fn qlaw_as_ruggiero_case_c() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 9.3,
-        isp: 3100.0,
+        thrust_N: 9.3,
+        isp_s: 3100.0,
     };
 
     let objectives = &[
@@ -215,8 +215,8 @@ fn qlaw_as_ruggiero_case_d() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     let objectives = &[
@@ -276,8 +276,8 @@ fn qlaw_as_ruggiero_case_e() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     let objectives = &[
@@ -347,8 +347,8 @@ fn qlaw_as_ruggiero_case_f() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     let objectives = &[Objective::new(StateParameter::Eccentricity, 0.15)];
@@ -414,8 +414,8 @@ fn ruggiero_iepc_2011_102() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     let objectives = &[

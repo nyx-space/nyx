@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -75,11 +75,17 @@ impl Objective {
 
 impl fmt::Display for Objective {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "\t{:x}", self)
+    }
+}
+
+impl fmt::LowerHex for Objective {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let max_obj_tol = self.tolerance.log10().abs().ceil() as usize;
 
         write!(
             f,
-            "\t{:?} → {:.prec$} ",
+            "{:?} → {:.prec$} ",
             self.parameter,
             self.desired_value,
             prec = max_obj_tol

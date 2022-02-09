@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -473,8 +473,34 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
             StateParameter::Cd => Ok(self.cd),
             StateParameter::Cr => Ok(self.cr),
             StateParameter::FuelMass => Ok(self.fuel_mass_kg),
+            StateParameter::Isp => match self.thruster {
+                Some(thruster) => Ok(thruster.isp_s),
+                None => Err(NyxError::NoThrusterAvail),
+            },
+            StateParameter::Thrust => match self.thruster {
+                Some(thruster) => Ok(thruster.thrust_N),
+                None => Err(NyxError::NoThrusterAvail),
+            },
             _ => self.orbit.value(param),
         }
+    }
+
+    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
+        match *param {
+            StateParameter::Cd => self.cd = val,
+            StateParameter::Cr => self.cr = val,
+            StateParameter::FuelMass => self.fuel_mass_kg = val,
+            StateParameter::Isp => match self.thruster {
+                Some(ref mut thruster) => thruster.isp_s = val,
+                None => return Err(NyxError::NoThrusterAvail),
+            },
+            StateParameter::Thrust => match self.thruster {
+                Some(ref mut thruster) => thruster.thrust_N = val,
+                None => return Err(NyxError::NoThrusterAvail),
+            },
+            _ => return self.orbit.set_value(param, val),
+        }
+        Ok(())
     }
 }
 

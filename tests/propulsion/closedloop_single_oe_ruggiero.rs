@@ -23,8 +23,8 @@ fn rugg_sma() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -76,8 +76,8 @@ fn rugg_sma_regress_threshold() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -133,8 +133,8 @@ fn rugg_sma_decr() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -191,8 +191,8 @@ fn rugg_inc() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -248,8 +248,8 @@ fn rugg_inc_threshold() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -306,8 +306,8 @@ fn rugg_inc_decr() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -364,8 +364,8 @@ fn rugg_ecc() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -422,8 +422,8 @@ fn rugg_ecc_regress_threshold() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -480,8 +480,8 @@ fn rugg_ecc_decr() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -540,8 +540,8 @@ fn rugg_aop() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -599,8 +599,8 @@ fn rugg_aop_decr() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -658,8 +658,8 @@ fn rugg_raan() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives
@@ -712,8 +712,8 @@ fn rugg_raan_regress_threshold() {
 
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
 
     // Define the objectives

@@ -20,8 +20,8 @@ fn alt_orbit_raising() {
         dry_mass_kg: 100.0,
         fuel_mass_kg: 500.0,
         thruster: Some(Thruster {
-            thrust: 150.0,
-            isp: 300.0,
+            thrust_N: 150.0,
+            isp_s: 300.0,
         }),
         ext: GuidanceMode::Thrust,
 
@@ -205,8 +205,8 @@ fn vmag_orbit_raising() {
         dry_mass_kg: 100.0,
         fuel_mass_kg: 500.0,
         thruster: Some(Thruster {
-            thrust: 150.0,
-            isp: 300.0,
+            thrust_N: 150.0,
+            isp_s: 300.0,
         }),
         ext: GuidanceMode::Thrust,
 

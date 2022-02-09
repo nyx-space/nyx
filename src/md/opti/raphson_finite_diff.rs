@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -100,7 +100,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             if var.component.is_finite_burn() {
                 if xi_start.thruster.is_none() {
                     // Can't do any conversion to finite burns without a thruster
-                    return Err(NyxError::CtrlExistsButNoThrusterAvail);
+                    return Err(NyxError::NoThrusterAvail);
                 }
                 finite_burn_target = true;
                 // Modify the default maneuver

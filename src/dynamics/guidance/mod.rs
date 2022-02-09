@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -33,18 +33,19 @@ pub use ruggiero::{Objective, Ruggiero, StateParameter};
 
 use std::fmt;
 /// Defines a thruster with a maximum isp and a maximum thrust.
+#[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug)]
 pub struct Thruster {
     /// The thrust is to be provided in Newtons
-    pub thrust: f64,
+    pub thrust_N: f64,
     /// The Isp is to be provided in seconds
-    pub isp: f64,
+    pub isp_s: f64,
 }
 
 impl Thruster {
     /// Returns the exhaust velocity v_e in meters per second
     pub fn exhaust_velocity(&self) -> f64 {
-        self.isp * STD_GRAVITY
+        self.isp_s * STD_GRAVITY
     }
 }
 

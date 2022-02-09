@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -240,7 +240,3 @@ impl EventEvaluator<Spacecraft> for Event {
         self.value_precision
     }
 }
-
-/// Computes the elevation between a body fixed point and something else.
-#[derive(Clone, Debug)]
-pub struct ElevationEvent {}

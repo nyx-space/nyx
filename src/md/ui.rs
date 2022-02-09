@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -39,7 +39,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, U6};
 pub use crate::md::objective::Objective;
 pub use crate::propagators::{PropOpts, Propagator};
-pub use crate::time::{Duration, Epoch, TimeUnit};
+pub use crate::time::{Duration, Epoch, TimeUnit, TimeUnitHelper};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
 use std::convert::TryFrom;

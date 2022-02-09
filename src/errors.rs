@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -63,8 +63,8 @@ pub enum NyxError {
     InvalidInterpolationData(String),
     NoStateData(String),
     DisjointFrameOrientations(String, String),
-    /// When there is a controller but there isn't any thruster available
-    CtrlExistsButNoThrusterAvail,
+    /// When a specific call requires a thruster but none is available (typically the spacecraft was not defined with a thruster)
+    NoThrusterAvail,
     /// The control vector returned by a controller must be a unit vector. Use the throttle() function to specify the amount.
     CtrlNotAUnitVector(f64),
     /// The control throttle range must be between 0.0 and 1.0 (both included) as it represents a percentage.

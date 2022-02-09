@@ -80,8 +80,8 @@ fn conv_tgt_sma_ecc() {
         dry_mass_kg: 10.0,
         fuel_mass_kg: 90.0,
         thruster: Some(Thruster {
-            thrust: 500.0,
-            isp: 300.0,
+            thrust_N: 500.0,
+            isp_s: 300.0,
         }),
         ext: GuidanceMode::Thrust,
 
