@@ -20,7 +20,7 @@ fn test_monte_carlo_epoch() {
 
     // Build the state generator using a Gaussian distribution (you may use any distribution from rand_distr)
     // 5% error on SMA and 5% on Eccentricity
-    let generator = GaussianGenerator::from_1σs_prct(
+    let generator = GaussianGenerator::from_std_dev_prcts(
         state,
         &[
             (StateParameter::SMA, 0.05),

@@ -53,7 +53,7 @@ where
         + Allocator<f64, S::VecLength>,
     <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
 {
-    /// Raw data from each run
+    /// Raw data from each run, sorted by run index for O(1) access to each run
     pub runs: Vec<Run<S>>,
     /// Name of this scenario
     pub scenario: String,

@@ -118,12 +118,16 @@ where
         + Allocator<f64, S::VecLength>,
 {
     /// Add a state dispersion from the provided 3-sigma value, zero mean
-    pub fn add_3σ(&mut self, param: StateParameter, three_sigma: f64) -> Result<(), NyxError> {
-        self.add_1σ(param, three_sigma / 3.0)
+    pub fn add_3std_dev(
+        &mut self,
+        param: StateParameter,
+        three_sigma: f64,
+    ) -> Result<(), NyxError> {
+        self.add_std_dev(param, three_sigma / 3.0)
     }
 
     /// Add a state dispersion from the provided 1-sigma value, zero mean
-    pub fn add_1σ(&mut self, param: StateParameter, std_dev: f64) -> Result<(), NyxError> {
+    pub fn add_std_dev(&mut self, param: StateParameter, std_dev: f64) -> Result<(), NyxError> {
         match self.template.value(&param) {
             Ok(_) => {
                 self.dispersions
@@ -135,73 +139,105 @@ where
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameters to disperse, and their respective 3-σ standard deviations, zero mean.
-    pub fn from_3σs(
+    pub fn from_3std_devs(
         template: S,
         three_sigmas: &[(StateParameter, f64)],
     ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
         for (param, three_sigma) in three_sigmas {
-            me.add_3σ(*param, *three_sigma)?;
+            me.add_3std_dev(*param, *three_sigma)?;
         }
         Ok(me)
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameter to disperse, and its 3-σ standard deviation, zero mean.
-    pub fn from_3σ(
+    pub fn from_3std_dev(
         template: S,
         param: StateParameter,
         three_sigma: f64,
     ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
 
-        me.add_3σ(param, three_sigma)?;
+        me.add_3std_dev(param, three_sigma)?;
 
         Ok(me)
     }
 
-    /// Create a new Monte Carlo state generator given a template state, the parameter to disperse, and its 1-σ standard deviation in percentage of the template's value, zero mean.
-    pub fn from_3σ_prct(template: S, param: StateParameter, prct: f64) -> Result<Self, NyxError> {
+    /// Create a new Monte Carlo state generator given a template state, the parameter to disperse, and its 3-σ standard deviation in percentage of the template's value, zero mean.
+    pub fn from_3std_dev_prct(
+        template: S,
+        param: StateParameter,
+        prct: f64,
+    ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
 
-        me.add_3σ(param, template.value(&param)? * prct)?;
+        me.add_3std_dev(param, template.value(&param)? * prct)?;
+
+        Ok(me)
+    }
+
+    /// Create a new Monte Carlo state generator given a template state, the parameter to disperse, and its 3-σ standard deviation in percentage of the template's value, zero mean.
+    pub fn from_3std_dev_prcts(
+        template: S,
+        prcts: &[(StateParameter, f64)],
+    ) -> Result<Self, NyxError> {
+        let mut me: Self = template.into();
+
+        for (param, prct) in prcts {
+            me.add_3std_dev(*param, template.value(&param)? * prct)?;
+        }
 
         Ok(me)
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameters to disperse, and their respective 1-σ standard deviations, zero mean.
-    pub fn from_1σs(template: S, std_devs: &[(StateParameter, f64)]) -> Result<Self, NyxError> {
+    pub fn from_std_devs(
+        template: S,
+        std_devs: &[(StateParameter, f64)],
+    ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
         for (param, three_sigma) in std_devs {
-            me.add_1σ(*param, *three_sigma)?;
+            me.add_std_dev(*param, *three_sigma)?;
         }
         Ok(me)
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameter to disperse, and its 1-σ standard deviation in percentage of the template's value, zero mean.
-    pub fn from_1σs_prct(template: S, prcts: &[(StateParameter, f64)]) -> Result<Self, NyxError> {
+    pub fn from_std_dev_prcts(
+        template: S,
+        prcts: &[(StateParameter, f64)],
+    ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
 
         for (param, prct) in prcts {
-            me.add_1σ(*param, template.value(&param)? * prct)?;
+            me.add_std_dev(*param, template.value(&param)? * prct)?;
         }
 
         Ok(me)
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameter to disperse, and its 1-σ standard deviation, zero mean.
-    pub fn from_1σ(template: S, param: StateParameter, std_dev: f64) -> Result<Self, NyxError> {
+    pub fn from_std_dev(
+        template: S,
+        param: StateParameter,
+        std_dev: f64,
+    ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
 
-        me.add_1σ(param, std_dev)?;
+        me.add_std_dev(param, std_dev)?;
 
         Ok(me)
     }
 
     /// Create a new Monte Carlo state generator given a template state, the parameter to disperse, and its 1-σ standard deviation in percentage of the template's value, zero mean.
-    pub fn from_1σ_prct(template: S, param: StateParameter, prct: f64) -> Result<Self, NyxError> {
+    pub fn from_std_dev_prct(
+        template: S,
+        param: StateParameter,
+        prct: f64,
+    ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
 
-        me.add_1σ(param, template.value(&param)? * prct)?;
+        me.add_std_dev(param, template.value(&param)? * prct)?;
 
         Ok(me)
     }
@@ -265,7 +301,7 @@ fn generate_orbit() {
     let dt = Epoch::from_gregorian_utc_at_midnight(2021, 1, 31);
     let state = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
 
-    let orbit_generator = GaussianGenerator::from_1σ(state, StateParameter::SMA, 1.0).unwrap();
+    let orbit_generator = GaussianGenerator::from_std_dev(state, StateParameter::SMA, 1.0).unwrap();
 
     // Ensure that this worked: a 3 sigma deviation around 1 km means we shouldn't have 99.7% of samples within those bounds.
     // Create a reproducible fast seed
@@ -319,7 +355,7 @@ fn generate_spacecraft() {
         crate::io::odp::GuidanceMode::Inhibit,
     );
 
-    let sc_generator = GaussianGenerator::from_1σs_prct(
+    let sc_generator = GaussianGenerator::from_std_dev_prcts(
         sc,
         &[(StateParameter::Thrust, 0.05), (StateParameter::Isp, 0.01)],
     )

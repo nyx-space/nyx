@@ -149,16 +149,20 @@ where
             clock_time.as_secs_f64() * TimeUnit::Second
         );
 
+        // Collect all of the results and sort them by run index
+        let mut runs = rx.iter().collect::<Vec<Run<D::StateType>>>();
+        runs.par_sort_by_key(|run| run.index);
+
         McResults {
-            runs: rx.iter().collect(),
+            runs,
             scenario: self.scenario,
         }
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
-    pub fn run_until_epoch(self, end_time: Epoch, num_runs: usize) -> McResults<D::StateType> {
-        self.resume_run_until_epoch(0, end_time, num_runs)
+    pub fn run_until_epoch(self, end_epoch: Epoch, num_runs: usize) -> McResults<D::StateType> {
+        self.resume_run_until_epoch(0, end_epoch, num_runs)
     }
 
     /// Resumes a Monte Carlo run by skipping the first `skip` items, generating states only after that, and propagate each independently until the specified epoch.
@@ -166,7 +170,7 @@ where
     pub fn resume_run_until_epoch(
         self,
         skip: usize,
-        end_time: Epoch,
+        end_epoch: Epoch,
         num_runs: usize,
     ) -> McResults<D::StateType> {
         // Setup the RNG
@@ -195,7 +199,7 @@ where
             |(arc_prop, sender), (index, dispersed_state)| {
                 let result = arc_prop
                     .with(dispersed_state.state)
-                    .until_epoch_with_traj(end_time);
+                    .until_epoch_with_traj(end_epoch);
 
                 // Build a single run result
                 let run = Run {
@@ -214,8 +218,12 @@ where
             clock_time.as_secs_f64() * TimeUnit::Second
         );
 
+        // Collect all of the results and sort them by run index
+        let mut runs = rx.iter().collect::<Vec<Run<D::StateType>>>();
+        runs.par_sort_by_key(|run| run.index);
+
         McResults {
-            runs: rx.iter().collect(),
+            runs,
             scenario: self.scenario,
         }
     }
@@ -236,6 +244,27 @@ where
             f,
             "{} - Nyx Monte Carlo - seed: {}",
             self.scenario, self.seed
+        )
+    }
+}
+
+impl<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy> fmt::LowerHex
+    for MonteCarlo<'a, D, E, Distr>
+where
+    D::StateType: InterpState,
+    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
+        + Allocator<f64, <D::StateType as State>::VecLength>,
+    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+{
+    /// Returns a filename friendly name
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "mc-data-{}-seed-{}",
+            self.scenario.replace(" ", "-"),
+            self.seed
         )
     }
 }
