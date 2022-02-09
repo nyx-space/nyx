@@ -299,6 +299,33 @@ pub fn unitize(v: Vector3<f64>) -> Vector3<f64> {
     }
 }
 
+/// Converts the input vector V from Cartesian coordinates to spherical coordinates
+/// Returns ρ, θ, φ where the range ρ is in the units of the input vector and the angles are in radians
+pub fn cartesian_to_spherical(v: &Vector3<f64>) -> (f64, f64, f64) {
+    if v.norm() < f64::EPSILON {
+        (0.0, 0.0, 0.0)
+    } else {
+        let range_ρ = v.norm();
+        let θ = v.y.atan2(v.x);
+        let φ = (v.z / range_ρ).acos();
+        (range_ρ, θ, φ)
+    }
+}
+
+/// Converts the input vector V from Cartesian coordinates to spherical coordinates
+/// Returns ρ, θ, φ where the range ρ is in the units of the input vector and the angles are in radians
+pub fn spherical_to_cartesian(range_ρ: f64, θ: f64, φ: f64) -> Vector3<f64> {
+    if range_ρ < f64::EPSILON {
+        // Treat a negative range as a zero vector
+        Vector3::zeros()
+    } else {
+        let x = range_ρ * φ.sin() * θ.cos();
+        let y = range_ρ * φ.sin() * θ.sin();
+        let z = range_ρ * φ.cos();
+        Vector3::new(x, y, z)
+    }
+}
+
 #[test]
 fn test_tilde_matrix() {
     let vec = Vector3::new(1.0, 2.0, 3.0);
@@ -404,4 +431,20 @@ fn test_pseudo_inv() {
     println!("{}", mat.try_inverse().unwrap());
 
     println!("{}", pseudo_inverse!(&mat).unwrap());
+}
+
+#[test]
+fn spherical() {
+    for v in &[
+        Vector3::<f64>::x(),
+        Vector3::<f64>::y(),
+        Vector3::<f64>::z(),
+        Vector3::<f64>::zeros(),
+        Vector3::<f64>::new(159.1, 561.2, 756.3),
+    ] {
+        let (range_ρ, θ, φ) = cartesian_to_spherical(v);
+        let v_prime = spherical_to_cartesian(range_ρ, θ, φ);
+
+        assert!(rss_errors(v, &v_prime) < 1e-12, "{} != {}", v, &v_prime);
+    }
 }

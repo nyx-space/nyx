@@ -30,7 +30,10 @@ use crate::linalg::{Const, OVector};
 use crate::md::ui::Objective;
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
-use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
+use crate::utils::{
+    between_0_360, between_pm_180, cartesian_to_spherical, perpv, r1, r3, rss_orbit_errors,
+    spherical_to_cartesian,
+};
 use crate::NyxError;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
@@ -1798,9 +1801,27 @@ impl State for Orbit {
             StateParameter::X => self.x = val,
             StateParameter::Y => self.y = val,
             StateParameter::Z => self.z = val,
+            StateParameter::Rmag => {
+                // Convert the position to spherical coordinates
+                let (_, θ, φ) = cartesian_to_spherical(&self.radius());
+                // Convert back to cartesian after setting the new range value
+                let new_radius = spherical_to_cartesian(val, θ, φ);
+                self.x = new_radius.x;
+                self.y = new_radius.y;
+                self.z = new_radius.z;
+            }
             StateParameter::VX => self.vx = val,
             StateParameter::VY => self.vy = val,
             StateParameter::VZ => self.vz = val,
+            StateParameter::Vmag => {
+                // Convert the velocity to spherical coordinates
+                let (_, θ, φ) = cartesian_to_spherical(&self.velocity());
+                // Convert back to cartesian after setting the new range value
+                let new_radius = spherical_to_cartesian(val, θ, φ);
+                self.vx = new_radius.x;
+                self.vy = new_radius.y;
+                self.vz = new_radius.z;
+            }
             _ => return Err(NyxError::StateParameterUnavailable),
         }
         Ok(())
