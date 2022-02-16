@@ -28,7 +28,7 @@ pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
-use hifitime::TimeUnitHelper;
+use hifitime::TimeUnits;
 use std::time::Instant;
 
 impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {

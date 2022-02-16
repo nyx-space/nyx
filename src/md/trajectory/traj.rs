@@ -29,7 +29,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
 use crate::polyfit::{hermite, Polynomial};
-use crate::time::{Duration, Epoch, TimeSeries, TimeUnit};
+use crate::time::{Duration, Epoch, TimeSeries, Unit};
 use crate::utils::normalize;
 use crate::State;
 use std::collections::BTreeMap;
@@ -174,10 +174,10 @@ where
 
         for _ in 0..max_iter {
             if ya.abs() < event.value_precision().abs() {
-                return self.at(xa_e + xa * TimeUnit::Second);
+                return self.at(xa_e + xa * Unit::Second);
             }
             if yb.abs() < event.value_precision().abs() {
-                return self.at(xa_e + xb * TimeUnit::Second);
+                return self.at(xa_e + xb * Unit::Second);
             }
             if has_converged(xa, xb) {
                 // The event isn't in the bracket
@@ -205,14 +205,14 @@ where
             } else {
                 flag = false;
             }
-            let next_try = self.at(xa_e + s * TimeUnit::Second)?;
+            let next_try = self.at(xa_e + s * Unit::Second)?;
             let ys = event.eval(&next_try);
             xd = xc;
             xc = xb;
             yc = yb;
             if ya * ys < 0.0 {
                 // Root bracketed between a and s
-                let next_try = self.at(xa_e + xa * TimeUnit::Second)?;
+                let next_try = self.at(xa_e + xa * Unit::Second)?;
                 let ya_p = event.eval(&next_try);
                 let (_a, _ya, _b, _yb) = arrange(xa, ya_p, s, ys);
                 {
@@ -223,7 +223,7 @@ where
                 }
             } else {
                 // Root bracketed between s and b
-                let next_try = self.at(xa_e + xb * TimeUnit::Second)?;
+                let next_try = self.at(xa_e + xb * Unit::Second)?;
                 let yb_p = event.eval(&next_try);
                 let (_a, _ya, _b, _yb) = arrange(s, ys, xb, yb_p);
                 {
@@ -283,34 +283,34 @@ where
             );
             // Crap, we didn't find the event.
             // Let's find the min and max of this event throughout the trajectory, and search around there.
-            match self.find_minmax(event, TimeUnit::Second) {
+            match self.find_minmax(event, Unit::Second) {
                 Ok((min_event, max_event)) => {
                     let lower_min_epoch =
-                        if min_event.epoch() - 1 * TimeUnit::Millisecond < self.first().epoch() {
+                        if min_event.epoch() - 1 * Unit::Millisecond < self.first().epoch() {
                             self.first().epoch()
                         } else {
-                            min_event.epoch() - 1 * TimeUnit::Millisecond
+                            min_event.epoch() - 1 * Unit::Millisecond
                         };
 
                     let lower_max_epoch =
-                        if min_event.epoch() + 1 * TimeUnit::Millisecond > self.last().epoch() {
+                        if min_event.epoch() + 1 * Unit::Millisecond > self.last().epoch() {
                             self.last().epoch()
                         } else {
-                            min_event.epoch() + 1 * TimeUnit::Millisecond
+                            min_event.epoch() + 1 * Unit::Millisecond
                         };
 
                     let upper_min_epoch =
-                        if max_event.epoch() - 1 * TimeUnit::Millisecond < self.first().epoch() {
+                        if max_event.epoch() - 1 * Unit::Millisecond < self.first().epoch() {
                             self.first().epoch()
                         } else {
-                            max_event.epoch() - 1 * TimeUnit::Millisecond
+                            max_event.epoch() - 1 * Unit::Millisecond
                         };
 
                     let upper_max_epoch =
-                        if max_event.epoch() + 1 * TimeUnit::Millisecond > self.last().epoch() {
+                        if max_event.epoch() + 1 * Unit::Millisecond > self.last().epoch() {
                             self.last().epoch()
                         } else {
-                            max_event.epoch() + 1 * TimeUnit::Millisecond
+                            max_event.epoch() + 1 * Unit::Millisecond
                         };
 
                     // Search around the min event
@@ -356,7 +356,7 @@ where
 
     /// Find the minimum and maximum of the provided event through the trajectory
     #[allow(clippy::identity_op)]
-    pub fn find_minmax<E>(&self, event: &E, precision: TimeUnit) -> Result<(S, S), NyxError>
+    pub fn find_minmax<E>(&self, event: &E, precision: Unit) -> Result<(S, S), NyxError>
     where
         E: EventEvaluator<S>,
     {
@@ -618,7 +618,7 @@ impl Traj<Orbit> {
     /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
     #[allow(clippy::identity_op)]
     pub fn to_csv(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        self.to_csv_with_step(filename, 1 * TimeUnit::Minute, cosm)
+        self.to_csv_with_step(filename, 1 * Unit::Minute, cosm)
     }
 
     /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
@@ -630,7 +630,7 @@ impl Traj<Orbit> {
         end: Option<Epoch>,
         cosm: Arc<Cosm>,
     ) -> Result<(), NyxError> {
-        self.to_csv_between_with_step(filename, start, end, 1 * TimeUnit::Minute, cosm)
+        self.to_csv_between_with_step(filename, start, end, 1 * Unit::Minute, cosm)
     }
 
     /// Exports this trajectory to the provided filename in CSV format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
@@ -655,7 +655,7 @@ impl Traj<Orbit> {
         let mut out = OrbitStateOutput::new(fmtr)?;
         for state in self
             .to_frame(body_fixed_frame, cosm)?
-            .every(1 * TimeUnit::Minute)
+            .every(1 * Unit::Minute)
         {
             out.handle(&state);
         }
@@ -854,7 +854,7 @@ impl Traj<Spacecraft> {
     /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
     #[allow(clippy::identity_op)]
     pub fn to_csv(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        self.to_csv_with_step(filename, 1 * TimeUnit::Minute, cosm)
+        self.to_csv_with_step(filename, 1 * Unit::Minute, cosm)
     }
 
     /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
@@ -866,7 +866,7 @@ impl Traj<Spacecraft> {
         end: Option<Epoch>,
         cosm: Arc<Cosm>,
     ) -> Result<(), NyxError> {
-        self.to_csv_between_with_step(filename, start, end, 1 * TimeUnit::Minute, cosm)
+        self.to_csv_between_with_step(filename, start, end, 1 * Unit::Minute, cosm)
     }
 
     /// Exports this trajectory to the provided filename in CSV format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
@@ -891,7 +891,7 @@ impl Traj<Spacecraft> {
         let mut out = OrbitStateOutput::new(fmtr)?;
         for state in self
             .to_frame(body_fixed_frame, cosm)?
-            .every(1 * TimeUnit::Minute)
+            .every(1 * Unit::Minute)
         {
             out.handle(&state);
         }

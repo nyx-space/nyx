@@ -3,7 +3,7 @@ use nyx::cosmic::{assert_orbit_eq_or_abs, assert_orbit_eq_or_rel, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::error_ctrl::RSSCartesianState;
 use nyx::propagators::*;
-use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
+use nyx::time::{Epoch, Unit, J2000_OFFSET};
 use nyx::utils::rss_orbit_errors;
 
 #[allow(clippy::identity_op)]
@@ -13,10 +13,10 @@ fn regress_leo_day_adaptive() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
-    let min_step = 0.1 * TimeUnit::Second;
-    let max_step = 30.0 * TimeUnit::Second;
+    let min_step = 0.1 * Unit::Second;
+    let max_step = 30.0 * Unit::Second;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
@@ -61,7 +61,7 @@ fn regress_leo_day_adaptive() {
     {
         let setup = Propagator::new::<RK2Fixed>(
             dynamics.clone(),
-            PropOpts::with_fixed_step(1.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(1.0 * Unit::Second),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -126,10 +126,10 @@ fn gmat_val_leo_day_adaptive() {
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
     let accuracy = 1e-12;
-    let min_step = 0.1 * TimeUnit::Second;
-    let max_step = 30.0 * TimeUnit::Second;
+    let min_step = 0.1 * Unit::Second;
+    let max_step = 30.0 * Unit::Second;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
@@ -314,7 +314,7 @@ fn gmat_val_leo_day_fixed() {
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
     let dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let init = Orbit::cartesian(
         -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
@@ -379,7 +379,7 @@ fn gmat_val_leo_day_fixed() {
     {
         let setup = Propagator::new::<RK4Fixed>(
             dynamics.clone(),
-            PropOpts::with_fixed_step(1.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(1.0 * Unit::Second),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -405,7 +405,7 @@ fn gmat_val_leo_day_fixed() {
     {
         let setup = Propagator::new::<Verner56>(
             dynamics.clone(),
-            PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -421,7 +421,7 @@ fn gmat_val_leo_day_fixed() {
     {
         let setup = Propagator::new::<Dormand45>(
             dynamics.clone(),
-            PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -437,7 +437,7 @@ fn gmat_val_leo_day_fixed() {
     {
         let setup = Propagator::new::<Dormand78>(
             dynamics.clone(),
-            PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
         );
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
@@ -452,7 +452,7 @@ fn gmat_val_leo_day_fixed() {
 
     {
         let setup =
-            Propagator::new::<RK89>(dynamics, PropOpts::with_fixed_step(10.0 * TimeUnit::Second));
+            Propagator::new::<RK89>(dynamics, PropOpts::with_fixed_step(10.0 * Unit::Second));
         let mut prop = setup.with(init);
         prop.for_duration(prop_time).unwrap();
         assert_eq!(prop.state, all_rslts[4], "two body prop failed");

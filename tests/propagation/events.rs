@@ -62,7 +62,7 @@ fn event_tracker_true_anomaly() {
     let mut max_el = std::f64::NEG_INFINITY;
     let mut min_dt = dt;
     let mut max_dt = dt;
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         let new_e_state = e_loc.compute(&state);
         if e_state != new_e_state {
             println!("{:x}\t{}", state, new_e_state);
@@ -95,8 +95,8 @@ fn event_tracker_true_anomaly() {
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
-                &e_loc.compute(&traj.at(orbit.epoch() - 10 * TimeUnit::Second).unwrap()),
-                &e_loc.compute(&traj.at(orbit.epoch() + 10 * TimeUnit::Second).unwrap())
+                &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
+                &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
             )
         })
         .collect::<String>();
@@ -112,8 +112,8 @@ fn event_tracker_true_anomaly() {
                 "{:x}\tevent value: {}\t(-10s: {}\t+10s: {})\n",
                 orbit,
                 &e_loc.compute(orbit),
-                &e_loc.compute(&traj.at(orbit.epoch() - 10 * TimeUnit::Second).unwrap()),
-                &e_loc.compute(&traj.at(orbit.epoch() + 10 * TimeUnit::Second).unwrap())
+                &e_loc.compute(&traj.at(orbit.epoch() - 10 * Unit::Second).unwrap()),
+                &e_loc.compute(&traj.at(orbit.epoch() + 10 * Unit::Second).unwrap())
             )
         })
         .collect::<String>();

@@ -141,7 +141,7 @@ fn tgt_b_plane_lunar_transfer() {
     );
 
     let tcm_epoch = periapse_spacecraft.epoch();
-    let loi_epoch = tcm_epoch + 556697 * TimeUnit::Second;
+    let loi_epoch = tcm_epoch + 556697 * Unit::Second;
 
     let sol = tgt
         .try_achieve_from(periapse_spacecraft, tcm_epoch, loi_epoch)
@@ -199,7 +199,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
 
     let prior_sc = prop
         .with(spacecraft)
-        .for_duration(-12 * TimeUnit::Hour)
+        .for_duration(-12 * Unit::Hour)
         .unwrap();
 
     let b_plane_tgt = BPlaneTarget::from_bt_br(13135.7982982557, 5022.26511510685);

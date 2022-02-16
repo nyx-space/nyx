@@ -27,7 +27,7 @@ use crate::linalg::{DefaultAllocator, OVector};
 use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
 use crate::md::trajectory::{interpolate, InterpState, Traj, TrajError};
 use crate::md::EventEvaluator;
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use std::collections::BTreeMap;
 use std::f64;
@@ -166,18 +166,18 @@ where
         duration: Duration,
         maybe_tx_chan: Option<Sender<D::StateType>>,
     ) -> Result<D::StateType, NyxError> {
-        if duration == 0 * TimeUnit::Second {
+        if duration == 0 * Unit::Second {
             return Ok(self.state);
         }
         let stop_time = self.state.epoch() + duration;
-        if duration > 2 * TimeUnit::Minute || duration < -2 * TimeUnit::Minute {
+        if duration > 2 * Unit::Minute || duration < -2 * Unit::Minute {
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
         // Call `finally` on the current state to set anything up
         self.state = self.prop.dynamics.finally(self.state)?;
 
-        let backprop = duration < TimeUnit::Nanosecond;
+        let backprop = duration < Unit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
@@ -511,7 +511,7 @@ where
                         );
                     }
 
-                    self.details.step = step_size * TimeUnit::Second;
+                    self.details.step = step_size * Unit::Second;
                     if self.details.error < self.prop.opts.tolerance {
                         // Let's increase the step size for the next iteration.
                         // Error is less than tolerance, let's attempt to increase the step for the next iteration.
@@ -526,7 +526,7 @@ where
                         };
                     }
                     // In all cases, let's update the step size to whatever was the adapted step size
-                    self.step_size = step_size * TimeUnit::Second;
+                    self.step_size = step_size * Unit::Second;
                     return Ok((self.details.step, next_state));
                 } else {
                     // Error is too high and we aren't using the smallest step, and we haven't hit the max number of attempts.
@@ -593,8 +593,8 @@ impl<E: ErrorCtrl> PropOpts<E> {
 
     pub fn with_adaptive_step_s(min_step: f64, max_step: f64, tolerance: f64, errctrl: E) -> Self {
         Self::with_adaptive_step(
-            min_step * TimeUnit::Second,
-            max_step * TimeUnit::Second,
+            min_step * Unit::Second,
+            max_step * Unit::Second,
             tolerance,
             errctrl,
         )
@@ -625,7 +625,7 @@ impl PropOpts<RSSCartesianStep> {
     }
 
     pub fn with_fixed_step_s(step: f64) -> Self {
-        Self::with_fixed_step(step * TimeUnit::Second)
+        Self::with_fixed_step(step * Unit::Second)
     }
 
     /// Returns the default options with a specific tolerance.
@@ -641,9 +641,9 @@ impl Default for PropOpts<RSSCartesianStep> {
     /// `default` returns the same default options as GMAT.
     fn default() -> PropOpts<RSSCartesianStep> {
         PropOpts {
-            init_step: 60.0 * TimeUnit::Second,
-            min_step: 0.001 * TimeUnit::Second,
-            max_step: 2700.0 * TimeUnit::Second,
+            init_step: 60.0 * Unit::Second,
+            min_step: 0.001 * Unit::Second,
+            max_step: 2700.0 * Unit::Second,
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
@@ -657,21 +657,21 @@ fn test_options() {
     use super::error_ctrl::RSSStep;
 
     let opts = PropOpts::with_fixed_step_s(1e-1);
-    assert_eq!(opts.min_step, 1e-1 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 1e-1 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 1e-1 * Unit::Second);
+    assert_eq!(opts.max_step, 1e-1 * Unit::Second);
     assert!(opts.tolerance.abs() < f64::EPSILON);
     assert!(opts.fixed_step);
 
     let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
-    assert_eq!(opts.min_step, 1e-2 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 10.0 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 1e-2 * Unit::Second);
+    assert_eq!(opts.max_step, 10.0 * Unit::Second);
     assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert!(!opts.fixed_step);
 
     let opts: PropOpts<RSSCartesianStep> = Default::default();
-    assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
-    assert_eq!(opts.min_step, 0.001 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);
+    assert_eq!(opts.init_step, 60.0 * Unit::Second);
+    assert_eq!(opts.min_step, 0.001 * Unit::Second);
+    assert_eq!(opts.max_step, 2700.0 * Unit::Second);
     assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert_eq!(opts.attempts, 50);
     assert!(!opts.fixed_step);

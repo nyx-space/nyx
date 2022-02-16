@@ -5,7 +5,7 @@ use self::nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use self::nyx::dynamics::guidance::{Objective, Ruggiero, StateParameter, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, TimeUnit};
+use self::nyx::time::{Epoch, Unit};
 
 #[test]
 fn rugg_sma() {
@@ -16,7 +16,7 @@ fn rugg_sma() {
 
     let orbit = Orbit::keplerian(24396.0, 0.0, 0.0, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 45 * TimeUnit::Day;
+    let prop_time = 45 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -46,7 +46,7 @@ fn rugg_sma() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -72,7 +72,7 @@ fn rugg_sma_regress_threshold() {
 
     let orbit = Orbit::keplerian(24396.0, 0.1, 0.0, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 175 * TimeUnit::Day;
+    let prop_time = 175 * Unit::Day;
 
     // Define the thruster
     let lowt = Thruster {
@@ -99,7 +99,7 @@ fn rugg_sma_regress_threshold() {
 
         let final_state = Propagator::new::<RK4Fixed>(
             sc.clone(),
-            PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
         )
         .with(sc_state)
         .for_duration(prop_time)
@@ -126,7 +126,7 @@ fn rugg_sma_decr() {
 
     let orbit = Orbit::keplerian(42164.0, 0.0, 0.0, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 45 * TimeUnit::Day;
+    let prop_time = 45 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -156,7 +156,7 @@ fn rugg_sma_decr() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -184,7 +184,7 @@ fn rugg_inc() {
 
     let orbit = Orbit::keplerian(sma, 0.001, 46.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 55 * TimeUnit::Day;
+    let prop_time = 55 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -214,7 +214,7 @@ fn rugg_inc() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -241,7 +241,7 @@ fn rugg_inc_threshold() {
 
     let orbit = Orbit::keplerian_altitude(350.0, 0.001, 46.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 130 * TimeUnit::Day;
+    let prop_time = 130 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -271,7 +271,7 @@ fn rugg_inc_threshold() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -299,7 +299,7 @@ fn rugg_inc_decr() {
 
     let orbit = Orbit::keplerian(sma, 0.001, 51.6, 1.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 55 * TimeUnit::Day;
+    let prop_time = 55 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -329,7 +329,7 @@ fn rugg_inc_decr() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -357,7 +357,7 @@ fn rugg_ecc() {
 
     let orbit = Orbit::keplerian(sma, 0.01, 98.7, 0.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 30 * TimeUnit::Day;
+    let prop_time = 30 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -387,7 +387,7 @@ fn rugg_ecc() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -415,7 +415,7 @@ fn rugg_ecc_regress_threshold() {
 
     let orbit = Orbit::keplerian(sma, 0.01, 98.7, 0.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 150 * TimeUnit::Day;
+    let prop_time = 150 * Unit::Day;
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -444,7 +444,7 @@ fn rugg_ecc_regress_threshold() {
 
         let final_state = Propagator::new::<RK4Fixed>(
             sc.clone(),
-            PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
         )
         .with(sc_state)
         .for_duration(prop_time)
@@ -473,7 +473,7 @@ fn rugg_ecc_decr() {
 
     let orbit = Orbit::keplerian(sma, 0.15, 98.7, 0.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 30 * TimeUnit::Day;
+    let prop_time = 30 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -503,7 +503,7 @@ fn rugg_ecc_decr() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -533,7 +533,7 @@ fn rugg_aop() {
     let orbit = Orbit::keplerian(sma, 5e-5, 5e-3, 0.0, 178.0, 0.0, start_time, eme2k);
 
     // This is a very quick change because we aren't using the Ruggiero formulation for AOP change and benefit both in-plane and out of plane control.
-    let prop_time = 44 * TimeUnit::Minute + 10 * TimeUnit::Second;
+    let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -563,7 +563,7 @@ fn rugg_aop() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -592,7 +592,7 @@ fn rugg_aop_decr() {
     // Note that AOP computation requires the orbit to not be equatorial or circular, hence the non-zero ECC and INC.
     let orbit = Orbit::keplerian(sma, 5e-5, 5e-3, 0.0, 183.0, 0.0, start_time, eme2k);
 
-    let prop_time = 44 * TimeUnit::Minute + 10 * TimeUnit::Second;
+    let prop_time = 44 * Unit::Minute + 10 * Unit::Second;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -622,7 +622,7 @@ fn rugg_aop_decr() {
 
     let final_state = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     )
     .with(sc_state)
     .for_duration(prop_time)
@@ -651,7 +651,7 @@ fn rugg_raan() {
 
     let orbit = Orbit::keplerian(sma, 0.00125, 98.57, 0.0, 1.0, 0.0, start_time, eme2k);
 
-    let prop_time = 49 * TimeUnit::Day;
+    let prop_time = 49 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -677,7 +677,7 @@ fn rugg_raan() {
 
     let setup = Propagator::new::<RK4Fixed>(
         sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+        PropOpts::with_fixed_step(10.0 * Unit::Second),
     );
     let mut prop = setup.with(sc_state);
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
@@ -705,7 +705,7 @@ fn rugg_raan_regress_threshold() {
 
     let orbit = Orbit::keplerian(sma, 0.00125, 98.57, 0.0, 1.0, 0.0, start_time, eme2k);
 
-    let prop_time = 130 * TimeUnit::Day;
+    let prop_time = 130 * Unit::Day;
 
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
@@ -730,7 +730,7 @@ fn rugg_raan_regress_threshold() {
 
         let final_state = Propagator::new::<RK4Fixed>(
             sc.clone(),
-            PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
+            PropOpts::with_fixed_step(10.0 * Unit::Second),
         )
         .with(sc_state)
         .for_duration(prop_time)

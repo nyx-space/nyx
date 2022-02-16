@@ -27,7 +27,7 @@ pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
-use crate::time::{Duration, Epoch, TimeUnit, SECONDS_PER_DAY};
+use crate::time::{Duration, Epoch, Unit, SECONDS_PER_DAY};
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
@@ -124,13 +124,13 @@ impl XbEpoch {
     }
 
     pub fn to_epoch(&self) -> Epoch {
-        let epoch_delta = self.days * TimeUnit::Day + self.seconds * TimeUnit::Second;
+        let epoch_delta = i64::from(self.days) * Unit::Day + self.seconds * Unit::Second;
         match self.ts {
             0 => {
                 unimplemented!("TAI")
             }
             1 => match self.repr {
-                5 => Epoch::from_jde_et(epoch_delta.in_unit_f64(TimeUnit::Day)),
+                5 => Epoch::from_jde_et(epoch_delta.in_unit(Unit::Day)),
                 _ => unimplemented!("ET"),
             },
             2 => match self.repr {
@@ -142,7 +142,7 @@ impl XbEpoch {
             }
             4 => match self.repr {
                 2 => Epoch::from_tdb_seconds(epoch_delta.in_seconds()),
-                5 => Epoch::from_jde_tdb(epoch_delta.in_unit_f64(TimeUnit::Day)),
+                5 => Epoch::from_jde_tdb(epoch_delta.in_unit(Unit::Day)),
                 _ => unimplemented!("TDB"),
             },
             _ => unimplemented!(),

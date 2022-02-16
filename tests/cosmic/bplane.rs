@@ -4,7 +4,7 @@ use nyx::cosmic::{try_achieve_b_plane, BPlaneTarget, Bodies, Cosm, Orbit};
 use nyx::dynamics::OrbitalDynamics;
 use nyx::md::Event;
 use nyx::propagators::Propagator;
-use nyx::time::{Epoch, TimeUnit};
+use nyx::time::{Epoch, Unit};
 
 use std::str::FromStr;
 
@@ -35,7 +35,7 @@ fn val_b_plane_gmat() {
 
     let (out, traj) = prop
         .with(orbit)
-        .until_event(0.5 * TimeUnit::Day, &Event::periapsis())
+        .until_event(0.5 * Unit::Day, &Event::periapsis())
         .unwrap();
 
     println!("{}\n{:x}", out, out);
@@ -227,7 +227,7 @@ fn b_plane_davis() {
     //     BPlaneTarget::from_targets(
     //         5022.26511510685,
     //         13135.7982982557,
-    //         1 * TimeUnit::Day + 3 * TimeUnit::Hour,
+    //         1 * Unit::Day + 3 * Unit::Hour,
     //     ),
     // )
     // .unwrap();

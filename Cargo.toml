@@ -21,7 +21,7 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.29"
 log = "0.4"
-hifitime = "2.3.2"
+hifitime = "3.0.0-beta.2"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"

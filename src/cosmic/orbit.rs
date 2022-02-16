@@ -29,7 +29,7 @@ use super::{BPlane, Frame};
 use crate::linalg::{Const, OVector};
 use crate::md::ui::Objective;
 use crate::md::StateParameter;
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch, Unit};
 use crate::utils::{
     between_0_360, between_pm_180, cartesian_to_spherical, perpv, r1, r3, rss_orbit_errors,
     spherical_to_cartesian,
@@ -616,7 +616,7 @@ impl Orbit {
     pub fn period(&self) -> Duration {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                2.0 * PI * (self.sma().powi(3) / gm).sqrt() * TimeUnit::Second
+                2.0 * PI * (self.sma().powi(3) / gm).sqrt() * Unit::Second
             }
             _ => panic!("orbital period not defined in this frame"),
         }

@@ -184,7 +184,7 @@ fn orbit_stm_chk() {
     let xi_orig = Orbit::keplerian(8_000.0, 0.2, 30.0, 60.0, 60.0, 0.0, orig_dt, eme2k);
 
     // let target_delta_t: Duration = xi_orig.period() / 2.0;
-    let target_delta_t = 100.0 * TimeUnit::Second;
+    let target_delta_t = 100.0 * Unit::Second;
 
     println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
 

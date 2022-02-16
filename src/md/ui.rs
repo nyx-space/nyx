@@ -39,7 +39,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, U6};
 pub use crate::md::objective::Objective;
 pub use crate::propagators::{PropOpts, Propagator};
-pub use crate::time::{Duration, Epoch, TimeUnit, TimeUnitHelper};
+pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
 use std::convert::TryFrom;
@@ -378,7 +378,7 @@ where
             // Let's write the state every minute
             let hdlr_start = Instant::now();
             let mut cnt = 0;
-            for prop_state in traj.every(1 * TimeUnit::Minute) {
+            for prop_state in traj.every(1 * Unit::Minute) {
                 cnt += 1;
                 // Provide to the handler
                 hdlrs.par_iter_mut().for_each(|hdlr| {

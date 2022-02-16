@@ -8,7 +8,7 @@ use nyx::dynamics::Harmonics;
 use nyx::dynamics::{OrbitalDynamics, PointMasses};
 use nyx::io::gravity::*;
 use nyx::propagators::*;
-use nyx::time::{Epoch, TimeUnit};
+use nyx::time::{Epoch, Unit};
 use nyx::State;
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
@@ -58,7 +58,7 @@ fn multi_thread_monte_carlo_demo() {
         .map(|delta_sma| state.with_sma(state.sma() + delta_sma))
         .collect();
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
     let start = StdInstant::now();
     let end_epoch = dt + prop_time;
     init_states.par_iter().for_each_with(setup, |setup, state| {

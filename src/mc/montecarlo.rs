@@ -28,7 +28,7 @@ use crate::mc::DispersedState;
 use crate::md::trajectory::InterpState;
 use crate::md::EventEvaluator;
 use crate::propagators::{ErrorCtrl, Propagator};
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
@@ -131,7 +131,7 @@ where
         println!(
             "Propagated {} states in {}",
             num_runs,
-            clock_time.as_secs_f64() * TimeUnit::Second
+            clock_time.as_secs_f64() * Unit::Second
         );
 
         // Collect all of the results and sort them by run index
@@ -189,7 +189,7 @@ where
         println!(
             "Propagated {} states in {}",
             num_runs,
-            clock_time.as_secs_f64() * TimeUnit::Second
+            clock_time.as_secs_f64() * Unit::Second
         );
 
         // Collect all of the results and sort them by run index

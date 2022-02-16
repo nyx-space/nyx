@@ -30,7 +30,7 @@ use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
-use hifitime::TimeUnitHelper;
+use hifitime::TimeUnits;
 use levenberg_marquardt::{LeastSquaresProblem, LevenbergMarquardt};
 // use std::time::Instant;
 

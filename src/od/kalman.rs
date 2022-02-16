@@ -24,7 +24,7 @@ pub use super::residual::Residual;
 pub use super::snc::SNC;
 use super::{CovarFormat, EpochFormat, Filter, State};
 pub use crate::errors::NyxError;
-pub use crate::time::{Epoch, TimeUnit};
+pub use crate::time::{Epoch, Unit};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
 /// S: State size (not propagated vector size)
