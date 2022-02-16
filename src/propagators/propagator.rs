@@ -562,13 +562,13 @@ where
 /// fixed step options will lead to an RK4 being used instead of an RK45.
 #[derive(Clone, Copy, Debug)]
 pub struct PropOpts<E: ErrorCtrl> {
-    init_step: Duration,
-    min_step: Duration,
-    max_step: Duration,
-    tolerance: f64,
-    attempts: u8,
-    fixed_step: bool,
-    _errctrl: E,
+    pub init_step: Duration,
+    pub min_step: Duration,
+    pub max_step: Duration,
+    pub tolerance: f64,
+    pub attempts: u8,
+    pub fixed_step: bool,
+    pub _errctrl: E,
 }
 
 impl<E: ErrorCtrl> PropOpts<E> {

@@ -12,6 +12,65 @@ use nyx::State;
 
 #[allow(clippy::identity_op)]
 #[test]
+fn energy_conservation() {
+    let prop_time = 1 * Unit::Day;
+
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let dt = Epoch::from_gregorian_utc_hms(2022, 2, 15, 17, 30, 37);
+    let start_state = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    let rslt = Orbit::cartesian(
+        -5_971.194_376_797_643,
+        3_945.517_912_574_178_4,
+        2_864.620_957_744_429_2,
+        0.049_083_101_605_507_95,
+        -4.185_084_125_817_658,
+        5.848_947_462_472_877,
+        dt + prop_time,
+        eme2k,
+    );
+
+    let rk89_final = Propagator::new::<Dormand45>(OrbitalDynamics::two_body(), PropOpts::default())
+        .with(start_state)
+        .for_duration(prop_time)
+        .unwrap();
+
+    let rk89_energy_bleed = rk89_final.energy() - start_state.energy();
+
+    println!(
+        "[RK89] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",
+        rk89_energy_bleed
+    );
+    let delta = rk89_final.to_cartesian_vec() - rslt.to_cartesian_vec();
+    for i in 0..6 {
+        print!("{:.0e}\t", delta[i].abs());
+    }
+    println!();
+
+    let dp78_final = Propagator::new::<Dormand78>(OrbitalDynamics::two_body(), PropOpts::default())
+        .with(start_state)
+        .for_duration(prop_time)
+        .unwrap();
+
+    let dp78_energy_bleed = dp78_final.energy() - start_state.energy();
+
+    println!(
+        "[DP78] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",
+        dp78_energy_bleed
+    );
+    let delta = dp78_final.to_cartesian_vec() - rslt.to_cartesian_vec();
+    for i in 0..6 {
+        print!("{:.0e}\t", delta[i].abs());
+    }
+    println!();
+}
+
+#[allow(clippy::identity_op)]
+#[test]
 fn val_two_body_dynamics() {
     let prop_time = 1 * Unit::Day;
 
