@@ -222,7 +222,7 @@ fn latitude() {
 
     let lat_event = Event::new(StateParameter::GeodeticLatitude, 2.0);
 
-    let setup = Propagator::default(OrbitalDynamics::two_body());
+    let setup = Propagator::default_dp78(OrbitalDynamics::two_body());
     let mut prop = setup.with(state);
     let (lon_state, _) = prop.until_event(3 * period, &lat_event).unwrap();
     println!(

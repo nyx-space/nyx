@@ -19,7 +19,7 @@
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::rayon::iter::ParallelBridge;
 use super::rayon::prelude::ParallelIterator;
-use super::{IntegrationDetails, RK, RK89};
+use super::{Dormand78, IntegrationDetails, RK, RK89};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
@@ -91,6 +91,12 @@ where
         Self::new::<RK89>(dynamics, opts)
     }
 
+    /// A Dormand Prince 7-8 propagator with custom propagator options: it's about 20% faster than an RK98, and more stable in two body dynamics.
+    /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
+    pub fn dp78(dynamics: D, opts: PropOpts<E>) -> Self {
+        Self::new::<Dormand78>(dynamics, opts)
+    }
+
     pub fn with(&'a self, state: D::StateType) -> PropInstance<'a, D, E> {
         // Pre-allocate the k used in the propagator
         let mut k = Vec::with_capacity(self.stages + 1);
@@ -122,6 +128,13 @@ where
     /// Default propagator is an RK89 with the default PropOpts.
     pub fn default(dynamics: D) -> Self {
         Self::new::<RK89>(dynamics, PropOpts::default())
+    }
+
+    /// A default Dormand Prince 78 propagator with the default PropOpts.
+    /// Faster and more stable than an RK89 (`default`) but seems to cause issues for event finding.
+    /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
+    pub fn default_dp78(dynamics: D) -> Self {
+        Self::new::<Dormand78>(dynamics, PropOpts::default())
     }
 }
 

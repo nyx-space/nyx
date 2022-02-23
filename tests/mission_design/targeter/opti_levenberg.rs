@@ -25,7 +25,7 @@ fn tgt_levenberg_sma_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
