@@ -79,10 +79,11 @@ where
 
     /// Set the maximum step size for the propagator and sets the initial step to that value if currently greater
     pub fn set_max_step(&mut self, step: Duration) {
-        if self.opts.init_step > step {
-            self.opts.init_step = step;
-        }
-        self.opts.max_step = step;
+        self.opts.set_max_step(step);
+    }
+
+    pub fn set_min_step(&mut self, step: Duration) {
+        self.opts.set_min_step(step);
     }
 
     /// An RK89 propagator (the default) with custom propagator options.
@@ -607,6 +608,22 @@ impl<E: ErrorCtrl> PropOpts<E> {
             self.min_step, self.max_step, self.tolerance, self.attempts,
         )
     }
+
+    /// Set the maximum step size and sets the initial step to that value if currently greater
+    pub fn set_max_step(&mut self, max_step: Duration) {
+        if self.init_step > max_step {
+            self.init_step = max_step;
+        }
+        self.max_step = max_step;
+    }
+
+    /// Set the minimum step size and sets the initial step to that value if currently smaller
+    pub fn set_min_step(&mut self, min_step: Duration) {
+        if self.init_step < min_step {
+            self.init_step = min_step;
+        }
+        self.min_step = min_step;
+    }
 }
 
 impl PropOpts<RSSCartesianStep> {
@@ -635,6 +652,14 @@ impl PropOpts<RSSCartesianStep> {
         opts.tolerance = tolerance;
         opts
     }
+
+    /// Creates a propagator with the provided max step, and sets the initial step to that value as well.
+    #[allow(clippy::field_reassign_with_default)]
+    pub fn with_max_step(max_step: Duration) -> Self {
+        let mut opts = Self::default();
+        opts.set_max_step(max_step);
+        opts
+    }
 }
 
 impl Default for PropOpts<RSSCartesianStep> {
@@ -657,21 +682,29 @@ fn test_options() {
     use super::error_ctrl::RSSStep;
 
     let opts = PropOpts::with_fixed_step_s(1e-1);
-    assert_eq!(opts.min_step, 1e-1 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 1e-1 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 1e-1_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 1e-1_f64 * TimeUnit::Second);
     assert!(opts.tolerance.abs() < f64::EPSILON);
     assert!(opts.fixed_step);
 
     let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
-    assert_eq!(opts.min_step, 1e-2 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 10.0 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 1e-2_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 10.0_f64 * TimeUnit::Second);
     assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert!(!opts.fixed_step);
 
     let opts: PropOpts<RSSCartesianStep> = Default::default();
-    assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
-    assert_eq!(opts.min_step, 0.001 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);
+    assert_eq!(opts.init_step, 60.0_f64 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 0.001_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 2700.0_f64 * TimeUnit::Second);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
+    assert_eq!(opts.attempts, 50);
+    assert!(!opts.fixed_step);
+
+    let opts = PropOpts::with_max_step(1.0_f64 * TimeUnit::Second);
+    assert_eq!(opts.init_step, 1.0_f64 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 0.001_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 1.0_f64 * TimeUnit::Second);
     assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert_eq!(opts.attempts, 50);
     assert!(!opts.fixed_step);
