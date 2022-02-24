@@ -382,7 +382,6 @@ fn traj_spacecraft() {
 #[allow(clippy::identity_op)]
 #[test]
 fn traj_ephem_backward() {
-    // BROKEN: cf. https://gitlab.com/chrisrabotin/nyx/-/issues/190
     // Test that we can correctly interpolate a spacecraft orbit
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

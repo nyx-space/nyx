@@ -46,7 +46,7 @@ fn multi_thread_monte_carlo_demo() {
     ]);
 
     // We need to wrap the propagator setup in an Arc to enable multithreading.
-    let setup = Arc::new(Propagator::default(orbital_dyn));
+    let setup = Arc::new(Propagator::default_dp78(orbital_dyn));
 
     // Around 1 km of error
     let sma_dist = Normal::new(0.0, 1.0).unwrap();

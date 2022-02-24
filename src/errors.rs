@@ -16,135 +16,96 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::thiserror::Error;
 use crate::md::trajectory::TrajError;
 pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;
 use std::convert::From;
-use std::error::Error;
-use std::fmt;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Error, Debug)]
 pub enum NyxError {
-    /// STM is singular, check the automatic differentiation function and file a bug
+    #[error("STM is singular, propagation or smoothing cannot proceed")]
     SingularStateTransitionMatrix,
-    /// Fuel exhausted error, try running without fuel depletion, and then adding it.
-    /// Parameter is the state at which the fuel has exhaused
+    #[error("Fuel exhausted at {0}")]
     FuelExhausted(Box<Spacecraft>),
-    /// Propagation event not triggered withinin the max propagation time
+    #[error("Propagation event not triggered within the max propagation time")]
     ConditionNeverTriggered,
-    /// Propagation event not hit enough times (requested, found).
+    #[error("Propagation event not hit enough times (requested, found).")]
     UnsufficientTriggers(usize, usize),
-    /// Maximum iterations reached, value corresponds to the number of iterations used
+    #[error("Maximum iterations of {0} reached")]
     MaxIterReached(String),
-    /// Event not in braket
+    #[error("Event not in braket: {0} <=> {1}")]
     EventNotInEpochBraket(String, String),
-    /// The operation was expecting the state to have an STM, but it isn't present.
+    #[error("The operation was expecting the state to have an STM, but it isn't present.")]
     StateTransitionMatrixUnset,
-    /// The sensitivity matrix was not updated prior to requesting a filter measurement update
+    #[error("The sensitivity matrix must be updated prior to a filter measurement update")]
     SensitivityNotUpdated,
-    /// Kalman gain is singular, file a bug if this is encountered
+    #[error("Gain could not be computed because H*P_bar*H + R is singular")]
     SingularKalmanGain,
-    /// Covariance is singular
+    #[error("Singular Covariance")]
     SingularCovarianceMatrix,
-    /// Jacobian of some optimization problem is singular
+    #[error("Singular Jacobian")]
     SingularJacobian,
+    #[error("Lambert too close: Δν ~=0 and A ~=0")]
     TargetsTooClose,
+    #[error("No reasonable phi found to connect both radii")]
     LambertNotReasonablePhi,
+    #[error("Use the Izzo algorithm for multi-rev transfers")]
     LambertMultiRevNotSupported,
-    /// Returns this error if the partials for this model are not defined, thereby preventing the computation of the STM
+    #[error("Partials for this model are not defined")]
     PartialsUndefined,
-    /// Returned if the requested state parameter cannot be used in this function
+    #[error("State parameter cannot be used in this function")]
     StateParameterUnavailable,
+    #[error("Could not load file: {0}")]
     LoadingError(String),
+    #[error("Could not read file: {0}")]
     FileUnreadable(String),
+    #[error("Cosm object not found")]
     ObjectNotFound(String),
+    #[error("No interpolation data: {0}")]
     NoInterpolationData(String),
+    #[error("Invalid interpolation data: {0}")]
     InvalidInterpolationData(String),
+    #[error("No state data: {0}")]
     NoStateData(String),
+    #[error("Cannot convert between disjoint frames: {0} <-> {1}")]
     DisjointFrameOrientations(String, String),
-    /// When a specific call requires a thruster but none is available (typically the spacecraft was not defined with a thruster)
+    #[error("No thruster attached to spacecraft")]
     NoThrusterAvail,
-    /// The control vector returned by a controller must be a unit vector. Use the throttle() function to specify the amount.
+    #[error("Control vector is not a unit vector: {0}")]
     CtrlNotAUnitVector(f64),
-    /// The control throttle range must be between 0.0 and 1.0 (both included) as it represents a percentage.
+    #[error("Throttle is not between 0.0 and 1.0: {0}")]
     CtrlThrottleRangeErr(f64),
-    /// Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that
+    #[error("Happens when trying to modify a polynomial's (error)-th error but the polynomial has less orders than that")]
     PolynomialOrderError(usize),
-    /// An objective based analysis or control was attempted, but no objective was defined.
+    #[error("An objective based analysis or control was attempted, but no objective was defined")]
     NoObjectiveDefined,
-    /// Error when exporting data
+    #[error("Error when exporting data: {0}")]
     ExportError(String),
-    /// This computation requires the orbit to be hyperbolic
+    #[error("This computation requires the orbit to be hyperbolic: {0}")]
     NotHyperbolic(String),
-    /// Raised if a differential corrector is not decreasing the error
+    #[error("Control variables to not decrease targeting error in differential corrector: {0}")]
     CorrectionIneffective(String),
-    /// When there is an error during a Monte Carlo or in the conditions starting a Monte Carlo run
+    #[error("Monte Carlo error: {0}")]
     MonteCarlo(String),
-    /// Returned if CCSDS encountered an error
+    #[error("CCSDS error: {0}")]
     CCSDS(String),
-    /// Returned if the targeter for `node_no` has failed
+    #[error("Multiple shooting failed on node {0} with {1}")]
     MultipleShootingTargeter(usize, Box<NyxError>),
-    /// Some custom error for new dynamics
+    #[error("Custom error: {0}")]
     CustomError(String),
-    /// Hifitime errors that rose upward
+    #[error("Time related error: {0}")]
     TimeError(TimeErrors),
+    #[error("Targeting error: {0}")]
     Targeter(TargetingError),
-    /// Trajectory related errors that rose upward
+    #[error("Trajectory error: {0}")]
     Trajectory(TrajError),
-    /// Some math domain error, e.g. the arcsin of a number that isn't within [-1; 1]
+    #[error("Math domain error: {0}")]
     MathDomain(String),
-    /// A guidance law is incorrectly configured
+    #[error("Guidance law config error: {0}")]
     GuidanceConfigError(String),
 }
-
-impl fmt::Display for NyxError {
-    // Prints the Keplerian orbital elements with units
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::SensitivityNotUpdated => write!(
-                f,
-                "The measurement matrix H_tilde was not updated prior to measurement update"
-            ),
-            Self::SingularKalmanGain => write!(
-                f,
-                "Gain could not be computed because H*P_bar*H + R is singular"
-            ),
-            Self::SingularStateTransitionMatrix => write!(
-                f,
-                "STM is singular, propagation or smoothing cannot proceed"
-            ),
-            Self::SingularCovarianceMatrix => {
-                write!(f, "Covariance is singular, smoothing cannot proceed")
-            }
-            Self::FuelExhausted(sc) => write!(
-                f,
-                "Spacecraft fuel exhausted, disable fuel depletion and place maneuvers\n{}",
-                sc
-            ),
-            Self::ConditionNeverTriggered => write!(
-                f,
-                "Try increasing the search space, i.e. increase the maximum propagation time"
-            ),
-            Self::TargetsTooClose => write!(f, "Lambert too close: Δν ~=0 and A ~=0"),
-            Self::LambertMultiRevNotSupported => {
-                write!(f, "Use the Izzo algorithm for multi-rev transfers")
-            }
-            Self::LambertNotReasonablePhi => {
-                write!(f, "No reasonable phi found to connect both radii")
-            }
-            Self::MultipleShootingTargeter(n, e) => {
-                write!(f, "Multiple shooting failed on node {} with {}", n, e)
-            }
-            Self::MaxIterReached(e) => {
-                write!(f, "MaxIterReached: {}", e)
-            }
-            _ => write!(f, "{:?}", self),
-        }
-    }
-}
-
-impl Error for NyxError {}
 
 impl From<TimeErrors> for NyxError {
     fn from(e: TimeErrors) -> Self {
