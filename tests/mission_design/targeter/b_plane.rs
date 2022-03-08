@@ -28,7 +28,7 @@ fn tgt_b_plane_earth_gravity_assist_no_propagation() {
         cosm.frame("EME2000"),
     );
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     )));
@@ -87,7 +87,7 @@ fn tgt_b_plane_lunar_transfer() {
         eme2k,
     );
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm.clone(),
     )));
@@ -190,7 +190,7 @@ fn tgt_b_plane_earth_gravity_assist_with_propagation() {
         cosm.frame("EME2000"),
     );
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     )));

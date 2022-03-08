@@ -19,7 +19,7 @@
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::rayon::iter::ParallelBridge;
 use super::rayon::prelude::ParallelIterator;
-use super::{IntegrationDetails, RK, RK89};
+use super::{Dormand78, IntegrationDetails, RK, RK89};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
@@ -79,15 +79,22 @@ where
 
     /// Set the maximum step size for the propagator and sets the initial step to that value if currently greater
     pub fn set_max_step(&mut self, step: Duration) {
-        if self.opts.init_step > step {
-            self.opts.init_step = step;
-        }
-        self.opts.max_step = step;
+        self.opts.set_max_step(step);
+    }
+
+    pub fn set_min_step(&mut self, step: Duration) {
+        self.opts.set_min_step(step);
     }
 
     /// An RK89 propagator (the default) with custom propagator options.
     pub fn rk89(dynamics: D, opts: PropOpts<E>) -> Self {
         Self::new::<RK89>(dynamics, opts)
+    }
+
+    /// A Dormand Prince 7-8 propagator with custom propagator options: it's about 20% faster than an RK98, and more stable in two body dynamics.
+    /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
+    pub fn dp78(dynamics: D, opts: PropOpts<E>) -> Self {
+        Self::new::<Dormand78>(dynamics, opts)
     }
 
     pub fn with(&'a self, state: D::StateType) -> PropInstance<'a, D, E> {
@@ -121,6 +128,13 @@ where
     /// Default propagator is an RK89 with the default PropOpts.
     pub fn default(dynamics: D) -> Self {
         Self::new::<RK89>(dynamics, PropOpts::default())
+    }
+
+    /// A default Dormand Prince 78 propagator with the default PropOpts.
+    /// Faster and more stable than an RK89 (`default`) but seems to cause issues for event finding.
+    /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
+    pub fn default_dp78(dynamics: D) -> Self {
+        Self::new::<Dormand78>(dynamics, PropOpts::default())
     }
 }
 
@@ -607,6 +621,22 @@ impl<E: ErrorCtrl> PropOpts<E> {
             self.min_step, self.max_step, self.tolerance, self.attempts,
         )
     }
+
+    /// Set the maximum step size and sets the initial step to that value if currently greater
+    pub fn set_max_step(&mut self, max_step: Duration) {
+        if self.init_step > max_step {
+            self.init_step = max_step;
+        }
+        self.max_step = max_step;
+    }
+
+    /// Set the minimum step size and sets the initial step to that value if currently smaller
+    pub fn set_min_step(&mut self, min_step: Duration) {
+        if self.init_step < min_step {
+            self.init_step = min_step;
+        }
+        self.min_step = min_step;
+    }
 }
 
 impl PropOpts<RSSCartesianStep> {
@@ -633,6 +663,14 @@ impl PropOpts<RSSCartesianStep> {
     pub fn with_tolerance(tolerance: f64) -> Self {
         let mut opts = Self::default();
         opts.tolerance = tolerance;
+        opts
+    }
+
+    /// Creates a propagator with the provided max step, and sets the initial step to that value as well.
+    #[allow(clippy::field_reassign_with_default)]
+    pub fn with_max_step(max_step: Duration) -> Self {
+        let mut opts = Self::default();
+        opts.set_max_step(max_step);
         opts
     }
 }
@@ -672,6 +710,14 @@ fn test_options() {
     assert_eq!(opts.init_step, 60.0 * Unit::Second);
     assert_eq!(opts.min_step, 0.001 * Unit::Second);
     assert_eq!(opts.max_step, 2700.0 * Unit::Second);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
+    assert_eq!(opts.attempts, 50);
+    assert!(!opts.fixed_step);
+
+    let opts = PropOpts::with_max_step(1.0 * Unit::Second);
+    assert_eq!(opts.init_step, 1.0 * Unit::Second);
+    assert_eq!(opts.min_step, 0.001 * Unit::Second);
+    assert_eq!(opts.max_step, 1.0 * Unit::Second);
     assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert_eq!(opts.attempts, 50);
     assert!(!opts.fixed_step);

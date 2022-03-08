@@ -34,7 +34,7 @@ fn thrust_dir_tgt_sma_aop_raan() {
     };
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Define the objective
     let objectives = [
@@ -84,7 +84,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
     };
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Define the objective
     let objectives = [
@@ -136,7 +136,7 @@ fn thrust_profile_tgt_sma_aop_raan() {
     };
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Define the objective
     let objectives = [

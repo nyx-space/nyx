@@ -35,7 +35,7 @@ fn test_monte_carlo_epoch() {
         cosm,
     )]);
 
-    let prop = Propagator::default(orbital_dyn);
+    let prop = Propagator::default_dp78(orbital_dyn);
 
     // Setup the Monte Carlo
 

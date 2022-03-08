@@ -51,7 +51,8 @@ yaserde = "0.7.0"
 yaserde_derive = "0.7.0"
 levenberg-marquardt = "0.11"
 indicatif = {version = "0.16", features = ["rayon"]}
-rstats = "1.0.9"
+rstats = "1.0.12"
+thiserror = "1.0"
 
 
 [features]

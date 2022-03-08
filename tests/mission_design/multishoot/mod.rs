@@ -43,7 +43,7 @@ fn alt_orbit_raising() {
     /* Define the multiple shooting parameters */
     let node_count = 30; // We're targeting 30 minutes in the future, so using 30 nodes
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut opti = MultipleShooting::linear_altitude_heuristic(
         sc,
         target,
@@ -228,7 +228,7 @@ fn vmag_orbit_raising() {
     /* Define the multiple shooting parameters */
     let node_count = 300;
 
-    let prop = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
+    let prop = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::two_body()));
     let mut opti = MultipleShooting::equidistant_nodes(sc, target, node_count, &prop).unwrap();
 
     // Check that all nodes are above the surface

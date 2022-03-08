@@ -25,7 +25,7 @@ fn tgt_sma_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
@@ -82,7 +82,7 @@ fn tgt_sma_from_peri_fd() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     ));
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
@@ -137,7 +137,7 @@ fn tgt_hd_sma_from_peri() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     ));
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
@@ -194,7 +194,7 @@ fn orbit_stm_chk() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     );
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
     let mut prop_instance = setup.with(xi_orig.with_stm());
 
     let achievement_epoch = orig_dt + target_delta_t;
@@ -242,7 +242,7 @@ fn tgt_ecc_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_ecc = 0.4;
 
@@ -313,7 +313,7 @@ fn tgt_ecc_from_peri() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     ));
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_ecc = 0.4;
 
@@ -382,7 +382,7 @@ fn tgt_raan_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_raan = 65.0;
 
@@ -433,7 +433,7 @@ fn tgt_raan_from_peri() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_raan = 65.0;
 
@@ -505,7 +505,7 @@ fn tgt_aop_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_aop = 65.0;
 
@@ -556,7 +556,7 @@ fn tgt_aop_from_peri() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_aop = 65.0;
 

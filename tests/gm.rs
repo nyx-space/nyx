@@ -160,7 +160,7 @@ fn gm_test() {
         omega: 2.0,
         zeta: 0.1,
     };
-    let fstate = Propagator::default(model)
+    let fstate = Propagator::default_dp78(model)
         .with(init)
         .for_duration(60 * Unit::Second)
         .unwrap();

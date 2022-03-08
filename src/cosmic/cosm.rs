@@ -1418,21 +1418,21 @@ mod tests {
         println!("Available ephems: {:?}", cosm.xb.ephemeris_get_names());
         println!("Available frames: {:?}", cosm.frames_get_names());
 
-        // let sun2k = cosm.frame("Sun J2000");
-        // let sun_iau = cosm.frame("IAU Sun");
-        // let ear_sun_2k =
-        //     cosm.celestial_state(Bodies::Earth.ephem_path(), jde, sun2k, LightTimeCalc::None);
-        // let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
-        // let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
+        let sun2k = cosm.frame("Sun J2000");
+        let sun_iau = cosm.frame("IAU Sun");
+        let ear_sun_2k =
+            cosm.celestial_state(Bodies::Earth.ephem_path(), jde, sun2k, LightTimeCalc::None);
+        let ear_sun_iau = cosm.frame_chg(&ear_sun_2k, sun_iau);
+        let ear_sun_2k_prime = cosm.frame_chg(&ear_sun_iau, sun2k);
 
-        // assert!(
-        //     (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 2e-16,
-        //     "a single rotation changes rmag"
-        // );
-        // assert!(
-        //     (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-7,
-        //     "reverse rotation does not match initial state"
-        // );
+        assert!(
+            (ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 2e-16,
+            "a single rotation changes rmag"
+        );
+        assert!(
+            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-7,
+            "reverse rotation does not match initial state"
+        );
 
         // Test an EME2k to Earth IAU rotation
 
