@@ -72,6 +72,10 @@ where
             }
             self.backward = true;
         }
+        assert!(
+            self.segments.get(&offset_s).is_none(),
+            "{offset_s} already exists!"
+        );
         self.segments.insert(offset_s, segment);
         Ok(())
     }

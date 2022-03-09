@@ -4,7 +4,7 @@ use nyx::cosmic::{try_achieve_b_plane, BPlaneTarget, Bodies, Cosm, Orbit};
 use nyx::dynamics::OrbitalDynamics;
 use nyx::md::Event;
 use nyx::propagators::Propagator;
-use nyx::time::{Epoch, Unit};
+use nyx::time::Epoch;
 
 use std::str::FromStr;
 
@@ -35,16 +35,10 @@ fn val_b_plane_gmat() {
 
     let (out, traj) = prop
         .with(orbit)
-        .until_event(0.5 * Unit::Day, &Event::periapsis())
+        .until_event(1.1 * orbit.period(), &Event::periapsis())
         .unwrap();
 
     println!("{}\n{:x}", out, out);
-
-    // Convert into the Moon J2000 frame -- Maybe bug, cf #190
-    // let moon_traj = traj
-    //     .to_frame(cosm.frame("Moon J2000"), cosm.clone())
-    //     .unwrap();
-    // println!("{}", moon_traj);
 
     // Here is the GMAT B Plane data from that initial state until periapse
     // We accept an error of less than 500 meters in the B Plane computation.
@@ -135,7 +129,6 @@ fn val_b_plane_gmat() {
     // Iterate through the truth data
     let luna = cosm.frame("Luna");
     for data in &datum {
-        // let state = moon_traj.evaluate(data.epoch).unwrap(); // Cf #190
         let eme2k_state = traj.at(data.epoch).unwrap();
         let state = cosm.frame_chg(&eme2k_state, luna);
         println!("{}\n{:x}", state, state);

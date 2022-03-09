@@ -360,7 +360,7 @@ fn traj_spacecraft() {
         }
     }
     println!(
-        "[traj_ephem] Maximum interpolation error after double conversion: pos: {:.2e} m\t\tvel: {:.2e} m/s",
+        "[traj_spacecraft] Maximum interpolation error after double conversion: pos: {:.2e} m\t\tvel: {:.2e} m/s",
         max_pos_err * 1e3,
         max_vel_err * 1e3,
     );
@@ -469,7 +469,7 @@ fn traj_ephem_backward() {
     }
 
     println!(
-        "[traj_ephem] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfull state: {:.2e} (no unit)",
+        "[traj_ephem_backward] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s\t\tfull state: {:.2e} (no unit)",
         max_pos_err * 1e3,
         max_vel_err * 1e3,
         max_err
