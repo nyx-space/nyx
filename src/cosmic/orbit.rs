@@ -839,6 +839,10 @@ impl Orbit {
     ///
     /// NOTE: This function will emit a warning stating that the TA should be avoided if in a very near circular orbit
     /// Code from https://github.com/ChristopherRabotin/GMAT/blob/80bde040e12946a61dae90d9fc3538f16df34190/src/gmatutil/util/StateConversionUtil.cpp#L6835
+    ///
+    /// LIMITATION: For an orbit whose true anomaly is (very nearly) 0.0 or 180.0, this function may return either 0.0 or 180.0 with a very small time increment.
+    /// This is due to the precision of the cosine calculation: if the arccosine calculation is out of bounds, the sign of the cosine of the true anomaly is used
+    /// to determine whether the true anomaly should be 0.0 or 180.0. **In other words**, there is an ambiguity in the computation in the true anomaly exactly at 180.0 and 0.0.
     pub fn ta(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
