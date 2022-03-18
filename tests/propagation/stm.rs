@@ -94,7 +94,7 @@ fn stm_variable_step() {
     let eme2k = cosm.frame("EME2000");
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::default(OrbitalDynamics::two_body());
+    let prop = Propagator::default_dp78(OrbitalDynamics::two_body());
 
     let eccs = vec![1e-5, 0.2];
 
@@ -171,7 +171,7 @@ fn stm_between_steps() {
     let eme2k = cosm.frame("EME2000");
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::default(OrbitalDynamics::two_body());
+    let prop = Propagator::default_dp78(OrbitalDynamics::two_body());
 
     let eccs = vec![1e-5, 0.2];
 
@@ -217,7 +217,7 @@ fn stm_hifi_variable_step() {
     let eme2k = cosm.frame("EME2000");
     let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
 
-    let prop = Propagator::default(OrbitalDynamics::point_masses(
+    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun],
         cosm.clone(),
     ));
@@ -317,7 +317,7 @@ fn orbit_set_unset() {
 
     let init = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
 
-    let prop = Propagator::default(OrbitalDynamics::point_masses(
+    let prop = Propagator::default_dp78(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun],
         cosm.clone(),
     ));
@@ -367,12 +367,12 @@ fn sc_and_orbit_stm_chk() {
     let init_orbit = Orbit::keplerian(8000.0, 0.5, 10.0, 5.0, 25.0, 0.0, epoch, eme2k).with_stm();
     let init_sc = Spacecraft::from_srp_defaults(init_orbit, 0.0, 0.0);
 
-    let prop_orbit = Propagator::default(OrbitalDynamics::point_masses(
+    let prop_orbit = Propagator::default_dp78(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun],
         cosm.clone(),
     ));
 
-    let prop_sc = Propagator::default(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
+    let prop_sc = Propagator::default_dp78(SpacecraftDynamics::new(OrbitalDynamics::point_masses(
         &[Bodies::Luna, Bodies::Sun],
         cosm.clone(),
     )));

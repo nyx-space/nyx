@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,10 +17,10 @@
 */
 
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{Float, Hyperdual};
+use super::hyperdual::{Float, OHyperdual};
 use super::{Frame, Orbit, OrbitDual, OrbitPartial};
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
-use crate::md::targeter::Objective;
+use crate::md::objective::Objective;
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, TimeUnit};
 use crate::utils::between_pm_180;
@@ -54,8 +54,8 @@ impl BPlane {
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
             ))
         } else {
-            let one = Hyperdual::from(1.0);
-            let zero = Hyperdual::from(0.0);
+            let one = OHyperdual::from(1.0);
+            let zero = OHyperdual::from(0.0);
 
             let e_hat = orbit.evec() / orbit.ecc().dual;
             let h_hat = orbit.hvec() / orbit.hmag().dual;
@@ -265,25 +265,24 @@ impl BPlaneTarget {
         self.ltof_s.abs() > 1e-10
     }
 
-    pub fn to_objectives(self) -> Vec<Objective> {
+    pub fn to_objectives(self) -> [Objective; 2] {
         self.to_objectives_with_tolerance(1.0)
     }
 
-    pub fn to_objectives_with_tolerance(self, tol_km: f64) -> Vec<Objective> {
-        let mut objs = vec![
+    pub fn to_objectives_with_tolerance(self, tol_km: f64) -> [Objective; 2] {
+        [
             Objective::within_tolerance(StateParameter::BdotR, self.b_r_km, tol_km),
             Objective::within_tolerance(StateParameter::BdotT, self.b_t_km, tol_km),
-        ];
+        ]
+    }
 
-        if self.ltof_s.abs() > std::f64::EPSILON {
-            objs.push(Objective::within_tolerance(
-                StateParameter::BLTOF,
-                self.ltof_s,
-                self.tol_ltof_s * 1e5,
-            ));
-        }
-
-        objs
+    /// Includes the linearized time of flight as an objective
+    pub fn to_all_objectives_with_tolerance(self, tol_km: f64) -> [Objective; 3] {
+        [
+            Objective::within_tolerance(StateParameter::BdotR, self.b_r_km, tol_km),
+            Objective::within_tolerance(StateParameter::BdotT, self.b_t_km, tol_km),
+            Objective::within_tolerance(StateParameter::BLTOF, self.ltof_s, self.tol_ltof_s * 1e5),
+        ]
     }
 }
 

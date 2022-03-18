@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,7 +17,7 @@
 */
 
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
+use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
 use super::{Dynamics, NyxError};
 use crate::linalg::{Const, Matrix3, Matrix6, OVector, SVector, Vector3, Vector6};
 use crate::State;
@@ -89,7 +89,7 @@ impl<const N: usize> Dynamics for Ecrv<N> {
     ) -> Result<(Vector6<f64>, Matrix6<f64>), NyxError> {
         // Extract data from hyperspace
         // Build full state vector with partials in the right position (hence building with all six components)
-        let state: Vector6<Hyperdual<f64, Const<7>>> =
+        let state: Vector6<OHyperdual<f64, Const<7>>> =
             hyperspace_from_vector(&osc.to_cartesian_vec());
 
         let radius = state.fixed_rows::<3>(0).into_owned();
@@ -98,7 +98,7 @@ impl<const N: usize> Dynamics for Ecrv<N> {
         // Code up math as usual
         let rmag = norm(&radius);
         let body_acceleration =
-            radius * (Hyperdual::<f64, Const<7>>::from_real(-osc.frame.gm()) / rmag.powi(3));
+            radius * (OHyperdual::<f64, Const<7>>::from_real(-osc.frame.gm()) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
         let mut dx = Vector6::zeros();

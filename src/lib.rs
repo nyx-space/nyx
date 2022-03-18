@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -54,9 +54,6 @@ pub mod md;
 /// Simple tools (e.g. Lambert solver)
 pub mod tools;
 
-/// Optimization module
-pub mod opti;
-
 /// Monte Carlo module
 pub mod mc;
 
@@ -68,6 +65,7 @@ extern crate log;
 extern crate hifitime;
 extern crate nalgebra as na;
 extern crate prost_derive;
+extern crate thiserror;
 
 /// Re-export of hifitime
 pub mod time {

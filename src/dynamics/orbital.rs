@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,7 +17,7 @@
 */
 
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, Hyperdual};
+use super::hyperdual::{extract_jacobian_and_result, hyperspace_from_vector, Float, OHyperdual};
 use super::{AccelModel, Dynamics, NyxError};
 use crate::cosmic::{Bodies, Cosm, Frame, LightTimeCalc, Orbit};
 use crate::linalg::{Const, Matrix3, Matrix6, OVector, Vector3, Vector6};
@@ -36,30 +36,24 @@ pub struct OrbitalDynamics<'a> {
 
 impl<'a> OrbitalDynamics<'a> {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
-    pub fn point_masses(bodies: &[Bodies], cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn point_masses(bodies: &[Bodies], cosm: Arc<Cosm>) -> Self {
         // Create the point masses
         Self::new(vec![PointMasses::new(bodies, cosm)])
     }
 
     /// Initializes a OrbitalDynamics which does not simulate the gravity pull of other celestial objects but the primary one.
-    pub fn two_body() -> Arc<Self> {
+    pub fn two_body() -> Self {
         Self::new(vec![])
     }
 
     /// Initialize orbital dynamics with a list of acceleration models
-    pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Arc<Self> {
-        Arc::new(Self::new_raw(accel_models))
-    }
-
-    /// Initialize orbital dynamics with a list of acceleration models, _without_ encapsulating it in an Arc
-    /// Use this only if you need to mutate the dynamics as you'll need to wrap it in an Arc before propagation.
-    pub fn new_raw(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
+    pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
         Self { accel_models }
     }
 
     /// Initialize new orbital mechanics with the provided model.
     /// **Note:** Orbital dynamics _always_ include two body dynamics, these cannot be turned off.
-    pub fn from_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Arc<Self> {
+    pub fn from_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Self {
         Self::new(vec![accel_model])
     }
 
@@ -69,10 +63,10 @@ impl<'a> OrbitalDynamics<'a> {
     }
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Arc<Self> {
+    pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Self {
         let mut me = self.clone();
         me.add_model(accel_model);
-        Arc::new(me)
+        me
     }
 }
 
@@ -137,7 +131,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
     ) -> Result<(Vector6<f64>, Matrix6<f64>), NyxError> {
         // Extract data from hyperspace
         // Build full state vector with partials in the right position (hence building with all six components)
-        let state: Vector6<Hyperdual<f64, Const<7>>> =
+        let state: Vector6<OHyperdual<f64, Const<7>>> =
             hyperspace_from_vector(&osc.to_cartesian_vec());
 
         let radius = state.fixed_rows::<3>(0).into_owned();
@@ -146,7 +140,7 @@ impl<'a> Dynamics for OrbitalDynamics<'a> {
         // Code up math as usual
         let rmag = norm(&radius);
         let body_acceleration =
-            radius * (Hyperdual::<f64, Const<7>>::from_real(-osc.frame.gm()) / rmag.powi(3));
+            radius * (OHyperdual::<f64, Const<7>>::from_real(-osc.frame.gm()) / rmag.powi(3));
 
         // Extract result into Vector6 and Matrix6
         let mut dx = Vector6::zeros();
@@ -265,7 +259,7 @@ impl AccelModel for PointMasses {
 
     fn dual_eom(&self, osc: &Orbit) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         // Build the hyperdual space of the radius vector
-        let radius: Vector3<Hyperdual<f64, Const<7>>> = hyperspace_from_vector(&osc.radius());
+        let radius: Vector3<OHyperdual<f64, Const<7>>> = hyperspace_from_vector(&osc.radius());
         // Extract result into Vector6 and Matrix6
         let mut fx = Vector3::zeros();
         let mut grad = Matrix3::zeros();
@@ -276,7 +270,7 @@ impl AccelModel for PointMasses {
                 // Ignore the contribution of the integration frame, that's handled by OrbitalDynamics
                 continue;
             }
-            let gm_d = Hyperdual::<f64, Const<7>>::from_real(-third_body.gm());
+            let gm_d = OHyperdual::<f64, Const<7>>::from_real(-third_body.gm());
 
             // Orbit of j-th body as seen from primary body
             let st_ij = self.cosm.celestial_state(
@@ -286,7 +280,7 @@ impl AccelModel for PointMasses {
                 self.correction,
             );
 
-            let r_ij: Vector3<Hyperdual<f64, Const<7>>> = hyperspace_from_vector(&st_ij.radius());
+            let r_ij: Vector3<OHyperdual<f64, Const<7>>> = hyperspace_from_vector(&st_ij.radius());
             let r_ij3 = norm(&r_ij).powi(3);
 
             // The difference leads to the dual parts nulling themselves out, so let's fix that.
@@ -301,8 +295,7 @@ impl AccelModel for PointMasses {
             third_body_acc_d[1] *= gm_d;
             third_body_acc_d[2] *= gm_d;
 
-            let (fxp, gradp) =
-                extract_jacobian_and_result::<_, Const<3>, Const<3>, _>(&third_body_acc_d);
+            let (fxp, gradp) = extract_jacobian_and_result::<_, 3, 3, 7>(&third_body_acc_d);
             fx += fxp;
             grad += gradp;
         }

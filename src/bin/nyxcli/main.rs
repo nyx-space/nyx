@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -47,8 +47,9 @@ const LOG_VAR: &str = "NYX_LOG";
 
 lazy_static! {
     static ref COSM: Arc<Cosm> = {
-        let de438_buf: Cow<'static, [u8]> =
-            EmbeddedAsset::get("de438s-00-50.xb").expect("Could not find de438s-00-55.xb as asset");
+        let de438_buf: Cow<'static, [u8]> = EmbeddedAsset::get("de438s-00-50.xb")
+            .expect("Could not find de438s-00-55.xb as asset")
+            .data;
         let xb = Xb::from_buffer(&de438_buf).unwrap();
         let mut cosm: Cosm = Cosm::try_from_xb(xb).unwrap();
         cosm.use_gmat_gm();

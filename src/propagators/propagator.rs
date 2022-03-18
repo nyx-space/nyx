@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -19,7 +19,7 @@
 use super::error_ctrl::{ErrorCtrl, RSSCartesianStep};
 use super::rayon::iter::ParallelBridge;
 use super::rayon::prelude::ParallelIterator;
-use super::{IntegrationDetails, RK, RK89};
+use super::{Dormand78, IntegrationDetails, RK, RK89};
 use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
@@ -32,7 +32,6 @@ use crate::State;
 use std::collections::BTreeMap;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::Arc;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
@@ -45,7 +44,7 @@ where
         + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
-    pub dynamics: Arc<D>, // Stores the dynamics used. *Must* use this to get the latest values
+    pub dynamics: D, // Stores the dynamics used. *Must* use this to get the latest values
     pub opts: PropOpts<E>, // Stores the integration options (tolerance, min/max step, init step, etc.)
     order: u8,             // Order of the integrator
     stages: usize,         // Number of stages, i.e. how many times the derivatives will be called
@@ -62,7 +61,7 @@ where
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Each propagator must be initialized with `new` which stores propagator information.
-    pub fn new<T: RK>(dynamics: Arc<D>, opts: PropOpts<E>) -> Self {
+    pub fn new<T: RK>(dynamics: D, opts: PropOpts<E>) -> Self {
         Self {
             dynamics,
             opts,
@@ -80,15 +79,22 @@ where
 
     /// Set the maximum step size for the propagator and sets the initial step to that value if currently greater
     pub fn set_max_step(&mut self, step: Duration) {
-        if self.opts.init_step > step {
-            self.opts.init_step = step;
-        }
-        self.opts.max_step = step;
+        self.opts.set_max_step(step);
+    }
+
+    pub fn set_min_step(&mut self, step: Duration) {
+        self.opts.set_min_step(step);
     }
 
     /// An RK89 propagator (the default) with custom propagator options.
-    pub fn rk89(dynamics: Arc<D>, opts: PropOpts<E>) -> Self {
+    pub fn rk89(dynamics: D, opts: PropOpts<E>) -> Self {
         Self::new::<RK89>(dynamics, opts)
+    }
+
+    /// A Dormand Prince 7-8 propagator with custom propagator options: it's about 20% faster than an RK98, and more stable in two body dynamics.
+    /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
+    pub fn dp78(dynamics: D, opts: PropOpts<E>) -> Self {
+        Self::new::<Dormand78>(dynamics, opts)
     }
 
     pub fn with(&'a self, state: D::StateType) -> PropInstance<'a, D, E> {
@@ -120,8 +126,15 @@ where
         + Allocator<f64, <D::StateType as State>::VecLength>,
 {
     /// Default propagator is an RK89 with the default PropOpts.
-    pub fn default(dynamics: Arc<D>) -> Self {
+    pub fn default(dynamics: D) -> Self {
         Self::new::<RK89>(dynamics, PropOpts::default())
+    }
+
+    /// A default Dormand Prince 78 propagator with the default PropOpts.
+    /// Faster and more stable than an RK89 (`default`) but seems to cause issues for event finding.
+    /// WARNINGS: Dormand Prince may have issues with generating proper trajectories, leading to glitches in event finding.
+    pub fn default_dp78(dynamics: D) -> Self {
+        Self::new::<Dormand78>(dynamics, PropOpts::default())
     }
 }
 
@@ -168,7 +181,6 @@ where
         maybe_tx_chan: Option<Sender<D::StateType>>,
     ) -> Result<D::StateType, NyxError> {
         if duration == 0 * TimeUnit::Second {
-            debug!("No propagation necessary");
             return Ok(self.state);
         }
         let stop_time = self.state.epoch() + duration;
@@ -176,6 +188,9 @@ where
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
+        // Call `finally` on the current state to set anything up
+        self.state = self.prop.dynamics.finally(self.state)?;
+
         let backprop = duration < TimeUnit::Nanosecond;
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
@@ -395,9 +410,23 @@ where
         self.for_duration_with_traj(duration)
     }
 
-    /// Propagate until a specific event is found `trigger` times.
+    /// Propagate until a specific event is found once.
     /// Returns the state found and the trajectory until `max_duration`
     pub fn until_event<F: EventEvaluator<D::StateType>>(
+        &mut self,
+        max_duration: Duration,
+        event: &F,
+    ) -> Result<(D::StateType, Traj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
+    {
+        self.until_nth_event(max_duration, event, 0)
+    }
+
+    /// Propagate until a specific event is found `trigger` times.
+    /// Returns the state found and the trajectory until `max_duration`
+    pub fn until_nth_event<F: EventEvaluator<D::StateType>>(
         &mut self,
         max_duration: Duration,
         event: &F,
@@ -553,7 +582,7 @@ pub struct PropOpts<E: ErrorCtrl> {
     tolerance: f64,
     attempts: u8,
     fixed_step: bool,
-    errctrl: E,
+    _errctrl: E,
 }
 
 impl<E: ErrorCtrl> PropOpts<E> {
@@ -572,7 +601,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
             tolerance,
             attempts: 50,
             fixed_step: false,
-            errctrl,
+            _errctrl: errctrl,
         }
     }
 
@@ -592,6 +621,22 @@ impl<E: ErrorCtrl> PropOpts<E> {
             self.min_step, self.max_step, self.tolerance, self.attempts,
         )
     }
+
+    /// Set the maximum step size and sets the initial step to that value if currently greater
+    pub fn set_max_step(&mut self, max_step: Duration) {
+        if self.init_step > max_step {
+            self.init_step = max_step;
+        }
+        self.max_step = max_step;
+    }
+
+    /// Set the minimum step size and sets the initial step to that value if currently smaller
+    pub fn set_min_step(&mut self, min_step: Duration) {
+        if self.init_step < min_step {
+            self.init_step = min_step;
+        }
+        self.min_step = min_step;
+    }
 }
 
 impl PropOpts<RSSCartesianStep> {
@@ -605,7 +650,7 @@ impl PropOpts<RSSCartesianStep> {
             tolerance: 0.0,
             fixed_step: true,
             attempts: 0,
-            errctrl: RSSCartesianStep {},
+            _errctrl: RSSCartesianStep {},
         }
     }
 
@@ -620,6 +665,14 @@ impl PropOpts<RSSCartesianStep> {
         opts.tolerance = tolerance;
         opts
     }
+
+    /// Creates a propagator with the provided max step, and sets the initial step to that value as well.
+    #[allow(clippy::field_reassign_with_default)]
+    pub fn with_max_step(max_step: Duration) -> Self {
+        let mut opts = Self::default();
+        opts.set_max_step(max_step);
+        opts
+    }
 }
 
 impl Default for PropOpts<RSSCartesianStep> {
@@ -632,7 +685,7 @@ impl Default for PropOpts<RSSCartesianStep> {
             tolerance: 1e-12,
             attempts: 50,
             fixed_step: false,
-            errctrl: RSSCartesianStep {},
+            _errctrl: RSSCartesianStep {},
         }
     }
 }
@@ -642,22 +695,30 @@ fn test_options() {
     use super::error_ctrl::RSSStep;
 
     let opts = PropOpts::with_fixed_step_s(1e-1);
-    assert_eq!(opts.min_step, 1e-1 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 1e-1 * TimeUnit::Second);
-    assert!(opts.tolerance.abs() < std::f64::EPSILON);
+    assert_eq!(opts.min_step, 1e-1_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 1e-1_f64 * TimeUnit::Second);
+    assert!(opts.tolerance.abs() < f64::EPSILON);
     assert!(opts.fixed_step);
 
     let opts = PropOpts::with_adaptive_step_s(1e-2, 10.0, 1e-12, RSSStep {});
-    assert_eq!(opts.min_step, 1e-2 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 10.0 * TimeUnit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
+    assert_eq!(opts.min_step, 1e-2_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 10.0_f64 * TimeUnit::Second);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert!(!opts.fixed_step);
 
     let opts: PropOpts<RSSCartesianStep> = Default::default();
-    assert_eq!(opts.init_step, 60.0 * TimeUnit::Second);
-    assert_eq!(opts.min_step, 0.001 * TimeUnit::Second);
-    assert_eq!(opts.max_step, 2700.0 * TimeUnit::Second);
-    assert!((opts.tolerance - 1e-12).abs() < std::f64::EPSILON);
+    assert_eq!(opts.init_step, 60.0_f64 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 0.001_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 2700.0_f64 * TimeUnit::Second);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
+    assert_eq!(opts.attempts, 50);
+    assert!(!opts.fixed_step);
+
+    let opts = PropOpts::with_max_step(1.0_f64 * TimeUnit::Second);
+    assert_eq!(opts.init_step, 1.0_f64 * TimeUnit::Second);
+    assert_eq!(opts.min_step, 0.001_f64 * TimeUnit::Second);
+    assert_eq!(opts.max_step, 1.0_f64 * TimeUnit::Second);
+    assert!((opts.tolerance - 1e-12).abs() < f64::EPSILON);
     assert_eq!(opts.attempts, 50);
     assert!(!opts.fixed_step);
 }

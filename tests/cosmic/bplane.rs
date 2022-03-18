@@ -35,7 +35,7 @@ fn val_b_plane_gmat() {
 
     let (out, traj) = prop
         .with(orbit)
-        .until_event(0.5 * TimeUnit::Day, &Event::periapsis(), 0)
+        .until_event(0.5 * TimeUnit::Day, &Event::periapsis())
         .unwrap();
 
     println!("{}\n{:x}", out, out);

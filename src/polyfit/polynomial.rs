@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -21,6 +21,8 @@
 use std::f64::EPSILON;
 use std::fmt;
 use std::ops;
+
+use crate::NyxError;
 
 /// Polynomial is a statically allocated polynomial.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -313,6 +315,75 @@ impl CommonPolynomial {
                 coefficients: [c, b, a],
             }
             .deriv(x),
+        }
+    }
+
+    pub fn coeff_in_order(&self, order: usize) -> Result<f64, NyxError> {
+        match *self {
+            Self::Constant(a) => {
+                if order == 0 {
+                    Ok(a)
+                } else {
+                    Err(NyxError::PolynomialOrderError(order))
+                }
+            }
+            Self::Linear(a, b) => match order {
+                0 => Ok(b),
+                1 => Ok(a),
+                _ => Err(NyxError::PolynomialOrderError(order)),
+            },
+            Self::Quadratic(a, b, c) => match order {
+                0 => Ok(c),
+                1 => Ok(b),
+                2 => Ok(a),
+                _ => Err(NyxError::PolynomialOrderError(order)),
+            },
+        }
+    }
+
+    pub fn with_val_in_order(self, new_val: f64, order: usize) -> Result<Self, NyxError> {
+        match self {
+            Self::Constant(_) => {
+                if order != 0 {
+                    Err(NyxError::PolynomialOrderError(order))
+                } else {
+                    Ok(Self::Constant(new_val))
+                }
+            }
+            Self::Linear(x, y) => match order {
+                0 => Ok(Self::Linear(new_val, y)),
+                1 => Ok(Self::Linear(x, new_val)),
+                _ => Err(NyxError::PolynomialOrderError(order)),
+            },
+            Self::Quadratic(x, y, z) => match order {
+                0 => Ok(Self::Quadratic(new_val, y, z)),
+                1 => Ok(Self::Quadratic(x, new_val, z)),
+                2 => Ok(Self::Quadratic(x, y, new_val)),
+                _ => Err(NyxError::PolynomialOrderError(order)),
+            },
+        }
+    }
+
+    pub fn add_val_in_order(self, new_val: f64, order: usize) -> Result<Self, NyxError> {
+        match self {
+            Self::Constant(x) => {
+                if order != 0 {
+                    Err(NyxError::PolynomialOrderError(order))
+                } else {
+                    Ok(Self::Constant(new_val + x))
+                }
+            }
+            Self::Linear(x, y) => match order {
+                0 => Ok(Self::Linear(new_val + x, y)),
+                1 => Ok(Self::Linear(x, new_val + y)),
+                _ => Err(NyxError::PolynomialOrderError(order)),
+            },
+            Self::Quadratic(x, y, z) => match order {
+                0 => Ok(Self::Quadratic(new_val + x, y, z)),
+                1 => Ok(Self::Quadratic(x, new_val + y, z)),
+                2 => Ok(Self::Quadratic(x, y, new_val + z)),
+                _ => Err(NyxError::PolynomialOrderError(order)),
+            },
         }
     }
 }

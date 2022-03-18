@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use nyx::md::targeter::*;
+use nyx::md::optimizer::*;
 use nyx::md::ui::*;
 
 // Semi major axis
@@ -25,15 +25,15 @@ fn tgt_sma_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
+    let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let tgt = Targeter::delta_v(&setup, objectives);
+    let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -82,15 +82,15 @@ fn tgt_sma_from_peri_fd() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     ));
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
+    let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let tgt = Targeter::delta_v(&setup, objectives);
+    let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -137,15 +137,15 @@ fn tgt_hd_sma_from_peri() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     ));
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     // Try to increase SMA
     let xf_desired_sma = 8_100.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::SMA, xf_desired_sma)];
+    let objectives = [Objective::new(StateParameter::SMA, xf_desired_sma)];
 
-    let mut tgt = Targeter::delta_v(&setup, objectives);
+    let mut tgt = Optimizer::delta_v(&setup, objectives);
     tgt.iterations = 5;
 
     println!("{}", tgt);
@@ -194,7 +194,7 @@ fn orbit_stm_chk() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     );
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
     let mut prop_instance = setup.with(xi_orig.with_stm());
 
     let achievement_epoch = orig_dt + target_delta_t;
@@ -242,13 +242,13 @@ fn tgt_ecc_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_ecc = 0.4;
 
-    let tgt = Targeter::new(
+    let tgt = Optimizer::new(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 5.0,
@@ -265,7 +265,7 @@ fn tgt_ecc_from_apo() {
                 ..Default::default()
             },
         ],
-        vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
+        [Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
     );
 
     println!("{}", tgt);
@@ -313,13 +313,13 @@ fn tgt_ecc_from_peri() {
         &[Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter],
         cosm,
     ));
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_ecc = 0.4;
 
-    let tgt = Targeter::new(
+    let tgt = Optimizer::new(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 5.0,
@@ -336,7 +336,7 @@ fn tgt_ecc_from_peri() {
                 ..Default::default()
             },
         ],
-        vec![Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
+        [Objective::new(StateParameter::Eccentricity, xf_desired_ecc)],
     );
 
     println!("{}", tgt);
@@ -382,14 +382,14 @@ fn tgt_raan_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_raan = 65.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::RAAN, xf_desired_raan)];
+    let objectives = [Objective::new(StateParameter::RAAN, xf_desired_raan)];
 
-    let tgt = Targeter::delta_v(&setup, objectives);
+    let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -433,16 +433,16 @@ fn tgt_raan_from_peri() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_raan = 65.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::RAAN, xf_desired_raan)];
+    let objectives = [Objective::new(StateParameter::RAAN, xf_desired_raan)];
 
-    let tgt = Targeter::new(
+    let tgt = Optimizer::new(
         &setup,
-        vec![
+        [
             Variable {
                 component: Vary::VelocityX,
                 max_step: 0.5,
@@ -505,14 +505,14 @@ fn tgt_aop_from_apo() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_aop = 65.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::AoP, xf_desired_aop)];
+    let objectives = [Objective::new(StateParameter::AoP, xf_desired_aop)];
 
-    let tgt = Targeter::delta_v(&setup, objectives);
+    let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 
@@ -556,14 +556,14 @@ fn tgt_aop_from_peri() {
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
     let dynamics = SpacecraftDynamics::new(OrbitalDynamics::two_body());
-    let setup = Propagator::default(dynamics);
+    let setup = Propagator::default_dp78(dynamics);
 
     let xf_desired_aop = 65.0;
 
     // Define the objective
-    let objectives = vec![Objective::new(StateParameter::AoP, xf_desired_aop)];
+    let objectives = [Objective::new(StateParameter::AoP, xf_desired_aop)];
 
-    let tgt = Targeter::delta_v(&setup, objectives);
+    let tgt = Optimizer::delta_v(&setup, objectives);
 
     println!("{}", tgt);
 

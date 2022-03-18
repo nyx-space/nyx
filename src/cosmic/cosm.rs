@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -138,7 +138,7 @@ impl Cosm {
     pub fn try_de438() -> Result<Self, NyxError> {
         let de438_buf =
             EmbeddedAsset::get("de438s-00-50.xb").expect("Could not find asset de438s-00-550.xb");
-        Self::try_from_xb(Xb::from_buffer(&de438_buf)?)
+        Self::try_from_xb(Xb::from_buffer(&de438_buf.data)?)
     }
 
     /// Load a subset of the DE438 XB from the embedded files, bounded between 01 Jan 2000 and 31 Dec 2050 TAI.
@@ -210,7 +210,7 @@ impl Cosm {
         let iau_toml_str =
             EmbeddedAsset::get("iau_frames.toml").expect("Could not find iau_frames.toml as asset");
         self.append_frames(
-            std::str::from_utf8(&iau_toml_str)
+            std::str::from_utf8(&iau_toml_str.data)
                 .expect("Could not deserialize iau_frames.toml as string"),
         )
     }

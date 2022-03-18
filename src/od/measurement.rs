@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,7 +17,7 @@
 */
 
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{hyperspace_from_vector, Hyperdual};
+use super::hyperdual::{hyperspace_from_vector, OHyperdual};
 use super::rand::thread_rng;
 use super::rand_distr::{Distribution, Normal};
 use super::serde::ser::SerializeSeq;
@@ -250,7 +250,7 @@ impl StdMeasurement {
     }
 
     fn compute_sensitivity(
-        state: &OVector<Hyperdual<f64, U7>, U6>,
+        state: &OVector<OHyperdual<f64, U7>, U6>,
         range_noise: f64,
         range_rate_noise: f64,
     ) -> (Vector2<f64>, Matrix2x6<f64>) {
@@ -260,8 +260,8 @@ impl StdMeasurement {
 
         // Code up math as usual
         let delta_v_vec = velocity_vec / norm(&range_vec);
-        let range = norm(&range_vec) + Hyperdual::from(range_noise);
-        let range_rate = range_vec.dot(&delta_v_vec) + Hyperdual::from(range_rate_noise);
+        let range = norm(&range_vec) + OHyperdual::from(range_noise);
+        let range_rate = range_vec.dot(&delta_v_vec) + OHyperdual::from(range_rate_noise);
 
         // Extract result into Vector2 and Matrix2x6
         let mut fx = Vector2::zeros();
@@ -397,7 +397,7 @@ impl RangeMsr {
     }
 
     fn compute_sensitivity(
-        state: &OVector<Hyperdual<f64, U7>, U6>,
+        state: &OVector<OHyperdual<f64, U7>, U6>,
     ) -> (Vector1<f64>, Matrix1x6<f64>) {
         // Extract data from hyperspace
         let range_vec = state.fixed_rows::<3>(0).into_owned();
@@ -492,7 +492,7 @@ impl DopplerMsr {
     }
 
     fn compute_sensitivity(
-        state: &OVector<Hyperdual<f64, U7>, U6>,
+        state: &OVector<OHyperdual<f64, U7>, U6>,
     ) -> (Vector1<f64>, Matrix1x6<f64>) {
         // Extract data from hyperspace
         let range_vec = state.fixed_rows::<3>(0).into_owned();

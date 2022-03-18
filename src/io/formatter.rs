@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -552,56 +552,12 @@ impl StateFormatter {
 
             formatted.push(match hdr.param {
                 StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(orbit.dt),
-                StateParameter::AoL => format!("{:.16}", orbit.aol()),
-                StateParameter::AoP => format!("{:.16}", orbit.aop()),
-                StateParameter::Apoapsis => format!("{:.16}", orbit.ta()),
-                StateParameter::C3 => format!("{:.16}", orbit.c3()),
-                StateParameter::Declination => format!("{:.16}", orbit.declination()),
-                StateParameter::ApoapsisRadius => format!("{:.16}", orbit.apoapsis()),
-                StateParameter::EccentricAnomaly => format!("{:.16}", orbit.ea()),
-                StateParameter::Eccentricity => format!("{:.16}", orbit.ecc()),
-                StateParameter::Energy => format!("{:.16}", orbit.energy()),
-                StateParameter::GeodeticHeight => format!("{:.16}", orbit.geodetic_height()),
-                StateParameter::GeodeticLatitude => format!("{:.16}", orbit.geodetic_latitude()),
-                StateParameter::GeodeticLongitude => format!("{:.16}", orbit.geodetic_longitude()),
-                StateParameter::FlightPathAngle => format!("{:.16}", orbit.fpa()),
-                StateParameter::Hmag => format!("{:.16}", orbit.hmag()),
-                StateParameter::HX => format!("{:.16}", orbit.hx()),
-                StateParameter::HY => format!("{:.16}", orbit.hy()),
-                StateParameter::HZ => format!("{:.16}", orbit.hz()),
-                StateParameter::HyperbolicAnomaly => {
-                    format!("{:.16}", orbit.hyperbolic_anomaly().unwrap())
-                }
-                StateParameter::Inclination => format!("{:.16}", orbit.inc()),
-                StateParameter::MeanAnomaly => format!("{:.16}", orbit.ma()),
-                StateParameter::Periapsis => format!("{:.16}", orbit.ta()),
-                StateParameter::PeriapsisRadius => format!("{:.16}", orbit.periapsis()),
-                StateParameter::Period => format!("{:.16}", orbit.period().in_seconds()),
-                StateParameter::RightAscension => format!("{:.16}", orbit.right_ascension()),
-                StateParameter::RAAN => format!("{:.16}", orbit.raan()),
-                StateParameter::Rmag => format!("{:.16}", orbit.rmag()),
-                StateParameter::SemiParameter => format!("{:.16}", orbit.semi_parameter()),
-                StateParameter::SemiMinorAxis => format!("{:.16}", orbit.semi_minor_axis()),
-                StateParameter::SMA => format!("{:.16}", orbit.sma()),
-                StateParameter::TrueAnomaly => format!("{:.16}", orbit.ta()),
-                StateParameter::TrueLongitude => format!("{:.16}", orbit.tlong()),
-                StateParameter::VelocityDeclination => {
-                    format!("{:.16}", orbit.velocity_declination())
-                }
-                StateParameter::Vmag => format!("{:.16}", orbit.vmag()),
-                StateParameter::X => format!("{:.16}", orbit.x),
-                StateParameter::Y => format!("{:.16}", orbit.y),
-                StateParameter::Z => format!("{:.16}", orbit.z),
-                StateParameter::VX => format!("{:.16}", orbit.vx),
-                StateParameter::VY => format!("{:.16}", orbit.vy),
-                StateParameter::VZ => format!("{:.16}", orbit.vz),
-                StateParameter::FuelMass => {
-                    unimplemented!("No fuel for an orbit, only for spacecraft!")
-                }
-                StateParameter::Custom { .. } => {
-                    unimplemented!("Cannot format custom state parameters yet")
-                }
-                _ => unimplemented!("{:?} cannot yet be formatted (yet)", hdr.param),
+                _ => match orbit.value(&hdr.param) {
+                    Ok(value) => format!("{:.16}", value),
+                    Err(e) => {
+                        unimplemented!("{:?} cannot yet be formatted (yet): {}", hdr.param, e)
+                    }
+                },
             });
         }
 

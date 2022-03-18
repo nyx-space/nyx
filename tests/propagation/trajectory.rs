@@ -3,8 +3,10 @@ extern crate pretty_env_logger;
 
 use hifitime::TimeUnitHelper;
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
-use nyx::dynamics::guidance::{Achieve, GuidanceLaw, Ruggiero, Thruster};
+use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
+use nyx::md::ui::Objective;
+use nyx::md::StateParameter;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, TimeUnit};
 use nyx::State;
@@ -186,26 +188,27 @@ fn traj_spacecraft() {
     let orbit = Orbit::keplerian(sma, 5e-5, 5e-3, 0.0, 178.0, 0.0, start_dt, eme2k);
 
     // Define the objectives and the control law
-    let objectives = vec![Achieve::Aop {
-        target: 183.0,
-        tol: 5e-3,
-    }];
+    let objectives = &[Objective::within_tolerance(
+        StateParameter::AoP,
+        183.0,
+        5e-3,
+    )];
 
-    let ruggiero_ctrl = Ruggiero::new(objectives, orbit);
+    let ruggiero_ctrl = Ruggiero::new(objectives, orbit).unwrap();
 
     // Build the spacecraft state
     let fuel_mass = 67.0;
     let dry_mass = 300.0;
     // Define the thruster
     let lowt = Thruster {
-        thrust: 89e-3,
-        isp: 1650.0,
+        thrust_N: 89e-3,
+        isp_s: 1650.0,
     };
     let start_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
     let sc_dynamics =
-        SpacecraftDynamics::from_ctrl(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
+        SpacecraftDynamics::from_guidance_law(OrbitalDynamics::two_body(), ruggiero_ctrl.clone());
 
     let setup = Propagator::default(sc_dynamics);
     let prop_time = 44 * TimeUnit::Minute + 10 * TimeUnit::Second;
@@ -220,30 +223,32 @@ fn traj_spacecraft() {
     // Note: _Because_ we need to use the trajectory below, we'll be cloning the trajectory
     // If you don't need the trajectory after you've iterated over it, don't clone it (rustc will tell you that).
 
-    for sc_state in traj.every(1 * TimeUnit::Day) {
+    for mut sc_state in traj.every(1 * TimeUnit::Day) {
         // We need to evaluate the mode of this state because the trajectory does not store discrete information
-        let mode_then = ruggiero_ctrl.next(&sc_state);
-        if mode_then != prev_mode {
+        ruggiero_ctrl.next(&mut sc_state);
+        if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
                 prev_mode,
-                mode_then,
+                sc_state.mode(),
                 sc_state.epoch()
             );
-            prev_mode = mode_then;
+            prev_mode = sc_state.mode();
         }
     }
 
     for epoch in TimeSeries::inclusive(start_dt, start_dt + prop_time, 1 * TimeUnit::Day) {
         // Note: the `evaluate` function will return a Result which prevents a panic if you request something out of the ephemeris
-        let sc_state = traj.at(epoch).unwrap();
-        let mode_then = ruggiero_ctrl.next(&sc_state);
-        if mode_then != prev_mode {
+        let mut sc_state = traj.at(epoch).unwrap();
+        ruggiero_ctrl.next(&mut sc_state);
+        if sc_state.mode() != prev_mode {
             println!(
                 "Mode changed from {:?} to {:?} @ {}",
-                prev_mode, mode_then, epoch
+                prev_mode,
+                sc_state.mode(),
+                epoch
             );
-            prev_mode = mode_then;
+            prev_mode = sc_state.mode();
         }
     }
 
@@ -377,7 +382,6 @@ fn traj_spacecraft() {
 #[allow(clippy::identity_op)]
 #[test]
 fn traj_ephem_backward() {
-    // BROKEN: cf. https://gitlab.com/chrisrabotin/nyx/-/issues/190
     // Test that we can correctly interpolate a spacecraft orbit
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

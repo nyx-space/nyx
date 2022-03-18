@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -193,36 +193,23 @@ impl EventEvaluator<Orbit> for Event {
 
         // Return the parameter centered around the desired value
         match self.parameter {
-            StateParameter::AoL => angled_value(state.aol(), self.desired_value),
-            StateParameter::AoP => angled_value(state.aop(), self.desired_value),
+            StateParameter::AoL
+            | StateParameter::AoP
+            | StateParameter::Declination
+            | StateParameter::EccentricAnomaly
+            | StateParameter::FlightPathAngle
+            | StateParameter::HyperbolicAnomaly
+            | StateParameter::Inclination
+            | StateParameter::MeanAnomaly
+            | StateParameter::RightAscension
+            | StateParameter::RAAN
+            | StateParameter::TrueAnomaly
+            | StateParameter::TrueLongitude
+            | StateParameter::VelocityDeclination => {
+                angled_value(state.value(&self.parameter).unwrap(), self.desired_value)
+            }
             StateParameter::Apoapsis => angled_value(state.ta(), 180.0),
-            StateParameter::C3 => state.c3() - self.desired_value,
-            StateParameter::Declination => angled_value(state.declination(), self.desired_value),
-            StateParameter::ApoapsisRadius => state.apoapsis() - self.desired_value,
-            StateParameter::EccentricAnomaly => angled_value(state.ea(), self.desired_value),
-            StateParameter::Eccentricity => state.ecc() - self.desired_value,
-            StateParameter::Energy => state.energy() - self.desired_value,
-            StateParameter::GeodeticHeight => state.geodetic_height() - self.desired_value,
-            StateParameter::GeodeticLatitude => state.geodetic_latitude() - self.desired_value,
-            StateParameter::GeodeticLongitude => state.geodetic_longitude() - self.desired_value,
-            StateParameter::FlightPathAngle => angled_value(state.fpa(), self.desired_value),
-            StateParameter::Hmag => state.hmag() - self.desired_value,
-            StateParameter::HX => state.hx() - self.desired_value,
-            StateParameter::HY => state.hy() - self.desired_value,
-            StateParameter::HZ => state.hz() - self.desired_value,
-            StateParameter::HyperbolicAnomaly => {
-                angled_value(state.hyperbolic_anomaly().unwrap(), self.desired_value)
-            }
-            StateParameter::Inclination => angled_value(state.inc(), self.desired_value),
-            StateParameter::MeanAnomaly => angled_value(state.ma(), self.desired_value),
             StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
-            StateParameter::PeriapsisRadius => state.periapsis() - self.desired_value,
-            StateParameter::Period => state.period().in_seconds() - self.desired_value,
-            StateParameter::RightAscension => {
-                angled_value(state.right_ascension(), self.desired_value)
-            }
-            StateParameter::RAAN => angled_value(state.raan(), self.desired_value),
-            StateParameter::Rmag => state.rmag() - self.desired_value,
             StateParameter::SlantAngle { x, y, z } => {
                 let mut tgt = Vector3::new(x, y, z);
                 tgt /= tgt.norm();
@@ -231,22 +218,7 @@ impl EventEvaluator<Orbit> for Event {
                     self.desired_value,
                 )
             }
-            StateParameter::SemiParameter => state.semi_parameter() - self.desired_value,
-            StateParameter::SemiMinorAxis => state.semi_minor_axis() - self.desired_value,
-            StateParameter::SMA => state.sma() - self.desired_value,
-            StateParameter::TrueAnomaly => angled_value(state.ta(), self.desired_value),
-            StateParameter::TrueLongitude => angled_value(state.tlong(), self.desired_value),
-            StateParameter::VelocityDeclination => {
-                angled_value(state.velocity_declination(), self.desired_value)
-            }
-            StateParameter::Vmag => state.vmag() - self.desired_value,
-            StateParameter::X => state.x - self.desired_value,
-            StateParameter::Y => state.y - self.desired_value,
-            StateParameter::Z => state.z - self.desired_value,
-            StateParameter::VX => state.vx - self.desired_value,
-            StateParameter::VY => state.vy - self.desired_value,
-            StateParameter::VZ => state.vz - self.desired_value,
-            _ => unimplemented!(),
+            _ => state.value(&self.parameter).unwrap() - self.desired_value,
         }
     }
 }
@@ -268,7 +240,3 @@ impl EventEvaluator<Spacecraft> for Event {
         self.value_precision
     }
 }
-
-/// Computes the elevation between a body fixed point and something else.
-#[derive(Clone, Debug)]
-pub struct ElevationEvent {}

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2021 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,7 +17,7 @@
 */
 
 use super::hyperdual::linalg::norm;
-use super::hyperdual::{hyperspace_from_vector, Float, Hyperdual};
+use super::hyperdual::{hyperspace_from_vector, Float, OHyperdual};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
@@ -40,11 +40,11 @@ where
     c_nm: DMatrix<f64>,
     vr01: DMatrix<f64>,
     vr11: DMatrix<f64>,
-    a_nm_h: DMatrix<Hyperdual<f64, U7>>,
-    b_nm_h: DMatrix<Hyperdual<f64, U7>>,
-    c_nm_h: DMatrix<Hyperdual<f64, U7>>,
-    vr01_h: DMatrix<Hyperdual<f64, U7>>,
-    vr11_h: DMatrix<Hyperdual<f64, U7>>,
+    a_nm_h: DMatrix<OHyperdual<f64, U7>>,
+    b_nm_h: DMatrix<OHyperdual<f64, U7>>,
+    c_nm_h: DMatrix<OHyperdual<f64, U7>>,
+    vr01_h: DMatrix<OHyperdual<f64, U7>>,
+    vr11_h: DMatrix<OHyperdual<f64, U7>>,
 }
 
 impl<S> Harmonics<S>
@@ -100,26 +100,26 @@ where
 
         // Repeat for the hyperdual part in case we need to super the partials
         let mut a_nm_h =
-            DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, Hyperdual::from(0.0));
-        let mut b_nm_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
-        let mut c_nm_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
-        let mut vr01_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
-        let mut vr11_h = DMatrix::from_element(degree_np2, degree_np2, Hyperdual::from(0.0));
+            DMatrix::from_element(degree_np2 + 1, degree_np2 + 1, OHyperdual::from(0.0));
+        let mut b_nm_h = DMatrix::from_element(degree_np2, degree_np2, OHyperdual::from(0.0));
+        let mut c_nm_h = DMatrix::from_element(degree_np2, degree_np2, OHyperdual::from(0.0));
+        let mut vr01_h = DMatrix::from_element(degree_np2, degree_np2, OHyperdual::from(0.0));
+        let mut vr11_h = DMatrix::from_element(degree_np2, degree_np2, OHyperdual::from(0.0));
 
         // initialize the diagonal elements (not a function of the input)
-        a_nm_h[(0, 0)] = Hyperdual::from(1.0);
+        a_nm_h[(0, 0)] = OHyperdual::from(1.0);
         for n in 1..=degree_np2 {
             // Diagonal element
-            a_nm_h[(n, n)] = Hyperdual::from(a_nm[(n, n)]);
+            a_nm_h[(n, n)] = OHyperdual::from(a_nm[(n, n)]);
         }
 
         // Pre-compute the B_nm, C_nm, vr01 and vr11 storages
         for n in 0..degree_np2 {
             for m in 0..degree_np2 {
-                vr01_h[(n, m)] = Hyperdual::from(vr01[(n, m)]);
-                vr11_h[(n, m)] = Hyperdual::from(vr11[(n, m)]);
-                b_nm_h[(n, m)] = Hyperdual::from(b_nm[(n, m)]);
-                c_nm_h[(n, m)] = Hyperdual::from(c_nm[(n, m)]);
+                vr01_h[(n, m)] = OHyperdual::from(vr01[(n, m)]);
+                vr11_h[(n, m)] = OHyperdual::from(vr11[(n, m)]);
+                b_nm_h[(n, m)] = OHyperdual::from(b_nm[(n, m)]);
+                c_nm_h[(n, m)] = OHyperdual::from(c_nm[(n, m)]);
             }
         }
 
@@ -250,7 +250,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = self.cosm.frame_chg(osc, self.compute_frame);
 
-        let radius: Vector3<Hyperdual<f64, U7>> = hyperspace_from_vector(&state.radius());
+        let radius: Vector3<OHyperdual<f64, U7>> = hyperspace_from_vector(&state.radius());
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = norm(&radius);
@@ -268,7 +268,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         for n in 1..=max_degree + 1 {
             let nf64 = n as f64;
             // Off diagonal
-            a_nm[(n + 1, n)] = Hyperdual::from((2.0 * nf64 + 3.0).sqrt()) * u_ * a_nm[(n, n)];
+            a_nm[(n + 1, n)] = OHyperdual::from((2.0 * nf64 + 3.0).sqrt()) * u_ * a_nm[(n, n)];
         }
 
         for m in 0..=max_order + 1 {
@@ -283,50 +283,50 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         let mut r_m = Vec::with_capacity(min(max_degree, max_order) + 1);
         let mut i_m = Vec::with_capacity(min(max_degree, max_order) + 1);
 
-        r_m.push(Hyperdual::<f64, U7>::from(1.0));
-        i_m.push(Hyperdual::<f64, U7>::from(0.0));
+        r_m.push(OHyperdual::<f64, U7>::from(1.0));
+        i_m.push(OHyperdual::<f64, U7>::from(0.0));
 
         for m in 1..=min(max_degree, max_order) {
             r_m.push(s_ * r_m[m - 1] - t_ * i_m[m - 1]);
             i_m.push(s_ * i_m[m - 1] + t_ * r_m[m - 1]);
         }
 
-        let eq_radius = Hyperdual::<f64, U7>::from(self.compute_frame.equatorial_radius());
+        let eq_radius = OHyperdual::<f64, U7>::from(self.compute_frame.equatorial_radius());
         let rho = eq_radius / r_;
-        let mut rho_np1 = Hyperdual::<f64, U7>::from(self.compute_frame.gm()) / r_ * rho;
+        let mut rho_np1 = OHyperdual::<f64, U7>::from(self.compute_frame.gm()) / r_ * rho;
 
-        let mut a0 = Hyperdual::<f64, U7>::from(0.0);
-        let mut a1 = Hyperdual::<f64, U7>::from(0.0);
-        let mut a2 = Hyperdual::<f64, U7>::from(0.0);
-        let mut a3 = Hyperdual::<f64, U7>::from(0.0);
-        let sqrt2 = Hyperdual::<f64, U7>::from(2.0.sqrt());
+        let mut a0 = OHyperdual::<f64, U7>::from(0.0);
+        let mut a1 = OHyperdual::<f64, U7>::from(0.0);
+        let mut a2 = OHyperdual::<f64, U7>::from(0.0);
+        let mut a3 = OHyperdual::<f64, U7>::from(0.0);
+        let sqrt2 = OHyperdual::<f64, U7>::from(2.0.sqrt());
 
         for n in 1..max_degree {
-            let mut sum0 = Hyperdual::from(0.0);
-            let mut sum1 = Hyperdual::from(0.0);
-            let mut sum2 = Hyperdual::from(0.0);
-            let mut sum3 = Hyperdual::from(0.0);
+            let mut sum0 = OHyperdual::from(0.0);
+            let mut sum1 = OHyperdual::from(0.0);
+            let mut sum2 = OHyperdual::from(0.0);
+            let mut sum3 = OHyperdual::from(0.0);
             rho_np1 *= rho;
 
             for m in 0..=min(n, max_order) {
                 let (c_valf64, s_valf64) = self.stor.cs_nm(n, m);
-                let c_val = Hyperdual::<f64, U7>::from(c_valf64);
-                let s_val = Hyperdual::<f64, U7>::from(s_valf64);
+                let c_val = OHyperdual::<f64, U7>::from(c_valf64);
+                let s_val = OHyperdual::<f64, U7>::from(s_valf64);
 
                 let d_ = (c_val * r_m[m] + s_val * i_m[m]) * sqrt2;
                 let e_ = if m == 0 {
-                    Hyperdual::from(0.0)
+                    OHyperdual::from(0.0)
                 } else {
                     (c_val * r_m[m - 1] + s_val * i_m[m - 1]) * sqrt2
                 };
                 let f_ = if m == 0 {
-                    Hyperdual::from(0.0)
+                    OHyperdual::from(0.0)
                 } else {
                     (s_val * r_m[m - 1] - c_val * i_m[m - 1]) * sqrt2
                 };
 
-                sum0 += Hyperdual::from(m as f64) * a_nm[(n, m)] * e_;
-                sum1 += Hyperdual::from(m as f64) * a_nm[(n, m)] * f_;
+                sum0 += OHyperdual::from(m as f64) * a_nm[(n, m)] * e_;
+                sum1 += OHyperdual::from(m as f64) * a_nm[(n, m)] * f_;
                 sum2 += self.vr01_h[(n, m)] * a_nm[(n, m + 1)] * d_;
                 sum3 += self.vr11_h[(n, m)] * a_nm[(n + 1, m + 1)] * d_;
             }
@@ -341,11 +341,11 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
             .cosm
             .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
 
-        // Convert DCM to Hyperdual DCMs
-        let mut dcm_d = Matrix3::<Hyperdual<f64, U7>>::zeros();
+        // Convert DCM to OHyperdual DCMs
+        let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();
         for i in 0..3 {
             for j in 0..3 {
-                dcm_d[(i, j)] = Hyperdual::from_fn(|k| {
+                dcm_d[(i, j)] = OHyperdual::from_fn(|k| {
                     if k == 0 {
                         dcm[(i, j)]
                     } else if i + 1 == k {
