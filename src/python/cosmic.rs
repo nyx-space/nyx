@@ -154,10 +154,10 @@ impl Orbit {
         vy: f64,
         vz: f64,
         dt: PyRef<Epoch>,
-        frame: PyRef<Frame>
+        frame: PyRef<Frame>,
     ) -> Self {
         Self {
-            inner: OrbitRs::cartesian_stm(x, y, z, vx, vy, vz, dt.inner, frame.inner)
+            inner: OrbitRs::cartesian_stm(x, y, z, vx, vy, vz, dt.inner, frame.inner),
         }
     }
 }
@@ -242,10 +242,7 @@ impl Cosm {
         })
     }
 
-    pub fn frames_get_names(&self) -> PyResult<Vec<String>>
-    {
-        Ok(
-            self.inner.frames_get_names()
-        )
+    pub fn frames_get_names(&self) -> PyResult<Vec<String>> {
+        Ok(self.inner.frames_get_names())
     }
 }

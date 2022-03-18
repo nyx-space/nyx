@@ -1,7 +1,7 @@
+use pyo3::exceptions::PyException;
 /// nyx_space.time
 use pyo3::prelude::*;
 use pyo3::types::PyType;
-use pyo3::exceptions::PyException;
 
 use crate::time::Epoch as EpochRs;
 
@@ -14,20 +14,17 @@ pub struct Epoch {
 #[derive(Debug)]
 pub struct TimeError(crate::time::Errors);
 
-impl std::convert::From<crate::time::Errors> for TimeError
-{
+impl std::convert::From<crate::time::Errors> for TimeError {
     fn from(other: crate::time::Errors) -> Self {
         Self(other)
     }
 }
 
-impl std::convert::From<TimeError> for PyErr 
-{
+impl std::convert::From<TimeError> for PyErr {
     fn from(err: TimeError) -> Self {
         PyException::new_err(err.0.to_string())
     }
 }
-
 
 #[pymethods]
 impl Epoch {
@@ -35,7 +32,7 @@ impl Epoch {
     #[classmethod]
     pub fn from_tai_seconds(_cls: &PyType, seconds: f64) -> Self {
         Self {
-            inner: EpochRs::from_tai_seconds(seconds)
+            inner: EpochRs::from_tai_seconds(seconds),
         }
     }
 
@@ -43,19 +40,21 @@ impl Epoch {
     #[classmethod]
     pub fn from_tai_days(_cls: &PyType, days: f64) -> Self {
         Self {
-            inner: EpochRs::from_tai_days(days)
+            inner: EpochRs::from_tai_days(days),
         }
     }
 
     #[classmethod]
     pub fn from_mjd_tai(_cls: &PyType, days: f64) -> Self {
-        Self { inner: EpochRs::from_mjd_tai(days) }
+        Self {
+            inner: EpochRs::from_mjd_tai(days),
+        }
     }
 
     #[classmethod]
     pub fn from_jde_tai(_cls: &PyType, days: f64) -> Self {
         Self {
-            inner: EpochRs::from_jde_tai(days)
+            inner: EpochRs::from_jde_tai(days),
         }
     }
 
@@ -63,14 +62,14 @@ impl Epoch {
     #[classmethod]
     pub fn from_tt_seconds(_cls: &PyType, seconds: f64) -> Self {
         Self {
-            inner: EpochRs::from_tt_seconds(seconds)
+            inner: EpochRs::from_tt_seconds(seconds),
         }
     }
 
     #[classmethod]
     pub fn from_et_seconds(_cls: &PyType, seconds: f64) -> Epoch {
         Self {
-            inner: EpochRs::from_et_seconds(seconds)
+            inner: EpochRs::from_et_seconds(seconds),
         }
     }
 
@@ -78,7 +77,7 @@ impl Epoch {
     #[classmethod]
     pub fn from_tdb_seconds(_cls: &PyType, seconds: f64) -> Epoch {
         Self {
-            inner: EpochRs::from_tdb_seconds(seconds)
+            inner: EpochRs::from_tdb_seconds(seconds),
         }
     }
 
@@ -92,7 +91,7 @@ impl Epoch {
     #[classmethod]
     pub fn from_jde_et(_cls: &PyType, days: f64) -> Self {
         Self {
-            inner: EpochRs::from_jde_et(days)
+            inner: EpochRs::from_jde_et(days),
         }
     }
 
@@ -100,7 +99,7 @@ impl Epoch {
     #[classmethod]
     pub fn from_jde_tdb(_cls: &PyType, days: f64) -> Self {
         Self {
-            inner: EpochRs::from_jde_tdb(days)
+            inner: EpochRs::from_jde_tdb(days),
         }
     }
 
@@ -125,7 +124,8 @@ impl Epoch {
         nanos: u32,
     ) -> PyResult<Self> {
         Ok(Self {
-            inner: EpochRs::maybe_from_gregorian_tai(year, month, day, hour, minute, second, nanos).map_err(TimeError::from)?
+            inner: EpochRs::maybe_from_gregorian_tai(year, month, day, hour, minute, second, nanos)
+                .map_err(TimeError::from)?,
         })
     }
 
@@ -141,7 +141,7 @@ impl Epoch {
     //     nanos: u32,
     //     ts: TimeSystem,
     // ) -> PyResult<Self> {
-        
+
     // }
 
     /// Builds an Epoch from the provided Gregorian date and time in TAI. If invalid date is provided, this function will panic.
@@ -158,21 +158,21 @@ impl Epoch {
         nanos: u32,
     ) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_tai(year, month, day, hour, minute, second, nanos)
+            inner: EpochRs::from_gregorian_tai(year, month, day, hour, minute, second, nanos),
         }
     }
 
     #[classmethod]
     pub fn from_gregorian_tai_at_midnight(_cls: &PyType, year: i32, month: u8, day: u8) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_tai_at_midnight(year, month, day)
+            inner: EpochRs::from_gregorian_tai_at_midnight(year, month, day),
         }
     }
 
     #[classmethod]
     pub fn from_gregorian_tai_at_noon(_cls: &PyType, year: i32, month: u8, day: u8) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_tai_at_noon(year, month, day)
+            inner: EpochRs::from_gregorian_tai_at_noon(year, month, day),
         }
     }
 
@@ -187,7 +187,7 @@ impl Epoch {
         second: u8,
     ) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_tai_hms(year, month, day, hour, minute, second)
+            inner: EpochRs::from_gregorian_tai_hms(year, month, day, hour, minute, second),
         }
     }
 
@@ -204,7 +204,8 @@ impl Epoch {
         nanos: u32,
     ) -> PyResult<Self> {
         Ok(Self {
-            inner: EpochRs::maybe_from_gregorian_utc(year, month, day, hour, minute, second, nanos).map_err(TimeError::from)?
+            inner: EpochRs::maybe_from_gregorian_utc(year, month, day, hour, minute, second, nanos)
+                .map_err(TimeError::from)?,
         })
     }
 
@@ -222,21 +223,21 @@ impl Epoch {
         nanos: u32,
     ) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_utc(year, month, day, hour, minute, second, nanos)
+            inner: EpochRs::from_gregorian_utc(year, month, day, hour, minute, second, nanos),
         }
     }
 
     #[classmethod]
     pub fn from_gregorian_utc_at_midnight(_cls: &PyType, year: i32, month: u8, day: u8) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_utc_at_midnight(year, month, day)
+            inner: EpochRs::from_gregorian_utc_at_midnight(year, month, day),
         }
     }
 
     #[classmethod]
     pub fn from_gregorian_utc_at_noon(_cls: &PyType, year: i32, month: u8, day: u8) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_utc_at_noon(year, month, day)
+            inner: EpochRs::from_gregorian_utc_at_noon(year, month, day),
         }
     }
 
@@ -251,7 +252,7 @@ impl Epoch {
         second: u8,
     ) -> Self {
         Self {
-            inner: EpochRs::from_gregorian_utc_hms(year, month, day, hour, minute, second)
+            inner: EpochRs::from_gregorian_utc_hms(year, month, day, hour, minute, second),
         }
     }
 
@@ -503,7 +504,7 @@ impl Epoch {
     #[classmethod]
     pub fn from_gregorian_str(_cls: &PyType, s: &str) -> PyResult<Self> {
         Ok(Self {
-            inner: EpochRs::from_gregorian_str(s).map_err(TimeError::from)?
+            inner: EpochRs::from_gregorian_str(s).map_err(TimeError::from)?,
         })
     }
 
@@ -559,7 +560,7 @@ impl Epoch {
 
     // /// Converts the Epoch to Gregorian in the provided time system and in the ISO8601 format with the time system appended to the string
     // pub fn as_gregorian_str(self, ts: TimeSystem) -> String {
-        
+
     // }
 }
 
