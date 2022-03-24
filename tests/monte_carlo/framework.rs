@@ -40,13 +40,12 @@ fn test_monte_carlo_epoch() {
     // Setup the Monte Carlo
 
     let my_mc = MonteCarlo {
-        prop,
         generator,
         seed: 0,
         scenario: "test_monte_carlo_epoch".to_string(),
     };
 
-    let rslts = my_mc.run_until_epoch(dt + 1.0_f64 * Unit::Day, 100);
+    let rslts = my_mc.run_until_epoch(prop, dt + 1.0_f64 * Unit::Day, 100);
 
     let average_sma_dispersion = rslts
         .dispersion_values_of(&StateParameter::SMA)
