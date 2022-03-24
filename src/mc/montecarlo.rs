@@ -23,7 +23,7 @@ use super::{Generator, Pcg64Mcg};
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::mc::results::{McResults, Run};
+use crate::mc::results::{PropResult, Results, Run};
 use crate::mc::DispersedState;
 use crate::md::trajectory::InterpState;
 use crate::md::EventEvaluator;
@@ -90,7 +90,7 @@ where
         event: &F,
         trigger: usize,
         num_runs: usize,
-    ) -> McResults<S>
+    ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
@@ -114,7 +114,7 @@ where
         event: &F,
         trigger: usize,
         num_runs: usize,
-    ) -> McResults<S>
+    ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
@@ -145,7 +145,12 @@ where
                 let run = Run {
                     index: *index,
                     dispersed_state: dispersed_state.clone(),
-                    result,
+                    result: result.and_then(|r| {
+                        Ok(PropResult {
+                            state: r.0,
+                            traj: r.1,
+                        })
+                    }),
                 };
                 tx.send(run).unwrap();
             },
@@ -159,10 +164,12 @@ where
         );
 
         // Collect all of the results and sort them by run index
-        let mut runs = rx.iter().collect::<Vec<Run<D::StateType>>>();
+        let mut runs = rx
+            .iter()
+            .collect::<Vec<Run<D::StateType, PropResult<D::StateType>>>>();
         runs.par_sort_by_key(|run| run.index);
 
-        McResults {
+        Results {
             runs,
             scenario: self.scenario.clone(),
         }
@@ -175,7 +182,7 @@ where
         prop: Propagator<'a, D, E>,
         end_epoch: Epoch,
         num_runs: usize,
-    ) -> McResults<S>
+    ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
@@ -196,7 +203,7 @@ where
         skip: usize,
         end_epoch: Epoch,
         num_runs: usize,
-    ) -> McResults<S>
+    ) -> Results<S, PropResult<S>>
     where
         D: Dynamics<StateType = S>,
         E: ErrorCtrl,
@@ -226,8 +233,14 @@ where
                 let run = Run {
                     index: *index,
                     dispersed_state: dispersed_state.clone(),
-                    result,
+                    result: result.and_then(|r| {
+                        Ok(PropResult {
+                            state: r.0,
+                            traj: r.1,
+                        })
+                    }),
                 };
+
                 tx.send(run).unwrap();
             },
         );
@@ -240,10 +253,10 @@ where
         );
 
         // Collect all of the results and sort them by run index
-        let mut runs = rx.iter().collect::<Vec<Run<S>>>();
+        let mut runs = rx.iter().collect::<Vec<Run<S, PropResult<S>>>>();
         runs.par_sort_by_key(|run| run.index);
 
-        McResults {
+        Results {
             runs,
             scenario: self.scenario.clone(),
         }

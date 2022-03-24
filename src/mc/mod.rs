@@ -34,4 +34,4 @@ mod generator;
 pub use generator::{DispersedState, GaussianGenerator, Generator};
 
 mod results;
-pub use results::{McResults, Stats};
+pub use results::{Results, Stats};
