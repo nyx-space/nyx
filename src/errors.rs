@@ -55,6 +55,9 @@ pub enum NyxError {
     /// Singular Covariance
     #[error("Singular Covariance")]
     SingularCovarianceMatrix,
+    /// Covariance is not positive semi definite
+    #[error("Covariance is not positive semi definite")]
+    CovarianceMatrixNotPsd,
     /// Singular Jacobian
     #[error("Singular Jacobian")]
     SingularJacobian,

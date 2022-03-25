@@ -18,7 +18,7 @@
 
 use super::rand_distr::{Distribution, Normal};
 use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
+use crate::linalg::{Const, DefaultAllocator, DimMin, DimSub, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::{NyxError, State};
 
@@ -267,6 +267,33 @@ where
         me.add_std_dev(param, template.value(&param)? * prct)?;
 
         Ok(me)
+    }
+
+    /// Creates a new Monte Carlos state generator from a mean and covariance which must be of the same size as the state vector
+    /// The covariance must be positive semi definite. The algorithm is the one from numpy
+    /// <https://github.com/numpy/numpy/blob/6c16f23c30fe490422959d30c2e22345211a2fe3/numpy/random/mtrand.pyx#L3979>
+    pub fn multivariate(
+        template: S,
+        mean: OVector<f64, S::Size>,
+        cov: OMatrix<f64, S::Size, S::Size>,
+    ) -> Result<Self, NyxError>
+    where
+        DefaultAllocator: Allocator<f64, S::Size>
+            + Allocator<f64, S::Size, S::Size>
+            + Allocator<usize, S::Size, S::Size>
+            + Allocator<f64, S::VecLength>
+            + Allocator<f64, <S::Size as DimMin<S::Size>>::Output>
+            + Allocator<f64, <<S::Size as DimMin<S::Size>>::Output as DimSub<Const<1>>>::Output>
+            + Allocator<f64, S::Size, <S::Size as DimMin<S::Size>>::Output>
+            + Allocator<f64, <S::Size as DimMin<S::Size>>::Output, S::Size>,
+        <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
+        S::Size: DimMin<S::Size>,
+        <S::Size as DimMin<S::Size>>::Output: DimSub<Const<1>>,
+    {
+        // TODO: Check that covariance is PSD
+        let svd = cov.svd_unordered(false, true);
+        // Perform the SVD of the covariance
+        todo!()
     }
 }
 
