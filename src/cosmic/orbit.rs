@@ -27,6 +27,7 @@ use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::State;
 use super::{BPlane, Frame};
 use crate::linalg::{Const, OVector};
+use crate::mc::MultivariateNormal;
 use crate::md::ui::Objective;
 use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
@@ -1410,6 +1411,48 @@ impl Orbit {
             rtn.push(Objective::new(*parameter, self.value(parameter)?));
         }
         Ok(rtn)
+    }
+
+    /// Create a multivariate normal dispersion structure from this orbit with the provided mean and covariance,
+    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    pub fn disperse(
+        &self,
+        mean: Vector6<f64>,
+        cov: Matrix6<f64>,
+    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+        MultivariateNormal::new(
+            *self,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+            ],
+            mean,
+            cov,
+        )
+    }
+
+    /// Create a multivariate normal dispersion structure from this orbit with the provided covariance,
+    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    pub fn disperse_zero_mean(
+        &self,
+        cov: Matrix6<f64>,
+    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+        MultivariateNormal::zero_mean(
+            *self,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+            ],
+            cov,
+        )
     }
 }
 
