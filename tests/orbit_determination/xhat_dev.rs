@@ -9,7 +9,7 @@ use self::nyx::io::gravity::*;
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, TimeUnit};
+use self::nyx::time::{Epoch, Unit};
 use self::nyx::utils::rss_orbit_errors;
 use std::convert::TryFrom;
 
@@ -31,7 +31,7 @@ fn xhat_dev_test_ekf_two_body() {
     // Define the ground stations.
     let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * TimeUnit::Hour;
+    let ekf_disable_time = 1 * Unit::Hour;
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
@@ -44,8 +44,8 @@ fn xhat_dev_test_ekf_two_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -75,7 +75,7 @@ fn xhat_dev_test_ekf_two_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&state).unwrap();
             if meas.visible() {
@@ -108,7 +108,7 @@ fn xhat_dev_test_ekf_two_body() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut odp = ODProcess::ekf(
@@ -218,7 +218,7 @@ fn xhat_dev_test_ekf_multi_body() {
     // Define the ground stations.
     let ekf_num_meas = 500;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0 * TimeUnit::Second;
+    let ekf_disable_time = 10.0 * Unit::Second;
     let elevation_mask = 0.0;
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
@@ -231,8 +231,8 @@ fn xhat_dev_test_ekf_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -264,7 +264,7 @@ fn xhat_dev_test_ekf_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&state).unwrap();
             if meas.visible() {
@@ -297,7 +297,7 @@ fn xhat_dev_test_ekf_multi_body() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
@@ -381,7 +381,7 @@ fn xhat_dev_test_ekf_harmonics() {
     // Define the ground stations.
     let ekf_num_meas = 5000;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * TimeUnit::Minute;
+    let ekf_disable_time = 1 * Unit::Minute;
     let elevation_mask = 0.0;
     let range_noise = 1e-6;
     let range_rate_noise = 1e-7;
@@ -394,8 +394,8 @@ fn xhat_dev_test_ekf_harmonics() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -434,7 +434,7 @@ fn xhat_dev_test_ekf_harmonics() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&state).unwrap();
             if meas.visible() {
@@ -467,7 +467,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let sigma_q = 1e-5_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
@@ -531,7 +531,7 @@ fn xhat_dev_test_ekf_realistic() {
     // Define the ground stations.
     let ekf_num_meas = 500;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 10.0 * TimeUnit::Second;
+    let ekf_disable_time = 10.0 * Unit::Second;
     let elevation_mask = 0.0;
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
@@ -544,8 +544,8 @@ fn xhat_dev_test_ekf_realistic() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -576,7 +576,7 @@ fn xhat_dev_test_ekf_realistic() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&state).unwrap();
             if meas.visible() {
@@ -689,8 +689,8 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -721,7 +721,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&state).unwrap();
             if meas.visible() {
@@ -952,8 +952,8 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -984,7 +984,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&state).unwrap();
             if meas.visible() {
@@ -1012,7 +1012,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     // Define the ground stations.
     let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 1 * TimeUnit::Hour;
+    let ekf_disable_time = 1 * Unit::Hour;
 
     // Define the initial estimate
     let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
@@ -1022,7 +1022,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
 
     let sigma_q = 1e-7_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
     let mut odp = ODProcess::ekf(
@@ -1212,8 +1212,8 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -1244,7 +1244,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    for state in traj.every(10 * TimeUnit::Second) {
+    for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
             let meas = station.measure(&state).unwrap();
             if meas.visible() {

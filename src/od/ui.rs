@@ -29,7 +29,7 @@ pub use super::*;
 
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
-pub use crate::time::{Duration, TimeUnit};
+pub use crate::time::{Duration, Unit};
 use crate::State;
 
 use std::convert::TryFrom;

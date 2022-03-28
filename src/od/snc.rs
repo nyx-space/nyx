@@ -189,16 +189,16 @@ where
 
 #[test]
 fn test_snc_init() {
-    use crate::time::TimeUnit;
+    use crate::time::Unit;
     let snc_expo = SNC3::with_decay(
-        2 * TimeUnit::Minute,
+        2 * Unit::Minute,
         &[1e-6, 1e-6, 1e-6],
         &[3600.0, 3600.0, 3600.0],
     );
     println!("{}", snc_expo);
 
     let snc_std = SNC3::with_start_time(
-        2 * TimeUnit::Minute,
+        2 * Unit::Minute,
         &[1e-6, 1e-6, 1e-6],
         Epoch::from_et_seconds(3600.0),
     );

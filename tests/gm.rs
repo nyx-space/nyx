@@ -153,7 +153,7 @@ impl Dynamics for BiasDriftCoupledGM {
 #[test]
 fn gm_test() {
     use nyx::propagators::Propagator;
-    use nyx::time::TimeUnit;
+    use nyx::time::Unit;
     let init = BiasDriftState::zeros();
     let model = BiasDriftCoupledGM {
         tau: 900.0,
@@ -162,7 +162,7 @@ fn gm_test() {
     };
     let fstate = Propagator::default_dp78(model)
         .with(init)
-        .for_duration(60 * TimeUnit::Second)
+        .for_duration(60 * Unit::Second)
         .unwrap();
     println!("Final state = {}", fstate);
 }

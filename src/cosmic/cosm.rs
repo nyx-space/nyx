@@ -31,7 +31,7 @@ use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, Xb};
 use super::SPEED_OF_LIGHT_KMS;
 use crate::errors::NyxError;
-use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
+use crate::hifitime::{Epoch, Unit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::{Matrix3, Matrix6};
 use crate::utils::{capitalize, dcm_finite_differencing, rotv};
@@ -774,7 +774,7 @@ impl Cosm {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
-                    let lt_dt = datetime - lt * TimeUnit::Second;
+                    let lt_dt = datetime - lt * Unit::Second;
                     tgt =
                         self.try_celestial_state(target_ephem, lt_dt, ssb2k, LightTimeCalc::None)?;
                 }
@@ -902,8 +902,8 @@ impl Cosm {
     ) -> Result<Matrix6<f64>, NyxError> {
         let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
         // Compute the dRdt DCM with finite differencing
-        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
-        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * Unit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * Unit::Second)?;
 
         Ok(dcm_finite_differencing(pre_r_dcm, r_dcm, post_r_dcm))
     }
@@ -918,8 +918,8 @@ impl Cosm {
     ) -> Result<(Matrix3<f64>, Matrix3<f64>), NyxError> {
         let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
         // Compute the dRdt DCM with finite differencing
-        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
-        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * Unit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * Unit::Second)?;
 
         let drdt = 0.5 * post_r_dcm - 0.5 * pre_r_dcm;
 
@@ -1166,7 +1166,7 @@ mod tests {
         */
         assert_eq!(moon_from_emb.frame, earth_bary);
         assert!(dbg!(moon_from_emb.x - -8.157_659_104_305_09e4).abs() < 1e-4);
-        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < 1e-5);
+        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < 2e-5);
         assert!(dbg!(moon_from_emb.z - -1.443_918_590_146_541e5).abs() < 1e-5);
         assert!(dbg!(moon_from_emb.vx - 9.607_118_443_970_266e-1).abs() < 1e-8);
         assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < 1e-8);
@@ -1467,6 +1467,8 @@ mod tests {
 
         let state_iau_earth_computed = cosm.frame_chg(&state_eme2k, earth_iau);
         let delta_state = cosm.frame_chg(&state_iau_earth_computed, eme2k) - state_eme2k;
+
+        println!("{}", delta_state);
 
         assert!(
             delta_state.rmag().abs() < 1e-11,
@@ -1974,7 +1976,7 @@ mod tests {
 
         // End of transfer
         let et: Epoch =
-            Epoch::from_gregorian_utc(2022, 12, 4, 11, 59, 51, 0) + 884000 * TimeUnit::Microsecond;
+            Epoch::from_gregorian_utc(2022, 12, 4, 11, 59, 51, 0) + 884000 * Unit::Microsecond;
         println!("{:.6}", et.as_tdb_seconds());
 
         let moon_state = Orbit::cartesian(
@@ -2030,6 +2032,6 @@ mod tests {
     fn why_broken() {
         let e = Epoch::from_gregorian_tai_hms(2002, 02, 14, 0, 0, 0);
         println!("{}", e.as_tdb_seconds());
-        println!("{}", e.as_jde_tdb_duration().in_unit(TimeUnit::Second));
+        println!("{}", e.as_jde_tdb_duration().in_unit(Unit::Second));
     }
 }

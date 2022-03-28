@@ -6,14 +6,73 @@ use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
 use nyx::linalg::{Matrix6, Vector6};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::*;
-use nyx::time::{Epoch, TimeUnit, J2000_OFFSET};
+use nyx::time::{Epoch, Unit, J2000_OFFSET};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
 use nyx::State;
 
 #[allow(clippy::identity_op)]
 #[test]
+fn energy_conservation() {
+    let prop_time = 1 * Unit::Day;
+
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let dt = Epoch::from_gregorian_utc_hms(2022, 2, 15, 17, 30, 37);
+    let start_state = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, dt, eme2k,
+    );
+
+    let rslt = Orbit::cartesian(
+        -5_971.194_376_797_643,
+        3_945.517_912_574_178_4,
+        2_864.620_957_744_429_2,
+        0.049_083_101_605_507_95,
+        -4.185_084_125_817_658,
+        5.848_947_462_472_877,
+        dt + prop_time,
+        eme2k,
+    );
+
+    let rk89_final = Propagator::new::<Dormand45>(OrbitalDynamics::two_body(), PropOpts::default())
+        .with(start_state)
+        .for_duration(prop_time)
+        .unwrap();
+
+    let rk89_energy_bleed = rk89_final.energy() - start_state.energy();
+
+    println!(
+        "[RK89] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",
+        rk89_energy_bleed
+    );
+    let delta = rk89_final.to_cartesian_vec() - rslt.to_cartesian_vec();
+    for i in 0..6 {
+        print!("{:.0e}\t", delta[i].abs());
+    }
+    println!();
+
+    let dp78_final = Propagator::new::<Dormand78>(OrbitalDynamics::two_body(), PropOpts::default())
+        .with(start_state)
+        .for_duration(prop_time)
+        .unwrap();
+
+    let dp78_energy_bleed = dp78_final.energy() - start_state.energy();
+
+    println!(
+        "[DP78] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",
+        dp78_energy_bleed
+    );
+    let delta = dp78_final.to_cartesian_vec() - rslt.to_cartesian_vec();
+    for i in 0..6 {
+        print!("{:.0e}\t", delta[i].abs());
+    }
+    println!();
+}
+
+#[allow(clippy::identity_op)]
+#[test]
 fn val_two_body_dynamics() {
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -84,7 +143,7 @@ fn val_halo_earth_moon_dynamics() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -117,7 +176,7 @@ fn val_halo_earth_moon_dynamics() {
     let bodies = vec![Bodies::Luna];
     let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * Unit::Second));
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_orbit_errors(&prop.state, &rslt);
@@ -148,7 +207,7 @@ fn val_halo_earth_moon_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -213,7 +272,7 @@ fn val_llo_earth_moon_dynamics_adaptive() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -275,7 +334,7 @@ fn val_halo_multi_body_dynamics() {
     We validate against GMAT after switching the GMAT script to use de438s.bsp. We are using GMAT's default GM values.
     The state in `rslt` is exactly the GMAT output.
     */
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -306,7 +365,7 @@ fn val_halo_multi_body_dynamics() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let dynamics = OrbitalDynamics::point_masses(&bodies, cosm);
 
-    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * TimeUnit::Second));
+    let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(10 * Unit::Second));
     let mut prop = setup.with(halo_rcvr);
     prop.for_duration(prop_time).unwrap();
     let (err_r, err_v) = rss_orbit_vec_errors(&prop.state.to_cartesian_vec(), &rslt);
@@ -338,7 +397,7 @@ fn val_halo_multi_body_dynamics_adaptive() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -405,7 +464,7 @@ fn val_llo_multi_body_dynamics_adaptive() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -468,7 +527,7 @@ fn val_leo_multi_body_dynamics_adaptive_wo_moon() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -528,7 +587,7 @@ fn val_leo_multi_body_dynamics_adaptive() {
     The state in `rslt` is exactly the GMAT output.
     */
 
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");
@@ -639,8 +698,8 @@ fn two_body_dual() {
 
     // [Earth J2000] 1917-11-14T00:00:00 UTC   sma = 22000.000344 km   ecc = 0.010000  inc = 30.000000 deg     raan = 80.000000 deg    aop = 40.000000 deg     ta = 0.000000 deg
     // Quite non-linear near periapsis
-    let prop_time = 2 * TimeUnit::Minute;
-    let step_size = 10 * TimeUnit::Second;
+    let prop_time = 2 * Unit::Minute;
+    let step_size = 10 * Unit::Second;
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step(step_size));
     let mut prop = setup.with(init);
@@ -672,8 +731,8 @@ fn multi_body_dynamics_dual() {
     // After trial and error, it seems that the linearization breaks after 45 minutes for this example.
     // Specifically, inverting the previous STM and multiplying it with the next STM to compute the STM
     // of this one step will round too much and cause an error greater than one meter.
-    let prop_time = 45 * TimeUnit::Minute;
-    let step_size = 10 * TimeUnit::Second;
+    let prop_time = 45 * Unit::Minute;
+    let step_size = 10 * Unit::Second;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -800,7 +859,7 @@ fn val_earth_sph_harmonics_j2() {
 
     let prop_state = Propagator::rk89(dynamics, PropOpts::<RSSCartesianStep>::default())
         .with(state)
-        .for_duration(1 * TimeUnit::Day)
+        .for_duration(1 * Unit::Day)
         .unwrap();
 
     println!("{}", prop_state);
@@ -853,7 +912,7 @@ fn val_earth_sph_harmonics_12x12() {
     let dynamics = OrbitalDynamics::from_model(harmonics);
 
     let setup = Propagator::rk89(dynamics.clone(), PropOpts::with_tolerance(1e-9));
-    let prop_time = 1 * TimeUnit::Day;
+    let prop_time = 1 * Unit::Day;
     let final_state = setup.with(state).for_duration(prop_time).unwrap();
 
     println!("{}", final_state);
@@ -873,7 +932,7 @@ fn val_earth_sph_harmonics_12x12() {
     // We set up a new propagator with a fixed step. Without the fixed step, the error control
     // on the STM leads to a difference of 1.04 meters in this one day propagation.
     let setup = Propagator::rk89(dynamics, PropOpts::with_fixed_step_s(30.0));
-    let prop_time = 6 * TimeUnit::Hour;
+    let prop_time = 6 * Unit::Hour;
     let final_state = setup.with(state).for_duration(prop_time).unwrap();
     // Compare the case with the hyperdual EOMs (computation uses another part of the code)
     let mut prop = setup.with(state.with_stm());
@@ -930,7 +989,7 @@ fn val_earth_sph_harmonics_70x70() {
 
     let prop_rslt = Propagator::default(dynamics)
         .with(state)
-        .for_duration(1 * TimeUnit::Day)
+        .for_duration(1 * Unit::Day)
         .unwrap();
 
     println!("{}", prop_rslt);
@@ -988,7 +1047,7 @@ fn val_earth_sph_harmonics_70x70_partials() {
 
     let prop_rslt = Propagator::default(dynamics)
         .with(state)
-        .for_duration(1 * TimeUnit::Day)
+        .for_duration(1 * Unit::Day)
         .unwrap();
 
     println!("{}", prop_rslt);
@@ -1038,17 +1097,14 @@ fn hf_prop() {
     let dynamics = OrbitalDynamics::new(vec![PointMasses::new(&bodies, cosm), harmonics]);
 
     let setup = Propagator::rk89(dynamics, PropOpts::with_tolerance(1e-9));
-    let rslt = setup
-        .with(state)
-        .for_duration(30.0 * TimeUnit::Day)
-        .unwrap();
+    let rslt = setup.with(state).for_duration(30.0 * Unit::Day).unwrap();
 
     println!("{}\n{:x}", rslt, rslt);
 }
 
 #[test]
 fn val_cislunar_dynamics() {
-    let prop_time = 36 * TimeUnit::Hour;
+    let prop_time = 36 * Unit::Hour;
 
     let cosm = Cosm::de438_gmat();
     let eme2k = cosm.frame("EME2000");

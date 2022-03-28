@@ -4,13 +4,13 @@ use nyx::cosmic::eclipse::{EclipseLocator, EclipseState};
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::propagators::{PropOpts, Propagator};
-use nyx::time::{Epoch, TimeUnit};
+use nyx::time::{Epoch, Unit};
 use std::sync::mpsc;
 use std::thread;
 
 #[test]
 fn leo_sun_earth_eclipses() {
-    let prop_time = 2.0 * TimeUnit::Day;
+    let prop_time = 2.0 * Unit::Day;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
@@ -62,7 +62,7 @@ fn leo_sun_earth_eclipses() {
 
 #[test]
 fn geo_sun_earth_eclipses() {
-    let prop_time = 2 * TimeUnit::Day;
+    let prop_time = 2 * Unit::Day;
 
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");

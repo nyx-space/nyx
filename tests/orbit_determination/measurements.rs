@@ -100,8 +100,8 @@ fn val_measurements_topo() {
     // Generate the measurements
 
     // Define the propagator information.
-    let prop_time = 12 * TimeUnit::Hour;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 12 * Unit::Hour;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     let setup = Propagator::new::<RK4Fixed>(
@@ -123,34 +123,34 @@ fn val_measurements_topo() {
     // Now iterate the trajectory to generate the measurements.
     let traj1_val_data = vec![
         GmatMsrData {
-            offset: 0.29097222222117125 * TimeUnit::Day,
+            offset: 0.29097222222117125 * Unit::Day,
             range: 9.145_755_787_575_61e4,
             range_rate: 2.199_227_723_432_48e0,
         },
         GmatMsrData {
-            offset: 0.3368055555547471 * TimeUnit::Day,
+            offset: 0.3368055555547471 * Unit::Day,
             range: 9.996_505_560_799_869e4,
             range_rate: 2.105_490_397_794_733e0,
         },
         GmatMsrData {
-            offset: 0.37777777777591837 * TimeUnit::Day,
+            offset: 0.37777777777591837 * Unit::Day,
             range: 1.073_229_118_411_670_2e5,
             range_rate: 2.056_308_226_930_496e0,
         },
         GmatMsrData {
-            offset: 0.4187500000007276 * TimeUnit::Day,
+            offset: 0.4187500000007276 * Unit::Day,
             range: 1.145_516_751_191_464_7e5,
             range_rate: 2.031_146_181_775_705_7e0,
         },
         GmatMsrData {
-            offset: 0.4874999999992724 * TimeUnit::Day,
+            offset: 0.4874999999992724 * Unit::Day,
             range: 1.265_739_190_638_930_7e5,
             range_rate: 2.021_375_530_901_736_7e0,
         },
     ];
 
     let mut traj1_msr_cnt = 0;
-    for state in traj1.every(1 * TimeUnit::Minute) {
+    for state in traj1.every(1 * Unit::Minute) {
         let meas = dss65_madrid.measure(&state).unwrap();
         if meas.visible() {
             traj1_msr_cnt += 1;
@@ -183,27 +183,27 @@ fn val_measurements_topo() {
     // Second cislunar test
     let traj2_val_data = vec![
         GmatMsrData {
-            offset: 0.32777777778028394 * TimeUnit::Day,
+            offset: 0.32777777778028394 * Unit::Day,
             range: 1.020_601_774_210_878_8e5,
             range_rate: 1.956_752_045_319_600_3e0,
         },
         GmatMsrData {
-            offset: 0.37222222222408163 * TimeUnit::Day,
+            offset: 0.37222222222408163 * Unit::Day,
             range: 1.093_894_902_936_570_1e5,
             range_rate: 1.867_718_050_780_170_7e0,
         },
         GmatMsrData {
-            offset: 0.41319444444889086 * TimeUnit::Day,
+            offset: 0.41319444444889086 * Unit::Day,
             range: 1.159_072_016_126_479_3e5,
             range_rate: 1.819_777_023_286_441_9e0,
         },
         GmatMsrData {
-            offset: 0.4541666666700621 * TimeUnit::Day,
+            offset: 0.4541666666700621 * Unit::Day,
             range: 1.223_057_077_408_475e5,
             range_rate: 1.799_383_353_751_318_2e0,
         },
         GmatMsrData {
-            offset: 0.4993055555605679 * TimeUnit::Day,
+            offset: 0.4993055555605679 * Unit::Day,
             range: 1.293_208_210_899_899_3e5,
             range_rate: 1.801_787_541_374_800_8e0,
         },
@@ -215,7 +215,7 @@ fn val_measurements_topo() {
         .unwrap();
 
     // Now iterate the trajectory to count the measurements.
-    for state in traj2.every(1 * TimeUnit::Minute) {
+    for state in traj2.every(1 * Unit::Minute) {
         let meas = dss65_madrid.measure(&state).unwrap();
         if meas.visible() {
             traj2_msr_cnt += 1;

@@ -34,8 +34,8 @@ fn od_val_multi_body_ckf_perfect_stations() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define state information.
@@ -169,8 +169,8 @@ fn multi_body_ckf_covar_map() {
     let all_stations = vec![dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).

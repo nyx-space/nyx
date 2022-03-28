@@ -18,7 +18,7 @@
 
 pub use super::{Bodies, Cosm, Frame, LightTimeCalc, Orbit, Spacecraft};
 use crate::md::EventEvaluator;
-use crate::time::{Duration, TimeUnit};
+use crate::time::{Duration, Unit};
 use std::cmp::{Eq, Ord, Ordering, PartialOrd};
 use std::convert::Into;
 use std::fmt;
@@ -185,7 +185,7 @@ impl EventEvaluator<Orbit> for UmbraEvent {
 
     /// Stop searching when the time has converged to less than 0.1 seconds
     fn epoch_precision(&self) -> Duration {
-        0.1 * TimeUnit::Second
+        0.1 * Unit::Second
     }
     /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
     fn value_precision(&self) -> f64 {
@@ -205,7 +205,7 @@ impl EventEvaluator<Spacecraft> for UmbraEvent {
 
     /// Stop searching when the time has converged to less than 0.1 seconds
     fn epoch_precision(&self) -> Duration {
-        0.1 * TimeUnit::Second
+        0.1 * Unit::Second
     }
     /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
     fn value_precision(&self) -> f64 {
@@ -235,7 +235,7 @@ impl EventEvaluator<Orbit> for PenumbraEvent {
 
     /// Stop searching when the time has converged to less than 0.1 seconds
     fn epoch_precision(&self) -> Duration {
-        0.1 * TimeUnit::Second
+        0.1 * Unit::Second
     }
     /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
     fn value_precision(&self) -> f64 {
@@ -254,7 +254,7 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
 
     /// Stop searching when the time has converged to less than 0.1 seconds
     fn epoch_precision(&self) -> Duration {
-        0.1 * TimeUnit::Second
+        0.1 * Unit::Second
     }
     /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
     fn value_precision(&self) -> f64 {

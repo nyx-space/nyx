@@ -22,10 +22,10 @@ use crate::cosmic::{Frame, GuidanceMode, Spacecraft};
 use crate::dynamics::guidance::unit_vector_from_ra_dec;
 use crate::linalg::Vector3;
 use crate::polyfit::CommonPolynomial;
-use crate::time::{Epoch, TimeUnit};
+use crate::time::{Epoch, Unit};
 use crate::NyxError;
 use crate::State;
-use hifitime::{Duration, TimeUnitHelper};
+use hifitime::{Duration, TimeUnits};
 use std::fmt;
 
 /// Mnvr defined a single maneuver. Direction MUST be in the VNC frame (Velocity / Normal / Cross).
@@ -51,7 +51,7 @@ impl fmt::Display for Mnvr {
     /// Prints the polynomial with the least significant coefficients first
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if (self.end - self.start).abs() >= 1 * TimeUnit::Millisecond {
+        if (self.end - self.start).abs() >= 1 * Unit::Millisecond {
             let start_vec = self.vector(self.start);
             let end_vec = self.vector(self.end);
             write!(
@@ -86,7 +86,7 @@ impl Mnvr {
     /// Creates an impulsive maneuver whose vector is the deltaV.
     /// TODO: This should use William's algorithm
     pub fn from_impulsive(dt: Epoch, vector: Vector3<f64>, frame: Frame) -> Self {
-        Self::from_time_invariant(dt, dt + TimeUnit::Millisecond, 1.0, vector, frame)
+        Self::from_time_invariant(dt, dt + Unit::Millisecond, 1.0, vector, frame)
     }
 
     /// Creates a manneuver from the provided time-invariant delta-v, in km/s

@@ -10,7 +10,7 @@ use self::nyx::io::gravity::*;
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::od::ui::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, TimeUnit};
+use self::nyx::time::{Epoch, Unit};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -26,7 +26,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     // Define the ground stations.
     let ekf_num_meas = 100;
     // Set the disable time to be very low to test enable/disable sequence
-    let ekf_disable_time = 5.0 * TimeUnit::Second;
+    let ekf_disable_time = 5.0 * Unit::Second;
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
@@ -39,8 +39,8 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -183,8 +183,8 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -340,7 +340,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     odp.iterate(
         &measurements,
         IterationConf {
-            smoother: SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+            smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
             ..Default::default()
         },
     )
@@ -407,8 +407,8 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -488,7 +488,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     odp.iterate(
         &measurements,
         IterationConf {
-            smoother: SmoothingArc::TimeGap(10.0 * TimeUnit::Second),
+            smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
             ..Default::default()
         },
     )
@@ -555,8 +555,8 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -610,7 +610,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q = 1e-8_f64.powi(2);
-    let process_noise = SNC3::from_diagonal(2 * TimeUnit::Minute, &[sigma_q, sigma_q, sigma_q]);
+    let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
@@ -689,8 +689,8 @@ fn od_tb_ckf_map_covar() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 2 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 2 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -775,8 +775,8 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -898,8 +898,8 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
-    let prop_time = 1 * TimeUnit::Day;
-    let step_size = 10.0 * TimeUnit::Second;
+    let prop_time = 1 * Unit::Day;
+    let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
     // Define the storages (channels for the states and a map for the measurements).
@@ -952,12 +952,12 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     // Define the process noise to assume an unmodel acceleration of 1e-3 km^2/s^2 on X, Y and Z in the ECI frame
     let sigma_q1 = 1e-7_f64.powi(2);
-    let process_noise1 = SNC3::from_diagonal(2 * TimeUnit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
+    let process_noise1 = SNC3::from_diagonal(2 * Unit::Day, &[sigma_q1, sigma_q1, sigma_q1]);
 
     let sigma_q2 = 1e-8_f64.powi(2);
     let sigma_q2_d = 3600.0;
     let mut process_noise2 = SNC3::with_decay(
-        2 * TimeUnit::Day,
+        2 * Unit::Day,
         &[sigma_q2, sigma_q2, sigma_q2],
         &[sigma_q2_d, sigma_q2_d, sigma_q2_d],
     );
