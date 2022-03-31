@@ -48,10 +48,10 @@ pub mod spacecraft;
 pub use self::spacecraft::*;
 
 /// Defines a few examples of guidance laws.
-pub mod guidance;
+pub use super::guidance;
 
 /// Defines some velocity change controllers.
-pub mod deltavctrl;
+pub use super::guidance::deltavctrl;
 
 /// Defines solar radiation pressure models
 pub mod solarpressure;

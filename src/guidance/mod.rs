@@ -22,10 +22,13 @@ use crate::cosmic::{
 use crate::errors::NyxError;
 use crate::linalg::Vector3;
 
-mod finiteburns;
+pub mod deltavctrl;
+pub use deltavctrl::DeltaVctrl;
+
+pub mod finiteburns;
 pub use finiteburns::FiniteBurns;
 
-mod mnvr;
+pub mod mnvr;
 pub use mnvr::Mnvr;
 
 mod ruggiero;

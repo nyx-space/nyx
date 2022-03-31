@@ -29,6 +29,9 @@ pub mod propagators;
 /// Provides several dynamics used for orbital mechanics and attitude dynamics, which can be elegantly combined.
 pub mod dynamics;
 
+/// Provides a few useful guidance laws
+pub mod guidance;
+
 /// Provides the solar system planets, and state and ephemeride management.
 pub mod cosmic;
 
