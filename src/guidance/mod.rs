@@ -31,8 +31,13 @@ pub use finiteburns::FiniteBurns;
 pub mod mnvr;
 pub use mnvr::Mnvr;
 
+pub use crate::md::objective::Objective;
+
 mod ruggiero;
-pub use ruggiero::{Objective, Ruggiero, StateParameter};
+pub use ruggiero::{Ruggiero, StateParameter};
+
+mod qlaw;
+pub use qlaw::QLaw;
 
 use std::fmt;
 /// Defines a thruster with a maximum isp and a maximum thrust.

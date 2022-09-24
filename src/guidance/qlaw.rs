@@ -22,32 +22,32 @@ use super::{
     Vector3,
 };
 pub use crate::md::StateParameter;
+use crate::utils::between_pm_180;
 use crate::State;
 use std::f64::consts::FRAC_PI_2 as half_pi;
 use std::fmt;
 use std::sync::Arc;
 
-/// Ruggiero defines the closed loop guidance law from IEPC 2011-102
-#[derive(Copy, Clone, Default, Debug)]
-pub struct Ruggiero {
+/// QLaw defines the Petropoulos refined laws from AAS/AIAA Space Flight Mechanics Conference, 2005
+#[derive(Copy, Clone, Debug, Default)]
+pub struct QLaw {
     /// Stores the objectives
     pub objectives: [Option<Objective>; 5],
     /// Stores the minimum efficiency to correct a given orbital element, defaults to zero (i.e. always correct)
     pub ηthresholds: [f64; 5],
-    init_state: Orbit,
+    /// The "best quadratic time-to-go" weight, nominally 1 (for now, all W_oe = 1)
+    pub w_p: f64,
+    // init_state: Orbit,
 }
 
-/// The Ruggiero is a locally optimal guidance law of a state for specific osculating elements.
-/// NOTE: The efficency parameters for AoP is NOT implemented: the paper's formulation is broken.
-/// WARNING: Objectives must be in degrees!
-impl Ruggiero {
-    /// Creates a new Ruggiero locally optimal control as an Arc
+impl QLaw {
+    /// Creates a new QLaw locally optimal control as an Arc
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
     pub fn new(objectives: &[Objective], initial: Orbit) -> Result<Arc<Self>, NyxError> {
         Self::with_ηthresholds(objectives, &[0.0; 5], initial)
     }
 
-    /// Creates a new Ruggiero locally optimal control as an Arc
+    /// Creates a new QLaw locally optimal control as an Arc
     /// Note: this returns an Arc so it can be plugged into the Spacecraft dynamics directly.
     pub fn with_ηthresholds(
         objectives: &[Objective],
@@ -93,83 +93,68 @@ impl Ruggiero {
         }
         Ok(Arc::new(Self {
             objectives: objs,
-            init_state: initial,
             ηthresholds: eff,
+            w_p: 1.0,
         }))
     }
 
-    /// Returns the efficency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
-    pub fn efficency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, NyxError> {
-        let e = osc_orbit.ecc();
-        match parameter {
-            StateParameter::SMA => {
-                let a = osc_orbit.sma();
-                let μ = osc_orbit.frame.gm();
-                Ok(osc_orbit.vmag() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
-            }
-            StateParameter::Eccentricity => {
-                let ν_ta = osc_orbit.ta().to_radians();
-                let num = 1.0 + 2.0 * e * ν_ta.cos() + ν_ta.cos().powi(2);
-                let denom = 1.0 + e * ν_ta.cos();
-                // NOTE: There is a typo in IEPC 2011 102: the max of this efficiency function is at ν=0
-                // where it is equal to 2*(2+2e) / (1+e). Therefore, I think the correct formulation should be
-                // _divided_ by two, not multiplied by two.
-                Ok(num / (2.0 * denom))
-            }
-            StateParameter::Inclination => {
-                let ν_ta = osc_orbit.ta().to_radians();
-                let ω = osc_orbit.aop().to_radians();
-                let num = (ω + ν_ta).cos().abs()
-                    * ((1.0 - e.powi(2) * ω.sin().powi(2)).sqrt() - e * ω.cos().abs());
-                let denom = 1.0 + e * ν_ta.cos();
-                Ok(num / denom)
-            }
-            StateParameter::RAAN => {
-                let ν_ta = osc_orbit.ta().to_radians();
-                let ω = osc_orbit.aop().to_radians();
-                let num = (ω + ν_ta).sin().abs()
-                    * ((1.0 - e.powi(2) * ω.cos().powi(2)).sqrt() - e * ω.sin().abs());
-                let denom = 1.0 + e * ν_ta.cos();
-                Ok(num / denom)
-            }
-            StateParameter::AoP => Ok(1.0),
-            _ => Err(NyxError::StateParameterUnavailable),
-        }
+    /// Penalty function
+    pub fn penalty(osc: &Orbit) -> f64 {
+        1.0 + (1.0 - osc.periapsis() / (150.0 + osc.frame.equatorial_radius())).exp()
     }
 
-    /// Computes the weight at which to correct this orbital element, will be zero if the current efficency is below the threshold
-    fn weighting(&self, obj: &Objective, osc_orbit: &Orbit, η_threshold: f64) -> f64 {
-        let init = self.init_state.value(&obj.parameter).unwrap();
-        let osc = osc_orbit.value(&obj.parameter).unwrap();
-        let target = obj.desired_value;
-        let tol = obj.tolerance;
+    /// Returns the distance of a given orbital element
+    fn distance(&self, obj: &Objective, osc: &Orbit) -> f64 {
+        let tgt_val = obj.desired_value;
+        let tgt_tol = obj.tolerance;
 
-        // Calculate the efficiency of correcting this specific orbital element
-        let η = Self::efficency(&obj.parameter, osc_orbit).unwrap();
+        // NOTE: This function will modulo the angle errors +/- 180 deg, but paper recommends 0-180
+        let dist = match obj.parameter {
+            StateParameter::SMA => osc.sma() - tgt_val,
+            StateParameter::Inclination => osc.inc() - tgt_val,
+            StateParameter::Eccentricity => osc.ecc() - tgt_val,
+            StateParameter::AoP => (between_pm_180(osc.aop() - tgt_val).to_radians())
+                .cos()
+                .acos(),
+            StateParameter::RAAN => (between_pm_180(osc.raan() - tgt_val).to_radians())
+                .cos()
+                .acos(),
+            _ => unreachable!(),
+        };
 
-        if (osc - target).abs() < tol || η < η_threshold {
+        if (dist - tgt_tol).abs() < f64::EPSILON {
             0.0
         } else {
-            // Let's add the tolerance to the initial value if we want to keep a parameter fixed (i.e. target and initial are equal)
-            (target - osc)
-                / (target
-                    - if (init - target).abs() < tol {
-                        init + tol
-                    } else {
-                        init
-                    })
-                .abs()
+            dist
         }
     }
-}
 
-impl fmt::Display for Ruggiero {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Ruggiero with {} objectives", self.objectives.len())
+    fn weighting(&self, obj: &Objective, osc: &Orbit, η_threshold: f64) -> f64 {
+        let s = if obj.parameter == StateParameter::SMA {
+            (1.0 + ((osc.sma() - obj.desired_value) / (3.0 * obj.desired_value)).powi(4)).powf(0.5)
+        } else {
+            1.0
+        };
+        let oe_xx = match obj.parameter {
+            StateParameter::SMA => {
+                2.0 * ((osc.sma().powi(3) * (1.0 + osc.ecc()))
+                    / (osc.frame.gm() * (1.0 - osc.ecc())))
+                .sqrt()
+            }
+            StateParameter::Eccentricity => 2.0 * osc.semi_parameter() / osc.hmag(),
+            _ => unreachable!(),
+        };
+        s * (self.distance(obj, osc) / oe_xx).powi(2)
     }
 }
 
-impl GuidanceLaw<GuidanceMode> for Ruggiero {
+impl fmt::Display for QLaw {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "QLaw with {} objectives", self.objectives.len())
+    }
+}
+
+impl GuidanceLaw<GuidanceMode> for QLaw {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         for obj in self.objectives.iter().flatten() {
@@ -186,9 +171,6 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
             let mut steering = Vector3::zeros();
             for (i, obj) in self.objectives.iter().flatten().enumerate() {
                 let weight = self.weighting(obj, &osc, self.ηthresholds[i]);
-                if weight.abs() <= 0.0 {
-                    continue;
-                }
 
                 match obj.parameter {
                     StateParameter::SMA => {
@@ -244,6 +226,9 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
                 }
             }
 
+            // Add the penalty factor
+            steering *= Self::penalty(&osc);
+
             // Return a normalized vector
             steering = if steering.norm() > 0.0 {
                 steering / steering.norm()
@@ -289,51 +274,4 @@ impl GuidanceLaw<GuidanceMode> for Ruggiero {
             }
         }
     }
-}
-
-#[test]
-fn ruggiero_weight() {
-    use crate::cosmic::Cosm;
-    use crate::time::Epoch;
-    let mut cosm = Cosm::de438_raw();
-    cosm.frame_mut_gm("EME2000", 398_600.433);
-    let eme2k = cosm.frame("EME2000");
-    let start_time = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let orbit = Orbit::keplerian(7378.1363, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
-
-    // Define the objectives
-    let objectives = &[
-        Objective::within_tolerance(StateParameter::SMA, 42164.0, 1.0),
-        Objective::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
-    ];
-
-    let ruggiero = Ruggiero::new(objectives, orbit).unwrap();
-    // 7301.597157 201.699933 0.176016 -0.202974 7.421233 0.006476 298.999726
-    let osc = Orbit::cartesian(
-        7_303.253_461_441_64f64,
-        127.478_714_816_381_75,
-        0.111_246_193_227_445_4,
-        -0.128_284_025_765_195_6,
-        7.422_889_151_816_439,
-        0.006_477_694_429_837_2,
-        start_time,
-        eme2k,
-    );
-
-    let mut osc_sc = Spacecraft::new(osc, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-    // Must set the guidance mode to thrusting otherwise the direction will be set to zero.
-    osc_sc.mut_mode(GuidanceMode::Thrust);
-
-    let expected = Vector3::new(
-        -0.017_279_636_133_108_3,
-        0.999_850_315_226_803,
-        0.000_872_534_222_883_2,
-    );
-
-    let got = ruggiero.direction(&osc_sc);
-
-    assert!(
-        dbg!(expected - got).norm() < 1e-12,
-        "incorrect direction computed"
-    );
 }
