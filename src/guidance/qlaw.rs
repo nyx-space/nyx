@@ -52,7 +52,7 @@ impl QLaw {
     pub fn with_ηthresholds(
         objectives: &[Objective],
         ηthresholds: &[f64],
-        initial: Orbit,
+        _initial: Orbit,
     ) -> Result<Arc<Self>, NyxError> {
         let mut objs: [Option<Objective>; 5] = [None, None, None, None, None];
         let mut eff: [f64; 5] = [0.0; 5];
@@ -129,7 +129,7 @@ impl QLaw {
         }
     }
 
-    fn weighting(&self, obj: &Objective, osc: &Orbit, η_threshold: f64) -> f64 {
+    fn weighting(&self, obj: &Objective, osc: &Orbit, _η_threshold: f64) -> f64 {
         let s = if obj.parameter == StateParameter::SMA {
             (1.0 + ((osc.sma() - obj.desired_value) / (3.0 * obj.desired_value)).powi(4)).powf(0.5)
         } else {
@@ -177,7 +177,10 @@ impl GuidanceLaw<GuidanceMode> for QLaw {
                         let num = osc.ecc() * osc.ta().to_radians().sin();
                         let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
                         let alpha = num.atan2(denom);
-                        steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
+                        // For SMA, we must multiply the weight by the thrust acceleration magnitude
+                        steering += unit_vector_from_plane_angles(alpha, 0.0)
+                            * weight
+                            * sc.thruster.unwrap().thrust_N;
                     }
                     StateParameter::Eccentricity => {
                         let num = osc.ta().to_radians().sin();

@@ -42,7 +42,7 @@ fn qlaw_case_a() {
         Event::within_tolerance(StateParameter::Eccentricity, 0.01, 5e-5),
     ];
 
-    let ruggiero_ctrl = QLaw::new(objectives, orbit).unwrap();
+    let q_ctrl = QLaw::new(objectives, orbit).unwrap();
 
     let dry_mass = 1.0;
     let fuel_mass = 299.0;
@@ -50,7 +50,7 @@ fn qlaw_case_a() {
     let sc_state =
         Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, lowt, GuidanceMode::Thrust);
 
-    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
+    let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, q_ctrl);
     println!("[qlaw_case_a] {:x}", orbit);
 
     let setup =

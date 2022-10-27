@@ -76,7 +76,7 @@ fn test_monte_carlo_epoch() {
 }
 
 #[test]
-fn test_monte_carlo_tb_benchmark() {
+fn test_monte_carlo_benchmark() {
     // TODO: Consider a cargo bench benchmark
     extern crate pretty_env_logger;
     if pretty_env_logger::try_init().is_err() {
@@ -103,7 +103,18 @@ fn test_monte_carlo_tb_benchmark() {
     .unwrap();
 
     // Set up the dynamics
-    let orbital_dyn = OrbitalDynamics::two_body();
+    let iau_earth = cosm.frame("IAU Earth");
+    let mut orbital_dyn = OrbitalDynamics::new(vec![PointMasses::new(
+        &[Bodies::Sun, Bodies::Luna],
+        cosm.clone(),
+    )]);
+    let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 12, 12, true).unwrap();
+
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
+
+    orbital_dyn.add_model(harmonics);
+
+    println!("{}", orbital_dyn);
 
     let prop = Propagator::new::<CashKarp45>(orbital_dyn, PropOpts::default());
 
@@ -115,7 +126,9 @@ fn test_monte_carlo_tb_benchmark() {
         scenario: "test_monte_carlo_epoch".to_string(),
     };
 
-    let rslts = my_mc.run_until_epoch(prop, dt + 1.0_f64 * Unit::Hour, 100_000);
+    println!("Propagation for {}", state.period());
+
+    let rslts = my_mc.run_until_epoch(prop, dt + state.period(), 10_000);
 
     let average_sma_dispersion = rslts
         .dispersion_values_of(&StateParameter::SMA)
