@@ -573,14 +573,6 @@ impl Orbit {
         }
     }
 
-    /// Returns the time derivative of the semi major axis.
-    /// Units: kilometer per second
-    pub fn sma_dt(&self, thrust: Vector3<f64>) -> f64 {
-        2.0 * self.sma().powi(2) / self.hmag()
-            * (self.ecc() * self.ta().to_radians().sin() * thrust.x
-                + self.semi_parameter() / self.rmag() * thrust.y)
-    }
-
     /// Mutates this orbit to change the SMA
     pub fn set_sma(&mut self, new_sma_km: f64) {
         let me = Self::keplerian(
@@ -822,14 +814,6 @@ impl Orbit {
             }
             _ => panic!("RAAN not defined in this frame"),
         }
-    }
-
-    /// Returns the time derivative of the RAAN using Gaussian Variation of Parameters
-    /// Units: degrees per second
-    pub fn raan_dt(&self) -> f64 {
-        (self.rmag() * (self.ta().to_radians() + self.aop().to_radians()).sin()
-            / (self.hmag() * self.inc().to_radians().sin()))
-        .to_degrees()
     }
 
     /// Mutates this orbit to change the RAAN
