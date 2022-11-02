@@ -20,6 +20,7 @@ pub mod convert_impulsive;
 pub mod multipleshooting;
 pub use multipleshooting::{ctrlnodes, multishoot};
 /// Uses a Levenberg Marquardt minimizer to solve the damped least squares problem.
+#[cfg(feature = "broken-donotuse")]
 pub mod minimize_lm;
 pub mod optimizer;
 /// Uses a [Newton Raphson](https://en.wikipedia.org/wiki/Newton%27s_method_in_optimization) method where the Jacobian is computed via finite differencing.
