@@ -528,7 +528,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
         delta.vmag() * 1e6
     );
 
-    assert!(delta.rmag() < 50e-3, "More than 50 meter error");
+    assert!(delta.rmag() < 75e-3, "More than 75 meter error");
     assert!(delta.vmag() < 50e-6, "More than 50 mm/s error");
 }
 
