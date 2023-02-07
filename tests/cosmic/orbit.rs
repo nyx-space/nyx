@@ -1,17 +1,13 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
+use approx::ulps_eq;
 use nyx::cosmic::{Cosm, Frame, Orbit};
 use nyx::time::{Epoch, Unit};
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
-        assert!(
-            ($x - $val).abs() < 1e-10,
-            "{}: {:.2e}",
-            $msg,
-            ($x - $val).abs()
-        )
+        assert!(ulps_eq!($x, $val), "{}: {:.2e}", $msg, ($x - $val).abs())
     };
 }
 
