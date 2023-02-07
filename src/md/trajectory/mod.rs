@@ -32,7 +32,7 @@ use crate::{NyxError, Orbit, Spacecraft, State};
 use std::error::Error;
 use std::fmt;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum TrajError {
     EventNotFound {
         start: Epoch,

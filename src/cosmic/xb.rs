@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#[derive(Clone, PartialEq, prost::Message)]
+#[derive(Clone, PartialEq, Eq, prost::Message)]
 pub struct Metadata {
     #[prost(message, optional, tag = "1")]
     pub version: ::core::option::Option<metadata::Version>,
@@ -33,7 +33,7 @@ pub struct Metadata {
 }
 /// Nested message and enum types in `Metadata`.
 pub mod metadata {
-    #[derive(Clone, PartialEq, prost::Message)]
+    #[derive(Clone, PartialEq, Eq, prost::Message)]
     pub struct CeDate {
         #[prost(uint32, tag = "1")]
         pub year: u32,
@@ -42,7 +42,7 @@ pub mod metadata {
         #[prost(uint32, tag = "3")]
         pub day: u32,
     }
-    #[derive(Clone, PartialEq, prost::Message)]
+    #[derive(Clone, PartialEq, Eq, prost::Message)]
     pub struct Version {
         #[prost(uint32, tag = "1")]
         pub major: u32,
@@ -52,7 +52,7 @@ pub mod metadata {
         pub patch: u32,
     }
 }
-#[derive(Clone, PartialEq, prost::Message)]
+#[derive(Clone, PartialEq, Eq, prost::Message)]
 pub struct Frame {
     /// Center object of this frame, may be a celestial body, a
     /// spacecraft, a ground station, an instrument, etc.

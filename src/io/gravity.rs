@@ -365,7 +365,7 @@ impl HarmonicsMem {
             let mut cur_degree: usize = 0;
             let mut c_nm: f64 = 0.0;
             let mut s_nm: f64 = 0.0;
-            for (ino, item) in line.replace(",", " ").split_whitespace().enumerate() {
+            for (ino, item) in line.replace(',', " ").split_whitespace().enumerate() {
                 match ino {
                     0 => match usize::from_str(item) {
                         Ok(val) => cur_degree = val,
@@ -387,7 +387,7 @@ impl HarmonicsMem {
                             )));
                         }
                     },
-                    2 => match f64::from_str(&item.replace("D", "E")) {
+                    2 => match f64::from_str(&item.replace('D', "E")) {
                         Ok(val) => c_nm = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
@@ -397,7 +397,7 @@ impl HarmonicsMem {
                             )));
                         }
                     },
-                    3 => match f64::from_str(&item.replace("D", "E")) {
+                    3 => match f64::from_str(&item.replace('D', "E")) {
                         Ok(val) => s_nm = val,
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(

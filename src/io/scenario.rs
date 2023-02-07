@@ -460,7 +460,7 @@ pub struct ConditionSerde {
 
 impl ConditionSerde {
     pub fn to_condition(&self) -> Event {
-        let rplt = self.event.replace("=", "");
+        let rplt = self.event.replace('=', "");
         let parts: Vec<&str> = rplt.split(' ').collect();
         let parameter = StateParameter::from_str(parts[0]).unwrap();
         let value = if parts.len() == 2 {

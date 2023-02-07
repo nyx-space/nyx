@@ -176,7 +176,7 @@ impl Xb {
 
         let decode_start = Instant::now();
 
-        match Self::decode(&*input_xb_buf) {
+        match Self::decode(input_xb_buf) {
             Ok(xb) => {
                 info!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
                 Ok(xb)
@@ -223,7 +223,7 @@ impl Xb {
     /// Seek an ephemeris from its celestial name (e.g. Earth Moon Barycenter)
     fn ephemeris_seek_by_name(
         name: &str,
-        cur_path: &mut Vec<usize>,
+        cur_path: &mut [usize],
         e: &Ephemeris,
     ) -> Result<Vec<usize>, NyxError> {
         if e.name == name {
@@ -232,7 +232,7 @@ impl Xb {
             Err(NyxError::ObjectNotFound(name.to_string()))
         } else {
             for (cno, child) in e.children.iter().enumerate() {
-                let mut this_path = cur_path.clone();
+                let mut this_path = cur_path.to_owned();
                 this_path.push(cno);
                 let child_attempt = Self::ephemeris_seek_by_name(name, &mut this_path, child);
                 if let Ok(found_path) = child_attempt {
@@ -260,10 +260,10 @@ impl Xb {
         }
     }
 
-    fn ephemeris_names(mut names: &mut Vec<String>, e: &Ephemeris) {
+    fn ephemeris_names(names: &mut Vec<String>, e: &Ephemeris) {
         names.push(e.name.clone());
         for child in &e.children {
-            Self::ephemeris_names(&mut names, child);
+            Self::ephemeris_names(names, child);
         }
     }
 

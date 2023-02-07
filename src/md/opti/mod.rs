@@ -30,7 +30,7 @@ pub mod raphson_hyperdual;
 pub mod solution;
 pub mod target_variable;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DiffMethod {
     /// Slower, but more commonly used
     FiniteDiff,

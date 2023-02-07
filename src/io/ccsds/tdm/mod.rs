@@ -44,7 +44,7 @@ pub struct Tdm {
     pub body: Body,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub struct Header {
     #[yaserde(child, rename = "COMMENT")]
     comment: Vec<String>,
@@ -60,13 +60,13 @@ impl Header {
     }
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub struct Body {
     #[yaserde(child)]
     pub segment: Vec<Segment>,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub struct Segment {
     #[yaserde(child)]
     pub metadata: Metadata,
@@ -74,7 +74,7 @@ pub struct Segment {
     pub data: Data,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub struct Data {
     #[yaserde(child, rename = "COMMENT")]
     comment: Vec<String>,
@@ -82,7 +82,7 @@ pub struct Data {
     pub observations: Vec<TdmObservation>,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub struct Metadata {
     #[yaserde(child, rename = "COMMENT")]
     comment: Vec<String>,
@@ -280,7 +280,7 @@ pub struct Participant {
     pub receive_delay: f64,
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum TimeSystem {
     Utc,
     Tai,
@@ -294,7 +294,7 @@ impl Default for TimeSystem {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(non_camel_case_types)]
 pub enum TrackingMode {
     Sequential,
@@ -307,7 +307,7 @@ impl Default for TrackingMode {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Band {
     S,
@@ -324,7 +324,7 @@ impl Default for Band {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum TimetagRef {
     Transmit,
     Receive,
@@ -336,7 +336,7 @@ impl Default for TimetagRef {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum IntegrationRef {
     Start,
     Middle,
@@ -349,7 +349,7 @@ impl Default for IntegrationRef {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(non_camel_case_types)]
 pub enum RangeMode {
     Coherent,
@@ -363,7 +363,7 @@ impl Default for RangeMode {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(non_camel_case_types)]
 pub enum RangeUnit {
     km,
@@ -377,7 +377,7 @@ impl Default for RangeUnit {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum AngleType {
     /// Azimuth, Elevation (local horizontal)
@@ -396,7 +396,7 @@ impl Default for AngleType {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum Interpolation {
     Hermite,
     Lagrange,
@@ -409,7 +409,7 @@ impl Default for Interpolation {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum DataQuality {
     Raw,
     Validated,
@@ -422,7 +422,7 @@ impl Default for DataQuality {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum YesNo {
     Yes,
     No,

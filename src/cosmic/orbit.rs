@@ -1609,6 +1609,7 @@ impl Serialize for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::Display for Orbit {
     // Prints as Cartesian in floating point with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1628,6 +1629,7 @@ impl fmt::Display for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::LowerExp for Orbit {
     // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1647,6 +1649,7 @@ impl fmt::LowerExp for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::UpperExp for Orbit {
     // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1666,6 +1669,7 @@ impl fmt::UpperExp for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::LowerHex for Orbit {
     // Prints the Keplerian orbital elements in floating point with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1685,6 +1689,7 @@ impl fmt::LowerHex for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::UpperHex for Orbit {
     // Prints the Keplerian orbital elements in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

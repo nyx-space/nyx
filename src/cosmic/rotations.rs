@@ -92,7 +92,7 @@ impl ParentRotation for Euler3Axis {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AngleUnit {
     Degrees,
     Radians,

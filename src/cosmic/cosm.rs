@@ -51,7 +51,7 @@ pub const SS_MASS: f64 = 1.0014;
 pub const SUN_GM: f64 = 132_712_440_041.939_38;
 
 /// Enable or not light time correction for the computation of the celestial states
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum LightTimeCalc {
     /// No correction, i.e. assumes instantaneous propagation of photons
@@ -75,7 +75,7 @@ impl FrameTree {
     /// Seek an ephemeris from its celestial name (e.g. Earth Moon Barycenter)
     fn frame_seek_by_name(
         name: &str,
-        cur_path: &mut Vec<usize>,
+        cur_path: &mut [usize],
         f: &FrameTree,
     ) -> Result<Vec<usize>, NyxError> {
         if f.name == name {
@@ -84,7 +84,7 @@ impl FrameTree {
             Err(NyxError::ObjectNotFound(name.to_string()))
         } else {
             for (cno, child) in f.children.iter().enumerate() {
-                let mut this_path = cur_path.clone();
+                let mut this_path = cur_path.to_owned();
                 this_path.push(cno);
                 let child_attempt = Self::frame_seek_by_name(name, &mut this_path, child);
                 if let Ok(found_path) = child_attempt {
@@ -229,7 +229,7 @@ impl Cosm {
     /// Seek a frame from its orientation name
     fn frame_find_path(
         frame_name: &str,
-        cur_path: &mut Vec<usize>,
+        cur_path: &mut [usize],
         f: &FrameTree,
     ) -> Result<Vec<usize>, NyxError> {
         if f.name == frame_name {
@@ -238,7 +238,7 @@ impl Cosm {
             Err(NyxError::ObjectNotFound(frame_name.to_string()))
         } else {
             for child in &f.children {
-                let mut this_path = cur_path.clone();
+                let mut this_path = cur_path.to_owned();
                 let child_attempt = Self::frame_find_path(frame_name, &mut this_path, child);
                 if let Ok(found_path) = child_attempt {
                     return Ok(found_path);
@@ -433,7 +433,7 @@ impl Cosm {
 
                     // Let's now create the Frame, we'll add the ephem path and frame path just after
                     let mut new_frame = definition.as_frame();
-                    let frame_name = name.replace("_", " ").trim().to_string();
+                    let frame_name = name.replace('_', " ").trim().to_string();
 
                     // Grab the inherited frame again so we know how to place it in the frame tree
                     if let Some(src_frame_name) = &definition.inherit {
@@ -514,7 +514,7 @@ impl Cosm {
 
     /// Returns the expected frame name with its ephemeris name for querying
     fn fix_frame_name(name: &str) -> String {
-        let name = name.to_lowercase().trim().replace("_", " ");
+        let name = name.to_lowercase().trim().replace('_', " ");
         // Handle the specific frames
         if name == "eme2000" {
             String::from("Earth J2000")
@@ -531,7 +531,7 @@ impl Cosm {
                 vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ")
             } else {
                 // Likely a default center and frame, so let's do some clever guessing and capitalize the words
-                let frame_name = capitalize(&splt[splt.len() - 1].to_string());
+                let frame_name = capitalize(splt[splt.len() - 1]);
                 let ephem_name = splt[0..splt.len() - 1]
                     .iter()
                     .map(|word| capitalize(word))
@@ -577,10 +577,10 @@ impl Cosm {
         }
     }
 
-    fn frame_names(mut names: &mut Vec<String>, f: &FrameTree) {
+    fn frame_names(names: &mut Vec<String>, f: &FrameTree) {
         names.push(f.name.clone());
         for child in &f.children {
-            Self::frame_names(&mut names, child);
+            Self::frame_names(names, child);
         }
     }
 
@@ -590,10 +590,10 @@ impl Cosm {
         names
     }
 
-    fn frames(mut frames: &mut Vec<Frame>, f: &FrameTree) {
+    fn frames(frames: &mut Vec<Frame>, f: &FrameTree) {
         frames.push(f.frame);
         for child in &f.children {
-            Self::frames(&mut frames, child);
+            Self::frames(frames, child);
         }
     }
 

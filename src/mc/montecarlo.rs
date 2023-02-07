@@ -145,11 +145,9 @@ where
                 let run = Run {
                     index: *index,
                     dispersed_state: dispersed_state.clone(),
-                    result: result.and_then(|r| {
-                        Ok(PropResult {
-                            state: r.0,
-                            traj: r.1,
-                        })
+                    result: result.map(|r| PropResult {
+                        state: r.0,
+                        traj: r.1,
                     }),
                 };
                 tx.send(run).unwrap();
@@ -233,11 +231,9 @@ where
                 let run = Run {
                     index: *index,
                     dispersed_state: dispersed_state.clone(),
-                    result: result.and_then(|r| {
-                        Ok(PropResult {
-                            state: r.0,
-                            traj: r.1,
-                        })
+                    result: result.map(|r| PropResult {
+                        state: r.0,
+                        traj: r.1,
                     }),
                 };
 
@@ -306,7 +302,7 @@ where
         write!(
             f,
             "mc-data-{}-seed-{}",
-            self.scenario.replace(" ", "-"),
+            self.scenario.replace(' ', "-"),
             self.seed
         )
     }

@@ -530,7 +530,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     var.component,
                     match self.correction_frame {
                         Some(f) => format!(" in {:?}", f),
-                        None => format!(""),
+                        None => String::new(),
                     },
                     i,
                     delta[i]
