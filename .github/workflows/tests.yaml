@@ -41,7 +41,7 @@ jobs:
           - { version: stable, name: stable }
 
     runs-on: ${{ matrix.os }}
-    name: Unit Tests (${{ matrix.os }}, ${{ matrix.rust.name }})
+    name: Tests (${{ matrix.os }}, ${{ matrix.rust.name }})
     needs: [check]
     steps:
       - name: Checkout sources

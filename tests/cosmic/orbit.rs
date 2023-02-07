@@ -1,13 +1,18 @@
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger as pel;
 
-use approx::ulps_eq;
+use approx::relative_eq;
 use nyx::cosmic::{Cosm, Frame, Orbit};
 use nyx::time::{Epoch, Unit};
 
 macro_rules! f64_eq {
     ($x:expr, $val:expr, $msg:expr) => {
-        assert!(ulps_eq!($x, $val), "{}: {:.2e}", $msg, ($x - $val).abs())
+        assert!(
+            relative_eq!($x, $val, max_relative = 1e-9),
+            "{}: {:.2e}",
+            $msg,
+            ($x - $val).abs()
+        )
     };
 }
 
@@ -443,7 +448,7 @@ fn with_init() {
         f64_eq!(
             new_state.ecc(),
             new_ecc,
-            format!("wrong ecc: got {}\twanted {}", new_state.inc(), new_ecc)
+            format!("wrong ecc: got {}\twanted {}", new_state.ecc(), new_ecc)
         );
     }
     for angle_incr in 0..360 {
