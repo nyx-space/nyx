@@ -70,9 +70,6 @@ jobs:
       - name: Unit Test (debug)
         run: cargo test --lib
 
-      - name: Unit Tests (release)
-        run: cargo test --lib --release
-
       - name: All integration tests (release)
         run: cargo test --release --test "*"
 
