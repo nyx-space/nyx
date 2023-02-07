@@ -1,0 +1,219 @@
+name: Rust testing, coverage, lint
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+  
+  unit-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust:
+          - { version: "1.64", name: MSRV }
+          - { version: stable, name: stable }
+
+    runs-on: ${{ matrix.os }}
+    name: Unit Tests (${{ matrix.os }}, ${{ matrix.rust.name }})
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install ${{ matrix.rust.name }} toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust.version }}
+          override: true
+
+      - name: Unit Test (debug)
+        run: cargo test --lib
+
+      - name: Unit Tests (release)
+        run: cargo test --lib --release
+
+  integration-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust:
+          - { version: "1.64", name: MSRV }
+          - { version: stable, name: stable }
+
+    runs-on: ${{ matrix.os }}
+    name: Integration Tests (${{ matrix.os }}, ${{ matrix.rust.name }})
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install ${{ matrix.rust.name }} toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust.version }}
+          override: true
+
+      - name: All integration tests (release)
+        run: cargo test --release --test "*"
+
+  scenario-check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust:
+          - { version: "1.64", name: MSRV }
+          - { version: stable, name: stable }
+
+    runs-on: ${{ matrix.os }}
+    name: Scenarios (${{ matrix.os }}, ${{ matrix.rust.name }})
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install ${{ matrix.rust.name }} toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust.version }}
+          override: true
+
+      - name: All integration tests (release)
+        run: |
+         cargo run --release -- data/simple-scenario.toml --all
+         # Check that when we do a unit conversion it's correct
+         # NOTE: We don't do that with km output because the unit conversion leads to some rounding issues
+         diff ./data/scenario-run-cm.csv ./data/scenario-run-m.csv
+         cargo run --release -- data/simple-od-scenario.toml
+         cargo run --release -- "data/od_validation/*" -a
+         cargo run --release -- data/iss-example.toml -s iss_cond
+
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate coverage report
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov test --no-report
+          cargo llvm-cov report --lcov > lcov.txt
+        env:
+          RUSTFLAGS: --cfg __ui_tests
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./lcov.txt
+    
+    audit:
+      name: Security Audit
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v3
+
+        - name: Install stable toolchain
+          uses: actions-rs/toolchain@v1
+          with:
+            profile: minimal
+            toolchain: stable
+            override: true
+
+        - name: Install cargo-audit
+          run: cargo install cargo-audit
+
+        - name: Audit code
+          run: cargo audit
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [check, unit-tests, integration-tests, lints, audit, coverage]
+    if: github.ref_type == 'tag'
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Publish to crates.io
+        env:
+          TOKEN: ${{ secrets.CRATESIO_API_TOKEN }}
+        run: |
+          cargo login $TOKEN
+          cargo publish
