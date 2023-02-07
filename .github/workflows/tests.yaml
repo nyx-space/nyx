@@ -32,7 +32,7 @@ jobs:
         with:
           command: check
   
-  unit-tests:
+  tests:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -86,7 +86,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     name: Scenarios (${{ matrix.os }}, ${{ matrix.rust.name }})
-    needs: [integration-tests]
+    needs: [tests]
 
     steps:
       - name: Checkout sources
@@ -112,7 +112,7 @@ jobs:
   lints:
     name: Lints
     runs-on: ubuntu-latest
-    needs: [integration-tests]
+    needs: [tests]
 
     steps:
       - name: Checkout sources
@@ -141,7 +141,7 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: [integration-tests]
+    needs: [tests]
 
     steps:
       - name: Checkout
