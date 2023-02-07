@@ -75,16 +75,14 @@ pub fn parse_duration(duration: &str) -> Result<Quantity, ParsingError> {
                 "s" | "sec" | "secs" => time_s *= 1.0,
                 _ => {
                     return Err(ParsingError::Duration(format!(
-                        "unknown duration unit in `{}`",
-                        duration
+                        "unknown duration unit in `{duration}`",
                     )))
                 }
             }
             Ok(Quantity::Duration(time_s))
         }
         None => Err(ParsingError::Duration(format!(
-            "Could not parse stopping condition: `{}`",
-            duration
+            "Could not parse stopping condition: `{duration}`",
         ))),
     }
 }
@@ -122,8 +120,7 @@ pub fn parse_quantity(input: &str) -> Result<Quantity, ParsingError> {
                 "n" => value *= 1e-12,
                 _ => {
                     return Err(ParsingError::Distance(format!(
-                        "unknown distance multiplier unit in `{}`",
-                        input
+                        "unknown distance multiplier unit in `{input}`",
                     )))
                 }
             }
@@ -134,8 +131,7 @@ pub fn parse_quantity(input: &str) -> Result<Quantity, ParsingError> {
                     "s" => value *= 1.0,
                     _ => {
                         return Err(ParsingError::Velocity(format!(
-                            "unknown time divisor unit in `{}`",
-                            input
+                            "unknown time divisor unit in `{input}`",
                         )))
                     }
                 }
@@ -149,8 +145,7 @@ pub fn parse_quantity(input: &str) -> Result<Quantity, ParsingError> {
             match parse_duration(input) {
                 Ok(v) => Ok(v),
                 Err(_) => Err(ParsingError::Quantity(format!(
-                    "Could not understand quantity: `{}`",
-                    input
+                    "Could not understand quantity: `{input}`",
                 ))),
             }
         }

@@ -55,8 +55,8 @@ impl fmt::Display for SmoothingArc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             SmoothingArc::All => write!(f, "all estimates"),
-            SmoothingArc::Epoch(e) => write!(f, "{}", e),
-            SmoothingArc::TimeGap(g) => write!(f, "time gap of {}", g),
+            SmoothingArc::Epoch(e) => write!(f, "{e}"),
+            SmoothingArc::TimeGap(g) => write!(f, "time gap of {g}"),
             SmoothingArc::Prediction => write!(f, "first prediction"),
         }
     }

@@ -157,11 +157,7 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
 
 impl<'a, X: SpacecraftExt> fmt::Display for BaseSpacecraftDynamics<'a, X> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let force_models: String = self
-            .force_models
-            .iter()
-            .map(|x| format!("{}; ", x))
-            .collect();
+        let force_models: String = self.force_models.iter().map(|x| format!("{x}; ")).collect();
         write!(
             f,
             "Spacecraft dynamics (with guidance = {}): {}\t{}",

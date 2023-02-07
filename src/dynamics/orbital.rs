@@ -72,12 +72,8 @@ impl<'a> OrbitalDynamics<'a> {
 
 impl<'a> fmt::Display for OrbitalDynamics<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let as_string: String = self
-            .accel_models
-            .iter()
-            .map(|x| format!("{}; ", x))
-            .collect();
-        write!(f, "Orbital dynamics: {}", as_string)
+        let as_string: String = self.accel_models.iter().map(|x| format!("{x}; ")).collect();
+        write!(f, "Orbital dynamics: {as_string}")
     }
 }
 
@@ -226,8 +222,8 @@ impl PointMasses {
 
 impl fmt::Display for PointMasses {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let body_list: String = self.bodies.iter().map(|x| format!("{}; ", x)).collect();
-        write!(f, "Point masses of {}", body_list)
+        let body_list: String = self.bodies.iter().map(|x| format!("{x}; ")).collect();
+        write!(f, "Point masses of {body_list}")
     }
 }
 

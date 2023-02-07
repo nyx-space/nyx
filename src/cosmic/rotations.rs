@@ -108,7 +108,7 @@ impl FromStr for AngleUnit {
         } else {
             Err(IoError::new(
                 IoErrorKind::InvalidData,
-                format!("unknown angles `{}`", s),
+                format!("unknown angles `{s}`"),
             ))
         }
     }
@@ -206,7 +206,7 @@ impl ParentRotation for Euler3AxisDt {
             ctx.var(
                 var.to_owned(),
                 as_expr.eval_with_context(&ctx).unwrap_or_else(|_| {
-                    panic!("Could not evaluate variable `{}` as `{}`", var, expr_str)
+                    panic!("Could not evaluate variable `{var}` as `{expr_str}`")
                 }),
             );
         }

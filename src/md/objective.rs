@@ -75,7 +75,7 @@ impl Objective {
 
 impl fmt::Display for Objective {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "\t{:x}", self)
+        write!(f, "\t{self:x}")
     }
 }
 

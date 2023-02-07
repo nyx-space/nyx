@@ -137,7 +137,7 @@ pub enum NyxError {
     TimeError(TimeErrors),
     /// Targeting error
     #[error("Targeting error: {0}")]
-    Targeter(TargetingError),
+    Targeter(Box<TargetingError>),
     /// Trajectory error
     #[error("Trajectory error: {0}")]
     Trajectory(TrajError),

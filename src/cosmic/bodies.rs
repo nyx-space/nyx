@@ -106,15 +106,15 @@ impl TryFrom<Vec<usize>> for Bodies {
                 7 => Ok(Self::UranusBarycenter),
                 8 => Ok(Self::NeptuneBarycenter),
                 9 => Ok(Self::PlutoBarycenter),
-                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
             },
             2 if ephem_path[0] == 3 => match ephem_path[1] {
                 // This only support the Earth system
                 0 => Ok(Self::Earth),
                 1 => Ok(Self::Luna),
-                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
             },
-            _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+            _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
         }
     }
 }

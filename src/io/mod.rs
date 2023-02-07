@@ -170,7 +170,7 @@ impl fmt::Display for CovarFormat {
             CovarFormat::Sqrt => write!(f, "exptd_val_"),
             CovarFormat::Sigma1 => write!(f, "covar_"),
             CovarFormat::Sigma3 => write!(f, "3sig_covar"),
-            CovarFormat::MulSigma(x) => write!(f, "{}sig_covar", x),
+            CovarFormat::MulSigma(x) => write!(f, "{x}sig_covar"),
         }
     }
 }

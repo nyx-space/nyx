@@ -220,8 +220,7 @@ pub fn hermite<const DEGREE: usize>(
     if hermite.is_nan() {
         dbg!(xs, ys, derivs);
         return Err(NyxError::InvalidInterpolationData(format!(
-            "Invalid interpolation {:x}",
-            hermite
+            "Invalid interpolation {hermite:x}",
         )));
     }
 

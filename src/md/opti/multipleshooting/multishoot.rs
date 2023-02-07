@@ -312,7 +312,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> 
                 None => SVector::<f64, VT>::zeros(),
             };
             for val in &dv {
-                this_costmsg.push_str(&format!("{}, ", val));
+                this_costmsg.push_str(&format!("{val}, "));
             }
             if VT == 3 {
                 // Add the norm of the control
@@ -326,7 +326,7 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> 
                 i + 1
             ));
         }
-        write!(f, "{}", nodemsg)
+        write!(f, "{nodemsg}")
     }
 }
 
@@ -341,7 +341,7 @@ pub struct MultipleShootingSolution<T: MultishootNode<O>, const O: usize> {
 impl<T: MultishootNode<O>, const O: usize> fmt::Display for MultipleShootingSolution<T, O> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for sol in &self.solutions {
-            write!(f, "{}", sol)?;
+            write!(f, "{sol}")?;
         }
         Ok(())
     }

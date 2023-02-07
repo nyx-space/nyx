@@ -85,6 +85,7 @@ impl MdHdlr<Orbit> for OrbitStateOutput {
     }
 }
 
+#[allow(clippy::result_large_err)]
 #[derive(Clone, PartialEq, Debug)]
 pub enum TargetingError {
     /// Raised if the variables to be adjusted lead to an under-determined of the problem for the targeter
@@ -104,10 +105,10 @@ impl fmt::Display for TargetingError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::UnderdeterminedProblem => write!(f, "The variables to be adjusted lead to an under-determined of the problem for the targeter"),
-            Self::VariableError(e) => write!(f, "Incorrectly configured variable: {}", e),
-            Self::FrameError(e) => write!(f, "Frame error in targeter: {}", e),
-            Self::UnsupportedVariable(v) => write!(f, "Unsupported variable in problem: {:?}", v),
-            Self::Verification(e) => write!(f, "Verification of targeting solution failed: {}",e)
+            Self::VariableError(e) => write!(f, "Incorrectly configured variable: {e}"),
+            Self::FrameError(e) => write!(f, "Frame error in targeter: {e}"),
+            Self::UnsupportedVariable(v) => write!(f, "Unsupported variable in problem: {v:?}"),
+            Self::Verification(e) => write!(f, "Verification of targeting solution failed: {e}")
         }
     }
 }
@@ -116,6 +117,6 @@ impl Error for TargetingError {}
 
 impl From<TargetingError> for NyxError {
     fn from(e: TargetingError) -> Self {
-        NyxError::Targeter(e)
+        NyxError::Targeter(Box::new(e))
     }
 }

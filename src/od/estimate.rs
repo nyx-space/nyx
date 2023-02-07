@@ -91,14 +91,14 @@ where
     fn header(epoch_fmt: EpochFormat, covar_fmt: CovarFormat) -> Vec<String> {
         let dim = <T as State>::Size::dim();
         let mut hdr_v = Vec::with_capacity(3 * dim + 1);
-        hdr_v.push(format!("{}", epoch_fmt));
+        hdr_v.push(format!("{epoch_fmt}"));
         for i in 0..dim {
-            hdr_v.push(format!("state_{}", i));
+            hdr_v.push(format!("state_{i}"));
         }
         // Serialize the covariance
         for i in 0..dim {
             for j in 0..dim {
-                hdr_v.push(format!("{}_{}_{}", covar_fmt, i, j));
+                hdr_v.push(format!("{covar_fmt}_{i}_{j}"));
             }
         }
         hdr_v

@@ -319,8 +319,7 @@ pub fn try_achieve_b_plane(
         loop {
             if attempt_no > max_iter {
                 return Err(NyxError::MaxIterReached(format!(
-                    "Error norm of {} km after {} iterations",
-                    prev_b_plane_err, max_iter
+                    "Error norm of {prev_b_plane_err} km after {max_iter} iterations",
                 )));
             }
 
@@ -341,7 +340,7 @@ pub fn try_achieve_b_plane(
             if b_plane_err.norm() >= prev_b_plane_err {
                 // If the error is not going down, we'll raise an error
                 return Err(NyxError::CorrectionIneffective(
-                    format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm())
+                    format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {prev_b_plane_err:.3} km\tcur err norm: {:.3} km", b_plane_err.norm())
                 ));
             }
             prev_b_plane_err = b_plane_err.norm();
@@ -368,8 +367,7 @@ pub fn try_achieve_b_plane(
         loop {
             if attempt_no > max_iter {
                 return Err(NyxError::MaxIterReached(format!(
-                    "Error norm of {} km after {} iterations",
-                    prev_b_plane_err, max_iter
+                    "Error norm of {prev_b_plane_err} km after {max_iter} iterations",
                 )));
             }
 

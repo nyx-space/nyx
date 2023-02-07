@@ -109,8 +109,7 @@ impl<'a> OdpScenario<'a> {
                         match all_stations.get(&device.to_lowercase()) {
                             None => {
                                 return Err(ParsingError::OD(format!(
-                                    "station `{}` in sequence `{}` not found",
-                                    device, seq_name
+                                    "station `{device}` in sequence `{seq_name}` not found",
                                 )))
                             }
                             Some(s) => {
@@ -136,8 +135,7 @@ impl<'a> OdpScenario<'a> {
                                         ),
                                         _ => {
                                             return Err(ParsingError::OD(format!(
-                                                "unknown base station `{}`",
-                                                base
+                                                "unknown base station `{base}`",
                                             )))
                                         }
                                     }
@@ -255,8 +253,7 @@ impl<'a> OdpScenario<'a> {
                                     Ok(d) => d,
                                     Err(e) => {
                                         return Err(ParsingError::IllDefined(format!(
-                                            "When parsing SNC duration: {}",
-                                            e
+                                            "When parsing SNC duration: {e}",
                                         )))
                                     }
                                 },
@@ -279,7 +276,7 @@ impl<'a> OdpScenario<'a> {
                                 }
                             };
 
-                            info!("Using SNC: {}", process_noise);
+                            info!("Using SNC: {process_noise}");
 
                             // And build the filter
                             KF::new(initial_estimate, process_noise, measurement_noise)
@@ -300,8 +297,7 @@ impl<'a> OdpScenario<'a> {
                         Some(output) => match &scenario.output.get(&output.to_lowercase()) {
                             None => {
                                 return Err(ParsingError::OD(format!(
-                                    "output `{}` not found",
-                                    output
+                                    "output `{output}` not found",
                                 )))
                             }
                             Some(output) => Some(output.to_nav_sol_formatter(cosm)?),
@@ -362,7 +358,7 @@ impl<'a> OdpScenario<'a> {
         let mut initial_state = Some(truth_prop.state);
 
         // Generate the measurements
-        info!("Generating measurements over {} ", prop_time);
+        info!("Generating measurements over {prop_time} ");
 
         let start = Instant::now();
         info!("Initial state: {}", truth_prop.state);
@@ -441,7 +437,7 @@ impl<'a> OdpScenario<'a> {
         };
 
         if let Some(final_estimate) = &odp.estimates.last() {
-            println!("Final estimate:\n{}", final_estimate);
+            println!("Final estimate:\n{final_estimate}");
         }
 
         Ok(())

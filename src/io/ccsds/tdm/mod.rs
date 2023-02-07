@@ -223,7 +223,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_1.unwrap_or(0.0),
                         receive_delay: self.receive_delay_1.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 2 => match &self.participant_2 {
                     Some(participant) => Ok(Participant {
@@ -232,7 +232,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_2.unwrap_or(0.0),
                         receive_delay: self.receive_delay_2.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 3 => match &self.participant_3 {
                     Some(participant) => Ok(Participant {
@@ -241,7 +241,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_3.unwrap_or(0.0),
                         receive_delay: self.receive_delay_3.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 4 => match &self.participant_4 {
                     Some(participant) => Ok(Participant {
@@ -250,7 +250,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_4.unwrap_or(0.0),
                         receive_delay: self.receive_delay_4.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 5 => match &self.participant_5 {
                     Some(participant) => Ok(Participant {
@@ -259,7 +259,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_5.unwrap_or(0.0),
                         receive_delay: self.receive_delay_5.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 _ => unreachable!(),
             }

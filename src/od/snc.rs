@@ -83,7 +83,7 @@ where
     DefaultAllocator: Allocator<f64, A> + Allocator<f64, A, A>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

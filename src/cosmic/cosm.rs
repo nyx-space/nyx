@@ -116,7 +116,7 @@ impl fmt::Debug for Cosm {
             }
         )?;
         for frame in self.frames_get() {
-            writeln!(f, "\t{:?}", frame)?;
+            writeln!(f, "\t{frame:?}")?;
         }
         write!(f, "")
     }
@@ -124,7 +124,7 @@ impl fmt::Debug for Cosm {
 
 impl fmt::Display for Cosm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -498,8 +498,7 @@ impl Cosm {
                         children.push(fnode);
                     } else {
                         warn!(
-                            "Frame `{}` does not inherit from anyone, cannot organize tree",
-                            frame_name
+                            "Frame `{frame_name}` does not inherit from anyone, cannot organize tree",
                         );
                     }
                 }
@@ -507,7 +506,7 @@ impl Cosm {
             }
             Err(e) => {
                 error!("{}", e);
-                Err(NyxError::LoadingError(format!("{}", e)))
+                Err(NyxError::LoadingError(format!("{e}")))
             }
         }
     }
@@ -681,8 +680,7 @@ impl Cosm {
             offset = interval_length;
         } else if index > exb_states.position.len() {
             return Err(NyxError::NoInterpolationData(format!(
-                "No interpolation data for date {}",
-                epoch
+                "No interpolation data for date {epoch}",
             )));
         }
         let pos_coeffs = &exb_states.position[index];

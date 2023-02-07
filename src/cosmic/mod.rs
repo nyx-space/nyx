@@ -156,7 +156,7 @@ impl Xb {
         let mut input_xb_buf = Vec::new();
 
         match File::open(input_filename) {
-            Err(e) => return Err(NyxError::LoadingError(format!("{}", e))),
+            Err(e) => return Err(NyxError::LoadingError(format!("{e}"))),
             Ok(mut f) => {
                 if f.read_to_end(&mut input_xb_buf).is_err() {
                     return Err(NyxError::LoadingError("Could not read buffer".to_string()));
@@ -181,10 +181,7 @@ impl Xb {
                 info!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
                 Ok(xb)
             }
-            Err(e) => Err(NyxError::LoadingError(format!(
-                "Could not decode XB: {}",
-                e
-            ))),
+            Err(e) => Err(NyxError::LoadingError(format!("Could not decode XB: {e}"))),
         }
     }
 
@@ -198,8 +195,7 @@ impl Xb {
                 }
                 for pos in path {
                     if root.children.get(*pos).is_none() {
-                        let hpath: String =
-                            path.iter().map(|p| format!("{}", p)).collect::<String>();
+                        let hpath: String = path.iter().map(|p| format!("{p}")).collect::<String>();
                         return Err(NyxError::ObjectNotFound(hpath));
                     }
                 }

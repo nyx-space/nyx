@@ -44,7 +44,7 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
 
-pub fn assert_orbit_eq_or_abs<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg: &'a str) {
+pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
     if !(left.to_cartesian_vec() == right.to_cartesian_vec())
         && !abs_diff_eq!(
             left.to_cartesian_vec(),
@@ -64,7 +64,7 @@ pub fn assert_orbit_eq_or_abs<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg
     }
 }
 
-pub fn assert_orbit_eq_or_rel<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg: &'a str) {
+pub fn assert_orbit_eq_or_rel(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
     if !(left.to_cartesian_vec() == right.to_cartesian_vec())
         && !relative_eq!(
             left.to_cartesian_vec(),
@@ -296,8 +296,7 @@ impl Orbit {
                     let ta = between_0_360(ta);
                     if ta > (PI - (1.0 / ecc).acos()).to_degrees() {
                         panic!(
-                            "true anomaly value ({}) physically impossible for a hyperbolic orbit",
-                            ta
+                            "true anomaly value ({ta}) physically impossible for a hyperbolic orbit",
                         );
                     }
                 }

@@ -209,7 +209,7 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
             ));
         } else if self.is_finite_burn() {
             let mnvr = self.to_mnvr().unwrap();
-            corrmsg.push_str(&format!("\n\t\t{}\n", mnvr));
+            corrmsg.push_str(&format!("\n\t\t{mnvr}\n"));
         }
 
         writeln!(

@@ -78,7 +78,7 @@ where
                 .template("[{elapsed_precise}] {bar:100.cyan/blue} {pos:>7}/{len:7} {msg}")
                 .progress_chars("##-"),
         );
-        pb.set_message(format!("{}", self));
+        pb.set_message(format!("{self}"));
         pb
     }
 

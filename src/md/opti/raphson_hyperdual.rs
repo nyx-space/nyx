@@ -37,7 +37,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution<V, O>, NyxError> {
         if self.objectives.is_empty() {
-            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
+            return Err(NyxError::Targeter(Box::new(
+                TargetingError::UnderdeterminedProblem,
+            )));
         }
 
         let mut is_bplane_tgt = false;
@@ -85,8 +87,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     xi.orbit.vz += var.init_guess;
                 }
                 _ => {
-                    return Err(NyxError::Targeter(TargetingError::UnsupportedVariable(
-                        *var,
+                    return Err(NyxError::Targeter(Box::new(
+                        TargetingError::UnsupportedVariable(*var),
                     )))
                 }
             }
@@ -101,8 +103,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             .objectives
             .iter()
             .map(|obj| {
-                (obj.desired_value.abs().ceil() as i32
-                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)) as i32
+                obj.desired_value.abs().ceil() as i32
+                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)
             })
             .max()
             .unwrap();
@@ -226,8 +228,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         Vary::VelocityY => state.orbit.vy += total_correction[i],
                         Vary::VelocityZ => state.orbit.vz += total_correction[i],
                         _ => {
-                            return Err(NyxError::Targeter(TargetingError::UnsupportedVariable(
-                                *var,
+                            return Err(NyxError::Targeter(Box::new(
+                                TargetingError::UnsupportedVariable(*var),
                             )))
                         }
                     }
@@ -305,8 +307,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         xi.orbit.vz += delta[i];
                     }
                     _ => {
-                        return Err(NyxError::Targeter(TargetingError::UnsupportedVariable(
-                            *var,
+                        return Err(NyxError::Targeter(Box::new(
+                            TargetingError::UnsupportedVariable(*var),
                         )))
                     }
                 }

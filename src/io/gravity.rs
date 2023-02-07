@@ -124,7 +124,7 @@ impl HarmonicsMem {
         gunzipped: bool,
     ) -> Result<HarmonicsMem, NyxError> {
         let mut f = File::open(filepath)
-            .map_err(|_| NyxError::FileUnreadable(format!("File not found: {}", filepath)))?;
+            .map_err(|_| NyxError::FileUnreadable(format!("File not found: {filepath}")))?;
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
@@ -164,8 +164,7 @@ impl HarmonicsMem {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
                                 "Harmonics file: 
-                                could not parse degree `{}` on line {}",
-                                item, lno
+                                could not parse degree `{item}` on line {lno}"
                             )));
                         }
                     },
@@ -174,8 +173,7 @@ impl HarmonicsMem {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
                                 "Harmonics file: 
-                                could not parse order `{}` on line {}",
-                                item, lno
+                                could not parse order `{item}` on line {lno}"
                             )));
                         }
                     },
@@ -189,8 +187,7 @@ impl HarmonicsMem {
                                 Err(_) => {
                                     return Err(NyxError::FileUnreadable(format!(
                                         "Harmonics file: 
-                                        could not parse C_nm `{}` on line {}",
-                                        item, lno
+                                        could not parse C_nm `{item}` on line {lno}"
                                     )));
                                 }
                             }
@@ -210,8 +207,7 @@ impl HarmonicsMem {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable(format!(
                                                 "Harmonics file: 
-                                                could not parse C_nm `{}` on line {}",
-                                                item, lno
+                                                could not parse C_nm `{item}` on line {lno}"
                                             )));
                                         }
                                     }
@@ -222,8 +218,7 @@ impl HarmonicsMem {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable(format!(
                                                 "Harmonics file: 
-                                                could not parse S_nm `{}` on line {}",
-                                                item, lno
+                                                could not parse S_nm `{item}` on line {lno}"
                                             )));
                                         }
                                     }
@@ -235,8 +230,7 @@ impl HarmonicsMem {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable(format!(
                                                 "Harmonics file: 
-                                                could not parse C_nm `{}` on line {}",
-                                                item, lno
+                                                could not parse C_nm `{item}` on line {lno}"
                                             )));
                                         }
                                     }
@@ -247,8 +241,7 @@ impl HarmonicsMem {
                                         Err(_) => {
                                             return Err(NyxError::FileUnreadable(format!(
                                                 "Harmonics file: 
-                                                could not parse S_nm `{}` on line {}",
-                                                item, lno
+                                                could not parse S_nm `{item}` on line {lno}"
                                             )));
                                         }
                                     }
@@ -260,8 +253,7 @@ impl HarmonicsMem {
                                     Err(_) => {
                                         return Err(NyxError::FileUnreadable(format!(
                                             "Harmonics file: 
-                                            could not parse C_nm `{}` on line {}",
-                                            item, lno
+                                            could not parse C_nm `{item}` on line {lno}"
                                         )));
                                     }
                                 }
@@ -274,8 +266,7 @@ impl HarmonicsMem {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
                                 "Harmonics file: 
-                                could not parse S_nm `{}` on line {}",
-                                item, lno
+                                could not parse S_nm `{item}` on line {lno}"
                             )));
                         }
                     },
@@ -334,7 +325,7 @@ impl HarmonicsMem {
         filepath: &str,
     ) -> Result<HarmonicsMem, NyxError> {
         let mut f = File::open(filepath)
-            .map_err(|_| NyxError::FileUnreadable(format!("File not found: {}", filepath)))?;
+            .map_err(|_| NyxError::FileUnreadable(format!("File not found: {filepath}")))?;
         let mut buffer = vec![0; 0];
         if gunzipped {
             let mut d = GzDecoder::new(f);
@@ -372,8 +363,7 @@ impl HarmonicsMem {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
                                 "Harmonics file: 
-                                could not parse degree on line {} (`{}`)",
-                                lno, item
+                                could not parse degree on line {lno} (`{item}`)",
                             )));
                         }
                     },
@@ -382,8 +372,7 @@ impl HarmonicsMem {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
                                 "Harmonics file: 
-                                could not parse order on line {} (`{}`)",
-                                lno, item
+                                could not parse order on line {lno} (`{item}`)"
                             )));
                         }
                     },
@@ -392,8 +381,7 @@ impl HarmonicsMem {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
                                 "Harmonics file: 
-                                could not parse C_nm `{}` on line {}",
-                                item, lno
+                                could not parse C_nm `{item}` on line {lno}"
                             )));
                         }
                     },
@@ -402,8 +390,7 @@ impl HarmonicsMem {
                         Err(_) => {
                             return Err(NyxError::FileUnreadable(format!(
                                 "Harmonics file: 
-                                could not parse S_nm `{}` on line {}",
-                                item, lno
+                                could not parse S_nm `{item}` on line {lno}"
                             )));
                         }
                     },
@@ -436,14 +423,10 @@ impl HarmonicsMem {
         }
         if max_degree < degree || max_order < order {
             warn!(
-                "{} only contained (degree, order) of ({}, {}) instead of requested ({}, {})",
-                filepath, max_degree, max_order, degree, order
+                "{filepath} only contained (degree, order) of ({max_degree}, {max_order}) instead of requested ({degree}, {order})",
             );
         } else {
-            info!(
-                "{} loaded with (degree, order) = ({}, {})",
-                filepath, degree, order
-            );
+            info!("{filepath} loaded with (degree, order) = ({degree}, {order})");
         }
         Ok(HarmonicsMem {
             order: max_order,
