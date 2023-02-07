@@ -83,6 +83,7 @@ where
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
+    #[allow(clippy::needless_lifetimes)]
     pub fn run_until_nth_event<'a, D, E, F>(
         self,
         prop: Propagator<'a, D, E>,
@@ -106,6 +107,7 @@ where
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
+    #[allow(clippy::needless_lifetimes)]
     pub fn resume_run_until_nth_event<'a, D, E, F>(
         &self,
         prop: Propagator<'a, D, E>,
@@ -175,6 +177,7 @@ where
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
+    #[allow(clippy::needless_lifetimes)]
     pub fn run_until_epoch<'a, D, E>(
         self,
         prop: Propagator<'a, D, E>,
@@ -195,6 +198,7 @@ where
 
     /// Resumes a Monte Carlo run by skipping the first `skip` items, generating states only after that, and propagate each independently until the specified epoch.
     #[must_use = "Monte Carlo result must be used"]
+    #[allow(clippy::needless_lifetimes)]
     pub fn resume_run_until_epoch<'a, D, E>(
         &self,
         prop: Propagator<'a, D, E>,

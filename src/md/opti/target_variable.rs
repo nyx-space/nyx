@@ -78,6 +78,7 @@ pub enum Vary {
 }
 
 impl Vary {
+    #[allow(clippy::nonminimal_bool)]
     pub fn is_finite_burn(&self) -> bool {
         *self == Self::MnvrAlpha
             || *self == Self::MnvrAlphaDDot
@@ -100,6 +101,7 @@ impl Vary {
             || *self == Self::ThrustAccelZ
     }
 
+    #[allow(clippy::nonminimal_bool)]
     pub fn vec_index(&self) -> usize {
         match self {
             Self::PositionX | Self::ThrustX | Self::MnvrAlphaDDot | Self::MnvrDeltaDDot => 0,
