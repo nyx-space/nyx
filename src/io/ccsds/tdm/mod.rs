@@ -60,13 +60,13 @@ impl Header {
     }
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
 pub struct Body {
     #[yaserde(child)]
     pub segment: Vec<Segment>,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
 pub struct Segment {
     #[yaserde(child)]
     pub metadata: Metadata,
@@ -74,7 +74,7 @@ pub struct Segment {
     pub data: Data,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
 pub struct Data {
     #[yaserde(child, rename = "COMMENT")]
     comment: Vec<String>,
@@ -82,7 +82,7 @@ pub struct Data {
     pub observations: Vec<TdmObservation>,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
 pub struct Metadata {
     #[yaserde(child, rename = "COMMENT")]
     comment: Vec<String>,
