@@ -173,26 +173,26 @@ jobs:
         with:
           files: ./lcov.txt
     
-    audit:
-      name: Security Audit
-      runs-on: ubuntu-latest
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
 
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-        - name: Install stable toolchain
-          uses: actions-rs/toolchain@v1
-          with:
-            profile: minimal
-            toolchain: stable
-            override: true
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
 
-        - name: Install cargo-audit
-          run: cargo install cargo-audit
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
 
-        - name: Audit code
-          run: cargo audit
+      - name: Audit code
+        run: cargo audit
 
   release:
     name: Release
