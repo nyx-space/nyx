@@ -135,31 +135,6 @@ jobs:
           command: clippy
           args: -- -D warnings
 
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    needs: [tests]
-
-    steps:
-      - name: Install cargo binstall
-        run: cargo install cargo-binstall
-
-      - name: Install tarpaulin
-        run: cargo binstall -y cargo-tarpaulin
-
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Generate coverage report
-        run: |
-          cargo tarpaulin --engine llvm --verbose --all-features --workspace --timeout 120 --out Xml
-
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v2
-        with:
-          token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
-          fail_ci_if_error: true
-
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
