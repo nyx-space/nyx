@@ -145,7 +145,7 @@ jobs:
         run: cargo install cargo-binstall
 
       - name: Install tarpaulin
-        run: cargo binstall cargo-tarpaulin
+        run: cargo binstall -y cargo-tarpaulin
 
       - name: Checkout
         uses: actions/checkout@v3
