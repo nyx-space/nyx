@@ -152,7 +152,7 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          cargo +nightly tarpaulin --engine llvm --verbose --all-features --workspace --timeout 120 --out Xml
+          cargo tarpaulin --engine llvm --verbose --all-features --workspace --timeout 120 --out Xml
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v2
