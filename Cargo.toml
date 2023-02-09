@@ -47,7 +47,7 @@ lazy_static = "1.4.0"
 approx = "0.5"
 rand_pcg = "0.3"
 yaserde = "0.7.0"
-yaserde_derive = "0.7.0"
+yaserde_derive = "0.8.0"
 levenberg-marquardt = {version="0.12", optional=true}
 indicatif = {version = "0.16", features = ["rayon"]}
 rstats = "1.0.12"
