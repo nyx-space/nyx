@@ -33,7 +33,7 @@ prost-derive = "0.7"
 rand = "0.8"
 rand_distr = "0.4"
 meval = "0.2"
-num = {version = "0.3", default-features = false}
+num = {version = "0.4", default-features = false}
 rust-embed = "6"
 toml = "0.5"
 clap = "2"
