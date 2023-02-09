@@ -160,7 +160,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [check, tests, scenario-check, lints, audit, coverage]
+    needs: [check, tests, scenario-check, lints, audit]
 
     if: github.ref_type == 'tag'
     steps:
