@@ -49,7 +49,7 @@ rand_pcg = "0.3"
 yaserde = "0.7.0"
 yaserde_derive = "0.7.0"
 levenberg-marquardt = {version="0.12", optional=true}
-indicatif = {version = "0.16", features = ["rayon"]}
+indicatif = {version = "0.17", features = ["rayon"]}
 rstats = "1.0.12"
 thiserror = "1.0"
 
