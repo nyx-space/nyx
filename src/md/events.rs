@@ -80,7 +80,7 @@ impl fmt::Display for Event {
             }
         }
         if let Some((frame, _)) = self.in_frame {
-            write!(f, "in frame {}", frame)?;
+            write!(f, "in frame {frame}")?;
         }
         fmt::Result::Ok(())
     }

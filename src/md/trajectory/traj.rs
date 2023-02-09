@@ -66,8 +66,7 @@ where
         if offset_s.is_negative() {
             if !self.segments.is_empty() && !self.backward {
                 return Err(NyxError::from(TrajError::CreationError(format!(
-                    "Offset = {} but traj is not backward",
-                    offset_s
+                    "Offset = {offset_s} but traj is not backward"
                 ))));
             }
             self.backward = true;
@@ -188,7 +187,7 @@ where
                 return Err(NyxError::from(TrajError::EventNotFound {
                     start,
                     end,
-                    event: format!("{}", event),
+                    event: format!("{event}"),
                 }));
             }
             let mut s = if (ya - yc).abs() > f64::EPSILON && (yb - yc).abs() > f64::EPSILON {
@@ -239,8 +238,7 @@ where
             }
         }
         Err(NyxError::MaxIterReached(format!(
-            "Brent solver failed after {} iterations",
-            max_iter
+            "Brent solver failed after {max_iter} iterations",
         )))
     }
 
@@ -260,14 +258,11 @@ where
             return Err(NyxError::from(TrajError::EventNotFound {
                 start: start_epoch,
                 end: end_epoch,
-                event: format!("{}", event),
+                event: format!("{event}"),
             }));
         }
         let heuristic = (end_epoch - start_epoch) / 100;
-        info!(
-            "Searching for {} with initial heuristic of {}",
-            event, heuristic
-        );
+        info!("Searching for {event} with initial heuristic of {heuristic}",);
 
         let (sender, receiver) = channel();
 
@@ -281,10 +276,7 @@ where
         let mut states: Vec<_> = receiver.iter().collect();
 
         if states.is_empty() {
-            warn!(
-                "Heuristic failed to find any {} event, using slower approach",
-                event
-            );
+            warn!("Heuristic failed to find any {event} event, using slower approach");
             // Crap, we didn't find the event.
             // Let's find the min and max of this event throughout the trajectory, and search around there.
             match self.find_minmax(event, Unit::Second) {
@@ -336,7 +328,7 @@ where
                         return Err(NyxError::from(TrajError::EventNotFound {
                             start: start_epoch,
                             end: end_epoch,
-                            event: format!("{}", event),
+                            event: format!("{event}"),
                         }));
                     }
                 }
@@ -344,7 +336,7 @@ where
                     return Err(NyxError::from(TrajError::EventNotFound {
                         start: start_epoch,
                         end: end_epoch,
-                        event: format!("{}", event),
+                        event: format!("{event}"),
                     }));
                 }
             };

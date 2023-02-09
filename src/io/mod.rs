@@ -136,7 +136,7 @@ impl FromStr for EpochFormat {
     type Err = ParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().replace(" ", "").as_str() {
+        match s.to_lowercase().replace(' ', "").as_str() {
             "gregorianutc" => Ok(EpochFormat::GregorianUtc),
             "gregoriantai" => Ok(EpochFormat::GregorianTai),
             "mjdtai" => Ok(EpochFormat::MjdTai),
@@ -170,7 +170,7 @@ impl fmt::Display for CovarFormat {
             CovarFormat::Sqrt => write!(f, "exptd_val_"),
             CovarFormat::Sigma1 => write!(f, "covar_"),
             CovarFormat::Sigma3 => write!(f, "3sig_covar"),
-            CovarFormat::MulSigma(x) => write!(f, "{}sig_covar", x),
+            CovarFormat::MulSigma(x) => write!(f, "{x}sig_covar"),
         }
     }
 }
@@ -179,7 +179,7 @@ impl FromStr for CovarFormat {
     type Err = ParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().replace(" ", "").as_str() {
+        match s.to_lowercase().replace(' ', "").as_str() {
             "sqrt" => Ok(CovarFormat::Sqrt),
             "1sigma" | "sigma1" => Ok(CovarFormat::Sigma1),
             "3sigma" | "sigma3" => Ok(CovarFormat::Sigma3),

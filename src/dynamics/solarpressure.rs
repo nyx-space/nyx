@@ -33,7 +33,7 @@ pub struct SolarPressure {
     pub e_loc: EclipseLocator,
 }
 
-impl<'a> SolarPressure {
+impl SolarPressure {
     /// Will set the solar flux at 1 AU to: Phi = 1367.0
     pub fn default_raw(shadow_bodies: Vec<Frame>, cosm: Arc<Cosm>) -> Self {
         let e_loc = EclipseLocator {

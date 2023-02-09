@@ -119,7 +119,7 @@ impl<const SIZE: usize> Polynomial<SIZE> {
     }
 
     fn fmt_with_var(&self, f: &mut fmt::Formatter, var: String) -> fmt::Result {
-        write!(f, "P({}) = ", var)?;
+        write!(f, "P({var}) = ")?;
         let mut data = Vec::with_capacity(SIZE);
 
         for (i, c) in self.coefficients.iter().enumerate().rev() {
@@ -131,21 +131,21 @@ impl<const SIZE: usize> Polynomial<SIZE> {
             if c.abs() > 100.0 || c.abs() < 0.01 {
                 // Use scientific notation
                 if c > &0.0 {
-                    d = format!("+{:e}", c);
+                    d = format!("+{c:e}");
                 } else {
-                    d = format!("{:e}", c);
+                    d = format!("{c:e}");
                 }
             } else if c > &0.0 {
-                d = format!("+{}", c);
+                d = format!("+{c}");
             } else {
-                d = format!("{}", c);
+                d = format!("{c}");
             }
             // Add the power
             let p = i;
             match p {
                 0 => {} // Show nothing for zero
-                1 => d = format!("{}{}", d, var),
-                _ => d = format!("{}{}^{}", d, var, p),
+                1 => d = format!("{d}{var}"),
+                _ => d = format!("{d}{var}^{p}"),
             }
             data.push(d);
         }

@@ -617,7 +617,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
     /// Returns a string with the information about these options
     pub fn info(&self) -> String {
         format!(
-            "[min_step: {:.e}, max_step: {:.e}, tol: {:.e}, attempts: {}]",
+            "[min_step: {:e}, max_step: {:e}, tol: {:e}, attempts: {}]",
             self.min_step, self.max_step, self.tolerance, self.attempts,
         )
     }

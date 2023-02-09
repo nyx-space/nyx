@@ -21,8 +21,7 @@ use nalgebra::Vector3;
 use super::{Orbit, State};
 use crate::dynamics::guidance::Thruster;
 use crate::errors::NyxError;
-use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector, Vector6};
-use crate::mc::MultivariateNormal;
+use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::utils::rss_orbit_errors;
@@ -35,7 +34,7 @@ use std::ops::Add;
 /// Most guidance laws can be implemented directly with the `Spacecraft` structure.
 pub trait SpacecraftExt: Clone + Copy + Default + fmt::Debug + Send + Sync {}
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     Coast,
@@ -302,6 +301,7 @@ impl<X: SpacecraftExt> PartialEq for BaseSpacecraft<X> {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
@@ -316,6 +316,7 @@ impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
@@ -330,6 +331,7 @@ impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
@@ -344,6 +346,7 @@ impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
@@ -358,6 +361,7 @@ impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl<X: SpacecraftExt> fmt::UpperHex for BaseSpacecraft<X> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);

@@ -263,7 +263,7 @@ pub(crate) fn dcm_assemble(r: Matrix3<f64>, drdt: Matrix3<f64>) -> Matrix6<f64> 
 #[macro_export]
 macro_rules! pseudo_inverse {
     ($mat:expr) => {{
-        use crate::NyxError;
+        use $crate::NyxError;
         let (rows, cols) = $mat.shape();
         if rows < cols {
             match ($mat * $mat.transpose()).try_inverse() {

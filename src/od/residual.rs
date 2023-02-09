@@ -58,14 +58,14 @@ where
 
     pub fn header(epoch_fmt: EpochFormat) -> Vec<String> {
         let mut hdr_v = Vec::with_capacity(2 * M::dim() + 1);
-        hdr_v.push(format!("{}", epoch_fmt));
+        hdr_v.push(format!("{epoch_fmt}"));
         // Serialize the prefit
         for i in 0..M::dim() {
-            hdr_v.push(format!("prefit_{}", i));
+            hdr_v.push(format!("prefit_{i}"));
         }
         // Serialize the postfit
         for i in 0..M::dim() {
-            hdr_v.push(format!("postfit_{}", i));
+            hdr_v.push(format!("postfit_{i}"));
         }
         hdr_v
     }

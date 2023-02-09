@@ -169,10 +169,9 @@ where
         param: StateParameter,
         prct: f64,
     ) -> Result<Self, NyxError> {
-        if prct < 0.0 || prct > 1.0 {
+        if !(0.0..=1.0).contains(&prct) {
             return Err(NyxError::MonteCarlo(format!(
-                "Generator dispersion percentages must be between 0 and 1, got {}",
-                prct
+                "Generator dispersion percentages must be between 0 and 1, got {prct}"
             )));
         }
         let mut me: Self = template.into();
@@ -190,14 +189,13 @@ where
         let mut me: Self = template.into();
 
         for (param, prct) in prcts {
-            if *prct < 0.0 || *prct > 1.0 {
+            if !(0.0..=1.0).contains(prct) {
                 return Err(NyxError::MonteCarlo(format!(
-                    "Generator dispersion percentages must be between 0 and 1, got {}",
-                    prct
+                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
                 )));
             }
 
-            me.add_3std_dev(*param, template.value(&param)? * prct)?;
+            me.add_3std_dev(*param, template.value(param)? * prct)?;
         }
 
         Ok(me)
@@ -225,12 +223,11 @@ where
         for (param, prct) in prcts {
             if *prct < 0.0 || *prct > 1.0 {
                 return Err(NyxError::MonteCarlo(format!(
-                    "Generator dispersion percentages must be between 0 and 1, got {}",
-                    prct
+                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
                 )));
             }
 
-            me.add_std_dev(*param, template.value(&param)? * prct)?;
+            me.add_std_dev(*param, template.value(param)? * prct)?;
         }
 
         Ok(me)
@@ -255,10 +252,9 @@ where
         param: StateParameter,
         prct: f64,
     ) -> Result<Self, NyxError> {
-        if prct < 0.0 || prct > 1.0 {
+        if !(0.0..=1.0).contains(&prct) {
             return Err(NyxError::MonteCarlo(format!(
-                "Generator dispersion percentages must be between 0 and 1, got {}",
-                prct
+                "Generator dispersion percentages must be between 0 and 1, got {prct}"
             )));
         }
 
@@ -351,8 +347,7 @@ fn generate_orbit() {
     // We specified a seed so we know exactly what to expect
     assert_eq!(
         cnt_too_far, 308,
-        "Should have less than 33% of samples being more than 1 sigma away, got {}",
-        cnt_too_far
+        "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
     );
 
     // Check that we can modify the radius magnitude
@@ -377,8 +372,7 @@ fn generate_orbit() {
     // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
     assert_eq!(
         cnt_too_far, 308,
-        "Should have less than 33% of samples being more than 1 sigma away, got {}",
-        cnt_too_far
+        "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}"
     );
 
     // Check that we can modify the velocity magnitude
@@ -403,8 +397,7 @@ fn generate_orbit() {
     // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
     assert_eq!(
         cnt_too_far, 308,
-        "Should have less than 33% of samples being more than 1 sigma away, got {}",
-        cnt_too_far
+        "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
     );
 }
 

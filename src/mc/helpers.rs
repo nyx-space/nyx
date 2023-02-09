@@ -42,16 +42,14 @@ pub fn dv_pointing_error<R: Rng>(
 ) -> Result<Vector3<f64>, NyxError> {
     if !(0.0..1.0).contains(&error_prct3s) {
         return Err(NyxError::MonteCarlo(format!(
-            "Pointing error percentage must be between 0 and 1, got {}",
-            error_prct3s
+            "Pointing error percentage must be between 0 and 1, got {error_prct3s}"
         )));
     }
 
     let dv_mag = dv.norm();
     if dv_mag < std::f64::EPSILON {
         return Err(NyxError::MonteCarlo(format!(
-            "Delta-v vector is nil, cannot apply a pointing error: {}",
-            dv
+            "Delta-v vector is nil, cannot apply a pointing error: {dv}"
         )));
     }
 

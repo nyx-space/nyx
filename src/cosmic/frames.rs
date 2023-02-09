@@ -183,7 +183,7 @@ impl fmt::Display for Frame {
                     }
                 )
             }
-            othframe => write!(f, "{:?}", othframe),
+            othframe => write!(f, "{othframe:?}"),
         }
     }
 }

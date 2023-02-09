@@ -44,7 +44,7 @@ pub struct Tdm {
     pub body: Body,
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub struct Header {
     #[yaserde(child, rename = "COMMENT")]
     comment: Vec<String>,
@@ -223,7 +223,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_1.unwrap_or(0.0),
                         receive_delay: self.receive_delay_1.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 2 => match &self.participant_2 {
                     Some(participant) => Ok(Participant {
@@ -232,7 +232,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_2.unwrap_or(0.0),
                         receive_delay: self.receive_delay_2.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 3 => match &self.participant_3 {
                     Some(participant) => Ok(Participant {
@@ -241,7 +241,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_3.unwrap_or(0.0),
                         receive_delay: self.receive_delay_3.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 4 => match &self.participant_4 {
                     Some(participant) => Ok(Participant {
@@ -250,7 +250,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_4.unwrap_or(0.0),
                         receive_delay: self.receive_delay_4.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 5 => match &self.participant_5 {
                     Some(participant) => Ok(Participant {
@@ -259,7 +259,7 @@ impl Metadata {
                         transmit_delay: self.transmit_delay_5.unwrap_or(0.0),
                         receive_delay: self.receive_delay_5.unwrap_or(0.0),
                     }),
-                    None => Err(NyxError::CCSDS(format!("No participant #{}", n))),
+                    None => Err(NyxError::CCSDS(format!("No participant #{n}"))),
                 },
                 _ => unreachable!(),
             }
@@ -280,7 +280,7 @@ pub struct Participant {
     pub receive_delay: f64,
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum TimeSystem {
     Utc,
     Tai,
@@ -294,7 +294,7 @@ impl Default for TimeSystem {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(non_camel_case_types)]
 pub enum TrackingMode {
     Sequential,
@@ -307,7 +307,7 @@ impl Default for TrackingMode {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Band {
     S,
@@ -324,7 +324,7 @@ impl Default for Band {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum TimetagRef {
     Transmit,
     Receive,
@@ -336,7 +336,7 @@ impl Default for TimetagRef {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum IntegrationRef {
     Start,
     Middle,
@@ -349,7 +349,7 @@ impl Default for IntegrationRef {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(non_camel_case_types)]
 pub enum RangeMode {
     Coherent,
@@ -363,7 +363,7 @@ impl Default for RangeMode {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(non_camel_case_types)]
 pub enum RangeUnit {
     km,
@@ -377,7 +377,7 @@ impl Default for RangeUnit {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum AngleType {
     /// Azimuth, Elevation (local horizontal)
@@ -396,7 +396,7 @@ impl Default for AngleType {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum Interpolation {
     Hermite,
     Lagrange,
@@ -409,7 +409,7 @@ impl Default for Interpolation {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum DataQuality {
     Raw,
     Validated,
@@ -422,7 +422,7 @@ impl Default for DataQuality {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, YaSerialize, YaDeserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, YaSerialize, YaDeserialize)]
 pub enum YesNo {
     Yes,
     No,

@@ -123,7 +123,7 @@ impl fmt::Display for EclipseLocator {
         let shadow_bodies = self
             .shadow_bodies
             .iter()
-            .map(|b| format!("{}, ", b))
+            .map(|b| format!("{b}, "))
             .collect::<String>();
         write!(
             f,

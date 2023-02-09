@@ -2,7 +2,7 @@ use crate::NyxError;
 use std::convert::TryFrom;
 
 /// Defines the default celestial bodies in the provided de438 XB.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Bodies {
     SSB,
@@ -106,15 +106,15 @@ impl TryFrom<Vec<usize>> for Bodies {
                 7 => Ok(Self::UranusBarycenter),
                 8 => Ok(Self::NeptuneBarycenter),
                 9 => Ok(Self::PlutoBarycenter),
-                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
             },
             2 if ephem_path[0] == 3 => match ephem_path[1] {
                 // This only support the Earth system
                 0 => Ok(Self::Earth),
                 1 => Ok(Self::Luna),
-                _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
             },
-            _ => Err(NyxError::ObjectNotFound(format!("{:?}", ephem_path))),
+            _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
         }
     }
 }

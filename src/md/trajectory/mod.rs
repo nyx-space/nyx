@@ -32,7 +32,7 @@ use crate::{NyxError, Orbit, Spacecraft, State};
 use std::error::Error;
 use std::fmt;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum TrajError {
     EventNotFound {
         start: Epoch,
@@ -52,16 +52,16 @@ impl fmt::Display for TrajError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::EventNotFound { start, end, event } => {
-                write!(f, "Event {} not found between {} and {}", event, start, end)
+                write!(f, "Event {event} not found between {start} and {end}")
             }
-            Self::CreationError(reason) => write!(f, "Failed to create trajectory: {}", reason),
-            Self::NoInterpolationData(e) => write!(f, "No interpolation data at {}", e),
+            Self::CreationError(reason) => write!(f, "Failed to create trajectory: {reason}"),
+            Self::NoInterpolationData(e) => write!(f, "No interpolation data at {e}"),
             Self::OutOfSpline {
                 req_epoch,
                 req_dur,
                 spline_dur,
             } => {
-                write!(f, "Probable bug: Requested epoch {}, corresponding to an offset of {} in a spline of duration {}", req_epoch, req_dur, spline_dur)
+                write!(f, "Probable bug: Requested epoch {req_epoch}, corresponding to an offset of {req_dur} in a spline of duration {spline_dur}")
             }
         }
     }

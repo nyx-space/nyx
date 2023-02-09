@@ -20,8 +20,8 @@ pub mod convert_impulsive;
 pub mod multipleshooting;
 pub use multipleshooting::{ctrlnodes, multishoot};
 /// Uses a Levenberg Marquardt minimizer to solve the damped least squares problem.
-#[cfg(feature = "broken-donotuse")]
-pub mod minimize_lm;
+// #[cfg(feature = "broken-donotuse")]
+// pub mod minimize_lm;
 pub mod optimizer;
 /// Uses a [Newton Raphson](https://en.wikipedia.org/wiki/Newton%27s_method_in_optimization) method where the Jacobian is computed via finite differencing.
 pub mod raphson_finite_diff;
@@ -30,7 +30,7 @@ pub mod raphson_hyperdual;
 pub mod solution;
 pub mod target_variable;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DiffMethod {
     /// Slower, but more commonly used
     FiniteDiff,

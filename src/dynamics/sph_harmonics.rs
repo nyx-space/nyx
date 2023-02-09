@@ -163,8 +163,8 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         let s_ = state.x / r_;
         let t_ = state.y / r_;
         let u_ = state.z / r_;
-        let max_degree = self.stor.max_degree_n() as usize; // In GMAT, the degree is NN
-        let max_order = self.stor.max_order_m() as usize; // In GMAT, the order is MM
+        let max_degree = self.stor.max_degree_n(); // In GMAT, the degree is NN
+        let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_nm = self.a_nm.clone();
@@ -257,8 +257,8 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         let s_ = radius[0] / r_;
         let t_ = radius[1] / r_;
         let u_ = radius[2] / r_;
-        let max_degree = self.stor.max_degree_n() as usize; // In GMAT, the order is NN
-        let max_order = self.stor.max_order_m() as usize; // In GMAT, the order is MM
+        let max_degree = self.stor.max_degree_n(); // In GMAT, the order is NN
+        let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
 
         // Create the associated Legendre polynomials. Note that we add three items as per GMAT (this may be useful for the STM)
         let mut a_nm = self.a_nm_h.clone();
