@@ -20,7 +20,7 @@ use super::StateParameter;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, Vector3};
-use crate::time::{Duration, TimeUnit};
+use crate::time::{Duration, Unit};
 use crate::utils::between_pm_x;
 use crate::{Spacecraft, State};
 use std::default::Default;
@@ -61,7 +61,7 @@ pub struct Event {
     /// The desired self.desired_value, must be in the same units as the state parameter
     pub desired_value: f64,
     /// The time precision after which the solver will report that it cannot find any more precise
-    pub epoch_precision: TimeUnit,
+    pub epoch_precision: Unit,
     /// The precision on the desired value
     pub value_precision: f64,
     /// An optional frame in which to search this -- it IS recommended to convert the whole trajectory instead of searching in a given frame!
@@ -80,7 +80,7 @@ impl fmt::Display for Event {
             }
         }
         if let Some((frame, _)) = self.in_frame {
-            write!(f, "in frame {}", frame)?;
+            write!(f, "in frame {frame}")?;
         }
         fmt::Result::Ok(())
     }
@@ -105,12 +105,7 @@ impl Event {
         desired_value: f64,
         value_precision: f64,
     ) -> Self {
-        Self::specific(
-            parameter,
-            desired_value,
-            value_precision,
-            TimeUnit::Millisecond,
-        )
+        Self::specific(parameter, desired_value, value_precision, Unit::Millisecond)
     }
 
     /// Match a specific event for the parameter to hit the specified value with the provided tolerance on the value and time
@@ -118,7 +113,7 @@ impl Event {
         parameter: StateParameter,
         desired_value: f64,
         value_precision: f64,
-        epoch_precision: TimeUnit,
+        epoch_precision: Unit,
     ) -> Self {
         Self {
             parameter,
@@ -150,7 +145,7 @@ impl Event {
         Self {
             parameter,
             desired_value,
-            epoch_precision: TimeUnit::Millisecond,
+            epoch_precision: Unit::Millisecond,
             value_precision: 1e-3,
             in_frame: Some((target_frame, cosm)),
         }
@@ -163,7 +158,7 @@ impl Default for Event {
             parameter: StateParameter::Custom { mapping: 0 },
             desired_value: 0.0,
             value_precision: 1e-3,
-            epoch_precision: TimeUnit::Second,
+            epoch_precision: Unit::Second,
             in_frame: None,
         }
     }

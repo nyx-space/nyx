@@ -28,7 +28,7 @@ pub use rstats::Stats;
 use super::DispersedState;
 
 /// A structure storing the result of a single Monte Carlo run
-pub struct Run<S: InterpState>
+pub struct Run<S: InterpState, R>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -41,11 +41,11 @@ where
     /// The original dispersed state
     pub dispersed_state: DispersedState<S>,
     /// The result from this run
-    pub result: Result<(S, Traj<S>), NyxError>,
+    pub result: Result<R, NyxError>,
 }
 
-/// A structure of Monte Carlo results allowing for filtering
-pub struct McResults<S: InterpState>
+/// A structure of Monte Carlo results
+pub struct Results<S: InterpState, R>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -54,12 +54,25 @@ where
     <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
 {
     /// Raw data from each run, sorted by run index for O(1) access to each run
-    pub runs: Vec<Run<S>>,
+    pub runs: Vec<Run<S, R>>,
     /// Name of this scenario
     pub scenario: String,
 }
 
-impl<S: InterpState> McResults<S>
+/// A structure that stores the result of a propagation segment of a Monte Carlo.
+pub struct PropResult<S: InterpState>
+where
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<usize, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>,
+    <DefaultAllocator as Allocator<f64, S::VecLength>>::Buffer: Send,
+{
+    pub state: S,
+    pub traj: Traj<S>,
+}
+
+impl<S: InterpState> Results<S, PropResult<S>>
 where
     DefaultAllocator: Allocator<f64, S::Size>
         + Allocator<f64, S::Size, S::Size>
@@ -80,8 +93,8 @@ where
         let mut report = Vec::with_capacity(self.runs.len());
         for run in &self.runs {
             match &run.result {
-                Ok((_, traj)) => {
-                    for state in traj.every_between(step, start, end) {
+                Ok(r) => {
+                    for state in r.traj.every_between(step, start, end) {
                         match state.value(param) {
                             Ok(val) => report.push(val),
                             Err(e) => match value_if_run_failed {
@@ -116,8 +129,8 @@ where
         let mut report = Vec::with_capacity(self.runs.len());
         for run in &self.runs {
             match &run.result {
-                Ok((_, traj)) => {
-                    for state in traj.every(step) {
+                Ok(r) => {
+                    for state in r.traj.every(step) {
                         match state.value(param) {
                             Ok(val) => report.push(val),
                             Err(e) => match value_if_run_failed {
@@ -151,7 +164,7 @@ where
         let mut report = Vec::with_capacity(self.runs.len());
         for run in &self.runs {
             match &run.result {
-                Ok((_, traj)) => match traj.first().value(param) {
+                Ok(r) => match r.traj.first().value(param) {
                     Ok(val) => report.push(val),
                     Err(e) => match value_if_run_failed {
                         Some(val) => report.push(val),
@@ -182,7 +195,7 @@ where
         let mut report = Vec::with_capacity(self.runs.len());
         for run in &self.runs {
             match &run.result {
-                Ok((_, traj)) => match traj.last().value(param) {
+                Ok(r) => match r.traj.last().value(param) {
                     Ok(val) => report.push(val),
                     Err(e) => match value_if_run_failed {
                         Some(val) => report.push(val),

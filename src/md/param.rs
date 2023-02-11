@@ -289,8 +289,7 @@ impl FromStr for StateParameter {
             "vy" => Ok(Self::VY),
             "vz" => Ok(Self::VZ),
             _ => Err(NyxError::LoadingError(format!(
-                "Unknown state parameter: {}",
-                s
+                "Unknown state parameter: {s}"
             ))),
         }
     }
@@ -298,7 +297,7 @@ impl FromStr for StateParameter {
 
 impl fmt::Display for StateParameter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let default = format!("{:?}", self);
+        let default = format!("{self:?}");
         let repr = match *self {
             Self::Apoapsis => "apoapsis",
             Self::Periapsis => "periapsis",
@@ -346,6 +345,6 @@ impl fmt::Display for StateParameter {
             Self::VZ => "vz",
             _ => &default,
         };
-        write!(f, "{}", repr)
+        write!(f, "{repr}")
     }
 }

@@ -6,7 +6,7 @@ use self::nyx::dynamics::guidance::{Objective, Ruggiero, Thruster};
 use self::nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use self::nyx::md::{Event, StateParameter};
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, TimeUnit};
+use self::nyx::time::{Epoch, Unit};
 
 /// NOTE: Herein shows the difference between the QLaw and Ruggiero (and other control laws).
 /// The Ruggiero control law takes quite some longer to converge than the QLaw.
@@ -23,7 +23,7 @@ fn qlaw_as_ruggiero_case_a() {
 
     let orbit = Orbit::keplerian(7000.0, 0.01, 0.05, 0.0, 0.0, 1.0, start_time, eme2k);
 
-    let prop_time = 39.91 * TimeUnit::Day;
+    let prop_time = 39.91 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -56,10 +56,8 @@ fn qlaw_as_ruggiero_case_a() {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_a] {:x}", orbit);
 
-    let setup = Propagator::new::<RK4Fixed>(
-        sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    );
+    let setup =
+        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
     let mut prop = setup.with(sc_state);
     let (final_state, traj) = prop.for_duration_with_traj(prop_time).unwrap();
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
@@ -92,7 +90,7 @@ fn qlaw_as_ruggiero_case_b() {
 
     let orbit = Orbit::keplerian(24505.9, 0.725, 7.05, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 160.0 * TimeUnit::Day;
+    let prop_time = 160.0 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -120,13 +118,11 @@ fn qlaw_as_ruggiero_case_b() {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_b] {:x}", orbit);
 
-    let final_state = Propagator::new::<RK4Fixed>(
-        sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    )
-    .with(sc_state)
-    .for_duration(prop_time)
-    .unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_b] {:x}", final_state.orbit);
@@ -150,7 +146,7 @@ fn qlaw_as_ruggiero_case_c() {
 
     let orbit = Orbit::keplerian(9222.7, 0.2, 0.573, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 3.0 * TimeUnit::Day;
+    let prop_time = 3.0 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -177,13 +173,11 @@ fn qlaw_as_ruggiero_case_c() {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_c] {:x}", orbit);
 
-    let final_state = Propagator::new::<RK4Fixed>(
-        sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    )
-    .with(sc_state)
-    .for_duration(prop_time)
-    .unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_c] {:x}", final_state.orbit);
@@ -208,7 +202,7 @@ fn qlaw_as_ruggiero_case_d() {
 
     let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 113.0 * TimeUnit::Day;
+    let prop_time = 113.0 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -237,13 +231,11 @@ fn qlaw_as_ruggiero_case_d() {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_d] {:x}", orbit);
 
-    let final_state = Propagator::new::<RK4Fixed>(
-        sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    )
-    .with(sc_state)
-    .for_duration(prop_time)
-    .unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_d] {:x}", final_state.orbit);
@@ -269,7 +261,7 @@ fn qlaw_as_ruggiero_case_e() {
 
     let orbit = Orbit::keplerian(24505.9, 0.725, 0.06, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 400.0 * TimeUnit::Day;
+    let prop_time = 400.0 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -299,13 +291,11 @@ fn qlaw_as_ruggiero_case_e() {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_e] {:x}", orbit);
 
-    let final_state = Propagator::new::<RK4Fixed>(
-        sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    )
-    .with(sc_state)
-    .for_duration(prop_time)
-    .unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_e] {:x}", final_state.orbit);
@@ -340,7 +330,7 @@ fn qlaw_as_ruggiero_case_f() {
 
     let orbit = Orbit::keplerian(15378.0, 0.01, 98.7, 0.0, 0.0, 0.0, start_time, eme2k);
 
-    let prop_time = 30.0 * TimeUnit::Day;
+    let prop_time = 30.0 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -376,10 +366,8 @@ fn qlaw_as_ruggiero_case_f() {
         }
     });
 
-    let setup = Propagator::new::<RK4Fixed>(
-        sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    );
+    let setup =
+        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
     let final_state = setup
         .with(sc_state)
         .for_duration_with_channel(prop_time, tx)
@@ -407,7 +395,7 @@ fn ruggiero_iepc_2011_102() {
 
     let orbit = Orbit::keplerian(24396.0, 0.7283, 7.0, 1.0, 1.0, 1.0, start_time, eme2k);
 
-    let prop_time = 105.0 * TimeUnit::Day;
+    let prop_time = 105.0 * Unit::Day;
 
     // Define the dynamics
     let orbital_dyn = OrbitalDynamics::two_body();
@@ -435,13 +423,11 @@ fn ruggiero_iepc_2011_102() {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[ruggiero_iepc_2011_102] {:x}", orbit);
 
-    let final_state = Propagator::new::<RK4Fixed>(
-        sc.clone(),
-        PropOpts::with_fixed_step(10.0 * TimeUnit::Second),
-    )
-    .with(sc_state)
-    .for_duration(prop_time)
-    .unwrap();
+    let final_state =
+        Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second))
+            .with(sc_state)
+            .for_duration(prop_time)
+            .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[ruggiero_iepc_2011_102] {:x}", final_state.orbit);

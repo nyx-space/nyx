@@ -110,9 +110,8 @@ fn main() -> Result<(), ParsingError> {
 
     let exec_all = matches.is_present("all");
     // Try to deserialize the scenario
-    let scenario: ScenarioSerde;
-    match s.try_into() {
-        Ok(s) => scenario = s,
+    let scenario: ScenarioSerde = match s.try_into() {
+        Ok(s) => s,
         Err(e) => return Err(ParsingError::LoadingError(e.to_string())),
     };
 

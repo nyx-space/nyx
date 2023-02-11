@@ -29,7 +29,7 @@ pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
-use crate::time::TimeUnitHelper;
+use crate::time::TimeUnits;
 use core::f64::consts::TAU;
 // use std::convert::TryInto;
 // use std::fmt;
@@ -75,31 +75,29 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let impulse_epoch = spacecraft.epoch();
         // Build the estimated maneuver
         let mut mnvr = Mnvr {
-            start: impulse_epoch - 0.5 * delta_tfb * TimeUnit::Second,
-            end: impulse_epoch + 0.5 * delta_tfb * TimeUnit::Second,
+            start: impulse_epoch - 0.5 * delta_tfb * Unit::Second,
+            end: impulse_epoch + 0.5 * delta_tfb * Unit::Second,
             thrust_lvl: 1.0,
             alpha_inplane_radians,
             delta_outofplane_radians: beta_outofplane_radians,
             frame: Frame::Inertial,
         };
 
-        println!("INITIAL GUESS\n{}\n\n", mnvr);
+        println!("INITIAL GUESS\n{mnvr}\n\n");
 
         /* ************************ */
         /* Compute the nominal traj */
         /* ************************ */
         // Pre-traj is the trajectory _before_ the impulsive maneuver
-        let pre_sc = prop
-            .with(spacecraft)
-            .for_duration(-60.0 * TimeUnit::Minute)?;
+        let pre_sc = prop.with(spacecraft).for_duration(-60.0 * Unit::Minute)?;
         let (_, pre_traj) = prop.with(pre_sc).until_epoch_with_traj(impulse_epoch)?;
         // Post-traj is the trajectory _after_ the impulsive maneuver
         let (_, post_traj) = prop
             .with(spacecraft.with_dv(dv))
-            .for_duration_with_traj(60.0 * TimeUnit::Minute)?;
+            .for_duration_with_traj(60.0 * Unit::Minute)?;
 
-        println!("{}", pre_traj);
-        println!("{}", post_traj);
+        println!("{pre_traj}");
+        println!("{post_traj}");
 
         // Now let's setup the optimizer.
         let variables = [
@@ -171,8 +169,8 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let max_obj_val = objectives
             .iter()
             .map(|obj| {
-                (obj.desired_value.abs().ceil() as i32
-                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)) as i32
+                obj.desired_value.abs().ceil() as i32
+                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)
             })
             .max()
             .unwrap();
@@ -198,10 +196,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                 .with(sc_x0.with_guidance_mode(GuidanceMode::Thrust))
                 .until_epoch(mnvr.end)?;
 
-            println!(
-                "#{} INIT: {}\nAchieved: {}\nDesired: {}",
-                it, sc_x0, sc_xf_achieved, sc_xf_desired
-            );
+            println!("#{it} INIT: {sc_x0}\nAchieved: {sc_xf_achieved}\nDesired: {sc_xf_desired}");
 
             // Build the error vector
             let mut err_vector = SVector::<f64, NUM_OBJ>::zeros();
@@ -400,12 +395,12 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
             }
 
             // Log progress to debug
-            info!("Targeter -- Iteration #{}", it);
+            info!("Targeter -- Iteration #{it}");
             for obj in &objmsg {
-                println!("{}", obj);
+                println!("{obj}");
             }
 
-            println!("New mnvr {}", mnvr);
+            println!("New mnvr {mnvr}");
             if update_obj {
                 sc_x0 = pre_traj.at(mnvr.start)?;
                 sc_xf_desired = post_traj.at(mnvr.end)?;

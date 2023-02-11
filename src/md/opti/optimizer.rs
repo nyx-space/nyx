@@ -49,19 +49,15 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> fmt::Display for Optimize
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut objmsg = String::from("");
         for obj in &self.objectives {
-            objmsg.push_str(&format!("{}; ", obj));
+            objmsg.push_str(&format!("{obj}; "));
         }
 
         let mut varmsg = String::from("");
         for var in &self.variables {
-            varmsg.push_str(&format!("{}; ", var));
+            varmsg.push_str(&format!("{var}; "));
         }
 
-        write!(
-            f,
-            "Targeter:\n\tObjectives: {}\n\tCorrect: {}",
-            objmsg, varmsg
-        )
+        write!(f, "Targeter:\n\tObjectives: {objmsg}\n\tCorrect: {varmsg}")
     }
 }
 
@@ -275,7 +271,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     ) -> Result<(Spacecraft, Traj<Spacecraft>), NyxError> {
         let (xf, traj) = match solution.to_mnvr() {
             Ok(mnvr) => {
-                println!("{}", mnvr);
+                println!("{mnvr}");
                 let mut prop = self.prop.clone();
                 prop.dynamics = prop.dynamics.with_guidance_law(Arc::new(mnvr));
                 prop.with(solution.corrected_state)
@@ -342,7 +338,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     param_errors[i]
                 ));
             }
-            Err(NyxError::Targeter(TargetingError::Verification(objmsg)))
+            Err(NyxError::Targeter(Box::new(TargetingError::Verification(
+                objmsg,
+            ))))
         }
     }
 }

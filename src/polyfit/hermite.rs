@@ -112,7 +112,10 @@ where
             <<Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output as DimSub<Const<1>>>::Output,
         > + Allocator<f64, <Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output, Const<{ VALS }>>
         + Allocator<f64, <Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output>
-        + Allocator<f64, Const<{ DEGREE }>, <Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output>,
+        + Allocator<f64, Const<{ DEGREE }>, <Const<{ DEGREE }> as DimMin<Const<{ VALS }>>>::Output>
+        + Allocator<(f64, usize), <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output>
+        + Allocator<(usize, usize), <Const<{ VALS }> as DimMin<Const<{ DEGREE }>>>::Output>,
+
     Const<{ VALS }>: DimMin<Const<{ DEGREE }>>,
     Const<{ DEGREE }>: DimMin<Const<{ VALS }>>,
     DimMinimum<Const<{ VALS }>, Const<{ DEGREE }>>: DimSub<Const<1>>,
@@ -217,8 +220,7 @@ pub fn hermite<const DEGREE: usize>(
     if hermite.is_nan() {
         dbg!(xs, ys, derivs);
         return Err(NyxError::InvalidInterpolationData(format!(
-            "Invalid interpolation {:x}",
-            hermite
+            "Invalid interpolation {hermite:x}",
         )));
     }
 

@@ -78,6 +78,7 @@ pub enum Vary {
 }
 
 impl Vary {
+    #[allow(clippy::nonminimal_bool)]
     pub fn is_finite_burn(&self) -> bool {
         *self == Self::MnvrAlpha
             || *self == Self::MnvrAlphaDDot
@@ -100,6 +101,7 @@ impl Vary {
             || *self == Self::ThrustAccelZ
     }
 
+    #[allow(clippy::nonminimal_bool)]
     pub fn vec_index(&self) -> usize {
         match self {
             Self::PositionX | Self::ThrustX | Self::MnvrAlphaDDot | Self::MnvrDeltaDDot => 0,
@@ -136,6 +138,7 @@ pub struct Variable {
 
 impl Variable {
     /// Returns whether the configuration of this variable is valid
+    #[allow(clippy::result_large_err)]
     pub fn valid(&self) -> Result<(), TargetingError> {
         if self.max_step < 0.0 {
             let msg = format!(
@@ -312,7 +315,7 @@ impl fmt::Display for Variable {
             f,
             "{}{:?} = {} ± {:} ∈ [{}; {}]",
             match self.frame {
-                Some(f) => format!("{}", f),
+                Some(f) => format!("{f}"),
                 None => "".to_string(),
             },
             self.component,

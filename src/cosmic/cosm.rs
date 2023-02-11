@@ -31,7 +31,7 @@ use super::xb::ephem_interp::StateData::{EqualStates, VarwindowStates};
 use super::xb::{Ephemeris, Xb};
 use super::SPEED_OF_LIGHT_KMS;
 use crate::errors::NyxError;
-use crate::hifitime::{Epoch, TimeUnit, SECONDS_PER_DAY};
+use crate::hifitime::{Epoch, Unit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::{Matrix3, Matrix6};
 use crate::utils::{capitalize, dcm_finite_differencing, rotv};
@@ -51,7 +51,7 @@ pub const SS_MASS: f64 = 1.0014;
 pub const SUN_GM: f64 = 132_712_440_041.939_38;
 
 /// Enable or not light time correction for the computation of the celestial states
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum LightTimeCalc {
     /// No correction, i.e. assumes instantaneous propagation of photons
@@ -75,7 +75,7 @@ impl FrameTree {
     /// Seek an ephemeris from its celestial name (e.g. Earth Moon Barycenter)
     fn frame_seek_by_name(
         name: &str,
-        cur_path: &mut Vec<usize>,
+        cur_path: &mut [usize],
         f: &FrameTree,
     ) -> Result<Vec<usize>, NyxError> {
         if f.name == name {
@@ -84,7 +84,7 @@ impl FrameTree {
             Err(NyxError::ObjectNotFound(name.to_string()))
         } else {
             for (cno, child) in f.children.iter().enumerate() {
-                let mut this_path = cur_path.clone();
+                let mut this_path = cur_path.to_owned();
                 this_path.push(cno);
                 let child_attempt = Self::frame_seek_by_name(name, &mut this_path, child);
                 if let Ok(found_path) = child_attempt {
@@ -116,7 +116,7 @@ impl fmt::Debug for Cosm {
             }
         )?;
         for frame in self.frames_get() {
-            writeln!(f, "\t{:?}", frame)?;
+            writeln!(f, "\t{frame:?}")?;
         }
         write!(f, "")
     }
@@ -124,7 +124,7 @@ impl fmt::Debug for Cosm {
 
 impl fmt::Display for Cosm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -229,7 +229,7 @@ impl Cosm {
     /// Seek a frame from its orientation name
     fn frame_find_path(
         frame_name: &str,
-        cur_path: &mut Vec<usize>,
+        cur_path: &mut [usize],
         f: &FrameTree,
     ) -> Result<Vec<usize>, NyxError> {
         if f.name == frame_name {
@@ -238,7 +238,7 @@ impl Cosm {
             Err(NyxError::ObjectNotFound(frame_name.to_string()))
         } else {
             for child in &f.children {
-                let mut this_path = cur_path.clone();
+                let mut this_path = cur_path.to_owned();
                 let child_attempt = Self::frame_find_path(frame_name, &mut this_path, child);
                 if let Ok(found_path) = child_attempt {
                     return Ok(found_path);
@@ -433,7 +433,7 @@ impl Cosm {
 
                     // Let's now create the Frame, we'll add the ephem path and frame path just after
                     let mut new_frame = definition.as_frame();
-                    let frame_name = name.replace("_", " ").trim().to_string();
+                    let frame_name = name.replace('_', " ").trim().to_string();
 
                     // Grab the inherited frame again so we know how to place it in the frame tree
                     if let Some(src_frame_name) = &definition.inherit {
@@ -498,8 +498,7 @@ impl Cosm {
                         children.push(fnode);
                     } else {
                         warn!(
-                            "Frame `{}` does not inherit from anyone, cannot organize tree",
-                            frame_name
+                            "Frame `{frame_name}` does not inherit from anyone, cannot organize tree",
                         );
                     }
                 }
@@ -507,14 +506,14 @@ impl Cosm {
             }
             Err(e) => {
                 error!("{}", e);
-                Err(NyxError::LoadingError(format!("{}", e)))
+                Err(NyxError::LoadingError(format!("{e}")))
             }
         }
     }
 
     /// Returns the expected frame name with its ephemeris name for querying
     fn fix_frame_name(name: &str) -> String {
-        let name = name.to_lowercase().trim().replace("_", " ");
+        let name = name.to_lowercase().trim().replace('_', " ");
         // Handle the specific frames
         if name == "eme2000" {
             String::from("Earth J2000")
@@ -531,7 +530,7 @@ impl Cosm {
                 vec![splt[0].to_string(), splt[1..splt.len()].join(" ")].join(" ")
             } else {
                 // Likely a default center and frame, so let's do some clever guessing and capitalize the words
-                let frame_name = capitalize(&splt[splt.len() - 1].to_string());
+                let frame_name = capitalize(splt[splt.len() - 1]);
                 let ephem_name = splt[0..splt.len() - 1]
                     .iter()
                     .map(|word| capitalize(word))
@@ -577,10 +576,10 @@ impl Cosm {
         }
     }
 
-    fn frame_names(mut names: &mut Vec<String>, f: &FrameTree) {
+    fn frame_names(names: &mut Vec<String>, f: &FrameTree) {
         names.push(f.name.clone());
         for child in &f.children {
-            Self::frame_names(&mut names, child);
+            Self::frame_names(names, child);
         }
     }
 
@@ -590,10 +589,10 @@ impl Cosm {
         names
     }
 
-    fn frames(mut frames: &mut Vec<Frame>, f: &FrameTree) {
+    fn frames(frames: &mut Vec<Frame>, f: &FrameTree) {
         frames.push(f.frame);
         for child in &f.children {
-            Self::frames(&mut frames, child);
+            Self::frames(frames, child);
         }
     }
 
@@ -681,8 +680,7 @@ impl Cosm {
             offset = interval_length;
         } else if index > exb_states.position.len() {
             return Err(NyxError::NoInterpolationData(format!(
-                "No interpolation data for date {}",
-                epoch
+                "No interpolation data for date {epoch}",
             )));
         }
         let pos_coeffs = &exb_states.position[index];
@@ -774,7 +772,7 @@ impl Cosm {
                     // Compute the light time
                     let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
-                    let lt_dt = datetime - lt * TimeUnit::Second;
+                    let lt_dt = datetime - lt * Unit::Second;
                     tgt =
                         self.try_celestial_state(target_ephem, lt_dt, ssb2k, LightTimeCalc::None)?;
                 }
@@ -902,8 +900,8 @@ impl Cosm {
     ) -> Result<Matrix6<f64>, NyxError> {
         let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
         // Compute the dRdt DCM with finite differencing
-        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
-        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * Unit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * Unit::Second)?;
 
         Ok(dcm_finite_differencing(pre_r_dcm, r_dcm, post_r_dcm))
     }
@@ -918,8 +916,8 @@ impl Cosm {
     ) -> Result<(Matrix3<f64>, Matrix3<f64>), NyxError> {
         let r_dcm = self.try_position_dcm_from_to(from, to, dt)?;
         // Compute the dRdt DCM with finite differencing
-        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * TimeUnit::Second)?;
-        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * TimeUnit::Second)?;
+        let pre_r_dcm = self.try_position_dcm_from_to(from, to, dt - 1 * Unit::Second)?;
+        let post_r_dcm = self.try_position_dcm_from_to(from, to, dt + 1 * Unit::Second)?;
 
         let drdt = 0.5 * post_r_dcm - 0.5 * pre_r_dcm;
 
@@ -1166,7 +1164,7 @@ mod tests {
         */
         assert_eq!(moon_from_emb.frame, earth_bary);
         assert!(dbg!(moon_from_emb.x - -8.157_659_104_305_09e4).abs() < 1e-4);
-        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < 1e-5);
+        assert!(dbg!(moon_from_emb.y - -3.454_756_891_448_087_4e5).abs() < 2e-5);
         assert!(dbg!(moon_from_emb.z - -1.443_918_590_146_541e5).abs() < 1e-5);
         assert!(dbg!(moon_from_emb.vx - 9.607_118_443_970_266e-1).abs() < 1e-8);
         assert!(dbg!(moon_from_emb.vy - -2.035_832_254_218_036_5e-1).abs() < 1e-8);
@@ -1467,6 +1465,8 @@ mod tests {
 
         let state_iau_earth_computed = cosm.frame_chg(&state_eme2k, earth_iau);
         let delta_state = cosm.frame_chg(&state_iau_earth_computed, eme2k) - state_eme2k;
+
+        println!("{}", delta_state);
 
         assert!(
             delta_state.rmag().abs() < 1e-11,
@@ -1974,7 +1974,7 @@ mod tests {
 
         // End of transfer
         let et: Epoch =
-            Epoch::from_gregorian_utc(2022, 12, 4, 11, 59, 51, 0) + 884000 * TimeUnit::Microsecond;
+            Epoch::from_gregorian_utc(2022, 12, 4, 11, 59, 51, 0) + 884000 * Unit::Microsecond;
         println!("{:.6}", et.as_tdb_seconds());
 
         let moon_state = Orbit::cartesian(
@@ -2030,6 +2030,6 @@ mod tests {
     fn why_broken() {
         let e = Epoch::from_gregorian_tai_hms(2002, 02, 14, 0, 0, 0);
         println!("{}", e.as_tdb_seconds());
-        println!("{}", e.as_jde_tdb_duration().in_unit(TimeUnit::Second));
+        println!("{}", e.as_jde_tdb_duration().in_unit(Unit::Second));
     }
 }

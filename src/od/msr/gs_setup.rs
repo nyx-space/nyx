@@ -41,7 +41,7 @@ pub enum Cadence {
     /// When tracking and in visibility, the ground station will always be able to generate measurements.
     AlwaysOn,
     /// The station will be turned on (and generate measurements) for the first duration starting from the availability and then off.
-    /// For example, (2*TimeUnit::Hour, 10*TimeUnit::Hour) here means that the station is will generate measurements for the first
+    /// For example, (2*Unit::Hour, 10*Unit::Hour) here means that the station is will generate measurements for the first
     /// two hours after the start of its availability and then shut off for the following 10 hours.
     FromAvailability { on: Duration, off: Duration },
     /// Same as FromAvailability but the start/end times are computed from when the spacecraft is in visibility.

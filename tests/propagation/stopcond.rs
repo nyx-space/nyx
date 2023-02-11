@@ -2,13 +2,12 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use hifitime::TimeUnitHelper;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
-use nyx::time::{Epoch, J2000_OFFSET};
+use nyx::time::{Epoch, TimeUnits, J2000_OFFSET};
 use nyx::State;
 
 #[test]
@@ -18,7 +17,7 @@ fn stop_cond_3rd_apo() {
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, start_dt, eme2k,
     );
 
     let period = state.period();
@@ -30,12 +29,20 @@ fn stop_cond_3rd_apo() {
     let mut prop = setup.with(state);
     // Propagate for at five orbital periods so we know we've passed the third one
     // NOTE: We start counting at ZERO, so finding the 3rd means grabbing the second found.
-    let (third_apo, _) = prop.until_nth_event(5 * period, &apo_event, 3).unwrap();
+    let (third_apo, traj) = prop.until_nth_event(5 * period, &apo_event, 2).unwrap();
+
+    let events = traj.find_all(&apo_event).unwrap();
+    let mut prev_event_match = events[0].epoch();
+    for event_match in events.iter().skip(1) {
+        let delta_period = event_match.epoch() - prev_event_match - period;
+        assert!(delta_period.abs() < 1.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        prev_event_match = event_match.epoch();
+    }
 
     let min_epoch = start_dt + 2.0 * period;
     let max_epoch = start_dt + 3.0 * period;
 
-    println!("{}\t{}\t\t{:x}", min_epoch, max_epoch, third_apo,);
+    println!("{}\t{}\t\t{:x}", min_epoch, max_epoch, third_apo);
     // Confirm that this is the third apoapse event which is found
     // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
@@ -62,7 +69,7 @@ fn stop_cond_3rd_peri() {
 
     let start_dt = Epoch::from_mjd_tai(J2000_OFFSET);
     let state = Orbit::cartesian(
-        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.01, start_dt, eme2k,
     );
 
     let period = state.period();
@@ -75,15 +82,33 @@ fn stop_cond_3rd_peri() {
     // Propagate for at four orbital periods so we know we've passed the third one
     // NOTE: We're fetching the 3rd item because the initial state is actually at periapse,
     // which the event finder will find.
-    let (third_peri, _) = prop.until_nth_event(5 * period, &peri_event, 4).unwrap();
+    let (third_peri, traj) = prop.until_nth_event(5 * period, &peri_event, 2).unwrap();
 
-    println!("{:x}", third_peri);
-    // Confirm that this is the third periapse event which is found
-    // Again, the initial state is at periapse, so we don't check a N number of orbit forward.
+    let events = traj.find_all(&peri_event).unwrap();
+    let mut prev_event_match = events[0].epoch();
+    for event_match in events.iter().skip(1) {
+        let delta_period = event_match.epoch() - prev_event_match - period;
+        assert!(delta_period.abs() < 5.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        prev_event_match = event_match.epoch();
+    }
+
+    let min_epoch = start_dt + 2.0 * period;
+    let max_epoch = start_dt + 3.0 * period;
+
+    println!("{}\t{}\t\t{:x}", min_epoch, max_epoch, third_peri);
+    // Confirm that this is the third apoapse event which is found
+    // We use a weird check because it actually converged on a time that's 0.00042 nanoseconds _after_ the max time
     assert!(
-        (start_dt + 1.9 * period..start_dt + 2.9 * period).contains(&third_peri.dt),
-        "converged on the wrong apoapse"
+        (third_peri.dt - min_epoch) >= 1.nanoseconds(),
+        "Found apoapse is {} before min epoch",
+        third_peri.dt - min_epoch
     );
+    assert!(
+        (third_peri.dt - max_epoch) <= 1.nanoseconds(),
+        "Found apoapse is {} after max epoch",
+        third_peri.dt - max_epoch
+    );
+
     assert!(
         third_peri.ta().abs() < 1e-1 || (360.0 - third_peri.ta().abs() < 1e-1),
         "converged, yet convergence critera not met"

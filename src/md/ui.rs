@@ -39,7 +39,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, U6};
 pub use crate::md::objective::Objective;
 pub use crate::propagators::{PropOpts, Propagator};
-pub use crate::time::{Duration, Epoch, TimeUnit, TimeUnitHelper};
+pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
 pub use crate::Spacecraft;
 pub use crate::{State, TimeTagged};
 use std::convert::TryFrom;
@@ -86,8 +86,7 @@ where
                     match scen.output.get(&output.to_lowercase()) {
                         None => {
                             return Err(ParsingError::MD(format!(
-                                "propagator `{}` refers to undefined output `{}`",
-                                prop_name, output
+                                "propagator `{prop_name}` refers to undefined output `{output}`",
                             )))
                         }
                         Some(out) => match out.to_state_formatter(cosm.clone()) {
@@ -101,8 +100,8 @@ where
                 let spacecraft = match scen.spacecraft.get(&prop.dynamics.to_lowercase()) {
                     None => {
                         return Err(ParsingError::MD(format!(
-                            "propagator `{}` refers to undefined spacecraft `{}`",
-                            prop_name, prop.dynamics
+                            "propagator `{prop_name}` refers to undefined spacecraft `{}`",
+                            prop.dynamics
                         )))
                     }
                     Some(spacecraft) => spacecraft,
@@ -144,8 +143,8 @@ where
                                     let inherited = match scen.state.get(&delta_state.inherit) {
                                         None => {
                                             return Err(ParsingError::MD(format!(
-                                                "delta state `{}` refers to unknown state `{}`",
-                                                state_name, delta_state.inherit
+                                                "delta state `{state_name}` refers to unknown state `{}`",
+                                                delta_state.inherit
                                             )))
                                         }
                                         Some(base) => {
@@ -209,7 +208,7 @@ where
                         match Bodies::try_from(obj.to_string()) {
                             Ok(b) => bodies.push(b),
                             Err(e) => {
-                                return Err(ParsingError::LoadingError(format!("Snif {:?}", e)));
+                                return Err(ParsingError::LoadingError(format!("Snif {e:?}")));
                             }
                         }
                     }
@@ -248,8 +247,8 @@ where
                         match scen.force_models.as_ref().unwrap().get(&mdl.to_lowercase()) {
                             None => {
                                 return Err(ParsingError::MD(format!(
-                                    "spacecraft `{}` refers to unknown force model `{}`",
-                                    prop.dynamics, mdl
+                                    "spacecraft `{}` refers to unknown force model `{mdl}`",
+                                    prop.dynamics
                                 )))
                             }
                             Some(amdl) => {
@@ -288,8 +287,8 @@ where
                         Err(_) => match Epoch::from_str(prop.stop_cond.as_str()) {
                             Err(e) => {
                                 return Err(ParsingError::IllDefined(format!(
-                                    "{}: `{}`",
-                                    e, prop.stop_cond
+                                    "{e}: `{}`",
+                                    prop.stop_cond
                                 )))
                             }
                             Ok(epoch) => Some(epoch - init_state.dt),
@@ -349,7 +348,7 @@ where
                 let max_duration = match Duration::from_str(prop_event.search_until.as_str()) {
                     Ok(d) => d,
                     Err(_) => match Epoch::from_str(prop_event.search_until.as_str()) {
-                        Err(e) => return Err(NyxError::LoadingError(format!("{}", e))),
+                        Err(e) => return Err(NyxError::LoadingError(format!("{e}"))),
                         Ok(epoch) => {
                             let delta_t: Duration = epoch - prop.state.epoch();
                             delta_t
@@ -378,7 +377,7 @@ where
             // Let's write the state every minute
             let hdlr_start = Instant::now();
             let mut cnt = 0;
-            for prop_state in traj.every(1 * TimeUnit::Minute) {
+            for prop_state in traj.every(1 * Unit::Minute) {
                 cnt += 1;
                 // Provide to the handler
                 hdlrs.par_iter_mut().for_each(|hdlr| {

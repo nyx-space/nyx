@@ -17,7 +17,7 @@
 */
 
 use super::Bodies;
-use crate::time::{Duration, TimeUnit};
+use crate::time::{Duration, Unit};
 use std::cmp::PartialEq;
 use std::convert::TryFrom;
 use std::f64::consts::PI;
@@ -144,29 +144,19 @@ impl Frame {
     pub fn angular_velocity(&self) -> f64 {
         let period_to_mean_motion = |dur: Duration| -> f64 { 2.0 * PI / dur.in_seconds() };
         match Bodies::try_from(self.ephem_path()).unwrap() {
-            Bodies::MercuryBarycenter | Bodies::Mercury => period_to_mean_motion(
-                58 * TimeUnit::Day + 15 * TimeUnit::Hour + 30 * TimeUnit::Minute,
-            ),
-            Bodies::VenusBarycenter | Bodies::Venus => period_to_mean_motion(243 * TimeUnit::Day),
+            Bodies::MercuryBarycenter | Bodies::Mercury => {
+                period_to_mean_motion(58 * Unit::Day + 15 * Unit::Hour + 30 * Unit::Minute)
+            }
+            Bodies::VenusBarycenter | Bodies::Venus => period_to_mean_motion(243 * Unit::Day),
             Bodies::Earth => 7.292_115_146_706_4e-5,
-            Bodies::Luna => period_to_mean_motion(
-                27 * TimeUnit::Day + 7 * TimeUnit::Hour + 12 * TimeUnit::Minute,
-            ),
-            Bodies::MarsBarycenter => {
-                period_to_mean_motion(1 * TimeUnit::Day + 37 * TimeUnit::Minute)
+            Bodies::Luna => {
+                period_to_mean_motion(27 * Unit::Day + 7 * Unit::Hour + 12 * Unit::Minute)
             }
-            Bodies::JupiterBarycenter => {
-                period_to_mean_motion(9 * TimeUnit::Hour + 56 * TimeUnit::Minute)
-            }
-            Bodies::SaturnBarycenter => {
-                period_to_mean_motion(10 * TimeUnit::Hour + 30 * TimeUnit::Minute)
-            }
-            Bodies::UranusBarycenter => {
-                period_to_mean_motion(17 * TimeUnit::Hour + 14 * TimeUnit::Minute)
-            }
-            Bodies::NeptuneBarycenter => {
-                period_to_mean_motion(16 * TimeUnit::Hour + 6 * TimeUnit::Minute)
-            }
+            Bodies::MarsBarycenter => period_to_mean_motion(1 * Unit::Day + 37 * Unit::Minute),
+            Bodies::JupiterBarycenter => period_to_mean_motion(9 * Unit::Hour + 56 * Unit::Minute),
+            Bodies::SaturnBarycenter => period_to_mean_motion(10 * Unit::Hour + 30 * Unit::Minute),
+            Bodies::UranusBarycenter => period_to_mean_motion(17 * Unit::Hour + 14 * Unit::Minute),
+            Bodies::NeptuneBarycenter => period_to_mean_motion(16 * Unit::Hour + 6 * Unit::Minute),
             _ => unimplemented!(),
         }
     }
@@ -193,7 +183,7 @@ impl fmt::Display for Frame {
                     }
                 )
             }
-            othframe => write!(f, "{:?}", othframe),
+            othframe => write!(f, "{othframe:?}"),
         }
     }
 }

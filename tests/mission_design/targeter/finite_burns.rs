@@ -1,6 +1,6 @@
 extern crate nyx_space as nyx;
 
-use hifitime::TimeUnitHelper;
+use hifitime::TimeUnits;
 use nyx::dynamics::guidance::{Mnvr, Thruster};
 use nyx::linalg::Vector3;
 use nyx::md::optimizer::*;
@@ -190,7 +190,7 @@ fn val_tgt_finite_burn() {
         GuidanceMode::Custom(0),
     );
 
-    let prop_time = 15.0 * TimeUnit::Second;
+    let prop_time = 15.0 * Unit::Second;
 
     // Define the dynamics
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
@@ -211,7 +211,7 @@ fn val_tgt_finite_burn() {
     let sc = SpacecraftDynamics::from_guidance_law_no_decr(orbital_dyn.clone(), Arc::new(mnvr0));
     // Setup a propagator, and propagate for that duration
     // NOTE: We specify the use an RK89 to match the GMAT setup.
-    // let prop = Propagator::rk89(sc, PropOpts::with_fixed_step(5.0 * TimeUnit::Second));
+    // let prop = Propagator::rk89(sc, PropOpts::with_fixed_step(5.0 * Unit::Second));
     let mut prop = Propagator::default(sc);
     prop.set_max_step(mnvr0.duration());
     let sc_xf_desired = prop.with(sc_state).for_duration(prop_time).unwrap();

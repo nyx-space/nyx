@@ -23,50 +23,52 @@ use super::{Generator, Pcg64Mcg};
 use crate::dynamics::Dynamics;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::mc::results::{McResults, Run};
+use crate::mc::results::{PropResult, Results, Run};
 use crate::mc::DispersedState;
 use crate::md::trajectory::InterpState;
 use crate::md::EventEvaluator;
 use crate::propagators::{ErrorCtrl, Propagator};
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::f64;
 use std::fmt;
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use std::time::Instant as StdInstant;
 
 /// A Monte Carlo framework, automatically running on all threads via a thread pool. This framework is targeted toward analysis of time-continuous variables.
 /// One caveat of the design is that the trajectory is used for post processing, not each individual state. This may prevent some event switching from being shown in GNC simulations.
-pub struct MonteCarlo<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy>
+pub struct MonteCarlo<S: InterpState, Distr: Distribution<f64> + Copy>
 where
-    D::StateType: InterpState,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>
+        + Allocator<usize, S::Size, S::Size>,
 {
-    /// Propagator with dynamics to use in all runs
-    pub prop: Propagator<'a, D, E>,
     /// Seed of the [64bit PCG random number generator](https://www.pcg-random.org/index.html)
     pub seed: u64,
     /// Generator of states for the Monte Carlo run
-    pub generator: Generator<D::StateType, Distr>,
+    pub generator: Generator<S, Distr>,
     /// Name of this run, will be reflected in the progress bar and in the output structure
     pub scenario: String,
 }
 
-impl<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy> MonteCarlo<'a, D, E, Distr>
+/*
+   D::StateType: InterpState,
+   DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+       + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+       + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
+       + Allocator<f64, <D::StateType as State>::VecLength>,
+   <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+*/
+
+impl<S: InterpState, Distr: Distribution<f64> + Copy> MonteCarlo<S, Distr>
 where
-    D::StateType: InterpState,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>
+        + Allocator<usize, S::Size, S::Size>,
 {
     // Just the template for the progress bar
     fn progress_bar(&self, num_runs: usize) -> ProgressBar {
@@ -76,69 +78,81 @@ where
                 .template("[{elapsed_precise}] {bar:100.cyan/blue} {pos:>7}/{len:7} {msg}")
                 .progress_chars("##-"),
         );
-        pb.set_message(format!("{}", self));
+        pb.set_message(format!("{self}"));
         pb
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
-    pub fn run_until_nth_event<F: EventEvaluator<D::StateType>>(
+    #[allow(clippy::needless_lifetimes)]
+    pub fn run_until_nth_event<'a, D, E, F>(
         self,
+        prop: Propagator<'a, D, E>,
         max_duration: Duration,
         event: &F,
         trigger: usize,
         num_runs: usize,
-    ) -> McResults<D::StateType> {
-        self.resume_run_until_nth_event(0, max_duration, event, trigger, num_runs)
+    ) -> Results<S, PropResult<S>>
+    where
+        D: Dynamics<StateType = S>,
+        E: ErrorCtrl,
+        F: EventEvaluator<S>,
+        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    {
+        self.resume_run_until_nth_event(prop, 0, max_duration, event, trigger, num_runs)
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
-    pub fn resume_run_until_nth_event<F: EventEvaluator<D::StateType>>(
-        self,
+    #[allow(clippy::needless_lifetimes)]
+    pub fn resume_run_until_nth_event<'a, D, E, F>(
+        &self,
+        prop: Propagator<'a, D, E>,
         skip: usize,
         max_duration: Duration,
         event: &F,
         trigger: usize,
         num_runs: usize,
-    ) -> McResults<D::StateType> {
-        // Setup the RNG
-        let rng = Pcg64Mcg::new(self.seed.into());
+    ) -> Results<S, PropResult<S>>
+    where
+        D: Dynamics<StateType = S>,
+        E: ErrorCtrl,
+        F: EventEvaluator<S>,
+        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    {
+        // Generate the initial states
+        let init_states = self.generate_states(skip, num_runs);
         // Setup the progress bar
         let pb = self.progress_bar(num_runs);
-        // Wrap the propagator in an Arc
-        let arc_prop = Arc::new(self.prop);
-
-        // Setup the channels
+        // Setup the thread friendly communication
         let (tx, rx) = channel();
 
         // Generate all states (must be done separately because the rng is not thread safe)
         let start = StdInstant::now();
-
-        let init_states = self
-            .generator
-            .sample_iter(rng)
-            .skip(skip)
-            .take(num_runs)
-            .enumerate()
-            .collect::<Vec<(usize, DispersedState<D::StateType>)>>();
-
-        // And propagate
         init_states.par_iter().progress_with(pb).for_each_with(
-            (arc_prop, tx),
-            |(arc_prop, sender), (index, dispersed_state)| {
-                let result = arc_prop.with(dispersed_state.state).until_nth_event(
-                    max_duration,
-                    event,
-                    trigger,
-                );
+            (prop, tx),
+            |(prop, tx), (index, dispersed_state)| {
+                let result =
+                    prop.with(dispersed_state.state)
+                        .until_nth_event(max_duration, event, trigger);
 
                 // Build a single run result
                 let run = Run {
                     index: *index,
                     dispersed_state: dispersed_state.clone(),
-                    result,
+                    result: result.map(|r| PropResult {
+                        state: r.0,
+                        traj: r.1,
+                    }),
                 };
-                sender.send(run).unwrap();
+                tx.send(run).unwrap();
             },
         );
 
@@ -146,57 +160,73 @@ where
         println!(
             "Propagated {} states in {}",
             num_runs,
-            clock_time.as_secs_f64() * TimeUnit::Second
+            clock_time.as_secs_f64() * Unit::Second
         );
 
         // Collect all of the results and sort them by run index
-        let mut runs = rx.iter().collect::<Vec<Run<D::StateType>>>();
+        let mut runs = rx
+            .iter()
+            .collect::<Vec<Run<D::StateType, PropResult<D::StateType>>>>();
         runs.par_sort_by_key(|run| run.index);
 
-        McResults {
+        Results {
             runs,
-            scenario: self.scenario,
+            scenario: self.scenario.clone(),
         }
     }
 
     /// Generate states and propagate each independently until a specific event is found `trigger` times.
     #[must_use = "Monte Carlo result must be used"]
-    pub fn run_until_epoch(self, end_epoch: Epoch, num_runs: usize) -> McResults<D::StateType> {
-        self.resume_run_until_epoch(0, end_epoch, num_runs)
+    #[allow(clippy::needless_lifetimes)]
+    pub fn run_until_epoch<'a, D, E>(
+        self,
+        prop: Propagator<'a, D, E>,
+        end_epoch: Epoch,
+        num_runs: usize,
+    ) -> Results<S, PropResult<S>>
+    where
+        D: Dynamics<StateType = S>,
+        E: ErrorCtrl,
+        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    {
+        self.resume_run_until_epoch(prop, 0, end_epoch, num_runs)
     }
 
     /// Resumes a Monte Carlo run by skipping the first `skip` items, generating states only after that, and propagate each independently until the specified epoch.
     #[must_use = "Monte Carlo result must be used"]
-    pub fn resume_run_until_epoch(
-        self,
+    #[allow(clippy::needless_lifetimes)]
+    pub fn resume_run_until_epoch<'a, D, E>(
+        &self,
+        prop: Propagator<'a, D, E>,
         skip: usize,
         end_epoch: Epoch,
         num_runs: usize,
-    ) -> McResults<D::StateType> {
-        // Setup the RNG
-        let rng = Pcg64Mcg::new(self.seed.into());
+    ) -> Results<S, PropResult<S>>
+    where
+        D: Dynamics<StateType = S>,
+        E: ErrorCtrl,
+        DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
+            + Allocator<f64, <D::StateType as State>::VecLength>,
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    {
+        // Generate the initial states
+        let init_states = self.generate_states(skip, num_runs);
         // Setup the progress bar
         let pb = self.progress_bar(num_runs);
-        // Wrap the propagator in an Arc
-        let arc_prop = Arc::new(self.prop);
-        // Setup the channels
+        // Setup the thread friendly communication
         let (tx, rx) = channel();
 
-        // Generate all states (must be done separately because the rng is not thread safe)
-        let start = StdInstant::now();
-
-        let init_states = self
-            .generator
-            .sample_iter(rng)
-            .skip(skip)
-            .take(num_runs)
-            .enumerate()
-            .collect::<Vec<(usize, DispersedState<D::StateType>)>>();
-
         // And propagate on the thread pool
+        let start = StdInstant::now();
         init_states.par_iter().progress_with(pb).for_each_with(
-            (arc_prop, tx),
-            |(arc_prop, sender), (index, dispersed_state)| {
+            (prop, tx),
+            |(arc_prop, tx), (index, dispersed_state)| {
                 let result = arc_prop
                     .with(dispersed_state.state)
                     .until_epoch_with_traj(end_epoch);
@@ -205,9 +235,13 @@ where
                 let run = Run {
                     index: *index,
                     dispersed_state: dispersed_state.clone(),
-                    result,
+                    result: result.map(|r| PropResult {
+                        state: r.0,
+                        traj: r.1,
+                    }),
                 };
-                sender.send(run).unwrap();
+
+                tx.send(run).unwrap();
             },
         );
 
@@ -215,29 +249,41 @@ where
         println!(
             "Propagated {} states in {}",
             num_runs,
-            clock_time.as_secs_f64() * TimeUnit::Second
+            clock_time.as_secs_f64() * Unit::Second
         );
 
         // Collect all of the results and sort them by run index
-        let mut runs = rx.iter().collect::<Vec<Run<D::StateType>>>();
+        let mut runs = rx.iter().collect::<Vec<Run<S, PropResult<S>>>>();
         runs.par_sort_by_key(|run| run.index);
 
-        McResults {
+        Results {
             runs,
-            scenario: self.scenario,
+            scenario: self.scenario.clone(),
         }
+    }
+
+    /// Set up the seed and generate the states. This is useful for checking the generated states before running a large scale Monte Carlo.
+    #[must_use = "Generated states for a Monte Carlo run must be used"]
+    pub fn generate_states(&self, skip: usize, num_runs: usize) -> Vec<(usize, DispersedState<S>)> {
+        // Setup the RNG
+        let rng = Pcg64Mcg::new(self.seed.into());
+
+        // Generate the states, forcing the borrow as specified in the `sample_iter` docs.
+        (&self.generator)
+            .sample_iter(rng)
+            .skip(skip)
+            .take(num_runs)
+            .enumerate()
+            .collect::<Vec<(usize, DispersedState<S>)>>()
     }
 }
 
-impl<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy> fmt::Display
-    for MonteCarlo<'a, D, E, Distr>
+impl<S: InterpState, Distr: Distribution<f64> + Copy> fmt::Display for MonteCarlo<S, Distr>
 where
-    D::StateType: InterpState,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>
+        + Allocator<usize, S::Size, S::Size>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -248,22 +294,19 @@ where
     }
 }
 
-impl<'a, D: Dynamics, E: ErrorCtrl, Distr: Distribution<f64> + Copy> fmt::LowerHex
-    for MonteCarlo<'a, D, E, Distr>
+impl<S: InterpState, Distr: Distribution<f64> + Copy> fmt::LowerHex for MonteCarlo<S, Distr>
 where
-    D::StateType: InterpState,
-    DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<usize, <D::StateType as State>::Size, <D::StateType as State>::Size>
-        + Allocator<f64, <D::StateType as State>::VecLength>,
-    <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+    DefaultAllocator: Allocator<f64, S::Size>
+        + Allocator<f64, S::Size, S::Size>
+        + Allocator<f64, S::VecLength>
+        + Allocator<usize, S::Size, S::Size>,
 {
     /// Returns a filename friendly name
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "mc-data-{}-seed-{}",
-            self.scenario.replace(" ", "-"),
+            self.scenario.replace(' ', "-"),
             self.seed
         )
     }

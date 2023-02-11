@@ -28,7 +28,7 @@ pub use crate::md::{Variable, Vary};
 use crate::polyfit::CommonPolynomial;
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::pseudo_inverse;
-use hifitime::TimeUnitHelper;
+use hifitime::TimeUnits;
 use std::time::Instant;
 
 impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
@@ -41,7 +41,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         achievement_epoch: Epoch,
     ) -> Result<TargeterSolution<V, O>, NyxError> {
         if self.objectives.is_empty() {
-            return Err(NyxError::Targeter(TargetingError::UnderdeterminedProblem));
+            return Err(NyxError::Targeter(Box::new(
+                TargetingError::UnderdeterminedProblem,
+            )));
         }
 
         let mut is_bplane_tgt = false;
@@ -93,7 +95,9 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     var.component
                 );
                 error!("{}", msg);
-                return Err(NyxError::Targeter(TargetingError::FrameError(msg)));
+                return Err(NyxError::Targeter(Box::new(TargetingError::FrameError(
+                    msg,
+                ))));
             }
 
             // Check that a thruster is provided since we'll be changing that and the burn duration
@@ -176,8 +180,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
             .objectives
             .iter()
             .map(|obj| {
-                (obj.desired_value.abs().ceil() as i32
-                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)) as i32
+                obj.desired_value.abs().ceil() as i32
+                    * 10_i32.pow(obj.tolerance.abs().log10().ceil() as u32)
             })
             .max()
             .unwrap();
@@ -529,8 +533,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     "Correction {:?}{} (element {}): {}",
                     var.component,
                     match self.correction_frame {
-                        Some(f) => format!(" in {:?}", f),
-                        None => format!(""),
+                        Some(f) => format!(" in {f:?}"),
+                        None => String::new(),
                     },
                     i,
                     delta[i]

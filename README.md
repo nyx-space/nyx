@@ -1,5 +1,5 @@
 # nyx
-[Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity, fast, reliable and **[validated](https://nyxspace.com/MathSpec/)** astrodynamical toolkit library written in Rust.
+[Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity, fast, reliable and **[validated]([https://nyxspace.com/MathSpec/](https://nyxspace.com/nyxspace/MathSpec/))** astrodynamical toolkit library written in Rust.
 
 The target audience is researchers and astrodynamics engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
 and portability to all platforms supported by [Rust](https://forge.rust-lang.org/platform-support.html).
@@ -60,6 +60,7 @@ of Colorado at Boulder. I work for Masten Space Systems on the XL-1 Moon Lander 
 
 # Examples
 Refer to the [showcase](https://nyxspace.com/showcase/).
+
 
 
 # Python todo

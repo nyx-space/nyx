@@ -169,6 +169,11 @@ where
         param: StateParameter,
         prct: f64,
     ) -> Result<Self, NyxError> {
+        if !(0.0..=1.0).contains(&prct) {
+            return Err(NyxError::MonteCarlo(format!(
+                "Generator dispersion percentages must be between 0 and 1, got {prct}"
+            )));
+        }
         let mut me: Self = template.into();
 
         me.add_3std_dev(param, template.value(&param)? * prct)?;
@@ -184,7 +189,13 @@ where
         let mut me: Self = template.into();
 
         for (param, prct) in prcts {
-            me.add_3std_dev(*param, template.value(&param)? * prct)?;
+            if !(0.0..=1.0).contains(prct) {
+                return Err(NyxError::MonteCarlo(format!(
+                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
+                )));
+            }
+
+            me.add_3std_dev(*param, template.value(param)? * prct)?;
         }
 
         Ok(me)
@@ -210,7 +221,13 @@ where
         let mut me: Self = template.into();
 
         for (param, prct) in prcts {
-            me.add_std_dev(*param, template.value(&param)? * prct)?;
+            if *prct < 0.0 || *prct > 1.0 {
+                return Err(NyxError::MonteCarlo(format!(
+                    "Generator dispersion percentages must be between 0 and 1, got {prct}"
+                )));
+            }
+
+            me.add_std_dev(*param, template.value(param)? * prct)?;
         }
 
         Ok(me)
@@ -235,6 +252,12 @@ where
         param: StateParameter,
         prct: f64,
     ) -> Result<Self, NyxError> {
+        if !(0.0..=1.0).contains(&prct) {
+            return Err(NyxError::MonteCarlo(format!(
+                "Generator dispersion percentages must be between 0 and 1, got {prct}"
+            )));
+        }
+
         let mut me: Self = template.into();
 
         me.add_std_dev(param, template.value(&param)? * prct)?;
@@ -308,11 +331,12 @@ fn generate_orbit() {
     let seed = 0;
     let rng = Pcg64Mcg::new(seed);
 
+    let init_sma = state.sma();
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
         .map(|dispersed_state| {
-            if (8_191.93 - dispersed_state.state.sma()).abs() > 1.0 {
+            if (init_sma - dispersed_state.state.sma()).abs() > 1.0 {
                 1
             } else {
                 0
@@ -323,8 +347,57 @@ fn generate_orbit() {
     // We specified a seed so we know exactly what to expect
     assert_eq!(
         cnt_too_far, 308,
-        "Should have less than 33% of samples being more than 1 sigma away, got {}",
-        cnt_too_far
+        "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
+    );
+
+    // Check that we can modify the radius magnitude
+    let std_dev = 1.0;
+    let orbit_generator =
+        GaussianGenerator::from_std_dev(state, StateParameter::Rmag, std_dev).unwrap();
+
+    let rng = Pcg64Mcg::new(seed);
+    let init_rmag = state.rmag();
+    let cnt_too_far: u16 = orbit_generator
+        .sample_iter(rng)
+        .take(1000)
+        .map(|dispersed_state| {
+            if (init_rmag - dispersed_state.state.rmag()).abs() > std_dev {
+                1
+            } else {
+                0
+            }
+        })
+        .sum::<u16>();
+
+    // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
+    assert_eq!(
+        cnt_too_far, 308,
+        "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}"
+    );
+
+    // Check that we can modify the velocity magnitude
+    let std_dev = 1e-2;
+    let orbit_generator =
+        GaussianGenerator::from_std_dev(state, StateParameter::Vmag, std_dev).unwrap();
+
+    let rng = Pcg64Mcg::new(seed);
+    let init_vmag = state.vmag();
+    let cnt_too_far: u16 = orbit_generator
+        .sample_iter(rng)
+        .take(1000)
+        .map(|dispersed_state| {
+            if (init_vmag - dispersed_state.state.vmag()).abs() > std_dev {
+                1
+            } else {
+                0
+            }
+        })
+        .sum::<u16>();
+
+    // We specified a seed so we know exactly what to expect and we've reset the seed to 0.
+    assert_eq!(
+        cnt_too_far, 308,
+        "Should have less than 33% of samples being more than 1 sigma away, got {cnt_too_far}",
     );
 }
 

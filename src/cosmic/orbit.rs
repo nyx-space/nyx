@@ -27,10 +27,14 @@ use super::na::{Matrix3, Matrix6, Vector3, Vector6};
 use super::State;
 use super::{BPlane, Frame};
 use crate::linalg::{Const, OVector};
+use crate::mc::MultivariateNormal;
 use crate::md::ui::Objective;
 use crate::md::StateParameter;
-use crate::time::{Duration, Epoch, TimeUnit};
-use crate::utils::{between_0_360, between_pm_180, perpv, r1, r3, rss_orbit_errors};
+use crate::time::{Duration, Epoch, Unit};
+use crate::utils::{
+    between_0_360, between_pm_180, cartesian_to_spherical, perpv, r1, r3, rss_orbit_errors,
+    spherical_to_cartesian,
+};
 use crate::NyxError;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
@@ -40,7 +44,7 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
 
-pub fn assert_orbit_eq_or_abs<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg: &'a str) {
+pub fn assert_orbit_eq_or_abs(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
     if !(left.to_cartesian_vec() == right.to_cartesian_vec())
         && !abs_diff_eq!(
             left.to_cartesian_vec(),
@@ -60,7 +64,7 @@ pub fn assert_orbit_eq_or_abs<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg
     }
 }
 
-pub fn assert_orbit_eq_or_rel<'a>(left: &Orbit, right: &Orbit, epsilon: f64, msg: &'a str) {
+pub fn assert_orbit_eq_or_rel(left: &Orbit, right: &Orbit, epsilon: f64, msg: &str) {
     if !(left.to_cartesian_vec() == right.to_cartesian_vec())
         && !relative_eq!(
             left.to_cartesian_vec(),
@@ -292,8 +296,7 @@ impl Orbit {
                     let ta = between_0_360(ta);
                     if ta > (PI - (1.0 / ecc).acos()).to_degrees() {
                         panic!(
-                            "true anomaly value ({}) physically impossible for a hyperbolic orbit",
-                            ta
+                            "true anomaly value ({ta}) physically impossible for a hyperbolic orbit",
                         );
                     }
                 }
@@ -613,7 +616,7 @@ impl Orbit {
     pub fn period(&self) -> Duration {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                2.0 * PI * (self.sma().powi(3) / gm).sqrt() * TimeUnit::Second
+                2.0 * PI * (self.sma().powi(3) / gm).sqrt() * Unit::Second
             }
             _ => panic!("orbital period not defined in this frame"),
         }
@@ -836,6 +839,10 @@ impl Orbit {
     ///
     /// NOTE: This function will emit a warning stating that the TA should be avoided if in a very near circular orbit
     /// Code from https://github.com/ChristopherRabotin/GMAT/blob/80bde040e12946a61dae90d9fc3538f16df34190/src/gmatutil/util/StateConversionUtil.cpp#L6835
+    ///
+    /// LIMITATION: For an orbit whose true anomaly is (very nearly) 0.0 or 180.0, this function may return either 0.0 or 180.0 with a very small time increment.
+    /// This is due to the precision of the cosine calculation: if the arccosine calculation is out of bounds, the sign of the cosine of the true anomaly is used
+    /// to determine whether the true anomaly should be 0.0 or 180.0. **In other words**, there is an ambiguity in the computation in the true anomaly exactly at 180.0 and 0.0.
     pub fn ta(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
@@ -1404,6 +1411,48 @@ impl Orbit {
         }
         Ok(rtn)
     }
+
+    /// Create a multivariate normal dispersion structure from this orbit with the provided mean and covariance,
+    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    pub fn disperse(
+        &self,
+        mean: Vector6<f64>,
+        cov: Matrix6<f64>,
+    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+        MultivariateNormal::new(
+            *self,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+            ],
+            mean,
+            cov,
+        )
+    }
+
+    /// Create a multivariate normal dispersion structure from this orbit with the provided covariance,
+    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    pub fn disperse_zero_mean(
+        &self,
+        cov: Matrix6<f64>,
+    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+        MultivariateNormal::zero_mean(
+            *self,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+            ],
+            cov,
+        )
+    }
 }
 
 impl PartialEq for Orbit {
@@ -1559,6 +1608,7 @@ impl Serialize for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::Display for Orbit {
     // Prints as Cartesian in floating point with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1578,6 +1628,7 @@ impl fmt::Display for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::LowerExp for Orbit {
     // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1597,6 +1648,7 @@ impl fmt::LowerExp for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::UpperExp for Orbit {
     // Prints as Cartesian in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1616,6 +1668,7 @@ impl fmt::UpperExp for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::LowerHex for Orbit {
     // Prints the Keplerian orbital elements in floating point with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1635,6 +1688,7 @@ impl fmt::LowerHex for Orbit {
     }
 }
 
+#[allow(clippy::format_in_format_args)]
 impl fmt::UpperHex for Orbit {
     // Prints the Keplerian orbital elements in scientific notation with units
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1798,9 +1852,27 @@ impl State for Orbit {
             StateParameter::X => self.x = val,
             StateParameter::Y => self.y = val,
             StateParameter::Z => self.z = val,
+            StateParameter::Rmag => {
+                // Convert the position to spherical coordinates
+                let (_, θ, φ) = cartesian_to_spherical(&self.radius());
+                // Convert back to cartesian after setting the new range value
+                let new_radius = spherical_to_cartesian(val, θ, φ);
+                self.x = new_radius.x;
+                self.y = new_radius.y;
+                self.z = new_radius.z;
+            }
             StateParameter::VX => self.vx = val,
             StateParameter::VY => self.vy = val,
             StateParameter::VZ => self.vz = val,
+            StateParameter::Vmag => {
+                // Convert the velocity to spherical coordinates
+                let (_, θ, φ) = cartesian_to_spherical(&self.velocity());
+                // Convert back to cartesian after setting the new range value
+                let new_radius = spherical_to_cartesian(val, θ, φ);
+                self.vx = new_radius.x;
+                self.vy = new_radius.y;
+                self.vz = new_radius.z;
+            }
             _ => return Err(NyxError::StateParameterUnavailable),
         }
         Ok(())

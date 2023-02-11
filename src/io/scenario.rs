@@ -55,7 +55,7 @@ impl StateSerde {
     pub fn as_state(&self, frame: Frame) -> Result<Orbit, ParsingError> {
         let epoch = match Epoch::from_str(&self.epoch) {
             Ok(epoch) => epoch,
-            Err(e) => return Err(ParsingError::Quantity(format!("{}", e))),
+            Err(e) => return Err(ParsingError::Quantity(format!("{e}"))),
         };
 
         // Rebuild a valid state from the three different initializations
@@ -73,8 +73,7 @@ impl StateSerde {
                     "cm" => 1e-5,
                     _ => {
                         return Err(ParsingError::Distance(format!(
-                            "unknown unit `{}` when converting state",
-                            unit
+                            "unknown unit `{unit}` when converting state"
                         )))
                     }
                 },
@@ -88,8 +87,7 @@ impl StateSerde {
                     "cm/s" => 1e-5,
                     _ => {
                         return Err(ParsingError::Velocity(format!(
-                            "unknown unit `{}` when converting state",
-                            unit
+                            "unknown unit `{unit}` when converting state"
                         )))
                     }
                 },
@@ -185,7 +183,7 @@ impl DeltaStateSerde {
                     "km" => 1.0,
                     "m" => 1e-3,
                     "cm" => 1e-5,
-                    _ => panic!("unknown unit `{}`", unit),
+                    _ => panic!("unknown unit `{unit}`"),
                 },
                 None => 1.0,
             };
@@ -195,7 +193,7 @@ impl DeltaStateSerde {
                     "km/s" => 1.0,
                     "m/s" => 1e-3,
                     "cm/s" => 1e-5,
-                    _ => panic!("unknown unit `{}`", unit),
+                    _ => panic!("unknown unit `{unit}`"),
                 },
                 None => 1.0,
             };
@@ -460,7 +458,7 @@ pub struct ConditionSerde {
 
 impl ConditionSerde {
     pub fn to_condition(&self) -> Event {
-        let rplt = self.event.replace("=", "");
+        let rplt = self.event.replace('=', "");
         let parts: Vec<&str> = rplt.split(' ').collect();
         let parameter = StateParameter::from_str(parts[0]).unwrap();
         let value = if parts.len() == 2 {

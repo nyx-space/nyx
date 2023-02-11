@@ -22,7 +22,7 @@ pub mod equidistant_heuristic;
 pub mod multishoot;
 
 /// Built-in cost functions to minimize
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CostFunction {
     /// J = ∫ \vec{u}^T\vec{u} dt
     MinimumEnergy,

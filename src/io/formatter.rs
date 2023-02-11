@@ -121,11 +121,11 @@ impl fmt::Display for StateHeader {
             }
             _ => format!("{:?}", self.param),
         };
-        write!(fh, "{}", fmtd)?;
+        write!(fh, "{fmtd}")?;
         if let Some(frame) = &self.frame_name {
-            write!(fh, ":{}", frame)?;
+            write!(fh, ":{frame}")?;
         } else if let Some(epoch_fmt) = self.epoch_fmt {
-            write!(fh, ":{:?}", epoch_fmt)?;
+            write!(fh, ":{epoch_fmt:?}")?;
         }
         Ok(())
     }
@@ -137,7 +137,7 @@ impl Serialize for StateHeader {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&format!("{}", self))
+        serializer.serialize_str(&format!("{self}"))
     }
 }
 
@@ -217,18 +217,18 @@ pub enum NavSolutionHeader {
 impl fmt::Display for NavSolutionHeader {
     fn fmt(&self, fh: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            NavSolutionHeader::Epoch(efmt) => write!(fh, "Epoch:{:?}", efmt),
+            NavSolutionHeader::Epoch(efmt) => write!(fh, "Epoch:{efmt:?}"),
             NavSolutionHeader::EstimatedState(hdr) => {
                 let mut seq = Vec::with_capacity(hdr.len());
                 for element in hdr {
-                    seq.push(format!("Estimate:{}", element));
+                    seq.push(format!("Estimate:{element}"));
                 }
                 write!(fh, "{}", seq.join(","))
             }
             NavSolutionHeader::NominalState(hdr) => {
                 let mut seq = Vec::with_capacity(hdr.len());
                 for element in hdr {
-                    seq.push(format!("Nominal:{}", element));
+                    seq.push(format!("Nominal:{element}"));
                 }
                 write!(fh, "{}", seq.join(","))
             }
@@ -240,147 +240,147 @@ impl fmt::Display for NavSolutionHeader {
             NavSolutionHeader::Delta_vz => write!(fh, "delta_vz"),
             NavSolutionHeader::Cx_x { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cx_x:{}", f)
+                    write!(fh, "cx_x:{f}")
                 } else {
                     write!(fh, "cx_x")
                 }
             }
             NavSolutionHeader::Cy_x { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cy_x:{}", f)
+                    write!(fh, "cy_x:{f}")
                 } else {
                     write!(fh, "cy_x")
                 }
             }
             NavSolutionHeader::Cy_y { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cy_y:{}", f)
+                    write!(fh, "cy_y:{f}")
                 } else {
                     write!(fh, "cy_y")
                 }
             }
             NavSolutionHeader::Cz_x { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_x:{}", f)
+                    write!(fh, "cz_x:{f}")
                 } else {
                     write!(fh, "cz_x")
                 }
             }
             NavSolutionHeader::Cz_y { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_y:{}", f)
+                    write!(fh, "cz_y:{f}")
                 } else {
                     write!(fh, "cz_y")
                 }
             }
             NavSolutionHeader::Cz_z { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_z:{}", f)
+                    write!(fh, "cz_z:{f}")
                 } else {
                     write!(fh, "cz_z")
                 }
             }
             NavSolutionHeader::Cx_dot_x { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cx_dot_x:{}", f)
+                    write!(fh, "cx_dot_x:{f}")
                 } else {
                     write!(fh, "cx_dot_x")
                 }
             }
             NavSolutionHeader::Cx_dot_y { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cx_dot_y:{}", f)
+                    write!(fh, "cx_dot_y:{f}")
                 } else {
                     write!(fh, "cx_dot_y")
                 }
             }
             NavSolutionHeader::Cx_dot_z { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cx_dot_z:{}", f)
+                    write!(fh, "cx_dot_z:{f}")
                 } else {
                     write!(fh, "cx_dot_z")
                 }
             }
             NavSolutionHeader::Cx_dot_x_dot { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cx_dot_x_dot:{}", f)
+                    write!(fh, "cx_dot_x_dot:{f}")
                 } else {
                     write!(fh, "cx_dot_x_dot")
                 }
             }
             NavSolutionHeader::Cy_dot_x { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cy_dot_x:{}", f)
+                    write!(fh, "cy_dot_x:{f}")
                 } else {
                     write!(fh, "cy_dot_x")
                 }
             }
             NavSolutionHeader::Cy_dot_y { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cy_dot_y:{}", f)
+                    write!(fh, "cy_dot_y:{f}")
                 } else {
                     write!(fh, "cy_dot_y")
                 }
             }
             NavSolutionHeader::Cy_dot_z { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cy_dot_z:{}", f)
+                    write!(fh, "cy_dot_z:{f}")
                 } else {
                     write!(fh, "cy_dot_z")
                 }
             }
             NavSolutionHeader::Cy_dot_x_dot { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cy_dot_x_dot:{}", f)
+                    write!(fh, "cy_dot_x_dot:{f}")
                 } else {
                     write!(fh, "cy_dot_x_dot")
                 }
             }
             NavSolutionHeader::Cy_dot_y_dot { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cy_dot_y_dot:{}", f)
+                    write!(fh, "cy_dot_y_dot:{f}")
                 } else {
                     write!(fh, "cy_dot_y_dot")
                 }
             }
             NavSolutionHeader::Cz_dot_x { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_dot_x:{}", f)
+                    write!(fh, "cz_dot_x:{f}")
                 } else {
                     write!(fh, "cz_dot_x")
                 }
             }
             NavSolutionHeader::Cz_dot_y { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_dot_y:{}", f)
+                    write!(fh, "cz_dot_y:{f}")
                 } else {
                     write!(fh, "cz_dot_y")
                 }
             }
             NavSolutionHeader::Cz_dot_z { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_dot_z:{}", f)
+                    write!(fh, "cz_dot_z:{f}")
                 } else {
                     write!(fh, "cz_dot_z")
                 }
             }
             NavSolutionHeader::Cz_dot_x_dot { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_dot_x_dot:{}", f)
+                    write!(fh, "cz_dot_x_dot:{f}")
                 } else {
                     write!(fh, "cz_dot_x_dot")
                 }
             }
             NavSolutionHeader::Cz_dot_y_dot { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_dot_y_dot:{}", f)
+                    write!(fh, "cz_dot_y_dot:{f}")
                 } else {
                     write!(fh, "cz_dot_y_dot")
                 }
             }
             NavSolutionHeader::Cz_dot_z_dot { frame } => {
                 if let Some(f) = frame {
-                    write!(fh, "cz_dot_z_dot:{}", f)
+                    write!(fh, "cz_dot_z_dot:{f}")
                 } else {
                     write!(fh, "cz_dot_z_dot")
                 }
@@ -401,18 +401,18 @@ impl Serialize for NavSolutionHeader {
             NavSolutionHeader::EstimatedState(hdr) => {
                 let mut seq = serializer.serialize_seq(Some(hdr.len()))?;
                 for element in hdr {
-                    seq.serialize_element(&format!("Estimate:{}", element))?;
+                    seq.serialize_element(&format!("Estimate:{element}"))?;
                 }
                 seq.end()
             }
             NavSolutionHeader::NominalState(hdr) => {
                 let mut seq = serializer.serialize_seq(Some(hdr.len()))?;
                 for element in hdr {
-                    seq.serialize_element(&format!("Nominal:{}", element))?;
+                    seq.serialize_element(&format!("Nominal:{element}"))?;
                 }
                 seq.end()
             }
-            _ => serializer.serialize_str(&format!("{}", self)),
+            _ => serializer.serialize_str(&format!("{self}")),
         }
     }
 }
@@ -553,7 +553,7 @@ impl StateFormatter {
             formatted.push(match hdr.param {
                 StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(orbit.dt),
                 _ => match orbit.value(&hdr.param) {
-                    Ok(value) => format!("{:.16}", value),
+                    Ok(value) => format!("{value:.16}"),
                     Err(e) => {
                         unimplemented!("{:?} cannot yet be formatted (yet): {}", hdr.param, e)
                     }

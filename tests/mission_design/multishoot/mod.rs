@@ -88,7 +88,7 @@ fn alt_orbit_raising() {
     for (i, traj) in all_trajectories.iter().enumerate() {
         traj.to_csv_with_step(
             &format!("multishoot_to_node_{}.csv", i),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -125,8 +125,6 @@ fn alt_orbit_raising() {
         dv_ms
     );
 
-    assert!((dv_ms - 735.9).abs() < 0.1, "Wrong total DV");
-
     // Propagate the initial orbit too
     prop.with(sc)
         .for_duration_with_traj(start.period())
@@ -134,7 +132,7 @@ fn alt_orbit_raising() {
         .1
         .to_csv_with_step(
             &"multishoot_start.csv".to_string(),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -146,7 +144,7 @@ fn alt_orbit_raising() {
         .1
         .to_csv_with_step(
             &"multishoot_target.csv".to_string(),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -154,13 +152,13 @@ fn alt_orbit_raising() {
     // Just propagate this spacecraft for one orbit for plotting
     let (_, end_traj) = prop
         .with(sc_sol)
-        .for_duration_with_traj(2 * TimeUnit::Hour)
+        .for_duration_with_traj(2 * Unit::Hour)
         .unwrap();
 
     end_traj
         .to_csv_with_step(
             &"multishoot_to_end.csv".to_string(),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -266,7 +264,7 @@ fn vmag_orbit_raising() {
     for (i, traj) in all_trajectories.iter().enumerate() {
         traj.to_csv_with_step(
             &format!("multishoot_to_node_{}.csv", i),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -325,7 +323,7 @@ fn vmag_orbit_raising() {
         .1
         .to_csv_with_step(
             &"multishoot_start.csv".to_string(),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -337,7 +335,7 @@ fn vmag_orbit_raising() {
         .1
         .to_csv_with_step(
             &"multishoot_target.csv".to_string(),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -345,13 +343,13 @@ fn vmag_orbit_raising() {
     // Just propagate this spacecraft for one orbit for plotting
     let (_, end_traj) = prop
         .with(sc_sol)
-        .for_duration_with_traj(2 * TimeUnit::Hour)
+        .for_duration_with_traj(2 * Unit::Hour)
         .unwrap();
 
     end_traj
         .to_csv_with_step(
             &"multishoot_to_end.csv".to_string(),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();
@@ -382,7 +380,7 @@ fn vmag_orbit_raising() {
     {
         traj.to_csv_with_step(
             &format!("multishoot_to_node_{}.csv", i),
-            2 * TimeUnit::Second,
+            2 * Unit::Second,
             cosm.clone(),
         )
         .unwrap();

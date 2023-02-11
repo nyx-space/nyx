@@ -22,7 +22,7 @@ use super::{Frame, Orbit, OrbitDual, OrbitPartial};
 use crate::linalg::{Matrix2, Matrix3, Vector2, Vector3};
 use crate::md::objective::Objective;
 use crate::md::StateParameter;
-use crate::time::{Duration, Epoch, TimeUnit};
+use crate::time::{Duration, Epoch, Unit};
 use crate::utils::between_pm_180;
 use crate::NyxError;
 
@@ -140,7 +140,7 @@ impl BPlane {
     }
 
     pub fn ltof(&self) -> Duration {
-        self.ltof_s.real() * TimeUnit::Second
+        self.ltof_s.real() * Unit::Second
     }
 
     /// Returns the B plane angle in degrees between -180 and 180
@@ -236,7 +236,7 @@ impl BPlaneTarget {
     /// Initializes a new B Plane target with only the targets and the default tolerances.
     /// Default tolerances are 1 millimeter in positions and 1 second in LTOF
     pub fn from_targets(b_r_km: f64, b_t_km: f64, ltof: Duration) -> Self {
-        let tol_ltof: Duration = 6.0 * TimeUnit::Hour;
+        let tol_ltof: Duration = 6.0 * Unit::Hour;
         Self {
             b_t_km,
             b_r_km,
@@ -250,7 +250,7 @@ impl BPlaneTarget {
     /// Initializes a new B Plane target with only the B Plane targets (not LTOF constraint) and the default tolerances.
     /// Default tolerances are 1 millimeter in positions. Here, the LTOF tolerance is set to 100 days.
     pub fn from_bt_br(b_t_km: f64, b_r_km: f64) -> Self {
-        let ltof_tol: Duration = 100 * TimeUnit::Day;
+        let ltof_tol: Duration = 100 * Unit::Day;
         Self {
             b_t_km,
             b_r_km,
@@ -319,8 +319,7 @@ pub fn try_achieve_b_plane(
         loop {
             if attempt_no > max_iter {
                 return Err(NyxError::MaxIterReached(format!(
-                    "Error norm of {} km after {} iterations",
-                    prev_b_plane_err, max_iter
+                    "Error norm of {prev_b_plane_err} km after {max_iter} iterations",
                 )));
             }
 
@@ -341,7 +340,7 @@ pub fn try_achieve_b_plane(
             if b_plane_err.norm() >= prev_b_plane_err {
                 // If the error is not going down, we'll raise an error
                 return Err(NyxError::CorrectionIneffective(
-                    format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {:.3} km\tcur err norm: {:.3} km", prev_b_plane_err, b_plane_err.norm())
+                    format!("Delta-V correction is ineffective at reducing the B-Plane error:\nprev err norm: {prev_b_plane_err:.3} km\tcur err norm: {:.3} km", b_plane_err.norm())
                 ));
             }
             prev_b_plane_err = b_plane_err.norm();
@@ -368,8 +367,7 @@ pub fn try_achieve_b_plane(
         loop {
             if attempt_no > max_iter {
                 return Err(NyxError::MaxIterReached(format!(
-                    "Error norm of {} km after {} iterations",
-                    prev_b_plane_err, max_iter
+                    "Error norm of {prev_b_plane_err} km after {max_iter} iterations",
                 )));
             }
 

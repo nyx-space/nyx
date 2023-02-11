@@ -48,12 +48,12 @@ where
                     {
                         if log_enabled!(log::Level::Error) {
                             error!("[!!!] BUG [!!!]");
-                            error!("[!!!]\t{}\t[!!!]", e);
+                            error!("[!!!]\t{e}\t[!!!]");
                             error!("[!!!]\t{}\t[!!!]", self.traj);
                             error!("[!!!]     [!!!]");
                         } else {
                             println!("[!!!] BUG [!!!]");
-                            println!("[!!!]\t{}\t[!!!]", e);
+                            println!("[!!!]\t{e}\t[!!!]");
                             println!("[!!!]\t{}\t[!!!]", self.traj);
                             println!("[!!!]     [!!!]");
                         };
