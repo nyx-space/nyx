@@ -31,11 +31,11 @@ pub use super::sph_harmonics::Harmonics;
 /// `OrbitalDynamics` provides the equations of motion for any celestial dynamic, without state transition matrix computation.
 #[derive(Clone)]
 
-pub struct OrbitalDynamics<'a> {
-    pub accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>,
+pub struct OrbitalDynamics {
+    pub accel_models: Vec<Arc<dyn AccelModel + Sync>>,
 }
 
-impl<'a> OrbitalDynamics<'a> {
+impl OrbitalDynamics {
     /// Initialize point mass dynamics given the EXB IDs and a Cosm
     pub fn point_masses(bodies: &[Bodies], cosm: Arc<Cosm>) -> Self {
         // Create the point masses
@@ -48,37 +48,37 @@ impl<'a> OrbitalDynamics<'a> {
     }
 
     /// Initialize orbital dynamics with a list of acceleration models
-    pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync + 'a>>) -> Self {
+    pub fn new(accel_models: Vec<Arc<dyn AccelModel + Sync>>) -> Self {
         Self { accel_models }
     }
 
     /// Initialize new orbital mechanics with the provided model.
     /// **Note:** Orbital dynamics _always_ include two body dynamics, these cannot be turned off.
-    pub fn from_model(accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Self {
+    pub fn from_model(accel_model: Arc<dyn AccelModel + Sync>) -> Self {
         Self::new(vec![accel_model])
     }
 
     /// Add a model to the currently defined orbital dynamics
-    pub fn add_model(&mut self, accel_model: Arc<dyn AccelModel + Sync + 'a>) {
+    pub fn add_model(&mut self, accel_model: Arc<dyn AccelModel + Sync>) {
         self.accel_models.push(accel_model);
     }
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync + 'a>) -> Self {
+    pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync>) -> Self {
         let mut me = self.clone();
         me.add_model(accel_model);
         me
     }
 }
 
-impl<'a> fmt::Display for OrbitalDynamics<'a> {
+impl fmt::Display for OrbitalDynamics {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let as_string: String = self.accel_models.iter().map(|x| format!("{x}; ")).collect();
         write!(f, "Orbital dynamics: {as_string}")
     }
 }
 
-impl<'a> Dynamics for OrbitalDynamics<'a> {
+impl Dynamics for OrbitalDynamics {
     type HyperdualSize = Const<7>;
     type StateType = Orbit;
 

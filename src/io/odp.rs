@@ -37,9 +37,9 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant;
 
-pub struct OdpScenario<'a> {
-    truth: MDProcess<'a>,
-    nav: MDProcess<'a>,
+pub struct OdpScenario {
+    truth: MDProcess,
+    nav: MDProcess,
     ekf_msr_trigger: usize,
     ekf_disable_time: Duration,
     kf: KF<Orbit, U3, U2>,
@@ -47,7 +47,7 @@ pub struct OdpScenario<'a> {
     formatter: Option<NavSolutionFormatter>,
 }
 
-impl<'a> OdpScenario<'a> {
+impl OdpScenario {
     #[allow(clippy::identity_op)]
     pub fn try_from_scenario(
         scenario: &ScenarioSerde,

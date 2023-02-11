@@ -45,7 +45,7 @@ pub struct MultipleShooting<
     const OT: usize,
 > {
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+    pub prop: &'a Propagator<'a, SpacecraftDynamics, E>,
     /// List of nodes of the optimal trajectory
     pub targets: Vec<T>,
     /// Starting point, must be a spacecraft equipped with a thruster

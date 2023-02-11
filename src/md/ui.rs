@@ -49,11 +49,11 @@ use std::time::Instant;
 
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics
 #[allow(clippy::upper_case_acronyms)]
-pub struct MDProcess<'a>
+pub struct MDProcess
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    pub sc_dyn: SpacecraftDynamics<'a>,
+    pub sc_dyn: SpacecraftDynamics,
     pub init_state: Spacecraft,
     pub formatter: Option<StateFormatter>,
     pub prop_time: Option<Duration>,
@@ -62,7 +62,7 @@ where
     pub name: String,
 }
 
-impl<'a> MDProcess<'a>
+impl MDProcess
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
