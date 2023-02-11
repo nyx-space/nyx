@@ -69,7 +69,7 @@ extern crate thiserror;
 
 /// Re-export of hifitime
 pub mod time {
-    pub use hifitime::*;
+    pub use hifitime::prelude::*;
 }
 
 /// Re-export nalgebra

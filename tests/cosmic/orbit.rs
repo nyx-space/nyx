@@ -32,7 +32,7 @@ fn state_def_circ_inc() {
         5.088_611,
         -5.088_611,
         0.0,
-        Epoch::from_jde_tai(dt.as_jde_tai_days()),
+        Epoch::from_jde_tai(dt.to_jde_tai_days()),
         eme2k,
     );
     assert_eq!(

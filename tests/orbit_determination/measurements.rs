@@ -4,7 +4,8 @@ extern crate nyx_space as nyx;
 fn nil_measurement() {
     use self::nyx::cosmic::{Cosm, Orbit};
     use self::nyx::od::ui::*;
-    use self::nyx::time::{Epoch, J2000_OFFSET};
+    use self::nyx::time::Epoch;
+    use hifitime::J2000_OFFSET;
     use std::f64::EPSILON;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 

@@ -1,12 +1,13 @@
 extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
+use hifitime::J2000_OFFSET;
 use nyx::cosmic::{assert_orbit_eq_or_abs, Bodies, Cosm, Orbit};
 use nyx::dynamics::{Dynamics, OrbitalDynamics, PointMasses};
 use nyx::linalg::{Matrix6, Vector6};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::*;
-use nyx::time::{Epoch, Unit, J2000_OFFSET};
+use nyx::time::{Epoch, Unit};
 use nyx::utils::{rss_orbit_errors, rss_orbit_vec_errors};
 use nyx::State;
 

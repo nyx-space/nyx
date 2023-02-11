@@ -30,8 +30,12 @@ use crate::Spacecraft;
 use std::fmt;
 use std::sync::Arc;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// GroundStation defines a Two Way ranging equipment.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct GroundStation {
     pub name: String,
     /// in degrees
@@ -146,7 +150,10 @@ impl GroundStation {
             cosm,
         )
     }
+}
 
+#[cfg_attr(feature = "python", pymethods)]
+impl GroundStation {
     /// Computes the elevation of the provided object seen from this ground station.
     /// Also returns the ground station's orbit in the frame of the receiver
     pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit, Orbit) {

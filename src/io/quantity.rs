@@ -17,7 +17,7 @@
 */
 
 use super::regex::Regex;
-use crate::time::{SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE};
+use hifitime::{SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE};
 
 pub use super::ParsingError;
 

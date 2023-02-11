@@ -870,7 +870,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         if err_p_sm_oom - err_p_oom > 2 {
             println!(
                 "[!!! POS !!!]RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s",
-                truth_state.dt.as_gregorian_tai_str(),
+                truth_state.dt,
                 i,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -882,7 +882,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         if err_v_sm_oom - err_v_oom > 2 {
             println!(
                 "[!!! VEL !!!] RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt.as_gregorian_tai_str(),
+                truth_state.dt,
                 i,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -900,7 +900,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
                     i,
                     i,
                     est.covar[(i, i)],
-                    truth_state.dt.as_gregorian_tai_str(),
+                    truth_state.dt,
                     i,
                 );
             }
@@ -1127,7 +1127,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         if err_p_sm_oom - err_p_oom > 2 {
             println!(
                 "RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt.as_gregorian_tai_str(),
+                truth_state.dt,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1141,7 +1141,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         if err_v_sm_oom - err_v_oom > 2 {
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt.as_gregorian_tai_str(),
+                truth_state.dt,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1159,7 +1159,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                     i,
                     i,
                     est.covar[(i, i)],
-                    truth_state.dt.as_gregorian_tai_str(),
+                    truth_state.dt,
                     odp.estimates.len() - offset,
                 );
             }
@@ -1382,7 +1382,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
         if err_p_it_oom - err_p_oom > 2 {
             println!(
                 "RSS position error after iteration not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt.as_gregorian_tai_str(),
+                truth_state.dt,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1396,7 +1396,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
         if err_v_it_oom - err_v_oom > 3 {
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt.as_gregorian_tai_str(),
+                truth_state.dt,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1414,7 +1414,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                     i,
                     i,
                     est.covar[(i, i)],
-                    truth_state.dt.as_gregorian_tai_str(),
+                    truth_state.dt,
                     odp.estimates.len() - offset,
                 );
             }

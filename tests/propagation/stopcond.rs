@@ -2,12 +2,13 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use hifitime::J2000_OFFSET;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
-use nyx::time::{Epoch, TimeUnits, J2000_OFFSET};
+use nyx::time::{Epoch, TimeUnits};
 use nyx::State;
 
 #[test]

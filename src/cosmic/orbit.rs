@@ -36,6 +36,8 @@ use crate::utils::{
     spherical_to_cartesian,
 };
 use crate::NyxError;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
@@ -92,6 +94,7 @@ pub fn assert_orbit_eq_or_rel(left: &Orbit, right: &Orbit, epsilon: f64, msg: &s
 /// _Note:_ although not yet supported, this struct may change once True of Date or other nutation frames
 /// are added to the toolkit.
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct Orbit {
     /// in km
     pub x: f64,

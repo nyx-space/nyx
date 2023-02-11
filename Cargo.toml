@@ -61,7 +61,7 @@ opt-level = 0
 debug = true
 
 [features]
-default = []
+default = ["python"]
 python = ["pyo3", "pyo3-log", "hifitime/python"]
 # broken-donotuse = ["levenberg-marquardt"] 
 
