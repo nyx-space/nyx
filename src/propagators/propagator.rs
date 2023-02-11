@@ -468,7 +468,7 @@ where
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds -- it's mutable because we may change it below
-        let mut step_size = self.step_size.in_seconds();
+        let mut step_size = self.step_size.to_seconds();
         loop {
             let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
             self.k[0] = ki;
@@ -515,7 +515,7 @@ where
                 // Compute the error estimate.
                 self.details.error = E::estimate(&error_est, &next_state, state);
                 if self.details.error <= self.prop.opts.tolerance
-                    || step_size <= self.prop.opts.min_step.in_seconds()
+                    || step_size <= self.prop.opts.min_step.to_seconds()
                     || self.details.attempts >= self.prop.opts.attempts
                 {
                     if self.details.attempts >= self.prop.opts.attempts {
@@ -533,8 +533,8 @@ where
                             * step_size
                             * (self.prop.opts.tolerance / self.details.error)
                                 .powf(1.0 / f64::from(self.prop.order));
-                        step_size = if proposed_step > self.prop.opts.max_step.in_seconds() {
-                            self.prop.opts.max_step.in_seconds()
+                        step_size = if proposed_step > self.prop.opts.max_step.to_seconds() {
+                            self.prop.opts.max_step.to_seconds()
                         } else {
                             proposed_step
                         };
@@ -550,8 +550,8 @@ where
                         * step_size
                         * (self.prop.opts.tolerance / self.details.error)
                             .powf(1.0 / f64::from(self.prop.order - 1));
-                    step_size = if proposed_step < self.prop.opts.min_step.in_seconds() {
-                        self.prop.opts.min_step.in_seconds()
+                    step_size = if proposed_step < self.prop.opts.min_step.to_seconds() {
+                        self.prop.opts.min_step.to_seconds()
                     } else {
                         proposed_step
                     };

@@ -111,7 +111,7 @@ impl Mnvr {
 
     /// Return the thrust vector computed at the provided epoch
     pub fn vector(&self, epoch: Epoch) -> Vector3<f64> {
-        let t = (epoch - self.start).in_seconds();
+        let t = (epoch - self.start).to_seconds();
         let alpha = self.alpha_inplane_radians.eval(t);
         let delta = self.delta_outofplane_radians.eval(t);
         unit_vector_from_ra_dec(alpha, delta)

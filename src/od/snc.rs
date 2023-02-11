@@ -69,7 +69,7 @@ where
             "SNC: diag({}) {}",
             fmt_cov.join(", "),
             if let Some(start) = self.start_time {
-                format!("starting at {}", start.as_gregorian_utc_str())
+                format!("starting at {start}")
             } else {
                 "".to_string()
             }
@@ -171,7 +171,7 @@ where
 
         if let Some(decay) = &self.decay_diag {
             // Let's apply the decay to the diagonals
-            let total_delta_t = (epoch - self.init_epoch.unwrap()).in_seconds();
+            let total_delta_t = (epoch - self.init_epoch.unwrap()).to_seconds();
             for i in 0..self.diag.nrows() {
                 snc[(i, i)] *= (-decay[i] * total_delta_t).exp();
             }

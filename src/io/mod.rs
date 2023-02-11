@@ -99,17 +99,17 @@ pub enum EpochFormat {
 impl EpochFormat {
     pub fn format(&self, dt: Epoch) -> String {
         match *self {
-            EpochFormat::GregorianUtc => dt.as_gregorian_utc_str(),
-            EpochFormat::GregorianTai => dt.as_gregorian_tai_str(),
-            EpochFormat::MjdTai => format!("{:.9}", dt.as_mjd_tai_days()),
-            EpochFormat::MjdTt => format!("{:.9}", dt.as_mjd_tt_days()),
-            EpochFormat::MjdUtc => format!("{:.9}", dt.as_mjd_utc_days()),
-            EpochFormat::JdeEt => format!("{:.9}", dt.as_jde_et_days()),
-            EpochFormat::JdeTai => format!("{:.9}", dt.as_jde_tai_days()),
-            EpochFormat::JdeTt => format!("{:.9}", dt.as_jde_tt_days()),
-            EpochFormat::JdeUtc => format!("{:.9}", dt.as_jde_utc_days()),
-            EpochFormat::TaiSecs(e) => format!("{:.9}", dt.as_tai_seconds() - e),
-            EpochFormat::TaiDays(e) => format!("{:.9}", dt.as_tai_days() - e),
+            EpochFormat::GregorianUtc => format!("{dt}"),
+            EpochFormat::GregorianTai => format!("{dt:x}",),
+            EpochFormat::MjdTai => format!("{:.9}", dt.to_mjd_tai_days()),
+            EpochFormat::MjdTt => format!("{:.9}", dt.to_mjd_tt_days()),
+            EpochFormat::MjdUtc => format!("{:.9}", dt.to_mjd_utc_days()),
+            EpochFormat::JdeEt => format!("{:.9}", dt.to_jde_et_days()),
+            EpochFormat::JdeTai => format!("{:.9}", dt.to_jde_tai_days()),
+            EpochFormat::JdeTt => format!("{:.9}", dt.to_jde_tt_days()),
+            EpochFormat::JdeUtc => format!("{:.9}", dt.to_jde_utc_days()),
+            EpochFormat::TaiSecs(e) => format!("{:.9}", dt.to_tai_seconds() - e),
+            EpochFormat::TaiDays(e) => format!("{:.9}", dt.to_tai_days() - e),
         }
     }
 }

@@ -314,7 +314,7 @@ impl<'a> OdpScenario<'a> {
                             None => 100_000,
                         },
                         ekf_disable_time: match &odp_seq.ekf_disable_time {
-                            Some(val) => *val,
+                            Some(val) => Duration::from_str(val).unwrap(),
                             None => 1 * Unit::Hour, // defaults to one hour
                         },
                         stations,

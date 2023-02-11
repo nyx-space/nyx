@@ -549,7 +549,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             if corr.abs() > 1e-3 {
                                 // Check that we are within the bounds
                                 let init_duration_s =
-                                    (correction_epoch - achievement_epoch).in_seconds();
+                                    (correction_epoch - achievement_epoch).to_seconds();
                                 let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
                                 mnvr.end = mnvr.start + acceptable_corr;
                             }
@@ -558,7 +558,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             if corr.abs() > 1e-3 {
                                 // Check that we are within the bounds
                                 let total_end_corr =
-                                    (mnvr.end + corr.seconds() - achievement_epoch).in_seconds();
+                                    (mnvr.end + corr.seconds() - achievement_epoch).to_seconds();
                                 let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
                                 mnvr.end += acceptable_corr;
                             }
@@ -567,7 +567,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             if corr.abs() > 1e-3 {
                                 // Check that we are within the bounds
                                 let total_start_corr =
-                                    (mnvr.start + corr.seconds() - correction_epoch).in_seconds();
+                                    (mnvr.start + corr.seconds() - correction_epoch).to_seconds();
                                 let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
                                 mnvr.end += acceptable_corr;
 

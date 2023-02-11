@@ -61,7 +61,7 @@ where
 {
     pub(crate) fn append_spline(&mut self, segment: Spline<S>) -> Result<(), NyxError> {
         // Compute the number of seconds since start of trajectory
-        let offset_s = ((100.0 * (segment.start_epoch - self.start_state.epoch()).in_seconds())
+        let offset_s = ((100.0 * (segment.start_epoch - self.start_state.epoch()).to_seconds())
             .floor()) as i32;
         if offset_s.is_negative() {
             if !self.segments.is_empty() && !self.backward {
@@ -82,7 +82,7 @@ where
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
         // Durations are darn precise and converting a -2.6e-23 into an i32 will be -1
-        let offset_s = ((100.0 * (epoch - self.start_state.epoch()).in_seconds()).floor()) as i32;
+        let offset_s = ((100.0 * (epoch - self.start_state.epoch()).to_seconds()).floor()) as i32;
 
         // Retrieve that segment
         match self.segments.range(..=offset_s).rev().next() {
@@ -144,7 +144,7 @@ where
 
         // Helper lambdas, for f64s only
         let has_converged =
-            |x1: f64, x2: f64| (x1 - x2).abs() <= event.epoch_precision().in_seconds();
+            |x1: f64, x2: f64| (x1 - x2).abs() <= event.epoch_precision().to_seconds();
         let arrange = |a: f64, ya: f64, b: f64, yb: f64| {
             if ya.abs() > yb.abs() {
                 (a, ya, b, yb)
@@ -158,7 +158,7 @@ where
 
         // Search in seconds (convert to epoch just in time)
         let mut xa = 0.0;
-        let mut xb = (xb_e - xa_e).in_seconds();
+        let mut xb = (xb_e - xa_e).to_seconds();
         // Evaluate the event at both bounds
         let mut ya = event.eval(&self.at(xa_e)?);
         let mut yb = event.eval(&self.at(xb_e)?);
@@ -924,7 +924,7 @@ where
             self.first().epoch(),
             self.last().epoch(),
             dur,
-            dur.in_seconds(),
+            dur.to_seconds(),
             self.segments.len()
         )
     }
@@ -967,9 +967,9 @@ where
             1.0
         } else {
             normalize(
-                (state.epoch() - start_win_epoch).in_seconds(),
+                (state.epoch() - start_win_epoch).to_seconds(),
                 0.0,
-                window_duration.in_seconds(),
+                window_duration.to_seconds(),
             )
         };
         // Deduplicate

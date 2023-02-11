@@ -142,7 +142,7 @@ impl Frame {
     /// Source for everything else: https://en.wikipedia.org/w/index.php?title=Day&oldid=1008298887
     #[allow(clippy::identity_op)]
     pub fn angular_velocity(&self) -> f64 {
-        let period_to_mean_motion = |dur: Duration| -> f64 { 2.0 * PI / dur.in_seconds() };
+        let period_to_mean_motion = |dur: Duration| -> f64 { 2.0 * PI / dur.to_seconds() };
         match Bodies::try_from(self.ephem_path()).unwrap() {
             Bodies::MercuryBarycenter | Bodies::Mercury => {
                 period_to_mean_motion(58 * Unit::Day + 15 * Unit::Hour + 30 * Unit::Minute)

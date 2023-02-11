@@ -297,56 +297,56 @@ impl Epoch {
     /// `as_mjd_days` creates an Epoch from the provided Modified Julian Date in days as explained
     /// [here](http://tycho.usno.navy.mil/mjd.html). MJD epoch is Modified Julian Day at 17 November 1858 at midnight.
     pub fn as_mjd_tai_days(&self) -> f64 {
-        self.inner.as_mjd_tai_days()
+        self.inner.to_mjd_tai_days()
     }
 
     /// Returns the Modified Julian Date in seconds TAI.
     pub fn as_mjd_tai_seconds(&self) -> f64 {
-        self.inner.as_mjd_tai_seconds()
+        self.inner.to_mjd_tai_seconds()
     }
 
     // pub fn as_mjd_tai(self, unit: TimeUnit) -> f64 {
-    //     self.inner.as_mjd_tai(unit)
+    //     self.inner.to_mjd_tai(unit)
     // }
 
     /// Returns the Modified Julian Date in days UTC.
     pub fn as_mjd_utc_days(&self) -> f64 {
-        self.inner.as_mjd_utc_days()
+        self.inner.to_mjd_utc_days()
     }
 
     // /// Returns the Modified Julian Date in the provided unit in UTC.
     // pub fn as_mjd_utc(self, unit: TimeUnit) -> f64 {
-    //     self.inner.as_mjd_utc_days()
+    //     self.inner.to_mjd_utc_days()
     // }
 
     /// Returns the Modified Julian Date in seconds UTC.
     pub fn as_mjd_utc_seconds(&self) -> f64 {
-        self.inner.as_mjd_utc_seconds()
+        self.inner.to_mjd_utc_seconds()
     }
 
     /// Returns the Julian days from epoch 01 Jan -4713, 12:00 (noon)
     /// as explained in "Fundamentals of astrodynamics and applications", Vallado et al.
     /// 4th edition, page 182, and on [Wikipedia](https://en.wikipedia.org/wiki/Julian_day).
     pub fn as_jde_tai_days(&self) -> f64 {
-        self.inner.as_jde_tai_days()
+        self.inner.to_jde_tai_days()
     }
 
     // pub fn as_jde_tai(self, unit: TimeUnit) -> f64 {
-    //     self.inner.as_jde_tai()
+    //     self.inner.to_jde_tai()
     // }
 
     // pub fn as_jde_tai_duration(&self) -> Duration {
-    //     self.inner.as_jde_tai_duration()
+    //     self.inner.to_jde_tai_duration()
     // }
 
     /// Returns the Julian seconds in TAI.
     pub fn as_jde_tai_seconds(&self) -> f64 {
-        self.inner.as_jde_tai_seconds()
+        self.inner.to_jde_tai_seconds()
     }
 
     /// Returns the Julian days in UTC.
     pub fn as_jde_utc_days(&self) -> f64 {
-        self.inner.as_jde_utc_days()
+        self.inner.to_jde_utc_days()
     }
 
     // pub fn as_jde_utc_duration(&self) -> Duration {
@@ -355,7 +355,7 @@ impl Epoch {
 
     /// Returns the Julian seconds in UTC.
     pub fn as_jde_utc_seconds(&self) -> f64 {
-        self.inner.as_jde_utc_seconds()
+        self.inner.to_jde_utc_seconds()
     }
 
     /// Returns seconds past TAI epoch in Terrestrial Time (TT) (previously called Terrestrial Dynamical Time (TDT))
@@ -384,7 +384,7 @@ impl Epoch {
 
     /// Returns days past Julian epoch in Terrestrial Time (TT) (previously called Terrestrial Dynamical Time (TDT))
     pub fn as_jde_tt_days(&self) -> f64 {
-        self.inner.as_jde_tt_days()
+        self.innerto_jde_tt_days()
     }
 
     // pub fn as_jde_tt_duration(&self) -> Duration {
@@ -393,7 +393,7 @@ impl Epoch {
 
     /// Returns days past Modified Julian epoch in Terrestrial Time (TT) (previously called Terrestrial Dynamical Time (TDT))
     pub fn as_mjd_tt_days(&self) -> f64 {
-        self.inner.as_mjd_tt_days()
+        self.inner.to_mjd_tt_days()
     }
 
     // pub fn as_mjd_tt_duration(&self) -> Duration {
@@ -436,24 +436,24 @@ impl Epoch {
 
     /// Returns the Ephemeris Time JDE past epoch
     pub fn as_jde_et_days(&self) -> f64 {
-        self.inner.as_jde_et_days()
+        self.innerto_jde_et_days()
     }
 
     // pub fn as_jde_et_duration(&self) -> Duration {
-    //     self.as_jde_tt_duration() + TimeUnit::Second * 0.000_935
+    //     selfto_jde_tt_duration() + TimeUnit::Second * 0.000_935
     // }
 
     // pub fn as_jde_et(self, unit: TimeUnit) -> f64 {
-    //     self.inner.as_jde_et()
+    //     self.innerto_jde_et()
     // }
 
     // pub fn as_jde_tdb_duration(&self) -> Duration {
-    //     self.as_jde_tdb_days() * TimeUnit::Day
+    //     selfto_jde_tdb_days() * TimeUnit::Day
     // }
 
     /// Returns the Dynamic Barycentric Time (TDB) (higher fidelity SPICE ephemeris time) whose epoch is 2000 JAN 01 noon TAI (cf. https://gssc.esa.int/navipedia/index.php/Transformations_between_Time_Systems#TDT_-_TDB.2C_TCB)
     pub fn as_jde_tdb_days(&self) -> f64 {
-        self.inner.as_jde_tdb_days()
+        self.innerto_jde_tdb_days()
     }
 
     /// Returns the number of days since Dynamic Barycentric Time (TDB) J2000 (used for Archinal et al. rotations)
@@ -516,22 +516,22 @@ impl Epoch {
     /// use hifitime::Epoch;
     /// let dt_str = "2017-01-14T00:31:55 UTC";
     /// let dt = Epoch::from_gregorian_str(dt_str).unwrap();
-    /// let (y, m, d, h, min, s, _) = dt.as_gregorian_utc();
+    /// let (y, m, d, h, min, s, _) = dt.to_gregorian_utc();
     /// assert_eq!(y, 2017);
     /// assert_eq!(m, 1);
     /// assert_eq!(d, 14);
     /// assert_eq!(h, 0);
     /// assert_eq!(min, 31);
     /// assert_eq!(s, 55);
-    /// assert_eq!(dt_str, dt.as_gregorian_utc_str().to_owned());
+    /// assert_eq!(dt_str, format!("{dt}"));
     /// ```
     pub fn as_gregorian_utc(&self) -> (i32, u8, u8, u8, u8, u8, u32) {
-        self.inner.as_gregorian_utc()
+        self.inner.to_gregorian_utc()
     }
 
     /// Converts the Epoch to UTC Gregorian in the ISO8601 format.
     pub fn as_gregorian_utc_str(&self) -> String {
-        self.inner.as_gregorian_utc_str()
+        format!("{}", self.inner)
     }
 
     /// Converts the Epoch to the Gregorian TAI equivalent as (year, month, day, hour, minute, second).
@@ -541,7 +541,7 @@ impl Epoch {
     /// ```
     /// use hifitime::Epoch;
     /// let dt = Epoch::from_gregorian_tai_at_midnight(1972, 1, 1);
-    /// let (y, m, d, h, min, s, _) = dt.as_gregorian_tai();
+    /// let (y, m, d, h, min, s, _) = dt.to_gregorian_tai();
     /// assert_eq!(y, 1972);
     /// assert_eq!(m, 1);
     /// assert_eq!(d, 1);
@@ -550,12 +550,12 @@ impl Epoch {
     /// assert_eq!(s, 0);
     /// ```
     pub fn as_gregorian_tai(&self) -> (i32, u8, u8, u8, u8, u8, u32) {
-        self.inner.as_gregorian_tai()
+        self.inner.to_gregorian_tai()
     }
 
     /// Converts the Epoch to TAI Gregorian in the ISO8601 format with " TAI" appended to the string
     pub fn as_gregorian_tai_str(&self) -> String {
-        self.inner.as_gregorian_tai_str()
+        self.inner.to_gregorian_tai_str()
     }
 
     // /// Converts the Epoch to Gregorian in the provided time system and in the ISO8601 format with the time system appended to the string

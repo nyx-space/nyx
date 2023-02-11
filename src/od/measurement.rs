@@ -374,7 +374,7 @@ impl Serialize for StdMeasurement {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(3))?;
-        seq.serialize_element(&self.dt.as_mjd_tai_days())?;
+        seq.serialize_element(&self.dt.to_mjd_tai_days())?;
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.serialize_element(&obs[(1, 0)])?;
@@ -470,7 +470,7 @@ impl Serialize for RangeMsr {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(3))?;
-        seq.serialize_element(&self.dt.as_mjd_tai_days())?;
+        seq.serialize_element(&self.dt.to_mjd_tai_days())?;
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.end()
@@ -566,7 +566,7 @@ impl Serialize for DopplerMsr {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(3))?;
-        seq.serialize_element(&self.dt.as_mjd_tai_days())?;
+        seq.serialize_element(&self.dt.to_mjd_tai_days())?;
         let obs = self.observation();
         seq.serialize_element(&obs[(0, 0)])?;
         seq.end()

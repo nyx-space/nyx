@@ -501,7 +501,7 @@ where
                 if self.prop.details.step < delta_t {
                     // Do a single step and (probably) a time update, but we'll see that later
                     self.prop.single_step()?;
-                } else if delta_t.in_seconds() > 0.0 {
+                } else if delta_t.to_seconds() > 0.0 {
                     // Take one final step of exactly the needed duration until the next measurement
                     self.prop.for_duration(delta_t)?;
                 }

@@ -130,19 +130,19 @@ impl XbEpoch {
                 unimplemented!("TAI")
             }
             1 => match self.repr {
-                5 => Epoch::from_jde_et(epoch_delta.in_unit(Unit::Day)),
+                5 => Epoch::from_jde_et(epoch_delta.to_unit(Unit::Day)),
                 _ => unimplemented!("ET"),
             },
             2 => match self.repr {
-                0 => Epoch::from_tt_seconds(epoch_delta.in_seconds()),
+                0 => Epoch::from_tt_seconds(epoch_delta.to_seconds()),
                 _ => unimplemented!("TT"),
             },
             3 => {
                 unimplemented!("UTC")
             }
             4 => match self.repr {
-                2 => Epoch::from_tdb_seconds(epoch_delta.in_seconds()),
-                5 => Epoch::from_jde_tdb(epoch_delta.in_unit(Unit::Day)),
+                2 => Epoch::from_tdb_seconds(epoch_delta.to_seconds()),
+                5 => Epoch::from_jde_tdb(epoch_delta.to_unit(Unit::Day)),
                 _ => unimplemented!("TDB"),
             },
             _ => unimplemented!(),

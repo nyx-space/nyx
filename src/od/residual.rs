@@ -119,17 +119,17 @@ where
     {
         let mut seq = serializer.serialize_seq(Some(2 * M::dim() + 1))?;
         match self.epoch_fmt {
-            EpochFormat::GregorianUtc => seq.serialize_element(&self.dt.as_gregorian_utc_str())?,
-            EpochFormat::GregorianTai => seq.serialize_element(&self.dt.as_gregorian_tai_str())?,
-            EpochFormat::MjdTai => seq.serialize_element(&self.dt.as_mjd_tai_days())?,
-            EpochFormat::MjdTt => seq.serialize_element(&self.dt.as_mjd_tt_days())?,
-            EpochFormat::MjdUtc => seq.serialize_element(&self.dt.as_mjd_utc_days())?,
-            EpochFormat::JdeEt => seq.serialize_element(&self.dt.as_jde_et_days())?,
-            EpochFormat::JdeTai => seq.serialize_element(&self.dt.as_jde_tai_days())?,
-            EpochFormat::JdeTt => seq.serialize_element(&self.dt.as_jde_tt_days())?,
-            EpochFormat::JdeUtc => seq.serialize_element(&self.dt.as_jde_utc_days())?,
-            EpochFormat::TaiSecs(e) => seq.serialize_element(&(self.dt.as_tai_seconds() - e))?,
-            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.dt.as_tai_days() - e))?,
+            EpochFormat::GregorianUtc => seq.serialize_element(&format!("{}", self.dt))?,
+            EpochFormat::GregorianTai => seq.serialize_element(&format!("{:x}", self.dt))?,
+            EpochFormat::MjdTai => seq.serialize_element(&self.dt.to_mjd_tai_days())?,
+            EpochFormat::MjdTt => seq.serialize_element(&self.dt.to_mjd_tt_days())?,
+            EpochFormat::MjdUtc => seq.serialize_element(&self.dt.to_mjd_utc_days())?,
+            EpochFormat::JdeEt => seq.serialize_element(&self.dt.to_jde_et_days())?,
+            EpochFormat::JdeTai => seq.serialize_element(&self.dt.to_jde_tai_days())?,
+            EpochFormat::JdeTt => seq.serialize_element(&self.dt.to_jde_tt_days())?,
+            EpochFormat::JdeUtc => seq.serialize_element(&self.dt.to_jde_utc_days())?,
+            EpochFormat::TaiSecs(e) => seq.serialize_element(&(self.dt.to_tai_seconds() - e))?,
+            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.dt.to_tai_days() - e))?,
         }
         // Serialize the prefit
         for i in 0..M::dim() {

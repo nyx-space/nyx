@@ -240,10 +240,10 @@ impl BPlaneTarget {
         Self {
             b_t_km,
             b_r_km,
-            ltof_s: ltof.in_seconds(),
+            ltof_s: ltof.to_seconds(),
             tol_b_t_km: 1e-6,
             tol_b_r_km: 1e-6,
-            tol_ltof_s: tol_ltof.in_seconds(),
+            tol_ltof_s: tol_ltof.to_seconds(),
         }
     }
 
@@ -257,7 +257,7 @@ impl BPlaneTarget {
             ltof_s: 0.0,
             tol_b_t_km: 1e-6,
             tol_b_r_km: 1e-6,
-            tol_ltof_s: ltof_tol.in_seconds(),
+            tol_ltof_s: ltof_tol.to_seconds(),
         }
     }
 

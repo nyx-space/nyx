@@ -24,7 +24,7 @@ use super::serde_derive::Deserialize;
 use super::ParsingError;
 use crate::cosmic::{Frame, Orbit};
 use crate::md::{Event, StateParameter};
-use crate::time::{Duration, Epoch};
+use crate::time::Epoch;
 use crate::NyxError;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -391,7 +391,7 @@ pub struct OdpSerde {
     /// Set the number of measurements to switch to an EKF
     pub ekf_msr_trigger: Option<usize>,
     /// Set the acceptable time between measurements
-    pub ekf_disable_time: Option<Duration>,
+    pub ekf_disable_time: Option<String>,
     /// An optional output of a NavSolution
     pub output: Option<String>,
 }

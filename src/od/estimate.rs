@@ -252,7 +252,7 @@ where
             f,
             "=== {} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
             word,
-            &self.epoch().as_gregorian_utc_str(),
+            &self.epoch(),
             self.within_3sigma(),
             &self.state(),
             fmt_cov.join(",")
@@ -293,23 +293,19 @@ where
         let dim = <T as State>::Size::dim();
         let mut seq = serializer.serialize_seq(Some(dim * 3 + 1))?;
         match self.epoch_fmt {
-            EpochFormat::GregorianUtc => {
-                seq.serialize_element(&self.epoch().as_gregorian_utc_str())?
-            }
-            EpochFormat::GregorianTai => {
-                seq.serialize_element(&self.epoch().as_gregorian_tai_str())?
-            }
-            EpochFormat::MjdTai => seq.serialize_element(&self.epoch().as_mjd_tai_days())?,
-            EpochFormat::MjdTt => seq.serialize_element(&self.epoch().as_mjd_tt_days())?,
-            EpochFormat::MjdUtc => seq.serialize_element(&self.epoch().as_mjd_utc_days())?,
-            EpochFormat::JdeEt => seq.serialize_element(&self.epoch().as_jde_et_days())?,
-            EpochFormat::JdeTai => seq.serialize_element(&self.epoch().as_jde_tai_days())?,
-            EpochFormat::JdeTt => seq.serialize_element(&self.epoch().as_jde_tt_days())?,
-            EpochFormat::JdeUtc => seq.serialize_element(&self.epoch().as_jde_utc_days())?,
+            EpochFormat::GregorianUtc => seq.serialize_element(&self.epoch())?,
+            EpochFormat::GregorianTai => seq.serialize_element(&self.epoch())?,
+            EpochFormat::MjdTai => seq.serialize_element(&self.epoch().to_mjd_tai_days())?,
+            EpochFormat::MjdTt => seq.serialize_element(&self.epoch().to_mjd_tt_days())?,
+            EpochFormat::MjdUtc => seq.serialize_element(&self.epoch().to_mjd_utc_days())?,
+            EpochFormat::JdeEt => seq.serialize_element(&self.epoch().to_jde_et_days())?,
+            EpochFormat::JdeTai => seq.serialize_element(&self.epoch().to_jde_tai_days())?,
+            EpochFormat::JdeTt => seq.serialize_element(&self.epoch().to_jde_tt_days())?,
+            EpochFormat::JdeUtc => seq.serialize_element(&self.epoch().to_jde_utc_days())?,
             EpochFormat::TaiSecs(e) => {
-                seq.serialize_element(&(self.epoch().as_tai_seconds() - e))?
+                seq.serialize_element(&(self.epoch().to_tai_seconds() - e))?
             }
-            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.epoch().as_tai_days() - e))?,
+            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.epoch().to_tai_days() - e))?,
         }
         // Serialize the state
         for i in 0..dim {

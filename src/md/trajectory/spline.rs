@@ -59,9 +59,9 @@ where
         }
 
         let t_prime = normalize(
-            dur_into_window.in_seconds(),
+            dur_into_window.to_seconds(),
             0.0,
-            self.duration.in_seconds(),
+            self.duration.to_seconds(),
         );
 
         let mut state = from;

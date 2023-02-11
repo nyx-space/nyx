@@ -250,7 +250,7 @@ where
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = OMatrix::<f64, <T as State>::Size, A>::zeros();
-                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).in_seconds();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).to_seconds();
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;
@@ -333,7 +333,7 @@ where
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = OMatrix::<f64, <T as State>::Size, A>::zeros();
-                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).in_seconds();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).to_seconds();
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;

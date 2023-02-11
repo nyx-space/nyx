@@ -1597,7 +1597,7 @@ impl Serialize for Orbit {
         S: Serializer,
     {
         let mut state = serializer.serialize_struct("Orbit", 7)?;
-        state.serialize_field("dt", &self.dt.as_jde_et_days())?;
+        state.serialize_field("dt", &self.dt.to_jde_et_days())?;
         state.serialize_field("x", &self.x)?;
         state.serialize_field("y", &self.y)?;
         state.serialize_field("z", &self.z)?;
@@ -1617,7 +1617,7 @@ impl fmt::Display for Orbit {
             f,
             "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
-            self.dt.as_gregorian_utc_str(),
+            self.dt,
             format!("{:.*}", decimals, self.x),
             format!("{:.*}", decimals, self.y),
             format!("{:.*}", decimals, self.z),
@@ -1637,7 +1637,7 @@ impl fmt::LowerExp for Orbit {
             f,
             "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
-            self.dt.as_gregorian_utc_str(),
+            self.dt,
             format!("{:.*e}", decimals, self.x),
             format!("{:.*e}", decimals, self.y),
             format!("{:.*e}", decimals, self.z),
@@ -1657,7 +1657,7 @@ impl fmt::UpperExp for Orbit {
             f,
             "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
-            self.dt.as_gregorian_utc_str(),
+            self.dt,
             format!("{:.*E}", decimals, self.x),
             format!("{:.*E}", decimals, self.y),
             format!("{:.*E}", decimals, self.z),
@@ -1677,7 +1677,7 @@ impl fmt::LowerHex for Orbit {
             f,
             "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
             self.frame,
-            self.dt.as_gregorian_utc_str(),
+            self.dt,
             format!("{:.*}", decimals, self.sma()),
             format!("{:.*}", decimals, self.ecc()),
             format!("{:.*}", decimals, self.inc()),
@@ -1697,7 +1697,7 @@ impl fmt::UpperHex for Orbit {
             f,
             "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
             self.frame,
-            self.dt.as_gregorian_utc_str(),
+            self.dt,
             format!("{:.*e}", decimals, self.sma()),
             format!("{:.*e}", decimals, self.ecc()),
             format!("{:.*e}", decimals, self.inc()),
@@ -1814,7 +1814,7 @@ impl State for Orbit {
             StateParameter::Inclination => Ok(self.inc()),
             StateParameter::MeanAnomaly => Ok(self.ma()),
             StateParameter::PeriapsisRadius => Ok(self.periapsis()),
-            StateParameter::Period => Ok(self.period().in_seconds()),
+            StateParameter::Period => Ok(self.period().to_seconds()),
             StateParameter::RightAscension => Ok(self.right_ascension()),
             StateParameter::RAAN => Ok(self.raan()),
             StateParameter::Rmag => Ok(self.rmag()),

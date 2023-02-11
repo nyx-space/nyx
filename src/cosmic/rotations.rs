@@ -194,8 +194,8 @@ impl fmt::Debug for Euler3AxisDt {
 
 impl ParentRotation for Euler3AxisDt {
     fn dcm_to_parent(&self, datetime: Epoch) -> Option<Matrix3<f64>> {
-        let days_d = datetime.as_tdb_days_since_j2000();
-        let centuries_t = datetime.as_tdb_centuries_since_j2000();
+        let days_d = datetime.to_tdb_days_since_j2000();
+        let centuries_t = datetime.to_tdb_centuries_since_j2000();
         // Let's create a new context, add the time variables, and compute the rotation's context
         // Note: this will be resolved with Chi/racr files.
         let mut ctx = Context::default();
