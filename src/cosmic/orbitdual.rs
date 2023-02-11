@@ -23,16 +23,13 @@ extern crate serde;
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, OHyperdual};
 use super::na::{Vector3, U7};
-use super::{Frame, Orbit};
+use super::{Frame, Orbit, ECC_EPSILON};
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::{NyxError, TimeTagged};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
-
-/// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
-pub const ECC_EPSILON: f64 = 1e-11;
 
 /// Orbit defines an orbital state
 ///
