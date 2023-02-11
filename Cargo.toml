@@ -21,8 +21,7 @@ gitlab = { repository = "nyx-space/nyx", branch = "master" }
 [dependencies]
 nalgebra = "0.31"
 log = "0.4"
-# hifitime = "=3.3.0"
-hifitime = "3.8.0"
+hifitime = { version = "3.8.0", features = ["std"] }
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"
@@ -49,6 +48,7 @@ approx = "0.5"
 rand_pcg = "0.3"
 yaserde = "0.7.0"
 yaserde_derive = "0.7.0"
+pyo3 = {version = "0.17.3", optional = true, features = ["extension-module"]}
 pyo3-log = {version = "0.8.1", optional = true}
 levenberg-marquardt = {version="0.12", optional=true}
 indicatif = {version = "0.16", features = ["rayon"]}
@@ -62,13 +62,8 @@ debug = true
 
 [features]
 default = []
-python = ["pyo3", "pyo3-log"]
-# broken-donotuse = ["levenberg-marquardt"]
-
-[dependencies.pyo3]
-version = "0.18"
-features = ["extension-module"]
-optional = true
+python = ["pyo3", "pyo3-log", "hifitime/python"]
+# broken-donotuse = ["levenberg-marquardt"] 
 
 [lib]
 crate-type = ["cdylib", "rlib"]
