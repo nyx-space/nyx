@@ -272,7 +272,7 @@ pub struct AttitudeRegistry {
     /// states. These time entries are seconds past the start_epoch provided in the
     /// higher struct. Perform a binary search in this index to retrieve time key
     /// for the desired time. In other words, search for the closest time to the
-    /// desired time, and retrive the Attitude for this time. Check the repr enum
+    /// desired time, and retrieve the Attitude for this time. Check the repr enum
     /// to understand the attitude representation. If it isn't set, check the
     /// comments or discuss with the publisher of the file.
     ///
@@ -383,7 +383,7 @@ pub struct AttitudeInterp {
     /// interpolated states. These time entries are seconds past the
     /// start_mod_julian dates (which is in days). Perform a binary search in this
     /// index to retrieve time key for the desired time. In other words, search for
-    /// the closest time to the desired time, retrive the InterpState for this
+    /// the closest time to the desired time, retrieve the InterpState for this
     /// time, build the interpolation functions, and finally apply these at the
     /// desired time.
     ///
@@ -488,7 +488,7 @@ pub enum AttitudeRepr {
 }
 #[derive(Clone, PartialEq, prost::Message)]
 pub struct Ephemeris {
-    /// Nmae of this ephemeris
+    /// Name of this ephemeris
     #[prost(string, tag = "1")]
     pub name: prost::alloc::string::String,
     /// Name of the orientation frame
@@ -683,7 +683,7 @@ pub struct VarWindowStates {
     /// interpolated states. These time entries are seconds past the start_epoch
     /// (defined in the parent Ephemeris object). Perform a binary search in this
     /// index to retrieve time key for the desired time. In other words, search for
-    /// the closest time to the desired time, retrive the InterpState for this
+    /// the closest time to the desired time, retrieve the InterpState for this
     /// time, build the interpolation functions, and finally apply these at the
     /// desired time. NOTE: Limitations of protobufs require this index to be an
     /// integer. NOTE: For better platform support, these reference times are

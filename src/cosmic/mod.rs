@@ -111,7 +111,7 @@ where
     }
 
     /// Allows setting the value of the given parameter.
-    /// NOTE: Most paramaters where the `value` is available CANNOT be also set for that parameter (it's a much harder problem!)
+    /// NOTE: Most parameters where the `value` is available CANNOT be also set for that parameter (it's a much harder problem!)
     fn set_value(&mut self, _param: &StateParameter, _val: f64) -> Result<(), NyxError> {
         Err(NyxError::StateParameterUnavailable)
     }
