@@ -33,11 +33,10 @@ prost-derive = "0.11"
 rand = "0.8"
 rand_distr = "0.4"
 meval = "0.2"
-num = {version = "0.4", default-features = false}
 rust-embed = "6"
 toml = "0.7"
 clap = "2"
-config = "0.11"
+config = "0.13"
 regex = "1.5"
 pretty_env_logger = "0.4"
 dialoguer = "0.10"
@@ -54,7 +53,7 @@ levenberg-marquardt = {version="0.12", optional=true}
 indicatif = {version = "0.16", features = ["rayon"]}
 rstats = "1.0.12"
 thiserror = "1.0"
-
+# parquet = "33.0.0"
 
 [profile.dev]
 opt-level = 0

@@ -20,7 +20,7 @@ fn tgt_sma_from_apo() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -74,7 +74,7 @@ fn tgt_sma_from_peri_fd() {
 
     let target_delta_t: Duration = xi_orig.period() / 20.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -129,7 +129,7 @@ fn tgt_hd_sma_from_peri() {
 
     let target_delta_t: Duration = xi_orig.period() / 40.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::new(xi_orig, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0);
 
@@ -186,7 +186,7 @@ fn orbit_stm_chk() {
     // let target_delta_t: Duration = xi_orig.period() / 2.0;
     let target_delta_t = 100.0 * Unit::Second;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     // let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -237,7 +237,7 @@ fn tgt_ecc_from_apo() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -305,7 +305,7 @@ fn tgt_ecc_from_peri() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -377,7 +377,7 @@ fn tgt_raan_from_apo() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -428,7 +428,7 @@ fn tgt_raan_from_peri() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -500,7 +500,7 @@ fn tgt_aop_from_apo() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -551,7 +551,7 @@ fn tgt_aop_from_peri() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 

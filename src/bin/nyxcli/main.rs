@@ -91,26 +91,28 @@ fn main() -> Result<(), ParsingError> {
 
     let matches = app.get_matches();
 
-    let mut s = Config::new();
+    let s = Config::builder();
 
     // Start off by merging in the "default" configuration file
     let scenario_path = matches.value_of("SCENARIO").unwrap();
-    if scenario_path.contains('*') {
-        s.merge(
+    let cfg = if scenario_path.contains('*') {
+        s.add_source(
             glob(scenario_path)
                 .unwrap()
                 .map(|path| File::from(path.unwrap()))
                 .collect::<Vec<_>>(),
         )
-        .expect("Could not load scenario from folder");
+        .build()
+        .unwrap()
     } else {
-        s.merge(File::with_name(scenario_path))
-            .expect("Could not load scenario from file");
-    }
+        s.add_source(File::with_name(scenario_path))
+            .build()
+            .unwrap()
+    };
 
     let exec_all = matches.is_present("all");
     // Try to deserialize the scenario
-    let scenario: ScenarioSerde = match s.try_into() {
+    let scenario: ScenarioSerde = match cfg.try_deserialize() {
         Ok(s) => s,
         Err(e) => return Err(ParsingError::LoadingError(e.to_string())),
     };

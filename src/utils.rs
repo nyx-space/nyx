@@ -17,10 +17,8 @@
 */
 
 extern crate nalgebra as na;
-extern crate num;
 
 use self::na::Complex;
-use self::num::traits::real::Real;
 use crate::cosmic::Orbit;
 use crate::linalg::{
     allocator::Allocator, DefaultAllocator, DimName, Matrix3, Matrix6, OVector, Vector3, Vector6,
@@ -124,11 +122,11 @@ pub fn between_pm_x(angle: f64, x: f64) -> f64 {
 }
 
 /// The Kronecker delta function
-pub fn kronecker<T: Real>(a: T, b: T) -> T {
-    if (a - b).abs() <= T::epsilon() {
-        T::one()
+pub fn kronecker(a: f64, b: f64) -> f64 {
+    if (a - b).abs() <= f64::EPSILON {
+        1.0
     } else {
-        T::zero()
+        0.0
     }
 }
 

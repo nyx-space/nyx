@@ -36,6 +36,7 @@ pub struct Mnvr {
     pub start: Epoch,
     /// End epoch of the maneuver
     pub end: Epoch,
+    /// TODO: Add a thruster group set to specify which set of thrusters to use for this maneuver, should be a key to a thruster (maybe change thruster to a hashmap actually now that I don't care about embedded stuff).
     /// Thrust level, if 1.0 use all thruster available at full power
     /// TODO: Convert this to a common polynomial as well to optimize throttle, throttle rate (and accel?)
     pub thrust_lvl: f64,

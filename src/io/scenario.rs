@@ -21,6 +21,7 @@ use super::gravity::HarmonicsMem;
 use super::quantity::*;
 use super::rv::Distribution;
 use super::serde_derive::Deserialize;
+use super::stations::StationSerde;
 use super::ParsingError;
 use crate::cosmic::{Frame, Orbit};
 use crate::md::{Event, StateParameter};
@@ -416,17 +417,6 @@ pub struct MeasurementSerde {
     pub output: Option<String>,
     /// Optionally specify whether to use the file if it exists
     pub use_file_if_available: Option<bool>,
-}
-
-#[derive(Deserialize)]
-pub struct StationSerde {
-    pub elevation: f64,
-    pub range_noise: f64,
-    pub range_rate_noise: f64,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub height: Option<f64>,
-    pub inherit: Option<String>,
 }
 
 #[derive(Deserialize)]

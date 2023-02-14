@@ -21,11 +21,16 @@ extern crate regex;
 extern crate serde;
 extern crate serde_derive;
 
+use serde::{Deserialize, Serialize};
+
 use crate::errors::NyxError;
 use crate::time::Epoch;
 use std::convert::From;
 use std::fmt;
 use std::str::FromStr;
+use std::sync::Arc;
+
+use self::odp::Cosm;
 
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
@@ -48,6 +53,25 @@ pub mod formatter;
 pub mod quantity;
 
 pub mod ccsds;
+
+mod stations;
+
+/// Trait to specify that a structure can be configured from a file, either in TOML, YAML, JSON, INI, etc.
+pub trait Configurable<'a>
+where
+    Self: Sized,
+{
+    /// The intermediate representation needed to create `Self` or to serialize Self.
+    type IntermediateRepr: Sized + Serialize + Deserialize<'a>;
+
+    /// Creates a new instance of `self` from the configuration.
+    fn from_config(cfg: &Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ParsingError>
+    where
+        Self: Sized;
+
+    /// Converts self into the intermediate representation which is serializable.
+    fn to_config(&self) -> Result<Self::IntermediateRepr, ParsingError>;
+}
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]

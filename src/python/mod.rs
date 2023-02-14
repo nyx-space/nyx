@@ -56,7 +56,7 @@ fn register_time_module(py: Python<'_>, parent_module: &PyModule) -> PyResult<()
 
 /// Orbit determination
 fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "od")?;
+    let sm = PyModule::new(py, "orbit_determination")?;
 
     sm.add_class::<GroundStation>()?;
 
