@@ -58,7 +58,7 @@ fn stop_cond_3rd_apo() {
 
     assert!(
         (180.0 - third_apo.ta()).abs() < 1e-3,
-        "converged, yet convergence critera not met"
+        "converged, yet convergence criteria not met"
     );
 }
 
@@ -111,7 +111,7 @@ fn stop_cond_3rd_peri() {
 
     assert!(
         third_peri.ta().abs() < 1e-1 || (360.0 - third_peri.ta().abs() < 1e-1),
-        "converged, yet convergence critera not met"
+        "converged, yet convergence criteria not met"
     );
 }
 
@@ -229,7 +229,7 @@ fn line_of_nodes() {
 
     assert!(
         lon_state.geodetic_longitude().abs() < lon_event.value_precision,
-        "converged, yet convergence critera not met"
+        "converged, yet convergence criteria not met"
     );
 }
 
@@ -258,6 +258,6 @@ fn latitude() {
 
     assert!(
         (2.0 - lon_state.geodetic_latitude()).abs() < lat_event.value_precision,
-        "converged, yet convergence critera not met"
+        "converged, yet convergence criteria not met"
     );
 }

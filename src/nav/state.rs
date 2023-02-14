@@ -114,7 +114,7 @@ impl NavState<Orbit, NoParameters> for OrbitNavState {}
 // {
 //     /// Estimated physical state
 //     state: X,
-//     /// Estimated paramaters
+//     /// Estimated parameters
 //     parameters: P,
 // }
 

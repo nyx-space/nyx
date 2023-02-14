@@ -66,7 +66,7 @@ impl OutputSerde {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StateHeader {
-    /// Stores either the state paramater or the epoch
+    /// Stores either the state parameter or the epoch
     pub param: StateParameter,
     pub frame_name: Option<String>,
     pub epoch_fmt: Option<EpochFormat>,
@@ -671,7 +671,7 @@ impl NavSolutionFormatter {
                 "covar_velocity" => hdrs.push(NavSolutionHeader::Covar_vel),
                 "estimate" | "nominal" => {
                     let param = StateParameter::from_str(splt[1].to_lowercase().as_str())
-                        .expect("Unknown paramater");
+                        .expect("Unknown parameter");
 
                     let state_hdr = StateHeader {
                         param,

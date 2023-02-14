@@ -50,7 +50,7 @@ Outstanding mission design features available [here](https://gitlab.com/chrisrab
 ## Celestial computations
 - [x] Orbital state manipulation
 - [x] Planetary and Solar eclipse and visibility computation
-- [x] Light-time corrections and abberations
+- [x] Light-time corrections and aberrations
 - [x] Frame rotations
 
 # Who am I?

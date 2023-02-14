@@ -44,7 +44,7 @@ where
 
 /// A largest error control which effectively computes the largest error at each component
 ///
-/// This is a standard error computation algorithm, but it's argubly bad if the state's components have different units.
+/// This is a standard error computation algorithm, but it's arguably bad if the state's components have different units.
 /// It calculates the largest local estimate of the error from the integration (`error_est`)
 /// given the difference in the candidate state and the previous state (`state_delta`).
 /// This error estimator is from the physical model estimator of GMAT
@@ -78,7 +78,7 @@ impl ErrorCtrl for LargestError {
 
 /// A largest step error control which effectively computes the L1 norm of the provided Vector of size 3
 ///
-/// Note that this error controller should be preferrably be used only with slices of a state with the same units.
+/// Note that this error controller should be preferably be used only with slices of a state with the same units.
 /// For example, one should probably use this for position independently of using it for the velocity.
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3033]
 #[derive(Clone, Copy)]
@@ -140,7 +140,7 @@ impl ErrorCtrl for LargestState {
 
 /// An RSS step error control which effectively computes the L2 norm of the provided Vector of size 3
 ///
-/// Note that this error controller should be preferrably be used only with slices of a state with the same units.
+/// Note that this error controller should be preferably be used only with slices of a state with the same units.
 /// For example, one should probably use this for position independently of using it for the velocity.
 /// (Source)[https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/forcemodel/ODEModel.cpp#L3045]
 #[derive(Clone, Copy)]

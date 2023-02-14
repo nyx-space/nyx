@@ -38,7 +38,7 @@ pub struct Ruggiero {
 }
 
 /// The Ruggiero is a locally optimal guidance law of a state for specific osculating elements.
-/// NOTE: The efficency parameters for AoP is NOT implemented: the paper's formulation is broken.
+/// NOTE: The efficiency parameters for AoP is NOT implemented: the paper's formulation is broken.
 /// WARNING: Objectives must be in degrees!
 impl Ruggiero {
     /// Creates a new Ruggiero locally optimal control as an Arc
@@ -98,7 +98,7 @@ impl Ruggiero {
         }))
     }
 
-    /// Returns the efficency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
+    /// Returns the efficiency η ∈ [0; 1] of correcting a specific orbital element at the provided osculating orbit
     pub fn efficency(parameter: &StateParameter, osc_orbit: &Orbit) -> Result<f64, NyxError> {
         let e = osc_orbit.ecc();
         match parameter {
@@ -137,7 +137,7 @@ impl Ruggiero {
         }
     }
 
-    /// Computes the weight at which to correct this orbital element, will be zero if the current efficency is below the threshold
+    /// Computes the weight at which to correct this orbital element, will be zero if the current efficiency is below the threshold
     fn weighting(&self, obj: &Objective, osc_orbit: &Orbit, η_threshold: f64) -> f64 {
         let init = self.init_state.value(&obj.parameter).unwrap();
         let osc = osc_orbit.value(&obj.parameter).unwrap();
