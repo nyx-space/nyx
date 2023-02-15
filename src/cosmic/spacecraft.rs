@@ -433,7 +433,7 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
 
         // Extract the orbit information
         let orbit_state = sc_state.fixed_rows::<6>(0).into_owned();
-        let orbit_stm = sc_full_stm.fixed_slice::<6, 6>(0, 0).into_owned();
+        let orbit_stm = sc_full_stm.fixed_view::<6, 6>(0, 0).into_owned();
         // Rebuild the orbit vector
         let mut orbit_vec = OVector::<f64, Const<42>>::zeros();
         orbit_vec[0] = orbit_state[0];

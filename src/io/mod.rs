@@ -52,8 +52,6 @@ pub mod formatter;
 
 pub mod quantity;
 
-pub mod ccsds;
-
 mod stations;
 
 /// Trait to specify that a structure can be configured from a file, either in TOML, YAML, JSON, INI, etc.

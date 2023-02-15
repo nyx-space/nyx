@@ -2,7 +2,7 @@
 name = "nyx-space"
 version = "1.1.1"
 edition = "2021"
-resolver = "2"
+# resolver = "2"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://nyxspace.com"
@@ -19,14 +19,14 @@ maintenance = { status = "actively-developed" }
 gitlab = { repository = "nyx-space/nyx", branch = "master" }
 
 [dependencies]
-nalgebra = "0.31"
+nalgebra = "0.32"
 log = "0.4"
 hifitime = { version = "3.8.0", features = ["std"] }
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 serde = "1.0"
 serde_derive = "1.0"
 csv = "1"
-hyperdual = "1.1.0"
+hyperdual = "1.2.0"
 bytes = "1.0"
 prost = "0.11"
 prost-derive = "0.11"
@@ -36,7 +36,7 @@ meval = "0.2"
 rust-embed = "6"
 toml = "0.7"
 clap = "2"
-config = "0.13"
+config = {version = "0.13.3", features = ["yaml"]}
 regex = "1.5"
 pretty_env_logger = "0.4"
 dialoguer = "0.10"
@@ -45,25 +45,20 @@ rayon = "1.5"
 lazy_static = "1.4.0"
 approx = "0.5"
 rand_pcg = "0.3"
-yaserde = "0.7.0"
-yaserde_derive = "0.7.0"
 pyo3 = {version = "0.17.3", optional = true, features = ["extension-module"]}
 pyo3-log = {version = "0.8.1", optional = true}
-levenberg-marquardt = {version="0.12", optional=true}
+# levenberg-marquardt = {version="0.12", optional=true}
 indicatif = {version = "0.16", features = ["rayon"]}
 rstats = "1.0.12"
 thiserror = "1.0"
-# parquet = "33.0.0"
-
-[profile.dev]
-opt-level = 0
-debug = true
+parquet = "33.0.0"
 
 [features]
-default = ["python"]
+default = []
 python = ["pyo3", "pyo3-log", "hifitime/python"]
+# python = ["pyo3", "pyo3-log"]
 # broken-donotuse = ["levenberg-marquardt"] 
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-name = "nyx_space"
+# [lib]
+# crate-type = ["cdylib", "rlib"]
+# name = "nyx_space"
