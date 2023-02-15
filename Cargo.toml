@@ -48,7 +48,7 @@ rand_pcg = "0.3"
 pyo3 = {version = "0.17.3", optional = true, features = ["extension-module"]}
 pyo3-log = {version = "0.8.1", optional = true}
 # levenberg-marquardt = {version="0.12", optional=true}
-indicatif = {version = "0.16", features = ["rayon"]}
+indicatif = {version = "0.17", features = ["rayon"]}
 rstats = "1.0.12"
 thiserror = "1.0"
 parquet = "33.0.0"

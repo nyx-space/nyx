@@ -76,6 +76,7 @@ where
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("[{elapsed_precise}] {bar:100.cyan/blue} {pos:>7}/{len:7} {msg}")
+                .unwrap()
                 .progress_chars("##-"),
         );
         pb.set_message(format!("{self}"));
