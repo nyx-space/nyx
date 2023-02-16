@@ -2,6 +2,8 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use rand::thread_rng;
+
 use self::nyx::md::ui::*;
 use self::nyx::od::ui::*;
 
@@ -56,10 +58,11 @@ fn od_val_multi_body_ckf_perfect_stations() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break;
@@ -192,10 +195,11 @@ fn multi_body_ckf_covar_map() {
     let mut prop = setup.with(initial_state);
     prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break;

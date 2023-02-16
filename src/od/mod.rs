@@ -16,16 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate hyperdual;
-extern crate rand;
-extern crate rand_distr;
-extern crate serde;
-
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::io::{CovarFormat, EpochFormat};
@@ -47,6 +43,11 @@ pub mod ui;
 
 /// Provides all of the measurements functionality, including measurement simulation
 // pub mod msr;
+
+/// Provides all of the functionality to simulate measurements from ground stations
+pub mod simulator;
+
+pub use simulator::trackdata::TrackingDataSim;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
@@ -129,7 +130,10 @@ where
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
+    fn sensitivity(
+        &self,
+        nominal: Self::State,
+    ) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
     where
         DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
 
@@ -137,10 +141,9 @@ where
     fn visible(&self) -> bool;
 }
 
-/// A trait to generalize measurement devices such as a ground station
-pub trait MeasurementDevice<MsrIn, Msr>
+/// A trait to generalize tracking devices such as a ground station
+pub trait TrackingData<Msr>
 where
-    Self: Sized,
     Msr: Measurement,
     DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
@@ -148,8 +151,23 @@ where
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
 {
-    /// Returns the measurement if the device and generate one, else returns None
-    fn measure(&self, input: &MsrIn, cosm: Arc<Cosm>) -> Option<Msr>;
+    /// Returns the observation at the provided epoch.
+    fn measure(&self, epoch: Epoch, cosm: Arc<Cosm>) -> Option<Msr>;
+}
+
+pub struct TrackingArc<Msr, D>
+where
+    D: TrackingData<Msr>,
+    Msr: Measurement,
+    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::VecLength>
+        + Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
+{
+    /// List of devices
+    pub devices: Vec<D>,
+    _msr: PhantomData<Msr>,
 }
 
 pub trait EstimateFrom<O: State>
