@@ -386,7 +386,7 @@ fn sc_and_orbit_stm_chk() {
     );
 
     let sc_stm = final_sc.stm().unwrap();
-    let sc_orbit_stm = sc_stm.fixed_slice::<6, 6>(0, 0);
+    let sc_orbit_stm = sc_stm.fixed_view::<6, 6>(0, 0);
     assert_eq!(
         sc_orbit_stm,
         final_orbit.stm().unwrap(),

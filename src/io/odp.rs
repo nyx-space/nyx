@@ -45,6 +45,7 @@ pub struct OdpScenario {
     kf: KF<Orbit, U3, U2>,
     stations: Vec<GroundStation>,
     formatter: Option<NavSolutionFormatter>,
+    cosm: Arc<Cosm>,
 }
 
 impl OdpScenario {
@@ -116,22 +117,22 @@ impl OdpScenario {
                                 let gs = if let Some(base) = &s.inherit {
                                     match base.to_lowercase().as_str() {
                                         "dss13" => GroundStation::dss13_goldstone(
-                                            s.elevation,
-                                            s.range_noise,
-                                            s.range_rate_noise,
-                                            cosm.clone(),
+                                            s.elevation_mask_deg,
+                                            s.range_noise_km,
+                                            s.range_rate_noise_km_s,
+                                            iau_earth,
                                         ),
                                         "dss34" => GroundStation::dss34_canberra(
-                                            s.elevation,
-                                            s.range_noise,
-                                            s.range_rate_noise,
-                                            cosm.clone(),
+                                            s.elevation_mask_deg,
+                                            s.range_noise_km,
+                                            s.range_rate_noise_km_s,
+                                            iau_earth,
                                         ),
                                         "dss65" => GroundStation::dss65_madrid(
-                                            s.elevation,
-                                            s.range_noise,
-                                            s.range_rate_noise,
-                                            cosm.clone(),
+                                            s.elevation_mask_deg,
+                                            s.range_noise_km,
+                                            s.range_rate_noise_km_s,
+                                            iau_earth,
                                         ),
                                         _ => {
                                             return Err(ParsingError::OD(format!(
@@ -143,14 +144,13 @@ impl OdpScenario {
                                     let station_name = device.clone();
                                     GroundStation::from_noise_values(
                                         station_name,
-                                        s.elevation,
-                                        s.latitude.unwrap(),
-                                        s.longitude.unwrap(),
-                                        s.height.unwrap(),
-                                        s.range_noise,
-                                        s.range_rate_noise,
+                                        s.elevation_mask_deg,
+                                        s.latitude_deg.unwrap(),
+                                        s.longitude_deg.unwrap(),
+                                        s.height_km.unwrap(),
+                                        s.range_noise_km,
+                                        s.range_rate_noise_km_s,
                                         iau_earth,
-                                        cosm.clone(),
                                     )
                                 };
                                 stations.push(gs);
@@ -300,7 +300,7 @@ impl OdpScenario {
                                     "output `{output}` not found",
                                 )))
                             }
-                            Some(output) => Some(output.to_nav_sol_formatter(cosm)?),
+                            Some(output) => Some(output.to_nav_sol_formatter(cosm.clone())?),
                         },
                         None => None,
                     };
@@ -319,6 +319,7 @@ impl OdpScenario {
                         },
                         stations,
                         formatter,
+                        cosm,
                     });
                 }
             }
@@ -391,7 +392,7 @@ impl OdpScenario {
                     .expect("could not format state");
             }
             for station in self.stations.iter() {
-                let meas = station.measure(&rx_state).unwrap();
+                let meas = station.measure(&rx_state, self.cosm.clone()).unwrap();
                 if meas.visible() {
                     sim_measurements.push(meas);
                     break; // We know that only one station is in visibility at each time.
@@ -416,7 +417,7 @@ impl OdpScenario {
 
         let kf = self.kf;
         let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
-        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), trig);
+        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), trig, self.cosm.clone());
 
         odp.process_measurements(&sim_measurements)?;
 

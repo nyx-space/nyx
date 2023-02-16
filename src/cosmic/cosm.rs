@@ -35,6 +35,8 @@ use crate::hifitime::{Epoch, Unit, SECONDS_PER_DAY};
 use crate::io::frame_serde;
 use crate::na::{Matrix3, Matrix6};
 use crate::utils::{capitalize, dcm_finite_differencing, rotv};
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::fmt;
 pub use std::io::{Error as IoError, ErrorKind as IoErrorKind};
@@ -98,6 +100,7 @@ impl FrameTree {
 }
 
 // Defines Cosm, from the Greek word for "world" or "universe".
+#[cfg_attr(feature = "python", pyclass)]
 pub struct Cosm {
     pub xb: Xb,
     pub frame_root: FrameTree,

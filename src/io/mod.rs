@@ -21,12 +21,19 @@ extern crate regex;
 extern crate serde;
 extern crate serde_derive;
 
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::errors::NyxError;
 use crate::time::Epoch;
+use serde_yaml::Error as YamlError;
 use std::convert::From;
 use std::fmt;
+use std::fmt::Debug;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Error as IoError;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -54,21 +61,64 @@ pub mod quantity;
 
 mod stations;
 
+use std::io;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("Failed to read configuration file: {0}")]
+    ReadError(#[from] io::Error),
+
+    #[error("Failed to parse YAML configuration file: {0}")]
+    ParseError(#[source] serde_yaml::Error),
+
+    #[error("Invalid configuration: {0}")]
+    InvalidConfig(String),
+}
+
+pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
+    /// Builds the configuration representation from the path to a yaml
+    fn load_yaml<P>(path: P) -> Result<Self, ConfigError>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+    }
+
+    /// Builds a sequence of "Selves" from the provided path to a yaml
+    fn load_many_yaml<P>(path: P) -> Result<Vec<Self>, ConfigError>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+    }
+}
+
 /// Trait to specify that a structure can be configured from a file, either in TOML, YAML, JSON, INI, etc.
-pub trait Configurable<'a>
+pub trait Configurable
 where
     Self: Sized,
 {
     /// The intermediate representation needed to create `Self` or to serialize Self.
-    type IntermediateRepr: Sized + Serialize + Deserialize<'a>;
+    type IntermediateRepr: ConfigRepr;
+
+    fn from_yaml<P: AsRef<Path>>(path: P, cosm: Arc<Cosm>) -> Result<Self, ConfigError> {
+        Self::from_config(Self::IntermediateRepr::load_yaml(path)?, cosm)
+    }
 
     /// Creates a new instance of `self` from the configuration.
-    fn from_config(cfg: &Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ParsingError>
+    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
     where
         Self: Sized;
 
     /// Converts self into the intermediate representation which is serializable.
-    fn to_config(&self) -> Result<Self::IntermediateRepr, ParsingError>;
+    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError>;
 }
 
 #[allow(clippy::upper_case_acronyms)]
@@ -91,6 +141,8 @@ pub enum ParsingError {
     Velocity(String),
     IllDefined(String),
     ExecutionError(NyxError),
+    IoError(IoError),
+    Yaml(YamlError),
 }
 
 impl From<NyxError> for ParsingError {

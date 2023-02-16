@@ -293,8 +293,8 @@ where
         let dim = <T as State>::Size::dim();
         let mut seq = serializer.serialize_seq(Some(dim * 3 + 1))?;
         match self.epoch_fmt {
-            EpochFormat::GregorianUtc => seq.serialize_element(&self.epoch())?,
-            EpochFormat::GregorianTai => seq.serialize_element(&self.epoch())?,
+            EpochFormat::GregorianUtc => seq.serialize_element(&format!("{}", self.epoch()))?,
+            EpochFormat::GregorianTai => seq.serialize_element(&format!("{}", self.epoch()))?,
             EpochFormat::MjdTai => seq.serialize_element(&self.epoch().to_mjd_tai_days())?,
             EpochFormat::MjdTt => seq.serialize_element(&self.epoch().to_mjd_tt_days())?,
             EpochFormat::MjdUtc => seq.serialize_element(&self.epoch().to_mjd_utc_days())?,

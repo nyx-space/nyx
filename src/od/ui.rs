@@ -168,6 +168,7 @@ pub struct ODProcess<
     /// Vector of residuals available after a pass
     pub residuals: Vec<Residual<Msr::MeasurementSize>>,
     pub ekf_trigger: T,
+    pub cosm: Arc<Cosm>,
     simultaneous_msr: bool,
     init_state: D::StateType,
     _marker: PhantomData<A>,
@@ -209,7 +210,13 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ekf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, trigger: T) -> Self {
+    pub fn ekf(
+        prop: PropInstance<'a, D, E>,
+        kf: K,
+        devices: Vec<N>,
+        trigger: T,
+        cosm: Arc<Cosm>,
+    ) -> Self {
         let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
@@ -220,6 +227,7 @@ where
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
+            cosm,
             init_state,
             simultaneous_msr: false,
             _marker: PhantomData::<A>,
@@ -518,7 +526,9 @@ where
 
                     // Get the computed observations
                     for device in self.devices.iter() {
-                        if let Some(computed_meas) = device.measure(&nominal_state) {
+                        if let Some(computed_meas) =
+                            device.measure(&nominal_state, self.cosm.clone())
+                        {
                             if computed_meas.visible() {
                                 self.kf.update_h_tilde(computed_meas.sensitivity());
 
@@ -703,7 +713,7 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>) -> Self {
+    pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, cosm: Arc<Cosm>) -> Self {
         let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
@@ -714,6 +724,7 @@ where
             simultaneous_msr: false,
             estimates,
             residuals: Vec::with_capacity(10_000),
+            cosm,
             ekf_trigger: CkfTrigger {},
             init_state,
             _marker: PhantomData::<A>,

@@ -16,34 +16,27 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate clap;
-extern crate config;
-extern crate dialoguer;
-extern crate glob;
-extern crate lazy_static;
-extern crate log;
-extern crate nyx_space as nyx;
-extern crate pretty_env_logger;
-extern crate rust_embed;
-
 use clap::{App, Arg};
 use config::{Config, File};
 use dialoguer::{theme::ColorfulTheme, Select};
 use glob::glob;
 use lazy_static::lazy_static;
 use log::{debug, error, info};
-use nyx::cosmic::{Cosm, Xb};
-use nyx::io::{odp::OdpScenario, scenario::*, ParsingError};
-use nyx::md::ui::MDProcess;
-use nyx::md::MdHdlr;
-use nyx::md::OrbitStateOutput;
-use nyx::Spacecraft;
+use nyx_space::cosmic::{Cosm, Xb};
+use nyx_space::io::{odp::OdpScenario, scenario::*, ParsingError};
+use nyx_space::md::ui::MDProcess;
+use nyx_space::md::MdHdlr;
+use nyx_space::md::OrbitStateOutput;
+use nyx_space::Spacecraft;
 use rust_embed::RustEmbed;
+use shadow_rs::shadow;
 use std::borrow::Cow;
 use std::env::{set_var, var};
 use std::sync::Arc;
 
 const LOG_VAR: &str = "NYX_LOG";
+
+shadow!(build);
 
 lazy_static! {
     static ref COSM: Arc<Cosm> = {
@@ -62,9 +55,11 @@ lazy_static! {
 #[folder = "data/embed/"]
 struct EmbeddedAsset;
 
+// TODO: Use shadow-rs here.
+
 fn main() -> Result<(), ParsingError> {
-    let app = App::new("nyx")
-        .version("1.0.0-alpha.2")
+    let app = App::new(build::PROJECT_NAME)
+        .version(build::PKG_VERSION)
         .author("Chris Rabotin <chris.rabotin@pm.me>")
         .about("Mission design, orbit determination and Monte-Carlo tool.")
         .arg(

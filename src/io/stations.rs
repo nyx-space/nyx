@@ -16,81 +16,183 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use super::serde_derive::{Deserialize, Serialize};
+use super::ConfigError;
+use super::{ConfigRepr, Configurable};
+use crate::od::ui::GroundStation;
+use std::fmt::Debug;
 use std::sync::Arc;
 
-use super::serde_derive::{Deserialize, Serialize};
-use super::{Configurable, ParsingError};
-use crate::od::ui::GroundStation;
-
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct StationSerde {
     pub name: String,
-    pub frame_name: Option<String>,
-    pub elevation: f64,
-    pub range_noise: f64,
-    pub range_rate_noise: f64,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub height: Option<f64>,
+    pub frame: Option<String>,
+    pub elevation_mask_deg: f64,
+    pub range_noise_km: f64,
+    pub range_rate_noise_km_s: f64,
+    pub latitude_deg: Option<f64>,
+    pub longitude_deg: Option<f64>,
+    pub height_km: Option<f64>,
     pub inherit: Option<String>,
 }
 
-impl<'a> Configurable<'a> for GroundStation {
+impl ConfigRepr for StationSerde {}
+
+impl Configurable for GroundStation {
     type IntermediateRepr = StationSerde;
 
     fn from_config(
-        cfg: &Self::IntermediateRepr,
+        cfg: Self::IntermediateRepr,
         cosm: Arc<super::odp::Cosm>,
-    ) -> Result<Self, ParsingError>
+    ) -> Result<Self, ConfigError>
     where
         Self: Sized,
     {
         let gs = if let Some(base) = &cfg.inherit {
+            let iau_earth = cosm.frame("IAU Earth");
             match base.to_lowercase().as_str() {
                 "dss13" => GroundStation::dss13_goldstone(
-                    cfg.elevation,
-                    cfg.range_noise,
-                    cfg.range_rate_noise,
-                    cosm.clone(), // Dammit it.
+                    cfg.elevation_mask_deg,
+                    cfg.range_noise_km,
+                    cfg.range_rate_noise_km_s,
+                    iau_earth,
                 ),
                 "dss34" => GroundStation::dss34_canberra(
-                    cfg.elevation,
-                    cfg.range_noise,
-                    cfg.range_rate_noise,
-                    cosm.clone(),
+                    cfg.elevation_mask_deg,
+                    cfg.range_noise_km,
+                    cfg.range_rate_noise_km_s,
+                    iau_earth,
                 ),
                 "dss65" => GroundStation::dss65_madrid(
-                    cfg.elevation,
-                    cfg.range_noise,
-                    cfg.range_rate_noise,
-                    cosm.clone(),
+                    cfg.elevation_mask_deg,
+                    cfg.range_noise_km,
+                    cfg.range_rate_noise_km_s,
+                    iau_earth,
                 ),
-                _ => return Err(ParsingError::OD(format!("unknown base station `{base}`",))),
+                _ => {
+                    return Err(ConfigError::InvalidConfig(format!(
+                        "unknown built-in station {base}"
+                    )))
+                }
             }
         } else {
             let frame_name = cfg
-                .frame_name
+                .frame
                 .clone()
                 .or_else(|| Some("IAU Earth".to_string()))
                 .unwrap();
 
             GroundStation::from_noise_values(
                 cfg.name.clone(),
-                cfg.elevation,
-                cfg.latitude.unwrap(),
-                cfg.longitude.unwrap(),
-                cfg.height.unwrap(),
-                cfg.range_noise,
-                cfg.range_rate_noise,
+                cfg.elevation_mask_deg,
+                cfg.latitude_deg.unwrap(),
+                cfg.longitude_deg.unwrap(),
+                cfg.height_km.unwrap(),
+                cfg.range_noise_km,
+                cfg.range_rate_noise_km_s,
                 cosm.frame(&frame_name),
-                cosm.clone(),
             )
         };
 
         Ok(gs)
     }
 
-    fn to_config(&self) -> Result<Self::IntermediateRepr, ParsingError> {
+    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
         todo!()
     }
+}
+
+#[test]
+fn test_load_single() {
+    use std::env;
+    use std::path::PathBuf;
+
+    // Get the path to the root directory of the current Cargo project
+    let test_data: PathBuf = [
+        env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data".to_string(),
+        "tests".to_string(),
+        "config".to_string(),
+        "one_ground_station.yaml".to_string(),
+    ]
+    .iter()
+    .collect();
+
+    assert!(test_data.exists(), "Could not find the test data");
+
+    let gs = StationSerde::load_yaml(test_data).unwrap();
+
+    dbg!(&gs);
+
+    let expected_gs = StationSerde {
+        name: "Demo ground station".to_string(),
+        frame: Some("IAU Earth".to_string()),
+        elevation_mask_deg: 5.0,
+        range_noise_km: 1e-3,
+        range_rate_noise_km_s: 1e-5,
+        latitude_deg: Some(2.3522),
+        longitude_deg: Some(48.8566),
+        height_km: Some(0.4),
+        inherit: None,
+    };
+
+    assert_eq!(expected_gs, gs);
+}
+
+#[test]
+fn test_load_many() {
+    use std::env;
+    use std::path::PathBuf;
+
+    // Get the path to the root directory of the current Cargo project
+
+    let test_data: PathBuf = [
+        env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data".to_string(),
+        "tests".to_string(),
+        "config".to_string(),
+        "many_ground_stations.yaml".to_string(),
+    ]
+    .iter()
+    .collect();
+
+    // assert!(test_data.exists(), "Could not find the test data");
+
+    // let stations = StationSerde::load_many_yaml(test_data).unwrap();
+    let stations = match StationSerde::load_many_yaml(test_data) {
+        Ok(stations) => stations,
+        Err(e) => {
+            println!("{e}");
+            panic!();
+        }
+    };
+
+    dbg!(&stations);
+
+    let expected = vec![
+        StationSerde {
+            name: "Demo ground station".to_string(),
+            frame: Some("IAU Earth".to_string()),
+            elevation_mask_deg: 5.0,
+            range_noise_km: 1e-3,
+            range_rate_noise_km_s: 1e-5,
+            latitude_deg: Some(2.3522),
+            longitude_deg: Some(48.8566),
+            height_km: Some(0.4),
+            inherit: None,
+        },
+        StationSerde {
+            name: "Inherited".to_string(),
+            frame: None,
+            elevation_mask_deg: 5.0,
+            range_noise_km: 1e-3,
+            range_rate_noise_km_s: 1e-5,
+            inherit: Some("DSS34".to_string()),
+            latitude_deg: None,
+            longitude_deg: None,
+            height_km: None,
+        },
+    ];
+
+    assert_eq!(expected, stations);
 }

@@ -364,7 +364,7 @@ pub enum PropagatorKind {
 pub struct PropagatorSerde {
     /// Name of the string being associated with this propagator
     pub dynamics: String,
-    /// Name of the stoping condition used
+    /// Name of the stopping condition used
     pub stop_cond: String,
     /// The tolerance of the propagator (default to 1e-12)
     pub tolerance: Option<f64>,

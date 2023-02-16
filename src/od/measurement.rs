@@ -48,7 +48,6 @@ pub struct GroundStation {
     pub height: f64,
     /// Frame in which this station is defined
     pub frame: Frame,
-    pub cosm: Arc<Cosm>,
     range_noise: Normal<f64>,
     range_rate_noise: Normal<f64>,
 }
@@ -64,7 +63,6 @@ impl GroundStation {
         range_noise: f64,
         range_rate_noise: f64,
         frame: Frame,
-        cosm: Arc<Cosm>,
     ) -> Self {
         Self {
             name,
@@ -73,7 +71,6 @@ impl GroundStation {
             longitude,
             height,
             frame,
-            cosm,
             range_noise: Normal::new(0.0, range_noise).unwrap(),
             range_rate_noise: Normal::new(0.0, range_rate_noise).unwrap(),
         }
@@ -87,18 +84,15 @@ impl GroundStation {
         longitude: f64,
         height: f64,
         frame: Frame,
-        cosm: Arc<Cosm>,
     ) -> Self {
-        Self::from_noise_values(
-            name, 0.0, latitude, longitude, height, 0.0, 0.0, frame, cosm,
-        )
+        Self::from_noise_values(name, 0.0, latitude, longitude, height, 0.0, 0.0, frame)
     }
 
     pub fn dss65_madrid(
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: Arc<Cosm>,
+        iau_earth: Frame,
     ) -> Self {
         Self::from_noise_values(
             "Madrid".to_string(),
@@ -108,8 +102,7 @@ impl GroundStation {
             0.834_939,
             range_noise,
             range_rate_noise,
-            cosm.frame("IAU Earth"),
-            cosm,
+            iau_earth,
         )
     }
 
@@ -117,7 +110,7 @@ impl GroundStation {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: Arc<Cosm>,
+        iau_earth: Frame,
     ) -> Self {
         Self::from_noise_values(
             "Canberra".to_string(),
@@ -127,8 +120,7 @@ impl GroundStation {
             0.691_750,
             range_noise,
             range_rate_noise,
-            cosm.frame("IAU Earth"),
-            cosm,
+            iau_earth,
         )
     }
 
@@ -136,7 +128,7 @@ impl GroundStation {
         elevation_mask: f64,
         range_noise: f64,
         range_rate_noise: f64,
-        cosm: Arc<Cosm>,
+        iau_earth: Frame,
     ) -> Self {
         Self::from_noise_values(
             "Goldstone".to_string(),
@@ -146,8 +138,7 @@ impl GroundStation {
             1.071_149_04,
             range_noise,
             range_rate_noise,
-            cosm.frame("IAU Earth"),
-            cosm,
+            iau_earth,
         )
     }
 }
@@ -156,9 +147,9 @@ impl GroundStation {
 impl GroundStation {
     /// Computes the elevation of the provided object seen from this ground station.
     /// Also returns the ground station's orbit in the frame of the receiver
-    pub fn elevation_of(&self, rx: &Orbit) -> (f64, Orbit, Orbit) {
+    pub fn elevation_of(&self, rx: &Orbit, cosm: &Cosm) -> (f64, Orbit, Orbit) {
         // Start by converting the receiver spacecraft into the ground station frame.
-        let rx_gs_frame = self.cosm.frame_chg(rx, self.frame);
+        let rx_gs_frame = cosm.frame_chg(rx, self.frame);
 
         let dt = rx.dt;
         // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
@@ -177,7 +168,7 @@ impl GroundStation {
         let elevation = rho_sez.declination();
 
         // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
-        (elevation, *rx, self.cosm.frame_chg(&tx_gs_frame, rx.frame))
+        (elevation, *rx, cosm.frame_chg(&tx_gs_frame, rx.frame))
     }
 
     /// Return this ground station as an orbit in its current frame
@@ -194,8 +185,8 @@ impl GroundStation {
 
 impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &Orbit) -> Option<StdMeasurement> {
-        let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx);
+    fn measure(&self, rx: &Orbit, cosm: Arc<Cosm>) -> Option<StdMeasurement> {
+        let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx, &cosm);
 
         Some(StdMeasurement::new(
             rx.dt,
@@ -210,8 +201,8 @@ impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
 
 impl MeasurementDevice<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, sc_rx: &Spacecraft) -> Option<StdMeasurement> {
-        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit);
+    fn measure(&self, sc_rx: &Spacecraft, cosm: Arc<Cosm>) -> Option<StdMeasurement> {
+        let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit, &cosm);
 
         Some(StdMeasurement::new(
             rx_ssb.dt,

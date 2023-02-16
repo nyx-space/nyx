@@ -1,5 +1,6 @@
 [package]
 name = "nyx-space"
+build = "build.rs"
 version = "1.1.1"
 edition = "2021"
 # resolver = "2"
@@ -52,13 +53,18 @@ indicatif = {version = "0.17", features = ["rayon"]}
 rstats = "1.0.12"
 thiserror = "1.0"
 parquet = "33.0.0"
+shadow-rs = "0.20.0"
+serde_yaml = "0.9.17"
+
+[build-dependencies]
+shadow-rs = "0.20.0"
 
 [features]
-default = []
+default = ["python"]
 python = ["pyo3", "pyo3-log", "hifitime/python"]
 # python = ["pyo3", "pyo3-log"]
 # broken-donotuse = ["levenberg-marquardt"] 
 
-# [lib]
-# crate-type = ["cdylib", "rlib"]
-# name = "nyx_space"
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "nyx_space"

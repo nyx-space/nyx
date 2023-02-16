@@ -25,7 +25,8 @@ pub use crate::dynamics::{Dynamics, NyxError};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
-pub use crate::{State, TimeTagged};
+pub use crate::{cosmic::Cosm, State, TimeTagged};
+use std::sync::Arc;
 
 use crate::io::{CovarFormat, EpochFormat};
 
@@ -148,7 +149,7 @@ where
         + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
 {
     /// Returns the measurement if the device and generate one, else returns None
-    fn measure(&self, input: &MsrIn) -> Option<Msr>;
+    fn measure(&self, input: &MsrIn, cosm: Arc<Cosm>) -> Option<Msr>;
 }
 
 pub trait EstimateFrom<O: State>

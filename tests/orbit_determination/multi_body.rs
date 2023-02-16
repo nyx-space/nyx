@@ -21,16 +21,18 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let cosm = Cosm::de438();
 
+    let iau_earth = cosm.frame("IAU Earth");
+
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -48,7 +50,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
     let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     // Generate the truth data.
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
@@ -57,7 +59,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break;
@@ -89,7 +91,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -160,12 +162,13 @@ fn multi_body_ckf_covar_map() {
 
     let cosm = Cosm::de438();
 
+    let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss13_goldstone];
 
     // Define the propagator information.
@@ -184,7 +187,7 @@ fn multi_body_ckf_covar_map() {
 
     // Generate the truth data on one thread.
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
     prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
@@ -192,7 +195,7 @@ fn multi_body_ckf_covar_map() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break;
@@ -224,7 +227,7 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 

@@ -36,16 +36,17 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let cosm = Cosm::de438();
 
+    let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -82,7 +83,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     while let Ok(rx_sc_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
             let rx_state = rx_sc_state.orbit;
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break;
@@ -117,7 +118,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 

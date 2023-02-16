@@ -25,12 +25,11 @@ fn nil_measurement() {
         0.0,
         0.0,
         eme2k,
-        cosm,
     );
 
     let at_station = Orbit::from_geodesic(lat, long, height, dt, eme2k);
 
-    let meas = station.measure(&at_station).unwrap();
+    let meas = station.measure(&at_station, cosm.clone()).unwrap();
 
     let h_tilde = meas.sensitivity();
     println!("{}", h_tilde);
@@ -92,11 +91,13 @@ fn val_measurements_topo() {
         cosm.frame("EME2000"),
     );
 
+    let iau_earth = cosm.frame("IAU Earth");
+
     let elevation_mask = 7.0; // in degrees
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Generate the measurements
 
@@ -152,7 +153,7 @@ fn val_measurements_topo() {
 
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
-        let meas = dss65_madrid.measure(&state).unwrap();
+        let meas = dss65_madrid.measure(&state, cosm.clone()).unwrap();
         if meas.visible() {
             traj1_msr_cnt += 1;
         }
@@ -167,7 +168,7 @@ fn val_measurements_topo() {
     for truth in &traj1_val_data {
         let now = cislunar1.epoch() + truth.offset;
         let state = traj1.at(now).unwrap();
-        let meas = dss65_madrid.measure(&state).unwrap();
+        let meas = dss65_madrid.measure(&state, cosm.clone()).unwrap();
         assert!(
             meas.visible(),
             "DSS65 not visible at time {} but it should be",
@@ -217,7 +218,7 @@ fn val_measurements_topo() {
 
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
-        let meas = dss65_madrid.measure(&state).unwrap();
+        let meas = dss65_madrid.measure(&state, cosm.clone()).unwrap();
         if meas.visible() {
             traj2_msr_cnt += 1;
         }
@@ -232,7 +233,7 @@ fn val_measurements_topo() {
     for truth in &traj2_val_data {
         let now = cislunar2.epoch() + truth.offset;
         let state = traj2.at(now).unwrap();
-        let meas = dss65_madrid.measure(&state).unwrap();
+        let meas = dss65_madrid.measure(&state, cosm.clone()).unwrap();
         assert!(
             meas.visible(),
             "DSS65 not visible at time {} but it should be",

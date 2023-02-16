@@ -22,6 +22,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let ekf_num_meas = 100;
@@ -31,11 +32,11 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -63,7 +64,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -100,6 +101,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
         kf,
         all_stations,
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        cosm.clone(),
     );
 
     odp.process_measurements(&measurements).unwrap();
@@ -169,17 +171,18 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     use std::io;
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -206,7 +209,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -239,7 +242,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -393,17 +396,18 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.1; // in km (so 100 meters of error)
     let range_rate_noise = 0.001; // in km/s (or 1 meter per second of error)
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -428,7 +432,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -463,7 +467,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -541,17 +545,18 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -577,7 +582,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -614,7 +619,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -675,17 +680,18 @@ fn od_tb_ckf_map_covar() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -722,7 +728,7 @@ fn od_tb_ckf_map_covar() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.map_covar(dt + prop_time).unwrap();
 
@@ -761,17 +767,18 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -790,7 +797,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
     let orbital_dyn = OrbitalDynamics::from_model(harmonics);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
@@ -800,7 +807,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -833,7 +840,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
@@ -884,17 +891,18 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
@@ -919,7 +927,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
+            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -969,7 +977,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 

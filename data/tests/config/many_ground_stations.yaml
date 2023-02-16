@@ -1,0 +1,14 @@
+- name: Demo ground station
+  frame: IAU Earth
+  elevation_mask_deg: 5.0
+  range_noise_km: 1e-3
+  range_rate_noise_km_s: 1e-5
+  latitude_deg: 2.3522
+  longitude_deg: 48.8566
+  height_km: 0.4
+
+- name: Inherited
+  inherit: DSS34
+  elevation_mask_deg: 5.0
+  range_noise_km: 1e-3
+  range_rate_noise_km_s: 1e-5

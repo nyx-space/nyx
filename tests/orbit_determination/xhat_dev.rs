@@ -27,6 +27,7 @@ fn xhat_dev_test_ekf_two_body() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let ekf_num_meas = 100;
@@ -36,9 +37,9 @@ fn xhat_dev_test_ekf_two_body() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -77,7 +78,7 @@ fn xhat_dev_test_ekf_two_body() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -116,6 +117,7 @@ fn xhat_dev_test_ekf_two_body() {
         kf,
         all_stations,
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        cosm.clone(),
     );
 
     odp.process_measurements(&measurements).unwrap();
@@ -214,6 +216,7 @@ fn xhat_dev_test_ekf_multi_body() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let ekf_num_meas = 500;
@@ -223,9 +226,9 @@ fn xhat_dev_test_ekf_multi_body() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -256,7 +259,7 @@ fn xhat_dev_test_ekf_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let (_, traj) = setup
@@ -266,7 +269,7 @@ fn xhat_dev_test_ekf_multi_body() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -303,7 +306,7 @@ fn xhat_dev_test_ekf_multi_body() {
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig);
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
     odp.iterate(
@@ -377,6 +380,7 @@ fn xhat_dev_test_ekf_harmonics() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let ekf_num_meas = 5000;
@@ -386,9 +390,9 @@ fn xhat_dev_test_ekf_harmonics() {
     let range_noise = 1e-6;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -425,7 +429,8 @@ fn xhat_dev_test_ekf_harmonics() {
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", hh_deg, hh_ord, true).unwrap();
     let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
-    let orbital_dyn = OrbitalDynamics::new(vec![harmonics, PointMasses::new(&bodies, cosm)]);
+    let orbital_dyn =
+        OrbitalDynamics::new(vec![harmonics, PointMasses::new(&bodies, cosm.clone())]);
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
@@ -436,7 +441,7 @@ fn xhat_dev_test_ekf_harmonics() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -473,7 +478,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig);
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -527,6 +532,7 @@ fn xhat_dev_test_ekf_realistic() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let ekf_num_meas = 500;
@@ -536,9 +542,9 @@ fn xhat_dev_test_ekf_realistic() {
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -578,7 +584,7 @@ fn xhat_dev_test_ekf_realistic() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -589,7 +595,7 @@ fn xhat_dev_test_ekf_realistic() {
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let estimator = OrbitalDynamics::point_masses(&bodies, cosm);
+    let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
     let covar_radius = 1.0e2;
@@ -615,7 +621,7 @@ fn xhat_dev_test_ekf_realistic() {
     let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig);
+    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -676,14 +682,15 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 0.0;
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -714,7 +721,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
         .with(initial_state)
@@ -723,7 +730,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -755,7 +762,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, kf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
@@ -939,14 +946,15 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 10.0;
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -977,7 +985,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
         .with(initial_state)
@@ -986,7 +994,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -1030,6 +1038,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         kf,
         all_stations,
         StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        cosm.clone(),
     );
 
     odp.process_measurements(&measurements).unwrap();
@@ -1199,14 +1208,15 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     let elevation_mask = 0.0;
     let range_noise = 1e-5;
     let range_rate_noise = 1e-7;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let all_stations = vec![dss65_madrid, dss34_canberra];
@@ -1237,7 +1247,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     );
 
     let bodies = vec![Bodies::Luna, Bodies::Sun, Bodies::JupiterBarycenter];
-    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm);
+    let orbital_dyn = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let (_, traj) = setup
         .with(initial_state)
@@ -1246,7 +1256,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state).unwrap();
+            let meas = station.measure(&state, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -1278,7 +1288,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, kf, all_stations, cosm.clone());
 
     odp.process_measurements(&measurements).unwrap();
 
