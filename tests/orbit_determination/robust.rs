@@ -2,6 +2,8 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use rand::thread_rng;
+
 use self::nyx::cosmic::{Bodies, Cosm, Orbit};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
@@ -75,9 +77,11 @@ fn od_robust_test_ekf_realistic() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
+
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -254,9 +258,11 @@ fn od_robust_ops_test() {
     wtr.serialize(&truth_fmtr.headers)
         .expect("could not write headers");
 
+    let mut rng = thread_rng();
+
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 // Always add it to the full list of measurements
                 measurements.push(meas);

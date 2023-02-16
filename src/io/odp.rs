@@ -18,6 +18,8 @@
 
 extern crate csv;
 
+use rand::thread_rng;
+
 pub use crate::cosmic::*;
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
@@ -28,7 +30,7 @@ use crate::md::ui::MDProcess;
 use crate::od::measurement::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
-use crate::od::MeasurementDevice;
+use crate::od::TrackingDataSim;
 use crate::propagators::Propagator;
 use crate::time::{Duration, Unit};
 use crate::Orbit;
@@ -373,6 +375,7 @@ impl OdpScenario {
         info!("\t\t{}", truth_prop.state);
         info!("\t\t{:x}", truth_prop.state);
 
+        let mut rng = thread_rng();
         let mut sim_measurements = Vec::with_capacity(10000);
         let start = Instant::now();
         while let Ok(rx_state) = rx.try_recv() {
@@ -392,7 +395,9 @@ impl OdpScenario {
                     .expect("could not format state");
             }
             for station in self.stations.iter() {
-                let meas = station.measure(&rx_state, self.cosm.clone()).unwrap();
+                let meas = station
+                    .measure(&rx_state, &mut rng, self.cosm.clone())
+                    .unwrap();
                 if meas.visible() {
                     sim_measurements.push(meas);
                     break; // We know that only one station is in visibility at each time.

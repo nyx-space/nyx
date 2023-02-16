@@ -16,22 +16,23 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::hyperdual::linalg::norm;
-use super::hyperdual::{hyperspace_from_vector, OHyperdual};
-use super::rand::thread_rng;
-use super::rand_distr::{Distribution, Normal};
-use super::serde::ser::SerializeSeq;
-use super::serde::{Serialize, Serializer};
-use super::{Measurement, MeasurementDevice, TimeTagged};
+use super::{Measurement, TimeTagged, TrackingDataSim};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::linalg::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
 use crate::time::Epoch;
 use crate::Spacecraft;
+use hyperdual::linalg::norm;
+use hyperdual::{hyperspace_from_vector, OHyperdual};
+use rand::thread_rng;
+use rand_distr::{Distribution, Normal};
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 use std::fmt;
 use std::sync::Arc;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+use rand::Rng;
 
 /// GroundStation defines a Two Way ranging equipment.
 #[derive(Debug, Clone)]
@@ -183,9 +184,9 @@ impl GroundStation {
     }
 }
 
-impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
+impl TrackingDataSim<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, rx: &Orbit, cosm: Arc<Cosm>) -> Option<StdMeasurement> {
+    fn measure<R: Rng>(&self, rx: &Orbit, rng: &mut R, cosm: Arc<Cosm>) -> Option<StdMeasurement> {
         let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx, &cosm);
 
         Some(StdMeasurement::new(
@@ -199,9 +200,14 @@ impl MeasurementDevice<Orbit, StdMeasurement> for GroundStation {
     }
 }
 
-impl MeasurementDevice<Spacecraft, StdMeasurement> for GroundStation {
+impl TrackingDataSim<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure(&self, sc_rx: &Spacecraft, cosm: Arc<Cosm>) -> Option<StdMeasurement> {
+    fn measure<R: Rng>(
+        &self,
+        sc_rx: &Spacecraft,
+        rng: &mut R,
+        cosm: Arc<Cosm>,
+    ) -> Option<StdMeasurement> {
         let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit, &cosm);
 
         Some(StdMeasurement::new(
@@ -346,7 +352,7 @@ impl Measurement for StdMeasurement {
         self.obs
     }
 
-    fn sensitivity(&self) -> Matrix2x6<f64> {
+    fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
         self.h_tilde
     }
 
@@ -442,7 +448,7 @@ impl Measurement for RangeMsr {
         self.obs
     }
 
-    fn sensitivity(&self) -> Matrix1x6<f64> {
+    fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
         self.h_tilde
     }
 
@@ -538,7 +544,7 @@ impl Measurement for DopplerMsr {
         self.obs
     }
 
-    fn sensitivity(&self) -> Matrix1x6<f64> {
+    fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
         self.h_tilde
     }
 

@@ -2,6 +2,8 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use rand::thread_rng;
+
 use self::nyx::cosmic::{Bodies, Cosm, Orbit};
 use self::nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
 use self::nyx::dynamics::sph_harmonics::Harmonics;
@@ -76,9 +78,10 @@ fn xhat_dev_test_ekf_two_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -267,9 +270,10 @@ fn xhat_dev_test_ekf_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -439,9 +443,11 @@ fn xhat_dev_test_ekf_harmonics() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
+
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -582,9 +588,10 @@ fn xhat_dev_test_ekf_realistic() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -728,9 +735,10 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -992,9 +1000,11 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
+
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -1254,9 +1264,10 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
+    let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter() {
-            let meas = station.measure(&state, cosm.clone()).unwrap();
+            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.

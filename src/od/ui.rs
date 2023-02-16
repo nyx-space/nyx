@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use rand::thread_rng;
+
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{InterpState, Traj};
@@ -130,7 +132,7 @@ pub struct ODProcess<
     D: Dynamics,
     E: ErrorCtrl,
     Msr: Measurement<State = S>,
-    N: MeasurementDevice<S, Msr>,
+    N: TrackingDataSim<S, Msr>,
     T: EkfTrigger,
     A: DimName,
     S: EstimateFrom<D::StateType>,
@@ -179,7 +181,7 @@ impl<
         D: Dynamics,
         E: ErrorCtrl,
         Msr: Measurement<State = S>,
-        N: MeasurementDevice<S, Msr>,
+        N: TrackingDataSim<S, Msr>,
         T: EkfTrigger,
         A: DimName,
         S: EstimateFrom<D::StateType>,
@@ -500,6 +502,8 @@ where
         // be wrong if the step would be larger. Moreover, we will reset the STM to ensure that the state transition matrix
         // stays linear (the error control function may verify this).
 
+        let mut rng = thread_rng();
+
         for (msr_cnt, msr) in measurements.iter().enumerate() {
             let next_msr_epoch = msr.epoch();
 
@@ -527,10 +531,11 @@ where
                     // Get the computed observations
                     for device in self.devices.iter() {
                         if let Some(computed_meas) =
-                            device.measure(&nominal_state, self.cosm.clone())
+                            device.measure(&nominal_state, &mut rng, self.cosm.clone())
                         {
                             if computed_meas.visible() {
-                                self.kf.update_h_tilde(computed_meas.sensitivity());
+                                self.kf
+                                    .update_h_tilde(computed_meas.sensitivity(nominal_state));
 
                                 // Switch back from extended if necessary
                                 if self.kf.is_extended() && self.ekf_trigger.disable_ekf(dt) {
@@ -684,7 +689,7 @@ impl<
         D: Dynamics,
         E: ErrorCtrl,
         Msr: Measurement<State = S>,
-        N: MeasurementDevice<S, Msr>,
+        N: TrackingDataSim<S, Msr>,
         A: DimName,
         S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,

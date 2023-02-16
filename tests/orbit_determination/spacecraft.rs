@@ -2,6 +2,8 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use rand::thread_rng;
+
 use self::nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
@@ -79,11 +81,12 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let mut prop = setup.with(sc_init_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_sc_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
             let rx_state = rx_sc_state.orbit;
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break;

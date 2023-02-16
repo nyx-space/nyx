@@ -2,6 +2,8 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use rand::thread_rng;
+
 use self::nyx::cosmic::{Cosm, Orbit};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::sph_harmonics::Harmonics;
@@ -61,10 +63,11 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
     println!("{}", final_truth);
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -206,10 +209,11 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -427,12 +431,13 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
+    let mut rng = thread_rng();
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -579,10 +584,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -804,10 +810,11 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
@@ -924,10 +931,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter() {
-            let meas = station.measure(&rx_state, cosm.clone()).unwrap();
+            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.

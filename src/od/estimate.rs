@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::serde::ser::SerializeSeq;
-use super::serde::{Serialize, Serializer};
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 use super::{CovarFormat, EpochFormat};
 use super::{EstimateFrom, State};
 use crate::cosmic::Orbit;
