@@ -39,7 +39,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -66,7 +66,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -186,7 +186,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -212,7 +212,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -412,7 +412,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -436,7 +436,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -562,7 +562,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -587,7 +587,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -785,7 +785,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -813,7 +813,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -910,7 +910,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -934,7 +934,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);

@@ -44,7 +44,7 @@ fn xhat_dev_test_ekf_two_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -80,7 +80,7 @@ fn xhat_dev_test_ekf_two_body() {
 
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -234,7 +234,7 @@ fn xhat_dev_test_ekf_multi_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -272,7 +272,7 @@ fn xhat_dev_test_ekf_multi_body() {
 
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -399,7 +399,7 @@ fn xhat_dev_test_ekf_harmonics() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -446,7 +446,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let mut rng = thread_rng();
 
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -553,7 +553,7 @@ fn xhat_dev_test_ekf_realistic() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -590,7 +590,7 @@ fn xhat_dev_test_ekf_realistic() {
 
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -700,7 +700,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -737,7 +737,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -965,7 +965,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -1003,7 +1003,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let mut rng = thread_rng();
 
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);
@@ -1229,7 +1229,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let all_stations = vec![dss65_madrid, dss34_canberra];
+    let mut all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -1266,7 +1266,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
             if meas.visible() {
                 measurements.push(meas);

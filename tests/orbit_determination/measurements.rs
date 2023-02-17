@@ -18,7 +18,7 @@ fn nil_measurement() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let station = GroundStation::from_noise_values(
+    let mut station = GroundStation::from_noise_values(
         "nil".to_string(),
         0.0,
         lat,
@@ -101,7 +101,7 @@ fn val_measurements_topo() {
     let elevation_mask = 7.0; // in degrees
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
-    let dss65_madrid =
+    let mut dss65_madrid =
         GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Generate the measurements

@@ -43,5 +43,5 @@ where
     }
 
     /// Observes the input state and returns a measurement from itself to the input state
-    fn measure<R: Rng>(&self, input: &MsrIn, rng: &mut R, cosm: Arc<Cosm>) -> Option<Msr>;
+    fn measure<R: Rng>(&mut self, input: &MsrIn, rng: &mut R, cosm: Arc<Cosm>) -> Option<Msr>;
 }

@@ -19,6 +19,7 @@
 pub(crate) mod spline;
 mod traj;
 mod traj_it;
+pub(crate) use traj_it::TrajIterator;
 
 pub(crate) use traj::interpolate;
 pub use traj::Traj;

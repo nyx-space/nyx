@@ -186,7 +186,12 @@ impl GroundStation {
 
 impl TrackingDataSim<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
-    fn measure<R: Rng>(&self, rx: &Orbit, rng: &mut R, cosm: Arc<Cosm>) -> Option<StdMeasurement> {
+    fn measure<R: Rng>(
+        &mut self,
+        rx: &Orbit,
+        rng: &mut R,
+        cosm: Arc<Cosm>,
+    ) -> Option<StdMeasurement> {
         let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx, &cosm);
 
         Some(StdMeasurement::new(
@@ -203,7 +208,7 @@ impl TrackingDataSim<Orbit, StdMeasurement> for GroundStation {
 impl TrackingDataSim<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure<R: Rng>(
-        &self,
+        &mut self,
         sc_rx: &Spacecraft,
         rng: &mut R,
         cosm: Arc<Cosm>,

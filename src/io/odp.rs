@@ -331,7 +331,7 @@ impl OdpScenario {
     }
 
     /// Will generate the measurements and run the filter.
-    pub fn execute(self) -> Result<(), NyxError> {
+    pub fn execute(mut self) -> Result<(), NyxError> {
         // Generate the measurements.
         let prop_time = self.truth.prop_time.unwrap();
 
@@ -394,7 +394,7 @@ impl OdpScenario {
                 wtr.serialize(self.truth.formatter.as_ref().unwrap().fmt(&rx_state.orbit))
                     .expect("could not format state");
             }
-            for station in self.stations.iter() {
+            for station in self.stations.iter_mut() {
                 let meas = station
                     .measure(&rx_state, &mut rng, self.cosm.clone())
                     .unwrap();

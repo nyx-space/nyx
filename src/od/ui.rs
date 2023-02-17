@@ -529,7 +529,7 @@ where
                     // Perform a measurement update
 
                     // Get the computed observations
-                    for device in self.devices.iter() {
+                    for device in self.devices.iter_mut() {
                         if let Some(computed_meas) =
                             device.measure(&nominal_state, &mut rng, self.cosm.clone())
                         {
