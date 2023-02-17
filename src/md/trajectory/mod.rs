@@ -16,17 +16,21 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub mod btraj;
 pub(crate) mod spline;
 mod traj;
 mod traj_it;
-pub(crate) use traj_it::TrajIterator;
+// pub(crate) use traj_it::TrajIterator;
 
 pub(crate) use traj::interpolate;
 pub use traj::Traj;
 
+use self::spline::INTERPOLATION_SAMPLES;
+
 use super::StateParameter;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::polyfit::hermite::hermite_eval;
 use crate::time::{Duration, Epoch};
 use crate::{NyxError, Orbit, Spacecraft, State};
 
@@ -97,6 +101,9 @@ where
         value: f64,
         value_dt: f64,
     ) -> Result<(), NyxError>;
+
+    /// Interpolates a new state at the provided epochs given a slice of states.
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError>;
 }
 
 impl InterpState for Orbit {
@@ -110,6 +117,63 @@ impl InterpState for Orbit {
             StateParameter::VZ,
         ]
     }
+
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
+        // This is copied from ANISE
+
+        // Statically allocated arrays of the maximum number of samples
+        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES];
+        let mut xs = [0.0; INTERPOLATION_SAMPLES];
+        let mut ys = [0.0; INTERPOLATION_SAMPLES];
+        let mut zs = [0.0; INTERPOLATION_SAMPLES];
+        let mut vxs = [0.0; INTERPOLATION_SAMPLES];
+        let mut vys = [0.0; INTERPOLATION_SAMPLES];
+        let mut vzs = [0.0; INTERPOLATION_SAMPLES];
+
+        for (cno, state) in states.iter().enumerate() {
+            xs[cno] = state.x;
+            ys[cno] = state.y;
+            zs[cno] = state.z;
+            vxs[cno] = state.vx;
+            vys[cno] = state.vy;
+            vzs[cno] = state.vz;
+            epochs_tdb[cno] = state.epoch().to_tdb_seconds();
+        }
+
+        // TODO: Once I switch to using ANISE, this should use the same function as ANISE and not a clone.
+        let (x_km, vx_km_s) = hermite_eval(
+            &epochs_tdb[..states.len()],
+            &xs[..states.len()],
+            &vxs[..states.len()],
+            epoch.to_et_seconds(),
+        )?;
+
+        let (y_km, vy_km_s) = hermite_eval(
+            &epochs_tdb[..states.len()],
+            &ys[..states.len()],
+            &vys[..states.len()],
+            epoch.to_et_seconds(),
+        )?;
+
+        let (z_km, vz_km_s) = hermite_eval(
+            &epochs_tdb[..states.len()],
+            &zs[..states.len()],
+            &vzs[..states.len()],
+            epoch.to_et_seconds(),
+        )?;
+
+        // And build the result
+        let mut me = self;
+        me.x = x_km;
+        me.y = y_km;
+        me.z = z_km;
+        me.vx = vx_km_s;
+        me.vy = vy_km_s;
+        me.vz = vz_km_s;
+
+        Ok(me)
+    }
+
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
         match *param {
             StateParameter::X => Ok((self.x, self.vx)),
@@ -166,6 +230,26 @@ impl InterpState for Spacecraft {
             StateParameter::FuelMass,
         ]
     }
+
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
+        // Use the Orbit interpolation first.
+        let orbit = Orbit::interpolate(
+            self.orbit,
+            epoch,
+            &states.iter().map(|sc| sc.orbit).collect::<Vec<_>>(),
+        )?;
+
+        // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
+        let fuel_kg = (states.last().unwrap().fuel_mass_kg - states.first().unwrap().fuel_mass_kg)
+            / (states.last().unwrap().epoch().to_tdb_seconds()
+                - states.first().unwrap().epoch().to_tdb_seconds());
+
+        let mut me = self.with_orbit(orbit);
+        me.fuel_mass_kg = fuel_kg;
+
+        Ok(me)
+    }
+
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
         match *param {
             StateParameter::X => Ok((self.orbit.x, self.orbit.vx)),
