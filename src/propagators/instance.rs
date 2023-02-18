@@ -24,6 +24,7 @@ use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
+use crate::md::trajectory::btraj::BTraj;
 use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
 use crate::md::trajectory::{interpolate, InterpState, Traj, TrajError};
 use crate::md::EventEvaluator;
@@ -286,6 +287,37 @@ where
             let spline = maybe_spline?;
             traj.append_spline(spline)?;
         }
+
+        Ok((end_state, traj))
+    }
+
+    /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
+    /// Returns the end state and the trajectory.
+    #[allow(clippy::map_clone)]
+    pub fn for_duration_with_btraj(
+        &mut self,
+        duration: Duration,
+    ) -> Result<(D::StateType, BTraj<D::StateType>), NyxError>
+    where
+        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
+        D::StateType: InterpState,
+    {
+        let end_state;
+        let mut traj = BTraj::new();
+        let start_state = self.state;
+
+        let rx = {
+            // Channels that have a single state for the propagator
+            let (tx, rx) = channel();
+            // Propagate the dynamics
+            end_state = self.for_duration_with_channel(duration, tx)?;
+            rx
+        };
+
+        traj.states = rx.into_iter().par_bridge().collect();
+        traj.states.push(start_state); // Push the start state -- will be reordered in the finalize instruction.
+
+        traj.finalize();
 
         Ok((end_state, traj))
     }

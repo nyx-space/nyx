@@ -41,6 +41,17 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
+    pub fn new() -> Self {
+        Self {
+            name: None,
+            states: Vec::new(),
+        }
+    }
+    /// Orders the states, can be used to store the states out of order
+    pub fn finalize(&mut self) {
+        self.states.sort_by(|a, b| a.epoch().cmp(&b.epoch()));
+    }
+
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
         if self.states.is_empty() {

@@ -14,7 +14,7 @@ use std::sync::mpsc::channel;
 
 #[allow(clippy::identity_op)]
 #[test]
-fn traj_ephem() {
+fn orig_traj_ephem() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -30,7 +30,10 @@ fn traj_ephem() {
     let setup = Propagator::default(OrbitalDynamics::two_body());
     let mut prop = setup.with(start_state);
     // The trajectory must always be generated on its own thread, no need to worry about it ;-)
+    let now = Epoch::now().unwrap();
     let (end_state, ephem) = prop.for_duration_with_traj(31 * Unit::Day).unwrap();
+    let exec_time = Epoch::now().unwrap() - now;
+    println!("[TIMING] {exec_time}");
 
     // Example of iterating through the trajectory.
     // Note how we receive a fully blown Orbit, so we can manipulate it exactly like a normal state.
@@ -166,6 +169,78 @@ fn traj_ephem() {
     // Allow for up to millimeters per second error after double conversion
     assert!(
         max_vel_err < 1e-6,
+        "Maximum orbit velocity in interpolation is too high!"
+    );
+}
+
+#[allow(clippy::identity_op)]
+#[test]
+fn btraj_ephem() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+    // Test that we can correctly interpolate a spacecraft orbit
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+
+    let start_dt = Epoch::from_gregorian_utc_at_noon(2021, 1, 1);
+    let start_state = Orbit::cartesian(
+        -2436.45, -2436.45, 6891.037, 5.088_611, -5.088_611, 0.0, start_dt, eme2k,
+    );
+
+    let setup = Propagator::default(OrbitalDynamics::two_body());
+    let mut prop = setup.with(start_state);
+    // The trajectory must always be generated on its own thread, no need to worry about it ;-)
+    let now = Epoch::now().unwrap();
+    let (end_state, ephem) = prop.for_duration_with_btraj(31 * Unit::Day).unwrap();
+    let exec_time = Epoch::now().unwrap() - now;
+    println!("[TIMING] {exec_time}");
+    println!("{end_state}");
+
+    // Now let's re-generate the truth data and ensure that each state we generate is in the ephemeris and matches the expected state within tolerance.
+
+    let (tx, rx) = channel();
+    std::thread::spawn(move || {
+        setup
+            .with(start_state)
+            .for_duration_with_channel(31 * Unit::Day, tx)
+            .unwrap();
+    });
+
+    // Evaluate the first time of the trajectory to make sure that one is there too.
+    let eval_state = ephem.at(start_dt).unwrap();
+
+    let mut max_pos_err = (eval_state.radius() - start_state.radius()).norm();
+    let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
+
+    while let Ok(prop_state) = rx.recv() {
+        let eval_state = ephem.at(prop_state.dt).unwrap();
+
+        let pos_err = (eval_state.radius() - prop_state.radius()).norm();
+        if pos_err > max_pos_err {
+            max_pos_err = pos_err;
+        }
+        let vel_err = (eval_state.velocity() - prop_state.velocity()).norm();
+        if vel_err > max_vel_err {
+            max_vel_err = vel_err;
+        }
+    }
+
+    println!(
+        "[traj_ephem] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s",
+        max_pos_err * 1e3,
+        max_vel_err * 1e3,
+    );
+
+    // Allow for up to micrometer error
+    assert!(
+        max_pos_err < 1e-8,
+        "Maximum spacecraft position in interpolation is too high!"
+    );
+
+    // Allow for up to micrometers per second error
+    assert!(
+        max_vel_err < 1e-8,
         "Maximum orbit velocity in interpolation is too high!"
     );
 }
