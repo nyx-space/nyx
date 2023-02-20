@@ -14,7 +14,7 @@ use std::sync::mpsc::channel;
 
 #[allow(clippy::identity_op)]
 #[test]
-fn orig_traj_ephem() {
+fn traj_ephem_forward() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -415,19 +415,20 @@ fn traj_ephem_backward() {
 
     // === Below is the validation of the ephemeris == //
 
+    // NOTE: The trajectory organizes the states chronologically.
     assert_eq!(
         ephem.first(),
-        &start_state,
+        &end_state,
         "Wrong initial state\nGot:  {}\nWant: {}",
         ephem.first(),
-        start_state
+        end_state
     );
     assert_eq!(
         ephem.last(),
-        &end_state,
+        &start_state,
         "Wrong final state\nGot:  {}\nWant: {}",
         ephem.last(),
-        end_state
+        start_state
     );
     assert!(ephem.last().stm().is_err(), "STM is set!");
     assert!(
