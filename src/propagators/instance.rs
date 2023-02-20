@@ -24,13 +24,10 @@ use crate::dynamics::Dynamics;
 use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, OVector};
-use crate::md::trajectory::btraj::BTraj;
-use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
-use crate::md::trajectory::{interpolate, InterpState, Traj, TrajError};
+use crate::md::trajectory::{InterpState, Traj};
 use crate::md::EventEvaluator;
 use crate::time::{Duration, Epoch, Unit};
 use crate::State;
-use std::collections::BTreeMap;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
 
@@ -164,7 +161,6 @@ where
 
     /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
     /// Returns the end state and the trajectory.
-    /// Known bug #190: Cannot generate a valid trajectory when propagating backward
     #[allow(clippy::map_clone)]
     pub fn for_duration_with_traj(
         &mut self,
@@ -174,136 +170,8 @@ where
         <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
         D::StateType: InterpState,
     {
-        let start_state = self.state;
         let end_state;
-
-        let rx = {
-            // Channels that have the states in a bucket of the correct length
-            let (tx_bucket, rx_bucket) = channel();
-
-            let rx = {
-                // Channels that have a single state for the propagator
-                let (tx, rx) = channel();
-                // Propagate the dynamics
-                end_state = self.for_duration_with_channel(duration, tx)?;
-                rx
-            };
-
-            /* *** */
-            /* Map: bucket the states and send on a channel */
-            /* *** */
-
-            let items_per_segments = INTERPOLATION_SAMPLES;
-            let mut window_states = Vec::with_capacity(2 * items_per_segments);
-            // Push the initial state
-            window_states.push(start_state);
-
-            // Note that we're using the typical map+reduce pattern
-            // Start receiving states on a blocking call
-            while let Ok(state) = rx.recv() {
-                window_states.push(state);
-                if window_states.len() == 2 * items_per_segments {
-                    // Publish the first items
-                    let this_wdn = window_states[..items_per_segments]
-                        .iter()
-                        .map(|&x| x)
-                        .collect::<Vec<D::StateType>>();
-
-                    tx_bucket.send(this_wdn).map_err(|_| {
-                        NyxError::from(TrajError::CreationError(
-                            "could not send onto channel".to_string(),
-                        ))
-                    })?;
-
-                    // Now, let's remove the first states
-                    for _ in 0..items_per_segments - 1 {
-                        window_states.remove(0);
-                    }
-                }
-            }
-            // If there aren't enough states, set the propagator step size to make sure there is at least that many states
-            if window_states.len() < items_per_segments {
-                let step_size =
-                    (end_state.epoch() - start_state.epoch()) / ((items_per_segments - 1) as f64);
-
-                self.state = start_state;
-                window_states.clear();
-                self.set_step(step_size, true);
-                let rx = {
-                    // Channels that have a single state for the propagator
-                    let (tx, rx) = channel();
-                    // Propagate the dynamics
-                    self.for_duration_with_channel(duration, tx)?;
-                    rx
-                };
-                window_states.push(start_state);
-                while let Ok(state) = rx.recv() {
-                    window_states.push(state);
-                }
-            }
-            // And interpolate the remaining states too, even if the buffer is not full!
-            let mut start_idx = 0;
-            loop {
-                tx_bucket
-                    .send(
-                        window_states
-                            [start_idx..(start_idx + items_per_segments).min(window_states.len())]
-                            .iter()
-                            .map(|&x| x)
-                            .collect::<Vec<D::StateType>>(),
-                    )
-                    .map_err(|_| {
-                        NyxError::from(TrajError::CreationError(
-                            "could not send onto channel".to_string(),
-                        ))
-                    })?;
-                if start_idx > 0 || window_states.len() < items_per_segments {
-                    break;
-                }
-                start_idx = window_states.len() - items_per_segments;
-                if start_idx == 0 {
-                    // This means that the window states are exactly the correct size, break here
-                    break;
-                }
-            }
-
-            // Return the rx channel for these buckets
-            rx_bucket
-        };
-
-        /* *** */
-        /* Reduce: Build an interpolation of each of the segments */
-        /* *** */
-        let splines: Vec<_> = rx.into_iter().par_bridge().map(interpolate).collect();
-
-        // Finally, build the whole trajectory
-        let mut traj = Traj {
-            segments: BTreeMap::new(),
-            start_state,
-            backward: false,
-        };
-
-        for maybe_spline in splines {
-            let spline = maybe_spline?;
-            traj.append_spline(spline)?;
-        }
-
-        Ok((end_state, traj))
-    }
-
-    /// Propagates the provided Dynamics for the provided duration and generate the trajectory of these dynamics on its own thread.
-    /// Returns the end state and the trajectory.
-    #[allow(clippy::map_clone)]
-    pub fn for_duration_with_btraj(
-        &mut self,
-        duration: Duration,
-    ) -> Result<(D::StateType, BTraj<D::StateType>), NyxError>
-    where
-        <DefaultAllocator as Allocator<f64, <D::StateType as State>::VecLength>>::Buffer: Send,
-        D::StateType: InterpState,
-    {
-        let end_state;
-        let mut traj = BTraj::new();
+        let mut traj = Traj::new();
         let start_state = self.state;
 
         let rx = {

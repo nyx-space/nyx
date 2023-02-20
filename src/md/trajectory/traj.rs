@@ -19,8 +19,8 @@
 extern crate rayon;
 
 use self::rayon::prelude::*;
-use super::spline::{Spline, INTERPOLATION_SAMPLES, SPLINE_DEGREE};
 use super::traj_it::TrajIterator;
+use super::INTERPOLATION_SAMPLES;
 use super::{InterpState, TrajError};
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
@@ -28,11 +28,8 @@ use crate::io::formatter::StateFormatter;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
-use crate::polyfit::{hermite, Polynomial};
 use crate::time::{Duration, Epoch, TimeSeries, Unit};
-use crate::utils::normalize;
 use crate::State;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::Iterator;
 use std::ops;
@@ -47,11 +44,10 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    /// Splines are organized as a binary tree map whose index is the
-    /// number of seconds since the start of this ephemeris rounded down
-    pub segments: BTreeMap<i32, Spline<S>>,
-    pub(crate) start_state: S,
-    pub(crate) backward: bool,
+    /// Optionally name this trajectory
+    pub name: Option<String>,
+    /// We use a vector because we know that the states are produced in a chronological manner (the direction does not matter).
+    pub states: Vec<S>,
 }
 
 impl<S: InterpState> Traj<S>
@@ -59,66 +55,68 @@ where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
 {
-    pub(crate) fn append_spline(&mut self, segment: Spline<S>) -> Result<(), NyxError> {
-        // Compute the number of seconds since start of trajectory
-        let offset_s = ((100.0 * (segment.start_epoch - self.start_state.epoch()).to_seconds())
-            .floor()) as i32;
-        if offset_s.is_negative() {
-            if !self.segments.is_empty() && !self.backward {
-                return Err(NyxError::from(TrajError::CreationError(format!(
-                    "Offset = {offset_s} but traj is not backward"
-                ))));
-            }
-            self.backward = true;
+    pub fn new() -> Self {
+        Self {
+            name: None,
+            states: Vec::new(),
         }
-        assert!(
-            self.segments.get(&offset_s).is_none(),
-            "{offset_s} already exists!"
-        );
-        self.segments.insert(offset_s, segment);
-        Ok(())
+    }
+    /// Orders the states, can be used to store the states out of order
+    pub fn finalize(&mut self) {
+        self.states.sort_by(|a, b| a.epoch().cmp(&b.epoch()));
     }
 
     /// Evaluate the trajectory at this specific epoch.
     pub fn at(&self, epoch: Epoch) -> Result<S, NyxError> {
-        // Durations are darn precise and converting a -2.6e-23 into an i32 will be -1
-        let offset_s = ((100.0 * (epoch - self.start_state.epoch()).to_seconds()).floor()) as i32;
-
-        // Retrieve that segment
-        match self.segments.range(..=offset_s).rev().next() {
-            None => {
-                // Let's see if this corresponds to the max offset value
-                let last_item = self.last();
-                if last_item.epoch() == epoch {
-                    Ok(last_item)
-                } else {
-                    Err(NyxError::from(TrajError::NoInterpolationData(epoch)))
-                }
+        if self.states.is_empty() {
+            return Err(NyxError::Trajectory(TrajError::NoInterpolationData(epoch)));
+        }
+        match self
+            .states
+            .binary_search_by(|state| state.epoch().cmp(&epoch))
+        {
+            Ok(idx) => {
+                // Oh wow, we actually had this exact state!
+                Ok(self.states[idx])
             }
-            Some((_, segment)) => segment.evaluate(self.start_state, epoch),
+            Err(idx) => {
+                if idx >= self.states.len() {
+                    return Err(NyxError::Trajectory(TrajError::NoInterpolationData(epoch)));
+                }
+                // This is the closest index, so let's grab the items around it.
+                // NOTE: This is essentially the same code as in ANISE for the Hermite SPK type 13
+
+                // We didn't find it, so let's build an interpolation here.
+                let num_left = INTERPOLATION_SAMPLES / 2;
+
+                // Ensure that we aren't fetching out of the window
+                let mut first_idx = idx.saturating_sub(num_left);
+                let last_idx = self.states.len().min(first_idx + INTERPOLATION_SAMPLES);
+
+                // Check that we have enough samples
+                if last_idx == self.states.len() {
+                    first_idx = last_idx - 2 * num_left;
+                }
+
+                let mut states = Vec::with_capacity(last_idx - first_idx);
+                for idx in first_idx..last_idx {
+                    states.push(self.states[idx]);
+                }
+
+                self.states[idx].interpolate(epoch, &states)
+            }
         }
     }
 
     /// Returns the first state in this ephemeris
-    pub fn first(&self) -> S {
-        if self.backward {
-            self.segments[self.segments.keys().last().unwrap()].end_state
-        } else {
-            self.start_state
-        }
+    pub fn first(&self) -> &S {
+        // This is done after we've ordered the states we received, so we can just return the first state.
+        self.states.first().unwrap()
     }
 
     /// Returns the last state in this ephemeris
-    pub fn last(&self) -> S {
-        if self.backward {
-            // Note that this trajectory's "start_state" is actually the first state received, so it's chronologically the last state of the first spline.
-            let spline = &self.segments[self.segments.keys().next().unwrap()];
-            spline
-                .evaluate(spline.end_state, spline.start_epoch)
-                .unwrap()
-        } else {
-            self.segments[self.segments.keys().last().unwrap()].end_state
-        }
+    pub fn last(&self) -> &S {
+        self.states.last().unwrap()
     }
 
     /// Creates an iterator through the trajectory by the provided step size
@@ -426,15 +424,12 @@ where
             );
         }
 
-        let mut me = Self {
-            segments: first.segments.clone(),
-            start_state: first.start_state,
-            backward: false,
-        };
+        let mut me = self.clone();
         // Now start adding the other segments while correcting the index
-        for spline in second.segments.values() {
-            me.append_spline(spline.clone()).unwrap();
+        for state in &second.states {
+            me.states.push(*state);
         }
+        me.finalize();
         me
     }
 }
@@ -460,114 +455,21 @@ where
 }
 
 impl Traj<Orbit> {
-    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
+    /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame.
+    /// This simply converts each state into the other frame and may lead to aliasing due to the Nyquist–Shannon sampling theorem.
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
         let start_instant = Instant::now();
-        let start_state = cosm.frame_chg(&self.first(), new_frame);
-
-        let rx = {
-            // Channels that have the states in a bucket of the correct length
-            let (tx, rx) = channel();
-
-            let items_per_segments = INTERPOLATION_SAMPLES;
-
-            // Nyquist–Shannon sampling theorem
-            let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
-            let step = sample_rate * (self.last().epoch() - self.first().epoch());
-
-            /* *** */
-            /* Map: bucket the states and send on a channel */
-            /* *** */
-
-            let mut window_states = Vec::with_capacity(2 * items_per_segments);
-
-            // Note that we're using the typical map+reduce pattern
-            for original_state in self.every(step) {
-                let state = cosm.frame_chg(&original_state, new_frame);
-                window_states.push(state);
-                if window_states.len() == 2 * items_per_segments {
-                    // Publish the first items of this vector
-                    let this_wdn = window_states[..items_per_segments]
-                        .iter()
-                        .map(|&x| x)
-                        .collect::<Vec<Orbit>>();
-
-                    tx.send(this_wdn).map_err(|_| {
-                        NyxError::from(TrajError::CreationError(
-                            "could not send onto channel".to_string(),
-                        ))
-                    })?;
-
-                    // Now, let's remove the first states
-                    for _ in 0..items_per_segments - 1 {
-                        window_states.remove(0);
-                    }
-                }
-            }
-
-            if window_states.last().unwrap().epoch() != self.last().epoch() {
-                // Our final step placed us out of the trajectory epochs, so let's add it
-                let state = cosm.frame_chg(&self.last(), new_frame);
-                window_states.push(state);
-            }
-
-            // And interpolate the remaining states too, even if the buffer is not full!
-            let mut start_idx = 0;
-            loop {
-                if window_states.is_empty() {
-                    break;
-                }
-
-                tx.send(
-                    window_states[start_idx..start_idx + items_per_segments]
-                        .iter()
-                        .map(|&x| x)
-                        .collect::<Vec<Orbit>>(),
-                )
-                .map_err(|_| {
-                    NyxError::from(TrajError::CreationError(
-                        "could not send final window onto channel".to_string(),
-                    ))
-                })?;
-                if start_idx > 0 {
-                    break;
-                }
-                start_idx = window_states.len() - items_per_segments;
-                if start_idx == 0 {
-                    // This means that the window states are exactly the correct size, break here
-                    break;
-                }
-            }
-
-            rx
-        };
-
-        /* *** */
-        /* Reduce: Build an interpolation of each of the segments */
-        /* *** */
-        let splines: Vec<_> = rx.into_iter().par_bridge().map(interpolate).collect();
-
-        // Finally, build the whole trajectory
-        let mut traj = Traj {
-            segments: BTreeMap::new(),
-            start_state,
-            backward: false,
-        };
-
-        for maybe_spline in splines {
-            let spline = maybe_spline?;
-            // This shouldn't fail because we're progressing through the trajectory in a chronological fashion
-            traj.append_spline(spline).unwrap();
+        let mut traj = Self::new();
+        for state in &self.states {
+            traj.states.push(cosm.frame_chg(state, new_frame));
         }
-
         info!(
             "Converted trajectory from {} to {} in {} ms",
             self.first().frame,
             new_frame,
             (Instant::now() - start_instant).as_millis()
         );
-
         Ok(traj)
     }
 
@@ -680,130 +582,17 @@ impl Traj<Spacecraft> {
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
         let start_instant = Instant::now();
-
-        let mut start_state = self.first();
-        let start_orbit = cosm.frame_chg(&start_state.orbit, new_frame);
-        // Update the orbit component and the frame
-        start_state.orbit.x = start_orbit.x;
-        start_state.orbit.y = start_orbit.y;
-        start_state.orbit.z = start_orbit.z;
-        start_state.orbit.vx = start_orbit.vx;
-        start_state.orbit.vy = start_orbit.vy;
-        start_state.orbit.vz = start_orbit.vz;
-        start_state.orbit.frame = start_orbit.frame;
-
-        let rx = {
-            // Channels that have the states in a bucket of the correct length
-            let (tx, rx) = channel();
-
-            let items_per_segments = INTERPOLATION_SAMPLES;
-
-            // Nyquist–Shannon sampling theorem
-            let sample_rate = 1.0 / (((items_per_segments * 2 + 1) * self.segments.len()) as f64);
-            let step = sample_rate * (self.last().epoch() - self.first().epoch());
-
-            /* *** */
-            /* Map: bucket the states and send on a channel */
-            /* *** */
-
-            let mut window_states = Vec::with_capacity(2 * items_per_segments);
-
-            // Note that we're using the typical map+reduce pattern
-            for original_state in self.every(step) {
-                let converted_orbit = cosm.frame_chg(&original_state.orbit, new_frame);
-                let mut converted_state = original_state;
-                // Update the orbit component and the frame
-                converted_state.orbit.x = converted_orbit.x;
-                converted_state.orbit.y = converted_orbit.y;
-                converted_state.orbit.z = converted_orbit.z;
-                converted_state.orbit.vx = converted_orbit.vx;
-                converted_state.orbit.vy = converted_orbit.vy;
-                converted_state.orbit.vz = converted_orbit.vz;
-                converted_state.orbit.frame = converted_orbit.frame;
-
-                window_states.push(converted_state);
-                if window_states.len() == 2 * items_per_segments {
-                    // Publish the first items of this vector
-                    let this_wdn = window_states[..items_per_segments]
-                        .iter()
-                        .map(|&x| x)
-                        .collect::<Vec<Spacecraft>>();
-
-                    tx.send(this_wdn).map_err(|_| {
-                        NyxError::from(TrajError::CreationError(
-                            "could not send onto channel".to_string(),
-                        ))
-                    })?;
-
-                    // Now, let's remove the first states
-                    for _ in 0..items_per_segments - 1 {
-                        window_states.remove(0);
-                    }
-                }
-            }
-            if window_states.last().unwrap().epoch() != self.last().epoch() {
-                let original_state = self.last();
-                // Our final step placed us out of the trajectory epochs, so let's add it
-                let converted_orbit = cosm.frame_chg(&original_state.orbit, new_frame);
-                window_states.push(original_state.with_orbit(converted_orbit));
-            }
-
-            // And interpolate the remaining states too, even if the buffer is not full!
-            let mut start_idx = 0;
-            loop {
-                if window_states.is_empty() {
-                    break;
-                }
-
-                tx.send(
-                    window_states[start_idx..start_idx + items_per_segments]
-                        .iter()
-                        .map(|&x| x)
-                        .collect::<Vec<Spacecraft>>(),
-                )
-                .map_err(|_| {
-                    NyxError::from(TrajError::CreationError(
-                        "could not send final window onto channel".to_string(),
-                    ))
-                })?;
-                if start_idx > 0 {
-                    break;
-                }
-                start_idx = window_states.len() - items_per_segments;
-                if start_idx == 0 {
-                    // This means that the window states are exactly the correct size, break here
-                    break;
-                }
-            }
-
-            rx
-        };
-
-        /* *** */
-        /* Reduce: Build an interpolation of each of the segments */
-        /* *** */
-        let splines: Vec<_> = rx.into_iter().par_bridge().map(interpolate).collect();
-
-        // Finally, build the whole trajectory
-        let mut traj = Traj {
-            segments: BTreeMap::new(),
-            start_state,
-            backward: false,
-        };
-
-        for maybe_spline in splines {
-            let spline = maybe_spline?;
-            // This shouldn't fail because we're progressing through the trajectory in a chronological fashion
-            traj.append_spline(spline).unwrap();
+        let mut traj = Self::new();
+        for state in &self.states {
+            let orbit = cosm.frame_chg(&state.orbit, new_frame);
+            traj.states.push(state.with_orbit(orbit));
         }
-
         info!(
             "Converted trajectory from {} to {} in {} ms",
             self.first().orbit.frame,
             new_frame,
             (Instant::now() - start_instant).as_millis()
         );
-
         Ok(traj)
     }
 
@@ -920,97 +709,12 @@ where
         let dur = self.last().epoch() - self.first().epoch();
         write!(
             f,
-            "Trajectory from {} to {} ({}, or {:.3} s) [{} splines]",
+            "Trajectory from {} to {} ({}, or {:.3} s) [{} states]",
             self.first().epoch(),
             self.last().epoch(),
             dur,
             dur.to_seconds(),
-            self.segments.len()
+            self.states.len()
         )
     }
-}
-
-pub(crate) fn interpolate<S: InterpState>(this_wdn: Vec<S>) -> Result<Spline<S>, NyxError>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    if this_wdn.is_empty() {
-        return Err(NyxError::from(TrajError::CreationError(
-            "cannot interpolate with zero items".to_string(),
-        )));
-    }
-    // Generate interpolation and flush.
-    let mut start_win_epoch = this_wdn.first().unwrap().epoch();
-    let mut end_win_epoch = this_wdn.last().unwrap().epoch();
-    let mut end_state = this_wdn.last().unwrap();
-    if end_win_epoch < start_win_epoch {
-        // Backward propagation, swap times
-        std::mem::swap(&mut start_win_epoch, &mut end_win_epoch);
-        // Swap end states
-        end_state = this_wdn.first().unwrap();
-    }
-    let window_duration = end_win_epoch - start_win_epoch;
-
-    let mut ts = Vec::with_capacity(this_wdn.len());
-    let mut values = Vec::with_capacity(S::params().len());
-    let mut values_dt = Vec::with_capacity(S::params().len());
-    let mut polynomials = Vec::with_capacity(S::params().len());
-
-    // Initialize the vector of values and coefficients.
-    for _ in 0..S::params().len() {
-        values.push(Vec::with_capacity(this_wdn.len()));
-        values_dt.push(Vec::with_capacity(this_wdn.len()));
-    }
-    for state in &this_wdn {
-        let t_prime = if this_wdn.len() == 1 {
-            1.0
-        } else {
-            normalize(
-                (state.epoch() - start_win_epoch).to_seconds(),
-                0.0,
-                window_duration.to_seconds(),
-            )
-        };
-        // Deduplicate
-        if let Some(latest_t) = ts.last() {
-            let delta_t: f64 = *latest_t - t_prime;
-            if delta_t.abs() < f64::EPSILON {
-                continue;
-            }
-        }
-
-        ts.push(t_prime);
-
-        for (pos, param) in S::params().iter().enumerate() {
-            let (value, deriv) = state.value_and_deriv(param)?;
-            values[pos].push(value);
-            values_dt[pos].push(deriv);
-        }
-    }
-
-    // Generate the polynomials
-    for pos in 0..values.len() {
-        let poly = if values[pos].len() != INTERPOLATION_SAMPLES {
-            // Do not fit the data, just build the polynomials for these values
-            let p =
-                hermite::hermite::<{ 2 * SPLINE_DEGREE + 1 }>(&ts, &values[pos], &values_dt[pos])?;
-            // println!("{:x}", p);
-            let mut coefficients: [f64; SPLINE_DEGREE] = [0.0; SPLINE_DEGREE];
-            // Rebuild the coeffs ignoring the highest power
-            coefficients[..SPLINE_DEGREE].clone_from_slice(&p.coefficients[..SPLINE_DEGREE]);
-            Polynomial { coefficients }
-        } else {
-            hermite::hermfit::<INTERPOLATION_SAMPLES, SPLINE_DEGREE>(&ts, &values[pos])?
-        };
-
-        polynomials.push(poly);
-    }
-
-    Ok(Spline {
-        start_epoch: start_win_epoch,
-        duration: window_duration,
-        polynomials,
-        end_state: *end_state,
-    })
 }

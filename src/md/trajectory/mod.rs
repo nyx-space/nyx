@@ -16,16 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod btraj;
-pub(crate) mod spline;
 mod traj;
 mod traj_it;
-// pub(crate) use traj_it::TrajIterator;
 
-pub(crate) use traj::interpolate;
+pub(crate) const INTERPOLATION_SAMPLES: usize = 12;
+
 pub use traj::Traj;
-
-use self::spline::INTERPOLATION_SAMPLES;
 
 use super::StateParameter;
 use crate::linalg::allocator::Allocator;
@@ -122,13 +118,13 @@ impl InterpState for Orbit {
         // This is copied from ANISE
 
         // Statically allocated arrays of the maximum number of samples
-        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES];
-        let mut xs = [0.0; INTERPOLATION_SAMPLES];
-        let mut ys = [0.0; INTERPOLATION_SAMPLES];
-        let mut zs = [0.0; INTERPOLATION_SAMPLES];
-        let mut vxs = [0.0; INTERPOLATION_SAMPLES];
-        let mut vys = [0.0; INTERPOLATION_SAMPLES];
-        let mut vzs = [0.0; INTERPOLATION_SAMPLES];
+        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut xs = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut ys = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut zs = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut vxs = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut vys = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut vzs = [0.0; INTERPOLATION_SAMPLES + 1];
 
         for (cno, state) in states.iter().enumerate() {
             xs[cno] = state.x;

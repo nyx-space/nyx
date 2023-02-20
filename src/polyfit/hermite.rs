@@ -24,7 +24,7 @@ use crate::linalg::{
     allocator::Allocator, Const, DefaultAllocator, DimMin, DimMinimum, DimSub, OMatrix, OVector,
     SVector,
 };
-use crate::md::trajectory::spline::INTERPOLATION_SAMPLES;
+use crate::md::trajectory::INTERPOLATION_SAMPLES;
 use crate::polyfit::polynomial::{multiply, Polynomial};
 use crate::NyxError;
 
@@ -240,8 +240,8 @@ pub fn hermite_eval(
     } else if xs.is_empty() {
         error!("No interpolation data provided");
         return Err(NyxError::MathDomain("=(".to_string()));
-    } else if xs.len() > INTERPOLATION_SAMPLES {
-        error!("More than {INTERPOLATION_SAMPLES} samples provided, which is the maximum number of items allowed for a Hermite interpolation");
+    } else if xs.len() > 3 * INTERPOLATION_SAMPLES {
+        error!("More than {} samples provided, which is the maximum number of items allowed for a Hermite interpolation", 3 * INTERPOLATION_SAMPLES);
         return Err(NyxError::MathDomain("=(".to_string()));
     }
 

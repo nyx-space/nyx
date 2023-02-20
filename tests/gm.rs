@@ -12,7 +12,7 @@ use nyx::{NyxError, State};
 
 use std::fmt;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Default, PartialEq)]
 struct BiasDriftState {
     epoch: Epoch,
     bias: f64,
