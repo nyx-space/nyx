@@ -47,6 +47,7 @@ pub mod ui;
 /// Provides all of the functionality to simulate measurements from ground stations
 pub mod simulator;
 
+use arrow_schema::Field;
 pub use simulator::trackdata::TrackingDataSim;
 
 /// Provides all state noise compensation functionality
@@ -124,6 +125,10 @@ where
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;
 
+    /// Returns the fields for this kind of measurement.
+    /// The metadata must include a `unit` field with the unit.
+    fn fields() -> Vec<Field>;
+
     /// Returns the measurement/observation as a vector.
     fn observation(&self) -> OVector<f64, Self::MeasurementSize>
     where
@@ -138,6 +143,7 @@ where
         DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
 
     /// Returns whether the transmitter and receiver where in line of sight.
+    /// TODO: Remove this.
     fn visible(&self) -> bool;
 }
 

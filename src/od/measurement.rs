@@ -21,12 +21,14 @@ use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::linalg::{DimName, Matrix1x6, Matrix2x6, OVector, Vector1, Vector2, U1, U2, U6, U7};
 use crate::time::Epoch;
 use crate::Spacecraft;
+use arrow_schema::{DataType, Field};
 use hyperdual::linalg::norm;
 use hyperdual::{hyperspace_from_vector, OHyperdual};
 use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -364,6 +366,13 @@ impl Measurement for StdMeasurement {
     fn visible(&self) -> bool {
         self.visible
     }
+
+    fn fields() -> Vec<Field> {
+        vec![
+            RangeMsr::fields()[0].clone(),
+            RangeRate::fields()[0].clone(),
+        ]
+    }
 }
 
 impl TimeTagged for StdMeasurement {
@@ -460,6 +469,12 @@ impl Measurement for RangeMsr {
     fn visible(&self) -> bool {
         self.visible
     }
+
+    fn fields() -> Vec<Field> {
+        let mut meta = HashMap::new();
+        meta.insert("unit".to_string(), "km".to_string());
+        vec![Field::new("Range", DataType::Float64, false).with_metadata(meta)]
+    }
 }
 
 impl TimeTagged for RangeMsr {
@@ -488,14 +503,14 @@ impl Serialize for RangeMsr {
 
 /// Stores a standard measurement of range (km)
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct DopplerMsr {
+pub struct RangeRate {
     pub dt: Epoch,
     pub obs: Vector1<f64>,
     visible: bool,
     h_tilde: Matrix1x6<f64>,
 }
 
-impl DopplerMsr {
+impl RangeRate {
     pub fn range_rate(&self) -> f64 {
         self.obs[(0, 0)]
     }
@@ -521,7 +536,7 @@ impl DopplerMsr {
         (fx, pmat)
     }
 
-    pub fn new(tx: Orbit, rx: Orbit, visible: bool) -> DopplerMsr {
+    pub fn new(tx: Orbit, rx: Orbit, visible: bool) -> RangeRate {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
         assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
 
@@ -529,7 +544,7 @@ impl DopplerMsr {
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 
-        DopplerMsr {
+        RangeRate {
             dt,
             obs,
             visible,
@@ -538,7 +553,7 @@ impl DopplerMsr {
     }
 }
 
-impl Measurement for DopplerMsr {
+impl Measurement for RangeRate {
     type State = Orbit;
     type MeasurementSize = U1;
 
@@ -556,9 +571,15 @@ impl Measurement for DopplerMsr {
     fn visible(&self) -> bool {
         self.visible
     }
+
+    fn fields() -> Vec<Field> {
+        let mut meta = HashMap::new();
+        meta.insert("unit".to_string(), "km/s".to_string());
+        vec![Field::new("Range rate", DataType::Float64, false).with_metadata(meta)]
+    }
 }
 
-impl TimeTagged for DopplerMsr {
+impl TimeTagged for RangeRate {
     fn epoch(&self) -> Epoch {
         self.dt
     }
@@ -568,7 +589,7 @@ impl TimeTagged for DopplerMsr {
     }
 }
 
-impl Serialize for DopplerMsr {
+impl Serialize for RangeRate {
     /// Serializes the observation vector at the given time.
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

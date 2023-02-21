@@ -53,6 +53,7 @@ indicatif = {version = "0.17", features = ["rayon"]}
 rstats = "1.0.12"
 thiserror = "1.0"
 parquet = "33.0.0"
+arrow-schema = "33.0.0"
 shadow-rs = "0.20.0"
 serde_yaml = "0.9.17"
 
