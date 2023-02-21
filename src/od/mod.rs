@@ -41,8 +41,8 @@ pub mod residual;
 /// Provides some helper for filtering.
 pub mod ui;
 
-/// Provides all of the measurements functionality, including measurement simulation
-// pub mod msr;
+/// Provides all of the support measurement models
+pub mod msr;
 
 /// Provides all of the functionality to simulate measurements from ground stations
 pub mod simulator;
