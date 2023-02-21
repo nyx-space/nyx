@@ -119,7 +119,7 @@ where
         + Allocator<f64, <Self::State as State>::VecLength>
         + Allocator<f64, Self::MeasurementSize, <Self::State as State>::Size>,
 {
-    /// Defines the state size of the estimated state
+    /// Defines the estimated state
     type State: State;
     /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
     type MeasurementSize: DimName;

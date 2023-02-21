@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use hifitime::TimeSeries;
+use hifitime::{Epoch, TimeSeries};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
@@ -27,11 +27,13 @@ pub use crate::{cosmic::Cosm, State, TimeTagged};
 use crate::{linalg::allocator::Allocator, od::TrackingDataSim};
 use crate::{linalg::DefaultAllocator, md::ui::Traj};
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 pub struct TrackingArcSim<MsrIn, Msr, D>
 where
     D: TrackingDataSim<MsrIn, Msr>,
-    Msr: Measurement,
+    MsrIn: State,
+    Msr: Measurement<State = MsrIn>,
     <Msr as Measurement>::State: InterpState,
     DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
@@ -54,7 +56,8 @@ where
 impl<MsrIn, Msr, D> TrackingArcSim<MsrIn, Msr, D>
 where
     D: TrackingDataSim<MsrIn, Msr>,
-    Msr: Measurement,
+    MsrIn: State,
+    Msr: Measurement<State = MsrIn>,
     <Msr as Measurement>::State: InterpState,
     DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
@@ -95,5 +98,33 @@ where
         let rng = StdRng::from_entropy();
 
         Self::with_rng(devices, trajectory, rng)
+    }
+
+    /// Generates measurements from the simulated tracking arc.
+    ///
+    /// Notes:
+    /// Although mutable, this function may be called several times to generate different measurements.
+    pub fn generate_measurements(&mut self, cosm: Arc<Cosm>) -> Result<Vec<Msr>, NyxError> {
+        let start = Epoch::now().unwrap();
+        let mut measurements = Vec::new();
+        // Clone the time series so we don't consume it.
+        let ts = self.gcd_time_series.clone();
+        for epoch in ts {
+            // Get the state
+            let state = self.trajectory.at(epoch)?;
+            for device in self.devices.iter_mut() {
+                if let Some(msr) = device.measure(&state, &mut self.rng, cosm.clone()) {
+                    measurements.push(msr);
+                }
+            }
+        }
+
+        info!(
+            "Generated {} measurements in {}",
+            measurements.len(),
+            Epoch::now().unwrap() - start
+        );
+
+        Ok(measurements)
     }
 }

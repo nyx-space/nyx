@@ -30,18 +30,22 @@ use super::{Cosm, TrkConfig};
 /// Implementations of the tracking data simulation can simulate tracking data (e.g. ground stations)
 pub trait TrackingDataSim<MsrIn, Msr>
 where
+    MsrIn: State,
     Msr: Measurement,
     DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
+        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>
+        + Allocator<f64, MsrIn::Size>
+        + Allocator<f64, MsrIn::Size, MsrIn::Size>
+        + Allocator<f64, MsrIn::VecLength>,
 {
     /// Returns the tracking configuration of this specific object
     fn config(&self) -> TrkConfig {
         todo!()
     }
 
-    /// Observes the input state and returns a measurement from itself to the input state
+    /// Observes the input state and returns a measurement from itself to the input state, and returns None of the object is not visible.
     fn measure<R: Rng>(&mut self, input: &MsrIn, rng: &mut R, cosm: Arc<Cosm>) -> Option<Msr>;
 }
