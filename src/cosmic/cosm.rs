@@ -60,7 +60,7 @@ pub enum LightTimeCalc {
     None,
     /// Accounts for light-time correction. This is corresponds to CN in SPICE.
     LightTime,
-    /// Accounts for light-time and stellar abberation where the solar system barycenter is the inertial frame. Corresponds to CN+S in SPICE.
+    /// Accounts for light-time and stellar aberration where the solar system barycenter is the inertial frame. Corresponds to CN+S in SPICE.
     Abberation,
 }
 

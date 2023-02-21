@@ -21,16 +21,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
+        run: cargo check
 
   tests:
     strategy:
@@ -48,11 +44,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install ${{ matrix.rust.name }} toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust.version }}
-          override: true
 
       - name: Set up cargo cache
         uses: actions/cache@v3
@@ -90,11 +84,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install ${{ matrix.rust.name }} toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust.version }}
-          override: true
 
       - name: All integration tests (release)
         run: |
@@ -116,24 +108,16 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
           components: rustfmt, clippy
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
 
       - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy -- -D warnings
 
   audit:
     name: Security Audit
@@ -145,11 +129,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       - name: Install cargo-audit
         run: cargo install cargo-audit
@@ -168,11 +150,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
           components: rustfmt, clippy
 
       - name: Publish to crates.io
