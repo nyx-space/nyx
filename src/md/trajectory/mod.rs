@@ -19,7 +19,7 @@
 mod traj;
 mod traj_it;
 
-pub(crate) const INTERPOLATION_SAMPLES: usize = 12;
+pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
 
 pub use traj::Traj;
 
@@ -166,6 +166,7 @@ impl InterpState for Orbit {
         me.vx = vx_km_s;
         me.vy = vy_km_s;
         me.vz = vz_km_s;
+        me.set_epoch(epoch);
 
         Ok(me)
     }

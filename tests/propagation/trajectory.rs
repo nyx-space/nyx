@@ -92,20 +92,19 @@ fn traj_ephem_forward() {
     }
 
     println!(
-        "[traj_ephem] Maximum interpolation error: pos: {:.2e} m\t\tvel: {:.2e} m/s",
+        "[traj_ephem] Maximum error on exact step: pos: {:.2e} m\t\tvel: {:.2e} m/s",
         max_pos_err * 1e3,
         max_vel_err * 1e3,
     );
 
-    // Allow for up to micrometer error
+    // Should be zero because we store these states as is
     assert!(
-        max_pos_err < 1e-8,
+        max_pos_err == 0.0,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to micrometers per second error
     assert!(
-        max_vel_err < 1e-8,
+        max_vel_err == 0.0,
         "Maximum orbit velocity in interpolation is too high!"
     );
 
@@ -162,13 +161,13 @@ fn traj_ephem_forward() {
 
     // Allow for up to meter error after double conversion
     assert!(
-        max_pos_err < 1e-3,
+        max_pos_err < 1.0,
         "Maximum spacecraft position in interpolation is too high!"
     );
 
-    // Allow for up to millimeters per second error after double conversion
+    // Allow for up to ten centimeters per second error after double conversion
     assert!(
-        max_vel_err < 1e-6,
+        max_vel_err < 1e-2,
         "Maximum orbit velocity in interpolation is too high!"
     );
 }

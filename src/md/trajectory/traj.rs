@@ -63,6 +63,9 @@ where
     }
     /// Orders the states, can be used to store the states out of order
     pub fn finalize(&mut self) {
+        // Remove duplicate epochs
+        self.states.dedup_by(|a, b| a.epoch().eq(&b.epoch()));
+        // And sort
         self.states.sort_by(|a, b| a.epoch().cmp(&b.epoch()));
     }
 
@@ -461,13 +464,34 @@ impl Traj<Orbit> {
     /// This simply converts each state into the other frame and may lead to aliasing due to the Nyquist–Shannon sampling theorem.
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
+        if self.states.is_empty() {
+            return Err(NyxError::Trajectory(TrajError::CreationError(
+                "No trajectory to convert".to_string(),
+            )));
+        }
         let start_instant = Instant::now();
         let mut traj = Self::new();
-        for state in &self.states {
-            traj.states.push(cosm.frame_chg(state, new_frame));
+        // For each state, add the state and the one in between two successive states
+        for these_states in self.states.windows(2) {
+            let state_1 = cosm.frame_chg(&these_states[0], new_frame);
+            traj.states.push(state_1);
+            let next_epoch = state_1.epoch() + (these_states[1].epoch() - state_1.epoch()) * 0.5;
+            match self.at(next_epoch) {
+                Ok(intermediate) => {
+                    // The at() call will fail on the last state.
+                    let state_2 = cosm.frame_chg(&intermediate, new_frame);
+                    traj.states.push(state_2);
+                }
+                Err(e) => error!("{e} @ {next_epoch}"),
+            }
         }
+        // Add the final state
+        let state_2 = cosm.frame_chg(self.last(), new_frame);
+        traj.states.push(state_2);
+        traj.finalize();
+
         info!(
-            "Converted trajectory from {} to {} in {} ms",
+            "Converted trajectory from {} to {} in {} ms: {traj}",
             self.first().frame,
             new_frame,
             (Instant::now() - start_instant).as_millis()
@@ -583,14 +607,35 @@ impl Traj<Spacecraft> {
     /// Allows converting the source trajectory into the (almost) equivalent trajectory in another frame
     #[allow(clippy::map_clone)]
     pub fn to_frame(&self, new_frame: Frame, cosm: Arc<Cosm>) -> Result<Self, NyxError> {
+        if self.states.is_empty() {
+            return Err(NyxError::Trajectory(TrajError::CreationError(
+                "No trajectory to convert".to_string(),
+            )));
+        }
         let start_instant = Instant::now();
         let mut traj = Self::new();
-        for state in &self.states {
-            let orbit = cosm.frame_chg(&state.orbit, new_frame);
-            traj.states.push(state.with_orbit(orbit));
+        // For each state, add the state and the one in between two successive states
+        for these_states in self.states.windows(2) {
+            let cur_sc = these_states[0];
+            let state_1 = cosm.frame_chg(&cur_sc.orbit, new_frame);
+            traj.states.push(cur_sc.with_orbit(state_1));
+            let next_epoch = state_1.epoch() + (these_states[1].epoch() - state_1.epoch()) * 0.5;
+            match self.at(next_epoch) {
+                Ok(intermediate) => {
+                    // The at() call will fail on the last state.
+                    let state_2 = cosm.frame_chg(&intermediate.orbit, new_frame);
+                    traj.states.push(cur_sc.with_orbit(state_2));
+                }
+                Err(e) => error!("{e} @ {next_epoch}"),
+            }
         }
+        // Add the final state
+        let state_2 = cosm.frame_chg(&self.last().orbit, new_frame);
+        traj.states.push(self.last().with_orbit(state_2));
+        traj.finalize();
+
         info!(
-            "Converted trajectory from {} to {} in {} ms",
+            "Converted trajectory from {} to {} in {} ms: {traj}",
             self.first().orbit.frame,
             new_frame,
             (Instant::now() - start_instant).as_millis()
