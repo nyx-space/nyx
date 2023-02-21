@@ -40,13 +40,13 @@ use rand::Rng;
 pub struct GroundStation {
     pub name: String,
     /// in degrees
-    pub elevation_mask: f64,
+    pub elevation_mask_deg: f64,
     /// in degrees
-    pub latitude: f64,
+    pub latitude_deg: f64,
     /// in degrees
-    pub longitude: f64,
+    pub longitude_deg: f64,
     /// in km
-    pub height: f64,
+    pub height_km: f64,
     /// Frame in which this station is defined
     pub frame: Frame,
     range_noise: Normal<f64>,
@@ -67,10 +67,10 @@ impl GroundStation {
     ) -> Self {
         Self {
             name,
-            elevation_mask,
-            latitude,
-            longitude,
-            height,
+            elevation_mask_deg: elevation_mask,
+            latitude_deg: latitude,
+            longitude_deg: longitude,
+            height_km: height,
             frame,
             range_noise: Normal::new(0.0, range_noise).unwrap(),
             range_rate_noise: Normal::new(0.0, range_rate_noise).unwrap(),
@@ -175,9 +175,9 @@ impl GroundStation {
     /// Return this ground station as an orbit in its current frame
     pub fn to_orbit(&self, epoch: Epoch) -> Orbit {
         Orbit::from_geodesic(
-            self.latitude,
-            self.longitude,
-            self.height,
+            self.latitude_deg,
+            self.longitude_deg,
+            self.height_km,
             epoch,
             self.frame,
         )
@@ -198,7 +198,7 @@ impl TrackingDataSim<Orbit, StdMeasurement> for GroundStation {
             rx.dt,
             tx_rxf,
             rx_rxf,
-            elevation >= self.elevation_mask,
+            elevation >= self.elevation_mask_deg,
             &self.range_noise,
             &self.range_rate_noise,
         ))
@@ -219,7 +219,7 @@ impl TrackingDataSim<Spacecraft, StdMeasurement> for GroundStation {
             rx_ssb.dt,
             tx_ssb,
             rx_ssb,
-            elevation >= self.elevation_mask,
+            elevation >= self.elevation_mask_deg,
             &self.range_noise,
             &self.range_rate_noise,
         ))
@@ -234,9 +234,9 @@ impl fmt::Display for GroundStation {
             "[{}] {} (lat.: {:.2} deg    long.: {:.2} deg    alt.: {:.2} m)",
             self.frame,
             self.name,
-            self.latitude,
-            self.longitude,
-            self.height * 1e3,
+            self.latitude_deg,
+            self.longitude_deg,
+            self.height_km * 1e3,
         )
     }
 }

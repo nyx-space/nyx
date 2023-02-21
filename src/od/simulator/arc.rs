@@ -26,6 +26,7 @@ use crate::od::Measurement;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use crate::{linalg::allocator::Allocator, od::TrackingDataSim};
 use crate::{linalg::DefaultAllocator, md::ui::Traj};
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -41,8 +42,8 @@ where
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
 {
-    /// List of devices.
-    pub devices: Vec<D>,
+    /// Map of devices to their names.
+    pub devices: HashMap<String, D>,
     /// Receiver trajectory
     pub trajectory: Traj<Msr::State>,
     /// Random number generator used for this tracking arc, ensures repeatability
@@ -65,13 +66,17 @@ where
         + Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
 {
-    pub fn with_rng(devices: Vec<D>, trajectory: Traj<Msr::State>, rng: StdRng) -> Self {
+    pub fn with_rng(
+        devices: HashMap<String, D>,
+        trajectory: Traj<Msr::State>,
+        rng: StdRng,
+    ) -> Self {
         // TODO: Support other schedules than Continuous.
 
         // Compute the smallest sampling of all the devices
         let step = devices
             .iter()
-            .map(|d| d.config())
+            .map(|d| d.1.config())
             .map(|c| c.sampling)
             .min()
             .unwrap();
@@ -88,13 +93,13 @@ where
         }
     }
 
-    pub fn with_seed(devices: Vec<D>, trajectory: Traj<Msr::State>, seed: u64) -> Self {
+    pub fn with_seed(devices: HashMap<String, D>, trajectory: Traj<Msr::State>, seed: u64) -> Self {
         let rng = StdRng::seed_from_u64(seed);
 
         Self::with_rng(devices, trajectory, rng)
     }
 
-    pub fn new(devices: Vec<D>, trajectory: Traj<Msr::State>) -> Self {
+    pub fn new(devices: HashMap<String, D>, trajectory: Traj<Msr::State>) -> Self {
         let rng = StdRng::from_entropy();
 
         Self::with_rng(devices, trajectory, rng)
@@ -104,7 +109,10 @@ where
     ///
     /// Notes:
     /// Although mutable, this function may be called several times to generate different measurements.
-    pub fn generate_measurements(&mut self, cosm: Arc<Cosm>) -> Result<Vec<Msr>, NyxError> {
+    pub fn generate_measurements(
+        &mut self,
+        cosm: Arc<Cosm>,
+    ) -> Result<Vec<(String, Msr)>, NyxError> {
         let start = Epoch::now().unwrap();
         let mut measurements = Vec::new();
         // Clone the time series so we don't consume it.
@@ -112,9 +120,9 @@ where
         for epoch in ts {
             // Get the state
             let state = self.trajectory.at(epoch)?;
-            for device in self.devices.iter_mut() {
+            for (name, device) in self.devices.iter_mut() {
                 if let Some(msr) = device.measure(&state, &mut self.rng, cosm.clone()) {
-                    measurements.push(msr);
+                    measurements.push((name.clone(), msr));
                 }
             }
         }

@@ -109,11 +109,11 @@ where
     type IntermediateRepr: ConfigRepr;
 
     fn from_yaml<P: AsRef<Path>>(path: P, cosm: Arc<Cosm>) -> Result<Self, ConfigError> {
-        Self::from_config(Self::IntermediateRepr::load_yaml(path)?, cosm)
+        Self::from_config(&Self::IntermediateRepr::load_yaml(path)?, cosm)
     }
 
     /// Creates a new instance of `self` from the configuration.
-    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    fn from_config(cfg: &Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
     where
         Self: Sized;
 
