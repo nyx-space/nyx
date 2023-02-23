@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::regex::Regex;
 use hifitime::{SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE};
+use regex::Regex;
 
 pub use super::ParsingError;
 

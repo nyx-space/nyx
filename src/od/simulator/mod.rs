@@ -18,29 +18,12 @@
 
 pub use crate::dynamics::{Dynamics, NyxError};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
-use hifitime::{Duration, Epoch};
-use serde_derive::Deserialize;
-use std::fmt::Debug;
 
 pub mod arc;
+mod schedule;
+pub use schedule::Schedule;
 pub mod trackdata;
-
-#[derive(Debug, Deserialize)]
-pub enum Schedule {
-    Continuous,
-    Intermittent { on: Duration, off: Duration },
-}
-
-pub enum StartMode {
-    /// Start the tracking schedule with respect to when the receiver is visible
-    Visible,
-    /// Start the tracking schedule with respect to the provided epoch
-    Epoch(Epoch),
-}
-
-/// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2)
-pub struct TrkConfig {
-    pub start_mode: StartMode,
-    pub schedule: Schedule,
-    pub sampling: Duration,
-}
+mod trkconfig;
+pub use trkconfig::TrkConfig;
+mod start_mode;
+pub use start_mode::StartMode;

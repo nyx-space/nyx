@@ -18,10 +18,10 @@
 
 use crate::cosmic::Orbit;
 use crate::linalg::{DimName, Matrix1x6, OVector, Vector1, U1, U6, U7};
-use crate::od::Measurement;
+use crate::od::{Measurement, SimMeasurement};
 use crate::time::Epoch;
 use crate::TimeTagged;
-use arrow_schema::{DataType, Field};
+use arrow::datatypes::{DataType, Field};
 use hyperdual::linalg::norm;
 use hyperdual::{hyperspace_from_vector, OHyperdual};
 use serde::ser::SerializeSeq;
@@ -80,7 +80,6 @@ impl RangeMsr {
 }
 
 impl Measurement for RangeMsr {
-    type State = Orbit;
     type MeasurementSize = U1;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -90,18 +89,31 @@ impl Measurement for RangeMsr {
         self.obs
     }
 
+    fn fields() -> Vec<Field> {
+        let mut meta = HashMap::new();
+        meta.insert("unit".to_string(), "km".to_string());
+        vec![Field::new("Range", DataType::Float64, false).with_metadata(meta)]
+    }
+
+    fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self {
+        Self {
+            dt: epoch,
+            obs,
+            visible: true,
+            h_tilde: Matrix1x6::zeros(),
+        }
+    }
+}
+
+impl SimMeasurement for RangeMsr {
+    type State = Orbit;
+
     fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
         self.h_tilde
     }
 
     fn visible(&self) -> bool {
         self.visible
-    }
-
-    fn fields() -> Vec<Field> {
-        let mut meta = HashMap::new();
-        meta.insert("unit".to_string(), "km".to_string());
-        vec![Field::new("Range", DataType::Float64, false).with_metadata(meta)]
     }
 }
 

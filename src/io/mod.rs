@@ -16,16 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate flate2;
-extern crate regex;
-extern crate serde;
-extern crate serde_derive;
-
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::errors::NyxError;
 use crate::time::Epoch;
+pub(crate) mod watermark;
+use hifitime::Duration;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer};
+use serde::{Serialize, Serializer};
 use serde_yaml::Error as YamlError;
 use std::convert::From;
 use std::fmt;
@@ -59,7 +56,9 @@ pub mod formatter;
 
 pub mod quantity;
 
-mod stations;
+pub mod stations;
+
+pub mod tracking_data;
 
 use std::io;
 use thiserror::Error;
@@ -119,6 +118,40 @@ where
 
     /// Converts self into the intermediate representation which is serializable.
     fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError>;
+}
+
+pub(crate) fn epoch_to_str<S>(epoch: &Epoch, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{epoch}"))
+}
+
+/// A deserializer from Epoch string
+pub(crate) fn epoch_from_str<'de, D>(deserializer: D) -> Result<Epoch, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // implementation of the custom deserialization function
+    let s: &str = Deserialize::deserialize(deserializer)?;
+    Epoch::from_str(s).map_err(serde::de::Error::custom)
+}
+
+pub(crate) fn duration_to_str<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{duration}"))
+}
+
+/// A deserializer from Duration string
+pub(crate) fn duration_from_str<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // implementation of the custom deserialization function
+    let s: &str = Deserialize::deserialize(deserializer)?;
+    Duration::from_str(s).map_err(serde::de::Error::custom)
 }
 
 #[allow(clippy::upper_case_acronyms)]

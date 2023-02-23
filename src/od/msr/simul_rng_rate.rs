@@ -18,10 +18,10 @@
 
 use crate::cosmic::Orbit;
 use crate::linalg::{DimName, Matrix2x6, OVector, Vector2, U2, U6, U7};
-use crate::od::Measurement;
+use crate::od::{Measurement, SimMeasurement};
 use crate::time::Epoch;
 use crate::TimeTagged;
-use arrow_schema::Field;
+use arrow::datatypes::Field;
 use hyperdual::linalg::norm;
 use hyperdual::{hyperspace_from_vector, OHyperdual};
 use rand::thread_rng;
@@ -137,7 +137,6 @@ impl StdMeasurement {
 }
 
 impl Measurement for StdMeasurement {
-    type State = Orbit;
     type MeasurementSize = U2;
 
     /// Returns this measurement as a vector of Range and Range Rate
@@ -147,19 +146,32 @@ impl Measurement for StdMeasurement {
         self.obs
     }
 
+    fn fields() -> Vec<Field> {
+        vec![
+            RangeMsr::fields()[0].clone(),
+            RangeRate::fields()[0].clone(),
+        ]
+    }
+
+    fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self {
+        Self {
+            dt: epoch,
+            obs,
+            visible: true,
+            h_tilde: Matrix2x6::zeros(),
+        }
+    }
+}
+
+impl SimMeasurement for StdMeasurement {
+    type State = Orbit;
+
     fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
         self.h_tilde
     }
 
     fn visible(&self) -> bool {
         self.visible
-    }
-
-    fn fields() -> Vec<Field> {
-        vec![
-            RangeMsr::fields()[0].clone(),
-            RangeRate::fields()[0].clone(),
-        ]
     }
 }
 

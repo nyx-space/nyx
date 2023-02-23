@@ -20,13 +20,13 @@ use super::formatter::OutputSerde;
 use super::gravity::HarmonicsMem;
 use super::quantity::*;
 use super::rv::Distribution;
-use super::serde_derive::Deserialize;
 use super::stations::StationSerde;
 use super::ParsingError;
 use crate::cosmic::{Frame, Orbit};
 use crate::md::{Event, StateParameter};
 use crate::time::Epoch;
 use crate::NyxError;
+use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::str::FromStr;
 

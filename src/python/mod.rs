@@ -16,15 +16,22 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::od::ui::*;
+use crate::io::ConfigError;
 use crate::NyxError;
 use hifitime::leap_seconds::{LatestLeapSeconds, LeapSecondsFile};
 use hifitime::prelude::*;
 use hifitime::ut1::Ut1Provider;
 use pyo3::{exceptions::PyException, prelude::*};
+mod orbit_determination;
 
-impl std::convert::From<NyxError> for PyErr {
+impl From<NyxError> for PyErr {
     fn from(err: NyxError) -> PyErr {
+        PyException::new_err(err.to_string())
+    }
+}
+
+impl From<ConfigError> for PyErr {
+    fn from(err: ConfigError) -> PyErr {
         PyException::new_err(err.to_string())
     }
 }
@@ -58,7 +65,7 @@ fn register_time_module(py: Python<'_>, parent_module: &PyModule) -> PyResult<()
 fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "orbit_determination")?;
 
-    sm.add_class::<GroundStation>()?;
+    sm.add_class::<orbit_determination::GroundStation>()?;
 
     parent_module.add_submodule(sm)?;
     Ok(())

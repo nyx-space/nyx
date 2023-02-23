@@ -20,18 +20,18 @@ use std::sync::Arc;
 
 use rand::Rng;
 
-use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
-use crate::od::Measurement;
+use crate::od::SimMeasurement;
 use crate::State;
+use crate::{io::Configurable, linalg::allocator::Allocator};
 
 use super::{Cosm, TrkConfig};
 
-/// Implementations of the tracking data simulation can simulate tracking data (e.g. ground stations)
-pub trait TrackingDataSim<MsrIn, Msr>
+/// Tracking device simulator.
+pub trait TrackingDeviceSim<MsrIn, Msr>: Configurable
 where
     MsrIn: State,
-    Msr: Measurement,
+    Msr: SimMeasurement,
     DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::VecLength>
@@ -43,8 +43,11 @@ where
 {
     /// Returns the tracking configuration of this specific object
     fn config(&self) -> TrkConfig {
-        todo!()
+        TrkConfig::default()
     }
+
+    /// Returns the name of this tracking data simulator
+    fn name(&self) -> String;
 
     /// Observes the input state and returns a measurement from itself to the input state, and returns None of the object is not visible.
     fn measure<R: Rng>(&mut self, input: &MsrIn, rng: &mut R, cosm: Arc<Cosm>) -> Option<Msr>;

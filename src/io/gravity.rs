@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::flate2::read::GzDecoder;
 use crate::linalg::DMatrix;
 use crate::NyxError;
+use flate2::read::GzDecoder;
 use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;

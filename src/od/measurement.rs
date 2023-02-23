@@ -17,7 +17,7 @@
 */
 
 use super::msr::StdMeasurement;
-use super::TrackingDataSim;
+use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::time::Epoch;
 use crate::Spacecraft;
@@ -44,8 +44,8 @@ pub struct GroundStation {
     pub height_km: f64,
     /// Frame in which this station is defined
     pub frame: Frame,
-    range_noise: Normal<f64>,
-    range_rate_noise: Normal<f64>,
+    pub(crate) range_noise: Normal<f64>,
+    pub(crate) range_rate_noise: Normal<f64>,
 }
 
 impl GroundStation {
@@ -139,7 +139,6 @@ impl GroundStation {
     }
 }
 
-#[cfg_attr(feature = "python", pymethods)]
 impl GroundStation {
     /// Computes the elevation of the provided object seen from this ground station.
     /// Also returns the ground station's orbit in the frame of the receiver
@@ -179,7 +178,7 @@ impl GroundStation {
     }
 }
 
-impl TrackingDataSim<Orbit, StdMeasurement> for GroundStation {
+impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure<R: Rng>(
         &mut self,
@@ -198,9 +197,13 @@ impl TrackingDataSim<Orbit, StdMeasurement> for GroundStation {
             &self.range_rate_noise,
         ))
     }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
 }
 
-impl TrackingDataSim<Spacecraft, StdMeasurement> for GroundStation {
+impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure<R: Rng>(
         &mut self,
@@ -218,6 +221,10 @@ impl TrackingDataSim<Spacecraft, StdMeasurement> for GroundStation {
             &self.range_noise,
             &self.range_rate_noise,
         ))
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
     }
 }
 

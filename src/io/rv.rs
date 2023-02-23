@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::serde_derive::Deserialize;
+use serde_derive::Deserialize;
 
 #[derive(Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

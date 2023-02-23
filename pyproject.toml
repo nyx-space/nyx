@@ -17,3 +17,6 @@ classifiers = [
 based_on_style = "google"
 spaces_before_comment = 4
 column_limit = 100
+
+[tool.maturin]
+python-source = "python"

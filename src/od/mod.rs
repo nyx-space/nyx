@@ -21,7 +21,6 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
 pub use crate::{cosmic::Cosm, State, TimeTagged};
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::io::{CovarFormat, EpochFormat};
@@ -47,8 +46,8 @@ pub mod msr;
 /// Provides all of the functionality to simulate measurements from ground stations
 pub mod simulator;
 
-use arrow_schema::Field;
-pub use simulator::trackdata::TrackingDataSim;
+use arrow::datatypes::Field;
+pub use simulator::trackdata::TrackingDeviceSim;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
@@ -110,8 +109,28 @@ where
     fn measurement_noise(&self, epoch: Epoch) -> &OMatrix<f64, M, M>;
 }
 
-/// A trait defining a measurement of size `MeasurementSize`
-pub trait Measurement: TimeTagged
+/// A trait defining a measurement
+pub trait Measurement: TimeTagged {
+    /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
+    type MeasurementSize: DimName;
+
+    /// Returns the fields for this kind of measurement.
+    /// The metadata must include a `unit` field with the unit.
+    fn fields() -> Vec<Field>;
+
+    /// Initializes a new measurement from the provided data.
+    fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self
+    where
+        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
+
+    /// Returns the measurement/observation as a vector.
+    fn observation(&self) -> OVector<f64, Self::MeasurementSize>
+    where
+        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
+}
+
+/// A trait defining a simulated measurement
+pub trait SimMeasurement: Measurement
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
@@ -122,17 +141,6 @@ where
 {
     /// Defines the estimated state
     type State: State;
-    /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
-    type MeasurementSize: DimName;
-
-    /// Returns the fields for this kind of measurement.
-    /// The metadata must include a `unit` field with the unit.
-    fn fields() -> Vec<Field>;
-
-    /// Returns the measurement/observation as a vector.
-    fn observation(&self) -> OVector<f64, Self::MeasurementSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
     fn sensitivity(
@@ -145,35 +153,6 @@ where
     /// Returns whether the transmitter and receiver where in line of sight.
     /// TODO: Remove this.
     fn visible(&self) -> bool;
-}
-
-/// A trait to generalize tracking devices such as a ground station
-pub trait TrackingData<Msr>
-where
-    Msr: Measurement,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
-{
-    /// Returns the observation at the provided epoch.
-    fn measure(&self, epoch: Epoch, cosm: Arc<Cosm>) -> Option<Msr>;
-}
-
-pub struct TrackingArc<Msr, D>
-where
-    D: TrackingData<Msr>,
-    Msr: Measurement,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
-{
-    /// List of devices
-    pub devices: Vec<D>,
-    _msr: PhantomData<Msr>,
 }
 
 pub trait EstimateFrom<O: State>

@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::serde_derive::{Deserialize, Serialize};
 use super::ConfigError;
 use super::{ConfigRepr, Configurable};
 use crate::od::ui::GroundStation;
+use serde_derive::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -98,7 +98,17 @@ impl Configurable for GroundStation {
     }
 
     fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
-        todo!()
+        Ok(StationSerde {
+            name: self.name.clone(),
+            frame: Some(self.frame.to_string()),
+            elevation_mask_deg: self.elevation_mask_deg,
+            range_noise_km: self.range_noise.mean(),
+            range_rate_noise_km_s: self.range_rate_noise.mean(),
+            latitude_deg: Some(self.latitude_deg),
+            longitude_deg: Some(self.longitude_deg),
+            height_km: Some(self.height_km),
+            inherit: None,
+        })
     }
 }
 
@@ -157,16 +167,7 @@ fn test_load_many() {
     .iter()
     .collect();
 
-    // assert!(test_data.exists(), "Could not find the test data");
-
-    // let stations = StationSerde::load_many_yaml(test_data).unwrap();
-    let stations = match StationSerde::load_many_yaml(test_data) {
-        Ok(stations) => stations,
-        Err(e) => {
-            println!("{e}");
-            panic!();
-        }
-    };
+    let stations = StationSerde::load_many_yaml(test_data).unwrap();
 
     dbg!(&stations);
 

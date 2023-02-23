@@ -10,6 +10,7 @@ mod measurements;
 mod multi_body;
 mod robust;
 mod spacecraft;
+mod trackingarc;
 mod two_body;
 mod xhat_dev;
 

@@ -30,7 +30,7 @@ use crate::md::ui::MDProcess;
 use crate::od::measurement::GroundStation;
 use crate::od::ui::snc::SNC3;
 use crate::od::ui::*;
-use crate::od::TrackingDataSim;
+use crate::od::TrackingDeviceSim;
 use crate::propagators::Propagator;
 use crate::time::{Duration, Unit};
 use crate::Orbit;
