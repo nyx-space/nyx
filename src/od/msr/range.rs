@@ -92,7 +92,7 @@ impl Measurement for RangeMsr {
     fn fields() -> Vec<Field> {
         let mut meta = HashMap::new();
         meta.insert("unit".to_string(), "km".to_string());
-        vec![Field::new("Range", DataType::Float64, false).with_metadata(meta)]
+        vec![Field::new("Range (km)", DataType::Float64, false).with_metadata(meta)]
     }
 
     fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self {

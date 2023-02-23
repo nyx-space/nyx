@@ -93,7 +93,7 @@ impl Measurement for RangeRate {
     fn fields() -> Vec<Field> {
         let mut meta = HashMap::new();
         meta.insert("unit".to_string(), "km/s".to_string());
-        vec![Field::new("Range rate", DataType::Float64, false).with_metadata(meta)]
+        vec![Field::new("Range rate (km/s)", DataType::Float64, false).with_metadata(meta)]
     }
 
     fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self {

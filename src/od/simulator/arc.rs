@@ -136,12 +136,12 @@ where
         let mut devices = Vec::new();
         for device in self.devices.values() {
             let repr = device.to_config().unwrap();
-            devices.push(serde_yaml::to_string(&repr).unwrap());
+            devices.push(repr);
         }
 
         // Build the tracking arc.
         let trk = TrackingArc {
-            devices,
+            device_cfg: serde_yaml::to_string(&devices).unwrap(),
             measurements,
         };
 

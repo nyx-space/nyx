@@ -14,7 +14,7 @@ def plot_measurements(path):
     df['Epoch'] = pd.to_datetime(df['Epoch Gregorian UTC'])
 
     # Plot all of the columns apart from the default ones.
-    default = ['Epoch Gregorian UTC', 'Epoch Gregorian TDB', 'Epoch TDB seconds', 'Tracking device']
+    default = ['Epoch Gregorian UTC', 'Epoch Gregorian TDB', 'Epoch TDB (s)', 'Tracking device']
 
     columns = [col for col in arc_pq.column_names if col not in default]
 

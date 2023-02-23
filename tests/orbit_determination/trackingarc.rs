@@ -1,4 +1,5 @@
 use nyx_space::io::stations::StationSerde;
+use nyx_space::io::tracking_data::DynamicTrackingArc;
 use nyx_space::io::{ConfigRepr, Configurable};
 use nyx_space::md::ui::*;
 use nyx_space::od::msr::StdMeasurement;
@@ -71,4 +72,11 @@ fn tracking_arc_simple() {
 
     let output_fn = arc.write_parquet(path).unwrap();
     println!("[{}] {arc}", output_fn.to_string_lossy());
+
+    // Now read this file back in.
+    let dyn_arc = DynamicTrackingArc::from_parquet(output_fn).unwrap();
+    // And convert to the same tracking arc as earlier
+    let arc_concrete = dyn_arc.to_tracking_arc::<StdMeasurement>().unwrap();
+
+    dbg!(arc_concrete);
 }

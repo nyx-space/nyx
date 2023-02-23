@@ -55,6 +55,7 @@ pub(crate) fn pq_writer(metadata: Option<HashMap<String, String>>) -> Option<Wri
 
     if let Some(custom_md) = metadata {
         for (k, v) in custom_md {
+            dbg!(&k, &v);
             file_metadata.push(KeyValue::new(k, v));
         }
     }
