@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::io::tracking_data::DynamicTrackingArc;
 use crate::io::ConfigError;
 use crate::NyxError;
 use hifitime::leap_seconds::{LatestLeapSeconds, LeapSecondsFile};
@@ -66,6 +67,7 @@ fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "orbit_determination")?;
 
     sm.add_class::<orbit_determination::GroundStation>()?;
+    sm.add_class::<DynamicTrackingArc>()?;
 
     parent_module.add_submodule(sm)?;
     Ok(())

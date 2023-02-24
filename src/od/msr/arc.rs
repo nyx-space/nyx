@@ -52,20 +52,21 @@ where
     DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut set = HashSet::new();
-        self.measurements.iter().for_each(|(name, _msr)| {
-            set.insert(name);
-        });
-        write!(f, "{} measurements from {:?}", self.measurements.len(), set)
+        write!(
+            f,
+            "{} measurements from {:?}",
+            self.measurements.len(),
+            self.device_names()
+        )
     }
 }
+
 impl<Msr> TrackingArc<Msr>
 where
     Msr: Measurement,
     DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
 {
     /// Store this tracking arc to a parquet file
-    /// TODO: Support time stamp in file name and shadow-rs info in metadata
     pub fn write_parquet<P: AsRef<Path>>(&self, path: P) -> Result<P, Box<dyn Error>> {
         // Build the schema
         let mut hdrs = vec![
@@ -138,5 +139,14 @@ where
 
         // Return the path this was written to
         Ok(path)
+    }
+
+    /// Returns the unique list of tracking devices in this tracking arc
+    pub fn device_names(&self) -> HashSet<&String> {
+        let mut set = HashSet::new();
+        self.measurements.iter().for_each(|(name, _msr)| {
+            set.insert(name);
+        });
+        set
     }
 }

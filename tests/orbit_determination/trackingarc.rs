@@ -78,5 +78,12 @@ fn tracking_arc_simple() {
     // And convert to the same tracking arc as earlier
     let arc_concrete = dyn_arc.to_tracking_arc::<StdMeasurement>().unwrap();
 
-    dbg!(arc_concrete);
+    println!("{arc_concrete}");
+
+    // Check that we've loaded all of the measurements
+    assert_eq!(arc_concrete.measurements.len(), arc.measurements.len());
+    // Check that we find the same device names too
+    assert_eq!(arc_concrete.device_names(), arc.device_names());
+    // Check that we've copied over the device configurations as well
+    assert_eq!(arc_concrete.device_cfg, arc.device_cfg);
 }

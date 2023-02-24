@@ -17,9 +17,9 @@
 */
 
 use crate::{
-    linalg::{allocator::Allocator, DefaultAllocator, DimName, OVector},
+    linalg::{allocator::Allocator, DefaultAllocator, OVector},
     od::{msr::arc::TrackingArc, Measurement},
-    NyxError, State,
+    NyxError,
 };
 use arrow::{
     array::{Float64Array, StringArray},
@@ -27,72 +27,15 @@ use arrow::{
 };
 use hifitime::Epoch;
 use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
-use serde::{Deserialize, Serialize};
+use std::fs::File;
 use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
-use std::{fs::File, sync::Arc};
 
-use crate::od::SimMeasurement;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
-/// A dynamic measurement is only used when reading tracking data file
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DynamicMeasurement {
-    measurement_type: String,
-    epoch: Epoch,
-    data: Vec<f64>,
-}
-
-impl DynamicMeasurement {
-    /// Initializes a new dynamic measurement from a concrete measurement.
-    /// TODO: Is this ever needed? The measurements will be serialized directly, so I'm not sure I'll ever need this function.
-    pub fn new<M: SimMeasurement>(measurement: M) -> DynamicMeasurement
-    where
-        Self: Sized,
-        DefaultAllocator: Allocator<f64, M::MeasurementSize>
-            + Allocator<f64, <M::State as State>::Size>
-            + Allocator<f64, <M::State as State>::Size, <M::State as State>::Size>
-            + Allocator<f64, <M::State as State>::VecLength>
-            + Allocator<f64, M::MeasurementSize, <M::State as State>::Size>,
-    {
-        let mut data = Vec::new();
-        for obs in measurement.observation().iter() {
-            data.push(*obs);
-        }
-        // for data in measurement.
-        DynamicMeasurement {
-            measurement_type: std::any::type_name::<M>().to_string(),
-            data,
-            epoch: measurement.epoch(),
-        }
-    }
-
-    /// Attempts to convert this dynamic measurement into the concrete turbofish measurement
-    pub fn try_into<M: SimMeasurement>(self) -> Result<M, Box<dyn std::error::Error>>
-    where
-        Self: Sized,
-        DefaultAllocator: Allocator<f64, M::MeasurementSize>
-            + Allocator<f64, <M::State as State>::Size>
-            + Allocator<f64, <M::State as State>::Size, <M::State as State>::Size>
-            + Allocator<f64, <M::State as State>::VecLength>
-            + Allocator<f64, M::MeasurementSize, <M::State as State>::Size>,
-    {
-        let expected_type = std::any::type_name::<M>().to_string();
-        if self.measurement_type != expected_type {
-            return Err(format!(
-                "Expected measurement of type {}, but got {}",
-                expected_type, self.measurement_type
-            )
-            .into());
-        }
-        // Try to build the vector of the observation
-        if self.data.len() != M::MeasurementSize::USIZE {
-            panic!();
-        }
-        let obs = OVector::<f64, M::MeasurementSize>::from_iterator(self.data);
-        let measurement = M::from_observation(self.epoch, obs);
-        Ok(measurement)
-    }
-}
-
+/// A dynamic tracking arc allows loading a set of measurements from a parquet file and converting them
+/// to the concrete measurement type when desired.
+#[cfg_attr(feature = "python", pyclass)]
 pub struct DynamicTrackingArc {
     pub device_cfg: String,
     pub path: String,
@@ -126,17 +69,15 @@ impl DynamicTrackingArc {
             device_cfg: "".to_string(),
         };
 
-        info!("{me}");
+        for item in me.repr() {
+            info!("{item}");
+        }
 
         Ok(me)
-
-        // let record_batch = reader.next().unwrap().unwrap();
-
-        // println!("Read {} records.", record_batch.num_rows());
     }
 
     /// Reads through the loaded parquet file and attempts to convert to the provided tracking arc.
-    pub fn to_tracking_arc<Msr>(mut self) -> Result<TrackingArc<Msr>, NyxError>
+    pub fn to_tracking_arc<Msr>(self) -> Result<TrackingArc<Msr>, NyxError>
     where
         Msr: Measurement,
         DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
@@ -170,8 +111,10 @@ impl DynamicTrackingArc {
             ));
         }
 
-        let expected_type = std::any::type_name::<Msr>().to_string();
-        match expected_type.as_str() {
+        let expected_type = std::any::type_name::<Msr>().split("::").last().unwrap();
+
+        // Only check that the file contains the data we need
+        match expected_type {
             "StdMeasurement" => {
                 if !range_avail || !rate_avail {
                     return Err(NyxError::FileUnreadable(
@@ -207,88 +150,136 @@ impl DynamicTrackingArc {
             device_cfg: self.metadata["devices"].clone(),
             measurements: Vec::new(),
         };
-        // Now convert each data on the fly
 
-        let batch = self.reader.next().unwrap().unwrap();
+        // Now convert each batch on the fly
+        for maybe_batch in self.reader {
+            let batch = maybe_batch.unwrap();
 
-        let tracking_device = batch
-            .column_by_name("Tracking device")
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
+            let tracking_device = batch
+                .column_by_name("Tracking device")
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
 
-        let epochs = batch
-            .column_by_name("Epoch TDB (s)")
-            .unwrap()
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .unwrap();
+            let epochs = batch
+                .column_by_name("Epoch TDB (s)")
+                .unwrap()
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .unwrap();
 
-        let expected_type = std::any::type_name::<Msr>().to_string();
-        match expected_type.as_str() {
-            "StdMeasurement" => {
-                let range_data = batch
-                    .column_by_name("Range (km)")
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap();
+            // Now read the data depending on what we're deserializing as
+            match expected_type {
+                "StdMeasurement" => {
+                    let range_data = batch
+                        .column_by_name("Range (km)")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap();
 
-                let rate_data = batch
-                    .column_by_name("Range rate (km/s)")
-                    .unwrap()
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap();
+                    let rate_data = batch
+                        .column_by_name("Range rate (km/s)")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap();
 
-                // Set the measurements in the tracking arc
-                for i in 0..batch.num_rows() {
-                    arc.measurements.push((
-                        tracking_device.value(i).to_string(),
-                        Msr::from_observation(
-                            Epoch::from_tdb_seconds(epochs.value(i)),
-                            OVector::<f64, Msr::MeasurementSize>::from_iterator([
-                                range_data.value(i),
-                                rate_data.value(i),
-                            ]),
-                        ),
-                    ));
+                    // Set the measurements in the tracking arc
+                    for i in 0..batch.num_rows() {
+                        arc.measurements.push((
+                            tracking_device.value(i).to_string(),
+                            Msr::from_observation(
+                                Epoch::from_tdb_seconds(epochs.value(i)),
+                                OVector::<f64, Msr::MeasurementSize>::from_iterator([
+                                    range_data.value(i),
+                                    rate_data.value(i),
+                                ]),
+                            ),
+                        ));
+                    }
                 }
-            }
-            "RangeMsr" => {
-                if !range_avail {
-                    return Err(NyxError::FileUnreadable(
-                        "Cannot convert to range measurement: data missing".to_string(),
-                    ));
+                "RangeMsr" => {
+                    let range_data = batch
+                        .column_by_name("Range (km)")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap();
+
+                    // Set the measurements in the tracking arc
+                    for i in 0..batch.num_rows() {
+                        arc.measurements.push((
+                            tracking_device.value(i).to_string(),
+                            Msr::from_observation(
+                                Epoch::from_tdb_seconds(epochs.value(i)),
+                                OVector::<f64, Msr::MeasurementSize>::from_iterator([
+                                    range_data.value(i)
+                                ]),
+                            ),
+                        ));
+                    }
                 }
-            }
-            "RangeRate" => {
-                if !rate_avail {
-                    return Err(NyxError::FileUnreadable(
-                        "Cannot convert to range rate measurement: data missing".to_string(),
-                    ));
+                "RangeRate" => {
+                    let rate_data = batch
+                        .column_by_name("Range rate (km/s)")
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Float64Array>()
+                        .unwrap();
+
+                    // Set the measurements in the tracking arc
+                    for i in 0..batch.num_rows() {
+                        arc.measurements.push((
+                            tracking_device.value(i).to_string(),
+                            Msr::from_observation(
+                                Epoch::from_tdb_seconds(epochs.value(i)),
+                                OVector::<f64, Msr::MeasurementSize>::from_iterator([
+                                    rate_data.value(i)
+                                ]),
+                            ),
+                        ));
+                    }
                 }
-            }
-            _ => {
-                return Err(NyxError::FileUnreadable(format!(
-                    "Yet unsupported measurement {expected_type}"
-                )));
+                _ => unreachable!("should have errored earlier"),
             }
         }
 
         Ok(arc)
     }
+
+    fn repr(&self) -> Vec<String> {
+        let mut r = Vec::new();
+        r.push(format!("File: {}", self.path));
+        for (k, v) in &self.metadata {
+            if k != "devices" {
+                r.push(format!("{k}: {v}"));
+            }
+        }
+        r
+    }
 }
 
 impl Display for DynamicTrackingArc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "File: {}", self.path)?;
-        for (k, v) in &self.metadata {
-            if k != "devices" {
-                write!(f, "{k}: {v}\n")?;
-            }
+        for item in self.repr() {
+            write!(f, "{item}\n")?;
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl DynamicTrackingArc {
+    /// Initializes a new dynamic tracking arc from the provided parquet file
+    #[new]
+    fn new(path: String) -> Result<Self, NyxError> {
+        Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self}")
     }
 }
