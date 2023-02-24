@@ -10,6 +10,7 @@ use nyx::md::StateParameter;
 use nyx::propagators::*;
 use nyx::time::{Epoch, TimeSeries, Unit};
 use nyx::State;
+use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
 #[allow(clippy::identity_op)]
@@ -107,6 +108,17 @@ fn traj_ephem_forward() {
         max_vel_err == 0.0,
         "Maximum orbit velocity in interpolation is too high!"
     );
+
+    // Save the trajectory to parquet
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "ephem_forward.parquet",
+    ]
+    .iter()
+    .collect();
+
+    ephem.to_parquet(path).unwrap();
 
     // And let's convert into another frame and back to check the error
     let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();

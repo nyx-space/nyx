@@ -16,23 +16,31 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate rayon;
-
-use self::rayon::prelude::*;
 use super::traj_it::TrajIterator;
 use super::INTERPOLATION_SAMPLES;
 use super::{InterpState, TrajError};
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
 use crate::io::formatter::StateFormatter;
+use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::md::StateParameter;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
 use crate::time::{Duration, Epoch, TimeSeries, Unit};
 use crate::State;
+use arrow::array::{ArrayRef, Float64Array, StringArray};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
+use parquet::arrow::ArrowWriter;
+use rayon::prelude::*;
+use std::collections::HashMap;
+use std::error::Error;
 use std::fmt;
+use std::fs::File;
 use std::iter::Iterator;
 use std::ops;
+use std::path::Path;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant;
@@ -137,7 +145,7 @@ where
         }
     }
 
-    /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval.
+    /// Find the exact state where the request event happens. The event function is expected to be monotone in the provided interval because we find the event using a Brent solver.
     #[allow(clippy::identity_op)]
     pub fn find_bracketed<E>(&self, start: Epoch, end: Epoch, event: &E) -> Result<S, NyxError>
     where
@@ -389,6 +397,92 @@ where
         }
 
         Ok((min_state, max_state))
+    }
+
+    /// Store this tracking arc to a parquet file
+    pub fn to_parquet<P: AsRef<Path>>(&self, path: P) -> Result<P, Box<dyn Error>> {
+        let mut position = HashMap::new();
+        position.insert("unit".to_string(), "km".to_string());
+
+        let mut velocity = HashMap::new();
+        velocity.insert("unit".to_string(), "km/s".to_string());
+
+        // Build the schema
+        // TODO: Add the custom headers and frame conversions, etc. from state formatter
+        let hdrs = vec![
+            Field::new("Epoch Gregorian UTC", DataType::Utf8, false),
+            Field::new("Epoch Gregorian TDB", DataType::Utf8, false),
+            Field::new("Epoch TDB (s)", DataType::Float64, false),
+            Field::new("X (km)", DataType::Float64, false).with_metadata(position.clone()),
+            Field::new("Y (km)", DataType::Float64, false).with_metadata(position.clone()),
+            Field::new("Z (km)", DataType::Float64, false).with_metadata(position.clone()),
+            Field::new("VX (km/s)", DataType::Float64, false).with_metadata(velocity.clone()),
+            Field::new("VY (km/s)", DataType::Float64, false).with_metadata(velocity.clone()),
+            Field::new("VZ (km/s)", DataType::Float64, false).with_metadata(velocity.clone()),
+        ];
+
+        // Build the schema
+        let schema = Arc::new(Schema::new(hdrs));
+        let mut record = Vec::new();
+
+        // Build all of the records
+        record.push(Arc::new(StringArray::from(
+            self.states
+                .iter()
+                .map(|s| format!("{}", s.epoch()))
+                .collect::<Vec<String>>(),
+        )) as ArrayRef);
+
+        // TDB epoch
+        record.push(Arc::new(StringArray::from(
+            self.states
+                .iter()
+                .map(|s| format!("{:e}", s.epoch()))
+                .collect::<Vec<String>>(),
+        )) as ArrayRef);
+
+        // TDB Epoch seconds
+        record.push(Arc::new(Float64Array::from(
+            self.states
+                .iter()
+                .map(|s| s.epoch().to_tdb_seconds())
+                .collect::<Vec<f64>>(),
+        )) as ArrayRef);
+
+        // Add all of the fields
+        let fields = vec![
+            StateParameter::X,
+            StateParameter::Y,
+            StateParameter::Z,
+            StateParameter::VX,
+            StateParameter::VY,
+            StateParameter::VZ,
+        ];
+
+        for field in fields {
+            record.push(Arc::new(Float64Array::from(
+                self.states
+                    .iter()
+                    .map(|s| s.value(&field).unwrap())
+                    .collect::<Vec<f64>>(),
+            )) as ArrayRef);
+        }
+
+        // Serialize all of the devices and add that to the parquet file too.
+        let mut metadata = HashMap::new();
+        metadata.insert("Purpose".to_string(), "Trajectory data".to_string());
+        // TODO: Add mission phases here or whatever events are passed as an input
+
+        let props = pq_writer(Some(metadata));
+        let file = File::create(&path)?;
+        let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
+
+        let batch = RecordBatch::try_new(schema, record)?;
+        writer.write(&batch)?;
+        writer.close()?;
+
+        // Return the path this was written to
+        Ok(path)
     }
 }
 

@@ -67,7 +67,7 @@ where
     DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
 {
     /// Store this tracking arc to a parquet file
-    pub fn write_parquet<P: AsRef<Path>>(&self, path: P) -> Result<P, Box<dyn Error>> {
+    pub fn to_parquet<P: AsRef<Path>>(&self, path: P) -> Result<P, Box<dyn Error>> {
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch Gregorian UTC", DataType::Utf8, false),

@@ -70,7 +70,7 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    let output_fn = arc.write_parquet(path).unwrap();
+    let output_fn = arc.to_parquet(path).unwrap();
     println!("[{}] {arc}", output_fn.to_string_lossy());
 
     // Now read this file back in.
