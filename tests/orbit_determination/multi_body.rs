@@ -62,10 +62,9 @@ fn od_val_multi_body_ckf_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
-                break;
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }
@@ -199,10 +198,9 @@ fn multi_body_ckf_covar_map() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
-                break;
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }

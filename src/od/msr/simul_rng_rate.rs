@@ -169,10 +169,6 @@ impl SimMeasurement for StdMeasurement {
     fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
         self.h_tilde
     }
-
-    fn visible(&self) -> bool {
-        self.visible
-    }
 }
 
 impl TimeTagged for StdMeasurement {

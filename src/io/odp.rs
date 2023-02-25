@@ -395,10 +395,7 @@ impl OdpScenario {
                     .expect("could not format state");
             }
             for station in self.stations.iter_mut() {
-                let meas = station
-                    .measure(&rx_state, &mut rng, self.cosm.clone())
-                    .unwrap();
-                if meas.visible() {
+                if let Some(meas) = station.measure(&rx_state, &mut rng, self.cosm.clone()) {
                     sim_measurements.push(meas);
                     break; // We know that only one station is in visibility at each time.
                 }

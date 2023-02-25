@@ -16,9 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use arrow::datatypes::{DataType, Field};
+
 use super::NyxError;
 use core::fmt;
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 /// Common state parameters
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -235,6 +237,19 @@ impl StateParameter {
             Self::Thrust => "N",
             _ => "",
         }
+    }
+
+    /// Returns the parquet field of this parameter
+    pub fn field(self) -> Field {
+        let mut meta = HashMap::new();
+        meta.insert("unit".to_string(), self.unit().to_string());
+
+        Field::new(
+            format!("{self} ({})", self.unit()),
+            DataType::Float64,
+            false,
+        )
+        .with_metadata(meta)
     }
 }
 

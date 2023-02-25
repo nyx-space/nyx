@@ -188,14 +188,18 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
     ) -> Option<StdMeasurement> {
         let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx, &cosm);
 
-        Some(StdMeasurement::new(
-            rx.dt,
-            tx_rxf,
-            rx_rxf,
-            elevation >= self.elevation_mask_deg,
-            &self.range_noise,
-            &self.range_rate_noise,
-        ))
+        if elevation >= self.elevation_mask_deg {
+            Some(StdMeasurement::new(
+                rx.dt,
+                tx_rxf,
+                rx_rxf,
+                true,
+                &self.range_noise,
+                &self.range_rate_noise,
+            ))
+        } else {
+            None
+        }
     }
 
     fn name(&self) -> String {
@@ -213,14 +217,18 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
     ) -> Option<StdMeasurement> {
         let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit, &cosm);
 
-        Some(StdMeasurement::new(
-            rx_ssb.dt,
-            tx_ssb,
-            rx_ssb,
-            elevation >= self.elevation_mask_deg,
-            &self.range_noise,
-            &self.range_rate_noise,
-        ))
+        if elevation >= self.elevation_mask_deg {
+            Some(StdMeasurement::new(
+                rx_ssb.dt,
+                tx_ssb,
+                rx_ssb,
+                true,
+                &self.range_noise,
+                &self.range_rate_noise,
+            ))
+        } else {
+            None
+        }
     }
 
     fn name(&self) -> String {

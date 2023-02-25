@@ -86,10 +86,9 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     while let Ok(rx_sc_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
             let rx_state = rx_sc_state.orbit;
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
-                break;
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }

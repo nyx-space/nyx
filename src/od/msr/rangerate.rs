@@ -112,10 +112,6 @@ impl SimMeasurement for RangeRate {
     fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
         self.h_tilde
     }
-
-    fn visible(&self) -> bool {
-        self.visible
-    }
 }
 
 impl TimeTagged for RangeRate {

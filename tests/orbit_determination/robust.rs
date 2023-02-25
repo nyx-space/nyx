@@ -81,8 +81,7 @@ fn od_robust_test_ekf_realistic() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -262,9 +261,7 @@ fn od_robust_ops_test() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
-                // Always add it to the full list of measurements
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }

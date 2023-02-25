@@ -67,8 +67,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -213,8 +212,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -437,13 +435,15 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
     }
+
+    // Check that we have the same number of measurements as before the behavior change.
+    assert_eq!(measurements.len(), 7953);
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -588,8 +588,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -814,8 +813,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -935,8 +933,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&rx_state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }

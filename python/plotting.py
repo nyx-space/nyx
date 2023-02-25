@@ -11,10 +11,10 @@ def plot_measurements(path):
 
     df = arc_pq.to_pandas()
     # Set the epoch to a Python object
-    df['Epoch'] = pd.to_datetime(df['Epoch Gregorian UTC'])
+    df['Epoch'] = pd.to_datetime(df['Epoch:Gregorian UTC'])
 
     # Plot all of the columns apart from the default ones.
-    default = ['Epoch Gregorian UTC', 'Epoch Gregorian TDB', 'Epoch TDB (s)', 'Tracking device']
+    default = ['Epoch:Gregorian UTC', 'Epoch:Gregorian TDB', 'Epoch:TDB (s)', 'Tracking device']
 
     columns = [col for col in arc_pq.column_names if col not in default]
 
@@ -29,8 +29,8 @@ def plot_measurements(path):
             axis_title = col
 
         fig.update_layout(
-            # xaxis_title='Time',
-            yaxis_title=axis_title
+            yaxis_title=axis_title,
+            title=f"{col} over time"
         )
 
         fig.show()

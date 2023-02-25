@@ -37,6 +37,17 @@ fn tracking_arc_simple() {
 
     println!("{trajectory}");
 
+    // Save the trajectory to parquet
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "tracking_truth_ephem.parquet",
+    ]
+    .iter()
+    .collect();
+
+    trajectory.to_parquet(path, None).unwrap();
+
     // Load the ground stations from the test data.
     let ground_station_yaml: PathBuf = [
         &env::var("CARGO_MANIFEST_DIR").unwrap(),
@@ -59,7 +70,7 @@ fn tracking_arc_simple() {
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
-    assert_eq!(arc.measurements.len(), 4322);
+    assert_eq!(arc.measurements.len(), 146);
 
     // And serialize to disk
     let path: PathBuf = [

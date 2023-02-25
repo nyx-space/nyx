@@ -118,7 +118,7 @@ fn traj_ephem_forward() {
     .iter()
     .collect();
 
-    ephem.to_parquet(path).unwrap();
+    ephem.to_parquet(path, None).unwrap();
 
     // And let's convert into another frame and back to check the error
     let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();

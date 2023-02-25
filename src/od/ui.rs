@@ -533,54 +533,49 @@ where
                         if let Some(computed_meas) =
                             device.measure(&nominal_state, &mut rng, self.cosm.clone())
                         {
-                            if computed_meas.visible() {
-                                self.kf
-                                    .update_h_tilde(computed_meas.sensitivity(nominal_state));
+                            self.kf
+                                .update_h_tilde(computed_meas.sensitivity(nominal_state));
 
-                                // Switch back from extended if necessary
-                                if self.kf.is_extended() && self.ekf_trigger.disable_ekf(dt) {
-                                    self.kf.set_extended(false);
-                                    info!("EKF disabled @ {}", dt);
-                                }
+                            // Switch back from extended if necessary
+                            if self.kf.is_extended() && self.ekf_trigger.disable_ekf(dt) {
+                                self.kf.set_extended(false);
+                                info!("EKF disabled @ {}", dt);
+                            }
 
-                                match self.kf.measurement_update(
-                                    nominal_state,
-                                    &msr.observation(),
-                                    &computed_meas.observation(),
-                                ) {
-                                    Ok((est, res)) => {
-                                        trace!("msr update #{} @ {}", msr_cnt, dt);
-                                        // Switch to EKF if necessary, and update the dynamics and such
-                                        // Note: we call enable_ekf first to ensure that the trigger gets
-                                        // called in case it needs to save some information (e.g. the
-                                        // StdEkfTrigger needs to store the time of the previous measurement).
-                                        if self.ekf_trigger.enable_ekf(&est)
-                                            && !self.kf.is_extended()
-                                        {
-                                            self.kf.set_extended(true);
-                                            if !est.within_3sigma() {
-                                                warn!("EKF enabled @ {} but filter DIVERGING", dt);
-                                            } else {
-                                                info!("EKF enabled @ {}", dt);
-                                            }
+                            match self.kf.measurement_update(
+                                nominal_state,
+                                &msr.observation(),
+                                &computed_meas.observation(),
+                            ) {
+                                Ok((est, res)) => {
+                                    trace!("msr update #{} @ {}", msr_cnt, dt);
+                                    // Switch to EKF if necessary, and update the dynamics and such
+                                    // Note: we call enable_ekf first to ensure that the trigger gets
+                                    // called in case it needs to save some information (e.g. the
+                                    // StdEkfTrigger needs to store the time of the previous measurement).
+                                    if self.ekf_trigger.enable_ekf(&est) && !self.kf.is_extended() {
+                                        self.kf.set_extended(true);
+                                        if !est.within_3sigma() {
+                                            warn!("EKF enabled @ {} but filter DIVERGING", dt);
+                                        } else {
+                                            info!("EKF enabled @ {}", dt);
                                         }
-                                        if self.kf.is_extended() {
-                                            self.prop.state =
-                                                self.prop.state + est.state_deviation();
-                                        }
-                                        self.prop.state.reset_stm();
-                                        self.estimates.push(est);
-                                        self.residuals.push(res);
                                     }
-                                    Err(e) => return Err(e),
+                                    if self.kf.is_extended() {
+                                        self.prop.state = self.prop.state + est.state_deviation();
+                                    }
+                                    self.prop.state.reset_stm();
+                                    self.estimates.push(est);
+                                    self.residuals.push(res);
                                 }
+                                Err(e) => return Err(e),
+                            }
 
-                                // If we do not have simultaneous measurements from different devices
-                                // then we don't need to check the visibility from other devices
-                                // if one is in visibility.
-                                if !self.simultaneous_msr {
-                                    break;
-                                }
+                            // If we do not have simultaneous measurements from different devices
+                            // then we don't need to check the visibility from other devices
+                            // if one is in visibility.
+                            if !self.simultaneous_msr {
+                                break;
                             }
                         }
                     }

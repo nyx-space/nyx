@@ -70,9 +70,9 @@ where
     pub fn to_parquet<P: AsRef<Path>>(&self, path: P) -> Result<P, Box<dyn Error>> {
         // Build the schema
         let mut hdrs = vec![
-            Field::new("Epoch Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch Gregorian TDB", DataType::Utf8, false),
-            Field::new("Epoch TDB (s)", DataType::Float64, false),
+            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
+            Field::new("Epoch:Gregorian TDB", DataType::Utf8, false),
+            Field::new("Epoch:TDB (s)", DataType::Float64, false),
             Field::new("Tracking device", DataType::Utf8, false),
         ];
 

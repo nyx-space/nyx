@@ -159,10 +159,10 @@ fn val_measurements_topo() {
     let mut rng = thread_rng();
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
-        let meas = dss65_madrid
+        if dss65_madrid
             .measure(&state, &mut rng, cosm.clone())
-            .unwrap();
-        if meas.visible() {
+            .is_some()
+        {
             traj1_msr_cnt += 1;
         }
     }
@@ -176,14 +176,11 @@ fn val_measurements_topo() {
     for truth in &traj1_val_data {
         let now = cislunar1.epoch() + truth.offset;
         let state = traj1.at(now).unwrap();
+        // Will panic if the measurement is not visible
         let meas = dss65_madrid
             .measure(&state, &mut rng, cosm.clone())
             .unwrap();
-        assert!(
-            meas.visible(),
-            "DSS65 not visible at time {} but it should be",
-            now
-        );
+
         let obs = meas.observation();
         println!(
             "range difference {:e}\t range rate difference: {:e}",
@@ -228,10 +225,10 @@ fn val_measurements_topo() {
 
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
-        let meas = dss65_madrid
+        if dss65_madrid
             .measure(&state, &mut rng, cosm.clone())
-            .unwrap();
-        if meas.visible() {
+            .is_some()
+        {
             traj2_msr_cnt += 1;
         }
     }
@@ -245,14 +242,10 @@ fn val_measurements_topo() {
     for truth in &traj2_val_data {
         let now = cislunar2.epoch() + truth.offset;
         let state = traj2.at(now).unwrap();
+        // Will panic if the measurement is not visible
         let meas = dss65_madrid
             .measure(&state, &mut rng, cosm.clone())
             .unwrap();
-        assert!(
-            meas.visible(),
-            "DSS65 not visible at time {} but it should be",
-            now
-        );
         let obs = meas.observation();
         println!(
             "range difference {:e}\t range rate difference: {:e}",

@@ -400,26 +400,35 @@ where
     }
 
     /// Store this tracking arc to a parquet file
-    pub fn to_parquet<P: AsRef<Path>>(&self, path: P) -> Result<P, Box<dyn Error>> {
-        let mut position = HashMap::new();
-        position.insert("unit".to_string(), "km".to_string());
+    pub fn to_parquet<P: AsRef<Path>>(
+        &self,
+        path: P,
+        additional_fields: Option<Vec<StateParameter>>,
+    ) -> Result<P, Box<dyn Error>> {
+        let mut fields = vec![
+            StateParameter::X,
+            StateParameter::Y,
+            StateParameter::Z,
+            StateParameter::VX,
+            StateParameter::VY,
+            StateParameter::VZ,
+        ];
 
-        let mut velocity = HashMap::new();
-        velocity.insert("unit".to_string(), "km/s".to_string());
+        if let Some(mut additional_fields) = additional_fields {
+            fields.append(&mut additional_fields);
+        }
 
         // Build the schema
         // TODO: Add the custom headers and frame conversions, etc. from state formatter
-        let hdrs = vec![
-            Field::new("Epoch Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch Gregorian TDB", DataType::Utf8, false),
-            Field::new("Epoch TDB (s)", DataType::Float64, false),
-            Field::new("X (km)", DataType::Float64, false).with_metadata(position.clone()),
-            Field::new("Y (km)", DataType::Float64, false).with_metadata(position.clone()),
-            Field::new("Z (km)", DataType::Float64, false).with_metadata(position.clone()),
-            Field::new("VX (km/s)", DataType::Float64, false).with_metadata(velocity.clone()),
-            Field::new("VY (km/s)", DataType::Float64, false).with_metadata(velocity.clone()),
-            Field::new("VZ (km/s)", DataType::Float64, false).with_metadata(velocity.clone()),
+        let mut hdrs = vec![
+            Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
+            Field::new("Epoch:Gregorian TDB", DataType::Utf8, false),
+            Field::new("Epoch:TDB (s)", DataType::Float64, false),
         ];
+
+        for field in &fields {
+            hdrs.push(field.field());
+        }
 
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
@@ -450,14 +459,6 @@ where
         )) as ArrayRef);
 
         // Add all of the fields
-        let fields = vec![
-            StateParameter::X,
-            StateParameter::Y,
-            StateParameter::Z,
-            StateParameter::VX,
-            StateParameter::VY,
-            StateParameter::VZ,
-        ];
 
         for field in fields {
             record.push(Arc::new(Float64Array::from(

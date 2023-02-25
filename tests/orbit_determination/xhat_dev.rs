@@ -81,8 +81,7 @@ fn xhat_dev_test_ekf_two_body() {
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -273,8 +272,7 @@ fn xhat_dev_test_ekf_multi_body() {
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -447,8 +445,7 @@ fn xhat_dev_test_ekf_harmonics() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -591,8 +588,7 @@ fn xhat_dev_test_ekf_realistic() {
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -738,8 +734,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -1004,8 +999,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -1267,8 +1261,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let mut rng = thread_rng();
     for state in traj.every(10 * Unit::Second) {
         for station in all_stations.iter_mut() {
-            let meas = station.measure(&state, &mut rng, cosm.clone()).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }

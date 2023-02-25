@@ -149,10 +149,6 @@ where
     ) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
     where
         DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
-
-    /// Returns whether the transmitter and receiver where in line of sight.
-    /// TODO: Remove this.
-    fn visible(&self) -> bool;
 }
 
 pub trait EstimateFrom<O: State>
