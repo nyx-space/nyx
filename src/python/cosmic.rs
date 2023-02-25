@@ -1,22 +1,12 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
+use super::Epoch;
 use crate::cosmic::Bodies as BodiesRs;
 use crate::cosmic::Cosm as CosmRs;
 use crate::cosmic::Frame as FrameRs;
 use crate::cosmic::Orbit as OrbitRs;
-use crate::python::time::Epoch;
 use std::sync::Arc;
-
-/// nyx_space.cosmic
-#[pymodule]
-fn cosmic(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<Cosm>()?;
-    m.add_class::<Bodies>()?;
-    m.add_class::<Frame>()?;
-    m.add_class::<Orbit>()?;
-    Ok(())
-}
 
 #[pyclass]
 #[derive(Clone, Copy)]
@@ -136,11 +126,11 @@ impl Orbit {
         vx: f64,
         vy: f64,
         vz: f64,
-        dt: PyRef<Epoch>,
+        epoch: Epoch,
         frame: PyRef<Frame>,
     ) -> Self {
         Self {
-            inner: OrbitRs::cartesian(x, y, z, vx, vy, vz, dt.inner, frame.inner),
+            inner: OrbitRs::cartesian(x, y, z, vx, vy, vz, epoch, frame.inner),
         }
     }
     /// Creates a new Orbit and initializes its STM.
@@ -153,11 +143,11 @@ impl Orbit {
         vx: f64,
         vy: f64,
         vz: f64,
-        dt: PyRef<Epoch>,
+        epoch: Epoch,
         frame: PyRef<Frame>,
     ) -> Self {
         Self {
-            inner: OrbitRs::cartesian_stm(x, y, z, vx, vy, vz, dt.inner, frame.inner),
+            inner: OrbitRs::cartesian_stm(x, y, z, vx, vy, vz, epoch, frame.inner),
         }
     }
 }

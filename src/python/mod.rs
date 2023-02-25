@@ -24,6 +24,8 @@ use hifitime::leap_seconds::{LatestLeapSeconds, LeapSecondsFile};
 use hifitime::prelude::*;
 use hifitime::ut1::Ut1Provider;
 use pyo3::{exceptions::PyException, prelude::*};
+
+mod cosmic;
 mod orbit_determination;
 
 impl From<NyxError> for PyErr {
@@ -45,6 +47,7 @@ fn nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
     register_time_module(py, m)?;
     register_od(py, m)?;
     register_md(py, m)?;
+    register_cosmic(py, m)?;
 
     Ok(())
 }
@@ -83,6 +86,18 @@ fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "mission_design")?;
 
     sm.add_class::<DynamicTrajectory>()?;
+
+    parent_module.add_submodule(sm)?;
+    Ok(())
+}
+
+/// nyx_space.cosmic
+fn register_cosmic(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
+    let sm = PyModule::new(py, "cosmic")?;
+    sm.add_class::<cosmic::Cosm>()?;
+    sm.add_class::<cosmic::Bodies>()?;
+    sm.add_class::<cosmic::Frame>()?;
+    sm.add_class::<cosmic::Orbit>()?;
 
     parent_module.add_submodule(sm)?;
     Ok(())
