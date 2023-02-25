@@ -58,6 +58,16 @@ where
     pub states: Vec<S>,
 }
 
+impl<S: InterpState> Default for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+ {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S: InterpState> Traj<S>
 where
     DefaultAllocator:
@@ -74,7 +84,7 @@ where
         // Remove duplicate epochs
         self.states.dedup_by(|a, b| a.epoch().eq(&b.epoch()));
         // And sort
-        self.states.sort_by(|a, b| a.epoch().cmp(&b.epoch()));
+        self.states.sort_by_key(|a| a.epoch());
     }
 
     /// Evaluate the trajectory at this specific epoch.

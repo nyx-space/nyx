@@ -398,7 +398,7 @@ where
                 if let Some(first_state) = initial_state {
                     hdlr.handle(&first_state);
                 }
-                hdlr.handle(&traj.last());
+                hdlr.handle(traj.last());
             });
 
             info!(

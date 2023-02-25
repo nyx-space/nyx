@@ -27,11 +27,9 @@ pub use crate::errors::NyxError;
 pub use crate::time::{Epoch, Unit};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
-/// S: State size (not propagated vector size)
 /// A: Acceleration size (for SNC)
 /// M: Measurement size (used for the sensitivity matrix)
 /// T: Type of state
-/// P: Propagated vector size
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct KF<T, A, M>

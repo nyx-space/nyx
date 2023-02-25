@@ -264,7 +264,7 @@ impl DynamicTrackingArc {
 impl Display for DynamicTrackingArc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for item in self.repr() {
-            write!(f, "{item}\n")?;
+            writeln!(f, "{item}")?;
         }
         Ok(())
     }

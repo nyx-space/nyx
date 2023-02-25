@@ -65,7 +65,7 @@ impl OrbitalDynamics {
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
     pub fn with_model(self, accel_model: Arc<dyn AccelModel + Sync>) -> Self {
-        let mut me = self.clone();
+        let mut me = self;
         me.add_model(accel_model);
         me
     }

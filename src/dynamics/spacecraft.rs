@@ -108,7 +108,7 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
     pub fn with_model(self, force_model: Arc<dyn ForceModel<X>>) -> Self {
-        let mut me = self.clone();
+        let mut me = self;
         me.add_model(force_model);
         me
     }
