@@ -28,6 +28,7 @@ pub use crate::{cosmic::Cosm, State, TimeTagged};
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
 use crate::{linalg::DefaultAllocator, md::ui::Traj};
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -146,5 +147,27 @@ where
         };
 
         Ok(trk)
+    }
+}
+
+impl<MsrIn, Msr, D> Display for TrackingArcSim<MsrIn, Msr, D>
+where
+    D: TrackingDeviceSim<MsrIn, Msr>,
+    MsrIn: State,
+    Msr: SimMeasurement<State = MsrIn>,
+    <Msr as SimMeasurement>::State: InterpState,
+    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
+        + Allocator<f64, <Msr::State as State>::VecLength>
+        + Allocator<f64, Msr::MeasurementSize>
+        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Tracking Arc Simulator on {} with devices {:?}",
+            self.trajectory,
+            self.devices.keys()
+        )
     }
 }

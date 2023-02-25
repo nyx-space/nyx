@@ -23,7 +23,7 @@ use crate::{
 };
 use arrow::{array::Float64Array, record_batch::RecordBatchReader};
 use hifitime::Epoch;
-use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use std::fs::File;
 use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 
@@ -34,10 +34,10 @@ use pyo3::prelude::*;
 /// to the concrete trajectory state type when desired.
 /// TODO: Trajectory export might benefit from storing the dynamics etc. as YAML to reload that?
 #[cfg_attr(feature = "python", pyclass)]
+#[derive(Clone)]
 pub struct DynamicTrajectory {
     pub path: String,
     metadata: HashMap<String, String>,
-    reader: ParquetRecordBatchReader,
 }
 
 impl DynamicTrajectory {
@@ -61,7 +61,6 @@ impl DynamicTrajectory {
 
         let me = Self {
             path: path.as_ref().to_string_lossy().to_string(),
-            reader: builder.build()?,
             metadata,
         };
 
@@ -73,7 +72,11 @@ impl DynamicTrajectory {
     }
 
     /// Reads through the loaded parquet file and attempts to convert to the provided concrete state.
-    pub fn to_traj<S>(self) -> Result<Traj<S>, NyxError>
+    ///
+    /// # Design limitations
+    /// For Python compatibility, the file is actually re-read here, although it was read and closed during initialization.
+    /// This is required because the parquet file reader is not clonable.
+    pub fn to_traj<S>(&self) -> Result<Traj<S>, Box<dyn Error>>
     where
         S: InterpState,
         DefaultAllocator: Allocator<f64, S::VecLength>
@@ -93,7 +96,13 @@ impl DynamicTrajectory {
             (StateParameter::FuelMass, false),
         ];
 
-        for field in &self.reader.schema().fields {
+        let file = File::open(&self.path)?;
+
+        let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
+
+        let reader = builder.build()?;
+
+        for field in &reader.schema().fields {
             if field.name().as_str() == "Epoch:TDB (s)" {
                 has_epoch = true;
             } else {
@@ -107,17 +116,17 @@ impl DynamicTrajectory {
         }
 
         if !has_epoch {
-            return Err(NyxError::FileUnreadable(
+            return Err(Box::new(NyxError::FileUnreadable(
                 "Missing `Epoch:TDB (s)` field".to_string(),
-            ));
+            )));
         }
 
         for (field, exists) in found_fields.iter().take(found_fields.len() - 1) {
             if !exists {
-                return Err(NyxError::FileUnreadable(format!(
+                return Err(Box::new(NyxError::FileUnreadable(format!(
                     "Missing `{}` field",
                     field.to_field().name()
-                )));
+                ))));
             }
         }
 
@@ -127,17 +136,17 @@ impl DynamicTrajectory {
 
         if expected_type == "Spacecraft" && !sc_compat {
             // Oops, missing fuel data (using the full call in case the field name changes in the future)
-            return Err(NyxError::FileUnreadable(format!(
+            return Err(Box::new(NyxError::FileUnreadable(format!(
                 "Missing `{}` field",
                 found_fields.last().unwrap().0.to_field().name()
-            )));
+            ))));
         }
 
         // At this stage, we know that the measurement is valid and the conversion is supported.
         let mut traj = Traj::default();
 
         // Now convert each batch on the fly
-        for maybe_batch in self.reader {
+        for maybe_batch in reader {
             let batch = maybe_batch.unwrap();
 
             let epochs = batch
@@ -214,7 +223,7 @@ impl Display for DynamicTrajectory {
 #[cfg(feature = "python")]
 #[pymethods]
 impl DynamicTrajectory {
-    /// Initializes a new dynamic tracking arc from the provided parquet file
+    /// Initializes a new dynamic trajectory from the provided parquet file
     #[new]
     fn new(path: String) -> Result<Self, NyxError> {
         Self::from_parquet(path).map_err(|e| NyxError::CustomError(e.to_string()))

@@ -17,6 +17,7 @@
 */
 
 use crate::io::tracking_data::DynamicTrackingArc;
+use crate::io::trajectory_data::DynamicTrajectory;
 use crate::io::ConfigError;
 use crate::NyxError;
 use hifitime::leap_seconds::{LatestLeapSeconds, LeapSecondsFile};
@@ -39,8 +40,11 @@ impl From<ConfigError> for PyErr {
 
 #[pymodule]
 fn nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
+    pyo3_log::init();
+
     register_time_module(py, m)?;
     register_od(py, m)?;
+    register_md(py, m)?;
 
     Ok(())
 }
@@ -67,7 +71,18 @@ fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "orbit_determination")?;
 
     sm.add_class::<orbit_determination::GroundStation>()?;
+    sm.add_class::<orbit_determination::GroundTrackingArcSim>()?;
     sm.add_class::<DynamicTrackingArc>()?;
+
+    parent_module.add_submodule(sm)?;
+    Ok(())
+}
+
+/// Mission design
+fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
+    let sm = PyModule::new(py, "mission_design")?;
+
+    sm.add_class::<DynamicTrajectory>()?;
 
     parent_module.add_submodule(sm)?;
     Ok(())
