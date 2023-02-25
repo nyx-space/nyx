@@ -59,6 +59,7 @@ pub mod quantity;
 pub mod stations;
 
 pub mod tracking_data;
+pub mod trajectory_data;
 
 use std::io;
 use thiserror::Error;

@@ -240,7 +240,7 @@ impl StateParameter {
     }
 
     /// Returns the parquet field of this parameter
-    pub fn field(self) -> Field {
+    pub fn to_field(self) -> Field {
         let mut meta = HashMap::new();
         meta.insert("unit".to_string(), self.unit().to_string());
 

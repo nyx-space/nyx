@@ -5,6 +5,7 @@ use hifitime::TimeUnits;
 use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
+use nyx::io::trajectory_data::DynamicTrajectory;
 use nyx::md::ui::Objective;
 use nyx::md::StateParameter;
 use nyx::propagators::*;
@@ -118,7 +119,17 @@ fn traj_ephem_forward() {
     .iter()
     .collect();
 
-    ephem.to_parquet(path, None).unwrap();
+    ephem.to_parquet(&path, None).unwrap();
+
+    // Reload this trajectory and make sure that it matches
+
+    let dyn_traj = DynamicTrajectory::from_parquet(path).unwrap();
+    let concrete_traj = dyn_traj.to_traj::<Orbit>().unwrap();
+
+    assert_eq!(
+        ephem, concrete_traj,
+        "loaded parquet trajectory does not match original trajectory"
+    );
 
     // And let's convert into another frame and back to check the error
     let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();

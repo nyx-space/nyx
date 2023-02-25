@@ -27,7 +27,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
-use crate::time::{Duration, Epoch, TimeSeries, Unit};
+use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
 use crate::State;
 use arrow::array::{ArrayRef, Float64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -56,16 +56,6 @@ where
     pub name: Option<String>,
     /// We use a vector because we know that the states are produced in a chronological manner (the direction does not matter).
     pub states: Vec<S>,
-}
-
-impl<S: InterpState> Default for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl<S: InterpState> Traj<S>
@@ -437,7 +427,7 @@ where
         ];
 
         for field in &fields {
-            hdrs.push(field.field());
+            hdrs.push(field.to_field());
         }
 
         // Build the schema
@@ -868,5 +858,41 @@ where
             dur.to_seconds(),
             self.states.len()
         )
+    }
+}
+
+impl<S: InterpState> fmt::Debug for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}",)
+    }
+}
+
+impl<S: InterpState> Default for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S: InterpState> PartialEq for Traj<S>
+where
+    DefaultAllocator:
+        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+{
+    /// Equality of trajectories is based SOLELY on the name matching (if set), the number of states being equal, and the first and last epoch being with 10 ms of each other
+    /// The reason why we don't do a strict equality is because serialization involves converting the epoch into a TDB epoch in second, and converting that back to a hifitime
+    /// may lead to an error of up to 150 nanoseconds due to the iteration used to calculate the TDB epoch.
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.states.len() == other.states.len()
+            && (self.first().epoch() - self.first().epoch()).abs() < 10.milliseconds()
+            && (self.last().epoch() - self.last().epoch()).abs() < 10.milliseconds()
     }
 }
