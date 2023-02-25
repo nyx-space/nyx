@@ -5,7 +5,7 @@ extern crate pretty_env_logger;
 use rand::thread_rng;
 
 use self::nyx::md::ui::*;
-use self::nyx::od::ui::*;
+use self::nyx::od::prelude::*;
 
 // Extra testing imports
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};

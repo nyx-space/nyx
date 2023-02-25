@@ -9,7 +9,7 @@ use self::nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
 use self::nyx::dynamics::sph_harmonics::Harmonics;
 use self::nyx::io::gravity::*;
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::ui::*;
+use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
 use self::nyx::utils::rss_orbit_errors;
@@ -118,7 +118,7 @@ fn xhat_dev_test_ekf_two_body() {
         prop_est,
         kf,
         all_stations,
-        StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         cosm.clone(),
     );
 
@@ -305,7 +305,7 @@ fn xhat_dev_test_ekf_multi_body() {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
+    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
@@ -478,7 +478,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
+    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
@@ -621,7 +621,7 @@ fn xhat_dev_test_ekf_realistic() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
+    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
@@ -1041,7 +1041,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         prop_est,
         kf,
         all_stations,
-        StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         cosm.clone(),
     );
 

@@ -37,20 +37,32 @@ pub mod estimate;
 /// Provide Residual handling functionalities.
 pub mod residual;
 
-/// Provides some helper for filtering.
-pub mod ui;
-
 /// Provides all of the support measurement models
 pub mod msr;
 
 /// Provides all of the functionality to simulate measurements from ground stations
 pub mod simulator;
 
+/// Provides the interfaces to the orbit determination process
+pub mod process;
+
 use arrow::datatypes::Field;
 pub use simulator::trackdata::TrackingDeviceSim;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
+
+pub mod prelude {
+    pub use super::estimate::*;
+    pub use super::kalman::*;
+    pub use super::measurement::*;
+    pub use super::process::*;
+    pub use super::residual::*;
+    pub use super::snc::*;
+    pub use super::*;
+
+    pub use crate::time::{Duration, Unit};
+}
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
 pub trait Filter<T, A, M>

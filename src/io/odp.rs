@@ -28,8 +28,8 @@ use crate::io::scenario::ScenarioSerde;
 use crate::linalg::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::md::ui::MDProcess;
 use crate::od::measurement::GroundStation;
-use crate::od::ui::snc::SNC3;
-use crate::od::ui::*;
+use crate::od::prelude::snc::SNC3;
+use crate::od::prelude::*;
 use crate::od::TrackingDeviceSim;
 use crate::propagators::Propagator;
 use crate::time::{Duration, Unit};
@@ -418,7 +418,7 @@ impl OdpScenario {
         nav.set_step(10.0 * Unit::Second, true);
 
         let kf = self.kf;
-        let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
+        let trig = EkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
         let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), trig, self.cosm.clone());
 
         odp.process_measurements(&sim_measurements)?;

@@ -22,7 +22,7 @@ use crate::io::{ConfigRepr, Configurable};
 use crate::od::msr::StdMeasurement;
 use crate::od::simulator::arc::TrackingArcSim;
 use crate::Orbit;
-pub use crate::{io::ConfigError, od::ui::GroundStation};
+pub use crate::{io::ConfigError, od::prelude::GroundStation};
 use pyo3::prelude::*;
 
 #[pymethods]

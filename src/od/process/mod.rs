@@ -22,108 +22,24 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::{InterpState, Traj};
 
-pub use super::estimate::*;
-pub use super::kalman::*;
-pub use super::measurement::*;
-pub use super::residual::*;
-pub use super::snc::*;
-pub use super::*;
+pub use crate::od::estimate::*;
+pub use crate::od::kalman::*;
+pub use crate::od::measurement::*;
+pub use crate::od::residual::*;
+pub use crate::od::snc::*;
+pub use crate::od::*;
 
 use crate::propagators::error_ctrl::ErrorCtrl;
 use crate::propagators::PropInstance;
 pub use crate::time::{Duration, Unit};
 use crate::State;
+mod conf;
+pub use conf::{IterationConf, SmoothingArc};
+mod trigger;
+pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
 
-use std::convert::TryFrom;
-use std::default::Default;
-use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Add;
-
-/// Defines the stopping condition for the smoother
-#[derive(Clone, Copy, Debug)]
-pub enum SmoothingArc {
-    /// Stop smoothing when the gap between estimate is the provided floating point number in seconds
-    TimeGap(Duration),
-    /// Stop smoothing at the provided Epoch.
-    Epoch(Epoch),
-    /// Stop smoothing at the first prediction
-    Prediction,
-    /// Only stop once all estimates have been processed
-    All,
-}
-
-impl fmt::Display for SmoothingArc {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            SmoothingArc::All => write!(f, "all estimates"),
-            SmoothingArc::Epoch(e) => write!(f, "{e}"),
-            SmoothingArc::TimeGap(g) => write!(f, "time gap of {g}"),
-            SmoothingArc::Prediction => write!(f, "first prediction"),
-        }
-    }
-}
-
-/// Defines a filter iteration configuration. Allows iterating on an OD solution until convergence criteria is met.
-/// The root mean squared of the postfit residuals is used to assess convergence between iterations.
-#[derive(Clone, Copy, Debug)]
-pub struct IterationConf {
-    /// The number of measurements to account for in the iteration
-    pub smoother: SmoothingArc,
-    /// The absolute tolerance of the RMS postfit residual
-    pub absolute_tol: f64,
-    /// The relative tolerance between the latest RMS postfit residual and the best RMS postfit residual so far
-    pub relative_tol: f64,
-    /// The maximum number of iterations to allow (will raise an error if the filter has not converged after this many iterations)
-    pub max_iterations: usize,
-    /// The maximum number of subsequent divergences in RMS.
-    pub max_divergences: usize,
-    /// Set to true to force an ODP failure when the convergence criteria is not met
-    pub force_failure: bool,
-    /// Set to true to use the RMS prefit instead of postfit
-    pub use_prefit: bool,
-}
-
-impl Default for IterationConf {
-    /// The default absolute tolerance is 1e-2 (calibrated on an EKF with error).
-    fn default() -> Self {
-        Self {
-            smoother: SmoothingArc::All,
-            absolute_tol: 1e-2,
-            relative_tol: 1e-3,
-            max_iterations: 15,
-            max_divergences: 3,
-            force_failure: false,
-            use_prefit: false,
-        }
-    }
-}
-
-impl fmt::Display for IterationConf {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let kind = if self.use_prefit { "prefit" } else { "postfit" };
-        write!(f, "Iterate {} residuals until abs = {:.2e}, or rel = {:.2e}, or {} iterations, or {} subsequent divergences with smoothing condition of {}",
-            kind,
-            self.absolute_tol,
-            self.relative_tol,
-            self.max_iterations,
-            self.max_divergences,
-            self.smoother)
-    }
-}
-
-impl TryFrom<SmoothingArc> for IterationConf {
-    type Error = NyxError;
-
-    /// Converts a smoother into an interation configuration to iterate just once without failing
-    fn try_from(smoother: SmoothingArc) -> Result<Self, Self::Error> {
-        Ok(Self {
-            smoother,
-            force_failure: false,
-            ..Default::default()
-        })
-    }
-}
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
@@ -133,7 +49,7 @@ pub struct ODProcess<
     E: ErrorCtrl,
     Msr: SimMeasurement<State = S>,
     N: TrackingDeviceSim<S, Msr>,
-    T: EkfTrigger,
+    T: KfTrigger,
     A: DimName,
     S: EstimateFrom<D::StateType>,
     K: Filter<S, A, Msr::MeasurementSize>,
@@ -182,7 +98,7 @@ impl<
         E: ErrorCtrl,
         Msr: SimMeasurement<State = S>,
         N: TrackingDeviceSim<S, Msr>,
-        T: EkfTrigger,
+        T: KfTrigger,
         A: DimName,
         S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,
@@ -728,99 +644,6 @@ where
             ekf_trigger: CkfTrigger {},
             init_state,
             _marker: PhantomData::<A>,
-        }
-    }
-}
-/// A trait detailing when to switch to from a CKF to an EKF
-pub trait EkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
-    where
-        E: Estimate<T>,
-        DefaultAllocator: Allocator<f64, <T as State>::Size>
-            + Allocator<f64, <T as State>::VecLength>
-            + Allocator<f64, <T as State>::Size, <T as State>::Size>;
-
-    /// Return true if the filter should not longer be as extended.
-    /// By default, this returns false, i.e. when a filter has been switched to an EKF, it will
-    /// remain as such.
-    fn disable_ekf(&mut self, _epoch: Epoch) -> bool {
-        false
-    }
-
-    /// If some iteration configuration is returned, the filter will iterate with it before enabling the EKF.
-    fn interation_config(&self) -> Option<IterationConf> {
-        None
-    }
-}
-
-/// CkfTrigger will never switch a KF to an EKF
-pub struct CkfTrigger;
-
-impl EkfTrigger for CkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, _est: &E) -> bool
-    where
-        E: Estimate<T>,
-        DefaultAllocator: Allocator<f64, <T as State>::Size>
-            + Allocator<f64, <T as State>::VecLength>
-            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
-    {
-        false
-    }
-}
-
-/// An EkfTrigger on the number of measurements processed and a time between measurements.
-pub struct StdEkfTrigger {
-    pub num_msrs: usize,
-    /// In seconds!
-    pub disable_time: Duration,
-    /// Set to the sigma number needed to switch to the EKF (cf. 68–95–99.7 rule). If number is negative, this is ignored.
-    pub within_sigma: f64,
-    prev_msr_dt: Option<Epoch>,
-    cur_msrs: usize,
-}
-
-impl StdEkfTrigger {
-    pub fn new(num_msrs: usize, disable_time: Duration) -> Self {
-        Self {
-            num_msrs,
-            disable_time,
-            within_sigma: -1.0,
-            prev_msr_dt: None,
-            cur_msrs: 0,
-        }
-    }
-}
-
-impl EkfTrigger for StdEkfTrigger {
-    fn enable_ekf<T: State, E>(&mut self, est: &E) -> bool
-    where
-        E: Estimate<T>,
-        DefaultAllocator: Allocator<f64, <T as State>::Size>
-            + Allocator<f64, <T as State>::VecLength>
-            + Allocator<f64, <T as State>::Size, <T as State>::Size>,
-    {
-        if !est.predicted() {
-            // If this isn't a prediction, let's update the previous measurement time
-            self.prev_msr_dt = Some(est.epoch());
-        }
-        self.cur_msrs += 1;
-        self.cur_msrs >= self.num_msrs
-            && ((self.within_sigma > 0.0 && est.within_sigma(self.within_sigma))
-                || self.within_sigma <= 0.0)
-    }
-
-    fn disable_ekf(&mut self, epoch: Epoch) -> bool {
-        // Return true if there is a prev msr dt, and the next measurement time is more than the disable time seconds away
-        match self.prev_msr_dt {
-            Some(prev_dt) => {
-                if (epoch - prev_dt).abs() > self.disable_time {
-                    self.cur_msrs = 0;
-                    true
-                } else {
-                    false
-                }
-            }
-            None => false,
         }
     }
 }

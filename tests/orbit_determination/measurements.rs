@@ -5,7 +5,7 @@ extern crate nyx_space as nyx;
 #[test]
 fn nil_measurement() {
     use self::nyx::cosmic::{Cosm, Orbit};
-    use self::nyx::od::ui::*;
+    use self::nyx::od::prelude::*;
     use self::nyx::time::Epoch;
     use hifitime::J2000_OFFSET;
     use std::f64::EPSILON;
@@ -67,7 +67,7 @@ fn nil_measurement() {
 fn val_measurements_topo() {
     use self::nyx::cosmic::{Cosm, Orbit};
     use self::nyx::md::ui::*;
-    use self::nyx::od::ui::*;
+    use self::nyx::od::prelude::*;
     use self::nyx::propagators::RK4Fixed;
     use std::str::FromStr;
 

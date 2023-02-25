@@ -10,7 +10,7 @@ use self::nyx::dynamics::sph_harmonics::Harmonics;
 use self::nyx::io::formatter::NavSolutionFormatter;
 use self::nyx::io::gravity::*;
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::ui::*;
+use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
 use std::sync::mpsc;
@@ -102,7 +102,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
         prop_est,
         kf,
         all_stations,
-        StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         cosm.clone(),
     );
 

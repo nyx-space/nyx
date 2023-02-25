@@ -8,7 +8,7 @@ use self::nyx::cosmic::{Bodies, Cosm, Orbit};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::ui::*;
+use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
 use self::nyx::utils::rss_orbit_errors;
@@ -114,7 +114,7 @@ fn od_robust_test_ekf_realistic() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut trig = StdEkfTrigger::new(ekf_num_meas, ekf_disable_time);
+    let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
@@ -312,7 +312,7 @@ fn od_robust_ops_test() {
     let process_noise = SNC3::from_diagonal(2 * Unit::Minute, &[sigma_q, sigma_q, sigma_q]);
     let kf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut trig = StdEkfTrigger::new(ekf_msr_trig, 10.0 * Unit::Second);
+    let mut trig = EkfTrigger::new(ekf_msr_trig, 10.0 * Unit::Second);
     trig.within_sigma = 3.0;
 
     let mut odp = ODProcess::ekf(prop_est, kf, all_stations_no_noise, trig, cosm.clone());

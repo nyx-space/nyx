@@ -18,7 +18,7 @@
 
 use super::ConfigError;
 use super::{ConfigRepr, Configurable};
-use crate::od::ui::GroundStation;
+use crate::od::prelude::GroundStation;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::Arc;

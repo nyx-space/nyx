@@ -9,7 +9,7 @@ use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
 use self::nyx::io::formatter::NavSolutionFormatter;
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::ui::*;
+use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
 use std::sync::mpsc;
