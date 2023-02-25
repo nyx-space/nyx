@@ -11,4 +11,4 @@ node_modules/
 *.data
 *.folded
 *.venv
-output_data/*
+dist/
