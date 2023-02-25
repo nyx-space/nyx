@@ -534,8 +534,9 @@ where
         Ok(())
     }
 
+    /// Process the provided tracking arc for this orbit determination process.
     #[allow(clippy::erasing_op)]
-    pub fn process_measurements_new<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
+    pub fn process_tracking_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
@@ -585,13 +586,11 @@ where
             // Advance the propagator
             loop {
                 let delta_t = next_msr_epoch - epoch;
-                if self.prop.details.step < delta_t {
-                    // Do a single step and (probably) a time update, but we'll see that later
-                    self.prop.single_step()?;
-                } else if delta_t.to_seconds() > 0.0 {
-                    // Take one final step of exactly the needed duration until the next measurement
-                    self.prop.for_duration(delta_t)?;
-                }
+
+                // Propagator for the minimum time between the step size and the duration to the next measurement.
+                let next_step_size = delta_t.min(self.prop.details.step);
+                trace!("advancing propagator by {next_step_size}");
+                self.prop.for_duration(next_step_size)?;
 
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
 
@@ -604,7 +603,6 @@ where
                     // Perform a measurement update
 
                     // Get the computed observations
-                    // for device in self.devices.iter_mut() {
                     match devices.get_mut(device_name) {
                         Some(device) => {
                             if let Some(computed_meas) =
@@ -670,7 +668,7 @@ where
 
                     break;
                 } else {
-                    // No measurement can be used here, let's just do a time update
+                    // No measurement can be used here, let's just do a time update and continue advancing the propagator.
                     trace!("time update {epoch}");
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {

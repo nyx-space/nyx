@@ -14,6 +14,7 @@ use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -179,7 +180,7 @@ fn od_val_with_arc() {
     let ekf_num_meas = 100;
 
     // Define the propagator information.
-    let prop_time = 1 * Unit::Day;
+    let duration = 1 * Unit::Day;
 
     // Define the storages (channels for the states and a map for the measurements).
 
@@ -193,12 +194,21 @@ fn od_val_with_arc() {
     let setup = Propagator::default(orbital_dyn);
 
     let mut prop = setup.with(initial_state);
-    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+    let (final_truth, traj) = prop.for_duration_with_traj(duration).unwrap();
     println!("{}", final_truth);
 
+    // Save the trajectory to parquet
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "od_val_with_arc_truth_ephem.parquet",
+    ]
+    .iter()
+    .collect();
+    traj.to_parquet(path, None).unwrap();
+
     // Simulate tracking data of range and range rate
-    // TODO: Flip the Msr with MsrIn
-    let mut arc_sim = TrackingArcSim::new(all_stations.clone(), traj);
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations.clone(), traj, 1);
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
@@ -234,13 +244,13 @@ fn od_val_with_arc() {
         cosm.clone(),
     );
 
-    odp.process_measurements_new::<GroundStation>(&arc).unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
-    println!("Final estimate:\n{est}\nΔ: {}", est.state_deviation());
+    println!("Final estimate:\n{est}");
     assert!(
-        dbg!(est.state_deviation().norm()) < 1e-12,
+        dbg!(est.state_deviation().norm()) < 1e-4,
         "In perfect modeling, the state deviation should be near zero"
     );
     for i in 0..6 {

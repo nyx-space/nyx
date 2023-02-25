@@ -62,7 +62,7 @@ impl<S: InterpState> Default for Traj<S>
 where
     DefaultAllocator:
         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
- {
+{
     fn default() -> Self {
         Self::new()
     }

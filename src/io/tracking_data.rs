@@ -50,6 +50,7 @@ impl DynamicTrackingArc {
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
         let mut metadata = HashMap::new();
+        let mut device_cfg = String::new();
         // Build the custom metadata
         if let Some(file_metadata) = builder.metadata().file_metadata().key_value_metadata() {
             for key_value in file_metadata {
@@ -58,6 +59,9 @@ impl DynamicTrackingArc {
                         key_value.key.clone(),
                         key_value.value.clone().unwrap_or("[unset]".to_string()),
                     );
+                    if key_value.key == "devices" {
+                        device_cfg = key_value.value.clone().unwrap_or("[unset]".to_string());
+                    }
                 }
             }
         }
@@ -66,7 +70,7 @@ impl DynamicTrackingArc {
             path: path.as_ref().to_string_lossy().to_string(),
             reader: builder.build()?,
             metadata,
-            device_cfg: "".to_string(),
+            device_cfg,
         };
 
         for item in me.repr() {
@@ -145,9 +149,8 @@ impl DynamicTrackingArc {
         }
 
         // At this stage, we know that the measurement is valid and the conversion is supported.
-
         let mut arc = TrackingArc {
-            device_cfg: self.metadata["devices"].clone(),
+            device_cfg: self.device_cfg,
             measurements: Vec::new(),
         };
 
