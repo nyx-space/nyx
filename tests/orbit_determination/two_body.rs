@@ -2,6 +2,7 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use nyx::od::simulator::arc::TrackingArcSim;
 use rand::thread_rng;
 
 use self::nyx::cosmic::{Cosm, Orbit};
@@ -110,9 +111,136 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
-    println!("Final estimate:\n{}", est);
+    println!("Final estimate:\n{est}");
     assert!(
         est.state_deviation().norm() < 1e-12,
+        "In perfect modeling, the state deviation should be near zero"
+    );
+    for i in 0..6 {
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
+    }
+    for i in 0..6 {
+        if i < 3 {
+            assert!(
+                est.covar[(i, i)] < covar_radius,
+                "covar radius did not decrease"
+            );
+        } else {
+            assert!(
+                est.covar[(i, i)] < covar_velocity,
+                "covar velocity did not decrease"
+            );
+        }
+    }
+
+    // Check the final estimate
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+}
+
+#[allow(clippy::identity_op)]
+#[test]
+fn od_val_with_arc() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
+
+    // Define the ground stations.
+    // Set the disable time to be very low to test enable/disable sequence
+    let ekf_disable_time = 5.0 * Unit::Second;
+    let elevation_mask = 0.0;
+    let range_noise = 0.0;
+    let range_rate_noise = 0.0;
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    let ekf_num_meas = 100;
+
+    // Define the propagator information.
+    let prop_time = 1 * Unit::Day;
+
+    // Define the storages (channels for the states and a map for the measurements).
+
+    // Define state information.
+    let eme2k = cosm.frame("EME2000");
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+
+    // We're sharing both the propagator and the dynamics.
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let setup = Propagator::default(orbital_dyn);
+
+    let mut prop = setup.with(initial_state);
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+    println!("{}", final_truth);
+
+    // Simulate tracking data of range and range rate
+    // TODO: Flip the Msr with MsrIn
+    let mut arc_sim = TrackingArcSim::new(all_stations.clone(), traj);
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
+    // the measurements, and the same time step.
+    let prop_est = setup.with(initial_state.with_stm());
+    let covar_radius = 1.0e-6;
+    let covar_velocity = 1.0e-6;
+    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+        covar_radius,
+        covar_radius,
+        covar_radius,
+        covar_velocity,
+        covar_velocity,
+        covar_velocity,
+    ));
+
+    // Define the initial estimate
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    println!("initial estimate:\n{}", initial_estimate);
+
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+
+    let kf = KF::no_snc(initial_estimate, measurement_noise);
+
+    let mut odp = ODProcess::ekf(
+        prop_est,
+        kf,
+        all_stations,
+        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        cosm.clone(),
+    );
+
+    odp.process_measurements_new::<GroundStation>(&arc).unwrap();
+
+    // Check that the covariance deflated
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("Final estimate:\n{est}\nΔ: {}", est.state_deviation());
+    assert!(
+        dbg!(est.state_deviation().norm()) < 1e-12,
         "In perfect modeling, the state deviation should be near zero"
     );
     for i in 0..6 {

@@ -38,8 +38,11 @@ pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
+
+use self::msr::arc::TrackingArc;
 
 /// An orbit determination process. Note that everything passed to this structure is moved.
 #[allow(clippy::upper_case_acronyms)]
@@ -403,9 +406,9 @@ where
         let prop_time = measurements[num_msrs - 1].epoch() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {}", prop_time);
 
-        let mut dt = self.prop.state.epoch();
+        let mut epoch = self.prop.state.epoch();
 
-        let mut reported = vec![false; 11];
+        let mut reported = [false; 11];
         info!(
             "Processing {} measurements with covariance mapping",
             num_msrs
@@ -425,7 +428,7 @@ where
 
             // Advance the propagator
             loop {
-                let delta_t = next_msr_epoch - dt;
+                let delta_t = next_msr_epoch - epoch;
                 if self.prop.details.step < delta_t {
                     // Do a single step and (probably) a time update, but we'll see that later
                     self.prop.single_step()?;
@@ -439,7 +442,7 @@ where
                 // Extract the state and update the STM in the filter.
                 let nominal_state = S::extract(self.prop.state);
                 // Get the datetime and info needed to compute the theoretical measurement according to the model
-                dt = nominal_state.epoch();
+                epoch = nominal_state.epoch();
 
                 if nominal_state.epoch() == next_msr_epoch {
                     // Perform a measurement update
@@ -453,9 +456,9 @@ where
                                 .update_h_tilde(computed_meas.sensitivity(nominal_state));
 
                             // Switch back from extended if necessary
-                            if self.kf.is_extended() && self.ekf_trigger.disable_ekf(dt) {
+                            if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
                                 self.kf.set_extended(false);
-                                info!("EKF disabled @ {}", dt);
+                                info!("EKF disabled @ {}", epoch);
                             }
 
                             match self.kf.measurement_update(
@@ -464,7 +467,7 @@ where
                                 &computed_meas.observation(),
                             ) {
                                 Ok((est, res)) => {
-                                    trace!("msr update #{} @ {}", msr_cnt, dt);
+                                    trace!("msr update #{} @ {}", msr_cnt, epoch);
                                     // Switch to EKF if necessary, and update the dynamics and such
                                     // Note: we call enable_ekf first to ensure that the trigger gets
                                     // called in case it needs to save some information (e.g. the
@@ -472,9 +475,9 @@ where
                                     if self.ekf_trigger.enable_ekf(&est) && !self.kf.is_extended() {
                                         self.kf.set_extended(true);
                                         if !est.within_3sigma() {
-                                            warn!("EKF enabled @ {} but filter DIVERGING", dt);
+                                            warn!("EKF enabled @ {} but filter DIVERGING", epoch);
                                         } else {
-                                            info!("EKF enabled @ {}", dt);
+                                            info!("EKF enabled @ {}", epoch);
                                         }
                                     }
                                     if self.kf.is_extended() {
@@ -509,7 +512,7 @@ where
                     break;
                 } else {
                     // No measurement can be used here, let's just do a time update
-                    trace!("time update {}", dt);
+                    trace!("time update {}", epoch);
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update
@@ -531,17 +534,173 @@ where
         Ok(())
     }
 
+    #[allow(clippy::erasing_op)]
+    pub fn process_measurements_new<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
+        // Rebuild the devices uses in this arc for O(1) access
+        let device_list = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
+        let mut devices = HashMap::new();
+        for device in device_list {
+            if !arc.device_names().contains(&device.name()) {
+                warn!(
+                    "{} from arc config does not appear in measurements -- ignored",
+                    device.name()
+                );
+            }
+            devices.insert(device.name(), device);
+        }
+
+        let measurements = &arc.measurements;
+        assert!(
+            measurements.len() >= 2,
+            "must have at least two measurements"
+        );
+        // Start by propagating the estimator (on the same thread).
+        let num_msrs = measurements.len();
+        let step_size = arc.min_duration_sep().unwrap();
+        // Update the step size of the navigation propagator
+        self.prop.set_step(step_size, false);
+        let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
+        info!("Navigation propagating for a total of {prop_time} with step size {step_size}");
+
+        let mut epoch = self.prop.state.epoch();
+
+        let mut reported = [false; 11];
+        info!("Processing {num_msrs} measurements with covariance mapping");
+
+        // In the following, we'll continuously tell the propagator to advance by a single step until the next measurement.
+        // This is effectively a clone of the "for_duration" function of the propagator.
+        // However, after every step of the propagator, we will perform a time update and reset the STM.
+        // This ensures that we have a time update every time the propagator error function says that the integration would
+        // be wrong if the step would be larger. Moreover, we will reset the STM to ensure that the state transition matrix
+        // stays linear (the error control function may verify this).
+
+        let mut rng = thread_rng();
+
+        for (msr_cnt, (device_name, msr)) in measurements.iter().enumerate() {
+            let next_msr_epoch = msr.epoch();
+
+            // Advance the propagator
+            loop {
+                let delta_t = next_msr_epoch - epoch;
+                if self.prop.details.step < delta_t {
+                    // Do a single step and (probably) a time update, but we'll see that later
+                    self.prop.single_step()?;
+                } else if delta_t.to_seconds() > 0.0 {
+                    // Take one final step of exactly the needed duration until the next measurement
+                    self.prop.for_duration(delta_t)?;
+                }
+
+                // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
+
+                // Extract the state and update the STM in the filter.
+                let nominal_state = S::extract(self.prop.state);
+                // Get the datetime and info needed to compute the theoretical measurement according to the model
+                epoch = nominal_state.epoch();
+
+                if nominal_state.epoch() == next_msr_epoch {
+                    // Perform a measurement update
+
+                    // Get the computed observations
+                    // for device in self.devices.iter_mut() {
+                    match devices.get_mut(device_name) {
+                        Some(device) => {
+                            if let Some(computed_meas) =
+                                device.measure(&nominal_state, &mut rng, self.cosm.clone())
+                            {
+                                self.kf
+                                    .update_h_tilde(computed_meas.sensitivity(nominal_state));
+
+                                // Switch back from extended if necessary
+                                if self.kf.is_extended() && self.ekf_trigger.disable_ekf(epoch) {
+                                    self.kf.set_extended(false);
+                                    info!("EKF disabled @ {epoch}");
+                                }
+
+                                match self.kf.measurement_update(
+                                    nominal_state,
+                                    &msr.observation(),
+                                    &computed_meas.observation(),
+                                ) {
+                                    Ok((est, res)) => {
+                                        trace!("msr update #{msr_cnt} @ {epoch}");
+                                        // Switch to EKF if necessary, and update the dynamics and such
+                                        // Note: we call enable_ekf first to ensure that the trigger gets
+                                        // called in case it needs to save some information (e.g. the
+                                        // StdEkfTrigger needs to store the time of the previous measurement).
+                                        if self.ekf_trigger.enable_ekf(&est)
+                                            && !self.kf.is_extended()
+                                        {
+                                            self.kf.set_extended(true);
+                                            if !est.within_3sigma() {
+                                                warn!("EKF enabled @ {epoch} but filter DIVERGING");
+                                            } else {
+                                                info!("EKF enabled @ {epoch}");
+                                            }
+                                        }
+                                        if self.kf.is_extended() {
+                                            self.prop.state =
+                                                self.prop.state + est.state_deviation();
+                                        }
+                                        self.prop.state.reset_stm();
+                                        self.estimates.push(est);
+                                        self.residuals.push(res);
+                                    }
+                                    Err(e) => return Err(e),
+                                }
+                            } else {
+                                warn!("Real observation exists @ {epoch} but simulated {device_name} does not see it -- ignoring measurement");
+                            }
+                        }
+                        None => {
+                            error!("Tracking arc references {device_name} which is not in the list of configured devices")
+                        }
+                    }
+
+                    let msr_prct = (10.0 * (msr_cnt as f64) / (num_msrs as f64)) as usize;
+                    if !reported[msr_prct] {
+                        info!(
+                            "{:>3}% done ({msr_cnt:.0} measurements processed)",
+                            10 * msr_prct,
+                        );
+                        reported[msr_prct] = true;
+                    }
+
+                    break;
+                } else {
+                    // No measurement can be used here, let's just do a time update
+                    trace!("time update {epoch}");
+                    match self.kf.time_update(nominal_state) {
+                        Ok(est) => {
+                            // State deviation is always zero for an EKF time update
+                            // therefore we don't do anything different for an extended filter
+                            self.estimates.push(est);
+                        }
+                        Err(e) => return Err(e),
+                    }
+                    self.prop.state.reset_stm();
+                }
+            }
+        }
+
+        // Always report the 100% mark
+        if !reported[10] {
+            info!("100% done ({num_msrs:.0} measurements processed)");
+        }
+
+        Ok(())
+    }
+
     /// Allows for covariance mapping without processing measurements
     pub fn map_covar(&mut self, end_epoch: Epoch) -> Result<(), NyxError> {
         let prop_time = end_epoch - self.kf.previous_estimate().epoch();
-        info!(
-            "Propagating for {} seconds and mapping covariance",
-            prop_time
-        );
+        info!("Propagating for {prop_time} seconds and mapping covariance",);
 
         loop {
-            let mut dt = self.prop.state.epoch();
-            if dt + self.prop.details.step > end_epoch {
+            let mut epoch = self.prop.state.epoch();
+            if epoch + self.prop.details.step > end_epoch {
                 self.prop.until_epoch(end_epoch)?;
             } else {
                 self.prop.single_step()?;
@@ -552,9 +711,9 @@ where
             let prop_state = self.prop.state;
             let nominal_state = S::extract(prop_state);
             // Get the datetime and info needed to compute the theoretical measurement according to the model
-            dt = nominal_state.epoch();
+            epoch = nominal_state.epoch();
             // No measurement can be used here, let's just do a time update
-            trace!("time update {}", dt);
+            trace!("time update {epoch}");
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
                     // State deviation is always zero for an EKF time update
@@ -564,7 +723,7 @@ where
                 Err(e) => return Err(e),
             }
             self.prop.state.reset_stm();
-            if dt == end_epoch {
+            if epoch == end_epoch {
                 break;
             }
         }

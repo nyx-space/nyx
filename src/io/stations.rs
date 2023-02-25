@@ -48,8 +48,8 @@ impl Configurable for GroundStation {
     where
         Self: Sized,
     {
+        let iau_earth = cosm.frame("IAU Earth");
         let gs = if let Some(base) = &cfg.inherit {
-            let iau_earth = cosm.frame("IAU Earth");
             match base.to_lowercase().as_str() {
                 "dss13" => GroundStation::dss13_goldstone(
                     cfg.elevation_mask_deg,
@@ -90,7 +90,13 @@ impl Configurable for GroundStation {
                 cfg.height_km.unwrap(),
                 cfg.range_noise_km,
                 cfg.range_rate_noise_km_s,
-                cosm.frame(&frame_name),
+                cosm.try_frame(&frame_name).map_or_else(
+                    |e| {
+                        error!("{e} - using {iau_earth}");
+                        iau_earth
+                    },
+                    |f| f,
+                ),
             )
         };
 
