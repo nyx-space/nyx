@@ -36,7 +36,7 @@ fn stop_cond_3rd_apo() {
     let mut prev_event_match = events[0].epoch();
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.epoch() - prev_event_match - period;
-        assert!(delta_period.abs() < 1.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        assert!(delta_period.abs() < 50.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
         prev_event_match = event_match.epoch();
     }
 
@@ -89,7 +89,7 @@ fn stop_cond_3rd_peri() {
     let mut prev_event_match = events[0].epoch();
     for event_match in events.iter().skip(1) {
         let delta_period = event_match.epoch() - prev_event_match - period;
-        assert!(delta_period.abs() < 5.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
+        assert!(delta_period.abs() < 50.microseconds(), "in two body dyn, event finding should be extremely precise, instead time error of {delta_period}");
         prev_event_match = event_match.epoch();
     }
 

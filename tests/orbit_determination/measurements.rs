@@ -8,7 +8,6 @@ fn nil_measurement() {
     use self::nyx::od::prelude::*;
     use self::nyx::time::Epoch;
     use hifitime::J2000_OFFSET;
-    use std::f64::EPSILON;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 
     let lat = -7.906_635_7;
@@ -32,30 +31,9 @@ fn nil_measurement() {
     let at_station = Orbit::from_geodesic(lat, long, height, dt, eme2k);
 
     let mut rng = thread_rng();
-    let meas = station
+    assert!(station
         .measure(&at_station, &mut rng, cosm.clone())
-        .unwrap();
-
-    let h_tilde = meas.sensitivity(at_station);
-    println!("{}", h_tilde);
-    assert!(h_tilde[(0, 0)].is_nan(), "expected NaN");
-    assert!(h_tilde[(0, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(0, 2)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 0)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 2)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 3)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 4)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 5)].is_nan(), "expected NaN");
-
-    assert!(
-        meas.observation()[(0, 0)] - 0.0 < EPSILON,
-        "observation is not range=0"
-    );
-    assert!(
-        meas.observation()[(1, 0)].is_nan(),
-        "observation is not range=0"
-    );
+        .is_none());
 }
 
 /// Tests that the measurements generated from a topocentric frame are correct.
