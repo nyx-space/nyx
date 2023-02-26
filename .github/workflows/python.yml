@@ -19,18 +19,25 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: develop --find-interpreter -F python
+          manylinux: auto
+
+      - name: Run script
+        run: |
+          python examples/python/orbit_determination.py
+          python examples/python/test.py
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter -F python
           manylinux: auto
-
-      - name: Run script
-        run: |
-          pip install dist/nyx_space-1.1.2-cp310-cp310-manylinux_2_35_x86_64.whl
-          python examples/python/orbit_determination.py
-          python examples/python/test.py
 
       - name: Upload wheels
         uses: actions/upload-artifact@v3
@@ -55,12 +62,6 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter -F python
 
-      - name: Run script
-        run: |
-          pip install dist/nyx_space-1.1.2-cp310-cp310-manylinux_2_35_x86_64.whl
-          python examples/python/orbit_determination.py
-          python examples/python/test.py
-
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -82,12 +83,6 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter -F python
-
-      - name: Run script
-        run: |
-          pip install dist/nyx_space-1.1.2-cp310-cp310-manylinux_2_35_x86_64.whl
-          python examples/python/orbit_determination.py
-          python examples/python/test.py
 
       - name: Upload wheels
         uses: actions/upload-artifact@v3
