@@ -103,7 +103,7 @@ impl DynamicTrajectory {
         let reader = builder.build()?;
 
         for field in &reader.schema().fields {
-            if field.name().as_str() == "Epoch:TDB (s)" {
+            if field.name().as_str() == "Epoch:TAI (s)" {
                 has_epoch = true;
             } else {
                 for potential_field in &mut found_fields {
@@ -117,7 +117,7 @@ impl DynamicTrajectory {
 
         if !has_epoch {
             return Err(Box::new(NyxError::FileUnreadable(
-                "Missing `Epoch:TDB (s)` field".to_string(),
+                "Missing `Epoch:TAI (s)` field".to_string(),
             )));
         }
 
@@ -150,7 +150,7 @@ impl DynamicTrajectory {
             let batch = maybe_batch.unwrap();
 
             let epochs = batch
-                .column_by_name("Epoch:TDB (s)")
+                .column_by_name("Epoch:TAI (s)")
                 .unwrap()
                 .as_any()
                 .downcast_ref::<Float64Array>()
@@ -184,7 +184,7 @@ impl DynamicTrajectory {
             // Build the states
             for i in 0..batch.num_rows() {
                 let mut state = S::zeros();
-                state.set_epoch(Epoch::from_tdb_seconds(epochs.value(i)));
+                state.set_epoch(Epoch::from_tai_seconds(epochs.value(i)));
 
                 for (j, (param, exists)) in found_fields.iter().enumerate() {
                     if *exists {

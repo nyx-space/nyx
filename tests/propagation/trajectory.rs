@@ -126,10 +126,33 @@ fn traj_ephem_forward() {
     let dyn_traj = DynamicTrajectory::from_parquet(path).unwrap();
     let concrete_traj = dyn_traj.to_traj::<Orbit>().unwrap();
 
-    assert_eq!(
-        ephem, concrete_traj,
-        "loaded parquet trajectory does not match original trajectory"
-    );
+    if ephem != concrete_traj {
+        // Uh oh, let's see where the differences are.
+        assert_eq!(
+            ephem.states.len(),
+            concrete_traj.states.len(),
+            "loaded trajectory has different number of states"
+        );
+
+        assert_eq!(
+            ephem.first().epoch(),
+            concrete_traj.first().epoch(),
+            "loaded trajectory has starts at different times"
+        );
+
+        assert_eq!(
+            ephem.last().epoch(),
+            concrete_traj.last().epoch(),
+            "loaded trajectory has ends at different times"
+        );
+
+        // So far so good, so let's iterate through both now.
+        for (i, (orig_state, loaded_state)) in
+            ephem.states.iter().zip(&concrete_traj.states).enumerate()
+        {
+            assert_eq!(orig_state, loaded_state, "#{i} differ");
+        }
+    }
 
     // And let's convert into another frame and back to check the error
     let ephem_luna = ephem.to_frame(cosm.frame("Luna"), cosm.clone()).unwrap();
@@ -368,6 +391,12 @@ fn traj_spacecraft() {
     // And convert back, to see the error this leads to
     let ephem_back_to_earth = ephem_luna.to_frame(eme2k, cosm).unwrap();
 
+    // This checks that we have exactly the same states after a conversion back to the original frame.
+    assert_eq!(
+        traj, ephem_back_to_earth,
+        "Expecting exactly the same data returned after converting back"
+    );
+
     let conv_state = ephem_back_to_earth.at(start_dt).unwrap();
     let mut max_pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
     let mut max_vel_err = (eval_state.orbit.velocity() - conv_state.orbit.velocity()).norm();
@@ -390,6 +419,7 @@ fn traj_spacecraft() {
         max_vel_err * 1e3,
     );
 
+    // TODO: Make this tighter once I switch to ANISE: Cosm has some errors in converting back to an original state (~1e-9 km it seems)
     // Allow for up to meter error
     assert!(
         max_pos_err < 1e-3,

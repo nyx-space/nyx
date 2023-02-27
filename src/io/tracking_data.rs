@@ -93,7 +93,7 @@ impl DynamicTrackingArc {
         let mut rate_avail = false;
         for field in &self.reader.schema().fields {
             match field.name().as_str() {
-                "Epoch:TDB (s)" => has_epoch = true,
+                "Epoch:TAI (s)" => has_epoch = true,
                 "Tracking device" => has_tracking_dev = true,
                 "Range (km)" => range_avail = true,
                 "Range rate (km/s)" => rate_avail = true,
@@ -103,7 +103,7 @@ impl DynamicTrackingArc {
 
         if !has_epoch {
             return Err(NyxError::FileUnreadable(
-                "Missing `Epoch:TDB (s)` field".to_string(),
+                "Missing `Epoch:TAI (s)` field".to_string(),
             ));
         } else if !has_tracking_dev {
             return Err(NyxError::FileUnreadable(
@@ -166,7 +166,7 @@ impl DynamicTrackingArc {
                 .unwrap();
 
             let epochs = batch
-                .column_by_name("Epoch:TDB (s)")
+                .column_by_name("Epoch:TAI (s)")
                 .unwrap()
                 .as_any()
                 .downcast_ref::<Float64Array>()
@@ -194,7 +194,7 @@ impl DynamicTrackingArc {
                         arc.measurements.push((
                             tracking_device.value(i).to_string(),
                             Msr::from_observation(
-                                Epoch::from_tdb_seconds(epochs.value(i)),
+                                Epoch::from_tai_seconds(epochs.value(i)),
                                 OVector::<f64, Msr::MeasurementSize>::from_iterator([
                                     range_data.value(i),
                                     rate_data.value(i),

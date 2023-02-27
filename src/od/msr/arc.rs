@@ -75,8 +75,8 @@ where
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch:Gregorian TDB", DataType::Utf8, false),
-            Field::new("Epoch:TDB (s)", DataType::Float64, false),
+            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
+            Field::new("Epoch:TAI (s)", DataType::Float64, false),
             Field::new("Tracking device", DataType::Utf8, false),
         ];
 
@@ -99,14 +99,14 @@ where
         record.push(Arc::new(StringArray::from(
             self.measurements
                 .iter()
-                .map(|m| format!("{:e}", m.1.epoch()))
+                .map(|m| format!("{:x}", m.1.epoch()))
                 .collect::<Vec<String>>(),
         )) as ArrayRef);
 
         record.push(Arc::new(Float64Array::from(
             self.measurements
                 .iter()
-                .map(|m| m.1.epoch().to_tdb_seconds())
+                .map(|m| m.1.epoch().to_tai_seconds())
                 .collect::<Vec<f64>>(),
         )) as ArrayRef);
 

@@ -27,7 +27,7 @@ use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
-use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
+use crate::time::{Duration, Epoch, TimeSeries, Unit};
 use crate::State;
 use arrow::array::{ArrayRef, Float64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -46,7 +46,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 /// Store a trajectory of any State.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Traj<S: InterpState>
 where
     DefaultAllocator:
@@ -422,8 +422,8 @@ where
         // TODO: Add the custom headers and frame conversions, etc. from state formatter
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
-            Field::new("Epoch:Gregorian TDB", DataType::Utf8, false),
-            Field::new("Epoch:TDB (s)", DataType::Float64, false),
+            Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
+            Field::new("Epoch:TAI (s)", DataType::Float64, false),
         ];
 
         for field in &fields {
@@ -446,7 +446,7 @@ where
         record.push(Arc::new(StringArray::from(
             self.states
                 .iter()
-                .map(|s| format!("{:e}", s.epoch()))
+                .map(|s| format!("{:x}", s.epoch()))
                 .collect::<Vec<String>>(),
         )) as ArrayRef);
 
@@ -454,7 +454,7 @@ where
         record.push(Arc::new(Float64Array::from(
             self.states
                 .iter()
-                .map(|s| s.epoch().to_tdb_seconds())
+                .map(|s| s.epoch().to_tai_seconds())
                 .collect::<Vec<f64>>(),
         )) as ArrayRef);
 
@@ -566,23 +566,9 @@ impl Traj<Orbit> {
         }
         let start_instant = Instant::now();
         let mut traj = Self::new();
-        // For each state, add the state and the one in between two successive states
-        for these_states in self.states.windows(2) {
-            let state_1 = cosm.frame_chg(&these_states[0], new_frame);
-            traj.states.push(state_1);
-            let next_epoch = state_1.epoch() + (these_states[1].epoch() - state_1.epoch()) * 0.5;
-            match self.at(next_epoch) {
-                Ok(intermediate) => {
-                    // The at() call will fail on the last state.
-                    let state_2 = cosm.frame_chg(&intermediate, new_frame);
-                    traj.states.push(state_2);
-                }
-                Err(e) => error!("{e} @ {next_epoch}"),
-            }
+        for state in &self.states {
+            traj.states.push(cosm.frame_chg(&state, new_frame));
         }
-        // Add the final state
-        let state_2 = cosm.frame_chg(self.last(), new_frame);
-        traj.states.push(state_2);
         traj.finalize();
 
         info!(
@@ -709,24 +695,10 @@ impl Traj<Spacecraft> {
         }
         let start_instant = Instant::now();
         let mut traj = Self::new();
-        // For each state, add the state and the one in between two successive states
-        for these_states in self.states.windows(2) {
-            let cur_sc = these_states[0];
-            let state_1 = cosm.frame_chg(&cur_sc.orbit, new_frame);
-            traj.states.push(cur_sc.with_orbit(state_1));
-            let next_epoch = state_1.epoch() + (these_states[1].epoch() - state_1.epoch()) * 0.5;
-            match self.at(next_epoch) {
-                Ok(intermediate) => {
-                    // The at() call will fail on the last state.
-                    let state_2 = cosm.frame_chg(&intermediate.orbit, new_frame);
-                    traj.states.push(cur_sc.with_orbit(state_2));
-                }
-                Err(e) => error!("{e} @ {next_epoch}"),
-            }
+        for state in &self.states {
+            traj.states
+                .push(state.with_orbit(cosm.frame_chg(&state.orbit, new_frame)));
         }
-        // Add the final state
-        let state_2 = cosm.frame_chg(&self.last().orbit, new_frame);
-        traj.states.push(self.last().with_orbit(state_2));
         traj.finalize();
 
         info!(
@@ -881,18 +853,18 @@ where
     }
 }
 
-impl<S: InterpState> PartialEq for Traj<S>
-where
-    DefaultAllocator:
-        Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-{
-    /// Equality of trajectories is based SOLELY on the name matching (if set), the number of states being equal, and the first and last epoch being with 10 ms of each other
-    /// The reason why we don't do a strict equality is because serialization involves converting the epoch into a TDB epoch in second, and converting that back to a hifitime
-    /// may lead to an error of up to 150 nanoseconds due to the iteration used to calculate the TDB epoch.
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.states.len() == other.states.len()
-            && (self.first().epoch() - self.first().epoch()).abs() < 10.milliseconds()
-            && (self.last().epoch() - self.last().epoch()).abs() < 10.milliseconds()
-    }
-}
+// impl<S: InterpState> PartialEq for Traj<S>
+// where
+//     DefaultAllocator:
+//         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
+// {
+//     /// Equality of trajectories is based SOLELY on the name matching (if set), the number of states being equal, and the first and last epoch being with 10 ms of each other
+//     /// The reason why we don't do a strict equality is because serialization involves converting the epoch into a TDB epoch in second, and converting that back to a hifitime
+//     /// may lead to an error of up to 150 nanoseconds due to the iteration used to calculate the TDB epoch.
+//     fn eq(&self, other: &Self) -> bool {
+//         self.name == other.name && self.states == other.states
+//         // && self.states.len() == other.states.len()
+//         // && (self.first().epoch() - self.first().epoch()).abs() < 10.milliseconds()
+//         // && (self.last().epoch() - self.last().epoch()).abs() < 10.milliseconds()
+//     }
+// }
