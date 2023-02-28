@@ -23,6 +23,7 @@ pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
 
 pub use traj::Traj;
 
+use super::ui::Frame;
 use super::StateParameter;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
@@ -100,6 +101,12 @@ where
 
     /// Interpolates a new state at the provided epochs given a slice of states.
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError>;
+
+    /// Returns the frame of this state
+    fn frame(&self) -> Frame;
+
+    /// Sets the frame of this state
+    fn set_frame(&mut self, frame: Frame);
 }
 
 impl InterpState for Orbit {
@@ -213,6 +220,14 @@ impl InterpState for Orbit {
         }
         Ok(())
     }
+
+    fn frame(&self) -> Frame {
+        self.frame
+    }
+
+    fn set_frame(&mut self, frame: Frame) {
+        self.frame = frame;
+    }
 }
 
 impl InterpState for Spacecraft {
@@ -291,5 +306,13 @@ impl InterpState for Spacecraft {
             _ => return Err(NyxError::StateParameterUnavailable),
         }
         Ok(())
+    }
+
+    fn frame(&self) -> Frame {
+        self.orbit.frame
+    }
+
+    fn set_frame(&mut self, frame: Frame) {
+        self.orbit.frame = frame;
     }
 }

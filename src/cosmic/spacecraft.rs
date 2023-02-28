@@ -508,6 +508,10 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
         }
         Ok(())
     }
+
+    fn unset_stm(&mut self) {
+        self.stm = None;
+    }
 }
 
 impl<X: SpacecraftExt> Add<OVector<f64, Const<6>>> for BaseSpacecraft<X> {

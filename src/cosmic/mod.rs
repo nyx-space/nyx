@@ -81,6 +81,9 @@ where
         unimplemented!()
     }
 
+    /// Unsets the STM for this state
+    fn unset_stm(&mut self);
+
     /// Set this state
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
         -> Result<(), NyxError>;
@@ -179,7 +182,7 @@ impl Xb {
 
         match Self::decode(input_xb_buf) {
             Ok(xb) => {
-                info!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
+                debug!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
                 Ok(xb)
             }
             Err(e) => Err(NyxError::LoadingError(format!("Could not decode XB: {e}"))),

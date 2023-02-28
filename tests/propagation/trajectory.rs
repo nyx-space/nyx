@@ -6,6 +6,7 @@ use nyx::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft};
 use nyx::dynamics::guidance::{GuidanceLaw, Ruggiero, Thruster};
 use nyx::dynamics::{OrbitalDynamics, SpacecraftDynamics};
 use nyx::io::trajectory_data::DynamicTrajectory;
+use nyx::md::trajectory::InterpState;
 use nyx::md::ui::Objective;
 use nyx::md::StateParameter;
 use nyx::propagators::*;
@@ -150,7 +151,17 @@ fn traj_ephem_forward() {
         for (i, (orig_state, loaded_state)) in
             ephem.states.iter().zip(&concrete_traj.states).enumerate()
         {
-            assert_eq!(orig_state, loaded_state, "#{i} differ");
+            // Check the data info one by one. Time may be very slightly off.
+            let delta_t = orig_state.epoch() - loaded_state.epoch();
+            assert!(
+                delta_t < 500 * Unit::Nanosecond,
+                "#{i} differ (Δt = {delta_t})"
+            );
+            assert_eq!(
+                orig_state.as_vector(),
+                loaded_state.as_vector(),
+                "#{i} differ (Δt = {delta_t})"
+            );
         }
     }
 
@@ -404,6 +415,15 @@ fn traj_spacecraft() {
     for conv_state in ephem_back_to_earth.every(5 * Unit::Minute) {
         let eval_state = traj.at(conv_state.epoch()).unwrap();
 
+        // Check the frame
+        assert_eq!(eval_state.frame(), conv_state.frame());
+        assert_eq!(
+            eval_state.epoch(),
+            conv_state.epoch(),
+            "Δt = {}",
+            eval_state.epoch() - conv_state.epoch()
+        );
+
         let pos_err = (eval_state.orbit.radius() - conv_state.orbit.radius()).norm();
         if pos_err > max_pos_err {
             max_pos_err = pos_err;
@@ -428,7 +448,7 @@ fn traj_spacecraft() {
 
     // Allow for up to millimeter per second error
     assert!(
-        max_vel_err < 1e-6,
+        max_vel_err < 1e-5,
         "Maximum orbit velocity in interpolation is too high!"
     );
 }

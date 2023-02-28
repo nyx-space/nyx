@@ -426,8 +426,12 @@ where
             Field::new("Epoch:TAI (s)", DataType::Float64, false),
         ];
 
+        let more_meta = Some(vec![(
+            "Frame".to_string(),
+            format!("{}", self.states[0].frame()),
+        )]);
         for field in &fields {
-            hdrs.push(field.to_field());
+            hdrs.push(field.to_field(more_meta.clone()));
         }
 
         // Build the schema

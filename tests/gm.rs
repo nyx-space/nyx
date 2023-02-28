@@ -96,6 +96,8 @@ impl State for BiasDriftState {
 
         me
     }
+
+    fn unset_stm(&mut self) {}
 }
 
 #[derive(Clone)]

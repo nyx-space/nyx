@@ -1880,6 +1880,10 @@ impl State for Orbit {
         }
         Ok(())
     }
+
+    fn unset_stm(&mut self) {
+        self.stm = None;
+    }
 }
 
 impl Add<OVector<f64, Const<6>>> for Orbit {

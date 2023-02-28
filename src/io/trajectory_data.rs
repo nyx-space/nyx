@@ -30,6 +30,8 @@ use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+use super::odp::Cosm;
+
 /// A dynamic trajectory allows loading a trajectory Parquet file and converting it
 /// to the concrete trajectory state type when desired.
 /// TODO: Trajectory export might benefit from storing the dynamics etc. as YAML to reload that?
@@ -85,6 +87,7 @@ impl DynamicTrajectory {
     {
         // Check the schema
         let mut has_epoch = false; // Required
+        let mut frame = None;
 
         let mut found_fields = [
             (StateParameter::X, false),
@@ -107,8 +110,22 @@ impl DynamicTrajectory {
                 has_epoch = true;
             } else {
                 for potential_field in &mut found_fields {
-                    if field.name() == potential_field.0.to_field().name() {
+                    if field.name() == potential_field.0.to_field(None).name() {
                         potential_field.1 = true;
+                        if potential_field.0 != StateParameter::FuelMass {
+                            if let Some(frame_info) = field.metadata().get("Frame") {
+                                if frame.is_none() {
+                                    frame = Some(frame_info.to_string())
+                                } else if frame.as_ref().unwrap().as_str() != frame_info {
+                                    return Err(Box::new(NyxError::FileUnreadable(format!(
+                                        "Frame previous set to `{}` but set to `{}` in field `{}`",
+                                        frame.unwrap(),
+                                        frame_info,
+                                        field.name()
+                                    ))));
+                                }
+                            }
+                        }
                         break;
                     }
                 }
@@ -119,13 +136,17 @@ impl DynamicTrajectory {
             return Err(Box::new(NyxError::FileUnreadable(
                 "Missing `Epoch:TAI (s)` field".to_string(),
             )));
+        } else if frame.is_none() {
+            return Err(Box::new(NyxError::FileUnreadable(
+                "Missing `Frame` in column metadata".to_string(),
+            )));
         }
 
         for (field, exists) in found_fields.iter().take(found_fields.len() - 1) {
             if !exists {
                 return Err(Box::new(NyxError::FileUnreadable(format!(
                     "Missing `{}` field",
-                    field.to_field().name()
+                    field.to_field(None).name()
                 ))));
             }
         }
@@ -138,7 +159,7 @@ impl DynamicTrajectory {
             // Oops, missing fuel data (using the full call in case the field name changes in the future)
             return Err(Box::new(NyxError::FileUnreadable(format!(
                 "Missing `{}` field",
-                found_fields.last().unwrap().0.to_field().name()
+                found_fields.last().unwrap().0.to_field(None).name()
             ))));
         }
 
@@ -161,7 +182,7 @@ impl DynamicTrajectory {
             for (field, _) in found_fields.iter().take(found_fields.len() - 1) {
                 shared_data.push(
                     batch
-                        .column_by_name(field.to_field().name())
+                        .column_by_name(field.to_field(None).name())
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()
@@ -181,10 +202,18 @@ impl DynamicTrajectory {
                 );
             }
 
+            // Grab the frame
+            // TODO: This is ugly and wrong because we might be using another frame info!
+            // So arguably, the cosm to load should be in the metadata or passed to this function!
+            let cosm = Cosm::de438();
+            let frame = cosm.try_frame(frame.as_ref().unwrap().as_str())?;
+
             // Build the states
             for i in 0..batch.num_rows() {
                 let mut state = S::zeros();
                 state.set_epoch(Epoch::from_tai_seconds(epochs.value(i)));
+                state.set_frame(frame);
+                state.unset_stm(); // We don't have any STM data, so let's unset this.
 
                 for (j, (param, exists)) in found_fields.iter().enumerate() {
                     if *exists {

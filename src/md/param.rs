@@ -240,9 +240,14 @@ impl StateParameter {
     }
 
     /// Returns the parquet field of this parameter
-    pub fn to_field(self) -> Field {
+    pub fn to_field(self, more_meta: Option<Vec<(String, String)>>) -> Field {
         let mut meta = HashMap::new();
         meta.insert("unit".to_string(), self.unit().to_string());
+        if let Some(more_data) = more_meta {
+            for (k, v) in more_data {
+                meta.insert(k, v);
+            }
+        }
 
         Field::new(
             format!("{self} ({})", self.unit()),
