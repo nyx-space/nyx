@@ -16,16 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate approx;
-extern crate hifitime;
-extern crate serde;
-
-use self::approx::{abs_diff_eq, relative_eq};
-use self::serde::ser::SerializeStruct;
-use self::serde::{Serialize, Serializer};
 use super::na::{Matrix3, Matrix6, Vector3, Vector6};
+use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
+use crate::io::orbit::OrbitSerde;
+use crate::io::{
+    epoch_from_str, epoch_to_str, frame_from_str, frame_to_str, ConfigRepr, Configurable,
+};
 use crate::linalg::{Const, OVector};
 use crate::mc::MultivariateNormal;
 use crate::md::ui::Objective;
@@ -36,12 +34,15 @@ use crate::utils::{
     spherical_to_cartesian,
 };
 use crate::NyxError;
+use approx::{abs_diff_eq, relative_eq};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use std::sync::Arc;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
@@ -93,25 +94,28 @@ pub fn assert_orbit_eq_or_rel(left: &Orbit, right: &Orbit, epsilon: f64, msg: &s
 /// as these are always non singular.
 /// _Note:_ although not yet supported, this struct may change once True of Date or other nutation frames
 /// are added to the toolkit.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
 pub struct Orbit {
     /// in km
-    pub x: f64,
+    pub x_km: f64,
     /// in km
-    pub y: f64,
+    pub y_km: f64,
     /// in km
-    pub z: f64,
+    pub z_km: f64,
     /// in km/s
-    pub vx: f64,
+    pub vx_km_s: f64,
     /// in km/s
-    pub vy: f64,
+    pub vy_km_s: f64,
     /// in km/s
-    pub vz: f64,
-    pub dt: Epoch,
+    pub vz_km_s: f64,
+    #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
+    pub epoch: Epoch,
     /// Frame contains everything we need to compute state information
+    #[serde(serialize_with = "frame_to_str", deserialize_with = "frame_from_str")]
     pub frame: Frame,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
+    #[serde(skip)]
     pub stm: Option<Matrix6<f64>>,
 }
 
@@ -120,23 +124,23 @@ impl Orbit {
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
     pub fn cartesian(
-        x: f64,
-        y: f64,
-        z: f64,
-        vx: f64,
-        vy: f64,
-        vz: f64,
-        dt: Epoch,
+        x_km: f64,
+        y_km: f64,
+        z_km: f64,
+        vx_km_s: f64,
+        vy_km_s: f64,
+        vz_km_s: f64,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
-        Orbit {
-            x,
-            y,
-            z,
-            vx,
-            vy,
-            vz,
-            dt,
+        Self {
+            x_km,
+            y_km,
+            z_km,
+            vx_km_s,
+            vy_km_s,
+            vz_km_s,
+            epoch,
             frame,
             stm: None,
         }
@@ -163,13 +167,13 @@ impl Orbit {
     /// **Units:** km, km, km
     pub fn from_position(x: f64, y: f64, z: f64, dt: Epoch, frame: Frame) -> Self {
         Orbit {
-            x,
-            y,
-            z,
-            vx: 0.0,
-            vy: 0.0,
-            vz: 0.0,
-            dt,
+            x_km: x,
+            y_km: y,
+            z_km: z,
+            vx_km_s: 0.0,
+            vy_km_s: 0.0,
+            vz_km_s: 0.0,
+            epoch: dt,
             frame,
             stm: None,
         }
@@ -181,13 +185,13 @@ impl Orbit {
     /// and as such it has the same unit requirements.
     pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
         Orbit {
-            x: state[0],
-            y: state[1],
-            z: state[2],
-            vx: state[3],
-            vy: state[4],
-            vz: state[5],
-            dt,
+            x_km: state[0],
+            y_km: state[1],
+            z_km: state[2],
+            vx_km_s: state[3],
+            vy_km_s: state[4],
+            vz_km_s: state[5],
+            epoch: dt,
             frame,
             stm: None,
         }
@@ -195,29 +199,36 @@ impl Orbit {
 
     /// Returns the magnitude of the radius vector in km
     pub fn rmag(&self) -> f64 {
-        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+        (self.x_km.powi(2) + self.y_km.powi(2) + self.z_km.powi(2)).sqrt()
     }
 
     /// Returns the magnitude of the velocity vector in km/s
     pub fn vmag(&self) -> f64 {
-        (self.vx.powi(2) + self.vy.powi(2) + self.vz.powi(2)).sqrt()
+        (self.vx_km_s.powi(2) + self.vy_km_s.powi(2) + self.vz_km_s.powi(2)).sqrt()
     }
 
     /// Returns the radius vector of this Orbit in [km, km, km]
     pub fn radius(&self) -> Vector3<f64> {
-        Vector3::new(self.x, self.y, self.z)
+        Vector3::new(self.x_km, self.y_km, self.z_km)
     }
 
     /// Returns the velocity vector of this Orbit in [km/s, km/s, km/s]
     pub fn velocity(&self) -> Vector3<f64> {
-        Vector3::new(self.vx, self.vy, self.vz)
+        Vector3::new(self.vx_km_s, self.vy_km_s, self.vz_km_s)
     }
 
     /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
     ///
     /// Note that the time is **not** returned in the vector.
     pub fn to_cartesian_vec(self) -> Vector6<f64> {
-        Vector6::new(self.x, self.y, self.z, self.vx, self.vy, self.vz)
+        Vector6::new(
+            self.x_km,
+            self.y_km,
+            self.z_km,
+            self.vx_km_s,
+            self.vy_km_s,
+            self.vz_km_s,
+        )
     }
 
     /// Returns the distance in kilometers between this state and another state.
@@ -232,8 +243,10 @@ impl Orbit {
 
     /// Returns the distance in kilometers between this state and a point assumed to be in the same frame.
     pub fn distance_to_point(&self, other: &Vector3<f64>) -> f64 {
-        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2))
-            .sqrt()
+        ((self.x_km - other.x).powi(2)
+            + (self.y_km - other.y).powi(2)
+            + (self.z_km - other.z).powi(2))
+        .sqrt()
     }
 
     /// Returns the unit vector in the direction of the state radius
@@ -255,13 +268,13 @@ impl Orbit {
     /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
     /// One should expect these errors to be on the order of 1e-12.
     pub fn keplerian(
-        sma: f64,
+        sma_km: f64,
         ecc: f64,
-        inc: f64,
-        raan: f64,
-        aop: f64,
-        ta: f64,
-        dt: Epoch,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ta_deg: f64,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         match frame {
@@ -279,14 +292,14 @@ impl Orbit {
                 } else {
                     ecc
                 };
-                let sma = if ecc > 1.0 && sma > 0.0 {
+                let sma = if ecc > 1.0 && sma_km > 0.0 {
                     warn!("eccentricity > 1 (hyperbolic) BUT SMA > 0 (elliptical): sign of SMA changed");
-                    sma * -1.0
-                } else if ecc < 1.0 && sma < 0.0 {
+                    sma_km * -1.0
+                } else if ecc < 1.0 && sma_km < 0.0 {
                     warn!("eccentricity < 1 (elliptical) BUT SMA < 0 (hyperbolic): sign of SMA changed");
-                    sma * -1.0
+                    sma_km * -1.0
                 } else {
-                    sma
+                    sma_km
                 };
                 if (sma * (1.0 - ecc)).abs() < 1e-3 {
                     // GMAT errors below one meter. Let's warn for below that, but not panic, might be useful for landing scenarios?
@@ -296,24 +309,24 @@ impl Orbit {
                     panic!("parabolic orbits have ill-defined Keplerian orbital elements");
                 }
                 if ecc > 1.0 {
-                    let ta = between_0_360(ta);
+                    let ta = between_0_360(ta_deg);
                     if ta > (PI - (1.0 / ecc).acos()).to_degrees() {
                         panic!(
                             "true anomaly value ({ta}) physically impossible for a hyperbolic orbit",
                         );
                     }
                 }
-                if (1.0 + ecc * ta.to_radians().cos()).is_infinite() {
+                if (1.0 + ecc * ta_deg.to_radians().cos()).is_infinite() {
                     panic!("radius of orbit is infinite");
                 }
                 // Done with all the warnings and errors supported by GMAT
                 // The conversion algorithm itself comes from GMAT's StateConversionUtil::ComputeKeplToCart
                 // NOTE: GMAT supports mean anomaly instead of true anomaly, but only for backward compatibility reasons
                 // so it isn't supported here.
-                let inc = inc.to_radians();
-                let raan = raan.to_radians();
-                let aop = aop.to_radians();
-                let ta = ta.to_radians();
+                let inc = inc_deg.to_radians();
+                let raan = raan_deg.to_radians();
+                let aop = aop_deg.to_radians();
+                let ta = ta_deg.to_radians();
                 let p = sma * (1.0 - ecc.powi(2));
                 if p.abs() < EPSILON {
                     panic!("Semilatus rectum ~= 0.0: parabolic orbit");
@@ -341,13 +354,13 @@ impl Orbit {
                         - sqrt_gm_p * sin_ta * (cos_aop * sin_raan + cos_inc * cos_raan * sin_aop);
                 let vz = sqrt_gm_p * (cos_ta_ecc * sin_inc * cos_aop - sin_ta * sin_inc * sin_aop);
                 Orbit {
-                    x,
-                    y,
-                    z,
-                    vx,
-                    vy,
-                    vz,
-                    dt,
+                    x_km: x,
+                    y_km: y,
+                    z_km: z,
+                    vx_km_s: vx,
+                    vy_km_s: vy,
+                    vz_km_s: vz,
+                    epoch,
                     frame,
                     stm: None,
                 }
@@ -552,18 +565,18 @@ impl Orbit {
     /// Returns a copy of the state with a new radius
     pub fn with_radius(self, new_radius: &Vector3<f64>) -> Self {
         let mut me = self;
-        me.x = new_radius[0];
-        me.y = new_radius[1];
-        me.z = new_radius[2];
+        me.x_km = new_radius[0];
+        me.y_km = new_radius[1];
+        me.z_km = new_radius[2];
         me
     }
 
     /// Returns a copy of the state with a new radius
     pub fn with_velocity(self, new_velocity: &Vector3<f64>) -> Self {
         let mut me = self;
-        me.vx = new_velocity[0];
-        me.vy = new_velocity[1];
-        me.vz = new_velocity[2];
+        me.vx_km_s = new_velocity[0];
+        me.vy_km_s = new_velocity[1];
+        me.vz_km_s = new_velocity[2];
         me
     }
 
@@ -584,16 +597,16 @@ impl Orbit {
             self.raan(),
             self.aop(),
             self.ta(),
-            self.dt,
+            self.epoch,
             self.frame,
         );
 
-        self.x = me.x;
-        self.y = me.y;
-        self.z = me.z;
-        self.vx = me.vx;
-        self.vy = me.vy;
-        self.vz = me.vz;
+        self.x_km = me.x_km;
+        self.y_km = me.y_km;
+        self.z_km = me.z_km;
+        self.vx_km_s = me.vx_km_s;
+        self.vy_km_s = me.vy_km_s;
+        self.vz_km_s = me.vz_km_s;
     }
 
     /// Returns a copy of the state with a new SMA
@@ -651,16 +664,16 @@ impl Orbit {
             self.raan(),
             self.aop(),
             self.ta(),
-            self.dt,
+            self.epoch,
             self.frame,
         );
 
-        self.x = me.x;
-        self.y = me.y;
-        self.z = me.z;
-        self.vx = me.vx;
-        self.vy = me.vy;
-        self.vz = me.vz;
+        self.x_km = me.x_km;
+        self.y_km = me.y_km;
+        self.z_km = me.z_km;
+        self.vx_km_s = me.vx_km_s;
+        self.vy_km_s = me.vy_km_s;
+        self.vz_km_s = me.vz_km_s;
     }
 
     /// Returns a copy of the state with a new ECC
@@ -696,16 +709,16 @@ impl Orbit {
             self.raan(),
             self.aop(),
             self.ta(),
-            self.dt,
+            self.epoch,
             self.frame,
         );
 
-        self.x = me.x;
-        self.y = me.y;
-        self.z = me.z;
-        self.vx = me.vx;
-        self.vy = me.vy;
-        self.vz = me.vz;
+        self.x_km = me.x_km;
+        self.y_km = me.y_km;
+        self.z_km = me.z_km;
+        self.vx_km_s = me.vx_km_s;
+        self.vy_km_s = me.vy_km_s;
+        self.vz_km_s = me.vz_km_s;
     }
 
     /// Returns a copy of the state with a new INC
@@ -754,16 +767,16 @@ impl Orbit {
             self.raan(),
             new_aop,
             self.ta(),
-            self.dt,
+            self.epoch,
             self.frame,
         );
 
-        self.x = me.x;
-        self.y = me.y;
-        self.z = me.z;
-        self.vx = me.vx;
-        self.vy = me.vy;
-        self.vz = me.vz;
+        self.x_km = me.x_km;
+        self.y_km = me.y_km;
+        self.z_km = me.z_km;
+        self.vx_km_s = me.vx_km_s;
+        self.vy_km_s = me.vy_km_s;
+        self.vz_km_s = me.vz_km_s;
     }
 
     /// Returns a copy of the state with a new AOP
@@ -812,16 +825,16 @@ impl Orbit {
             new_raan,
             self.aop(),
             self.ta(),
-            self.dt,
+            self.epoch,
             self.frame,
         );
 
-        self.x = me.x;
-        self.y = me.y;
-        self.z = me.z;
-        self.vx = me.vx;
-        self.vy = me.vy;
-        self.vz = me.vz;
+        self.x_km = me.x_km;
+        self.y_km = me.y_km;
+        self.z_km = me.z_km;
+        self.vx_km_s = me.vx_km_s;
+        self.vy_km_s = me.vy_km_s;
+        self.vz_km_s = me.vz_km_s;
     }
 
     /// Returns a copy of the state with a new RAAN
@@ -883,16 +896,16 @@ impl Orbit {
             self.raan(),
             self.aop(),
             new_ta,
-            self.dt,
+            self.epoch,
             self.frame,
         );
 
-        self.x = me.x;
-        self.y = me.y;
-        self.z = me.z;
-        self.vx = me.vx;
-        self.vy = me.vy;
-        self.vz = me.vz;
+        self.x_km = me.x_km;
+        self.y_km = me.y_km;
+        self.z_km = me.z_km;
+        self.vx_km_s = me.vx_km_s;
+        self.vy_km_s = me.vy_km_s;
+        self.vz_km_s = me.vz_km_s;
     }
 
     /// Returns a copy of the state with a new TA
@@ -918,7 +931,7 @@ impl Orbit {
             self.raan(),
             self.aop(),
             self.ta(),
-            self.dt,
+            self.epoch,
             self.frame,
         )
     }
@@ -932,7 +945,7 @@ impl Orbit {
             self.raan(),
             self.aop(),
             self.ta(),
-            self.dt,
+            self.epoch,
             self.frame,
         )
     }
@@ -1084,7 +1097,7 @@ impl Orbit {
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
     pub fn geodetic_longitude(&self) -> f64 {
         match self.frame {
-            Frame::Geoid { .. } => between_0_360(self.y.atan2(self.x).to_degrees()),
+            Frame::Geoid { .. } => between_0_360(self.y_km.atan2(self.x_km).to_degrees()),
             _ => panic!("geodetic elements only defined in a Geoid frame"),
         }
     }
@@ -1105,14 +1118,14 @@ impl Orbit {
                 let eps = 1e-12;
                 let max_attempts = 20;
                 let mut attempt_no = 0;
-                let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
-                let mut latitude = (self.z / self.rmag()).asin();
+                let r_delta = (self.x_km.powi(2) + self.y_km.powi(2)).sqrt();
+                let mut latitude = (self.z_km / self.rmag()).asin();
                 let e2 = flattening * (2.0 - flattening);
                 loop {
                     attempt_no += 1;
                     let c_earth =
                         semi_major_radius / ((1.0 - e2 * (latitude).sin().powi(2)).sqrt());
-                    let new_latitude = (self.z + c_earth * e2 * (latitude).sin()).atan2(r_delta);
+                    let new_latitude = (self.z_km + c_earth * e2 * (latitude).sin()).atan2(r_delta);
                     if (latitude - new_latitude).abs() < eps {
                         return between_pm_180(new_latitude.to_degrees());
                     } else if attempt_no >= max_attempts {
@@ -1149,10 +1162,10 @@ impl Orbit {
                     // We are near poles, let's use another formulation.
                     let s_earth = (semi_major_radius * (1.0 - flattening).powi(2))
                         / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
-                    self.z / latitude.sin() - s_earth
+                    self.z_km / latitude.sin() - s_earth
                 } else {
                     let c_earth = semi_major_radius / ((1.0 - e2 * sin_lat.powi(2)).sqrt());
-                    let r_delta = (self.x.powi(2) + self.y.powi(2)).sqrt();
+                    let r_delta = (self.x_km.powi(2) + self.y_km.powi(2)).sqrt();
                     r_delta / latitude.cos() - c_earth
                 }
             }
@@ -1162,12 +1175,12 @@ impl Orbit {
 
     /// Returns the right ascension of this orbit in degrees
     pub fn right_ascension(&self) -> f64 {
-        between_0_360((self.y.atan2(self.x)).to_degrees())
+        between_0_360((self.y_km.atan2(self.x_km)).to_degrees())
     }
 
     /// Returns the declination of this orbit in degrees
     pub fn declination(&self) -> f64 {
-        between_pm_180((self.z / self.rmag()).asin().to_degrees())
+        between_pm_180((self.z_km / self.rmag()).asin().to_degrees())
     }
 
     /// Returns the semi minor axis in km, includes code for a hyperbolic orbit
@@ -1181,7 +1194,7 @@ impl Orbit {
 
     /// Returns the velocity declination of this orbit in degrees
     pub fn velocity_declination(&self) -> f64 {
-        between_pm_180((self.vz / self.vmag()).asin().to_degrees())
+        between_pm_180((self.vz_km_s / self.vmag()).asin().to_degrees())
     }
 
     pub fn b_plane(&self) -> Result<BPlane, NyxError> {
@@ -1260,7 +1273,7 @@ impl Orbit {
                 if !self.frame.is_body_fixed() {
                     warn!("Computation of SEZ rotation matrix must be done in a body fixed frame and {} is not one!", self.frame);
                 }
-                if (self.x.powi(2) + self.y.powi(2)).sqrt() < 1e-3 {
+                if (self.x_km.powi(2) + self.y_km.powi(2)).sqrt() < 1e-3 {
                     warn!("SEZ frame ill-defined when close to the poles");
                 }
                 let phi = self.geodetic_latitude().to_radians();
@@ -1303,9 +1316,9 @@ impl Orbit {
 
     /// Apply the provided delta-v (in km/s)
     pub fn apply_dv(&mut self, dv: Vector3<f64>) {
-        self.vx += dv[0];
-        self.vy += dv[1];
-        self.vz += dv[2];
+        self.vx_km_s += dv[0];
+        self.vy_km_s += dv[1];
+        self.vz_km_s += dv[2];
     }
 
     /// Copies this orbit after applying the provided delta-v (in km/s)
@@ -1318,13 +1331,13 @@ impl Orbit {
     /// Rotate this state provided a direct cosine matrix of position and velocity
     pub fn rotate_by(&mut self, dcm: Matrix6<f64>) {
         let new_orbit = dcm * self.to_cartesian_vec();
-        self.x = new_orbit[0];
-        self.y = new_orbit[1];
-        self.z = new_orbit[2];
+        self.x_km = new_orbit[0];
+        self.y_km = new_orbit[1];
+        self.z_km = new_orbit[2];
 
-        self.vx = new_orbit[3];
-        self.vy = new_orbit[4];
-        self.vz = new_orbit[5];
+        self.vx_km_s = new_orbit[3];
+        self.vy_km_s = new_orbit[4];
+        self.vz_km_s = new_orbit[5];
     }
 
     /// Rotate this state provided a direct cosine matrix of position and velocity
@@ -1339,14 +1352,14 @@ impl Orbit {
     /// This does not account for the transport theorem and therefore is physically WRONG.
     pub fn position_rotated_by(&mut self, dcm: Matrix3<f64>) {
         let new_radius = dcm * self.radius();
-        self.x = new_radius[0];
-        self.y = new_radius[1];
-        self.z = new_radius[2];
+        self.x_km = new_radius[0];
+        self.y_km = new_radius[1];
+        self.z_km = new_radius[2];
 
         let new_velocity = dcm * self.velocity();
-        self.vx = new_velocity[0];
-        self.vy = new_velocity[1];
-        self.vz = new_velocity[2];
+        self.vx_km_s = new_velocity[0];
+        self.vy_km_s = new_velocity[1];
+        self.vz_km_s = new_velocity[2];
     }
 
     /// Rotate the position of this state provided a direct cosine matrix of position and velocity
@@ -1389,13 +1402,13 @@ impl Orbit {
 
     /// Returns whether this orbit and another are equal within the specified radial and velocity absolute tolerances
     pub fn eq_within(&self, other: &Self, radial_tol: f64, velocity_tol: f64) -> bool {
-        self.dt == other.dt
-            && (self.x - other.x).abs() < radial_tol
-            && (self.y - other.y).abs() < radial_tol
-            && (self.z - other.z).abs() < radial_tol
-            && (self.vx - other.vx).abs() < velocity_tol
-            && (self.vy - other.vy).abs() < velocity_tol
-            && (self.vz - other.vz).abs() < velocity_tol
+        self.epoch == other.epoch
+            && (self.x_km - other.x_km).abs() < radial_tol
+            && (self.y_km - other.y_km).abs() < radial_tol
+            && (self.z_km - other.z_km).abs() < radial_tol
+            && (self.vx_km_s - other.vx_km_s).abs() < velocity_tol
+            && (self.vy_km_s - other.vy_km_s).abs() < velocity_tol
+            && (self.vz_km_s - other.vz_km_s).abs() < velocity_tol
             && self.frame == other.frame
             && self.stm.is_some() == other.stm.is_some()
             && if self.stm.is_some() {
@@ -1473,13 +1486,13 @@ impl Add for Orbit {
     /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
     fn add(self, other: Orbit) -> Orbit {
         Orbit {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            vx: self.vx + other.vx,
-            vy: self.vy + other.vy,
-            vz: self.vz + other.vz,
-            dt: self.dt,
+            x_km: self.x_km + other.x_km,
+            y_km: self.y_km + other.y_km,
+            z_km: self.z_km + other.z_km,
+            vx_km_s: self.vx_km_s + other.vx_km_s,
+            vy_km_s: self.vy_km_s + other.vy_km_s,
+            vz_km_s: self.vz_km_s + other.vz_km_s,
+            epoch: self.epoch,
             frame: self.frame,
             stm: self.stm,
         }
@@ -1492,13 +1505,13 @@ impl Sub for Orbit {
     /// Subtract one state from another. STM will be copied from &self.
     fn sub(self, other: Orbit) -> Orbit {
         Orbit {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            vx: self.vx - other.vx,
-            vy: self.vy - other.vy,
-            vz: self.vz - other.vz,
-            dt: self.dt,
+            x_km: self.x_km - other.x_km,
+            y_km: self.y_km - other.y_km,
+            z_km: self.z_km - other.z_km,
+            vx_km_s: self.vx_km_s - other.vx_km_s,
+            vy_km_s: self.vy_km_s - other.vy_km_s,
+            vz_km_s: self.vz_km_s - other.vz_km_s,
+            epoch: self.epoch,
             frame: self.frame,
             stm: self.stm,
         }
@@ -1511,13 +1524,13 @@ impl Neg for Orbit {
     /// Subtract one state from another. STM will be copied from &self.
     fn neg(self) -> Self::Output {
         Orbit {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-            vx: -self.vx,
-            vy: -self.vy,
-            vz: -self.vz,
-            dt: self.dt,
+            x_km: -self.x_km,
+            y_km: -self.y_km,
+            z_km: -self.z_km,
+            vx_km_s: -self.vx_km_s,
+            vy_km_s: -self.vy_km_s,
+            vz_km_s: -self.vz_km_s,
+            epoch: self.epoch,
             frame: self.frame,
             stm: self.stm,
         }
@@ -1530,13 +1543,13 @@ impl Add for &Orbit {
     /// Add one state from another. Frame must be manually changed if needed. STM will be copied from &self.
     fn add(self, other: &Orbit) -> Orbit {
         Orbit {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            vx: self.vx + other.vx,
-            vy: self.vy + other.vy,
-            vz: self.vz + other.vz,
-            dt: self.dt,
+            x_km: self.x_km + other.x_km,
+            y_km: self.y_km + other.y_km,
+            z_km: self.z_km + other.z_km,
+            vx_km_s: self.vx_km_s + other.vx_km_s,
+            vy_km_s: self.vy_km_s + other.vy_km_s,
+            vz_km_s: self.vz_km_s + other.vz_km_s,
+            epoch: self.epoch,
             frame: self.frame,
             stm: self.stm,
         }
@@ -1555,13 +1568,13 @@ impl Sub for &Orbit {
     /// Subtract one state from another. STM will be copied from &self.
     fn sub(self, other: &Orbit) -> Orbit {
         Orbit {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            vx: self.vx - other.vx,
-            vy: self.vy - other.vy,
-            vz: self.vz - other.vz,
-            dt: self.dt,
+            x_km: self.x_km - other.x_km,
+            y_km: self.y_km - other.y_km,
+            z_km: self.z_km - other.z_km,
+            vx_km_s: self.vx_km_s - other.vx_km_s,
+            vy_km_s: self.vy_km_s - other.vy_km_s,
+            vz_km_s: self.vz_km_s - other.vz_km_s,
+            epoch: self.epoch,
             frame: self.frame,
             stm: self.stm,
         }
@@ -1580,34 +1593,16 @@ impl Neg for &Orbit {
     /// Subtract one state from another. STM will be copied form &self.
     fn neg(self) -> Self::Output {
         Orbit {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-            vx: -self.vx,
-            vy: -self.vy,
-            vz: -self.vz,
-            dt: self.dt,
+            x_km: -self.x_km,
+            y_km: -self.y_km,
+            z_km: -self.z_km,
+            vx_km_s: -self.vx_km_s,
+            vy_km_s: -self.vy_km_s,
+            vz_km_s: -self.vz_km_s,
+            epoch: self.epoch,
             frame: self.frame,
             stm: self.stm,
         }
-    }
-}
-
-impl Serialize for Orbit {
-    /// NOTE: This is not part of unit testing because there is no deseralization of Orbit (yet)
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Orbit", 7)?;
-        state.serialize_field("dt", &self.dt.to_jde_et_days())?;
-        state.serialize_field("x", &self.x)?;
-        state.serialize_field("y", &self.y)?;
-        state.serialize_field("z", &self.z)?;
-        state.serialize_field("vx", &self.vx)?;
-        state.serialize_field("vy", &self.vy)?;
-        state.serialize_field("vz", &self.vz)?;
-        state.end()
     }
 }
 
@@ -1620,13 +1615,13 @@ impl fmt::Display for Orbit {
             f,
             "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
-            self.dt,
-            format!("{:.*}", decimals, self.x),
-            format!("{:.*}", decimals, self.y),
-            format!("{:.*}", decimals, self.z),
-            format!("{:.*}", decimals, self.vx),
-            format!("{:.*}", decimals, self.vy),
-            format!("{:.*}", decimals, self.vz)
+            self.epoch,
+            format!("{:.*}", decimals, self.x_km),
+            format!("{:.*}", decimals, self.y_km),
+            format!("{:.*}", decimals, self.z_km),
+            format!("{:.*}", decimals, self.vx_km_s),
+            format!("{:.*}", decimals, self.vy_km_s),
+            format!("{:.*}", decimals, self.vz_km_s)
         )
     }
 }
@@ -1640,13 +1635,13 @@ impl fmt::LowerExp for Orbit {
             f,
             "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
-            self.dt,
-            format!("{:.*e}", decimals, self.x),
-            format!("{:.*e}", decimals, self.y),
-            format!("{:.*e}", decimals, self.z),
-            format!("{:.*e}", decimals, self.vx),
-            format!("{:.*e}", decimals, self.vy),
-            format!("{:.*e}", decimals, self.vz)
+            self.epoch,
+            format!("{:.*e}", decimals, self.x_km),
+            format!("{:.*e}", decimals, self.y_km),
+            format!("{:.*e}", decimals, self.z_km),
+            format!("{:.*e}", decimals, self.vx_km_s),
+            format!("{:.*e}", decimals, self.vy_km_s),
+            format!("{:.*e}", decimals, self.vz_km_s)
         )
     }
 }
@@ -1660,13 +1655,13 @@ impl fmt::UpperExp for Orbit {
             f,
             "[{}] {}\tposition = [{}, {}, {}] km\tvelocity = [{}, {}, {}] km/s",
             self.frame,
-            self.dt,
-            format!("{:.*E}", decimals, self.x),
-            format!("{:.*E}", decimals, self.y),
-            format!("{:.*E}", decimals, self.z),
-            format!("{:.*E}", decimals, self.vx),
-            format!("{:.*E}", decimals, self.vy),
-            format!("{:.*E}", decimals, self.vz)
+            self.epoch,
+            format!("{:.*E}", decimals, self.x_km),
+            format!("{:.*E}", decimals, self.y_km),
+            format!("{:.*E}", decimals, self.z_km),
+            format!("{:.*E}", decimals, self.vx_km_s),
+            format!("{:.*E}", decimals, self.vy_km_s),
+            format!("{:.*E}", decimals, self.vz_km_s)
         )
     }
 }
@@ -1680,7 +1675,7 @@ impl fmt::LowerHex for Orbit {
             f,
             "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
             self.frame,
-            self.dt,
+            self.epoch,
             format!("{:.*}", decimals, self.sma()),
             format!("{:.*}", decimals, self.ecc()),
             format!("{:.*}", decimals, self.inc()),
@@ -1700,7 +1695,7 @@ impl fmt::UpperHex for Orbit {
             f,
             "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
             self.frame,
-            self.dt,
+            self.epoch,
             format!("{:.*e}", decimals, self.sma()),
             format!("{:.*e}", decimals, self.ecc()),
             format!("{:.*e}", decimals, self.inc()),
@@ -1729,13 +1724,13 @@ impl State for Orbit {
         };
 
         Self {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            vx: 0.0,
-            vy: 0.0,
-            vz: 0.0,
-            dt: Epoch::from_tai_seconds(0.0),
+            x_km: 0.0,
+            y_km: 0.0,
+            z_km: 0.0,
+            vx_km_s: 0.0,
+            vy_km_s: 0.0,
+            vz_km_s: 0.0,
+            epoch: Epoch::from_tai_seconds(0.0),
             frame,
             stm: Some(Matrix6::identity()),
         }
@@ -1743,12 +1738,12 @@ impl State for Orbit {
 
     fn as_vector(&self) -> Result<OVector<f64, Const<42>>, NyxError> {
         let mut as_vec = OVector::<f64, Const<42>>::zeros();
-        as_vec[0] = self.x;
-        as_vec[1] = self.y;
-        as_vec[2] = self.z;
-        as_vec[3] = self.vx;
-        as_vec[4] = self.vy;
-        as_vec[5] = self.vz;
+        as_vec[0] = self.x_km;
+        as_vec[1] = self.y_km;
+        as_vec[2] = self.z_km;
+        as_vec[3] = self.vx_km_s;
+        as_vec[4] = self.vy_km_s;
+        as_vec[5] = self.vz_km_s;
         if let Some(stm) = self.stm {
             for (idx, stm_val) in stm.as_slice().iter().enumerate() {
                 as_vec[idx + 6] = *stm_val;
@@ -1759,12 +1754,12 @@ impl State for Orbit {
 
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Const<42>>) -> Result<(), NyxError> {
         self.set_epoch(epoch);
-        self.x = vector[0];
-        self.y = vector[1];
-        self.z = vector[2];
-        self.vx = vector[3];
-        self.vy = vector[4];
-        self.vz = vector[5];
+        self.x_km = vector[0];
+        self.y_km = vector[1];
+        self.z_km = vector[2];
+        self.vx_km_s = vector[3];
+        self.vy_km_s = vector[4];
+        self.vz_km_s = vector[5];
         // And update the STM if applicable
         if self.stm.is_some() {
             let stm_k_to_0 = Matrix6::from_column_slice(&vector.as_slice()[6..]);
@@ -1781,11 +1776,11 @@ impl State for Orbit {
     }
 
     fn epoch(&self) -> Epoch {
-        self.dt
+        self.epoch
     }
 
     fn set_epoch(&mut self, epoch: Epoch) {
-        self.dt = epoch
+        self.epoch = epoch
     }
 
     fn add(self, other: OVector<f64, Self::Size>) -> Self {
@@ -1834,12 +1829,12 @@ impl State for Orbit {
             StateParameter::TrueLongitude => Ok(self.tlong()),
             StateParameter::VelocityDeclination => Ok(self.velocity_declination()),
             StateParameter::Vmag => Ok(self.vmag()),
-            StateParameter::X => Ok(self.x),
-            StateParameter::Y => Ok(self.y),
-            StateParameter::Z => Ok(self.z),
-            StateParameter::VX => Ok(self.vx),
-            StateParameter::VY => Ok(self.vy),
-            StateParameter::VZ => Ok(self.vz),
+            StateParameter::X => Ok(self.x_km),
+            StateParameter::Y => Ok(self.y_km),
+            StateParameter::Z => Ok(self.z_km),
+            StateParameter::VX => Ok(self.vx_km_s),
+            StateParameter::VY => Ok(self.vy_km_s),
+            StateParameter::VZ => Ok(self.vz_km_s),
             _ => Err(NyxError::StateParameterUnavailable),
         }
     }
@@ -1852,29 +1847,29 @@ impl State for Orbit {
             StateParameter::RAAN => self.set_raan(val),
             StateParameter::SMA => self.set_sma(val),
             StateParameter::TrueAnomaly => self.set_ta(val),
-            StateParameter::X => self.x = val,
-            StateParameter::Y => self.y = val,
-            StateParameter::Z => self.z = val,
+            StateParameter::X => self.x_km = val,
+            StateParameter::Y => self.y_km = val,
+            StateParameter::Z => self.z_km = val,
             StateParameter::Rmag => {
                 // Convert the position to spherical coordinates
                 let (_, θ, φ) = cartesian_to_spherical(&self.radius());
                 // Convert back to cartesian after setting the new range value
                 let new_radius = spherical_to_cartesian(val, θ, φ);
-                self.x = new_radius.x;
-                self.y = new_radius.y;
-                self.z = new_radius.z;
+                self.x_km = new_radius.x;
+                self.y_km = new_radius.y;
+                self.z_km = new_radius.z;
             }
-            StateParameter::VX => self.vx = val,
-            StateParameter::VY => self.vy = val,
-            StateParameter::VZ => self.vz = val,
+            StateParameter::VX => self.vx_km_s = val,
+            StateParameter::VY => self.vy_km_s = val,
+            StateParameter::VZ => self.vz_km_s = val,
             StateParameter::Vmag => {
                 // Convert the velocity to spherical coordinates
                 let (_, θ, φ) = cartesian_to_spherical(&self.velocity());
                 // Convert back to cartesian after setting the new range value
                 let new_radius = spherical_to_cartesian(val, θ, φ);
-                self.vx = new_radius.x;
-                self.vy = new_radius.y;
-                self.vz = new_radius.z;
+                self.vx_km_s = new_radius.x;
+                self.vy_km_s = new_radius.y;
+                self.vz_km_s = new_radius.z;
             }
             _ => return Err(NyxError::StateParameterUnavailable),
         }
@@ -1892,12 +1887,12 @@ impl Add<OVector<f64, Const<6>>> for Orbit {
     /// Adds the provided state deviation to this orbit
     fn add(self, other: OVector<f64, Const<6>>) -> Self {
         let mut me = self;
-        me.x += other[0];
-        me.y += other[1];
-        me.z += other[2];
-        me.vx += other[3];
-        me.vy += other[4];
-        me.vz += other[5];
+        me.x_km += other[0];
+        me.y_km += other[1];
+        me.z_km += other[2];
+        me.vx_km_s += other[3];
+        me.vy_km_s += other[4];
+        me.vz_km_s += other[5];
 
         me
     }
@@ -1906,5 +1901,135 @@ impl Add<OVector<f64, Const<6>>> for Orbit {
 impl Default for Orbit {
     fn default() -> Self {
         Self::zeros()
+    }
+}
+
+impl ConfigRepr for OrbitSerde {}
+
+impl Configurable for Orbit {
+    type IntermediateRepr = OrbitSerde;
+
+    fn from_config(
+        cfg: &Self::IntermediateRepr,
+        _cosm: Arc<Cosm>,
+    ) -> Result<Self, crate::io::ConfigError>
+    where
+        Self: Sized,
+    {
+        let orbit: Orbit = (*cfg).into();
+        Ok(orbit)
+    }
+
+    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
+        let serded: Self::IntermediateRepr = (*self).into();
+        Ok(serded)
+    }
+}
+
+#[test]
+fn test_serde() {
+    use super::Cosm;
+    use crate::io::orbit::OrbitSerde;
+    use crate::utils::rss_orbit_errors;
+    use serde_yaml;
+    use std::env;
+    use std::path::PathBuf;
+    use std::str::FromStr;
+
+    // Get the path to the root directory of the current Cargo project
+    let s = r#"
+x_km: -9042.862234
+y_km: 18536.333069
+z_km: 6999.957069
+vx_km_s: -3.288789
+vy_km_s: -2.226285
+vz_km_s: 1.646738
+frame: EME2000
+epoch: 2018-09-15T00:15:53.098 UTC
+    "#;
+
+    let orbit: Orbit = serde_yaml::from_str(s).unwrap();
+
+    dbg!(&orbit);
+
+    let cosm = Cosm::de438();
+    let exp = Orbit::cartesian(
+        -9042.862234,
+        18536.333069,
+        6999.957069,
+        -3.288789,
+        -2.226285,
+        1.646738,
+        Epoch::from_str("2018-09-15T00:15:53.098 UTC").unwrap(),
+        cosm.frame("EME2000"),
+    );
+
+    assert_eq!(exp, orbit);
+
+    let cosm = Cosm::de438();
+    let orbit = Orbit::cartesian(
+        -9042.862234,
+        18536.333069,
+        6999.957069,
+        -3.288789,
+        -2.226285,
+        1.646738,
+        Epoch::from_str("2018-09-15T00:15:53.098 UTC").unwrap(),
+        cosm.frame("EME2000"),
+    );
+
+    dbg!(serde_yaml::to_string(&orbit).unwrap());
+
+    let as_serde: OrbitSerde = orbit.into();
+    println!("{}", serde_yaml::to_string(&as_serde).unwrap());
+
+    // Try to deserialize from Keplerian
+    let s = format!("sma_km: {}\necc: {}\ninc_deg: {}\nraan_deg: {}\naop_deg: {}\nta_deg: {}\nepoch: {}\nframe: {}", orbit.sma(), orbit.ecc(), orbit.inc(), orbit.raan(), orbit.aop(), orbit.ta(), orbit.epoch, orbit.frame);
+    println!("{s}");
+    let deserd: OrbitSerde = serde_yaml::from_str(&s).unwrap();
+    let deser_orbit: Orbit = deserd.into();
+    dbg!(deser_orbit);
+
+    // Check that the orbits (mostly) match -- there will be rounding errors
+    assert_eq!(deser_orbit.frame, orbit.frame);
+    assert_eq!(deser_orbit.epoch, orbit.epoch);
+    let (pos_err, vel_err) = rss_orbit_errors(&deser_orbit, &orbit);
+    assert!(pos_err < 1e-5);
+    assert!(vel_err < 1e-9);
+
+    // Check that we can deserialize from a file
+    let test_data: PathBuf = [
+        env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data".to_string(),
+        "tests".to_string(),
+        "config".to_string(),
+        "orbit.yaml".to_string(),
+    ]
+    .iter()
+    .collect();
+
+    let orbit =
+        Orbit::from_config(&OrbitSerde::load_yaml(test_data).unwrap(), cosm.clone()).unwrap();
+    assert_eq!(exp, orbit);
+
+    let test_data: PathBuf = [
+        env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data".to_string(),
+        "tests".to_string(),
+        "config".to_string(),
+        "orbits.yaml".to_string(),
+    ]
+    .iter()
+    .collect();
+
+    let serded_orbits = OrbitSerde::load_many_yaml(test_data).unwrap();
+    for orbit_s in serded_orbits {
+        let orbit: Orbit = orbit_s.into();
+        // Check that the orbits (mostly) match -- there will be rounding errors
+        assert_eq!(exp.frame, orbit.frame);
+        assert_eq!(exp.epoch, orbit.epoch);
+        let (pos_err, vel_err) = rss_orbit_errors(&exp, &orbit);
+        assert!(pos_err < 1e-5);
+        assert!(vel_err < 1e-9);
     }
 }

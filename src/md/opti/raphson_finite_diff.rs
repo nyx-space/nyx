@@ -160,12 +160,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                     xi.orbit.apply_dv(velocity_correction);
                 } else {
-                    xi.orbit.x += state_correction[0];
-                    xi.orbit.y += state_correction[1];
-                    xi.orbit.z += state_correction[2];
-                    xi.orbit.vx += state_correction[3];
-                    xi.orbit.vy += state_correction[4];
-                    xi.orbit.vz += state_correction[5];
+                    xi.orbit.x_km += state_correction[0];
+                    xi.orbit.y_km += state_correction[1];
+                    xi.orbit.z_km += state_correction[2];
+                    xi.orbit.vx_km_s += state_correction[3];
+                    xi.orbit.vy_km_s += state_correction[4];
+                    xi.orbit.vz_km_s += state_correction[5];
                 }
             }
 

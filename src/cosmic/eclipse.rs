@@ -277,7 +277,7 @@ pub fn eclipse_state(
     if light_source.equatorial_radius() < std::f64::EPSILON {
         let observed = cosm.celestial_state(
             &light_source.ephem_path(),
-            observer.dt,
+            observer.epoch,
             observer.frame,
             LightTimeCalc::None,
         );

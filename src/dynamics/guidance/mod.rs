@@ -21,6 +21,7 @@ use crate::cosmic::{
 };
 use crate::errors::NyxError;
 use crate::linalg::Vector3;
+use serde::{Deserialize, Serialize};
 
 mod finiteburns;
 pub use finiteburns::FiniteBurns;
@@ -34,7 +35,7 @@ pub use ruggiero::{Objective, Ruggiero, StateParameter};
 use std::fmt;
 /// Defines a thruster with a maximum isp and a maximum thrust.
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Thruster {
     /// The thrust is to be provided in Newtons
     pub thrust_N: f64,

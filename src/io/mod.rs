@@ -18,6 +18,7 @@
 
 use crate::errors::NyxError;
 use crate::time::Epoch;
+use crate::Orbit;
 pub(crate) mod watermark;
 use hifitime::Duration;
 use serde::de::DeserializeOwned;
@@ -34,7 +35,8 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use self::odp::Cosm;
+use self::odp::{Cosm, Frame};
+use self::orbit::OrbitSerde;
 
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
@@ -48,9 +50,9 @@ pub mod frame_serde;
 /// Handles reading random variables
 pub mod rv;
 
-pub mod scenario;
-
 pub mod odp;
+pub mod orbit;
+pub mod scenario;
 
 pub mod formatter;
 
@@ -140,8 +142,8 @@ where
     D: Deserializer<'de>,
 {
     // implementation of the custom deserialization function
-    let s: &str = Deserialize::deserialize(deserializer)?;
-    Epoch::from_str(s).map_err(serde::de::Error::custom)
+    let s = String::deserialize(deserializer)?;
+    Epoch::from_str(&s).map_err(serde::de::Error::custom)
 }
 
 pub(crate) fn duration_to_str<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
@@ -157,8 +159,34 @@ where
     D: Deserializer<'de>,
 {
     // implementation of the custom deserialization function
-    let s: &str = Deserialize::deserialize(deserializer)?;
-    Duration::from_str(s).map_err(serde::de::Error::custom)
+    let s = String::deserialize(deserializer)?;
+    Duration::from_str(&s).map_err(serde::de::Error::custom)
+}
+
+pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{frame}"))
+}
+
+pub(crate) fn frame_from_str<'de, D>(deserializer: D) -> Result<Frame, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    // TODO: Figure out how to use DeserializeSeed here, but I'm not sure it would work.
+    let cosm = Cosm::de438();
+    cosm.try_frame(&s).map_err(serde::de::Error::custom)
+}
+
+/// A deserializer from Epoch string
+pub(crate) fn orbit_from_str<'de, D>(deserializer: D) -> Result<Orbit, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let orbit_serde: OrbitSerde = Deserialize::deserialize(deserializer)?;
+    Ok(orbit_serde.into())
 }
 
 #[allow(clippy::upper_case_acronyms)]

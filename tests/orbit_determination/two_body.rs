@@ -600,9 +600,9 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     // Define the initial estimate (x_hat): add 100 meters in X, remove 100 meters in Y and add 50 meters in Z
     let mut initial_state2 = initial_state;
-    initial_state2.x += 0.1;
-    initial_state2.y -= 0.1;
-    initial_state2.z += 0.05;
+    initial_state2.x_km += 0.1;
+    initial_state2.y_km -= 0.1;
+    initial_state2.z_km += 0.05;
     let initial_estimate = KfEstimate::from_covar(initial_state2, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)

@@ -134,12 +134,12 @@ impl InterpState for Orbit {
         let mut vzs = [0.0; INTERPOLATION_SAMPLES + 1];
 
         for (cno, state) in states.iter().enumerate() {
-            xs[cno] = state.x;
-            ys[cno] = state.y;
-            zs[cno] = state.z;
-            vxs[cno] = state.vx;
-            vys[cno] = state.vy;
-            vzs[cno] = state.vz;
+            xs[cno] = state.x_km;
+            ys[cno] = state.y_km;
+            zs[cno] = state.z_km;
+            vxs[cno] = state.vx_km_s;
+            vys[cno] = state.vy_km_s;
+            vzs[cno] = state.vz_km_s;
             epochs_tdb[cno] = state.epoch().to_tdb_seconds();
         }
 
@@ -167,12 +167,12 @@ impl InterpState for Orbit {
 
         // And build the result
         let mut me = self;
-        me.x = x_km;
-        me.y = y_km;
-        me.z = z_km;
-        me.vx = vx_km_s;
-        me.vy = vy_km_s;
-        me.vz = vz_km_s;
+        me.x_km = x_km;
+        me.y_km = y_km;
+        me.z_km = z_km;
+        me.vx_km_s = vx_km_s;
+        me.vy_km_s = vy_km_s;
+        me.vz_km_s = vz_km_s;
         me.set_epoch(epoch);
 
         Ok(me)
@@ -180,12 +180,12 @@ impl InterpState for Orbit {
 
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
         match *param {
-            StateParameter::X => Ok((self.x, self.vx)),
-            StateParameter::Y => Ok((self.y, self.vy)),
-            StateParameter::Z => Ok((self.z, self.vz)),
-            StateParameter::VX => Ok((self.vx, 0.0)),
-            StateParameter::VY => Ok((self.vy, 0.0)),
-            StateParameter::VZ => Ok((self.vz, 0.0)),
+            StateParameter::X => Ok((self.x_km, self.vx_km_s)),
+            StateParameter::Y => Ok((self.y_km, self.vy_km_s)),
+            StateParameter::Z => Ok((self.z_km, self.vz_km_s)),
+            StateParameter::VX => Ok((self.vx_km_s, 0.0)),
+            StateParameter::VY => Ok((self.vy_km_s, 0.0)),
+            StateParameter::VZ => Ok((self.vz_km_s, 0.0)),
             _ => Err(NyxError::StateParameterUnavailable),
         }
     }
@@ -198,22 +198,22 @@ impl InterpState for Orbit {
     ) -> Result<(), NyxError> {
         match *param {
             StateParameter::X => {
-                self.x = value;
+                self.x_km = value;
             }
             StateParameter::Y => {
-                self.y = value;
+                self.y_km = value;
             }
             StateParameter::Z => {
-                self.z = value;
+                self.z_km = value;
             }
             StateParameter::VX => {
-                self.vx = value;
+                self.vx_km_s = value;
             }
             StateParameter::VY => {
-                self.vy = value;
+                self.vy_km_s = value;
             }
             StateParameter::VZ => {
-                self.vz = value;
+                self.vz_km_s = value;
             }
 
             _ => return Err(NyxError::StateParameterUnavailable),
@@ -264,12 +264,12 @@ impl InterpState for Spacecraft {
 
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
         match *param {
-            StateParameter::X => Ok((self.orbit.x, self.orbit.vx)),
-            StateParameter::Y => Ok((self.orbit.y, self.orbit.vy)),
-            StateParameter::Z => Ok((self.orbit.z, self.orbit.vz)),
-            StateParameter::VX => Ok((self.orbit.vx, 0.0)),
-            StateParameter::VY => Ok((self.orbit.vy, 0.0)),
-            StateParameter::VZ => Ok((self.orbit.vz, 0.0)),
+            StateParameter::X => Ok((self.orbit.x_km, self.orbit.vx_km_s)),
+            StateParameter::Y => Ok((self.orbit.y_km, self.orbit.vy_km_s)),
+            StateParameter::Z => Ok((self.orbit.z_km, self.orbit.vz_km_s)),
+            StateParameter::VX => Ok((self.orbit.vx_km_s, 0.0)),
+            StateParameter::VY => Ok((self.orbit.vy_km_s, 0.0)),
+            StateParameter::VZ => Ok((self.orbit.vz_km_s, 0.0)),
             StateParameter::FuelMass => Ok((self.fuel_mass_kg, 0.0)),
             _ => Err(NyxError::StateParameterUnavailable),
         }
@@ -283,22 +283,22 @@ impl InterpState for Spacecraft {
     ) -> Result<(), NyxError> {
         match *param {
             StateParameter::X => {
-                self.orbit.x = value;
+                self.orbit.x_km = value;
             }
             StateParameter::Y => {
-                self.orbit.y = value;
+                self.orbit.y_km = value;
             }
             StateParameter::Z => {
-                self.orbit.z = value;
+                self.orbit.z_km = value;
             }
             StateParameter::VX => {
-                self.orbit.vx = value;
+                self.orbit.vx_km_s = value;
             }
             StateParameter::VY => {
-                self.orbit.vy = value;
+                self.orbit.vy_km_s = value;
             }
             StateParameter::VZ => {
-                self.orbit.vz = value;
+                self.orbit.vz_km_s = value;
             }
             StateParameter::Cr => self.cr = value,
             StateParameter::Cd => self.cd = value,

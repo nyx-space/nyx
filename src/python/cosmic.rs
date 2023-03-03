@@ -5,7 +5,9 @@ use super::Epoch;
 use crate::cosmic::Bodies as BodiesRs;
 use crate::cosmic::Cosm as CosmRs;
 use crate::cosmic::Frame as FrameRs;
-use crate::cosmic::Orbit as OrbitRs;
+pub use crate::cosmic::Orbit;
+use crate::io::orbit::OrbitSerde;
+use crate::io::{ConfigError, ConfigRepr, Configurable};
 use std::sync::Arc;
 
 #[pyclass]
@@ -108,47 +110,65 @@ impl Bodies {
     }
 }
 
-#[pyclass]
-pub struct Orbit {
-    pub inner: OrbitRs,
-}
 #[pymethods]
 impl Orbit {
     /// Creates a new Orbit in the provided frame at the provided Epoch.
     ///
     /// **Units:** km, km, km, km/s, km/s, km/s
-    #[classmethod]
+    #[new]
     pub fn from_cartesian(
-        _cls: &PyType,
-        x: f64,
-        y: f64,
-        z: f64,
-        vx: f64,
-        vy: f64,
-        vz: f64,
+        x_km: f64,
+        y_km: f64,
+        z_km: f64,
+        vx_km_s: f64,
+        vy_km_s: f64,
+        vz_km_s: f64,
         epoch: Epoch,
         frame: PyRef<Frame>,
     ) -> Self {
-        Self {
-            inner: OrbitRs::cartesian(x, y, z, vx, vy, vz, epoch, frame.inner),
-        }
+        Self::cartesian(
+            x_km,
+            y_km,
+            z_km,
+            vx_km_s,
+            vy_km_s,
+            vz_km_s,
+            epoch,
+            frame.inner,
+        )
     }
-    /// Creates a new Orbit and initializes its STM.
-    #[classmethod]
-    pub fn from_cartesian_stm(
-        _cls: &PyType,
-        x: f64,
-        y: f64,
-        z: f64,
-        vx: f64,
-        vy: f64,
-        vz: f64,
-        epoch: Epoch,
-        frame: PyRef<Frame>,
-    ) -> Self {
-        Self {
-            inner: OrbitRs::cartesian_stm(x, y, z, vx, vy, vz, epoch, frame.inner),
+
+    #[staticmethod]
+    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
+        let serde = OrbitSerde::load_yaml(path)?;
+
+        let cosm = CosmRs::de438();
+
+        Self::from_config(&serde, cosm)
+    }
+
+    #[staticmethod]
+    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
+        let orbits = OrbitSerde::load_many_yaml(path)?;
+
+        // Create a new Cosm until ANISE switch
+        let cosm = CosmRs::de438();
+
+        let mut selves = Vec::with_capacity(orbits.len());
+
+        for serde in orbits {
+            selves.push(Self::from_config(&serde, cosm.clone())?);
         }
+
+        Ok(selves)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    fn __str__(&self) -> String {
+        format!("{self}")
     }
 }
 
@@ -228,7 +248,7 @@ impl Cosm {
 
     pub fn frame(&self, name: &str) -> PyResult<Frame> {
         Ok(Frame {
-            inner: self.inner.frame(name),
+            inner: self.inner.try_frame(name)?,
         })
     }
 

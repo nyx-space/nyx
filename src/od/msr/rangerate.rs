@@ -65,9 +65,9 @@ impl RangeRate {
 
     pub fn new(tx: Orbit, rx: Orbit, visible: bool) -> RangeRate {
         assert_eq!(tx.frame, rx.frame, "tx and rx in different frames");
-        assert_eq!(tx.dt, rx.dt, "tx and rx states have different times");
+        assert_eq!(tx.epoch, rx.epoch, "tx and rx states have different times");
 
-        let dt = tx.dt;
+        let dt = tx.epoch;
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate);
 

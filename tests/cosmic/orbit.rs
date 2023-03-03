@@ -39,12 +39,12 @@ fn state_def_circ_inc() {
         cart, cart2,
         "different representations of the datetime are not considered equal"
     );
-    f64_eq!(cart.x, -2436.45, "x");
-    f64_eq!(cart.y, -2436.45, "y");
-    f64_eq!(cart.z, 6891.037, "z");
-    f64_eq!(cart.vx, 5.088_611, "vx");
-    f64_eq!(cart.vy, -5.088_611, "vy");
-    f64_eq!(cart.vz, 0.0, "vz");
+    f64_eq!(cart.x_km, -2436.45, "x");
+    f64_eq!(cart.y_km, -2436.45, "y");
+    f64_eq!(cart.z_km, 6891.037, "z");
+    f64_eq!(cart.vx_km_s, 5.088_611, "vx");
+    f64_eq!(cart.vy_km_s, -5.088_611, "vy");
+    f64_eq!(cart.vz_km_s, 0.0, "vz");
     f64_eq!(cart.energy(), -25.842_247_282_849_137, "energy");
     assert_eq!(
         cart.period(),
@@ -72,12 +72,12 @@ fn state_def_circ_inc() {
     );
 
     let kep = Orbit::keplerian(8_191.93, 1e-6, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k);
-    f64_eq!(kep.x, 8_057.976_452_202_976, "x");
-    f64_eq!(kep.y, -0.196_740_370_290_888_9, "y");
-    f64_eq!(kep.z, 1_475.383_214_274_138, "z");
-    f64_eq!(kep.vx, -0.166_470_488_584_076_31, "vx");
-    f64_eq!(kep.vy, 6.913_868_638_275_646_5, "vy");
-    f64_eq!(kep.vz, 0.910_157_981_443_279_1, "vz");
+    f64_eq!(kep.x_km, 8_057.976_452_202_976, "x");
+    f64_eq!(kep.y_km, -0.196_740_370_290_888_9, "y");
+    f64_eq!(kep.z_km, 1_475.383_214_274_138, "z");
+    f64_eq!(kep.vx_km_s, -0.166_470_488_584_076_31, "vx");
+    f64_eq!(kep.vy_km_s, 6.913_868_638_275_646_5, "vy");
+    f64_eq!(kep.vz_km_s, 0.910_157_981_443_279_1, "vz");
     f64_eq!(kep.sma(), 8_191.929_999_999_999, "sma");
     f64_eq!(kep.ecc(), 1.000_000_000_388_51e-06, "ecc");
     f64_eq!(kep.inc(), 12.849_999_999_999_987, "inc");
@@ -162,12 +162,12 @@ fn state_def_elliptical() {
     let kep = Orbit::keplerian(
         8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
     );
-    f64_eq!(kep.x, 8_087.161_618_048_522_5, "x");
-    f64_eq!(kep.y, -0.197_452_943_772_520_73, "y");
-    f64_eq!(kep.z, 1_480.726_901_246_883, "z");
-    f64_eq!(kep.vx, -0.000_168_592_186_843_952_16, "vx");
-    f64_eq!(kep.vy, 6.886_845_792_370_852, "vy");
-    f64_eq!(kep.vz, 0.936_931_260_302_891_8, "vz");
+    f64_eq!(kep.x_km, 8_087.161_618_048_522_5, "x");
+    f64_eq!(kep.y_km, -0.197_452_943_772_520_73, "y");
+    f64_eq!(kep.z_km, 1_480.726_901_246_883, "z");
+    f64_eq!(kep.vx_km_s, -0.000_168_592_186_843_952_16, "vx");
+    f64_eq!(kep.vy_km_s, 6.886_845_792_370_852, "vy");
+    f64_eq!(kep.vz_km_s, 0.936_931_260_302_891_8, "vz");
     f64_eq!(kep.sma(), 8_191.930_000_000_003, "sma");
     f64_eq!(kep.ecc(), 0.024_500_000_000_000_348, "ecc");
     f64_eq!(kep.inc(), 12.850_000_000_000_016, "inc");
@@ -243,12 +243,12 @@ fn state_def_circ_eq() {
     );
 
     let kep = Orbit::keplerian(18191.098, 1e-6, 1e-6, 306.543, 314.32, 98.765, dt, eme2k);
-    f64_eq!(kep.x, 18_190.717_357_886_37, "x");
-    f64_eq!(kep.y, -118.107_162_539_218_69, "y");
-    f64_eq!(kep.z, 0.000_253_845_647_633_053_35, "z");
-    f64_eq!(kep.vx, 0.030_396_440_130_264_88, "vx");
-    f64_eq!(kep.vy, 4.680_909_107_924_576, "vy");
-    f64_eq!(kep.vz, 4.907_089_816_726_583e-8, "vz");
+    f64_eq!(kep.x_km, 18_190.717_357_886_37, "x");
+    f64_eq!(kep.y_km, -118.107_162_539_218_69, "y");
+    f64_eq!(kep.z_km, 0.000_253_845_647_633_053_35, "z");
+    f64_eq!(kep.vx_km_s, 0.030_396_440_130_264_88, "vx");
+    f64_eq!(kep.vy_km_s, 4.680_909_107_924_576, "vy");
+    f64_eq!(kep.vz_km_s, 4.907_089_816_726_583e-8, "vz");
     f64_eq!(kep.sma(), 18_191.098_000_000_013, "sma");
     f64_eq!(kep.ecc(), 9.999_999_997_416_087e-7, "ecc");
     f64_eq!(kep.inc(), 1.207_418_269_725_733_3e-6, "inc");
@@ -406,9 +406,9 @@ fn geodetic_vallado() {
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
     f64_eq!(r.geodetic_height(), height, "height");
     let r = Orbit::from_geodesic(lat, long, height, dt, eme2k);
-    f64_eq!(r.x, ri_val, "r_i");
-    f64_eq!(r.y, rj_val, "r_j");
-    f64_eq!(r.z, rk, "r_k");
+    f64_eq!(r.x_km, ri_val, "r_i");
+    f64_eq!(r.y_km, rj_val, "r_j");
+    f64_eq!(r.z_km, rk, "r_k");
 
     // Test case from Vallado, 4th Ed., page 173, Example 3-4
     let lat = -7.906_635_7;
@@ -420,9 +420,9 @@ fn geodetic_vallado() {
     let rj = -1_571.479_380_333_195;
     let rk = -871.561_161_926_003_9;
     let r = Orbit::from_geodesic(lat, long, height, dt, eme2k);
-    f64_eq!(r.x, ri, "r_i");
-    f64_eq!(r.y, rj, "r_j");
-    f64_eq!(r.z, rk, "r_k");
+    f64_eq!(r.x_km, ri, "r_i");
+    f64_eq!(r.y_km, rj, "r_j");
+    f64_eq!(r.z_km, rk, "r_k");
     let r = Orbit::from_position(ri, rj, rk, dt, eme2k);
     f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
     f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");

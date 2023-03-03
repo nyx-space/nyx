@@ -224,9 +224,9 @@ fn val_tgt_finite_burn() {
     let impulsive_tgt = Optimizer::delta_v(
         &prop_no_thrust,
         [
-            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x, 1e-5),
-            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y, 1e-5),
-            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z, 1e-5),
+            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-5),
+            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-5),
+            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z_km, 1e-5),
         ],
     )
     .try_achieve_from(sc_state, sc_state.epoch(), sc_xf_desired.epoch())

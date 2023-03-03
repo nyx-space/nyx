@@ -47,7 +47,7 @@ fn leo_sun_earth_eclipses() {
     while let Ok(rx_state) = truth_rx.recv() {
         let new_eclipse_state = e_loc.compute(&rx_state);
         if new_eclipse_state != prev_eclipse_state {
-            println!("{:.6} now in {:?}", rx_state.dt, new_eclipse_state);
+            println!("{:.6} now in {:?}", rx_state.epoch, new_eclipse_state);
             prev_eclipse_state = new_eclipse_state;
             cnt_changes += 1;
         }
@@ -96,7 +96,7 @@ fn geo_sun_earth_eclipses() {
     while let Ok(rx_state) = truth_rx.recv() {
         let new_eclipse_state = e_loc.compute(&rx_state);
         if new_eclipse_state != prev_eclipse_state {
-            println!("{:.6} now in {:?}", rx_state.dt, new_eclipse_state);
+            println!("{:.6} now in {:?}", rx_state.epoch, new_eclipse_state);
             prev_eclipse_state = new_eclipse_state;
             cnt_changes += 1;
         }

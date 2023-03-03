@@ -289,9 +289,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> 
         // Add the starting point too
         nodemsg.push_str(&format!(
             "[{:.3}, {:.3}, {:.3}, {}, {}, {}, {}, {}, {}],\n",
-            self.x0.orbit.x,
-            self.x0.orbit.y,
-            self.x0.orbit.z,
+            self.x0.orbit.x_km,
+            self.x0.orbit.y_km,
+            self.x0.orbit.z_km,
             self.current_iteration,
             0.0,
             0.0,

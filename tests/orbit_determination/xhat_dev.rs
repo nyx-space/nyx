@@ -59,9 +59,9 @@ fn xhat_dev_test_ekf_two_body() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state.with_stm();
-    initial_state_dev.x += 5.0;
-    initial_state_dev.y -= 5.0;
-    initial_state_dev.z += 5.0;
+    initial_state_dev.x_km += 5.0;
+    initial_state_dev.y_km -= 5.0;
+    initial_state_dev.z_km += 5.0;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
@@ -145,7 +145,7 @@ fn xhat_dev_test_ekf_two_body() {
     let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
-        final_truth_state.dt == est.epoch(),
+        final_truth_state.epoch == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
         final_truth_state - est.state()
@@ -176,7 +176,7 @@ fn xhat_dev_test_ekf_two_body() {
     }
 
     assert_eq!(
-        final_truth_state.dt,
+        final_truth_state.epoch,
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
@@ -248,9 +248,9 @@ fn xhat_dev_test_ekf_multi_body() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x_km += 9.5;
+    initial_state_dev.y_km -= 9.5;
+    initial_state_dev.z_km += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
@@ -325,7 +325,7 @@ fn xhat_dev_test_ekf_multi_body() {
     println!("Truth:\n{}", final_truth_state);
 
     // Some sanity checks to make sure that we have correctly indexed the estimates
-    assert_eq!(est.epoch(), final_truth_state.dt);
+    assert_eq!(est.epoch(), final_truth_state.epoch);
 
     let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
 
@@ -362,7 +362,7 @@ fn xhat_dev_test_ekf_multi_body() {
     }
 
     assert_eq!(
-        final_truth_state.dt,
+        final_truth_state.epoch,
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
@@ -413,9 +413,9 @@ fn xhat_dev_test_ekf_harmonics() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x_km += 9.5;
+    initial_state_dev.y_km -= 9.5;
+    initial_state_dev.z_km += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
@@ -494,7 +494,7 @@ fn xhat_dev_test_ekf_harmonics() {
     let (err_p, err_v) = rss_orbit_errors(&est.state(), &final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}): {:.3} m\t{:.3} m/s\n{}",
-        final_truth_state.dt == est.epoch(),
+        final_truth_state.epoch == est.epoch(),
         err_p * 1e3,
         err_v * 1e3,
         final_truth_state - est.state()
@@ -514,7 +514,7 @@ fn xhat_dev_test_ekf_harmonics() {
     assert!(est.within_3sigma(), "Final estimate is not within 3 sigma!");
 
     assert_eq!(
-        final_truth_state.dt,
+        final_truth_state.epoch,
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
@@ -565,9 +565,9 @@ fn xhat_dev_test_ekf_realistic() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x_km += 9.5;
+    initial_state_dev.y_km -= 9.5;
+    initial_state_dev.z_km += 9.5;
 
     println!("Initial state dev:\n{}", initial_state - initial_state_dev);
 
@@ -636,7 +636,7 @@ fn xhat_dev_test_ekf_realistic() {
     println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.dt == est.epoch(),
+        final_truth_state.epoch == est.epoch(),
         final_truth_state - est.state()
     );
 
@@ -665,7 +665,7 @@ fn xhat_dev_test_ekf_realistic() {
     }
 
     assert_eq!(
-        final_truth_state.dt,
+        final_truth_state.epoch,
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
@@ -711,9 +711,9 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x_km += 9.5;
+    initial_state_dev.y_km -= 9.5;
+    initial_state_dev.z_km += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
@@ -830,7 +830,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(smoothed_est.epoch(), est.epoch());
-        assert_eq!(est.epoch(), truth_state.dt);
+        assert_eq!(est.epoch(), truth_state.epoch);
 
         let (err_p, err_v) = rss_orbit_errors(&est.state(), &truth_state);
         let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state(), &truth_state);
@@ -880,7 +880,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         if err_p_sm_oom - err_p_oom > 2 {
             println!(
                 "[!!! POS !!!]RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s",
-                truth_state.dt,
+                truth_state.epoch,
                 i,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -892,7 +892,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         if err_v_sm_oom - err_v_oom > 2 {
             println!(
                 "[!!! VEL !!!] RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt,
+                truth_state.epoch,
                 i,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -910,7 +910,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
                     i,
                     i,
                     est.covar[(i, i)],
-                    truth_state.dt,
+                    truth_state.epoch,
                     i,
                 );
             }
@@ -975,9 +975,9 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x_km += 9.5;
+    initial_state_dev.y_km -= 9.5;
+    initial_state_dev.z_km += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
@@ -1068,7 +1068,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(smoothed_est.epoch(), est.epoch());
-        assert_eq!(est.epoch(), truth_state.dt);
+        assert_eq!(est.epoch(), truth_state.epoch);
 
         let (err_p, err_v) = rss_orbit_errors(&est.state(), &truth_state);
         let (err_p_sm, err_v_sm) = rss_orbit_errors(&smoothed_est.state(), &truth_state);
@@ -1140,7 +1140,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         if err_p_sm_oom - err_p_oom > 2 {
             println!(
                 "RSS position error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt,
+                truth_state.epoch,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1154,7 +1154,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
         if err_v_sm_oom - err_v_oom > 2 {
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt,
+                truth_state.epoch,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1172,7 +1172,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                     i,
                     i,
                     est.covar[(i, i)],
-                    truth_state.dt,
+                    truth_state.epoch,
                     odp.estimates.len() - offset,
                 );
             }
@@ -1238,9 +1238,9 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x_km += 9.5;
+    initial_state_dev.y_km -= 9.5;
+    initial_state_dev.z_km += 9.5;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(
@@ -1324,7 +1324,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
         // Some sanity checks to make sure that we have correctly indexed the estimates
         assert_eq!(prior_est.epoch(), est.epoch());
-        assert_eq!(est.epoch(), truth_state.dt);
+        assert_eq!(est.epoch(), truth_state.epoch);
 
         let (err_p, err_v) = rss_orbit_errors(&prior_est.state(), &truth_state);
         let (err_p_it, err_v_it) = rss_orbit_errors(&est.state(), &truth_state);
@@ -1396,7 +1396,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
         if err_p_it_oom - err_p_oom > 2 {
             println!(
                 "RSS position error after iteration not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt,
+                truth_state.epoch,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1410,7 +1410,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
         if err_v_it_oom - err_v_oom > 3 {
             println!(
                 "RSS velocity error after smoothing not better @{} (#{}):\n\testimate vs truth: {:.3e} m\t{:.3e} m/s\n{}\n\tsmoothed estimate vs truth: {:.3e} m\t{:.3e} m/s\n{}",
-                truth_state.dt,
+                truth_state.epoch,
                 odp.estimates.len() - offset,
                 err_p * 1e3,
                 err_v * 1e3,
@@ -1428,7 +1428,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                     i,
                     i,
                     est.covar[(i, i)],
-                    truth_state.dt,
+                    truth_state.epoch,
                     odp.estimates.len() - offset,
                 );
             }

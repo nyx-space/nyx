@@ -16,9 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use serde::ser::SerializeSeq;
-use serde::{Serialize, Serializer};
-use serde_derive::Deserialize;
 use super::EpochFormat;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::linalg::allocator::Allocator;
@@ -26,6 +23,9 @@ use crate::linalg::DefaultAllocator;
 use crate::md::StateParameter;
 use crate::od::estimate::NavSolution;
 use crate::{NyxError, State};
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
+use serde_derive::Deserialize;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fmt;
@@ -551,7 +551,7 @@ impl StateFormatter {
             };
 
             formatted.push(match hdr.param {
-                StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(orbit.dt),
+                StateParameter::Epoch => hdr.epoch_fmt.as_ref().unwrap().format(orbit.epoch),
                 _ => match orbit.value(&hdr.param) {
                     Ok(value) => format!("{value:.16}"),
                     Err(e) => {
@@ -780,7 +780,7 @@ impl NavSolutionFormatter {
                 }
                 _ => self
                     .cosm
-                    .try_dcm_from_to(&orbit.frame, frame, orbit.dt)
+                    .try_dcm_from_to(&orbit.frame, frame, orbit.epoch)
                     .unwrap(),
             };
             dcms.insert(name.to_lowercase(), mapping_dcm);

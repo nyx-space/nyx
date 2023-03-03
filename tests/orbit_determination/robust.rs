@@ -58,9 +58,9 @@ fn od_robust_test_ekf_realistic() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 9.5;
-    initial_state_dev.y -= 9.5;
-    initial_state_dev.z += 9.5;
+    initial_state_dev.x_km += 9.5;
+    initial_state_dev.y_km -= 9.5;
+    initial_state_dev.z_km += 9.5;
 
     println!("Initial state dev:\n{}", initial_state - initial_state_dev);
 
@@ -130,7 +130,7 @@ fn od_robust_test_ekf_realistic() {
     println!("Truth:\n{}", final_truth_state);
     println!(
         "Delta state with truth (epoch match: {}):\n{}",
-        final_truth_state.dt == est.epoch(),
+        final_truth_state.epoch == est.epoch(),
         final_truth_state - est.state()
     );
 
@@ -159,7 +159,7 @@ fn od_robust_test_ekf_realistic() {
     }
 
     assert_eq!(
-        final_truth_state.dt,
+        final_truth_state.epoch,
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
@@ -221,9 +221,9 @@ fn od_robust_ops_test() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.9, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
     let mut initial_state_dev = initial_state;
-    initial_state_dev.x += 0.0005;
-    initial_state_dev.y -= 0.0005;
-    initial_state_dev.z += 0.0005;
+    initial_state_dev.x_km += 0.0005;
+    initial_state_dev.y_km -= 0.0005;
+    initial_state_dev.z_km += 0.0005;
 
     let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
     println!(

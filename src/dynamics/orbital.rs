@@ -240,7 +240,7 @@ impl AccelModel for PointMasses {
             // Orbit of j-th body as seen from primary body
             let st_ij = self.cosm.celestial_state(
                 &third_body.ephem_path(),
-                osc.dt,
+                osc.epoch,
                 osc.frame,
                 self.correction,
             );
@@ -272,7 +272,7 @@ impl AccelModel for PointMasses {
             // Orbit of j-th body as seen from primary body
             let st_ij = self.cosm.celestial_state(
                 &third_body.ephem_path(),
-                osc.dt,
+                osc.epoch,
                 osc.frame,
                 self.correction,
             );

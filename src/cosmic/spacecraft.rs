@@ -17,10 +17,13 @@
 */
 
 use nalgebra::Vector3;
+use serde::{Deserialize, Serialize};
 
+use super::eclipse::Cosm;
 use super::{Orbit, State};
 use crate::dynamics::guidance::Thruster;
 use crate::errors::NyxError;
+use crate::io::{orbit_from_str, ConfigRepr, Configurable};
 use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::Epoch;
@@ -29,6 +32,7 @@ use crate::utils::rss_orbit_errors;
 use std::default::Default;
 use std::fmt;
 use std::ops::Add;
+use std::sync::Arc;
 
 /// Defines a spacecraft extension.
 /// This is useful for highly specialized guidance laws that need to store additional data in the spacecraft state.
@@ -55,9 +59,10 @@ impl Default for GuidanceMode {
 impl SpacecraftExt for GuidanceMode {}
 
 /// A spacecraft state
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct BaseSpacecraft<X: SpacecraftExt> {
     /// Initial orbit the vehicle is in
+    #[serde(deserialize_with = "orbit_from_str")]
     pub orbit: Orbit,
     /// Dry mass, i.e. mass without fuel, in kg
     pub dry_mass_kg: f64,
@@ -73,8 +78,10 @@ pub struct BaseSpacecraft<X: SpacecraftExt> {
     pub cd: f64,
     pub thruster: Option<Thruster>,
     /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
+    #[serde(skip)]
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
     /// Any extra information or extension that is needed for specific guidance laws
+    #[serde(skip)]
     pub ext: X,
 }
 
@@ -94,6 +101,40 @@ impl<X: SpacecraftExt> Default for BaseSpacecraft<X> {
             thruster: None,
             stm: None,
             ext: X::default(),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct SrpConfig {
+    /// solar radiation pressure area
+    pub area_m2: f64,
+    /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back), defaults to 1.8
+    pub cr: f64,
+}
+
+impl Default for SrpConfig {
+    fn default() -> Self {
+        Self {
+            area_m2: 0.0,
+            cr: 1.8,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct DragConfig {
+    /// drag area
+    pub area_m2: f64,
+    /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere (default)).
+    pub cd: f64,
+}
+
+impl Default for DragConfig {
+    fn default() -> Self {
+        Self {
+            area_m2: 0.0,
+            cd: 2.2,
         }
     }
 }
@@ -463,11 +504,11 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
     }
 
     fn epoch(&self) -> Epoch {
-        self.orbit.dt
+        self.orbit.epoch
     }
 
     fn set_epoch(&mut self, epoch: Epoch) {
-        self.orbit.dt = epoch
+        self.orbit.epoch = epoch
     }
 
     fn add(self, other: OVector<f64, Self::Size>) -> Self {
@@ -520,12 +561,12 @@ impl<X: SpacecraftExt> Add<OVector<f64, Const<6>>> for BaseSpacecraft<X> {
     /// Adds the provided state deviation to this orbit
     fn add(self, other: OVector<f64, Const<6>>) -> Self {
         let mut me = self;
-        me.orbit.x += other[0];
-        me.orbit.y += other[1];
-        me.orbit.z += other[2];
-        me.orbit.vx += other[3];
-        me.orbit.vy += other[4];
-        me.orbit.vz += other[5];
+        me.orbit.x_km += other[0];
+        me.orbit.y_km += other[1];
+        me.orbit.z_km += other[2];
+        me.orbit.vx_km_s += other[3];
+        me.orbit.vy_km_s += other[4];
+        me.orbit.vz_km_s += other[5];
 
         me
     }
@@ -537,12 +578,12 @@ impl<X: SpacecraftExt> Add<OVector<f64, Const<9>>> for BaseSpacecraft<X> {
     /// Adds the provided state deviation to this orbit
     fn add(self, other: OVector<f64, Const<9>>) -> Self {
         let mut me = self;
-        me.orbit.x += other[0];
-        me.orbit.y += other[1];
-        me.orbit.z += other[2];
-        me.orbit.vx += other[3];
-        me.orbit.vy += other[4];
-        me.orbit.vz += other[5];
+        me.orbit.x_km += other[0];
+        me.orbit.y_km += other[1];
+        me.orbit.z_km += other[2];
+        me.orbit.vx_km_s += other[3];
+        me.orbit.vy_km_s += other[4];
+        me.orbit.vz_km_s += other[5];
         me.cr += other[6];
         me.cd += other[7];
         me.fuel_mass_kg += other[8];
@@ -566,4 +607,104 @@ impl Spacecraft {
     pub fn mut_mode(&mut self, mode: GuidanceMode) {
         self.ext = mode;
     }
+}
+
+impl ConfigRepr for Spacecraft {}
+
+impl Configurable for Spacecraft {
+    type IntermediateRepr = Self;
+
+    fn from_config(
+        cfg: &Self::IntermediateRepr,
+        _cosm: Arc<Cosm>,
+    ) -> Result<Self, crate::io::ConfigError>
+    where
+        Self: Sized,
+    {
+        Ok(*cfg)
+    }
+
+    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
+        Ok(*self)
+    }
+}
+
+#[test]
+fn test_serde() {
+    use super::Cosm;
+    use serde_yaml;
+    use std::str::FromStr;
+
+    let cosm = Cosm::de438();
+    let orbit = Orbit::cartesian(
+        -9042.862234,
+        18536.333069,
+        6999.957069,
+        -3.288789,
+        -2.226285,
+        1.646738,
+        Epoch::from_str("2018-09-15T00:15:53.098 UTC").unwrap(),
+        cosm.frame("EME2000"),
+    );
+
+    let sc = Spacecraft::new(orbit, 500.0, 159.0, 2.0, 2.0, 1.8, 2.2);
+
+    let serialized_sc = serde_yaml::to_string(&sc).unwrap();
+    println!("{}", serialized_sc);
+
+    let deser_sc: Spacecraft = serde_yaml::from_str(&serialized_sc).unwrap();
+
+    assert_eq!(sc, deser_sc);
+
+    // Check that we can omit the thruster info entirely.
+    let s = r#"
+orbit:
+    x_km: -9042.862234
+    y_km: 18536.333069
+    z_km: 6999.957069
+    vx_km_s: -3.288789
+    vy_km_s: -2.226285
+    vz_km_s: 1.646738
+    epoch: 2018-09-15T00:15:53.098000000 UTC
+    frame: Earth J2000
+dry_mass_kg: 500.0
+fuel_mass_kg: 159.0
+srp_area_m2: 2.0
+drag_area_m2: 2.0
+cr: 1.8
+cd: 2.2
+    "#;
+
+    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    assert_eq!(sc, deser_sc);
+
+    // Check that we can specify a thruster info entirely.
+    let s = r#"
+orbit:
+    x_km: -9042.862234
+    y_km: 18536.333069
+    z_km: 6999.957069
+    vx_km_s: -3.288789
+    vy_km_s: -2.226285
+    vz_km_s: 1.646738
+    epoch: 2018-09-15T00:15:53.098000000 UTC
+    frame: Earth J2000
+dry_mass_kg: 500.0
+fuel_mass_kg: 159.0
+srp_area_m2: 2.0
+drag_area_m2: 2.0
+cr: 1.8
+cd: 2.2
+thruster:
+    thrust_N: 1e-5
+    isp_s: 300.5
+    "#;
+
+    let mut sc_thruster = sc;
+    sc_thruster.thruster = Some(Thruster {
+        isp_s: 300.5,
+        thrust_N: 1e-5,
+    });
+    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    assert_eq!(sc_thruster, deser_sc);
 }

@@ -121,42 +121,42 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let mut objectives = [
             Objective {
                 parameter: StateParameter::X,
-                desired_value: sc_xf_desired.orbit.x,
+                desired_value: sc_xf_desired.orbit.x_km,
                 tolerance: 1e-3,
                 additive_factor: 0.0,
                 multiplicative_factor: 1.0,
             },
             Objective {
                 parameter: StateParameter::Y,
-                desired_value: sc_xf_desired.orbit.y,
+                desired_value: sc_xf_desired.orbit.y_km,
                 tolerance: 1e-3,
                 additive_factor: 0.0,
                 multiplicative_factor: 1.0,
             },
             Objective {
                 parameter: StateParameter::Z,
-                desired_value: sc_xf_desired.orbit.z,
+                desired_value: sc_xf_desired.orbit.z_km,
                 tolerance: 1e-3,
                 additive_factor: 0.0,
                 multiplicative_factor: 1.0,
             },
             Objective {
                 parameter: StateParameter::VX,
-                desired_value: sc_xf_desired.orbit.vx,
+                desired_value: sc_xf_desired.orbit.vx_km_s,
                 tolerance: 1e-3,
                 additive_factor: 0.0,
                 multiplicative_factor: 1e-3,
             },
             Objective {
                 parameter: StateParameter::VY,
-                desired_value: sc_xf_desired.orbit.vy,
+                desired_value: sc_xf_desired.orbit.vy_km_s,
                 tolerance: 1e-3,
                 additive_factor: 0.0,
                 multiplicative_factor: 1e-3,
             },
             Objective {
                 parameter: StateParameter::VZ,
-                desired_value: sc_xf_desired.orbit.vz,
+                desired_value: sc_xf_desired.orbit.vz_km_s,
                 tolerance: 1e-3,
                 additive_factor: 0.0,
                 multiplicative_factor: 1e-3,
@@ -405,12 +405,24 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                 sc_x0 = pre_traj.at(mnvr.start)?;
                 sc_xf_desired = post_traj.at(mnvr.end)?;
                 objectives = [
-                    Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x, 1e-3),
-                    Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y, 1e-3),
-                    Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z, 1e-3),
-                    Objective::within_tolerance(StateParameter::VX, sc_xf_desired.orbit.vx, 1e-3),
-                    Objective::within_tolerance(StateParameter::VY, sc_xf_desired.orbit.vy, 1e-3),
-                    Objective::within_tolerance(StateParameter::VZ, sc_xf_desired.orbit.vz, 1e-3),
+                    Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-3),
+                    Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-3),
+                    Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z_km, 1e-3),
+                    Objective::within_tolerance(
+                        StateParameter::VX,
+                        sc_xf_desired.orbit.vx_km_s,
+                        1e-3,
+                    ),
+                    Objective::within_tolerance(
+                        StateParameter::VY,
+                        sc_xf_desired.orbit.vy_km_s,
+                        1e-3,
+                    ),
+                    Objective::within_tolerance(
+                        StateParameter::VZ,
+                        sc_xf_desired.orbit.vz_km_s,
+                        1e-3,
+                    ),
                 ];
             }
         }

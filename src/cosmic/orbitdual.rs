@@ -61,13 +61,13 @@ impl From<Orbit> for OrbitDual {
     /// Initialize a new OrbitDual from an orbit, no other initializers
     fn from(orbit: Orbit) -> Self {
         Self {
-            x: OHyperdual::from_slice(&[orbit.x, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-            y: OHyperdual::from_slice(&[orbit.y, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
-            z: OHyperdual::from_slice(&[orbit.z, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
-            vx: OHyperdual::from_slice(&[orbit.vx, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
-            vy: OHyperdual::from_slice(&[orbit.vy, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
-            vz: OHyperdual::from_slice(&[orbit.vz, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
-            dt: orbit.dt,
+            x: OHyperdual::from_slice(&[orbit.x_km, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            y: OHyperdual::from_slice(&[orbit.y_km, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
+            z: OHyperdual::from_slice(&[orbit.z_km, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
+            vx: OHyperdual::from_slice(&[orbit.vx_km_s, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            vy: OHyperdual::from_slice(&[orbit.vy_km_s, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+            vz: OHyperdual::from_slice(&[orbit.vz_km_s, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+            dt: orbit.epoch,
             frame: orbit.frame,
         }
     }

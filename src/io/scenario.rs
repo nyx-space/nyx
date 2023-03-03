@@ -170,7 +170,7 @@ pub struct DeltaStateSerde {
 impl DeltaStateSerde {
     pub fn as_state(&self, base: Orbit) -> Result<Orbit, ParsingError> {
         let frame = base.frame;
-        let epoch = base.dt;
+        let epoch = base.epoch;
         // Rebuild a valid state from the three different initializations
         if self.x.is_some()
             || self.y.is_some()

@@ -146,7 +146,7 @@ impl GroundStation {
         // Start by converting the receiver spacecraft into the ground station frame.
         let rx_gs_frame = cosm.frame_chg(rx, self.frame);
 
-        let dt = rx.dt;
+        let dt = rx.epoch;
         // Then, compute the rotation matrix from the body fixed frame of the ground station to its topocentric frame SEZ.
         let tx_gs_frame = self.to_orbit(dt);
         // Note: we're only looking at the radis so we don't need to apply the transport theorem here.
@@ -190,7 +190,7 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
 
         if elevation >= self.elevation_mask_deg {
             Some(StdMeasurement::new(
-                rx.dt,
+                rx.epoch,
                 tx_rxf,
                 rx_rxf,
                 true,
@@ -219,7 +219,7 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
 
         if elevation >= self.elevation_mask_deg {
             Some(StdMeasurement::new(
-                rx_ssb.dt,
+                rx_ssb.epoch,
                 tx_ssb,
                 rx_ssb,
                 true,

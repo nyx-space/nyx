@@ -291,7 +291,7 @@ where
                                     prop.stop_cond
                                 )))
                             }
-                            Ok(epoch) => Some(epoch - init_state.dt),
+                            Ok(epoch) => Some(epoch - init_state.epoch),
                         },
                     }
                 } else {

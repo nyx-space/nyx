@@ -356,9 +356,9 @@ pub fn try_achieve_b_plane(
             total_dv[2] += dv[2];
 
             // Rebuild a new orbit
-            real_orbit.vx += dv[0];
-            real_orbit.vy += dv[1];
-            real_orbit.vz += dv[2];
+            real_orbit.vx_km_s += dv[0];
+            real_orbit.vy_km_s += dv[1];
+            real_orbit.vz_km_s += dv[2];
 
             attempt_no += 1;
         }
@@ -404,9 +404,9 @@ pub fn try_achieve_b_plane(
             total_dv[2] += dv[2];
 
             // Rebuild a new orbit
-            real_orbit.vx += dv[0];
-            real_orbit.vy += dv[1];
-            real_orbit.vz += dv[2];
+            real_orbit.vx_km_s += dv[0];
+            real_orbit.vy_km_s += dv[1];
+            real_orbit.vz_km_s += dv[2];
 
             attempt_no += 1;
         }

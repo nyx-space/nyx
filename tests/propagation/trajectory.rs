@@ -59,7 +59,7 @@ fn traj_ephem_forward() {
     assert_eq!(ephem.last(), &end_state, "Wrong final state");
     assert!(ephem.last().stm().is_err(), "STM is set!");
     assert!(
-        ephem.at(end_state.dt + 1 * Unit::Nanosecond).is_err(),
+        ephem.at(end_state.epoch + 1 * Unit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
     );
 
@@ -82,7 +82,7 @@ fn traj_ephem_forward() {
     let mut max_vel_err = (eval_state.velocity() - start_state.velocity()).norm();
 
     while let Ok(prop_state) = rx.recv() {
-        let eval_state = ephem.at(prop_state.dt).unwrap();
+        let eval_state = ephem.at(prop_state.epoch).unwrap();
 
         let pos_err = (eval_state.radius() - prop_state.radius()).norm();
         if pos_err > max_pos_err {
@@ -193,7 +193,7 @@ fn traj_ephem_forward() {
     let mut max_vel_err = (eval_state.velocity() - conv_state.velocity()).norm();
 
     for conv_state in ephem_back_to_earth.every(5 * Unit::Minute) {
-        let eval_state = ephem.at(conv_state.dt).unwrap();
+        let eval_state = ephem.at(conv_state.epoch).unwrap();
 
         let pos_err = (eval_state.radius() - conv_state.radius()).norm();
         if pos_err > max_pos_err {
@@ -504,7 +504,7 @@ fn traj_ephem_backward() {
     );
     assert!(ephem.last().stm().is_err(), "STM is set!");
     assert!(
-        ephem.at(end_state.dt - 1 * Unit::Nanosecond).is_err(),
+        ephem.at(end_state.epoch - 1 * Unit::Nanosecond).is_err(),
         "Expected to be outside of interpolation window!"
     );
 
@@ -528,7 +528,7 @@ fn traj_ephem_backward() {
     println!("{}", ephem);
 
     while let Ok(prop_state) = rx.recv() {
-        let eval_state = ephem.at(prop_state.dt).unwrap();
+        let eval_state = ephem.at(prop_state.epoch).unwrap();
 
         let pos_err = (eval_state.radius() - prop_state.radius()).norm();
         if pos_err > max_pos_err {

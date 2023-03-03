@@ -160,9 +160,9 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = state.rmag();
-        let s_ = state.x / r_;
-        let t_ = state.y / r_;
-        let u_ = state.z / r_;
+        let s_ = state.x_km / r_;
+        let t_ = state.y_km / r_;
+        let u_ = state.z_km / r_;
         let max_degree = self.stor.max_degree_n(); // In GMAT, the degree is NN
         let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
 
@@ -242,7 +242,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = self
             .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)?;
         Ok(dcm * accel)
     }
 
@@ -339,7 +339,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
 
         let dcm = self
             .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)?;
 
         // Convert DCM to OHyperdual DCMs
         let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();

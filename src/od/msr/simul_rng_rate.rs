@@ -112,7 +112,7 @@ impl StdMeasurement {
         range_rate_noise: f64,
     ) -> StdMeasurement {
         assert_eq!(tx.frame, rx.frame, "tx & rx in different frames");
-        assert_eq!(tx.dt, rx.dt, "tx & rx states have different times");
+        assert_eq!(tx.epoch, rx.epoch, "tx & rx states have different times");
 
         let hyperstate = hyperspace_from_vector(&(rx - tx).to_cartesian_vec());
         let (obs, h_tilde) = Self::compute_sensitivity(&hyperstate, range_noise, range_rate_noise);
