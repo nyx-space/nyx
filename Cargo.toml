@@ -62,7 +62,7 @@ either = {version = "1.8.1", features = ["serde"]}
 shadow-rs = "0.20.0"
 
 [features]
-default = ["python"]
+default = []
 python = ["pyo3", "pyo3-log", "hifitime/python"]
 
 [lib]
