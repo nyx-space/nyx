@@ -21,6 +21,7 @@ use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
 use crate::io::orbit::OrbitSerde;
+use crate::io::ConfigError;
 use crate::io::{
     epoch_from_str, epoch_to_str, frame_from_str, frame_to_str, ConfigRepr, Configurable,
 };
@@ -28,6 +29,8 @@ use crate::linalg::{Const, OVector};
 use crate::mc::MultivariateNormal;
 use crate::md::ui::Objective;
 use crate::md::StateParameter;
+#[cfg(feature = "python")]
+use crate::python::cosmic::Frame as PyFrame;
 use crate::time::{Duration, Epoch, Unit};
 use crate::utils::{
     between_0_360, between_pm_180, cartesian_to_spherical, perpv, r1, r3, rss_orbit_errors,
@@ -195,68 +198,6 @@ impl Orbit {
             frame,
             stm: None,
         }
-    }
-
-    /// Returns the magnitude of the radius vector in km
-    pub fn rmag(&self) -> f64 {
-        (self.x_km.powi(2) + self.y_km.powi(2) + self.z_km.powi(2)).sqrt()
-    }
-
-    /// Returns the magnitude of the velocity vector in km/s
-    pub fn vmag(&self) -> f64 {
-        (self.vx_km_s.powi(2) + self.vy_km_s.powi(2) + self.vz_km_s.powi(2)).sqrt()
-    }
-
-    /// Returns the radius vector of this Orbit in [km, km, km]
-    pub fn radius(&self) -> Vector3<f64> {
-        Vector3::new(self.x_km, self.y_km, self.z_km)
-    }
-
-    /// Returns the velocity vector of this Orbit in [km/s, km/s, km/s]
-    pub fn velocity(&self) -> Vector3<f64> {
-        Vector3::new(self.vx_km_s, self.vy_km_s, self.vz_km_s)
-    }
-
-    /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
-    ///
-    /// Note that the time is **not** returned in the vector.
-    pub fn to_cartesian_vec(self) -> Vector6<f64> {
-        Vector6::new(
-            self.x_km,
-            self.y_km,
-            self.z_km,
-            self.vx_km_s,
-            self.vy_km_s,
-            self.vz_km_s,
-        )
-    }
-
-    /// Returns the distance in kilometers between this state and another state.
-    /// Will **panic** is the frames are different
-    pub fn distance_to(&self, other: &Orbit) -> f64 {
-        assert_eq!(
-            self.frame, other.frame,
-            "cannot compute the distance between two states in different frames"
-        );
-        self.distance_to_point(&other.radius())
-    }
-
-    /// Returns the distance in kilometers between this state and a point assumed to be in the same frame.
-    pub fn distance_to_point(&self, other: &Vector3<f64>) -> f64 {
-        ((self.x_km - other.x).powi(2)
-            + (self.y_km - other.y).powi(2)
-            + (self.z_km - other.z).powi(2))
-        .sqrt()
-    }
-
-    /// Returns the unit vector in the direction of the state radius
-    pub fn r_hat(&self) -> Vector3<f64> {
-        self.radius() / self.rmag()
-    }
-
-    /// Returns the unit vector in the direction of the state velocity
-    pub fn v_hat(&self) -> Vector3<f64> {
-        perpv(&self.velocity(), &self.r_hat()) / self.rmag()
     }
 
     /// Creates a new Orbit around the provided Celestial or Geoid frame from the Keplerian orbital elements.
@@ -431,19 +372,6 @@ impl Orbit {
         )
     }
 
-    /// Creates a new Orbit around the provided frame from the borrowed state vector
-    ///
-    /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
-    /// and as such it has the same unit requirements.
-    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
-        match frame {
-            Frame::Geoid { .. } | Frame::Celestial { .. } => Self::keplerian(
-                state[0], state[1], state[2], state[3], state[4], state[5], dt, frame,
-            ),
-            _ => panic!("Frame is not Celestial or Geoid in kind"),
-        }
-    }
-
     /// Creates a new Orbit from the geodetic latitude (φ), longitude (λ) and height with respect to the ellipsoid of the frame.
     ///
     /// **Units:** degrees, degrees, km
@@ -513,6 +441,52 @@ impl Orbit {
         }
     }
 
+    /// Returns the radius vector of this Orbit in [km, km, km]
+    pub fn radius(&self) -> Vector3<f64> {
+        Vector3::new(self.x_km, self.y_km, self.z_km)
+    }
+
+    /// Returns the velocity vector of this Orbit in [km/s, km/s, km/s]
+    pub fn velocity(&self) -> Vector3<f64> {
+        Vector3::new(self.vx_km_s, self.vy_km_s, self.vz_km_s)
+    }
+
+    /// Returns the unit vector in the direction of the state radius
+    pub fn r_hat(&self) -> Vector3<f64> {
+        self.radius() / self.rmag()
+    }
+
+    /// Returns the unit vector in the direction of the state velocity
+    pub fn v_hat(&self) -> Vector3<f64> {
+        perpv(&self.velocity(), &self.r_hat()) / self.rmag()
+    }
+
+    /// Returns the eccentricity vector (no unit)
+    pub fn evec(&self) -> Vector3<f64> {
+        match self.frame {
+            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
+                let r = self.radius();
+                let v = self.velocity();
+                ((v.norm().powi(2) - gm / r.norm()) * r - (r.dot(&v)) * v) / gm
+            }
+            _ => panic!("eccentricity not defined in this frame"),
+        }
+    }
+
+    /// Returns this state as a Cartesian Vector6 in [km, km, km, km/s, km/s, km/s]
+    ///
+    /// Note that the time is **not** returned in the vector.
+    pub fn to_cartesian_vec(self) -> Vector6<f64> {
+        Vector6::new(
+            self.x_km,
+            self.y_km,
+            self.z_km,
+            self.vx_km_s,
+            self.vy_km_s,
+            self.vz_km_s,
+        )
+    }
+
     /// Returns this state as a Keplerian Vector6 in [km, none, degrees, degrees, degrees, degrees]
     ///
     /// Note that the time is **not** returned in the vector.
@@ -527,9 +501,376 @@ impl Orbit {
         )
     }
 
+    /// Creates a new Orbit around the provided frame from the borrowed state vector
+    ///
+    /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
+    /// and as such it has the same unit requirements.
+    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
+        match frame {
+            Frame::Geoid { .. } | Frame::Celestial { .. } => Self::keplerian(
+                state[0], state[1], state[2], state[3], state[4], state[5], dt, frame,
+            ),
+            _ => panic!("Frame is not Celestial or Geoid in kind"),
+        }
+    }
+
     /// Returns the orbital momentum vector
     pub fn hvec(&self) -> Vector3<f64> {
         self.radius().cross(&self.velocity())
+    }
+
+    /// Returns a copy of the state with a new radius
+    pub fn with_radius(self, new_radius: &Vector3<f64>) -> Self {
+        let mut me = self;
+        me.x_km = new_radius[0];
+        me.y_km = new_radius[1];
+        me.z_km = new_radius[2];
+        me
+    }
+
+    /// Returns a copy of the state with a new radius
+    pub fn with_velocity(self, new_velocity: &Vector3<f64>) -> Self {
+        let mut me = self;
+        me.vx_km_s = new_velocity[0];
+        me.vy_km_s = new_velocity[1];
+        me.vz_km_s = new_velocity[2];
+        me
+    }
+
+    /// Returns a copy of the state with a new SMA
+    pub fn with_sma(self, new_sma_km: f64) -> Self {
+        let mut me = self;
+        me.set_sma(new_sma_km);
+        me
+    }
+
+    /// Returns a copy of the state with a provided SMA added to the current one
+    pub fn add_sma(self, delta_sma: f64) -> Self {
+        let mut me = self;
+        me.set_sma(me.sma() + delta_sma);
+        me
+    }
+
+    /// Returns a copy of the state with a new ECC
+    pub fn with_ecc(self, new_ecc: f64) -> Self {
+        let mut me = self;
+        me.set_ecc(new_ecc);
+        me
+    }
+
+    /// Returns a copy of the state with a provided ECC added to the current one
+    pub fn add_ecc(self, delta_ecc: f64) -> Self {
+        let mut me = self;
+        me.set_ecc(me.ecc() + delta_ecc);
+        me
+    }
+
+    /// Returns a copy of the state with a new INC
+    pub fn with_inc(self, new_inc: f64) -> Self {
+        let mut me = self;
+        me.set_inc(new_inc);
+        me
+    }
+
+    /// Returns a copy of the state with a provided INC added to the current one
+    pub fn add_inc(self, delta_inc: f64) -> Self {
+        let mut me = self;
+        me.set_inc(me.inc() + delta_inc);
+        me
+    }
+
+    /// Returns a copy of the state with a new AOP
+    pub fn with_aop(self, new_aop: f64) -> Self {
+        let mut me = self;
+        me.set_aop(new_aop);
+        me
+    }
+
+    /// Returns a copy of the state with a provided AOP added to the current one
+    pub fn add_aop(self, delta_aop: f64) -> Self {
+        let mut me = self;
+        me.set_aop(me.aop() + delta_aop);
+        me
+    }
+
+    /// Returns a copy of the state with a new RAAN
+    pub fn with_raan(self, new_raan: f64) -> Self {
+        let mut me = self;
+        me.set_raan(new_raan);
+        me
+    }
+
+    /// Returns a copy of the state with a provided RAAN added to the current one
+    pub fn add_raan(self, delta_raan: f64) -> Self {
+        let mut me = self;
+        me.set_raan(me.raan() + delta_raan);
+        me
+    }
+
+    /// Returns a copy of the state with a new TA
+    pub fn with_ta(self, new_ta: f64) -> Self {
+        let mut me = self;
+        me.set_ta(new_ta);
+        me
+    }
+
+    /// Returns a copy of the state with a provided TA added to the current one
+    pub fn add_ta(self, delta_ta: f64) -> Self {
+        let mut me = self;
+        me.set_ta(me.ta() + delta_ta);
+        me
+    }
+
+    /// Returns a copy of this state with the provided apoasis and periapse
+    pub fn with_apoapsis_periapsis(self, new_ra: f64, new_rp: f64) -> Self {
+        Self::keplerian_apsis_radii(
+            new_ra,
+            new_rp,
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta(),
+            self.epoch,
+            self.frame,
+        )
+    }
+
+    /// Returns a copy of this state with the provided apoasis and periapse added to the current values
+    pub fn add_apoapsis_periapsis(self, delta_ra: f64, delta_rp: f64) -> Self {
+        Self::keplerian_apsis_radii(
+            self.apoapsis() + delta_ra,
+            self.periapsis() + delta_rp,
+            self.inc(),
+            self.raan(),
+            self.aop(),
+            self.ta(),
+            self.epoch,
+            self.frame,
+        )
+    }
+
+    /// Returns the direct cosine rotation matrix to convert to this state's frame (inertial or otherwise).
+    /// ## Example
+    /// let dcm_vnc2inertial = orbit.dcm_from_traj_frame(Frame::VNC)?;
+    /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
+    pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, NyxError> {
+        match from {
+            Frame::RIC => Ok(r3(-self.raan().to_radians())
+                * r1(-self.inc().to_radians())
+                * r3(-self.aol().to_radians())),
+            Frame::VNC => {
+                let v = self.velocity() / self.vmag();
+                let n = self.hvec() / self.hmag();
+                let c = v.cross(&n);
+                Ok(Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose())
+            }
+            Frame::RCN => {
+                let r = self.radius() / self.rmag();
+                let n = self.hvec() / self.hmag();
+                let c = n.cross(&r);
+                Ok(Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose())
+            }
+            Frame::SEZ => {
+                // From the GMAT MathSpec, page 30 section 2.6.9 and from `Calculate_RFT` in `TopocentricAxes.cpp`, this returns the
+                // rotation matrix from the topocentric frame (SEZ) to body fixed frame.
+                // In the GMAT MathSpec notation, R_{IF} is the DCM from body fixed to inertial. Similarly, R{FT} is from topocentric
+                // to body fixed.
+                if !self.frame.is_body_fixed() {
+                    warn!("Computation of SEZ rotation matrix must be done in a body fixed frame and {} is not one!", self.frame);
+                }
+                if (self.x_km.powi(2) + self.y_km.powi(2)).sqrt() < 1e-3 {
+                    warn!("SEZ frame ill-defined when close to the poles");
+                }
+                let phi = self.geodetic_latitude().to_radians();
+                let lambda = self.geodetic_longitude().to_radians();
+                let z_hat = Vector3::new(
+                    phi.cos() * lambda.cos(),
+                    phi.cos() * lambda.sin(),
+                    phi.sin(),
+                );
+                // y_hat MUST be renormalized otherwise it's about 0.76 and therefore the rotation looses the norms conservation property.
+                let mut y_hat = Vector3::new(0.0, 0.0, 1.0).cross(&z_hat);
+                y_hat /= y_hat.norm();
+                let x_hat = y_hat.cross(&z_hat);
+                Ok(Matrix3::new(
+                    x_hat[0], y_hat[0], z_hat[0], x_hat[1], y_hat[1], z_hat[1], x_hat[2], y_hat[2],
+                    z_hat[2],
+                ))
+            }
+            _ => Err(NyxError::CustomError(
+                "did not provide a local frame".to_string(),
+            )),
+        }
+    }
+
+    /// Returns a 6x6 DCM to convert to this inertial state.
+    /// WARNING: This DCM does NOT contain the corrections needed for the transport theorem, and therefore the velocity rotation is wrong.
+    pub fn dcm6x6_from_traj_frame(&self, from: Frame) -> Result<Matrix6<f64>, NyxError> {
+        let dcm3x3 = self.dcm_from_traj_frame(from)?;
+
+        let mut dcm = Matrix6::zeros();
+        for i in 0..3 {
+            for j in 0..3 {
+                dcm[(i, j)] = dcm3x3[(i, j)];
+                dcm[(i + 3, j + 3)] = dcm3x3[(i, j)];
+            }
+        }
+
+        Ok(dcm)
+    }
+
+    /// Apply the provided delta-v (in km/s)
+    pub fn apply_dv(&mut self, dv: Vector3<f64>) {
+        self.vx_km_s += dv[0];
+        self.vy_km_s += dv[1];
+        self.vz_km_s += dv[2];
+    }
+
+    /// Copies this orbit after applying the provided delta-v (in km/s)
+    pub fn with_dv(self, dv: Vector3<f64>) -> Self {
+        let mut me = self;
+        me.apply_dv(dv);
+        me
+    }
+
+    /// Rotate this state provided a direct cosine matrix of position and velocity
+    pub fn rotate_by(&mut self, dcm: Matrix6<f64>) {
+        let new_orbit = dcm * self.to_cartesian_vec();
+        self.x_km = new_orbit[0];
+        self.y_km = new_orbit[1];
+        self.z_km = new_orbit[2];
+
+        self.vx_km_s = new_orbit[3];
+        self.vy_km_s = new_orbit[4];
+        self.vz_km_s = new_orbit[5];
+    }
+
+    /// Rotate this state provided a direct cosine matrix of position and velocity
+    pub fn with_rotation_by(&self, dcm: Matrix6<f64>) -> Self {
+        let mut me = *self;
+        me.rotate_by(dcm);
+        me
+    }
+
+    /// Rotate the position and the velocity of this state provided a direct cosine matrix of position and velocity
+    /// WARNING: You only want to use this if you'll only be using the position components of the rotated state.
+    /// This does not account for the transport theorem and therefore is physically WRONG.
+    pub fn position_rotated_by(&mut self, dcm: Matrix3<f64>) {
+        let new_radius = dcm * self.radius();
+        self.x_km = new_radius[0];
+        self.y_km = new_radius[1];
+        self.z_km = new_radius[2];
+
+        let new_velocity = dcm * self.velocity();
+        self.vx_km_s = new_velocity[0];
+        self.vy_km_s = new_velocity[1];
+        self.vz_km_s = new_velocity[2];
+    }
+
+    /// Rotate the position of this state provided a direct cosine matrix of position and velocity
+    /// WARNING: You only want to use this if you'll only be using the position components of the rotated state.
+    /// This does not account for the transport theorem and therefore is physically WRONG.
+    pub fn with_position_rotated_by(&self, dcm: Matrix3<f64>) -> Self {
+        let mut me = *self;
+        me.position_rotated_by(dcm);
+        me
+    }
+
+    /// Copies the current state but sets the STM to identity
+    pub fn with_stm(self) -> Self {
+        let mut me = self;
+        me.enable_stm();
+        me
+    }
+
+    /// Copies the current state but disables the STM
+    pub fn without_stm(self) -> Self {
+        let mut me = self;
+        me.disable_stm();
+        me
+    }
+
+    /// Returns the distance in kilometers between this state and a point assumed to be in the same frame.
+    pub fn distance_to_point(&self, other: &Vector3<f64>) -> f64 {
+        ((self.x_km - other.x).powi(2)
+            + (self.y_km - other.y).powi(2)
+            + (self.z_km - other.z).powi(2))
+        .sqrt()
+    }
+
+    /// Use the current orbit as a template to generate mission design objectives.
+    /// Note: this sets the objective tolerances to be quite tight, so consider modifying them.
+    pub fn to_objectives(&self, params: &[StateParameter]) -> Result<Vec<Objective>, NyxError> {
+        let mut rtn = Vec::with_capacity(params.len());
+        for parameter in params {
+            rtn.push(Objective::new(*parameter, self.value(parameter)?));
+        }
+        Ok(rtn)
+    }
+
+    /// Create a multivariate normal dispersion structure from this orbit with the provided mean and covariance,
+    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    pub fn disperse(
+        &self,
+        mean: Vector6<f64>,
+        cov: Matrix6<f64>,
+    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+        MultivariateNormal::new(
+            *self,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+            ],
+            mean,
+            cov,
+        )
+    }
+
+    /// Create a multivariate normal dispersion structure from this orbit with the provided covariance,
+    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
+    pub fn disperse_zero_mean(
+        &self,
+        cov: Matrix6<f64>,
+    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
+        MultivariateNormal::zero_mean(
+            *self,
+            vec![
+                StateParameter::X,
+                StateParameter::Y,
+                StateParameter::Z,
+                StateParameter::VX,
+                StateParameter::VY,
+                StateParameter::VZ,
+            ],
+            cov,
+        )
+    }
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl Orbit {
+    /// Returns the magnitude of the radius vector in km
+    pub fn rmag(&self) -> f64 {
+        (self.x_km.powi(2) + self.y_km.powi(2) + self.z_km.powi(2)).sqrt()
+    }
+
+    /// Returns the magnitude of the velocity vector in km/s
+    pub fn vmag(&self) -> f64 {
+        (self.vx_km_s.powi(2) + self.vy_km_s.powi(2) + self.vz_km_s.powi(2)).sqrt()
+    }
+
+    /// Returns the distance in kilometers between this state and another state.
+    /// Will **panic** is the frames are different
+    pub fn distance_to(&self, other: &Orbit) -> f64 {
+        assert_eq!(
+            self.frame, other.frame,
+            "cannot compute the distance between two states in different frames"
+        );
+        self.distance_to_point(&other.radius())
     }
 
     /// Returns the orbital momentum value on the X axis
@@ -562,24 +903,6 @@ impl Orbit {
         }
     }
 
-    /// Returns a copy of the state with a new radius
-    pub fn with_radius(self, new_radius: &Vector3<f64>) -> Self {
-        let mut me = self;
-        me.x_km = new_radius[0];
-        me.y_km = new_radius[1];
-        me.z_km = new_radius[2];
-        me
-    }
-
-    /// Returns a copy of the state with a new radius
-    pub fn with_velocity(self, new_velocity: &Vector3<f64>) -> Self {
-        let mut me = self;
-        me.vx_km_s = new_velocity[0];
-        me.vy_km_s = new_velocity[1];
-        me.vz_km_s = new_velocity[2];
-        me
-    }
-
     /// Returns the semi-major axis in km
     pub fn sma(&self) -> f64 {
         match self.frame {
@@ -609,20 +932,6 @@ impl Orbit {
         self.vz_km_s = me.vz_km_s;
     }
 
-    /// Returns a copy of the state with a new SMA
-    pub fn with_sma(self, new_sma_km: f64) -> Self {
-        let mut me = self;
-        me.set_sma(new_sma_km);
-        me
-    }
-
-    /// Returns a copy of the state with a provided SMA added to the current one
-    pub fn add_sma(self, delta_sma: f64) -> Self {
-        let mut me = self;
-        me.set_sma(me.sma() + delta_sma);
-        me
-    }
-
     /// Returns the SMA altitude in km
     pub fn sma_altitude(&self) -> f64 {
         self.sma() - self.frame.equatorial_radius()
@@ -635,18 +944,6 @@ impl Orbit {
                 2.0 * PI * (self.sma().powi(3) / gm).sqrt() * Unit::Second
             }
             _ => panic!("orbital period not defined in this frame"),
-        }
-    }
-
-    /// Returns the eccentricity vector (no unit)
-    pub fn evec(&self) -> Vector3<f64> {
-        match self.frame {
-            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                let r = self.radius();
-                let v = self.velocity();
-                ((v.norm().powi(2) - gm / r.norm()) * r - (r.dot(&v)) * v) / gm
-            }
-            _ => panic!("eccentricity not defined in this frame"),
         }
     }
 
@@ -674,20 +971,6 @@ impl Orbit {
         self.vx_km_s = me.vx_km_s;
         self.vy_km_s = me.vy_km_s;
         self.vz_km_s = me.vz_km_s;
-    }
-
-    /// Returns a copy of the state with a new ECC
-    pub fn with_ecc(self, new_ecc: f64) -> Self {
-        let mut me = self;
-        me.set_ecc(new_ecc);
-        me
-    }
-
-    /// Returns a copy of the state with a provided ECC added to the current one
-    pub fn add_ecc(self, delta_ecc: f64) -> Self {
-        let mut me = self;
-        me.set_ecc(me.ecc() + delta_ecc);
-        me
     }
 
     /// Returns the inclination in degrees
@@ -719,20 +1002,6 @@ impl Orbit {
         self.vx_km_s = me.vx_km_s;
         self.vy_km_s = me.vy_km_s;
         self.vz_km_s = me.vz_km_s;
-    }
-
-    /// Returns a copy of the state with a new INC
-    pub fn with_inc(self, new_inc: f64) -> Self {
-        let mut me = self;
-        me.set_inc(new_inc);
-        me
-    }
-
-    /// Returns a copy of the state with a provided INC added to the current one
-    pub fn add_inc(self, delta_inc: f64) -> Self {
-        let mut me = self;
-        me.set_inc(me.inc() + delta_inc);
-        me
     }
 
     /// Returns the argument of periapsis in degrees
@@ -779,20 +1048,6 @@ impl Orbit {
         self.vz_km_s = me.vz_km_s;
     }
 
-    /// Returns a copy of the state with a new AOP
-    pub fn with_aop(self, new_aop: f64) -> Self {
-        let mut me = self;
-        me.set_aop(new_aop);
-        me
-    }
-
-    /// Returns a copy of the state with a provided AOP added to the current one
-    pub fn add_aop(self, delta_aop: f64) -> Self {
-        let mut me = self;
-        me.set_aop(me.aop() + delta_aop);
-        me
-    }
-
     /// Returns the right ascension of ther ascending node in degrees
     pub fn raan(&self) -> f64 {
         match self.frame {
@@ -835,20 +1090,6 @@ impl Orbit {
         self.vx_km_s = me.vx_km_s;
         self.vy_km_s = me.vy_km_s;
         self.vz_km_s = me.vz_km_s;
-    }
-
-    /// Returns a copy of the state with a new RAAN
-    pub fn with_raan(self, new_raan: f64) -> Self {
-        let mut me = self;
-        me.set_raan(new_raan);
-        me
-    }
-
-    /// Returns a copy of the state with a provided RAAN added to the current one
-    pub fn add_raan(self, delta_raan: f64) -> Self {
-        let mut me = self;
-        me.set_raan(me.raan() + delta_raan);
-        me
     }
 
     /// Returns the true anomaly in degrees between 0 and 360.0
@@ -906,48 +1147,6 @@ impl Orbit {
         self.vx_km_s = me.vx_km_s;
         self.vy_km_s = me.vy_km_s;
         self.vz_km_s = me.vz_km_s;
-    }
-
-    /// Returns a copy of the state with a new TA
-    pub fn with_ta(self, new_ta: f64) -> Self {
-        let mut me = self;
-        me.set_ta(new_ta);
-        me
-    }
-
-    /// Returns a copy of the state with a provided TA added to the current one
-    pub fn add_ta(self, delta_ta: f64) -> Self {
-        let mut me = self;
-        me.set_ta(me.ta() + delta_ta);
-        me
-    }
-
-    /// Returns a copy of this state with the provided apoasis and periapse
-    pub fn with_apoapsis_periapsis(self, new_ra: f64, new_rp: f64) -> Self {
-        Self::keplerian_apsis_radii(
-            new_ra,
-            new_rp,
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
-            self.epoch,
-            self.frame,
-        )
-    }
-
-    /// Returns a copy of this state with the provided apoasis and periapse added to the current values
-    pub fn add_apoapsis_periapsis(self, delta_ra: f64, delta_rp: f64) -> Self {
-        Self::keplerian_apsis_radii(
-            self.apoapsis() + delta_ra,
-            self.periapsis() + delta_rp,
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
-            self.epoch,
-            self.frame,
-        )
     }
 
     /// Returns the true longitude in degrees
@@ -1244,133 +1443,6 @@ impl Orbit {
         }
     }
 
-    /// Returns the direct cosine rotation matrix to convert to this state's frame (inertial or otherwise).
-    /// ## Example
-    /// let dcm_vnc2inertial = orbit.dcm_from_traj_frame(Frame::VNC)?;
-    /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
-    pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, NyxError> {
-        match from {
-            Frame::RIC => Ok(r3(-self.raan().to_radians())
-                * r1(-self.inc().to_radians())
-                * r3(-self.aol().to_radians())),
-            Frame::VNC => {
-                let v = self.velocity() / self.vmag();
-                let n = self.hvec() / self.hmag();
-                let c = v.cross(&n);
-                Ok(Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose())
-            }
-            Frame::RCN => {
-                let r = self.radius() / self.rmag();
-                let n = self.hvec() / self.hmag();
-                let c = n.cross(&r);
-                Ok(Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose())
-            }
-            Frame::SEZ => {
-                // From the GMAT MathSpec, page 30 section 2.6.9 and from `Calculate_RFT` in `TopocentricAxes.cpp`, this returns the
-                // rotation matrix from the topocentric frame (SEZ) to body fixed frame.
-                // In the GMAT MathSpec notation, R_{IF} is the DCM from body fixed to inertial. Similarly, R{FT} is from topocentric
-                // to body fixed.
-                if !self.frame.is_body_fixed() {
-                    warn!("Computation of SEZ rotation matrix must be done in a body fixed frame and {} is not one!", self.frame);
-                }
-                if (self.x_km.powi(2) + self.y_km.powi(2)).sqrt() < 1e-3 {
-                    warn!("SEZ frame ill-defined when close to the poles");
-                }
-                let phi = self.geodetic_latitude().to_radians();
-                let lambda = self.geodetic_longitude().to_radians();
-                let z_hat = Vector3::new(
-                    phi.cos() * lambda.cos(),
-                    phi.cos() * lambda.sin(),
-                    phi.sin(),
-                );
-                // y_hat MUST be renormalized otherwise it's about 0.76 and therefore the rotation looses the norms conservation property.
-                let mut y_hat = Vector3::new(0.0, 0.0, 1.0).cross(&z_hat);
-                y_hat /= y_hat.norm();
-                let x_hat = y_hat.cross(&z_hat);
-                Ok(Matrix3::new(
-                    x_hat[0], y_hat[0], z_hat[0], x_hat[1], y_hat[1], z_hat[1], x_hat[2], y_hat[2],
-                    z_hat[2],
-                ))
-            }
-            _ => Err(NyxError::CustomError(
-                "did not provide a local frame".to_string(),
-            )),
-        }
-    }
-
-    /// Returns a 6x6 DCM to convert to this inertial state.
-    /// WARNING: This DCM does NOT contain the corrections needed for the transport theorem, and therefore the velocity rotation is wrong.
-    pub fn dcm6x6_from_traj_frame(&self, from: Frame) -> Result<Matrix6<f64>, NyxError> {
-        let dcm3x3 = self.dcm_from_traj_frame(from)?;
-
-        let mut dcm = Matrix6::zeros();
-        for i in 0..3 {
-            for j in 0..3 {
-                dcm[(i, j)] = dcm3x3[(i, j)];
-                dcm[(i + 3, j + 3)] = dcm3x3[(i, j)];
-            }
-        }
-
-        Ok(dcm)
-    }
-
-    /// Apply the provided delta-v (in km/s)
-    pub fn apply_dv(&mut self, dv: Vector3<f64>) {
-        self.vx_km_s += dv[0];
-        self.vy_km_s += dv[1];
-        self.vz_km_s += dv[2];
-    }
-
-    /// Copies this orbit after applying the provided delta-v (in km/s)
-    pub fn with_dv(self, dv: Vector3<f64>) -> Self {
-        let mut me = self;
-        me.apply_dv(dv);
-        me
-    }
-
-    /// Rotate this state provided a direct cosine matrix of position and velocity
-    pub fn rotate_by(&mut self, dcm: Matrix6<f64>) {
-        let new_orbit = dcm * self.to_cartesian_vec();
-        self.x_km = new_orbit[0];
-        self.y_km = new_orbit[1];
-        self.z_km = new_orbit[2];
-
-        self.vx_km_s = new_orbit[3];
-        self.vy_km_s = new_orbit[4];
-        self.vz_km_s = new_orbit[5];
-    }
-
-    /// Rotate this state provided a direct cosine matrix of position and velocity
-    pub fn with_rotation_by(&self, dcm: Matrix6<f64>) -> Self {
-        let mut me = *self;
-        me.rotate_by(dcm);
-        me
-    }
-
-    /// Rotate the position and the velocity of this state provided a direct cosine matrix of position and velocity
-    /// WARNING: You only want to use this if you'll only be using the position components of the rotated state.
-    /// This does not account for the transport theorem and therefore is physically WRONG.
-    pub fn position_rotated_by(&mut self, dcm: Matrix3<f64>) {
-        let new_radius = dcm * self.radius();
-        self.x_km = new_radius[0];
-        self.y_km = new_radius[1];
-        self.z_km = new_radius[2];
-
-        let new_velocity = dcm * self.velocity();
-        self.vx_km_s = new_velocity[0];
-        self.vy_km_s = new_velocity[1];
-        self.vz_km_s = new_velocity[2];
-    }
-
-    /// Rotate the position of this state provided a direct cosine matrix of position and velocity
-    /// WARNING: You only want to use this if you'll only be using the position components of the rotated state.
-    /// This does not account for the transport theorem and therefore is physically WRONG.
-    pub fn with_position_rotated_by(&self, dcm: Matrix3<f64>) -> Self {
-        let mut me = *self;
-        me.position_rotated_by(dcm);
-        me
-    }
-
     /// Sets the STM of this state of identity, which also enables computation of the STM for spacecraft navigation
     pub fn enable_stm(&mut self) {
         self.stm = Some(Matrix6::identity());
@@ -1379,20 +1451,6 @@ impl Orbit {
     /// Disable the STM of this state
     pub fn disable_stm(&mut self) {
         self.stm = None;
-    }
-
-    /// Copies the current state but sets the STM to identity
-    pub fn with_stm(self) -> Self {
-        let mut me = self;
-        me.enable_stm();
-        me
-    }
-
-    /// Copies the current state but disables the STM
-    pub fn without_stm(self) -> Self {
-        let mut me = self;
-        me.disable_stm();
-        me
     }
 
     /// Returns the root sum square error between this state and the other, in kilometers for the position and kilometers per second in velocity
@@ -1418,56 +1476,64 @@ impl Orbit {
             }
     }
 
-    /// Use the current orbit as a template to generate mission design objectives.
-    /// Note: this sets the objective tolerances to be quite tight, so consider modifying them.
-    pub fn to_objectives(&self, params: &[StateParameter]) -> Result<Vec<Objective>, NyxError> {
-        let mut rtn = Vec::with_capacity(params.len());
-        for parameter in params {
-            rtn.push(Objective::new(*parameter, self.value(parameter)?));
+    #[cfg(feature = "python")]
+    pub fn __repr__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    #[cfg(feature = "python")]
+    pub fn __str__(&self) -> String {
+        format!("{self}")
+    }
+
+    #[cfg(feature = "python")]
+    #[new]
+    pub fn py_new(
+        x_km: f64,
+        y_km: f64,
+        z_km: f64,
+        vx_km_s: f64,
+        vy_km_s: f64,
+        vz_km_s: f64,
+        epoch: Epoch,
+        frame: PyRef<PyFrame>,
+    ) -> Self {
+        Self::cartesian(
+            x_km,
+            y_km,
+            z_km,
+            vx_km_s,
+            vy_km_s,
+            vz_km_s,
+            epoch,
+            frame.inner,
+        )
+    }
+
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
+        let serde = OrbitSerde::load_yaml(path)?;
+
+        let cosm = Cosm::de438();
+
+        Self::from_config(&serde, cosm)
+    }
+
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
+        let orbits = OrbitSerde::load_many_yaml(path)?;
+
+        let cosm = Cosm::de438();
+
+        let mut selves = Vec::with_capacity(orbits.len());
+
+        for serde in orbits {
+            selves.push(Self::from_config(&serde, cosm.clone())?);
         }
-        Ok(rtn)
-    }
 
-    /// Create a multivariate normal dispersion structure from this orbit with the provided mean and covariance,
-    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
-    pub fn disperse(
-        &self,
-        mean: Vector6<f64>,
-        cov: Matrix6<f64>,
-    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
-        MultivariateNormal::new(
-            *self,
-            vec![
-                StateParameter::X,
-                StateParameter::Y,
-                StateParameter::Z,
-                StateParameter::VX,
-                StateParameter::VY,
-                StateParameter::VZ,
-            ],
-            mean,
-            cov,
-        )
-    }
-
-    /// Create a multivariate normal dispersion structure from this orbit with the provided covariance,
-    /// specified as {X, Y, Z, VX, VY, VZ} in km and km/s
-    pub fn disperse_zero_mean(
-        &self,
-        cov: Matrix6<f64>,
-    ) -> Result<MultivariateNormal<Orbit>, NyxError> {
-        MultivariateNormal::zero_mean(
-            *self,
-            vec![
-                StateParameter::X,
-                StateParameter::Y,
-                StateParameter::Z,
-                StateParameter::VX,
-                StateParameter::VY,
-                StateParameter::VZ,
-            ],
-            cov,
-        )
+        Ok(selves)
     }
 }
 

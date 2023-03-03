@@ -25,7 +25,7 @@ use hifitime::prelude::*;
 use hifitime::ut1::Ut1Provider;
 use pyo3::{exceptions::PyException, prelude::*};
 
-mod cosmic;
+pub(crate) mod cosmic;
 mod orbit_determination;
 
 impl From<NyxError> for PyErr {

@@ -1,13 +1,10 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use super::Epoch;
 use crate::cosmic::Bodies as BodiesRs;
 use crate::cosmic::Cosm as CosmRs;
 use crate::cosmic::Frame as FrameRs;
 pub use crate::cosmic::Orbit;
-use crate::io::orbit::OrbitSerde;
-use crate::io::{ConfigError, ConfigRepr, Configurable};
 use std::sync::Arc;
 
 #[pyclass]
@@ -110,68 +107,6 @@ impl Bodies {
     }
 }
 
-#[pymethods]
-impl Orbit {
-    /// Creates a new Orbit in the provided frame at the provided Epoch.
-    ///
-    /// **Units:** km, km, km, km/s, km/s, km/s
-    #[new]
-    pub fn from_cartesian(
-        x_km: f64,
-        y_km: f64,
-        z_km: f64,
-        vx_km_s: f64,
-        vy_km_s: f64,
-        vz_km_s: f64,
-        epoch: Epoch,
-        frame: PyRef<Frame>,
-    ) -> Self {
-        Self::cartesian(
-            x_km,
-            y_km,
-            z_km,
-            vx_km_s,
-            vy_km_s,
-            vz_km_s,
-            epoch,
-            frame.inner,
-        )
-    }
-
-    #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = OrbitSerde::load_yaml(path)?;
-
-        let cosm = CosmRs::de438();
-
-        Self::from_config(&serde, cosm)
-    }
-
-    #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let orbits = OrbitSerde::load_many_yaml(path)?;
-
-        // Create a new Cosm until ANISE switch
-        let cosm = CosmRs::de438();
-
-        let mut selves = Vec::with_capacity(orbits.len());
-
-        for serde in orbits {
-            selves.push(Self::from_config(&serde, cosm.clone())?);
-        }
-
-        Ok(selves)
-    }
-
-    fn __repr__(&self) -> String {
-        format!("{self:?}")
-    }
-
-    fn __str__(&self) -> String {
-        format!("{self}")
-    }
-}
-
 #[pyclass]
 pub struct Frame {
     pub inner: FrameRs,
@@ -203,7 +138,7 @@ impl Frame {
     pub fn semi_major_radius(&self) -> f64 {
         self.inner.semi_major_radius()
     }
-    pub fn angualar_velocity(&self) -> f64 {
+    pub fn angular_velocity(&self) -> f64 {
         self.inner.angular_velocity()
     }
 }

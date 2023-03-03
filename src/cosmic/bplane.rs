@@ -25,12 +25,14 @@ use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
 use crate::utils::between_pm_180;
 use crate::NyxError;
-
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use std::convert::From;
 use std::fmt;
 
 /// Stores a B-Plane
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct BPlane {
     /// The $B_T$ component, in kilometers
     pub b_t: OrbitPartial,
@@ -131,28 +133,6 @@ impl BPlane {
         Self::from_dual(OrbitDual::from(orbit))
     }
 
-    pub fn b_dot_t(&self) -> f64 {
-        self.b_t.real()
-    }
-
-    pub fn b_dot_r(&self) -> f64 {
-        self.b_r.real()
-    }
-
-    pub fn ltof(&self) -> Duration {
-        self.ltof_s.real() * Unit::Second
-    }
-
-    /// Returns the B plane angle in degrees between -180 and 180
-    pub fn angle(&self) -> f64 {
-        between_pm_180(self.b_dot_r().atan2(self.b_dot_t()).to_degrees())
-    }
-
-    /// Returns the B plane vector magnitude, in kilometers
-    pub fn mag(&self) -> f64 {
-        (self.b_dot_t().powi(2) + self.b_dot_r().powi(2)).sqrt()
-    }
-
     /// Returns the DCM to convert to the B Plane from the inertial frame
     pub fn inertial_to_bplane(&self) -> Matrix3<f64> {
         self.str_dcm
@@ -198,6 +178,41 @@ impl BPlane {
                 "B Plane jacobian invariant must be either VX, VY or VZ".to_string(),
             )),
         }
+    }
+}
+
+#[cfg_attr(feature = "python", pymethods)]
+impl BPlane {
+    pub fn b_dot_t(&self) -> f64 {
+        self.b_t.real()
+    }
+
+    pub fn b_dot_r(&self) -> f64 {
+        self.b_r.real()
+    }
+
+    pub fn ltof(&self) -> Duration {
+        self.ltof_s.real() * Unit::Second
+    }
+
+    /// Returns the B plane angle in degrees between -180 and 180
+    pub fn angle(&self) -> f64 {
+        between_pm_180(self.b_dot_r().atan2(self.b_dot_t()).to_degrees())
+    }
+
+    /// Returns the B plane vector magnitude, in kilometers
+    pub fn mag(&self) -> f64 {
+        (self.b_dot_t().powi(2) + self.b_dot_r().powi(2)).sqrt()
+    }
+
+    #[cfg(feature = "python")]
+    pub fn __repr__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    #[cfg(feature = "python")]
+    pub fn __str__(&self) -> String {
+        format!("{self}")
     }
 }
 
