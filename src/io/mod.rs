@@ -25,6 +25,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde::{Serialize, Serializer};
 use serde_yaml::Error as YamlError;
+use std::collections::HashMap;
 use std::convert::From;
 use std::fmt;
 use std::fmt::Debug;
@@ -93,6 +94,17 @@ pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
 
     /// Builds a sequence of "Selves" from the provided path to a yaml
     fn load_many_yaml<P>(path: P) -> Result<Vec<Self>, ConfigError>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+    }
+
+    /// Builds a map of names to "selves" from the provided path to a yaml
+    fn load_named_yaml<P>(path: P) -> Result<HashMap<String, Self>, ConfigError>
     where
         P: AsRef<Path>,
     {

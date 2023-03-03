@@ -26,7 +26,7 @@
 // }
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Harmonics {
@@ -37,15 +37,10 @@ pub struct Harmonics {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Shadows {
-    shadows: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct Srp {
     phi: Option<f64>,
     #[serde(flatten)]
-    shadows: Option<Shadows>,
+    shadows: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

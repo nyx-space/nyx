@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::collections::HashMap;
+
 use crate::io::odp::Cosm;
 use crate::io::stations::StationSerde;
 use crate::io::trajectory_data::DynamicTrajectory;
@@ -49,6 +51,21 @@ impl GroundStation {
 
         for serde in stations {
             selves.push(GroundStation::from_config(&serde, cosm.clone())?);
+        }
+
+        Ok(selves)
+    }
+
+    #[staticmethod]
+    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = StationSerde::load_named_yaml(path)?;
+
+        let cosm = Cosm::de438();
+
+        let mut selves = HashMap::with_capacity(orbits.len());
+
+        for (k, v) in orbits {
+            selves.insert(k, Self::from_config(&v, cosm.clone())?);
         }
 
         Ok(selves)

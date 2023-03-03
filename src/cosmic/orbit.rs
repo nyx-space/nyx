@@ -41,6 +41,7 @@ use approx::{abs_diff_eq, relative_eq};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
@@ -1531,6 +1532,22 @@ impl Orbit {
 
         for serde in orbits {
             selves.push(Self::from_config(&serde, cosm.clone())?);
+        }
+
+        Ok(selves)
+    }
+
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = OrbitSerde::load_named_yaml(path)?;
+
+        let cosm = Cosm::de438();
+
+        let mut selves = HashMap::with_capacity(orbits.len());
+
+        for (k, v) in orbits {
+            selves.insert(k, Self::from_config(&v, cosm.clone())?);
         }
 
         Ok(selves)
