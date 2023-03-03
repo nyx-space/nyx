@@ -1,0 +1,26 @@
+hifi:
+  point_masses:
+    - Sun
+    - Earth
+    - Moon
+
+  harmonics:
+    - frame: IAU Earth
+      coeffs: data/JGM3.cof.gz
+      degree: 10
+      order: 10
+
+  srp:
+    phi: 1367.0 # Can be omitted, uses default value
+    shadows:
+      - Sun
+      - Moon
+
+lofi:
+  point_masses:
+    - Sun
+    - Earth
+
+  #drag:
+  #  density: !Constant 159.0
+  #  frame: IAU Earth

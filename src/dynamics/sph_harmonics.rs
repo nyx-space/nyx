@@ -21,20 +21,17 @@ use super::hyperdual::{hyperspace_from_vector, Float, OHyperdual};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
-use crate::io::gravity::GravityPotentialStor;
+use crate::io::gravity::HarmonicsMem;
 use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
 use std::cmp::min;
 use std::fmt;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct Harmonics<S>
-where
-    S: GravityPotentialStor,
-{
+pub struct Harmonics {
     cosm: Arc<Cosm>,
     compute_frame: Frame,
-    stor: S,
+    stor: HarmonicsMem,
     a_nm: DMatrix<f64>,
     b_nm: DMatrix<f64>,
     c_nm: DMatrix<f64>,
@@ -47,12 +44,9 @@ where
     vr11_h: DMatrix<OHyperdual<f64, U7>>,
 }
 
-impl<S> Harmonics<S>
-where
-    S: GravityPotentialStor,
-{
+impl Harmonics {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: S, cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem, cosm: Arc<Cosm>) -> Arc<Self> {
         assert!(
             compute_frame.is_geoid(),
             "harmonics only work around geoids"
@@ -141,7 +135,7 @@ where
     }
 }
 
-impl<S: GravityPotentialStor + Send> fmt::Display for Harmonics<S> {
+impl fmt::Display for Harmonics {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -153,7 +147,7 @@ impl<S: GravityPotentialStor + Send> fmt::Display for Harmonics<S> {
     }
 }
 
-impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
+impl AccelModel for Harmonics {
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = self.cosm.frame_chg(osc, self.compute_frame);

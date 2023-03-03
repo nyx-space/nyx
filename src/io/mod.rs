@@ -50,6 +50,7 @@ pub mod frame_serde;
 /// Handles reading random variables
 pub mod rv;
 
+pub mod dynamics;
 pub mod odp;
 pub mod orbit;
 pub mod scenario;
