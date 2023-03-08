@@ -19,7 +19,7 @@
 use super::guidance::GuidanceLaw;
 use super::orbital::OrbitalDynamics;
 use super::{Dynamics, ForceModel};
-pub use crate::cosmic::{BaseSpacecraft, GuidanceMode, Spacecraft, SpacecraftExt, STD_GRAVITY};
+pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
 use crate::errors::NyxError;
 use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
 
@@ -35,20 +35,17 @@ const NORM_ERR: f64 = 1e-4;
 /// Note: when developing new guidance laws, it is recommended to _not_ enable fuel decrement until the guidance law seems to work without proper physics.
 /// Note: if the spacecraft runs out of fuel, the propagation segment will return an error.
 #[derive(Clone)]
-pub struct BaseSpacecraftDynamics<X: SpacecraftExt> {
+pub struct SpacecraftDynamics {
     pub orbital_dyn: OrbitalDynamics,
-    pub force_models: Vec<Arc<dyn ForceModel<X>>>,
-    pub guid_law: Option<Arc<dyn GuidanceLaw<X>>>,
+    pub force_models: Vec<Arc<dyn ForceModel>>,
+    pub guid_law: Option<Arc<dyn GuidanceLaw>>,
     pub decrement_mass: bool,
 }
 
-impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
+impl SpacecraftDynamics {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
     /// By default, the mass of the vehicle will be decremented as propellant is consumed.
-    pub fn from_guidance_law(
-        orbital_dyn: OrbitalDynamics,
-        guid_law: Arc<dyn GuidanceLaw<X>>,
-    ) -> Self {
+    pub fn from_guidance_law(orbital_dyn: OrbitalDynamics, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn,
             guid_law: Some(guid_law),
@@ -61,7 +58,7 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
     /// Will _not_ decrement the fuel mass as propellant is consumed.
     pub fn from_guidance_law_no_decr(
         orbital_dyn: OrbitalDynamics,
-        guid_law: Arc<dyn GuidanceLaw<X>>,
+        guid_law: Arc<dyn GuidanceLaw>,
     ) -> Self {
         Self {
             orbital_dyn,
@@ -82,7 +79,7 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
     }
 
     /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
-    pub fn from_model(orbital_dyn: OrbitalDynamics, force_model: Arc<dyn ForceModel<X>>) -> Self {
+    pub fn from_model(orbital_dyn: OrbitalDynamics, force_model: Arc<dyn ForceModel>) -> Self {
         Self {
             orbital_dyn,
             guid_law: None,
@@ -94,7 +91,7 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
     /// Initialize new spacecraft dynamics with a vector of force models.
     pub fn from_models(
         orbital_dyn: OrbitalDynamics,
-        force_models: Vec<Arc<dyn ForceModel<X>>>,
+        force_models: Vec<Arc<dyn ForceModel>>,
     ) -> Self {
         let mut me = Self::new(orbital_dyn);
         me.force_models = force_models;
@@ -102,19 +99,19 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
     }
 
     /// Add a model to the currently defined spacecraft dynamics
-    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel<X>>) {
+    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel>) {
         self.force_models.push(force_model);
     }
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, force_model: Arc<dyn ForceModel<X>>) -> Self {
+    pub fn with_model(self, force_model: Arc<dyn ForceModel>) -> Self {
         let mut me = self;
         me.add_model(force_model);
         me
     }
 
     /// A shortcut to spacecraft.guid_law if a guidance law is defined for these dynamics
-    pub fn guidance_achieved(&self, state: &BaseSpacecraft<X>) -> Result<bool, NyxError> {
+    pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         match &self.guid_law {
             Some(guid_law) => guid_law.achieved(state),
             None => Err(NyxError::NoObjectiveDefined),
@@ -122,7 +119,7 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
     }
 
     /// Clone these spacecraft dynamics and update the control to the one provided.
-    pub fn with_guidance_law(&self, guid_law: Arc<dyn GuidanceLaw<X>>) -> Self {
+    pub fn with_guidance_law(&self, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn: self.orbital_dyn.clone(),
             guid_law: Some(guid_law),
@@ -132,7 +129,7 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
     }
 
     /// Clone these spacecraft dynamics and update the control to the one provided.
-    pub fn with_guidance_law_no_decr(&self, guid_law: Arc<dyn GuidanceLaw<X>>) -> Self {
+    pub fn with_guidance_law_no_decr(&self, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn: self.orbital_dyn.clone(),
             guid_law: Some(guid_law),
@@ -152,7 +149,7 @@ impl<X: SpacecraftExt> BaseSpacecraftDynamics<X> {
     }
 }
 
-impl<X: SpacecraftExt> fmt::Display for BaseSpacecraftDynamics<X> {
+impl fmt::Display for SpacecraftDynamics {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let force_models: String = self.force_models.iter().map(|x| format!("{x}; ")).collect();
         write!(
@@ -165,16 +162,14 @@ impl<X: SpacecraftExt> fmt::Display for BaseSpacecraftDynamics<X> {
     }
 }
 
-impl<X: SpacecraftExt> Dynamics for BaseSpacecraftDynamics<X> {
+impl Dynamics for SpacecraftDynamics {
     type HyperdualSize = Const<9>;
-    type StateType = BaseSpacecraft<X>;
+    type StateType = Spacecraft;
 
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
-            return Err(NyxError::FuelExhausted(Box::new(
-                next_state.degrade_to_spacecraft(),
-            )));
+            return Err(NyxError::FuelExhausted(Box::new(next_state)));
         }
 
         if let Some(guid_law) = &self.guid_law {
@@ -327,5 +322,5 @@ impl<X: SpacecraftExt> Dynamics for BaseSpacecraftDynamics<X> {
     }
 }
 
-/// A spaceraft dynamics that works in nearly all guidance law cases
-pub type SpacecraftDynamics = BaseSpacecraftDynamics<GuidanceMode>;
+// A spaceraft dynamics that works in nearly all guidance law cases
+// pub type SpacecraftDynamics = BaseSpacecraftDynamics<GuidanceMode>;

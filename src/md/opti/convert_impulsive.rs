@@ -77,7 +77,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         let mut mnvr = Mnvr {
             start: impulse_epoch - 0.5 * delta_tfb * Unit::Second,
             end: impulse_epoch + 0.5 * delta_tfb * Unit::Second,
-            thrust_lvl: 1.0,
+            thrust_prct: 1.0,
             alpha_inplane_radians,
             delta_outofplane_radians: beta_outofplane_radians,
             frame: Frame::Inertial,

@@ -34,11 +34,6 @@ use std::fmt;
 use std::ops::Add;
 use std::sync::Arc;
 
-/// Defines a spacecraft extension.
-/// This is useful for highly specialized guidance laws that need to store additional data in the spacecraft state.
-/// Most guidance laws can be implemented directly with the `Spacecraft` structure.
-pub trait SpacecraftExt: Clone + Copy + Default + fmt::Debug + Send + Sync {}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
@@ -47,7 +42,6 @@ pub enum GuidanceMode {
     Thrust,
     /// Guidance is turned off and Guidance Law may not change its mode (will need to be done externally to the guidance law).
     Inhibit,
-    Custom(u8),
 }
 
 impl Default for GuidanceMode {
@@ -56,11 +50,9 @@ impl Default for GuidanceMode {
     }
 }
 
-impl SpacecraftExt for GuidanceMode {}
-
 /// A spacecraft state
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct BaseSpacecraft<X: SpacecraftExt> {
+pub struct Spacecraft {
     /// Initial orbit the vehicle is in
     #[serde(deserialize_with = "orbit_from_str")]
     pub orbit: Orbit,
@@ -82,13 +74,13 @@ pub struct BaseSpacecraft<X: SpacecraftExt> {
     pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
     /// Any extra information or extension that is needed for specific guidance laws
     #[serde(skip)]
-    pub ext: X,
+    pub mode: GuidanceMode,
 }
 
-/// A spacecraft state
-pub type Spacecraft = BaseSpacecraft<GuidanceMode>;
+// A spacecraft state
+// pub type Spacecraft = BaseSpacecraft<GuidanceMode>;
 
-impl<X: SpacecraftExt> Default for BaseSpacecraft<X> {
+impl Default for Spacecraft {
     fn default() -> Self {
         Self {
             orbit: Orbit::zeros(),
@@ -100,7 +92,7 @@ impl<X: SpacecraftExt> Default for BaseSpacecraft<X> {
             cd: 2.2,
             thruster: None,
             stm: None,
-            ext: X::default(),
+            mode: GuidanceMode::default(),
         }
     }
 }
@@ -139,7 +131,7 @@ impl Default for DragConfig {
     }
 }
 
-impl<X: SpacecraftExt> BaseSpacecraft<X> {
+impl Spacecraft {
     /// Initialize a spacecraft state from all of its parameters
     pub fn new(
         orbit: Orbit,
@@ -165,20 +157,20 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
         }
     }
 
-    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing guidance laws whilke ignoring drag and SRP.
+    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing guidance laws while ignoring drag and SRP.
     pub fn from_thruster(
         orbit: Orbit,
         dry_mass_kg: f64,
         fuel_mass_kg: f64,
         thruster: Thruster,
-        ext: X,
+        mode: GuidanceMode,
     ) -> Self {
         Self {
             orbit,
             dry_mass_kg,
             fuel_mass_kg,
             thruster: Some(thruster),
-            ext,
+            mode,
             stm: orbit
                 .stm
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
@@ -314,25 +306,23 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
         self.dry_mass_kg + self.fuel_mass_kg
     }
 
-    /// Allows the automatic conversion of a BaseSpacecraft into a standard spacecraft.
-    /// WARNING: This will IGNORE the `extra` of BaseSpacecraft
-    pub fn degrade_to_spacecraft(&self) -> Spacecraft {
-        Spacecraft {
-            orbit: self.orbit,
-            dry_mass_kg: self.dry_mass_kg,
-            fuel_mass_kg: self.fuel_mass_kg,
-            srp_area_m2: self.srp_area_m2,
-            drag_area_m2: self.drag_area_m2,
-            cr: self.cr,
-            cd: self.cd,
-            thruster: self.thruster,
-            stm: self.stm,
-            ext: GuidanceMode::Coast,
-        }
+    /// Returns a copy of the state with the provided guidance mode
+    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
+        let mut me = self;
+        me.mode = mode;
+        me
+    }
+
+    pub fn mode(&self) -> GuidanceMode {
+        self.mode
+    }
+
+    pub fn mut_mode(&mut self, mode: GuidanceMode) {
+        self.mode = mode;
     }
 }
 
-impl<X: SpacecraftExt> PartialEq for BaseSpacecraft<X> {
+impl PartialEq for Spacecraft {
     fn eq(&self, other: &Self) -> bool {
         let mass_tol = 1e-6; // milligram
         self.orbit == other.orbit
@@ -344,7 +334,7 @@ impl<X: SpacecraftExt> PartialEq for BaseSpacecraft<X> {
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
+impl fmt::Display for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -353,13 +343,13 @@ impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
+impl fmt::LowerExp for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -368,13 +358,13 @@ impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*e}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
+impl fmt::UpperExp for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -383,13 +373,13 @@ impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*E}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*E}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
+impl fmt::LowerHex for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -398,13 +388,13 @@ impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*x}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::UpperHex for BaseSpacecraft<X> {
+impl fmt::UpperHex for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -413,12 +403,12 @@ impl<X: SpacecraftExt> fmt::UpperHex for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*X}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
-impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
+impl State for Spacecraft {
     type Size = Const<9>;
     type VecLength = Const<90>;
 
@@ -555,7 +545,7 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
     }
 }
 
-impl<X: SpacecraftExt> Add<OVector<f64, Const<6>>> for BaseSpacecraft<X> {
+impl Add<OVector<f64, Const<6>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
@@ -572,7 +562,7 @@ impl<X: SpacecraftExt> Add<OVector<f64, Const<6>>> for BaseSpacecraft<X> {
     }
 }
 
-impl<X: SpacecraftExt> Add<OVector<f64, Const<9>>> for BaseSpacecraft<X> {
+impl Add<OVector<f64, Const<9>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
@@ -589,23 +579,6 @@ impl<X: SpacecraftExt> Add<OVector<f64, Const<9>>> for BaseSpacecraft<X> {
         me.fuel_mass_kg += other[8];
 
         me
-    }
-}
-
-impl Spacecraft {
-    /// Returns a copy of the state with the provided guidance mode
-    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
-        let mut me = self;
-        me.ext = mode;
-        me
-    }
-
-    pub fn mode(&self) -> GuidanceMode {
-        self.ext
-    }
-
-    pub fn mut_mode(&mut self, mode: GuidanceMode) {
-        self.ext = mode;
     }
 }
 

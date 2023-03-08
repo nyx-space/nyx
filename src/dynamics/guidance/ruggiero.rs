@@ -169,7 +169,7 @@ impl fmt::Display for Ruggiero {
     }
 }
 
-impl GuidanceLaw<GuidanceMode> for Ruggiero {
+impl GuidanceLaw for Ruggiero {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         for obj in self.objectives.iter().flatten() {

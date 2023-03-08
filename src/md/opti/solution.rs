@@ -71,7 +71,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
             let mut mnvr = Mnvr {
                 start: correction_epoch,
                 end: achievement_epoch,
-                thrust_lvl: 1.0,
+                thrust_prct: 1.0,
                 alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
                 delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
                 frame: Frame::RCN,
@@ -144,8 +144,8 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                         mnvr.set_accel(vector)?;
                     }
                     Vary::ThrustLevel => {
-                        mnvr.thrust_lvl += corr;
-                        var.ensure_bounds(&mut mnvr.thrust_lvl);
+                        mnvr.thrust_prct += corr;
+                        var.ensure_bounds(&mut mnvr.thrust_prct);
                     }
                     _ => unreachable!(),
                 }

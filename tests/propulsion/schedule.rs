@@ -237,14 +237,14 @@ fn val_transfer_single_maneuver_depl() {
         thrust_N: 10.0,
         isp_s: 300.0,
     };
-    let dry_mass = 1e3;
-    let fuel_mass = 756.0;
+    let dry_mass_kg = 1e3;
+    let fuel_mass_kg = 756.0;
     let sc_state = Spacecraft::from_thruster(
         orbit,
-        dry_mass,
-        fuel_mass,
+        dry_mass_kg,
+        fuel_mass_kg,
         monoprop,
-        GuidanceMode::Custom(0),
+        GuidanceMode::Coast,
     );
 
     let prop_time = 50.0 * Unit::Minute;

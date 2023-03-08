@@ -17,7 +17,7 @@
 */
 
 use super::ForceModel;
-use crate::cosmic::{BaseSpacecraft, Cosm, Frame, SpacecraftExt};
+use crate::cosmic::{Cosm, Frame, Spacecraft};
 use crate::errors::NyxError;
 use crate::linalg::{Matrix3, Vector3};
 use std::fmt;
@@ -56,17 +56,14 @@ impl fmt::Display for ConstantDrag {
     }
 }
 
-impl<X: SpacecraftExt> ForceModel<X> for ConstantDrag {
-    fn eom(&self, ctx: &BaseSpacecraft<X>) -> Result<Vector3<f64>, NyxError> {
+impl ForceModel for ConstantDrag {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
         Ok(-0.5 * self.rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
     }
 
-    fn dual_eom(
-        &self,
-        _osc_ctx: &BaseSpacecraft<X>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }
 }
@@ -118,8 +115,8 @@ impl fmt::Display for Drag {
     }
 }
 
-impl<X: SpacecraftExt> ForceModel<X> for Drag {
-    fn eom(&self, ctx: &BaseSpacecraft<X>) -> Result<Vector3<f64>, NyxError> {
+impl ForceModel for Drag {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let integration_frame = ctx.orbit.frame;
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         match self.density {
@@ -171,10 +168,7 @@ impl<X: SpacecraftExt> ForceModel<X> for Drag {
         }
     }
 
-    fn dual_eom(
-        &self,
-        _osc_ctx: &BaseSpacecraft<X>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }
 }

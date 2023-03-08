@@ -29,7 +29,7 @@ fn thrust_dir_tgt_sma_aop_raan() {
             thrust_N: 500.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -79,7 +79,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
             thrust_N: 500.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -131,7 +131,7 @@ fn thrust_profile_tgt_sma_aop_raan() {
             thrust_N: 500.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -182,13 +182,8 @@ fn val_tgt_finite_burn() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = Spacecraft::from_thruster(
-        orbit,
-        dry_mass,
-        fuel_mass,
-        monoprop,
-        GuidanceMode::Custom(0),
-    );
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, monoprop, GuidanceMode::Thrust);
 
     let prop_time = 15.0 * Unit::Second;
 
