@@ -11,16 +11,16 @@ def plot_measurements(path):
 
     df = arc_pq.to_pandas()
     # Set the epoch to a Python object
-    df['Epoch'] = pd.to_datetime(df['Epoch:Gregorian UTC'])
+    df['Epoch (UTC)'] = pd.to_datetime(df['Epoch:Gregorian UTC'])
 
     # Plot all of the columns apart from the default ones.
-    default = ['Epoch:Gregorian UTC', 'Epoch:Gregorian TDB', 'Epoch:TDB (s)', 'Tracking device']
+    default = ['Epoch:Gregorian UTC', 'Epoch:Gregorian TAI', 'Epoch:TAI (s)', 'Tracking device']
 
     columns = [col for col in arc_pq.column_names if col not in default]
 
     for col in columns:
         # Create Plotly trace with units as axis label
-        fig = px.scatter(df, x='Epoch', y=col, color='Tracking device')
+        fig = px.scatter(df, x='Epoch (UTC)', y=col, color='Tracking device')
 
         # See if there is any metadata
         try:

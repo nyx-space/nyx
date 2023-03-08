@@ -19,123 +19,15 @@
 use std::collections::HashMap;
 
 use crate::io::odp::Cosm;
-use crate::io::stations::StationSerde;
 use crate::io::trajectory_data::DynamicTrajectory;
-use crate::io::{ConfigRepr, Configurable};
 use crate::od::msr::StdMeasurement;
 use crate::od::simulator::arc::TrackingArcSim;
+pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 use crate::{NyxError, Orbit};
 use pyo3::prelude::*;
-
-#[pymethods]
-impl GroundStation {
-    #[staticmethod]
-    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
-        let serde = StationSerde::load_yaml(path)?;
-
-        // Create a new Cosm until ANISE switch
-        let cosm = Cosm::de438();
-
-        GroundStation::from_config(&serde, cosm)
-    }
-
-    #[staticmethod]
-    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
-        let stations = StationSerde::load_many_yaml(path)?;
-
-        // Create a new Cosm until ANISE switch
-        let cosm = Cosm::de438();
-
-        let mut selves = Vec::with_capacity(stations.len());
-
-        for serde in stations {
-            selves.push(GroundStation::from_config(&serde, cosm.clone())?);
-        }
-
-        Ok(selves)
-    }
-
-    #[staticmethod]
-    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
-        let orbits = StationSerde::load_named_yaml(path)?;
-
-        let cosm = Cosm::de438();
-
-        let mut selves = HashMap::with_capacity(orbits.len());
-
-        for (k, v) in orbits {
-            selves.insert(k, Self::from_config(&v, cosm.clone())?);
-        }
-
-        Ok(selves)
-    }
-
-    // Manual getter/setters -- waiting on https://github.com/PyO3/pyo3/pull/2786
-
-    #[getter]
-    fn get_name(&self) -> PyResult<String> {
-        Ok(self.name.clone())
-    }
-
-    #[setter]
-    fn set_name(&mut self, name: String) -> PyResult<()> {
-        self.name = name;
-        Ok(())
-    }
-
-    #[getter]
-    fn get_elevation_mask_deg(&self) -> PyResult<f64> {
-        Ok(self.elevation_mask_deg)
-    }
-
-    #[setter]
-    fn set_elevation_mask_deg(&mut self, mask_deg: f64) -> PyResult<()> {
-        self.elevation_mask_deg = mask_deg;
-        Ok(())
-    }
-
-    #[getter]
-    fn get_latitude_deg(&self) -> PyResult<f64> {
-        Ok(self.latitude_deg)
-    }
-
-    #[setter]
-    fn set_latitude_deg(&mut self, lat_deg: f64) -> PyResult<()> {
-        self.latitude_deg = lat_deg;
-        Ok(())
-    }
-
-    #[getter]
-    fn get_longitude_deg(&self) -> PyResult<f64> {
-        Ok(self.longitude_deg)
-    }
-
-    #[setter]
-    fn set_longitude_deg(&mut self, long_deg: f64) -> PyResult<()> {
-        self.longitude_deg = long_deg;
-        Ok(())
-    }
-
-    #[getter]
-    fn get_height_km(&self) -> PyResult<f64> {
-        Ok(self.height_km)
-    }
-
-    #[setter]
-    fn set_height_km(&mut self, height_km: f64) -> PyResult<()> {
-        self.height_km = height_km;
-        Ok(())
-    }
-
-    fn __repr__(&self) -> String {
-        format!("{self:?}")
-    }
-
-    fn __str__(&self) -> String {
-        format!("{self}")
-    }
-}
+mod ground_station;
+mod trkconfig;
 
 #[pyclass]
 pub struct GroundTrackingArcSim {
@@ -144,11 +36,12 @@ pub struct GroundTrackingArcSim {
 
 #[pymethods]
 impl GroundTrackingArcSim {
-    /// Initiailizes a new tracking arc simulation from the provided devices, trajectory, and the random number generator seed.
+    /// Initializes a new tracking arc simulation from the provided devices, trajectory, and the random number generator seed.
     #[new]
     pub fn with_seed(
         devices: Vec<GroundStation>,
         trajectory: DynamicTrajectory,
+        configs: HashMap<String, TrkConfig>,
         seed: u64,
     ) -> Result<Self, NyxError> {
         // Try to convert the dynamic trajectory into an Orbit trajectory
@@ -156,7 +49,8 @@ impl GroundTrackingArcSim {
             .to_traj()
             .map_err(|e| NyxError::CustomError(e.to_string()))?;
 
-        let inner = TrackingArcSim::with_seed(devices, traj, seed);
+        let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
+            .map_err(|e| NyxError::ConfigError(e))?;
 
         Ok(Self { inner })
     }

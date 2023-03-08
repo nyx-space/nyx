@@ -18,21 +18,28 @@
 
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::{duration_from_str, duration_to_str};
+use crate::io::{ConfigRepr, Configurable};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use hifitime::Duration;
 use hifitime::TimeUnits;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use super::schedule::Schedule;
-use super::StartMode;
+use super::Availability;
 
 /// Stores a tracking configuration, there is one per tracking data simulator (e.g. one for ground station #1 and another for #2)
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct TrkConfig {
     #[serde(default)]
-    pub start_mode: StartMode,
+    pub start: Availability,
+    #[serde(default)]
+    pub end: Availability,
     #[serde(default)]
     pub schedule: Schedule,
     #[serde(
@@ -42,11 +49,32 @@ pub struct TrkConfig {
     pub sampling: Duration,
 }
 
+impl ConfigRepr for TrkConfig {}
+
+impl Configurable for TrkConfig {
+    type IntermediateRepr = Self;
+
+    fn from_config(
+        cfg: &Self::IntermediateRepr,
+        _cosm: Arc<Cosm>,
+    ) -> Result<Self, crate::io::ConfigError>
+    where
+        Self: Sized,
+    {
+        Ok(*cfg)
+    }
+
+    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
+        Ok(*self)
+    }
+}
+
 impl Default for TrkConfig {
     /// The default configuration is to generate a measurement every minute (continuously) while the vehicle is visible
     fn default() -> Self {
         Self {
-            start_mode: StartMode::Visible,
+            start: Availability::Visible,
+            end: Availability::Visible,
             schedule: Schedule::Continuous,
             sampling: 1.minutes(),
         }
@@ -61,17 +89,19 @@ fn serde_trkconfig() {
     // Test the default config
     let cfg = TrkConfig::default();
     let serialized = serde_yaml::to_string(&cfg).unwrap();
+    println!("{serialized}");
     let deserd: TrkConfig = serde_yaml::from_str(&serialized).unwrap();
     assert_eq!(deserd, cfg);
 
     // Specify an intermittent schedule and a specific start epoch.
     let cfg = TrkConfig {
-        start_mode: StartMode::Epoch(Epoch::from_gregorian_at_midnight(
+        start: Availability::Epoch(Epoch::from_gregorian_at_midnight(
             2023,
             2,
             22,
             TimeScale::TAI,
         )),
+        end: Availability::Visible,
         schedule: Schedule::Intermittent {
             on: 23.1.hours(),
             off: 0.9.hours(),

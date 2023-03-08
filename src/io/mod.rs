@@ -80,6 +80,13 @@ pub enum ConfigError {
     InvalidConfig(String),
 }
 
+impl PartialEq for ConfigError {
+    /// No two configuration errors match
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
 pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
     /// Builds the configuration representation from the path to a yaml
     fn load_yaml<P>(path: P) -> Result<Self, ConfigError>

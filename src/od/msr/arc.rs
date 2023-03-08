@@ -18,7 +18,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
@@ -71,7 +71,7 @@ where
     DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
 {
     /// Store this tracking arc to a parquet file
-    pub fn to_parquet<P: AsRef<Path>>(&self, path: P) -> Result<P, Box<dyn Error>> {
+    pub fn to_parquet<P: AsRef<Path> + Debug>(&self, path: P) -> Result<P, Box<dyn Error>> {
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
@@ -140,6 +140,8 @@ where
         let batch = RecordBatch::try_new(schema, record)?;
         writer.write(&batch)?;
         writer.close()?;
+
+        info!("Serialized {self} to {path:?}");
 
         // Return the path this was written to
         Ok(path)

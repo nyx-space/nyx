@@ -26,4 +26,4 @@ pub mod trackdata;
 mod trkconfig;
 pub use trkconfig::TrkConfig;
 mod start_mode;
-pub use start_mode::StartMode;
+pub use start_mode::Availability;

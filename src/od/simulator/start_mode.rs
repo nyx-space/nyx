@@ -24,25 +24,26 @@ use serde::Deserialize;
 use serde_derive::Serialize;
 use std::fmt::{Debug, Display};
 
+/// Defines the availability methods for a tracking arc.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum StartMode {
-    /// Start the tracking schedule with respect to when the receiver is visible
+pub enum Availability {
+    /// Start/stop the tracking schedule with respect to when the receiver is visible
     Visible,
-    /// Start the tracking schedule with respect to the provided epoch
+    /// Start/stop the tracking schedule with respect to the provided epoch
     #[serde(serialize_with = "epoch_to_str", deserialize_with = "epoch_from_str")]
     Epoch(Epoch),
 }
 
-impl Display for StartMode {
+impl Display for Availability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StartMode::Visible => write!(f, "StartMode::{self:?}"),
-            StartMode::Epoch(e) => write!(f, "StartMode::Epoch({e})"),
+            Availability::Visible => write!(f, "{self:?}"),
+            Availability::Epoch(e) => write!(f, "Epoch({e})"),
         }
     }
 }
 
-impl Default for StartMode {
+impl Default for Availability {
     fn default() -> Self {
         Self::Visible
     }
@@ -53,14 +54,14 @@ fn serde_startmode() {
     use core::str::FromStr;
     use serde_yaml;
 
-    let vis: StartMode = serde_yaml::from_str("!Visible").unwrap();
-    assert_eq!(vis, StartMode::Visible);
+    let vis: Availability = serde_yaml::from_str("!Visible").unwrap();
+    assert_eq!(vis, Availability::Visible);
 
     let val = "!Epoch 2023-02-23T00:00:00 UTC";
-    let mode: StartMode = serde_yaml::from_str(val).unwrap();
+    let mode: Availability = serde_yaml::from_str(val).unwrap();
     assert_eq!(
         mode,
-        StartMode::Epoch(Epoch::from_str("2023-02-23T00:00:00 UTC").unwrap())
+        Availability::Epoch(Epoch::from_str("2023-02-23T00:00:00 UTC").unwrap())
     );
 
     assert_eq!(val, serde_yaml::to_string(&mode).unwrap().trim());

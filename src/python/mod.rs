@@ -76,6 +76,7 @@ fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     sm.add_class::<orbit_determination::GroundStation>()?;
     sm.add_class::<orbit_determination::GroundTrackingArcSim>()?;
     sm.add_class::<DynamicTrackingArc>()?;
+    sm.add_class::<orbit_determination::TrkConfig>()?;
 
     parent_module.add_submodule(sm)?;
     Ok(())

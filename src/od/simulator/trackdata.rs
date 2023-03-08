@@ -25,7 +25,7 @@ use crate::od::SimMeasurement;
 use crate::State;
 use crate::{io::Configurable, linalg::allocator::Allocator};
 
-use super::{Cosm, TrkConfig};
+use super::Cosm;
 
 /// Tracking device simulator.
 pub trait TrackingDeviceSim<MsrIn, Msr>: Configurable
@@ -41,11 +41,6 @@ where
         + Allocator<f64, MsrIn::Size, MsrIn::Size>
         + Allocator<f64, MsrIn::VecLength>,
 {
-    /// Returns the tracking configuration of this specific object
-    fn config(&self) -> TrkConfig {
-        TrkConfig::default()
-    }
-
     /// Returns the name of this tracking data simulator
     fn name(&self) -> String;
 

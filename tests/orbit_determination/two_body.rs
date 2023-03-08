@@ -2,7 +2,9 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use nyx::io::ConfigRepr;
 use nyx::od::simulator::arc::TrackingArcSim;
+use nyx::od::simulator::TrkConfig;
 use rand::thread_rng;
 
 use self::nyx::cosmic::{Cosm, Orbit};
@@ -14,6 +16,8 @@ use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
+use std::collections::HashMap;
+use std::env;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -191,7 +195,7 @@ fn od_val_with_arc() {
 
     // We're sharing both the propagator and the dynamics.
     let orbital_dyn = OrbitalDynamics::two_body();
-    let setup = Propagator::default(orbital_dyn);
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, PropOpts::with_fixed_step_s(10.0));
 
     let mut prop = setup.with(initial_state);
     let (final_truth, traj) = prop.for_duration_with_traj(duration).unwrap();
@@ -207,10 +211,34 @@ fn od_val_with_arc() {
     .collect();
     traj.to_parquet(path, None).unwrap();
 
+    // Load the tracking configs
+    let trkconfig_yaml: PathBuf = [
+        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data",
+        "tests",
+        "config",
+        "trk_cfg_od_val_arc.yaml",
+    ]
+    .iter()
+    .collect();
+
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfig_yaml).unwrap();
+
     // Simulate tracking data of range and range rate
-    let mut arc_sim = TrackingArcSim::with_seed(all_stations.clone(), traj, 1);
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations.clone(), traj, configs, 1).unwrap();
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+
+    // And serialize to disk
+    let path: PathBuf = [
+        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "output_data",
+        "two_body_od_val_arc.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc.to_parquet(path).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -250,7 +278,7 @@ fn od_val_with_arc() {
     let est = &odp.estimates[odp.estimates.len() - 1];
     println!("Final estimate:\n{est}");
     assert!(
-        dbg!(est.state_deviation().norm()) < 1e-4,
+        dbg!(est.state_deviation().norm()) < f64::EPSILON,
         "In perfect modeling, the state deviation should be near zero"
     );
     for i in 0..6 {

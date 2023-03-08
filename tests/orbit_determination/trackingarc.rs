@@ -5,6 +5,8 @@ use nyx_space::md::ui::*;
 use nyx_space::od::msr::StdMeasurement;
 use nyx_space::od::prelude::*;
 use nyx_space::od::simulator::arc::TrackingArcSim;
+use nyx_space::od::simulator::TrkConfig;
+use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -65,8 +67,27 @@ fn tracking_arc_simple() {
         .map(|station| GroundStation::from_config(&station, cosm.clone()).unwrap())
         .collect();
 
+    dbg!(&devices);
+
+    // Load the tracking configuration from the test data.
+    let trkconfg_yaml: PathBuf = [
+        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data",
+        "tests",
+        "config",
+        "tracking_cfg.yaml",
+    ]
+    .iter()
+    .collect();
+
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfg_yaml).unwrap();
+
+    dbg!(&configs);
+
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<_, StdMeasurement, _>::with_seed(devices, trajectory, 12345);
+    let mut trk =
+        TrackingArcSim::<_, StdMeasurement, _>::with_seed(devices, trajectory, configs, 12345)
+            .unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 
