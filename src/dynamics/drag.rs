@@ -60,7 +60,7 @@ impl ForceModel for ConstantDrag {
     fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
-        Ok(-0.5 * self.rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+        Ok(-0.5 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
     }
 
     fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
@@ -122,7 +122,7 @@ impl ForceModel for Drag {
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc.velocity();
-                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::Exponential {
@@ -137,7 +137,7 @@ impl ForceModel for Drag {
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
                 let velocity = velocity_integr_frame - osc.velocity();
-                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
@@ -163,7 +163,7 @@ impl ForceModel for Drag {
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
                 let velocity = velocity_integr_frame - osc.velocity();
-                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
         }
     }

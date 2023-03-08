@@ -300,8 +300,8 @@ impl InterpState for Spacecraft {
             StateParameter::VZ => {
                 self.orbit.vz_km_s = value;
             }
-            StateParameter::Cr => self.cr = value,
-            StateParameter::Cd => self.cd = value,
+            StateParameter::Cr => self.srp.cr = value,
+            StateParameter::Cd => self.drag.cd = value,
             StateParameter::FuelMass => self.fuel_mass_kg = value,
             _ => return Err(NyxError::StateParameterUnavailable),
         }

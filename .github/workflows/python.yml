@@ -20,11 +20,11 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Build wheels
+      - name: Development build
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: develop --find-interpreter -F python
+          args: develop -F python
           manylinux: auto
 
       - name: Run script

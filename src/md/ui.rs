@@ -263,8 +263,8 @@ where
                                     );
                                     srp.phi = smdl.phi;
                                     sc_dyn.add_model(Arc::new(srp));
-                                    init_sc.srp_area_m2 = smdl.sc_area;
-                                    init_sc.cr = smdl.cr;
+                                    init_sc.srp.area_m2 = smdl.sc_area;
+                                    init_sc.srp.cr = smdl.cr;
                                 }
                             }
                         }

@@ -77,7 +77,7 @@ impl ForceModel for SolarPressure {
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        Ok(1e-3 * ctx.cr * ctx.srp_area_m2 * flux_pressure * r_sun_unit)
+        Ok(1e-3 * ctx.srp.cr * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
     }
 
     fn dual_eom(&self, ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
@@ -105,7 +105,7 @@ impl ForceModel for SolarPressure {
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         let dual_force_scalar =
-            OHyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.cr * ctx.srp_area_m2);
+            OHyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.srp.cr * ctx.srp.area_m2);
         let mut dual_force: Vector3<OHyperdual<f64, Const<9>>> = Vector3::zeros();
         dual_force[0] = dual_force_scalar * flux_pressure * r_sun_unit[0];
         dual_force[1] = dual_force_scalar * flux_pressure * r_sun_unit[1];
