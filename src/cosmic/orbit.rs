@@ -21,7 +21,6 @@ use super::Cosm;
 use super::State;
 use super::{BPlane, Frame};
 use crate::io::orbit::OrbitSerde;
-use crate::io::ConfigError;
 use crate::io::{
     epoch_from_str, epoch_to_str, frame_from_str, frame_to_str, ConfigRepr, Configurable,
 };
@@ -29,8 +28,7 @@ use crate::linalg::{Const, OVector};
 use crate::mc::MultivariateNormal;
 use crate::md::ui::Objective;
 use crate::md::StateParameter;
-#[cfg(feature = "python")]
-use crate::python::cosmic::Frame as PyFrame;
+
 use crate::time::{Duration, Epoch, Unit};
 use crate::utils::{
     between_0_360, between_pm_180, cartesian_to_spherical, perpv, r1, r3, rss_orbit_errors,
@@ -38,15 +36,21 @@ use crate::utils::{
 };
 use crate::NyxError;
 use approx::{abs_diff_eq, relative_eq};
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 use std::sync::Arc;
+
+#[cfg(feature = "python")]
+use crate::io::ConfigError;
+#[cfg(feature = "python")]
+use crate::python::cosmic::Frame as PyFrame;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use std::collections::HashMap;
 
 /// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
 pub const ECC_EPSILON: f64 = 1e-11;
@@ -336,39 +340,41 @@ impl Orbit {
 
     /// Creates a new Orbit from the provided radii of apoapsis and periapsis, in kilometers
     pub fn keplerian_apsis_radii(
-        r_a: f64,
-        r_p: f64,
-        inc: f64,
-        raan: f64,
-        aop: f64,
-        ta: f64,
-        dt: Epoch,
+        r_apo_km: f64,
+        r_peri_km: f64,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ta_deg: f64,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
-        let sma = (r_a + r_p) / 2.0;
-        let ecc = r_a / sma - 1.0;
-        Self::keplerian(sma, ecc, inc, raan, aop, ta, dt, frame)
+        let sma_km = (r_apo_km + r_peri_km) / 2.0;
+        let ecc = r_apo_km / sma_km - 1.0;
+        Self::keplerian(
+            sma_km, ecc, inc_deg, raan_deg, aop_deg, ta_deg, epoch, frame,
+        )
     }
 
     /// Creates a new Orbit from the provided altitudes of apoapsis and periapsis, in kilometers
     pub fn keplerian_apsis_altitude(
-        a_a: f64,
-        a_p: f64,
-        inc: f64,
-        raan: f64,
-        aop: f64,
-        ta: f64,
-        dt: Epoch,
+        apo_alt_km: f64,
+        peri_alt_km: f64,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ta_deg: f64,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         Self::keplerian_apsis_radii(
-            a_a + frame.equatorial_radius(),
-            a_p + frame.equatorial_radius(),
-            inc,
-            raan,
-            aop,
-            ta,
-            dt,
+            apo_alt_km + frame.equatorial_radius(),
+            peri_alt_km + frame.equatorial_radius(),
+            inc_deg,
+            raan_deg,
+            aop_deg,
+            ta_deg,
+            epoch,
             frame,
         )
     }
@@ -1477,19 +1483,24 @@ impl Orbit {
             }
     }
 
+    /// Prints this orbit in Cartesian form
     #[cfg(feature = "python")]
-    pub fn __repr__(&self) -> String {
-        format!("{self:?}")
-    }
-
-    #[cfg(feature = "python")]
-    pub fn __str__(&self) -> String {
+    fn __repr__(&self) -> String {
         format!("{self}")
     }
 
+    /// Prints this orbit in Keplerian form
+    #[cfg(feature = "python")]
+    fn __str__(&self) -> String {
+        format!("{self:x}")
+    }
+
+    /// Creates a new Orbit in the provided frame at the provided Epoch given the position and velocity components.
+    ///
+    /// **Units:** km, km, km, km/s, km/s, km/s
     #[cfg(feature = "python")]
     #[new]
-    pub fn py_new(
+    fn py_new(
         x_km: f64,
         y_km: f64,
         z_km: f64,
@@ -1551,6 +1562,130 @@ impl Orbit {
         }
 
         Ok(selves)
+    }
+
+    /// Creates a new Orbit around the provided Celestial or Geoid frame from the Keplerian orbital elements.
+    ///
+    /// **Units:** km, none, degrees, degrees, degrees, degrees
+    ///
+    /// WARNING: This function will panic if the singularities in the conversion are expected.
+    /// NOTE: The state is defined in Cartesian coordinates as they are non-singular. This causes rounding
+    /// errors when creating a state from its Keplerian orbital elements (cf. the state tests).
+    /// One should expect these errors to be on the order of 1e-12.
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn from_keplerian(
+        sma_km: f64,
+        ecc: f64,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ta_deg: f64,
+        epoch: Epoch,
+        frame: PyRef<PyFrame>,
+    ) -> Self {
+        Self::keplerian(
+            sma_km,
+            ecc,
+            inc_deg,
+            raan_deg,
+            aop_deg,
+            ta_deg,
+            epoch,
+            frame.inner,
+        )
+    }
+
+    /// Creates a new Orbit from the provided semi-major axis altitude in kilometers
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn from_keplerian_altitude(
+        sma_altitude_km: f64,
+        ecc: f64,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ta_deg: f64,
+        epoch: Epoch,
+        frame: PyRef<PyFrame>,
+    ) -> Self {
+        Self::keplerian_altitude(
+            sma_altitude_km,
+            ecc,
+            inc_deg,
+            raan_deg,
+            aop_deg,
+            ta_deg,
+            epoch,
+            frame.inner,
+        )
+    }
+
+    /// Creates a new Orbit from the provided altitudes of apoapsis and periapsis, in kilometers
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn from_keplerian_apsis_altitude(
+        apo_alt_km: f64,
+        peri_alt_km: f64,
+        inc_deg: f64,
+        raan_deg: f64,
+        aop_deg: f64,
+        ta_deg: f64,
+        epoch: Epoch,
+        frame: PyRef<PyFrame>,
+    ) -> Self {
+        Self::keplerian_apsis_altitude(
+            apo_alt_km,
+            peri_alt_km,
+            inc_deg,
+            raan_deg,
+            aop_deg,
+            ta_deg,
+            epoch,
+            frame.inner,
+        )
+    }
+
+    #[cfg(feature = "python")]
+    #[setter(sma_km)]
+    fn py_set_sma(&mut self, new_sma_km: f64) -> PyResult<()> {
+        self.set_sma(new_sma_km);
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
+    #[setter(ecc)]
+    fn py_set_ecc(&mut self, new_ecc: f64) -> PyResult<()> {
+        self.set_ecc(new_ecc);
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
+    #[setter(inc_deg)]
+    fn py_set_inc(&mut self, new_inc_deg: f64) -> PyResult<()> {
+        self.set_inc(new_inc_deg);
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
+    #[setter(inc_deg)]
+    fn py_set_raan(&mut self, new_raan_deg: f64) -> PyResult<()> {
+        self.set_raan(new_raan_deg);
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
+    #[setter(aop_deg)]
+    fn py_set_aop(&mut self, new_aop_deg: f64) -> PyResult<()> {
+        self.set_aop(new_aop_deg);
+        Ok(())
+    }
+
+    #[cfg(feature = "python")]
+    #[setter(ta_deg)]
+    fn py_set_ta(&mut self, new_ta_deg: f64) -> PyResult<()> {
+        self.set_ta(new_ta_deg);
+        Ok(())
     }
 }
 

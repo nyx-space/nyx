@@ -5,6 +5,7 @@ use crate::cosmic::Bodies as BodiesRs;
 use crate::cosmic::Cosm as CosmRs;
 use crate::cosmic::Frame as FrameRs;
 pub use crate::cosmic::Orbit;
+pub use crate::cosmic::Spacecraft;
 use std::sync::Arc;
 
 #[pyclass]

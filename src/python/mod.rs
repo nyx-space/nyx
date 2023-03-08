@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::dynamics::guidance::Thruster;
+use crate::io::odp::GuidanceMode;
 use crate::io::tracking_data::DynamicTrackingArc;
 use crate::io::trajectory_data::DynamicTrajectory;
 use crate::io::ConfigError;
@@ -26,6 +28,7 @@ use hifitime::ut1::Ut1Provider;
 use pyo3::{exceptions::PyException, prelude::*};
 
 pub(crate) mod cosmic;
+mod mission_design;
 mod orbit_determination;
 
 impl From<NyxError> for PyErr {
@@ -99,6 +102,9 @@ fn register_cosmic(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     sm.add_class::<cosmic::Bodies>()?;
     sm.add_class::<cosmic::Frame>()?;
     sm.add_class::<cosmic::Orbit>()?;
+    sm.add_class::<cosmic::Spacecraft>()?;
+    sm.add_class::<Thruster>()?;
+    sm.add_class::<GuidanceMode>()?;
 
     parent_module.add_submodule(sm)?;
     Ok(())

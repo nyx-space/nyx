@@ -108,7 +108,7 @@ where
 
                 // Check that we have enough samples
                 if last_idx == self.states.len() {
-                    first_idx = last_idx - 2 * num_left;
+                    first_idx = last_idx.saturating_sub(2 * num_left);
                 }
 
                 let mut states = Vec::with_capacity(last_idx - first_idx);

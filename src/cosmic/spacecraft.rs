@@ -34,7 +34,12 @@ use std::fmt;
 use std::ops::Add;
 use std::sync::Arc;
 
+use crate::io::ConfigError;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "python", pyclass)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     Coast,
@@ -52,6 +57,7 @@ impl Default for GuidanceMode {
 
 /// A spacecraft state
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct Spacecraft {
     /// Initial orbit the vehicle is in
     #[serde(deserialize_with = "orbit_from_str")]
@@ -76,9 +82,6 @@ pub struct Spacecraft {
     #[serde(skip)]
     pub mode: GuidanceMode,
 }
-
-// A spacecraft state
-// pub type Spacecraft = BaseSpacecraft<GuidanceMode>;
 
 impl Default for Spacecraft {
     fn default() -> Self {
@@ -587,17 +590,14 @@ impl ConfigRepr for Spacecraft {}
 impl Configurable for Spacecraft {
     type IntermediateRepr = Self;
 
-    fn from_config(
-        cfg: &Self::IntermediateRepr,
-        _cosm: Arc<Cosm>,
-    ) -> Result<Self, crate::io::ConfigError>
+    fn from_config(cfg: &Self::IntermediateRepr, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
     where
         Self: Sized,
     {
         Ok(*cfg)
     }
 
-    fn to_config(&self) -> Result<Self::IntermediateRepr, crate::io::ConfigError> {
+    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
         Ok(*self)
     }
 }

@@ -31,7 +31,12 @@ mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
 
 use std::fmt;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Defines a thruster with a maximum isp and a maximum thrust.
+#[cfg_attr(feature = "python", pyclass)]
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Thruster {
@@ -41,10 +46,19 @@ pub struct Thruster {
     pub isp_s: f64,
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl Thruster {
     /// Returns the exhaust velocity v_e in meters per second
-    pub fn exhaust_velocity(&self) -> f64 {
+    pub fn exhaust_velocity_m_s(&self) -> f64 {
         self.isp_s * STD_GRAVITY
+    }
+
+    /// Creates a new Thruster given its thrust in Newton and its Isp in seconds
+    #[allow(non_snake_case)]
+    #[cfg(feature = "python")]
+    #[new]
+    fn py_new(thrust_N: f64, isp_s: f64) -> Self {
+        Self { thrust_N, isp_s }
     }
 }
 

@@ -67,7 +67,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
         // Compute a few thruster parameters
         let thruster = spacecraft.thruster.as_ref().unwrap();
-        let v_exhaust_m_s = thruster.exhaust_velocity();
+        let v_exhaust_m_s = thruster.exhaust_velocity_m_s();
 
         let delta_tfb = ((v_exhaust_m_s * spacecraft.mass_kg()) / thruster.thrust_N)
             * (1.0 - (-dv.norm() * 1e3 / v_exhaust_m_s).exp());
