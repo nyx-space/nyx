@@ -44,32 +44,32 @@ pub struct KeplerianOrbit {
     frame: Frame,
 }
 
-impl Into<Orbit> for KeplerianOrbit {
-    fn into(self) -> Orbit {
+impl From<KeplerianOrbit> for Orbit {
+    fn from(val: KeplerianOrbit) -> Self {
         Orbit::keplerian(
-            self.sma_km,
-            self.ecc,
-            self.inc_deg,
-            self.raan_deg,
-            self.aop_deg,
-            self.ta_deg,
-            self.epoch,
-            self.frame,
+            val.sma_km,
+            val.ecc,
+            val.inc_deg,
+            val.raan_deg,
+            val.aop_deg,
+            val.ta_deg,
+            val.epoch,
+            val.frame,
         )
     }
 }
 
-impl Into<OrbitSerde> for Orbit {
-    fn into(self) -> OrbitSerde {
+impl From<Orbit> for OrbitSerde {
+    fn from(val: Orbit) -> Self {
         OrbitSerde {
-            inner: Either::Left(self),
+            inner: Either::Left(val),
         }
     }
 }
 
-impl Into<Orbit> for OrbitSerde {
-    fn into(self) -> Orbit {
-        match self.inner {
+impl From<OrbitSerde> for Orbit {
+    fn from(val: OrbitSerde) -> Orbit {
+        match val.inner {
             Either::Left(orbit) => orbit,
             Either::Right(kep) => kep.into(),
         }

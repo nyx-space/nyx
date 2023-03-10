@@ -173,36 +173,30 @@ where
             'devices: for (name, device) in self.devices.iter_mut() {
                 let cfg = &self.configs[name];
                 // Check the start condition
-                match cfg.start {
-                    Availability::Epoch(start_epoch) => {
-                        if start_epoch > epoch {
-                            if !start_trace_msg.contains(name) {
-                                trace!(
-                                    "{name} tracking starts in {} (start = {start_epoch})",
-                                    start_epoch - epoch
-                                );
-                                start_trace_msg.insert(name.clone());
-                            }
-                            continue;
+                if let Availability::Epoch(start_epoch) = cfg.start {
+                    if start_epoch > epoch {
+                        if !start_trace_msg.contains(name) {
+                            trace!(
+                                "{name} tracking starts in {} (start = {start_epoch})",
+                                start_epoch - epoch
+                            );
+                            start_trace_msg.insert(name.clone());
                         }
+                        continue;
                     }
-                    _ => {}
                 }
                 // Check the end condition
-                match cfg.end {
-                    Availability::Epoch(end_epoch) => {
-                        if end_epoch < epoch {
-                            if !end_trace_msg.contains(name) {
-                                trace!(
-                                    "{name} tracking ended {} ago (end = {end_epoch})",
-                                    epoch - end_epoch
-                                );
-                                end_trace_msg.insert(name.clone());
-                            }
-                            continue;
+                if let Availability::Epoch(end_epoch) = cfg.end {
+                    if end_epoch < epoch {
+                        if !end_trace_msg.contains(name) {
+                            trace!(
+                                "{name} tracking ended {} ago (end = {end_epoch})",
+                                epoch - end_epoch
+                            );
+                            end_trace_msg.insert(name.clone());
                         }
+                        continue;
                     }
-                    _ => {}
                 }
 
                 // Check the schedule

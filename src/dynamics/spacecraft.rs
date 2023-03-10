@@ -441,7 +441,7 @@ impl Configurable for SpacecraftDynamics {
             force_models.push(SolarPressure::with_flux(
                 srp.phi.map_or(1367.0, |v| v),
                 srp.shadows,
-                cosm.clone(),
+                cosm,
             ));
         }
 

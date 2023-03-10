@@ -571,7 +571,7 @@ impl Traj<Orbit> {
         let start_instant = Instant::now();
         let mut traj = Self::new();
         for state in &self.states {
-            traj.states.push(cosm.frame_chg(&state, new_frame));
+            traj.states.push(cosm.frame_chg(state, new_frame));
         }
         traj.finalize();
 
