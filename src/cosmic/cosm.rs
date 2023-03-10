@@ -83,7 +83,10 @@ impl FrameTree {
         if f.name == name {
             Ok(cur_path.to_vec())
         } else if f.children.is_empty() {
-            Err(NyxError::ObjectNotFound(name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                name.to_string(),
+                f.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         } else {
             for (cno, child) in f.children.iter().enumerate() {
                 let mut this_path = cur_path.to_owned();
@@ -94,7 +97,10 @@ impl FrameTree {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                name.to_string(),
+                f.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         }
     }
 }
@@ -238,7 +244,10 @@ impl Cosm {
         if f.name == frame_name {
             Ok(cur_path.to_vec())
         } else if f.children.is_empty() {
-            Err(NyxError::ObjectNotFound(frame_name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                frame_name.to_string(),
+                f.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         } else {
             for child in &f.children {
                 let mut this_path = cur_path.to_owned();
@@ -248,7 +257,10 @@ impl Cosm {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(frame_name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                frame_name.to_string(),
+                f.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         }
     }
 

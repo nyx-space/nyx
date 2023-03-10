@@ -198,7 +198,7 @@ where
         let mut selves = Vec::with_capacity(devices_repr.len());
 
         for serde in devices_repr {
-            selves.push(D::from_config(&serde, cosm.clone())?);
+            selves.push(D::from_config(serde, cosm.clone())?);
         }
 
         Ok(selves)

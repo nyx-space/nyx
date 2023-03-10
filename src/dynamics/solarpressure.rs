@@ -93,7 +93,7 @@ impl ForceModel for SolarPressure {
         let r_sun_d: Vector3<OHyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
-        // Compute the shaddowing factor.
+        // Compute the shadowing factor.
         let k: f64 = self.e_loc.compute(osc).into();
 
         let r_sun_au = norm(&r_sun_d) / AU;

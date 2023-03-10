@@ -614,11 +614,11 @@ impl ConfigRepr for Spacecraft {}
 impl Configurable for Spacecraft {
     type IntermediateRepr = Self;
 
-    fn from_config(cfg: &Self::IntermediateRepr, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    fn from_config(cfg: Self::IntermediateRepr, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
     where
         Self: Sized,
     {
-        Ok(*cfg)
+        Ok(cfg)
     }
 
     fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {

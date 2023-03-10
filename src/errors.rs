@@ -84,8 +84,8 @@ pub enum NyxError {
     #[error("Could not read file: {0}")]
     FileUnreadable(String),
     /// Celestial object or spacecraft not found
-    #[error("Cosm object not found: {0}")]
-    ObjectNotFound(String),
+    #[error("Cosm object not found: `{0}` (available: {1:?})")]
+    ObjectNotFound(String, Vec<String>),
     /// No interpolation data
     #[error("No interpolation data: {0}")]
     NoInterpolationData(String),

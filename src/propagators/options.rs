@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::fmt;
+
 use crate::time::{Duration, Unit};
 
 use super::{ErrorCtrl, RSSCartesianStep};
@@ -69,10 +71,7 @@ impl<E: ErrorCtrl> PropOpts<E> {
 
     /// Returns a string with the information about these options
     pub fn info(&self) -> String {
-        format!(
-            "[min_step: {:e}, max_step: {:e}, tol: {:e}, attempts: {}]",
-            self.min_step, self.max_step, self.tolerance, self.attempts,
-        )
+        format!("{self}")
     }
 
     /// Set the maximum step size and sets the initial step to that value if currently greater
@@ -89,6 +88,20 @@ impl<E: ErrorCtrl> PropOpts<E> {
             self.init_step = min_step;
         }
         self.min_step = min_step;
+    }
+}
+
+impl<E: ErrorCtrl> fmt::Display for PropOpts<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.fixed_step {
+            write!(f, "fixed step: {:e}", self.min_step,)
+        } else {
+            write!(
+                f,
+                "min_step: {:e}, max_step: {:e}, tol: {:e}, attempts: {}",
+                self.min_step, self.max_step, self.tolerance, self.attempts,
+            )
+        }
     }
 }
 

@@ -1,9 +1,31 @@
+/*
+    Nyx, blazing fast astrodynamics
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 use crate::NyxError;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 /// Defines the default celestial bodies in the provided de438 XB.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
+#[cfg_attr(feature = "python", pyclass)]
 pub enum Bodies {
     SSB,
     Sun,
@@ -70,6 +92,24 @@ impl TryFrom<String> for Bodies {
     type Error = NyxError;
 
     fn try_from(name: String) -> Result<Self, Self::Error> {
+        let avail = vec![
+            "SSB".to_string(),
+            "Sun".to_string(),
+            "MercuryBarycenter".to_string(),
+            "Mercury".to_string(),
+            "VenusBarycenter".to_string(),
+            "Venus".to_string(),
+            "EarthBarycenter".to_string(),
+            "Earth".to_string(),
+            "Luna".to_string(),
+            "MarsBarycenter".to_string(),
+            "JupiterBarycenter".to_string(),
+            "SaturnBarycenter".to_string(),
+            "UranusBarycenter".to_string(),
+            "NeptuneBarycenter".to_string(),
+            "PlutoBarycenter".to_string(),
+        ];
+
         match name.to_lowercase().as_str() {
             "solar system barycenter" | "ssb" => Ok(Self::SSB),
             "sun" => Ok(Self::Sun),
@@ -84,7 +124,7 @@ impl TryFrom<String> for Bodies {
             "uranus" | "uranus barycenter" => Ok(Self::UranusBarycenter),
             "neptune" | "neptune barycenter" => Ok(Self::NeptuneBarycenter),
             "pluto" | "pluto barycenter" => Ok(Self::PlutoBarycenter),
-            _ => Err(NyxError::ObjectNotFound(name)),
+            _ => Err(NyxError::ObjectNotFound(name, avail)),
         }
     }
 }
@@ -93,6 +133,24 @@ impl TryFrom<Vec<usize>> for Bodies {
     type Error = NyxError;
 
     fn try_from(ephem_path: Vec<usize>) -> Result<Self, Self::Error> {
+        let avail = vec![
+            "SSB".to_string(),
+            "Sun".to_string(),
+            "MercuryBarycenter".to_string(),
+            "Mercury".to_string(),
+            "VenusBarycenter".to_string(),
+            "Venus".to_string(),
+            "EarthBarycenter".to_string(),
+            "Earth".to_string(),
+            "Luna".to_string(),
+            "MarsBarycenter".to_string(),
+            "JupiterBarycenter".to_string(),
+            "SaturnBarycenter".to_string(),
+            "UranusBarycenter".to_string(),
+            "NeptuneBarycenter".to_string(),
+            "PlutoBarycenter".to_string(),
+        ];
+
         match ephem_path.len() {
             0 => Ok(Self::SSB),
             1 => match ephem_path[0] {
@@ -106,15 +164,15 @@ impl TryFrom<Vec<usize>> for Bodies {
                 7 => Ok(Self::UranusBarycenter),
                 8 => Ok(Self::NeptuneBarycenter),
                 9 => Ok(Self::PlutoBarycenter),
-                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
+                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"), avail)),
             },
             2 if ephem_path[0] == 3 => match ephem_path[1] {
                 // This only support the Earth system
                 0 => Ok(Self::Earth),
                 1 => Ok(Self::Luna),
-                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
+                _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"), avail)),
             },
-            _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"))),
+            _ => Err(NyxError::ObjectNotFound(format!("{ephem_path:?}"), avail)),
         }
     }
 }

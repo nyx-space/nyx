@@ -170,8 +170,8 @@ where
         for epoch in ts {
             // Get the state
             let state = self.trajectory.at(epoch)?;
-            for (name, device) in self.devices.iter_mut() {
-                let cfg = self.configs[name];
+            'devices: for (name, device) in self.devices.iter_mut() {
+                let cfg = &self.configs[name];
                 // Check the start condition
                 match cfg.start {
                     Availability::Epoch(start_epoch) => {
@@ -244,6 +244,26 @@ where
                         }
                         Schedule::Continuous => {
                             // No filtering, pass through
+                        }
+                    }
+                }
+
+                // Check the exclusion epochs
+                if let Some(excl_list) = &cfg.exclusion_epochs {
+                    for excl in excl_list {
+                        if excl.contains(state.epoch()) {
+                            // We are in an exclusion epoch, move to next device.
+                            continue 'devices;
+                        }
+                    }
+                }
+
+                // Check the inclusion epochs
+                if let Some(incl_list) = &cfg.inclusion_epochs {
+                    for incl in incl_list {
+                        if !incl.contains(state.epoch()) {
+                            // Current epoch is not included in the inclusion epochs list, move to next device.
+                            continue 'devices;
                         }
                     }
                 }

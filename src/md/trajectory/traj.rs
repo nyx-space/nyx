@@ -856,19 +856,3 @@ where
         Self::new()
     }
 }
-
-// impl<S: InterpState> PartialEq for Traj<S>
-// where
-//     DefaultAllocator:
-//         Allocator<f64, S::VecLength> + Allocator<f64, S::Size> + Allocator<f64, S::Size, S::Size>,
-// {
-//     /// Equality of trajectories is based SOLELY on the name matching (if set), the number of states being equal, and the first and last epoch being with 10 ms of each other
-//     /// The reason why we don't do a strict equality is because serialization involves converting the epoch into a TDB epoch in second, and converting that back to a hifitime
-//     /// may lead to an error of up to 150 nanoseconds due to the iteration used to calculate the TDB epoch.
-//     fn eq(&self, other: &Self) -> bool {
-//         self.name == other.name && self.states == other.states
-//         // && self.states.len() == other.states.len()
-//         // && (self.first().epoch() - self.first().epoch()).abs() < 10.milliseconds()
-//         // && (self.last().epoch() - self.last().epoch()).abs() < 10.milliseconds()
-//     }
-// }

@@ -16,72 +16,84 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-// use std::collections::HashMap;
-
-// use serde_derive::{Deserialize, Serialize};
-// #[derive(Debug, Serialize, Deserialize, PartialEq)]
-// pub struct DynamicsSerde {
-//     #[serde(transparent)]
-//     inner: HashMap<String, String>,
-// }
-
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
-// use std::collections::HashMap;
+
+use super::{
+    frames_from_str, frames_to_str,
+    odp::{Bodies, Frame},
+    ConfigRepr,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Harmonics {
-    frame: String,
-    coeffs: String,
-    degree: usize,
-    order: usize,
+pub struct HarmonicsSerde {
+    pub frame: String,
+    pub coeffs: String,
+    pub degree: usize,
+    pub order: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Srp {
-    phi: Option<f64>,
-    #[serde(flatten)]
-    shadows: Vec<String>,
+pub struct SrpSerde {
+    pub phi: Option<f64>,
+    #[serde(serialize_with = "frames_to_str", deserialize_with = "frames_from_str")]
+    pub shadows: Vec<Frame>,
 }
 
+/// A representation of spacecraft dynamics that need to be used in Python with the spacecraft Propagator class.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Dynamics {
-    point_masses: Vec<String>,
-    harmonics: Vec<Harmonics>,
-    srp: Option<Srp>,
+#[cfg_attr(feature = "python", pyclass)]
+pub struct DynamicsSerde {
+    pub point_masses: Vec<Bodies>,
+    pub harmonics: Option<Vec<HarmonicsSerde>>,
+    pub srp: Option<SrpSerde>,
 }
 
-// fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     let yaml = "
-// lofi:
-//   point_masses:
-//     - Sun
-//     - Earth
-// hifi:
-//   point_masses:
-//     - Sun
-//     - Earth
-//     - Moon
-//   harmonics:
-//     - frame: IAU Earth
-//       coeffs: data/JGM3.cof.gz
-//       degree: 10
-//       order: 10
-//   srp:
-//     phi: 1367.0
-//     shadows:
-//       - Sun
-//       - Moon
-// ";
+impl ConfigRepr for DynamicsSerde {}
 
-//     let mut dynamics: HashMap<String, Dynamics> = serde_yaml::from_str(yaml)?;
+#[test]
+fn test_serde() {
+    use crate::io::odp::Cosm;
+    use crate::io::Configurable;
+    use crate::md::ui::SpacecraftDynamics;
+    use std::collections::HashMap;
 
-//     // Access the "hifi" dynamics
-//     let hifi_dynamics = dynamics.remove("hifi").unwrap();
-//     println!("hifi dynamics: {:?}", hifi_dynamics);
+    let yaml = "
+lofi:
+  point_masses:
+    - Sun
+    - Earth
+hifi:
+  point_masses:
+    - Sun
+    - Earth
+    - Luna
+  harmonics:
+    - frame: IAU Earth
+      coeffs: data/JGM3.cof.gz
+      degree: 10
+      order: 10
+  srp:
+    phi: 1367.0
+    shadows:
+      - Sun J2000
+      - Moon J2000
+";
 
-//     // Access the "lofi" dynamics
-//     let lofi_dynamics = dynamics.remove("lofi").unwrap();
-//     println!("lofi dynamics: {:?}", lofi_dynamics);
+    let cosm = Cosm::de438();
 
-//     Ok(())
-// }
+    let mut dynamics_serde: HashMap<String, DynamicsSerde> = serde_yaml::from_str(yaml).unwrap();
+
+    // Access the "hifi" dynamics
+    let hifi_dynamics =
+        SpacecraftDynamics::from_config(dynamics_serde.remove("hifi").unwrap(), cosm.clone())
+            .unwrap();
+    println!("hifi dynamics: {}", hifi_dynamics);
+
+    // Access the "lofi" dynamics
+    let lofi_dynamics =
+        SpacecraftDynamics::from_config(dynamics_serde.remove("lofi").unwrap(), cosm.clone())
+            .unwrap();
+    println!("lofi dynamics: {}", lofi_dynamics);
+}

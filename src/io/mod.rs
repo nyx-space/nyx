@@ -22,6 +22,7 @@ use crate::Orbit;
 pub(crate) mod watermark;
 use hifitime::Duration;
 use serde::de::DeserializeOwned;
+use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer};
 use serde::{Serialize, Serializer};
 use serde_yaml::Error as YamlError;
@@ -39,29 +40,21 @@ use std::sync::Arc;
 use self::odp::{Cosm, Frame};
 use self::orbit::OrbitSerde;
 
-/// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
-pub mod gravity;
-
 /// Handles writing to an XYZV file
 pub mod cosmo;
-
+pub mod dynamics;
+pub mod formatter;
 /// Handles reading from frames defined in input files
 pub mod frame_serde;
-
-/// Handles reading random variables
-pub mod rv;
-
-pub mod dynamics;
+/// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
+pub mod gravity;
 pub mod odp;
 pub mod orbit;
-pub mod scenario;
-
-pub mod formatter;
-
 pub mod quantity;
-
+/// Handles reading random variables
+pub mod rv;
+pub mod scenario;
 pub mod stations;
-
 pub mod tracking_data;
 pub mod trajectory_data;
 
@@ -137,11 +130,11 @@ where
     type IntermediateRepr: ConfigRepr;
 
     fn from_yaml<P: AsRef<Path>>(path: P, cosm: Arc<Cosm>) -> Result<Self, ConfigError> {
-        Self::from_config(&Self::IntermediateRepr::load_yaml(path)?, cosm)
+        Self::from_config(Self::IntermediateRepr::load_yaml(path)?, cosm)
     }
 
     /// Creates a new instance of `self` from the configuration.
-    fn from_config(cfg: &Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
     where
         Self: Sized;
 
@@ -198,6 +191,30 @@ where
     // TODO: Figure out how to use DeserializeSeed here, but I'm not sure it would work.
     let cosm = Cosm::de438();
     cosm.try_frame(&s).map_err(serde::de::Error::custom)
+}
+
+pub(crate) fn frames_to_str<S>(frames: &Vec<Frame>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(frames.len()))?;
+    for frame in frames {
+        seq.serialize_element(&format!("{frame}"))?;
+    }
+    seq.end()
+}
+
+pub(crate) fn frames_from_str<'de, D>(deserializer: D) -> Result<Vec<Frame>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let frame_names: Vec<String> = Vec::deserialize(deserializer)?;
+    let cosm = Cosm::de438();
+    let mut frames = Vec::new();
+    for name in frame_names {
+        frames.push(cosm.try_frame(&name).map_err(serde::de::Error::custom)?)
+    }
+    Ok(frames)
 }
 
 /// A deserializer from Epoch string

@@ -24,13 +24,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: develop -F python
+          args: develop --find-interpreter -F python
           manylinux: auto
 
       - name: Run script
         run: |
           python examples/python/orbit_determination.py
-          python examples/python/test.py
+          python examples/python/mission_design.py
+          python examples/python/demo.py
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1

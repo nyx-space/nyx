@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 /*
     Nyx, blazing fast astrodynamics
     Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
@@ -19,10 +17,16 @@ use std::collections::HashMap;
 */
 use crate::{
     dynamics::guidance::Thruster,
-    io::{odp::GuidanceMode, ConfigError, ConfigRepr},
-    Orbit, Spacecraft,
+    io::{
+        odp::{DragConfig, GuidanceMode, SrpConfig},
+        ConfigError, ConfigRepr,
+    },
+    Orbit, Spacecraft, State,
 };
+use crate::{md::StateParameter, NyxError};
+use std::collections::HashMap;
 
+use hifitime::Epoch;
 use pyo3::prelude::*;
 
 #[pymethods]
@@ -47,10 +51,14 @@ impl Spacecraft {
             thruster,
             mode: mode.or_else(|| Some(GuidanceMode::Coast)).unwrap(),
             stm: None,
-            srp_area_m2,
-            drag_area_m2,
-            cr,
-            cd,
+            srp: SrpConfig {
+                area_m2: srp_area_m2,
+                cr,
+            },
+            drag: DragConfig {
+                area_m2: drag_area_m2,
+                cd,
+            },
         }
     }
 
@@ -74,12 +82,12 @@ impl Spacecraft {
     }
 
     fn __str__(&self) -> String {
-        format!("{self}")
+        format!("{self}\n{self:x}")
     }
 
     /// Note: this returns a COPY of the orbit, not a mutable reference to it!
     #[getter]
-    fn get_orbit(&mut self) -> Orbit {
+    fn get_orbit(&self) -> Orbit {
         self.orbit
     }
 
@@ -87,5 +95,17 @@ impl Spacecraft {
     fn py_set_orbit(&mut self, orbit: Orbit) -> PyResult<()> {
         self.orbit = orbit;
         Ok(())
+    }
+
+    /// Note: this returns a COPY of the epoch, not a mutable reference to it!
+    #[getter]
+    fn get_epoch(&self) -> Epoch {
+        self.orbit.epoch
+    }
+
+    /// Returns the value of the provided state parameter if available
+    #[cfg(feature = "python")]
+    fn value_of(&self, param: &StateParameter) -> Result<f64, NyxError> {
+        self.value(param)
     }
 }

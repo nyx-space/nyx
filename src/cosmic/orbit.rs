@@ -1529,7 +1529,7 @@ impl Orbit {
 
         let cosm = Cosm::de438();
 
-        Self::from_config(&serde, cosm)
+        Self::from_config(serde, cosm)
     }
 
     #[cfg(feature = "python")]
@@ -1542,7 +1542,7 @@ impl Orbit {
         let mut selves = Vec::with_capacity(orbits.len());
 
         for serde in orbits {
-            selves.push(Self::from_config(&serde, cosm.clone())?);
+            selves.push(Self::from_config(serde, cosm.clone())?);
         }
 
         Ok(selves)
@@ -1558,7 +1558,7 @@ impl Orbit {
         let mut selves = HashMap::with_capacity(orbits.len());
 
         for (k, v) in orbits {
-            selves.insert(k, Self::from_config(&v, cosm.clone())?);
+            selves.insert(k, Self::from_config(v, cosm.clone())?);
         }
 
         Ok(selves)
@@ -1686,6 +1686,12 @@ impl Orbit {
     fn py_set_ta(&mut self, new_ta_deg: f64) -> PyResult<()> {
         self.set_ta(new_ta_deg);
         Ok(())
+    }
+
+    /// Returns the value of the provided state parameter if available
+    #[cfg(feature = "python")]
+    fn value_of(&self, param: &StateParameter) -> Result<f64, NyxError> {
+        self.value(param)
     }
 }
 
@@ -2036,12 +2042,6 @@ impl State for Orbit {
             StateParameter::Rmag => Ok(self.rmag()),
             StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis()),
             StateParameter::SemiParameter => Ok(self.semi_parameter()),
-            StateParameter::SlantAngle { x, y, z } => {
-                let mut tgt = Vector3::new(x, y, z);
-                tgt /= tgt.norm();
-
-                Ok(self.r_hat().dot(&tgt).acos().to_degrees())
-            }
             StateParameter::SMA => Ok(self.sma()),
             StateParameter::TrueAnomaly => Ok(self.ta()),
             StateParameter::TrueLongitude => Ok(self.tlong()),
@@ -2128,13 +2128,13 @@ impl Configurable for Orbit {
     type IntermediateRepr = OrbitSerde;
 
     fn from_config(
-        cfg: &Self::IntermediateRepr,
+        cfg: Self::IntermediateRepr,
         _cosm: Arc<Cosm>,
     ) -> Result<Self, crate::io::ConfigError>
     where
         Self: Sized,
     {
-        let orbit: Orbit = (*cfg).into();
+        let orbit: Orbit = cfg.into();
         Ok(orbit)
     }
 
@@ -2227,7 +2227,7 @@ epoch: 2018-09-15T00:15:53.098 UTC
     .collect();
 
     let orbit =
-        Orbit::from_config(&OrbitSerde::load_yaml(test_data).unwrap(), cosm.clone()).unwrap();
+        Orbit::from_config(OrbitSerde::load_yaml(test_data).unwrap(), cosm.clone()).unwrap();
     assert_eq!(exp, orbit);
 
     let test_data: PathBuf = [

@@ -35,7 +35,7 @@ impl GroundStation {
         // Create a new Cosm until ANISE switch
         let cosm = Cosm::de438();
 
-        GroundStation::from_config(&serde, cosm)
+        GroundStation::from_config(serde, cosm)
     }
 
     #[staticmethod]
@@ -48,7 +48,7 @@ impl GroundStation {
         let mut selves = Vec::with_capacity(stations.len());
 
         for serde in stations {
-            selves.push(GroundStation::from_config(&serde, cosm.clone())?);
+            selves.push(GroundStation::from_config(serde, cosm.clone())?);
         }
 
         Ok(selves)
@@ -63,7 +63,7 @@ impl GroundStation {
         let mut selves = HashMap::with_capacity(orbits.len());
 
         for (k, v) in orbits {
-            selves.insert(k, Self::from_config(&v, cosm.clone())?);
+            selves.insert(k, Self::from_config(v, cosm.clone())?);
         }
 
         Ok(selves)

@@ -31,6 +31,7 @@ fn tracking_arc_simple() {
         Epoch::from_str("2023-02-22T19:18:17.16 UTC").unwrap(),
         cosm.frame("EME2000"),
     );
+
     // Generate a trajectory
     let (_, trajectory) = Propagator::default(OrbitalDynamics::two_body())
         .with(orbit)
@@ -63,8 +64,8 @@ fn tracking_arc_simple() {
 
     let stations_serde = StationSerde::load_many_yaml(ground_station_yaml).unwrap();
     let devices: Vec<GroundStation> = stations_serde
-        .iter()
-        .map(|station| GroundStation::from_config(&station, cosm.clone()).unwrap())
+        .into_iter()
+        .map(|station| GroundStation::from_config(station, cosm.clone()).unwrap())
         .collect();
 
     dbg!(&devices);

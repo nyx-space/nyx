@@ -16,15 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::dynamics::guidance::Thruster;
-use crate::io::odp::GuidanceMode;
-use crate::io::tracking_data::DynamicTrackingArc;
-use crate::io::trajectory_data::DynamicTrajectory;
 use crate::io::ConfigError;
 use crate::NyxError;
 use hifitime::leap_seconds::{LatestLeapSeconds, LeapSecondsFile};
 use hifitime::prelude::*;
 use hifitime::ut1::Ut1Provider;
+use pyo3::py_run;
 use pyo3::{exceptions::PyException, prelude::*};
 
 pub(crate) mod cosmic;
@@ -48,16 +45,16 @@ fn nyx_space(py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
 
     register_time_module(py, m)?;
-    register_od(py, m)?;
-    register_md(py, m)?;
-    register_cosmic(py, m)?;
+    orbit_determination::register_od(py, m)?;
+    mission_design::register_md(py, m)?;
+    cosmic::register_cosmic(py, m)?;
 
     Ok(())
 }
 
 /// Reexport hifitime as nyx_space.time
 fn register_time_module(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "time")?;
+    let sm = PyModule::new(py, "nyx_space.time")?;
 
     sm.add_class::<Epoch>()?;
     sm.add_class::<TimeScale>()?;
@@ -68,44 +65,7 @@ fn register_time_module(py: Python<'_>, parent_module: &PyModule) -> PyResult<()
     sm.add_class::<LeapSecondsFile>()?;
     sm.add_class::<Ut1Provider>()?;
 
-    parent_module.add_submodule(sm)?;
-    Ok(())
-}
-
-/// Orbit determination
-fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "orbit_determination")?;
-
-    sm.add_class::<orbit_determination::GroundStation>()?;
-    sm.add_class::<orbit_determination::GroundTrackingArcSim>()?;
-    sm.add_class::<DynamicTrackingArc>()?;
-    sm.add_class::<orbit_determination::TrkConfig>()?;
-
-    parent_module.add_submodule(sm)?;
-    Ok(())
-}
-
-/// Mission design
-fn register_md(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "mission_design")?;
-
-    sm.add_class::<DynamicTrajectory>()?;
-
-    parent_module.add_submodule(sm)?;
-    Ok(())
-}
-
-/// nyx_space.cosmic
-fn register_cosmic(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let sm = PyModule::new(py, "cosmic")?;
-    sm.add_class::<cosmic::Cosm>()?;
-    sm.add_class::<cosmic::Bodies>()?;
-    sm.add_class::<cosmic::Frame>()?;
-    sm.add_class::<cosmic::Orbit>()?;
-    sm.add_class::<cosmic::Spacecraft>()?;
-    sm.add_class::<Thruster>()?;
-    sm.add_class::<GuidanceMode>()?;
-
+    py_run!(py, sm, "import sys; sys.modules['nyx_space.time'] = sm");
     parent_module.add_submodule(sm)?;
     Ok(())
 }

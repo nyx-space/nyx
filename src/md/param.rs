@@ -16,15 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use arrow::datatypes::{DataType, Field};
-
 use super::NyxError;
+use arrow::datatypes::{DataType, Field};
 use core::fmt;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use std::{collections::HashMap, str::FromStr};
 
 /// Common state parameters
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "python", pyclass)]
 pub enum StateParameter {
     /// Argument of Latitude (deg)
     AoL,
@@ -96,8 +98,6 @@ pub enum StateParameter {
     Rmag,
     /// Semi parameter (km)
     SemiParameter,
-    /// Computes the slant angle by returning the arccos of the dot product between state's radius vector and the provided vector coordinates. The vector will be normalized if needed.
-    SlantAngle { x: f64, y: f64, z: f64 },
     /// Semi major axis (km)
     SMA,
     /// Semi minor axis (km)
@@ -124,13 +124,12 @@ pub enum StateParameter {
     VY,
     /// Z component of the velocity (km/s)
     VZ,
-    /// Allows creating new custom events by matching on the value of the field
-    Custom { mapping: usize },
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl StateParameter {
     /// Returns the default event finding precision in the unit of that parameter
-    pub fn default_event_precision(self) -> f64 {
+    pub fn default_event_precision(&self) -> f64 {
         match self {
             Self::Eccentricity => 1e-5,
             // Non anomaly angles
@@ -152,7 +151,6 @@ impl StateParameter {
             | Self::MeanAnomaly
             | Self::EccentricAnomaly
             | Self::HyperbolicAnomaly
-            | Self::SlantAngle { .. }
             | Self::TrueAnomaly => 1e-3,
 
             // Distances
@@ -185,11 +183,11 @@ impl StateParameter {
     }
 
     /// Returns whether this parameter is of the B-Plane kind
-    pub fn is_b_plane(self) -> bool {
-        self == Self::BdotR || self == Self::BdotT || self == Self::BLTOF
+    pub fn is_b_plane(&self) -> bool {
+        self == &Self::BdotR || self == &Self::BdotT || self == &Self::BLTOF
     }
 
-    pub fn unit(self) -> &'static str {
+    pub fn unit(&self) -> &'static str {
         match self {
             // Angles
             Self::AoL
@@ -208,7 +206,6 @@ impl StateParameter {
             | Self::MeanAnomaly
             | Self::EccentricAnomaly
             | Self::HyperbolicAnomaly
-            | Self::SlantAngle { .. }
             | Self::TrueAnomaly => "deg",
 
             // Distances
@@ -239,6 +236,14 @@ impl StateParameter {
         }
     }
 
+    /// Prints this orbit in Keplerian form
+    #[cfg(feature = "python")]
+    fn __str__(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
+impl StateParameter {
     /// Returns the parquet field of this parameter
     pub fn to_field(self, more_meta: Option<Vec<(String, String)>>) -> Field {
         let mut meta = HashMap::new();

@@ -192,7 +192,10 @@ impl Xb {
     /// Finds the ephemeris provided the path as usize, e.g. [3,1] would return the Moon with any DE xb.
     pub fn ephemeris_from_path<'a>(&'a self, path: &[usize]) -> Result<&'a Ephemeris, NyxError> {
         match &self.ephemeris_root {
-            None => Err(NyxError::ObjectNotFound("not ephemeris root".to_string())),
+            None => Err(NyxError::ObjectNotFound(
+                "not ephemeris root".to_string(),
+                self.ephemeris_get_names(),
+            )),
             Some(root) => {
                 if path.is_empty() {
                     return Ok(root);
@@ -200,7 +203,7 @@ impl Xb {
                 for pos in path {
                     if root.children.get(*pos).is_none() {
                         let hpath: String = path.iter().map(|p| format!("{p}")).collect::<String>();
-                        return Err(NyxError::ObjectNotFound(hpath));
+                        return Err(NyxError::ObjectNotFound(hpath, self.ephemeris_get_names()));
                     }
                 }
 
@@ -229,7 +232,10 @@ impl Xb {
         if e.name == name {
             Ok(cur_path.to_vec())
         } else if e.children.is_empty() {
-            Err(NyxError::ObjectNotFound(name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                name.to_string(),
+                e.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         } else {
             for (cno, child) in e.children.iter().enumerate() {
                 let mut this_path = cur_path.to_owned();
@@ -240,14 +246,20 @@ impl Xb {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                name.to_string(),
+                e.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         }
     }
 
     /// Returns the machine path of the requested ephemeris
     pub fn ephemeris_find_path(&self, name: String) -> Result<Vec<usize>, NyxError> {
         match &self.ephemeris_root {
-            None => Err(NyxError::ObjectNotFound("No root!".to_string())),
+            None => Err(NyxError::ObjectNotFound(
+                "No root!".to_string(),
+                self.ephemeris_get_names(),
+            )),
             Some(root) => {
                 if root.name == name {
                     // Return an empty vector (but OK because we're asking for the root)

@@ -23,7 +23,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::Arc;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct StationSerde {
     pub name: String,
     pub frame: Option<String>,
@@ -42,7 +42,7 @@ impl Configurable for GroundStation {
     type IntermediateRepr = StationSerde;
 
     fn from_config(
-        cfg: &Self::IntermediateRepr,
+        cfg: Self::IntermediateRepr,
         cosm: Arc<super::odp::Cosm>,
     ) -> Result<Self, ConfigError>
     where
@@ -214,7 +214,7 @@ fn test_load_many() {
     let expected_height = 0.4;
     let expected_frame = cosm.frame("IAU Earth");
 
-    let gs = GroundStation::from_config(&stations[0], cosm.clone()).unwrap();
+    let gs = GroundStation::from_config(stations[0].clone(), cosm.clone()).unwrap();
     dbg!(&gs);
     assert_eq!(expected_name, gs.name);
     assert_eq!(expected_el_mask, gs.elevation_mask_deg);
