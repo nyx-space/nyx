@@ -1,4 +1,4 @@
-name: Rust testing, coverage, lint
+name: Rust
 
 on:
   push:

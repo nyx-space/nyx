@@ -172,8 +172,7 @@ where
     {
         let end_state;
         let mut traj = Traj::new();
-
-        traj.states.push(self.state); // Push the start state -- will be reordered in the finalize instruction.
+        let start_state = self.state;
 
         let rx = {
             // Channels that have a single state for the propagator
@@ -184,6 +183,7 @@ where
         };
 
         traj.states = rx.into_iter().par_bridge().collect();
+        traj.states.push(start_state); // Push the start state -- will be reordered in the finalize instruction.
 
         traj.finalize();
 
