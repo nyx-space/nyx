@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use serde::ser::SerializeSeq;
-use serde::{Serialize, Serializer};
 use super::{CovarFormat, EpochFormat};
 use super::{EstimateFrom, State};
 use crate::cosmic::Orbit;
@@ -25,6 +23,8 @@ use crate::hifitime::Epoch;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::Spacecraft;
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 use std::cmp::PartialEq;
 use std::fmt;
 
