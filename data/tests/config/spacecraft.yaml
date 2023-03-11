@@ -7,10 +7,12 @@ orbit:
   vz_km_s: 1.646738
   frame: EME2000
   epoch: 2018-09-15T00:15:53.098 UTC
-cr: 1.0
-srp_area_m2: 2.0
-cd: 2.2
-drag_area_m2: 0.95
+srp:
+  cr: 1.0
+  area_m2: 2.0
+drag:
+  cd: 2.2
+  area_m2: 0.95
 dry_mass_kg: 50.0
 fuel_mass_kg: 50.0
 thruster:
