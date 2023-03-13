@@ -3,6 +3,7 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use nyx::io::ConfigRepr;
+use nyx::od::msr::StdMeasurement;
 use nyx::od::simulator::arc::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
 use rand::thread_rng;
@@ -107,12 +108,12 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let mut odp = ODProcess::ekf(
         prop_est,
         kf,
-        all_stations,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         cosm.clone(),
     );
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -267,7 +268,6 @@ fn od_val_with_arc() {
     let mut odp = ODProcess::ekf(
         prop_est,
         kf,
-        all_stations,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         cosm.clone(),
     );
@@ -410,9 +410,10 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("tb_ckf.csv".to_owned(), cosm);
@@ -509,6 +510,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     // Iterate
     odp.iterate(
+        &mut all_stations,
         &measurements,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
@@ -638,9 +640,10 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Check the final estimate prior to iteration
     let delta = odp.estimates.last().unwrap().state() - final_truth;
@@ -661,6 +664,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     // Iterate, and check that the initial state difference is lower
     odp.iterate(
+        &mut all_stations,
         &measurements,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
@@ -790,9 +794,10 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
@@ -851,19 +856,6 @@ fn od_tb_ckf_map_covar() {
     }
 
     let cosm = Cosm::de438();
-    let iau_earth = cosm.frame("IAU Earth");
-
-    // Define the ground stations.
-    let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 2 * Unit::Day;
@@ -899,7 +891,15 @@ fn od_tb_ckf_map_covar() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp: ODProcess<
+        OrbitalDynamics,
+        nyx::propagators::RSSCartesianStep,
+        StdMeasurement,
+        CkfTrigger,
+        nalgebra::Const<3>,
+        Orbit,
+        KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
+    > = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
     odp.map_covar(dt + prop_time).unwrap();
 
@@ -1011,9 +1011,10 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
     // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
@@ -1148,9 +1149,10 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 

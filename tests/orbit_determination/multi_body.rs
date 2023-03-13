@@ -93,9 +93,10 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
@@ -229,9 +230,10 @@ fn multi_body_ckf_covar_map() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     let mut num_pred = 0_u32;
     for est in odp.estimates.iter() {

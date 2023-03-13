@@ -1,0 +1,29 @@
+example 1:
+  nominal:
+    x_km: -9042.862234
+    y_km: 18536.333069
+    z_km: 6999.957069
+    vx_km_s: -3.288789
+    vy_km_s: -2.226285
+    vz_km_s: 1.646738
+    frame: EME2000
+    epoch: 2018-09-15T00:15:53.098 UTC
+  covar: [1000, 1000, 1000, 1, 1, 1] # Specified as a diagonal, always in Cartesian!
+
+example 2:
+  nominal:
+    sma_km: 21999.99774705774
+    ecc: 0.009999898621923374
+    inc_deg: 29.99999648075657
+    raan_deg: 79.99999409817876
+    aop_deg: 39.99995066149999
+    ta_deg: 0.00005445443010434949
+    epoch: 2018-09-15T00:15:53.098000000 UTC
+    frame: EME2000
+  covar: # Specified as a full matrix, always in Cartesian!
+    - [1000, 0, 0, 0, 0, 0]
+    - [0, 1000, 0, 0, 0, 0]
+    - [0, 0, 1000, 0, 0, 0]
+    - [0, 0, 0, 1, 0, 0]
+    - [0, 0, 0, 0, 1, 0]
+    - [0, 0, 0, 0, 0, 1]

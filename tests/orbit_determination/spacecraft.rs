@@ -120,9 +120,10 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);

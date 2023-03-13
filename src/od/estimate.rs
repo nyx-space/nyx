@@ -366,3 +366,4 @@ impl EstimateFrom<Spacecraft> for Spacecraft {
         from
     }
 }
+

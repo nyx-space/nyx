@@ -22,14 +22,14 @@ use either::Either;
 use hifitime::Epoch;
 use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OrbitSerde {
     #[serde(with = "either::serde_untagged")]
     inner: Either<Orbit, KeplerianOrbit>,
 }
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct KeplerianOrbit {
     sma_km: f64,
     ecc: f64,

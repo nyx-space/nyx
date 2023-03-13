@@ -117,15 +117,16 @@ fn xhat_dev_test_ekf_two_body() {
     let mut odp = ODProcess::ekf(
         prop_est,
         kf,
-        all_stations,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         cosm.clone(),
     );
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
     let pre_smooth_first_est = odp.estimates[0].clone();
     let pre_smooth_num_est = odp.estimates.len();
     odp.iterate(
+        &mut all_stations,
         &measurements,
         IterationConf::try_from(SmoothingArc::All).unwrap(),
     )
@@ -308,10 +309,12 @@ fn xhat_dev_test_ekf_multi_body() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
     odp.iterate(
+        &mut all_stations,
         &measurements,
         IterationConf::try_from(SmoothingArc::All).unwrap(),
     )
@@ -481,9 +484,10 @@ fn xhat_dev_test_ekf_harmonics() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -624,9 +628,10 @@ fn xhat_dev_test_ekf_realistic() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -765,9 +770,10 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, kf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
@@ -1040,12 +1046,12 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
     let mut odp = ODProcess::ekf(
         prop_est,
         kf,
-        all_stations,
         EkfTrigger::new(ekf_num_meas, ekf_disable_time),
         cosm.clone(),
     );
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
@@ -1292,15 +1298,17 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
 
     let kf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, kf, all_stations, cosm.clone());
+    let mut odp = ODProcess::ckf(prop_est, kf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Clone the initial estimates
     let pre_iteration_estimates = odp.estimates.clone();
 
     // Iterate
     odp.iterate(
+        &mut all_stations,
         &measurements,
         IterationConf::try_from(SmoothingArc::All).unwrap(),
     )

@@ -117,10 +117,11 @@ fn od_robust_test_ekf_realistic() {
     let mut trig = EkfTrigger::new(ekf_num_meas, ekf_disable_time);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
-    odp.iterate(&measurements, IterationConf::default())
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
+    odp.iterate(&mut all_stations, &measurements, IterationConf::default())
         .unwrap();
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -203,10 +204,6 @@ fn od_robust_ops_test() {
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
     let mut all_stations = vec![dss65_madrid, dss34_canberra];
-    // Bug identified in #147 means we need to redefine the stations here without noise
-    let dss65_madrid = GroundStation::dss65_madrid(elevation_mask, 0.0, 0.0, iau_earth);
-    let dss34_canberra = GroundStation::dss13_goldstone(elevation_mask, 0.0, 0.0, iau_earth);
-    let all_stations_no_noise = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -315,9 +312,10 @@ fn od_robust_ops_test() {
     let mut trig = EkfTrigger::new(ekf_msr_trig, 10.0 * Unit::Second);
     trig.within_sigma = 3.0;
 
-    let mut odp = ODProcess::ekf(prop_est, kf, all_stations_no_noise, trig, cosm.clone());
+    let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Clone the initial estimate
     let pre_smooth_first_est = odp.estimates[0].clone();
@@ -351,7 +349,7 @@ fn od_robust_ops_test() {
     );
 
     // Iterate
-    odp.iterate(&measurements, IterationConf::default())
+    odp.iterate(&mut all_stations, &measurements, IterationConf::default())
         .unwrap();
 
     let fmtr = NavSolutionFormatter::default(

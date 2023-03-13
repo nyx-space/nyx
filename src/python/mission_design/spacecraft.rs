@@ -16,11 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use crate::{
+    cosmic::{DragConfig, SrpConfig},
     dynamics::guidance::Thruster,
-    io::{
-        odp::{DragConfig, GuidanceMode, SrpConfig},
-        ConfigError, ConfigRepr,
-    },
+    io::{ConfigError, ConfigRepr},
+    md::ui::GuidanceMode,
     Orbit, Spacecraft, State,
 };
 use crate::{md::StateParameter, NyxError};

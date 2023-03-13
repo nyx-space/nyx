@@ -37,18 +37,20 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use self::odp::{Cosm, Frame};
 use self::orbit::OrbitSerde;
+use crate::cosmic::{Cosm, Frame};
 
 /// Handles writing to an XYZV file
 pub mod cosmo;
 pub mod dynamics;
+pub mod estimate;
 pub mod formatter;
 /// Handles reading from frames defined in input files
 pub mod frame_serde;
 /// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
 pub mod gravity;
-pub mod odp;
+pub mod matrices;
+// pub mod odp;
 pub mod orbit;
 pub mod quantity;
 /// Handles reading random variables

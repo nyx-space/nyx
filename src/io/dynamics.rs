@@ -20,11 +20,9 @@
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    frames_from_str, frames_to_str,
-    odp::{Bodies, Frame},
-    ConfigRepr,
-};
+use super::{frames_from_str, frames_to_str, ConfigRepr};
+
+use crate::cosmic::{Bodies, Frame};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HarmonicsSerde {
@@ -54,7 +52,7 @@ impl ConfigRepr for DynamicsSerde {}
 
 #[test]
 fn test_serde() {
-    use crate::io::odp::Cosm;
+    use crate::cosmic::Cosm;
     use crate::io::Configurable;
     use crate::md::ui::SpacecraftDynamics;
     use std::collections::HashMap;

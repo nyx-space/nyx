@@ -23,7 +23,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::io::odp::Cosm;
+use crate::cosmic::Cosm;
 use crate::io::watermark::pq_writer;
 use crate::io::{ConfigError, ConfigRepr};
 use crate::linalg::allocator::Allocator;
@@ -185,7 +185,10 @@ where
 {
     /// If this tracking arc has devices that can be used to generate simulated measurements,
     /// then this function can be used to rebuild said measurement devices
-    pub fn rebuild_devices<MsrIn, D>(&self, cosm: Arc<Cosm>) -> Result<Vec<D>, ConfigError>
+    pub fn rebuild_devices<MsrIn, D>(
+        &self,
+        cosm: Arc<Cosm>,
+    ) -> Result<HashMap<String, D>, ConfigError>
     where
         MsrIn: State,
         D: TrackingDeviceSim<MsrIn, Msr>,
@@ -195,12 +198,20 @@ where
     {
         let devices_repr = D::IntermediateRepr::load_many(&self.device_cfg)?;
 
-        let mut selves = Vec::with_capacity(devices_repr.len());
+        let mut devices = HashMap::new();
 
         for serde in devices_repr {
-            selves.push(D::from_config(serde, cosm.clone())?);
+            let device = D::from_config(serde, cosm.clone())?;
+            if !self.device_names().contains(&device.name()) {
+                warn!(
+                    "{} from arc config does not appear in measurements -- ignored",
+                    device.name()
+                );
+                continue;
+            }
+            devices.insert(device.name(), device);
         }
 
-        Ok(selves)
+        Ok(devices)
     }
 }

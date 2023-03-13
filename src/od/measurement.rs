@@ -29,7 +29,7 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 use rand::Rng;
 
-/// GroundStation defines a Two Way ranging equipment.
+/// GroundStation defines a two-way ranging and doppler station.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "python", pyclass)]
 pub struct GroundStation {
@@ -49,7 +49,7 @@ pub struct GroundStation {
 }
 
 impl GroundStation {
-    /// Initializes a new Two Way ranging equipment from the noise values.
+    /// Initializes a new two-way ranging and doppler station from the noise values.
     pub fn from_noise_values(
         name: String,
         elevation_mask: f64,

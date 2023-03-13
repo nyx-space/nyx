@@ -425,7 +425,7 @@ fn generate_spacecraft() {
             isp_s: 300.0,
             thrust_N: 50.0,
         },
-        crate::io::odp::GuidanceMode::Inhibit,
+        crate::cosmic::GuidanceMode::Inhibit,
     );
 
     let sc_generator = GaussianGenerator::from_std_dev_prcts(

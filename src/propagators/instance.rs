@@ -30,6 +30,7 @@ use crate::time::{Duration, Epoch, Unit};
 use crate::State;
 use std::f64;
 use std::sync::mpsc::{channel, Sender};
+use std::time::Instant;
 
 /// A Propagator allows propagating a set of dynamics forward or backward in time.
 /// It is an EventTracker, without any event tracking. It includes the options, the integrator
@@ -77,30 +78,33 @@ where
             return Ok(self.state);
         }
         let stop_time = self.state.epoch() + duration;
-        if duration > 2 * Unit::Minute || duration < -2 * Unit::Minute {
+        let tick = Instant::now();
+        if duration.abs() >= 2 * Unit::Minute {
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
         // Call `finally` on the current state to set anything up
         self.state = self.prop.dynamics.finally(self.state)?;
 
-        let backprop = duration < Unit::Nanosecond;
+        let backprop = duration.is_negative();
         if backprop {
             self.step_size = -self.step_size; // Invert the step size
         }
         loop {
-            let dt = self.state.epoch();
-            if (!backprop && dt + self.step_size > stop_time)
-                || (backprop && dt + self.step_size <= stop_time)
+            let epoch = self.state.epoch();
+            if (!backprop && epoch + self.step_size > stop_time)
+                || (backprop && epoch + self.step_size <= stop_time)
             {
-                if stop_time == dt {
+                if stop_time == epoch {
                     // No propagation necessary
+                    let tock: Duration = tick.elapsed().into();
+                    info!("Done in {}", tock);
                     return Ok(self.state);
                 }
                 // Take one final step of exactly the needed duration until the stop time
                 let prev_step_size = self.step_size;
                 let prev_step_kind = self.fixed_step;
-                self.set_step(stop_time - dt, true);
+                self.set_step(stop_time - epoch, true);
 
                 self.single_step()?;
 
@@ -116,6 +120,8 @@ where
                 if backprop {
                     self.step_size = -self.step_size; // Restore to a positive step size
                 }
+                let tock: Duration = tick.elapsed().into();
+                info!("Done in {}", tock);
                 return Ok(self.state);
             } else {
                 self.single_step()?;

@@ -18,7 +18,7 @@
 
 use std::collections::HashMap;
 
-use crate::io::odp::Cosm;
+use crate::cosmic::Cosm;
 use crate::io::tracking_data::DynamicTrackingArc;
 use crate::io::trajectory_data::DynamicTrajectory;
 use crate::od::msr::StdMeasurement;
@@ -27,8 +27,11 @@ pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
 use crate::{NyxError, Orbit};
 use pyo3::{prelude::*, py_run};
+pub(crate) mod estimate;
 mod ground_station;
 mod trkconfig;
+
+use estimate::OrbitEstimate;
 
 pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "nyx_space.orbit_determination")?;
@@ -37,6 +40,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<GroundTrackingArcSim>()?;
     sm.add_class::<DynamicTrackingArc>()?;
     sm.add_class::<TrkConfig>()?;
+    sm.add_class::<OrbitEstimate>()?;
 
     py_run!(
         py,

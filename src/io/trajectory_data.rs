@@ -30,7 +30,7 @@ use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-use super::odp::Cosm;
+use crate::cosmic::Cosm;
 
 /// A dynamic trajectory allows loading a trajectory Parquet file and converting it
 /// to the concrete trajectory state type when desired.

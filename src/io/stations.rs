@@ -18,6 +18,7 @@
 
 use super::ConfigError;
 use super::{ConfigRepr, Configurable};
+use crate::md::ui::Cosm;
 use crate::od::prelude::GroundStation;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -41,10 +42,7 @@ impl ConfigRepr for StationSerde {}
 impl Configurable for GroundStation {
     type IntermediateRepr = StationSerde;
 
-    fn from_config(
-        cfg: Self::IntermediateRepr,
-        cosm: Arc<super::odp::Cosm>,
-    ) -> Result<Self, ConfigError>
+    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
     where
         Self: Sized,
     {
@@ -157,7 +155,7 @@ fn test_load_single() {
 
 #[test]
 fn test_load_many() {
-    use crate::io::odp::Cosm;
+    use crate::cosmic::Cosm;
     use std::env;
     use std::path::PathBuf;
 

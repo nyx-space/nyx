@@ -5,10 +5,10 @@ use pyo3::types::PyType;
 pub use crate::cosmic::Bodies;
 use crate::cosmic::Cosm as CosmRs;
 use crate::cosmic::Frame as FrameRs;
+use crate::cosmic::GuidanceMode;
 pub use crate::cosmic::Orbit;
 pub use crate::cosmic::Spacecraft;
 use crate::dynamics::guidance::Thruster;
-use crate::io::odp::GuidanceMode;
 use std::sync::Arc;
 
 pub(crate) fn register_cosmic(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {

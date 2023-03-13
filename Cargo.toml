@@ -1,9 +1,8 @@
 [package]
 name = "nyx-space"
 build = "build.rs"
-version = "1.1.2"
+version = "2.0.0-alpha.0"
 edition = "2021"
-# resolver = "2"
 authors = ["Christopher Rabotin <christopher.rabotin@gmail.com>"]
 description = "A high-fidelity space mission toolkit, with orbit propagation, estimation and some systems engineering"
 homepage = "https://nyxspace.com"
@@ -48,6 +47,7 @@ approx = "0.5"
 rand_pcg = "0.3"
 pyo3 = {version = "0.17.3", optional = true, features = ["extension-module"]}
 pyo3-log = {version = "0.8.1", optional = true}
+numpy = {version = "0.17", optional = true}
 indicatif = {version = "0.17", features = ["rayon"]}
 rstats = "=1.2.26"
 thiserror = "1.0"
@@ -63,8 +63,8 @@ num = "0.4.0"
 shadow-rs = "0.20.0"
 
 [features]
-default = []
-python = ["pyo3", "pyo3-log", "hifitime/python"]
+default = ["python"]
+python = ["pyo3", "pyo3-log", "hifitime/python", "numpy"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

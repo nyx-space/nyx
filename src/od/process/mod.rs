@@ -4,7 +4,7 @@
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundation, either version 3 of the License, or
+    by the Free Software Foundatio either version 3 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -38,7 +38,6 @@ pub use conf::{IterationConf, SmoothingArc};
 mod trigger;
 pub use trigger::{CkfTrigger, EkfTrigger, KfTrigger};
 
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Add;
 
@@ -51,7 +50,6 @@ pub struct ODProcess<
     D: Dynamics,
     E: ErrorCtrl,
     Msr: SimMeasurement<State = S>,
-    N: TrackingDeviceSim<S, Msr>,
     T: KfTrigger,
     A: DimName,
     S: EstimateFrom<D::StateType>,
@@ -82,8 +80,6 @@ pub struct ODProcess<
     pub prop: PropInstance<'a, D, E>,
     /// Kalman filter itself
     pub kf: K,
-    /// List of measurement devices used
-    pub devices: Vec<N>,
     /// Vector of estimates available after a pass
     pub estimates: Vec<K::Estimate>,
     /// Vector of residuals available after a pass
@@ -100,12 +96,11 @@ impl<
         D: Dynamics,
         E: ErrorCtrl,
         Msr: SimMeasurement<State = S>,
-        N: TrackingDeviceSim<S, Msr>,
         T: KfTrigger,
         A: DimName,
         S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, N, T, A, S, K>
+    > ODProcess<'a, D, E, Msr, T, A, S, K>
 where
     D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
@@ -131,20 +126,13 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ekf(
-        prop: PropInstance<'a, D, E>,
-        kf: K,
-        devices: Vec<N>,
-        trigger: T,
-        cosm: Arc<Cosm>,
-    ) -> Self {
+    pub fn ekf(prop: PropInstance<'a, D, E>, kf: K, trigger: T, cosm: Arc<Cosm>) -> Self {
         let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
-            devices,
             estimates,
             residuals: Vec::with_capacity(10_000),
             ekf_trigger: trigger,
@@ -280,7 +268,15 @@ where
     }
 
     /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
-    pub fn iterate(&mut self, measurements: &[Msr], config: IterationConf) -> Result<(), NyxError> {
+    pub fn iterate<Dev>(
+        &mut self,
+        devices: &mut [Dev],
+        measurements: &[Msr],
+        config: IterationConf,
+    ) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
         // Compute the initial RMS
         let mut best_rms = if config.use_prefit {
             self.rms_prefit_residual()
@@ -318,7 +314,7 @@ where
             self.estimates.push(smoothed[0].clone());
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
-            self.process_measurements(measurements)?;
+            self.process_measurements(devices, measurements)?;
 
             // Compute the new RMS
             let new_rms = if config.use_prefit {
@@ -395,7 +391,14 @@ where
     ///
     /// WARNING: Measurements **MUST** be ordered in positive chronological time.
     #[allow(clippy::erasing_op)]
-    pub fn process_measurements(&mut self, measurements: &[Msr]) -> Result<(), NyxError> {
+    pub fn process_measurements<Dev>(
+        &mut self,
+        devices: &mut [Dev],
+        measurements: &[Msr],
+    ) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
         assert!(
             !measurements.is_empty(),
             "must have at least one measurement"
@@ -448,7 +451,7 @@ where
                     // Perform a measurement update
 
                     // Get the computed observations
-                    for device in self.devices.iter_mut() {
+                    for device in devices.iter_mut() {
                         if let Some(computed_meas) =
                             device.measure(&nominal_state, &mut rng, self.cosm.clone())
                         {
@@ -540,18 +543,7 @@ where
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
-        // Rebuild the devices uses in this arc for O(1) access
-        let device_list = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
-        let mut devices = HashMap::new();
-        for device in device_list {
-            if !arc.device_names().contains(&device.name()) {
-                warn!(
-                    "{} from arc config does not appear in measurements -- ignored",
-                    device.name()
-                );
-            }
-            devices.insert(device.name(), device);
-        }
+        let mut devices = arc.rebuild_devices::<S, Dev>(self.cosm.clone()).unwrap();
 
         let measurements = &arc.measurements;
         assert!(
@@ -757,11 +749,10 @@ impl<
         D: Dynamics,
         E: ErrorCtrl,
         Msr: SimMeasurement<State = S>,
-        N: TrackingDeviceSim<S, Msr>,
         A: DimName,
         S: EstimateFrom<D::StateType>,
         K: Filter<S, A, Msr::MeasurementSize>,
-    > ODProcess<'a, D, E, Msr, N, CkfTrigger, A, S, K>
+    > ODProcess<'a, D, E, Msr, CkfTrigger, A, S, K>
 where
     D::StateType: Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
     DefaultAllocator: Allocator<f64, <D::StateType as State>::Size>
@@ -786,14 +777,13 @@ where
         + Allocator<f64, <S as State>::Size, A>
         + Allocator<f64, A, <S as State>::Size>,
 {
-    pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, devices: Vec<N>, cosm: Arc<Cosm>) -> Self {
+    pub fn ckf(prop: PropInstance<'a, D, E>, kf: K, cosm: Arc<Cosm>) -> Self {
         let init_state = prop.state;
         let mut estimates = Vec::with_capacity(10_001);
         estimates.push(kf.previous_estimate().clone());
         Self {
             prop,
             kf,
-            devices,
             simultaneous_msr: false,
             estimates,
             residuals: Vec::with_capacity(10_000),
