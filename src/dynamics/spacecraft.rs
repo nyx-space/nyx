@@ -33,7 +33,6 @@ use crate::State;
 use std::fmt;
 use std::sync::Arc;
 
-#[cfg(feature = "python")]
 use crate::cosmic::Cosm;
 #[cfg(feature = "python")]
 use crate::io::ConfigRepr;
@@ -393,10 +392,7 @@ impl Dynamics for SpacecraftDynamics {
 impl Configurable for SpacecraftDynamics {
     type IntermediateRepr = DynamicsSerde;
 
-    fn from_config(
-        cfg: Self::IntermediateRepr,
-        cosm: Arc<Cosm>,
-    ) -> Result<Self, ConfigError>
+    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
     where
         Self: Sized,
     {

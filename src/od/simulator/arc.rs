@@ -37,6 +37,7 @@ use std::sync::Arc;
 
 use super::TrkConfig;
 
+#[derive(Clone)]
 pub struct TrackingArcSim<MsrIn, Msr, D>
 where
     D: TrackingDeviceSim<MsrIn, Msr>,

@@ -29,9 +29,11 @@ use crate::{NyxError, Orbit};
 use pyo3::{prelude::*, py_run};
 pub(crate) mod estimate;
 mod ground_station;
+mod process;
 mod trkconfig;
 
 use estimate::OrbitEstimate;
+use process::process_tracking_arc;
 
 pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
     let sm = PyModule::new(py, "nyx_space.orbit_determination")?;
@@ -41,6 +43,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     sm.add_class::<DynamicTrackingArc>()?;
     sm.add_class::<TrkConfig>()?;
     sm.add_class::<OrbitEstimate>()?;
+    sm.add_function(wrap_pyfunction!(process_tracking_arc, sm)?)?;
 
     py_run!(
         py,
@@ -51,6 +54,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
     Ok(())
 }
 
+#[derive(Clone)]
 #[pyclass]
 pub struct GroundTrackingArcSim {
     inner: TrackingArcSim<Orbit, StdMeasurement, GroundStation>,

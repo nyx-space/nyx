@@ -26,7 +26,7 @@ use arrow::{
     record_batch::RecordBatchReader,
 };
 use hifitime::Epoch;
-use parquet::arrow::arrow_reader::{ParquetRecordBatchReader, ParquetRecordBatchReaderBuilder};
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use std::fs::File;
 use std::{collections::HashMap, error::Error, fmt::Display, path::Path};
 
@@ -40,7 +40,6 @@ pub struct DynamicTrackingArc {
     pub device_cfg: String,
     pub path: String,
     metadata: HashMap<String, String>,
-    reader: ParquetRecordBatchReader,
 }
 
 impl DynamicTrackingArc {
@@ -68,7 +67,6 @@ impl DynamicTrackingArc {
 
         let me = Self {
             path: path.as_ref().to_string_lossy().to_string(),
-            reader: builder.build()?,
             metadata,
             device_cfg,
         };
@@ -81,17 +79,25 @@ impl DynamicTrackingArc {
     }
 
     /// Reads through the loaded parquet file and attempts to convert to the provided tracking arc.
-    pub fn to_tracking_arc<Msr>(self) -> Result<TrackingArc<Msr>, NyxError>
+    pub fn to_tracking_arc<Msr>(&self) -> Result<TrackingArc<Msr>, NyxError>
     where
         Msr: Measurement,
         DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
     {
+        // Read the file since we closed it earlier
+        let file = File::open(&self.path).map_err(|e| NyxError::CustomError(e.to_string()))?;
+        let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
+
+        let reader = builder
+            .build()
+            .map_err(|e| NyxError::CustomError(e.to_string()))?;
+
         // Check the schema
         let mut has_epoch = false;
         let mut has_tracking_dev = false;
         let mut range_avail = false;
         let mut rate_avail = false;
-        for field in &self.reader.schema().fields {
+        for field in &reader.schema().fields {
             match field.name().as_str() {
                 "Epoch:TAI (s)" => has_epoch = true,
                 "Tracking device" => has_tracking_dev = true,
@@ -150,12 +156,12 @@ impl DynamicTrackingArc {
 
         // At this stage, we know that the measurement is valid and the conversion is supported.
         let mut arc = TrackingArc {
-            device_cfg: self.device_cfg,
+            device_cfg: self.device_cfg.clone(),
             measurements: Vec::new(),
         };
 
         // Now convert each batch on the fly
-        for maybe_batch in self.reader {
+        for maybe_batch in reader {
             let batch = maybe_batch.unwrap();
 
             let tracking_device = batch

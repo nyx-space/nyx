@@ -34,7 +34,7 @@ use super::ConfigError;
 #[derive(Debug, Clone, PartialEq)]
 #[pyclass]
 #[pyo3(text_signature = "(nominal_orbit, covariance)")]
-pub(crate) struct OrbitEstimate(KfEstimate<Orbit>);
+pub(crate) struct OrbitEstimate(pub(crate) KfEstimate<Orbit>);
 
 impl Configurable for OrbitEstimate {
     type IntermediateRepr = OrbitEstimateSerde;
