@@ -63,7 +63,7 @@ num = "0.4.0"
 shadow-rs = "0.20.0"
 
 [features]
-default = ["python"]
+default = []
 python = ["pyo3", "pyo3-log", "hifitime/python", "numpy"]
 
 [lib]
