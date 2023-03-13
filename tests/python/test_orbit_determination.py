@@ -1,9 +1,18 @@
 import logging
 from pathlib import Path
+import numpy as np
 
-from nyx_space.orbit_determination import GroundStation, GroundTrackingArcSim, TrkConfig
+from nyx_space.orbit_determination import (
+    GroundStation,
+    GroundTrackingArcSim,
+    TrkConfig,
+    OrbitEstimate,
+    process_tracking_arc,
+    DynamicTrackingArc,
+)
 from nyx_space.mission_design import DynamicTrajectory, SpacecraftDynamics, propagate
 from nyx_space.cosmic import Spacecraft
+from nyx_space.time import Unit
 
 
 def test_generate_msr():
@@ -58,3 +67,32 @@ def test_generate_msr():
     # Generate the measurements
     path = arc_sim.generate_measurements(str(outpath.joinpath("./from_python.parquet")))
     print(f"Saved {arc_sim} to {path}")
+
+    # Now let's filter this same data.
+    # Load the tracking arc
+    arc = DynamicTrackingArc(path)
+
+    # Create the orbit estimate with the covariance diagonal (100 km on position and 1 km/s on velocity)
+    orbit_est = OrbitEstimate(
+        sc.orbit, covar=np.diag([100.0, 100.0, 100.0, 1.0, 1.0, 1.0])
+    )
+
+    msr_noise = [1e-3, 0, 0, 1e-6]  # TODO: Convert this to a numpy matrix
+    ekf_num_msr_trig = 100  # Switch from sequential to EKF after 100 measurements
+    ekf_disable_time = (
+        Unit.Hour * 2
+    )  # Unless there is a 2 hour gap in the measurements, and then switch back to classical
+
+    estimates = process_tracking_arc(
+        dynamics["hifi"],
+        sc,
+        orbit_est,
+        msr_noise,
+        arc,
+        ekf_num_msr_trig,
+        ekf_disable_time,
+    )
+
+    assert len(estimates) == 846
+
+    # TODO: Add more tests
