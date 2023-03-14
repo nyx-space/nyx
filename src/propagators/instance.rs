@@ -79,7 +79,8 @@ where
         }
         let stop_time = self.state.epoch() + duration;
         let tick = Instant::now();
-        if duration.abs() >= 2 * Unit::Minute {
+        let log_progress = duration.abs() >= 2 * Unit::Minute;
+        if log_progress {
             // Prevent the print spam for orbit determination cases
             info!("Propagating for {} until {}", duration, stop_time);
         }
@@ -97,8 +98,10 @@ where
             {
                 if stop_time == epoch {
                     // No propagation necessary
-                    let tock: Duration = tick.elapsed().into();
-                    info!("Done in {}", tock);
+                    if log_progress {
+                        let tock: Duration = tick.elapsed().into();
+                        info!("Done in {}", tock);
+                    }
                     return Ok(self.state);
                 }
                 // Take one final step of exactly the needed duration until the stop time
@@ -120,8 +123,10 @@ where
                 if backprop {
                     self.step_size = -self.step_size; // Restore to a positive step size
                 }
-                let tock: Duration = tick.elapsed().into();
-                info!("Done in {}", tock);
+                if log_progress {
+                    let tock: Duration = tick.elapsed().into();
+                    info!("Done in {}", tock);
+                }
                 return Ok(self.state);
             } else {
                 self.single_step()?;

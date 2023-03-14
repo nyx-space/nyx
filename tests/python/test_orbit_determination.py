@@ -15,7 +15,7 @@ from nyx_space.cosmic import Spacecraft
 from nyx_space.time import Unit
 
 
-def test_generate_msr():
+def test_filter_arc():
     # Initialize logging
     FORMAT = "%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s"
     logging.basicConfig(format=FORMAT)
@@ -96,3 +96,6 @@ def test_generate_msr():
     assert len(estimates) == 846
 
     # TODO: Add more tests
+
+if __name__ == '__main__':
+    test_filter_arc()

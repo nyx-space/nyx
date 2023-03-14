@@ -82,3 +82,6 @@ def test_propagate():
         event=Event(StateParameter.Apoapsis, 0.0, value_precision=1e-6),
     )
     assert abs(rslt_apo.value_of(StateParameter.TrueAnomaly) - 180.0) <= 1e-6
+
+if __name__ == '__main__':
+    test_propagate()
