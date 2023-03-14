@@ -51,7 +51,7 @@ numpy = {version = "0.17", optional = true}
 indicatif = {version = "0.17", features = ["rayon"]}
 rstats = "1.2.39"
 thiserror = "1.0"
-parquet = "33.0.0"
+parquet = "35.0.0"
 arrow = "33.0.0"
 shadow-rs = "0.21.0"
 serde_yaml = "0.9.17"
