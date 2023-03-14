@@ -18,7 +18,7 @@ fn tgt_vnc_c3_decl() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -69,7 +69,7 @@ fn tgt_vnc_sma_ecc() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 

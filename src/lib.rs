@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -69,7 +69,7 @@ extern crate thiserror;
 
 /// Re-export of hifitime
 pub mod time {
-    pub use hifitime::*;
+    pub use hifitime::prelude::*;
 }
 
 /// Re-export nalgebra
@@ -79,3 +79,6 @@ pub mod linalg {
 
 /// Re-export some useful things
 pub use self::cosmic::{Orbit, Spacecraft, State, TimeTagged};
+
+#[cfg(feature = "python")]
+mod python;

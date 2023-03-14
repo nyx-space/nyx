@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,16 +18,28 @@
 
 use super::guidance::GuidanceLaw;
 use super::orbital::OrbitalDynamics;
-use super::{Dynamics, ForceModel};
-pub use crate::cosmic::{BaseSpacecraft, GuidanceMode, Spacecraft, SpacecraftExt, STD_GRAVITY};
+use super::{AccelModel, Dynamics, ForceModel};
+pub use crate::cosmic::{GuidanceMode, Spacecraft, STD_GRAVITY};
 use crate::errors::NyxError;
-use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
+use crate::io::dynamics::DynamicsSerde;
+use crate::io::gravity::HarmonicsMem;
 
+use crate::io::{ConfigError, Configurable};
+use crate::linalg::{Const, DimName, OMatrix, OVector, Vector3};
+pub use crate::md::ui::SolarPressure;
+use crate::md::ui::{Harmonics, PointMasses};
 use crate::State;
+
 use std::fmt;
 use std::sync::Arc;
 
-pub use super::solarpressure::SolarPressure;
+use crate::cosmic::Cosm;
+#[cfg(feature = "python")]
+use crate::io::ConfigRepr;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use std::collections::HashMap;
 
 const NORM_ERR: f64 = 1e-4;
 
@@ -35,20 +47,18 @@ const NORM_ERR: f64 = 1e-4;
 /// Note: when developing new guidance laws, it is recommended to _not_ enable fuel decrement until the guidance law seems to work without proper physics.
 /// Note: if the spacecraft runs out of fuel, the propagation segment will return an error.
 #[derive(Clone)]
-pub struct BaseSpacecraftDynamics<'a, X: SpacecraftExt> {
-    pub orbital_dyn: OrbitalDynamics<'a>,
-    pub force_models: Vec<Arc<dyn ForceModel<X> + 'a>>,
-    pub guid_law: Option<Arc<dyn GuidanceLaw<X> + 'a>>,
+#[cfg_attr(feature = "python", pyclass)]
+pub struct SpacecraftDynamics {
+    pub orbital_dyn: OrbitalDynamics,
+    pub force_models: Vec<Arc<dyn ForceModel>>,
+    pub guid_law: Option<Arc<dyn GuidanceLaw>>,
     pub decrement_mass: bool,
 }
 
-impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
+impl SpacecraftDynamics {
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
-    /// By default, the mass of the vehicle will be decremented as propellant is consummed.
-    pub fn from_guidance_law(
-        orbital_dyn: OrbitalDynamics<'a>,
-        guid_law: Arc<dyn GuidanceLaw<X> + 'a>,
-    ) -> Self {
+    /// By default, the mass of the vehicle will be decremented as propellant is consumed.
+    pub fn from_guidance_law(orbital_dyn: OrbitalDynamics, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn,
             guid_law: Some(guid_law),
@@ -58,10 +68,10 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and a propulsion subsystem.
-    /// Will _not_ decrement the fuel mass as propellant is consummed.
+    /// Will _not_ decrement the fuel mass as propellant is consumed.
     pub fn from_guidance_law_no_decr(
-        orbital_dyn: OrbitalDynamics<'a>,
-        guid_law: Arc<dyn GuidanceLaw<X> + 'a>,
+        orbital_dyn: OrbitalDynamics,
+        guid_law: Arc<dyn GuidanceLaw>,
     ) -> Self {
         Self {
             orbital_dyn,
@@ -72,7 +82,7 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     }
 
     /// Initialize a Spacecraft with a set of orbital dynamics and with SRP enabled.
-    pub fn new(orbital_dyn: OrbitalDynamics<'a>) -> Self {
+    pub fn new(orbital_dyn: OrbitalDynamics) -> Self {
         Self {
             orbital_dyn,
             guid_law: None,
@@ -82,10 +92,7 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     }
 
     /// Initialize new spacecraft dynamics with the provided orbital mechanics and with the provided force model.
-    pub fn from_model(
-        orbital_dyn: OrbitalDynamics<'a>,
-        force_model: Arc<dyn ForceModel<X> + 'a>,
-    ) -> Self {
+    pub fn from_model(orbital_dyn: OrbitalDynamics, force_model: Arc<dyn ForceModel>) -> Self {
         Self {
             orbital_dyn,
             guid_law: None,
@@ -96,8 +103,8 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
 
     /// Initialize new spacecraft dynamics with a vector of force models.
     pub fn from_models(
-        orbital_dyn: OrbitalDynamics<'a>,
-        force_models: Vec<Arc<dyn ForceModel<X> + 'a>>,
+        orbital_dyn: OrbitalDynamics,
+        force_models: Vec<Arc<dyn ForceModel>>,
     ) -> Self {
         let mut me = Self::new(orbital_dyn);
         me.force_models = force_models;
@@ -105,19 +112,19 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     }
 
     /// Add a model to the currently defined spacecraft dynamics
-    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel<X> + 'a>) {
+    pub fn add_model(&mut self, force_model: Arc<dyn ForceModel>) {
         self.force_models.push(force_model);
     }
 
     /// Clone these dynamics and add a model to the currently defined orbital dynamics
-    pub fn with_model(self, force_model: Arc<dyn ForceModel<X> + 'a>) -> Self {
-        let mut me = self.clone();
+    pub fn with_model(self, force_model: Arc<dyn ForceModel>) -> Self {
+        let mut me = self;
         me.add_model(force_model);
         me
     }
 
     /// A shortcut to spacecraft.guid_law if a guidance law is defined for these dynamics
-    pub fn guidance_achieved(&self, state: &BaseSpacecraft<X>) -> Result<bool, NyxError> {
+    pub fn guidance_achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         match &self.guid_law {
             Some(guid_law) => guid_law.achieved(state),
             None => Err(NyxError::NoObjectiveDefined),
@@ -125,7 +132,7 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     }
 
     /// Clone these spacecraft dynamics and update the control to the one provided.
-    pub fn with_guidance_law(&self, guid_law: Arc<dyn GuidanceLaw<X> + 'a>) -> Self {
+    pub fn with_guidance_law(&self, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn: self.orbital_dyn.clone(),
             guid_law: Some(guid_law),
@@ -135,7 +142,7 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     }
 
     /// Clone these spacecraft dynamics and update the control to the one provided.
-    pub fn with_guidance_law_no_decr(&self, guid_law: Arc<dyn GuidanceLaw<X> + 'a>) -> Self {
+    pub fn with_guidance_law_no_decr(&self, guid_law: Arc<dyn GuidanceLaw>) -> Self {
         Self {
             orbital_dyn: self.orbital_dyn.clone(),
             guid_law: Some(guid_law),
@@ -155,12 +162,66 @@ impl<'a, X: SpacecraftExt> BaseSpacecraftDynamics<'a, X> {
     }
 }
 
-impl<'a, X: SpacecraftExt> fmt::Display for BaseSpacecraftDynamics<'a, X> {
+#[cfg_attr(feature = "python", pymethods)]
+impl SpacecraftDynamics {
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn load_yaml(path: &str) -> Result<Self, ConfigError> {
+        let serde = DynamicsSerde::load_yaml(path)?;
+
+        let cosm = Cosm::de438();
+
+        Self::from_config(serde, cosm)
+    }
+
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn load_many_yaml(path: &str) -> Result<Vec<Self>, ConfigError> {
+        let orbits = DynamicsSerde::load_many_yaml(path)?;
+
+        let cosm = Cosm::de438();
+
+        let mut selves = Vec::with_capacity(orbits.len());
+
+        for serde in orbits {
+            selves.push(Self::from_config(serde, cosm.clone())?);
+        }
+
+        Ok(selves)
+    }
+
+    #[cfg(feature = "python")]
+    #[staticmethod]
+    fn load_named_yaml(path: &str) -> Result<HashMap<String, Self>, ConfigError> {
+        let orbits = DynamicsSerde::load_named_yaml(path)?;
+
+        let cosm = Cosm::de438();
+
+        let mut selves = HashMap::with_capacity(orbits.len());
+
+        for (k, v) in orbits {
+            selves.insert(k, Self::from_config(v, cosm.clone())?);
+        }
+
+        Ok(selves)
+    }
+
+    #[cfg(feature = "python")]
+    fn __repr__(&self) -> String {
+        format!("{self}")
+    }
+}
+
+impl fmt::Display for SpacecraftDynamics {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let force_models: String = self.force_models.iter().map(|x| format!("{x}; ")).collect();
+        let force_models: String = if self.force_models.is_empty() {
+            "No force models;".to_string()
+        } else {
+            self.force_models.iter().map(|x| format!("{x}; ")).collect()
+        };
         write!(
             f,
-            "Spacecraft dynamics (with guidance = {}): {}\t{}",
+            "Spacecraft dynamics (with guidance = {}): {} {}",
             self.guid_law.is_some(),
             force_models,
             self.orbital_dyn
@@ -168,16 +229,14 @@ impl<'a, X: SpacecraftExt> fmt::Display for BaseSpacecraftDynamics<'a, X> {
     }
 }
 
-impl<'a, X: SpacecraftExt> Dynamics for BaseSpacecraftDynamics<'a, X> {
+impl Dynamics for SpacecraftDynamics {
     type HyperdualSize = Const<9>;
-    type StateType = BaseSpacecraft<X>;
+    type StateType = Spacecraft;
 
     fn finally(&self, next_state: Self::StateType) -> Result<Self::StateType, NyxError> {
         if next_state.fuel_mass_kg < 0.0 {
             error!("negative fuel mass at {}", next_state.epoch());
-            return Err(NyxError::FuelExhausted(Box::new(
-                next_state.degrade_to_spacecraft(),
-            )));
+            return Err(NyxError::FuelExhausted(Box::new(next_state)));
         }
 
         if let Some(guid_law) = &self.guid_law {
@@ -330,5 +389,64 @@ impl<'a, X: SpacecraftExt> Dynamics for BaseSpacecraftDynamics<'a, X> {
     }
 }
 
-/// A spaceraft dynamics that works in nearly all guidance law cases
-pub type SpacecraftDynamics<'a> = BaseSpacecraftDynamics<'a, GuidanceMode>;
+impl Configurable for SpacecraftDynamics {
+    type IntermediateRepr = DynamicsSerde;
+
+    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    where
+        Self: Sized,
+    {
+        // Builds the orbital dynamics
+        let mut accel_models: Vec<Arc<dyn AccelModel + Sync>> = Vec::new();
+
+        accel_models.push(PointMasses::new(&cfg.point_masses, cosm.clone()));
+
+        if let Some(harmonics_serde) = cfg.harmonics {
+            for hh in harmonics_serde {
+                let gunzipped = hh.coeffs.ends_with(".gz");
+                let stor = if hh.coeffs.contains("cof") {
+                    HarmonicsMem::from_cof(&hh.coeffs, hh.degree, hh.order, gunzipped)
+                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                } else if hh.coeffs.contains("sha") {
+                    HarmonicsMem::from_shadr(&hh.coeffs, hh.degree, hh.order, gunzipped)
+                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                } else if hh.coeffs.contains("EGM") {
+                    HarmonicsMem::from_egm(&hh.coeffs, hh.degree, hh.order, gunzipped)
+                        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?
+                } else {
+                    return Err(ConfigError::InvalidConfig(
+                        "Unknown coefficients file type".to_string(),
+                    ));
+                };
+
+                // Grab the frame
+                let frame = cosm
+                    .try_frame(&hh.frame)
+                    .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+
+                accel_models.push(Harmonics::from_stor(frame, stor, cosm.clone()));
+            }
+        }
+
+        let orbital_dyn = OrbitalDynamics::new(accel_models);
+
+        let mut force_models: Vec<Arc<dyn ForceModel>> = Vec::new();
+
+        // SRP
+        if let Some(srp) = cfg.srp {
+            force_models.push(SolarPressure::with_flux(
+                srp.phi.map_or(1367.0, |v| v),
+                srp.shadows,
+                cosm,
+            ));
+        }
+
+        // TODO: Drag
+
+        Ok(SpacecraftDynamics::from_models(orbital_dyn, force_models))
+    }
+
+    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
+        todo!()
+    }
+}

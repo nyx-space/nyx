@@ -2,15 +2,24 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use nyx::io::ConfigRepr;
+use nyx::od::msr::StdMeasurement;
+use nyx::od::simulator::arc::TrackingArcSim;
+use nyx::od::simulator::TrkConfig;
+use rand::thread_rng;
+
 use self::nyx::cosmic::{Cosm, Orbit};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::sph_harmonics::Harmonics;
 use self::nyx::io::formatter::NavSolutionFormatter;
 use self::nyx::io::gravity::*;
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::ui::*;
+use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
+use std::collections::HashMap;
+use std::env;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -22,6 +31,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let ekf_num_meas = 100;
@@ -31,12 +41,12 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -60,11 +70,11 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
     println!("{}", final_truth);
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
-            if meas.visible() {
+        for station in all_stations.iter_mut() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -98,17 +108,177 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let mut odp = ODProcess::ekf(
         prop_est,
         kf,
-        all_stations,
-        StdEkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        cosm.clone(),
     );
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
-    println!("Final estimate:\n{}", est);
+    println!("Final estimate:\n{est}");
     assert!(
         est.state_deviation().norm() < 1e-12,
+        "In perfect modeling, the state deviation should be near zero"
+    );
+    for i in 0..6 {
+        assert!(
+            est.covar[(i, i)] >= 0.0,
+            "covar diagonal element negative @ [{}, {}]",
+            i,
+            i
+        );
+    }
+    for i in 0..6 {
+        if i < 3 {
+            assert!(
+                est.covar[(i, i)] < covar_radius,
+                "covar radius did not decrease"
+            );
+        } else {
+            assert!(
+                est.covar[(i, i)] < covar_velocity,
+                "covar velocity did not decrease"
+            );
+        }
+    }
+
+    // Check the final estimate
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("{}\n\n{}\n{}", est.state_deviation(), est, final_truth);
+    let delta = est.state() - final_truth;
+    println!(
+        "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
+        delta.rmag() * 1e3,
+        delta.vmag() * 1e6
+    );
+
+    assert!(delta.rmag() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+}
+
+#[allow(clippy::identity_op)]
+#[test]
+fn od_val_with_arc() {
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
+
+    // Define the ground stations.
+    // Set the disable time to be very low to test enable/disable sequence
+    let ekf_disable_time = 5.0 * Unit::Second;
+    let elevation_mask = 0.0;
+    let range_noise = 0.0;
+    let range_rate_noise = 0.0;
+    let dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss34_canberra =
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let dss13_goldstone =
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    let ekf_num_meas = 100;
+
+    // Define the propagator information.
+    let duration = 1 * Unit::Day;
+
+    // Define the storages (channels for the states and a map for the measurements).
+
+    // Define state information.
+    let eme2k = cosm.frame("EME2000");
+    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+
+    // We're sharing both the propagator and the dynamics.
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, PropOpts::with_fixed_step_s(10.0));
+
+    let mut prop = setup.with(initial_state);
+    let (final_truth, traj) = prop.for_duration_with_traj(duration).unwrap();
+    println!("{}", final_truth);
+
+    // Save the trajectory to parquet
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "od_val_with_arc_truth_ephem.parquet",
+    ]
+    .iter()
+    .collect();
+    traj.to_parquet(path, None).unwrap();
+
+    // Load the tracking configs
+    let trkconfig_yaml: PathBuf = [
+        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "data",
+        "tests",
+        "config",
+        "trk_cfg_od_val_arc.yaml",
+    ]
+    .iter()
+    .collect();
+
+    let configs: HashMap<String, TrkConfig> = TrkConfig::load_named_yaml(trkconfig_yaml).unwrap();
+
+    // Simulate tracking data of range and range rate
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations.clone(), traj, configs, 1).unwrap();
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+
+    // And serialize to disk
+    let path: PathBuf = [
+        &env::var("CARGO_MANIFEST_DIR").unwrap(),
+        "output_data",
+        "two_body_od_val_arc.parquet",
+    ]
+    .iter()
+    .collect();
+
+    arc.to_parquet(path).unwrap();
+
+    // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
+    // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
+    // the measurements, and the same time step.
+    let prop_est = setup.with(initial_state.with_stm());
+    let covar_radius = 1.0e-6;
+    let covar_velocity = 1.0e-6;
+    let init_covar = Matrix6::from_diagonal(&Vector6::new(
+        covar_radius,
+        covar_radius,
+        covar_radius,
+        covar_velocity,
+        covar_velocity,
+        covar_velocity,
+    ));
+
+    // Define the initial estimate
+    let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
+    println!("initial estimate:\n{}", initial_estimate);
+
+    // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
+    let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
+
+    let kf = KF::no_snc(initial_estimate, measurement_noise);
+
+    let mut odp = ODProcess::ekf(
+        prop_est,
+        kf,
+        EkfTrigger::new(ekf_num_meas, ekf_disable_time),
+        cosm.clone(),
+    );
+
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+
+    // Check that the covariance deflated
+    let est = &odp.estimates[odp.estimates.len() - 1];
+    println!("Final estimate:\n{est}");
+    assert!(
+        dbg!(est.state_deviation().norm()) < f64::EPSILON,
         "In perfect modeling, the state deviation should be near zero"
     );
     for i in 0..6 {
@@ -169,18 +339,19 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     use std::io;
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -203,11 +374,11 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
-            if meas.visible() {
+        for station in all_stations.iter_mut() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -239,9 +410,10 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("tb_ckf.csv".to_owned(), cosm);
@@ -252,7 +424,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     // Check that we have as many estimates as steps taken by the propagator.
     // Note that this test cannot work when using a variable step propagator in that same setup.
     // We're adding +1 because the propagation time is inclusive on both ends.
-    let expected_num_estimates = (prop_time.in_seconds() / step_size.in_seconds()) as usize + 1;
+    let expected_num_estimates = (prop_time.to_seconds() / step_size.to_seconds()) as usize + 1;
 
     // Check that there are no duplicates of epochs.
     let mut prev_epoch = odp.estimates[0].epoch();
@@ -338,6 +510,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     // Iterate
     odp.iterate(
+        &mut all_stations,
         &measurements,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
@@ -393,18 +566,19 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.1; // in km (so 100 meters of error)
     let range_rate_noise = 0.001; // in km/s (or 1 meter per second of error)
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -423,18 +597,21 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
+    let mut rng = thread_rng();
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
-            if meas.visible() {
+        for station in all_stations.iter_mut() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
         }
     }
+
+    // Check that we have the same number of measurements as before the behavior change.
+    assert_eq!(measurements.len(), 7953);
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -453,9 +630,9 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     // Define the initial estimate (x_hat): add 100 meters in X, remove 100 meters in Y and add 50 meters in Z
     let mut initial_state2 = initial_state;
-    initial_state2.x += 0.1;
-    initial_state2.y -= 0.1;
-    initial_state2.z += 0.05;
+    initial_state2.x_km += 0.1;
+    initial_state2.y_km -= 0.1;
+    initial_state2.z_km += 0.05;
     let initial_estimate = KfEstimate::from_covar(initial_state2, init_covar);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -463,9 +640,10 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Check the final estimate prior to iteration
     let delta = odp.estimates.last().unwrap().state() - final_truth;
@@ -486,6 +664,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     // Iterate, and check that the initial state difference is lower
     odp.iterate(
+        &mut all_stations,
         &measurements,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
@@ -541,18 +720,19 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -574,11 +754,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
-            if meas.visible() {
+        for station in all_stations.iter_mut() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -614,9 +794,10 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let ckf = KF::new(initial_estimate, process_noise, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
@@ -676,18 +857,6 @@ fn od_tb_ckf_map_covar() {
 
     let cosm = Cosm::de438();
 
-    // Define the ground stations.
-    let elevation_mask = 0.0;
-    let range_noise = 0.0;
-    let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
-
     // Define the propagator information.
     let prop_time = 2 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
@@ -722,7 +891,15 @@ fn od_tb_ckf_map_covar() {
     let measurement_noise = Matrix2::from_diagonal(&Vector2::new(1e-6, 1e-3));
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp: ODProcess<
+        OrbitalDynamics,
+        nyx::propagators::RSSCartesianStep,
+        StdMeasurement,
+        CkfTrigger,
+        nalgebra::Const<3>,
+        Orbit,
+        KF<Orbit, nalgebra::Const<3>, nalgebra::Const<2>>,
+    > = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
     odp.map_covar(dt + prop_time).unwrap();
 
@@ -761,18 +938,19 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -790,18 +968,18 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
     let earth_sph_harm = HarmonicsMem::from_cof("data/JGM3.cof.gz", 70, 70, true).unwrap();
-    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm);
+    let harmonics = Harmonics::from_stor(iau_earth, earth_sph_harm, cosm.clone());
     let orbital_dyn = OrbitalDynamics::from_model(harmonics);
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
-            if meas.visible() {
+        for station in all_stations.iter_mut() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -833,9 +1011,10 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
     // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
@@ -884,18 +1063,19 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     }
 
     let cosm = Cosm::de438();
+    let iau_earth = cosm.frame("IAU Earth");
 
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -916,11 +1096,11 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let mut prop = setup.with(initial_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
-            let meas = station.measure(&rx_state).unwrap();
-            if meas.visible() {
+        for station in all_stations.iter_mut() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
                 break; // We know that only one station is in visibility at each time.
             }
@@ -969,9 +1149,10 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         measurement_noise,
     );
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 

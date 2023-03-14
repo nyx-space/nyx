@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -55,7 +55,7 @@ impl DeltaVctrl for ImpulsiveBurns {
             Vector3::zeros()
         } else {
             let next_mnvr = self.mnvrs[self.mnvr_no];
-            if next_mnvr.start <= state.dt && next_mnvr.end >= state.dt {
+            if next_mnvr.start <= state.epoch && next_mnvr.end >= state.epoch {
                 state.dcm_from_traj_frame(Frame::VNC).unwrap() * next_mnvr.vector(state.epoch())
             } else {
                 Vector3::zeros()
@@ -66,7 +66,7 @@ impl DeltaVctrl for ImpulsiveBurns {
     fn next(&mut self, state: &Orbit) {
         if self.mnvr_no < self.mnvrs.len() {
             let cur_mnvr = self.mnvrs[self.mnvr_no];
-            if state.dt >= cur_mnvr.end {
+            if state.epoch >= cur_mnvr.end {
                 self.mnvr_no += 1;
             }
         }

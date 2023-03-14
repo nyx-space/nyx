@@ -1,0 +1,23 @@
+lofi:
+  point_masses:
+    - Sun
+    - Earth
+hifi:
+  point_masses:
+    - Sun
+    - Earth
+    - Luna
+  harmonics:
+    - frame: IAU Earth
+      coeffs: data/JGM3.cof.gz
+      degree: 10
+      order: 10
+  srp:
+    phi: 1367.0
+    shadows:
+      - Sun J2000
+      - Moon J2000
+
+  #drag:
+  #  density: !Constant 159.0
+  #  frame: IAU Earth

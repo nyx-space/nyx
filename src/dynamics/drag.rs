@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,7 +17,7 @@
 */
 
 use super::ForceModel;
-use crate::cosmic::{BaseSpacecraft, Cosm, Frame, SpacecraftExt};
+use crate::cosmic::{Cosm, Frame, Spacecraft};
 use crate::errors::NyxError;
 use crate::linalg::{Matrix3, Vector3};
 use std::fmt;
@@ -56,17 +56,14 @@ impl fmt::Display for ConstantDrag {
     }
 }
 
-impl<X: SpacecraftExt> ForceModel<X> for ConstantDrag {
-    fn eom(&self, ctx: &BaseSpacecraft<X>) -> Result<Vector3<f64>, NyxError> {
+impl ForceModel for ConstantDrag {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         let velocity = osc.velocity();
-        Ok(-0.5 * self.rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+        Ok(-0.5 * self.rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
     }
 
-    fn dual_eom(
-        &self,
-        _osc_ctx: &BaseSpacecraft<X>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }
 }
@@ -118,14 +115,14 @@ impl fmt::Display for Drag {
     }
 }
 
-impl<X: SpacecraftExt> ForceModel<X> for Drag {
-    fn eom(&self, ctx: &BaseSpacecraft<X>) -> Result<Vector3<f64>, NyxError> {
+impl ForceModel for Drag {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let integration_frame = ctx.orbit.frame;
         let osc = self.cosm.frame_chg(&ctx.orbit, self.drag_frame);
         match self.density {
             AtmDensity::Constant(rho) => {
                 let velocity = osc.velocity();
-                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::Exponential {
@@ -140,7 +137,7 @@ impl<X: SpacecraftExt> ForceModel<X> for Drag {
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
                 let velocity = velocity_integr_frame - osc.velocity();
-                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
@@ -166,15 +163,12 @@ impl<X: SpacecraftExt> ForceModel<X> for Drag {
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
 
                 let velocity = velocity_integr_frame - osc.velocity();
-                Ok(-0.5 * rho * ctx.cd * ctx.drag_area_m2 * velocity.norm() * velocity)
+                Ok(-0.5 * rho * ctx.drag.cd * ctx.drag.area_m2 * velocity.norm() * velocity)
             }
         }
     }
 
-    fn dual_eom(
-        &self,
-        _osc_ctx: &BaseSpacecraft<X>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, _osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         Err(NyxError::PartialsUndefined)
     }
 }

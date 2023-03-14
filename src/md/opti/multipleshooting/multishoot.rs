@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -45,7 +45,7 @@ pub struct MultipleShooting<
     const OT: usize,
 > {
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+    pub prop: &'a Propagator<'a, SpacecraftDynamics, E>,
     /// List of nodes of the optimal trajectory
     pub targets: Vec<T>,
     /// Starting point, must be a spacecraft equipped with a thruster
@@ -289,9 +289,9 @@ impl<'a, E: ErrorCtrl, T: MultishootNode<OT>, const VT: usize, const OT: usize> 
         // Add the starting point too
         nodemsg.push_str(&format!(
             "[{:.3}, {:.3}, {:.3}, {}, {}, {}, {}, {}, {}],\n",
-            self.x0.orbit.x,
-            self.x0.orbit.y,
-            self.x0.orbit.z,
+            self.x0.orbit.x_km,
+            self.x0.orbit.y_km,
+            self.x0.orbit.z_km,
             self.current_iteration,
             0.0,
             0.0,

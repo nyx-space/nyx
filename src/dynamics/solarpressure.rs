@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -19,7 +19,7 @@
 use super::hyperdual::{hyperspace_from_vector, linalg::norm, Float, OHyperdual};
 use super::ForceModel;
 use crate::cosmic::eclipse::EclipseLocator;
-use crate::cosmic::{BaseSpacecraft, Cosm, Frame, SpacecraftExt, AU, SPEED_OF_LIGHT};
+use crate::cosmic::{Cosm, Frame, Spacecraft, AU, SPEED_OF_LIGHT};
 use crate::errors::NyxError;
 use crate::linalg::{Const, Matrix3, Vector3};
 use std::fmt;
@@ -57,8 +57,8 @@ impl SolarPressure {
     }
 }
 
-impl<X: SpacecraftExt> ForceModel<X> for SolarPressure {
-    fn eom(&self, ctx: &BaseSpacecraft<X>) -> Result<Vector3<f64>, NyxError> {
+impl ForceModel for SolarPressure {
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError> {
         let osc = &ctx.orbit;
         // Compute the position of the Sun as seen from the spacecraft
         let r_sun = self
@@ -77,10 +77,10 @@ impl<X: SpacecraftExt> ForceModel<X> for SolarPressure {
         let flux_pressure = (k * self.phi / SPEED_OF_LIGHT) * (1.0 / r_sun_au).powi(2);
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
-        Ok(1e-3 * ctx.cr * ctx.srp_area_m2 * flux_pressure * r_sun_unit)
+        Ok(1e-3 * ctx.srp.cr * ctx.srp.area_m2 * flux_pressure * r_sun_unit)
     }
 
-    fn dual_eom(&self, ctx: &BaseSpacecraft<X>) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
+    fn dual_eom(&self, ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError> {
         let osc = &ctx.orbit;
 
         // Compute the position of the Sun as seen from the spacecraft
@@ -93,7 +93,7 @@ impl<X: SpacecraftExt> ForceModel<X> for SolarPressure {
         let r_sun_d: Vector3<OHyperdual<f64, Const<9>>> = hyperspace_from_vector(&r_sun);
         let r_sun_unit = r_sun_d / norm(&r_sun_d);
 
-        // Compute the shaddowing factor.
+        // Compute the shadowing factor.
         let k: f64 = self.e_loc.compute(osc).into();
 
         let r_sun_au = norm(&r_sun_d) / AU;
@@ -105,7 +105,7 @@ impl<X: SpacecraftExt> ForceModel<X> for SolarPressure {
 
         // Note the 1e-3 is to convert the SRP from m/s^2 to km/s^2
         let dual_force_scalar =
-            OHyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.cr * ctx.srp_area_m2);
+            OHyperdual::<f64, Const<9>>::from_real(1e-3 * ctx.srp.cr * ctx.srp.area_m2);
         let mut dual_force: Vector3<OHyperdual<f64, Const<9>>> = Vector3::zeros();
         dual_force[0] = dual_force_scalar * flux_pressure * r_sun_unit[0];
         dual_force[1] = dual_force_scalar * flux_pressure * r_sun_unit[1];

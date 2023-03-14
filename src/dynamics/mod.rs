@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -64,10 +64,6 @@ pub use self::drag::*;
 /// Define the spherical harmonic models.
 pub mod sph_harmonics;
 pub use self::sph_harmonics::*;
-
-/// Defines the Exponentially Correlated Random Variable dynamics
-// pub mod ecrv;
-// pub use self::ecrv::*;
 
 /// The `Dynamics` trait handles and stores any equation of motion *and* the state is integrated.
 ///
@@ -135,16 +131,13 @@ where
 /// The `ForceModel` trait handles immutable dynamics which return a force. Those will be divided by the mass of the spacecraft to compute the acceleration (F = ma).
 ///
 /// Examples include Solar Radiation Pressure, drag, etc., i.e. forces which do not need to save the current state, only act on it.
-pub trait ForceModel<X: SpacecraftExt>: Send + Sync + fmt::Display {
+pub trait ForceModel: Send + Sync + fmt::Display {
     /// Defines the equations of motion for this force model from the provided osculating state.
-    fn eom(&self, ctx: &BaseSpacecraft<X>) -> Result<Vector3<f64>, NyxError>;
+    fn eom(&self, ctx: &Spacecraft) -> Result<Vector3<f64>, NyxError>;
 
     /// Force models must implement their partials, although those will only be called if the propagation requires the
     /// computation of the STM. The `osc_ctx` is the osculating context, i.e. it changes for each sub-step of the integrator.
-    fn dual_eom(
-        &self,
-        osc_ctx: &BaseSpacecraft<X>,
-    ) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
+    fn dual_eom(&self, osc_ctx: &Spacecraft) -> Result<(Vector3<f64>, Matrix3<f64>), NyxError>;
 }
 
 /// The `AccelModel` trait handles immutable dynamics which return an acceleration. Those can be added directly to Orbital Dynamics for example.

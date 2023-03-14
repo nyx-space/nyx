@@ -1,4 +1,3 @@
-mod ccsds;
 mod cosmic;
 mod mission_design;
 mod monte_carlo;

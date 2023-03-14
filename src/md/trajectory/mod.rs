@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,16 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub(crate) mod spline;
 mod traj;
 mod traj_it;
 
-pub(crate) use traj::interpolate;
+pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
+
 pub use traj::Traj;
 
+use super::ui::Frame;
 use super::StateParameter;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::polyfit::hermite::hermite_eval;
 use crate::time::{Duration, Epoch};
 use crate::{NyxError, Orbit, Spacecraft, State};
 
@@ -96,6 +98,15 @@ where
         value: f64,
         value_dt: f64,
     ) -> Result<(), NyxError>;
+
+    /// Interpolates a new state at the provided epochs given a slice of states.
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError>;
+
+    /// Returns the frame of this state
+    fn frame(&self) -> Frame;
+
+    /// Sets the frame of this state
+    fn set_frame(&mut self, frame: Frame);
 }
 
 impl InterpState for Orbit {
@@ -109,14 +120,72 @@ impl InterpState for Orbit {
             StateParameter::VZ,
         ]
     }
+
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
+        // This is copied from ANISE
+
+        // Statically allocated arrays of the maximum number of samples
+        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut xs = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut ys = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut zs = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut vxs = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut vys = [0.0; INTERPOLATION_SAMPLES + 1];
+        let mut vzs = [0.0; INTERPOLATION_SAMPLES + 1];
+
+        for (cno, state) in states.iter().enumerate() {
+            xs[cno] = state.x_km;
+            ys[cno] = state.y_km;
+            zs[cno] = state.z_km;
+            vxs[cno] = state.vx_km_s;
+            vys[cno] = state.vy_km_s;
+            vzs[cno] = state.vz_km_s;
+            epochs_tdb[cno] = state.epoch().to_tdb_seconds();
+        }
+
+        // TODO: Once I switch to using ANISE, this should use the same function as ANISE and not a clone.
+        let (x_km, vx_km_s) = hermite_eval(
+            &epochs_tdb[..states.len()],
+            &xs[..states.len()],
+            &vxs[..states.len()],
+            epoch.to_et_seconds(),
+        )?;
+
+        let (y_km, vy_km_s) = hermite_eval(
+            &epochs_tdb[..states.len()],
+            &ys[..states.len()],
+            &vys[..states.len()],
+            epoch.to_et_seconds(),
+        )?;
+
+        let (z_km, vz_km_s) = hermite_eval(
+            &epochs_tdb[..states.len()],
+            &zs[..states.len()],
+            &vzs[..states.len()],
+            epoch.to_et_seconds(),
+        )?;
+
+        // And build the result
+        let mut me = self;
+        me.x_km = x_km;
+        me.y_km = y_km;
+        me.z_km = z_km;
+        me.vx_km_s = vx_km_s;
+        me.vy_km_s = vy_km_s;
+        me.vz_km_s = vz_km_s;
+        me.set_epoch(epoch);
+
+        Ok(me)
+    }
+
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
         match *param {
-            StateParameter::X => Ok((self.x, self.vx)),
-            StateParameter::Y => Ok((self.y, self.vy)),
-            StateParameter::Z => Ok((self.z, self.vz)),
-            StateParameter::VX => Ok((self.vx, 0.0)),
-            StateParameter::VY => Ok((self.vy, 0.0)),
-            StateParameter::VZ => Ok((self.vz, 0.0)),
+            StateParameter::X => Ok((self.x_km, self.vx_km_s)),
+            StateParameter::Y => Ok((self.y_km, self.vy_km_s)),
+            StateParameter::Z => Ok((self.z_km, self.vz_km_s)),
+            StateParameter::VX => Ok((self.vx_km_s, 0.0)),
+            StateParameter::VY => Ok((self.vy_km_s, 0.0)),
+            StateParameter::VZ => Ok((self.vz_km_s, 0.0)),
             _ => Err(NyxError::StateParameterUnavailable),
         }
     }
@@ -129,27 +198,35 @@ impl InterpState for Orbit {
     ) -> Result<(), NyxError> {
         match *param {
             StateParameter::X => {
-                self.x = value;
+                self.x_km = value;
             }
             StateParameter::Y => {
-                self.y = value;
+                self.y_km = value;
             }
             StateParameter::Z => {
-                self.z = value;
+                self.z_km = value;
             }
             StateParameter::VX => {
-                self.vx = value;
+                self.vx_km_s = value;
             }
             StateParameter::VY => {
-                self.vy = value;
+                self.vy_km_s = value;
             }
             StateParameter::VZ => {
-                self.vz = value;
+                self.vz_km_s = value;
             }
 
             _ => return Err(NyxError::StateParameterUnavailable),
         }
         Ok(())
+    }
+
+    fn frame(&self) -> Frame {
+        self.frame
+    }
+
+    fn set_frame(&mut self, frame: Frame) {
+        self.frame = frame;
     }
 }
 
@@ -165,14 +242,34 @@ impl InterpState for Spacecraft {
             StateParameter::FuelMass,
         ]
     }
+
+    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
+        // Use the Orbit interpolation first.
+        let orbit = Orbit::interpolate(
+            self.orbit,
+            epoch,
+            &states.iter().map(|sc| sc.orbit).collect::<Vec<_>>(),
+        )?;
+
+        // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
+        let fuel_kg = (states.last().unwrap().fuel_mass_kg - states.first().unwrap().fuel_mass_kg)
+            / (states.last().unwrap().epoch().to_tdb_seconds()
+                - states.first().unwrap().epoch().to_tdb_seconds());
+
+        let mut me = self.with_orbit(orbit);
+        me.fuel_mass_kg = fuel_kg;
+
+        Ok(me)
+    }
+
     fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
         match *param {
-            StateParameter::X => Ok((self.orbit.x, self.orbit.vx)),
-            StateParameter::Y => Ok((self.orbit.y, self.orbit.vy)),
-            StateParameter::Z => Ok((self.orbit.z, self.orbit.vz)),
-            StateParameter::VX => Ok((self.orbit.vx, 0.0)),
-            StateParameter::VY => Ok((self.orbit.vy, 0.0)),
-            StateParameter::VZ => Ok((self.orbit.vz, 0.0)),
+            StateParameter::X => Ok((self.orbit.x_km, self.orbit.vx_km_s)),
+            StateParameter::Y => Ok((self.orbit.y_km, self.orbit.vy_km_s)),
+            StateParameter::Z => Ok((self.orbit.z_km, self.orbit.vz_km_s)),
+            StateParameter::VX => Ok((self.orbit.vx_km_s, 0.0)),
+            StateParameter::VY => Ok((self.orbit.vy_km_s, 0.0)),
+            StateParameter::VZ => Ok((self.orbit.vz_km_s, 0.0)),
             StateParameter::FuelMass => Ok((self.fuel_mass_kg, 0.0)),
             _ => Err(NyxError::StateParameterUnavailable),
         }
@@ -186,28 +283,36 @@ impl InterpState for Spacecraft {
     ) -> Result<(), NyxError> {
         match *param {
             StateParameter::X => {
-                self.orbit.x = value;
+                self.orbit.x_km = value;
             }
             StateParameter::Y => {
-                self.orbit.y = value;
+                self.orbit.y_km = value;
             }
             StateParameter::Z => {
-                self.orbit.z = value;
+                self.orbit.z_km = value;
             }
             StateParameter::VX => {
-                self.orbit.vx = value;
+                self.orbit.vx_km_s = value;
             }
             StateParameter::VY => {
-                self.orbit.vy = value;
+                self.orbit.vy_km_s = value;
             }
             StateParameter::VZ => {
-                self.orbit.vz = value;
+                self.orbit.vz_km_s = value;
             }
-            StateParameter::Cr => self.cr = value,
-            StateParameter::Cd => self.cd = value,
+            StateParameter::Cr => self.srp.cr = value,
+            StateParameter::Cd => self.drag.cd = value,
             StateParameter::FuelMass => self.fuel_mass_kg = value,
             _ => return Err(NyxError::StateParameterUnavailable),
         }
         Ok(())
+    }
+
+    fn frame(&self) -> Frame {
+        self.orbit.frame
+    }
+
+    fn set_frame(&mut self, frame: Frame) {
+        self.orbit.frame = frame;
     }
 }

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -71,7 +71,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
             let mut mnvr = Mnvr {
                 start: correction_epoch,
                 end: achievement_epoch,
-                thrust_lvl: 1.0,
+                thrust_prct: 1.0,
                 alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
                 delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
                 frame: Frame::RCN,
@@ -86,7 +86,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                         if corr.abs() > 1e-3 {
                             // Check that we are within the bounds
                             let init_duration_s =
-                                (correction_epoch - achievement_epoch).in_seconds();
+                                (correction_epoch - achievement_epoch).to_seconds();
                             let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
                             mnvr.end = mnvr.start + acceptable_corr;
                         }
@@ -95,7 +95,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                         if corr.abs() > 1e-3 {
                             // Check that we are within the bounds
                             let total_end_corr =
-                                (mnvr.end + corr.seconds() - achievement_epoch).in_seconds();
+                                (mnvr.end + corr.seconds() - achievement_epoch).to_seconds();
                             let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
                             mnvr.end += acceptable_corr;
                         }
@@ -104,7 +104,7 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                         if corr.abs() > 1e-3 {
                             // Check that we are within the bounds
                             let total_start_corr =
-                                (mnvr.start + corr.seconds() - correction_epoch).in_seconds();
+                                (mnvr.start + corr.seconds() - correction_epoch).to_seconds();
                             let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
                             mnvr.end += acceptable_corr;
 
@@ -144,8 +144,8 @@ impl<const V: usize, const O: usize> TargeterSolution<V, O> {
                         mnvr.set_accel(vector)?;
                     }
                     Vary::ThrustLevel => {
-                        mnvr.thrust_lvl += corr;
-                        var.ensure_bounds(&mut mnvr.thrust_lvl);
+                        mnvr.thrust_prct += corr;
+                        var.ensure_bounds(&mut mnvr.thrust_prct);
                     }
                     _ => unreachable!(),
                 }
@@ -169,10 +169,7 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
             ));
         }
 
-        let mut corrmsg = format!(
-            "Correction @ {}:",
-            self.corrected_state.epoch().as_gregorian_utc_str()
-        );
+        let mut corrmsg = format!("Correction @ {}:", self.corrected_state.epoch());
         let mut is_only_position = true;
         let mut is_only_velocity = true;
         for (i, var) in self.variables.iter().enumerate() {
@@ -216,7 +213,7 @@ impl<const V: usize, const O: usize> fmt::Display for TargeterSolution<V, O> {
             f,
             "Targeter solution correcting {:?} (converged in {:.3} seconds, {} iterations):\n\t{}\n\tAchieved @ {}:{}\n\tCorrected state:\n\t\t{}\n\t\t{:x}\n\tAchieved state:\n\t\t{}\n\t\t{:x}",
             self.variables.iter().map(|v| format!("{:?}", v.component)).collect::<Vec<String>>(),
-            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.achieved_state.epoch().as_gregorian_utc_str(), objmsg, self.corrected_state, self.corrected_state, self.achieved_state, self.achieved_state
+            self.computation_dur.as_secs_f64(), self.iterations, corrmsg, self.achieved_state.epoch(), objmsg, self.corrected_state, self.corrected_state, self.achieved_state, self.achieved_state
         )
     }
 }

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,8 +18,8 @@
 
 extern crate toml;
 
-use super::serde_derive::Deserialize;
 use crate::cosmic::Frame;
+use serde_derive::Deserialize;
 use std::collections::HashMap;
 
 #[derive(Clone, Deserialize)]

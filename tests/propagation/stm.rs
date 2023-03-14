@@ -48,12 +48,12 @@ fn stm_fixed_step() {
         for i in 0..6 {
             let mut this_init = init.with_stm();
             match i {
-                0 => this_init.x += pert,
-                1 => this_init.y += pert,
-                2 => this_init.z += pert,
-                3 => this_init.vx += pert,
-                4 => this_init.vy += pert,
-                5 => this_init.vz += pert,
+                0 => this_init.x_km += pert,
+                1 => this_init.y_km += pert,
+                2 => this_init.z_km += pert,
+                3 => this_init.vx_km_s += pert,
+                4 => this_init.vy_km_s += pert,
+                5 => this_init.vz_km_s += pert,
                 _ => unreachable!(),
             }
 
@@ -123,12 +123,12 @@ fn stm_variable_step() {
         for i in 0..6 {
             let mut this_init = init.with_stm();
             match i {
-                0 => this_init.x += pert,
-                1 => this_init.y += pert,
-                2 => this_init.z += pert,
-                3 => this_init.vx += pert,
-                4 => this_init.vy += pert,
-                5 => this_init.vz += pert,
+                0 => this_init.x_km += pert,
+                1 => this_init.y_km += pert,
+                2 => this_init.z_km += pert,
+                3 => this_init.vx_km_s += pert,
+                4 => this_init.vy_km_s += pert,
+                5 => this_init.vz_km_s += pert,
                 _ => unreachable!(),
             }
 
@@ -246,12 +246,12 @@ fn stm_hifi_variable_step() {
         for i in 0..6 {
             let mut this_init = init.with_stm();
             match i {
-                0 => this_init.x += pert,
-                1 => this_init.y += pert,
-                2 => this_init.z += pert,
-                3 => this_init.vx += pert,
-                4 => this_init.vy += pert,
-                5 => this_init.vz += pert,
+                0 => this_init.x_km += pert,
+                1 => this_init.y_km += pert,
+                2 => this_init.z_km += pert,
+                3 => this_init.vx_km_s += pert,
+                4 => this_init.vy_km_s += pert,
+                5 => this_init.vz_km_s += pert,
                 _ => unreachable!(),
             }
 

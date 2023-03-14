@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,16 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate hyperdual;
-extern crate rand;
-extern crate rand_distr;
-extern crate serde;
-
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::time::Epoch;
-pub use crate::{State, TimeTagged};
+pub use crate::{cosmic::Cosm, State, TimeTagged};
+use std::sync::Arc;
 
 use crate::io::{CovarFormat, EpochFormat};
 
@@ -41,14 +37,32 @@ pub mod estimate;
 /// Provide Residual handling functionalities.
 pub mod residual;
 
-/// Provides some helper for filtering.
-pub mod ui;
+/// Provides all of the support measurement models
+pub mod msr;
 
-/// Provides all of the measurements functionality, including measurement simulation
-// pub mod msr;
+/// Provides all of the functionality to simulate measurements from ground stations
+pub mod simulator;
+
+/// Provides the interfaces to the orbit determination process
+pub mod process;
+
+use arrow::datatypes::Field;
+pub use simulator::trackdata::TrackingDeviceSim;
 
 /// Provides all state noise compensation functionality
 pub mod snc;
+
+pub mod prelude {
+    pub use super::estimate::*;
+    pub use super::kalman::*;
+    pub use super::measurement::*;
+    pub use super::process::*;
+    pub use super::residual::*;
+    pub use super::snc::*;
+    pub use super::*;
+
+    pub use crate::time::{Duration, Unit};
+}
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.
 pub trait Filter<T, A, M>
@@ -107,8 +121,28 @@ where
     fn measurement_noise(&self, epoch: Epoch) -> &OMatrix<f64, M, M>;
 }
 
-/// A trait defining a measurement of size `MeasurementSize`
-pub trait Measurement: TimeTagged
+/// A trait defining a measurement
+pub trait Measurement: TimeTagged {
+    /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
+    type MeasurementSize: DimName;
+
+    /// Returns the fields for this kind of measurement.
+    /// The metadata must include a `unit` field with the unit.
+    fn fields() -> Vec<Field>;
+
+    /// Initializes a new measurement from the provided data.
+    fn from_observation(epoch: Epoch, obs: OVector<f64, Self::MeasurementSize>) -> Self
+    where
+        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
+
+    /// Returns the measurement/observation as a vector.
+    fn observation(&self) -> OVector<f64, Self::MeasurementSize>
+    where
+        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
+}
+
+/// A trait defining a simulated measurement
+pub trait SimMeasurement: Measurement
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
@@ -117,38 +151,16 @@ where
         + Allocator<f64, <Self::State as State>::VecLength>
         + Allocator<f64, Self::MeasurementSize, <Self::State as State>::Size>,
 {
-    /// Defines the state size of the estimated state
+    /// Defines the estimated state
     type State: State;
-    /// Defines how much data is measured. For example, if measuring range and range rate, this should be of size 2 (nalgebra::U2).
-    type MeasurementSize: DimName;
-
-    /// Returns the measurement/observation as a vector.
-    fn observation(&self) -> OVector<f64, Self::MeasurementSize>
-    where
-        DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 
     /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(&self) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
+    fn sensitivity(
+        &self,
+        nominal: Self::State,
+    ) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
     where
         DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
-
-    /// Returns whether the transmitter and receiver where in line of sight.
-    fn visible(&self) -> bool;
-}
-
-/// A trait to generalize measurement devices such as a ground station
-pub trait MeasurementDevice<MsrIn, Msr>
-where
-    Self: Sized,
-    Msr: Measurement,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
-{
-    /// Returns the measurement if the device and generate one, else returns None
-    fn measure(&self, input: &MsrIn) -> Option<Msr>;
 }
 
 pub trait EstimateFrom<O: State>

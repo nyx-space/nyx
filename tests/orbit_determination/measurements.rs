@@ -1,11 +1,13 @@
+use rand::thread_rng;
+
 extern crate nyx_space as nyx;
 
 #[test]
 fn nil_measurement() {
     use self::nyx::cosmic::{Cosm, Orbit};
-    use self::nyx::od::ui::*;
-    use self::nyx::time::{Epoch, J2000_OFFSET};
-    use std::f64::EPSILON;
+    use self::nyx::od::prelude::*;
+    use self::nyx::time::Epoch;
+    use hifitime::J2000_OFFSET;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 
     let lat = -7.906_635_7;
@@ -15,7 +17,7 @@ fn nil_measurement() {
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
-    let station = GroundStation::from_noise_values(
+    let mut station = GroundStation::from_noise_values(
         "nil".to_string(),
         0.0,
         lat,
@@ -24,33 +26,14 @@ fn nil_measurement() {
         0.0,
         0.0,
         eme2k,
-        cosm,
     );
 
     let at_station = Orbit::from_geodesic(lat, long, height, dt, eme2k);
 
-    let meas = station.measure(&at_station).unwrap();
-
-    let h_tilde = meas.sensitivity();
-    println!("{}", h_tilde);
-    assert!(h_tilde[(0, 0)].is_nan(), "expected NaN");
-    assert!(h_tilde[(0, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(0, 2)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 0)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 1)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 2)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 3)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 4)].is_nan(), "expected NaN");
-    assert!(h_tilde[(1, 5)].is_nan(), "expected NaN");
-
-    assert!(
-        meas.observation()[(0, 0)] - 0.0 < EPSILON,
-        "observation is not range=0"
-    );
-    assert!(
-        meas.observation()[(1, 0)].is_nan(),
-        "observation is not range=0"
-    );
+    let mut rng = thread_rng();
+    assert!(station
+        .measure(&at_station, &mut rng, cosm.clone())
+        .is_none());
 }
 
 /// Tests that the measurements generated from a topocentric frame are correct.
@@ -62,7 +45,7 @@ fn nil_measurement() {
 fn val_measurements_topo() {
     use self::nyx::cosmic::{Cosm, Orbit};
     use self::nyx::md::ui::*;
-    use self::nyx::od::ui::*;
+    use self::nyx::od::prelude::*;
     use self::nyx::propagators::RK4Fixed;
     use std::str::FromStr;
 
@@ -91,11 +74,13 @@ fn val_measurements_topo() {
         cosm.frame("EME2000"),
     );
 
+    let iau_earth = cosm.frame("IAU Earth");
+
     let elevation_mask = 7.0; // in degrees
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
-    let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+    let mut dss65_madrid =
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Generate the measurements
 
@@ -149,10 +134,13 @@ fn val_measurements_topo() {
         },
     ];
 
+    let mut rng = thread_rng();
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
-        let meas = dss65_madrid.measure(&state).unwrap();
-        if meas.visible() {
+        if dss65_madrid
+            .measure(&state, &mut rng, cosm.clone())
+            .is_some()
+        {
             traj1_msr_cnt += 1;
         }
     }
@@ -166,12 +154,11 @@ fn val_measurements_topo() {
     for truth in &traj1_val_data {
         let now = cislunar1.epoch() + truth.offset;
         let state = traj1.at(now).unwrap();
-        let meas = dss65_madrid.measure(&state).unwrap();
-        assert!(
-            meas.visible(),
-            "DSS65 not visible at time {} but it should be",
-            now
-        );
+        // Will panic if the measurement is not visible
+        let meas = dss65_madrid
+            .measure(&state, &mut rng, cosm.clone())
+            .unwrap();
+
         let obs = meas.observation();
         println!(
             "range difference {:e}\t range rate difference: {:e}",
@@ -216,8 +203,10 @@ fn val_measurements_topo() {
 
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
-        let meas = dss65_madrid.measure(&state).unwrap();
-        if meas.visible() {
+        if dss65_madrid
+            .measure(&state, &mut rng, cosm.clone())
+            .is_some()
+        {
             traj2_msr_cnt += 1;
         }
     }
@@ -231,12 +220,10 @@ fn val_measurements_topo() {
     for truth in &traj2_val_data {
         let now = cislunar2.epoch() + truth.offset;
         let state = traj2.at(now).unwrap();
-        let meas = dss65_madrid.measure(&state).unwrap();
-        assert!(
-            meas.visible(),
-            "DSS65 not visible at time {} but it should be",
-            now
-        );
+        // Will panic if the measurement is not visible
+        let meas = dss65_madrid
+            .measure(&state, &mut rng, cosm.clone())
+            .unwrap();
         let obs = meas.observation();
         println!(
             "range difference {:e}\t range rate difference: {:e}",

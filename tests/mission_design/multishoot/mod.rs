@@ -23,7 +23,7 @@ fn alt_orbit_raising() {
             thrust_N: 150.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
 
         ..Default::default()
     };
@@ -59,11 +59,7 @@ fn alt_orbit_raising() {
     for (i, node) in opti.targets.iter().enumerate() {
         println!(
             "{}, {}, {}, {}, '{}'",
-            i,
-            node.x,
-            node.y,
-            node.z,
-            node.epoch.as_gregorian_utc_str()
+            i, node.x, node.y, node.z, node.epoch
         );
     }
 
@@ -73,11 +69,7 @@ fn alt_orbit_raising() {
     for (i, node) in opti.targets.iter().enumerate() {
         println!(
             "{}, {}, {}, {}, '{}'",
-            i,
-            node.x,
-            node.y,
-            node.z,
-            node.epoch.as_gregorian_utc_str()
+            i, node.x, node.y, node.z, node.epoch
         );
     }
 
@@ -206,7 +198,7 @@ fn vmag_orbit_raising() {
             thrust_N: 150.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
 
         ..Default::default()
     };
@@ -234,12 +226,7 @@ fn vmag_orbit_raising() {
     for (i, node) in opti.targets.iter().enumerate() {
         println!(
             "{}, {}, {}, {}, {}, '{}'",
-            i,
-            node.x,
-            node.y,
-            node.z,
-            node.vmag,
-            node.epoch.as_gregorian_utc_str()
+            i, node.x, node.y, node.z, node.vmag, node.epoch
         );
     }
 
@@ -249,11 +236,7 @@ fn vmag_orbit_raising() {
     for (i, node) in opti.targets.iter().enumerate() {
         println!(
             "{}, {}, {}, {}, '{}'",
-            i,
-            node.x,
-            node.y,
-            node.z,
-            node.epoch.as_gregorian_utc_str()
+            i, node.x, node.y, node.z, node.epoch
         );
     }
 

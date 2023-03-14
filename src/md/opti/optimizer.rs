@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -31,7 +31,7 @@ use super::solution::TargeterSolution;
 #[derive(Clone)]
 pub struct Optimizer<'a, E: ErrorCtrl, const V: usize, const O: usize> {
     /// The propagator setup (kind, stages, etc.)
-    pub prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+    pub prop: &'a Propagator<'a, SpacecraftDynamics, E>,
     /// The list of objectives of this targeter
     pub objectives: [Objective; O],
     /// An optional frame (and Cosm) to compute the objectives in.
@@ -64,7 +64,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> fmt::Display for Optimize
 impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn delta_v(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         objectives: [Objective; O],
     ) -> Self {
         Self {
@@ -83,7 +83,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
 
     /// Create a new Targeter which will MOVE the position of the spacecraft at the correction epoch
     pub fn delta_r(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         objectives: [Objective; O],
     ) -> Self {
         Self {
@@ -102,7 +102,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
 
     /// Create a new Targeter which will apply an impulsive delta-v correction on all components of the VNC frame. By default, max step is 0.5 km/s.
     pub fn vnc(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         objectives: [Objective; O],
     ) -> Self {
         Self {
@@ -123,7 +123,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 3, O> {
 impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 4, O> {
     /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
     pub fn thrust_dir(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         objectives: [Objective; O],
     ) -> Self {
         Self {
@@ -145,7 +145,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 4, O> {
 impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 7, O> {
     /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
     pub fn thrust_dir_rate(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         objectives: [Objective; O],
     ) -> Self {
         Self {
@@ -170,7 +170,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 7, O> {
 impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 10, O> {
     /// Create a new Targeter which will apply a continuous thrust for the whole duration of the segment
     pub fn thrust_profile(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         objectives: [Objective; O],
     ) -> Self {
         Self {
@@ -198,7 +198,7 @@ impl<'a, E: ErrorCtrl, const O: usize> Optimizer<'a, E, 10, O> {
 impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn new(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         variables: [Variable; V],
         objectives: [Objective; O],
     ) -> Self {
@@ -214,7 +214,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
     /// Create a new Targeter which will apply an impulsive delta-v correction.
     pub fn in_frame(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         variables: [Variable; V],
         objectives: [Objective; O],
         objective_frame: Frame,
@@ -232,7 +232,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
     /// Create a new Targeter which will apply an impulsive delta-v correction on the specified components of the VNC frame.
     pub fn vnc_with_components(
-        prop: &'a Propagator<'a, SpacecraftDynamics<'a>, E>,
+        prop: &'a Propagator<'a, SpacecraftDynamics, E>,
         variables: [Variable; V],
         objectives: [Objective; O],
     ) -> Self {

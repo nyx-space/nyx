@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -23,16 +23,13 @@ extern crate serde;
 use super::hyperdual::linalg::norm;
 use super::hyperdual::{Float, OHyperdual};
 use super::na::{Vector3, U7};
-use super::{Frame, Orbit};
+use super::{Frame, Orbit, ECC_EPSILON};
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::{NyxError, TimeTagged};
 use std::f64::consts::PI;
 use std::f64::EPSILON;
 use std::fmt;
-
-/// If an orbit has an eccentricity below the following value, it is considered circular (only affects warning messages)
-pub const ECC_EPSILON: f64 = 1e-11;
 
 /// Orbit defines an orbital state
 ///
@@ -64,13 +61,13 @@ impl From<Orbit> for OrbitDual {
     /// Initialize a new OrbitDual from an orbit, no other initializers
     fn from(orbit: Orbit) -> Self {
         Self {
-            x: OHyperdual::from_slice(&[orbit.x, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-            y: OHyperdual::from_slice(&[orbit.y, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
-            z: OHyperdual::from_slice(&[orbit.z, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
-            vx: OHyperdual::from_slice(&[orbit.vx, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
-            vy: OHyperdual::from_slice(&[orbit.vy, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
-            vz: OHyperdual::from_slice(&[orbit.vz, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
-            dt: orbit.dt,
+            x: OHyperdual::from_slice(&[orbit.x_km, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            y: OHyperdual::from_slice(&[orbit.y_km, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
+            z: OHyperdual::from_slice(&[orbit.z_km, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
+            vx: OHyperdual::from_slice(&[orbit.vx_km_s, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            vy: OHyperdual::from_slice(&[orbit.vy_km_s, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+            vz: OHyperdual::from_slice(&[orbit.vz_km_s, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
+            dt: orbit.epoch,
             frame: orbit.frame,
         }
     }

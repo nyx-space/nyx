@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,30 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::flate2::read::GzDecoder;
 use crate::linalg::DMatrix;
 use crate::NyxError;
+use flate2::read::GzDecoder;
 use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;
-
-/// All gravity potential storage backends must implement this trait in order to be used in the provided dynamics.
-/// Currently, only a HashMap based storage is provided. However, the use of this trait enables any application
-/// from storing the gravity potential in another way, such as a remote database.
-pub trait GravityPotentialStor
-where
-    Self: Clone + Sized + Sync,
-{
-    /// Returns the maximum degree of this gravity potential storage (Jn=J2,J3...)
-    fn max_degree_n(&self) -> usize;
-    /// Returns the maximum order of this gravity potential storage (Jnm=Jn2,Jn3...)
-    fn max_order_m(&self) -> usize;
-    /// Returns the C_nm and S_nm for the provided order and degree.
-    ///
-    /// WARNING: It's up to the caller to ensure that no degree or order greater than stored
-    /// in this `GravityPotentialStor` is requested. Depending on the implementor, this call might `panic!`.
-    fn cs_nm(&self, degree: usize, order: usize) -> (f64, f64);
-}
 
 /// `HarmonicsMem` loads the requested gravity potential files and stores them in memory (in a HashMap).
 ///
@@ -435,18 +417,19 @@ impl HarmonicsMem {
             s_nm: s_nm_mat,
         })
     }
-}
 
-impl GravityPotentialStor for HarmonicsMem {
-    fn max_order_m(&self) -> usize {
+    /// Returns the maximum order of this gravity potential storage (Jnm=Jn2,Jn3...)
+    pub fn max_order_m(&self) -> usize {
         self.order
     }
 
-    fn max_degree_n(&self) -> usize {
+    /// Returns the maximum degree of this gravity potential storage (Jn=J2,J3...)
+    pub fn max_degree_n(&self) -> usize {
         self.degree
     }
 
-    fn cs_nm(&self, degree: usize, order: usize) -> (f64, f64) {
+    /// Returns the C_nm and S_nm for the provided order and degree.
+    pub fn cs_nm(&self, degree: usize, order: usize) -> (f64, f64) {
         (self.c_nm[(degree, order)], self.s_nm[(degree, order)])
     }
 }

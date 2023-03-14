@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -49,11 +49,11 @@ use std::time::Instant;
 
 /// An MDProcess allows the creation and propagation of a spacecraft subjected to some dynamics
 #[allow(clippy::upper_case_acronyms)]
-pub struct MDProcess<'a>
+pub struct MDProcess
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
-    pub sc_dyn: SpacecraftDynamics<'a>,
+    pub sc_dyn: SpacecraftDynamics,
     pub init_state: Spacecraft,
     pub formatter: Option<StateFormatter>,
     pub prop_time: Option<Duration>,
@@ -62,7 +62,7 @@ where
     pub name: String,
 }
 
-impl<'a> MDProcess<'a>
+impl MDProcess
 where
     DefaultAllocator: Allocator<f64, U6>,
 {
@@ -263,8 +263,8 @@ where
                                     );
                                     srp.phi = smdl.phi;
                                     sc_dyn.add_model(Arc::new(srp));
-                                    init_sc.srp_area_m2 = smdl.sc_area;
-                                    init_sc.cr = smdl.cr;
+                                    init_sc.srp.area_m2 = smdl.sc_area;
+                                    init_sc.srp.cr = smdl.cr;
                                 }
                             }
                         }
@@ -291,7 +291,7 @@ where
                                     prop.stop_cond
                                 )))
                             }
-                            Ok(epoch) => Some(epoch - init_state.dt),
+                            Ok(epoch) => Some(epoch - init_state.epoch),
                         },
                     }
                 } else {
@@ -398,7 +398,7 @@ where
                 if let Some(first_state) = initial_state {
                     hdlr.handle(&first_state);
                 }
-                hdlr.handle(&traj.last());
+                hdlr.handle(traj.last());
             });
 
             info!(

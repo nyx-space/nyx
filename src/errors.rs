@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,13 +17,14 @@
 */
 
 use super::thiserror::Error;
+use crate::io::ConfigError;
 use crate::md::trajectory::TrajError;
 pub use crate::md::TargetingError;
 pub use crate::time::Errors as TimeErrors;
 use crate::Spacecraft;
 use std::convert::From;
 
-#[derive(Clone, PartialEq, Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum NyxError {
     /// STM is singular, propagation or smoothing cannot proceed
     #[error("STM is singular, propagation or smoothing cannot proceed")]
@@ -83,8 +84,8 @@ pub enum NyxError {
     #[error("Could not read file: {0}")]
     FileUnreadable(String),
     /// Celestial object or spacecraft not found
-    #[error("Cosm object not found: {0}")]
-    ObjectNotFound(String),
+    #[error("Cosm object not found: `{0}` (available: {1:?})")]
+    ObjectNotFound(String, Vec<String>),
     /// No interpolation data
     #[error("No interpolation data: {0}")]
     NoInterpolationData(String),
@@ -147,6 +148,9 @@ pub enum NyxError {
     /// Guidance law config error
     #[error("Guidance law config error: {0}")]
     GuidanceConfigError(String),
+    /// Configuration file error
+    #[error("Config error: {0}")]
+    ConfigError(ConfigError),
 }
 
 impl From<TimeErrors> for NyxError {
@@ -158,5 +162,11 @@ impl From<TimeErrors> for NyxError {
 impl From<TrajError> for NyxError {
     fn from(e: TrajError) -> Self {
         NyxError::Trajectory(e)
+    }
+}
+
+impl From<ConfigError> for NyxError {
+    fn from(e: ConfigError) -> Self {
+        NyxError::ConfigError(e)
     }
 }

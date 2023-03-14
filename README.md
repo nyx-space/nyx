@@ -1,7 +1,7 @@
 # nyx
-[Nyx](https://en.wikipedia.org/wiki/Nyx) is a high fidelity, fast, reliable and **[validated]([https://nyxspace.com/MathSpec/](https://nyxspace.com/nyxspace/MathSpec/))** astrodynamical toolkit library written in Rust.
+[Nyx](https://nyxspace.com) is a high fidelity, fast, reliable and **[validated]([https://nyxspace.com/MathSpec/](https://nyxspace.com/nyxspace/MathSpec/))** astrodynamics toolkit library written in Rust. It provides convenient interfaces to both Rust and Python.
 
-The target audience is researchers and astrodynamics engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
+The target audience is mission designers, astrodynamics engineers/hobbyists, and GNC engineers. The rationale for using Rust is to allow for very fast computations, guaranteed thread safety,
 and portability to all platforms supported by [Rust](https://forge.rust-lang.org/platform-support.html).
 
 [![nyx-space on crates.io][cratesio-image]][cratesio]
@@ -14,13 +14,9 @@ and portability to all platforms supported by [Rust](https://forge.rust-lang.org
 [docsrs]: https://docs.rs/nyx-space/
 
 # License
-The [AGPLv3 LICENSE](https://nyxspace.com/license/) is strictly enforced.
+The [AGPLv3 LICENSE](https://nyxspace.com/license/) is enforced.
 
 # Features
-Unless specified otherwise in the documentation of specific functions, all vectors and matrices are [statically allocated](https://discourse.nphysics.org/t/statically-typed-matrices-whose-size-is-a-multiple-or-another-one/460/4).
-
-Lots of features are still being worked on, and there currently isn't any guarantee that the API won't change _between_ versions. However, you can be assured that the API will not change for previous versions.
-Outstanding mission design features available [here](https://gitlab.com/chrisrabotin/nyx/-/issues?label_name=subsys%3A%3AMD), and orbit determination features [here](https://gitlab.com/chrisrabotin/nyx/-/issues?scope=all&utf8=%E2%9C%93&state=opened&label_name[]=subsys%3A%3AOD).
 
 ## Propagation
 - [x] Propagation with different Runge Kutta methods (validated in GMAT)
@@ -54,9 +50,49 @@ Outstanding mission design features available [here](https://gitlab.com/chrisrab
 - [x] Frame rotations
 
 # Who am I?
-An astrodynamics engineer with a heavy background in software. Nyx relies on the drawbacks of
-[smd](https://github.com/ChristopherRabotin/smd), a library I wrote in Go while researching at the University
-of Colorado at Boulder. I work for Masten Space Systems on the XL-1 Moon Lander ([we do really cool stuff](https://masten.aero/)).
+An astrodynamics engineer with a heavy background in software. I currently work for Rocket Lab USA on the GNC of the Blue Ghost lunar lander.
 
 # Examples
 Refer to the [showcase](https://nyxspace.com/showcase/).
+
+# Python todo
+
+The "[maturin](https://crates.io/crates/maturin)" python package is used to build the python bindings.
+
+```
+pip install maturin
+```
+
+Build the python bindings using the following command.
+```
+maturin build --cargo-extra-args="--features python"
+```
+
+This creates a wheel file in `./target/wheels/` which can be installed using `pip install <filename.whl>`.
+
+For development mode, the following command may be used that automatically installs the python module
+
+```
+maturin develop --cargo-extra-args="--features python"
+```
+
+## Python code example
+
+This minimal example runs the scenario defined in `data/simple-scenario.toml` using the Python bindings.
+
+```
+from nyx_space import md
+from nyx_space import io
+from nyx_space import cosmic
+
+# Initialize the cosm which stores the ephemeris
+cosm = cosmic.Cosm.de438()
+
+with open('data/simple-scenario.toml', 'r') as f:
+    scen_data = f.read()
+
+scenario = io.ScenarioSerde.from_toml_str(scen_data)
+
+md.MDProcess.execute_all_in_scenario(scenario, cosm)
+
+```

@@ -1,0 +1,20 @@
+orbit:
+  x_km: -9042.862234
+  y_km: 18536.333069
+  z_km: 6999.957069
+  vx_km_s: -3.288789
+  vy_km_s: -2.226285
+  vz_km_s: 1.646738
+  frame: EME2000
+  epoch: 2018-09-15T00:15:53.098 UTC
+srp:
+  cr: 1.0
+  area_m2: 2.0
+drag:
+  cd: 2.2
+  area_m2: 0.95
+dry_mass_kg: 50.0
+fuel_mass_kg: 50.0
+thruster:
+  thrust_N: 1e-5
+  isp_s: 300.0

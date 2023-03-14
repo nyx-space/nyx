@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -120,15 +120,13 @@ pub struct EclipseLocator {
 
 impl fmt::Display for EclipseLocator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let shadow_bodies = self
-            .shadow_bodies
-            .iter()
-            .map(|b| format!("{b}, "))
-            .collect::<String>();
+        let shadow_bodies: Vec<String> =
+            self.shadow_bodies.iter().map(|b| format!("{b}")).collect();
         write!(
             f,
             "light-source: {}, shadows casted by: {}",
-            self.light_source, shadow_bodies
+            self.light_source,
+            shadow_bodies.join(", ")
         )
     }
 }
@@ -277,7 +275,7 @@ pub fn eclipse_state(
     if light_source.equatorial_radius() < std::f64::EPSILON {
         let observed = cosm.celestial_state(
             &light_source.ephem_path(),
-            observer.dt,
+            observer.epoch,
             observer.frame,
             LightTimeCalc::None,
         );

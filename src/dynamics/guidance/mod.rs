@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,11 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::cosmic::{
-    BaseSpacecraft, Frame, GuidanceMode, Orbit, Spacecraft, SpacecraftExt, STD_GRAVITY,
-};
+use crate::cosmic::{Frame, GuidanceMode, Orbit, Spacecraft, STD_GRAVITY};
 use crate::errors::NyxError;
 use crate::linalg::Vector3;
+use serde::{Deserialize, Serialize};
 
 mod finiteburns;
 pub use finiteburns::FiniteBurns;
@@ -32,9 +31,14 @@ mod ruggiero;
 pub use ruggiero::{Objective, Ruggiero, StateParameter};
 
 use std::fmt;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Defines a thruster with a maximum isp and a maximum thrust.
+#[cfg_attr(feature = "python", pyclass)]
 #[allow(non_snake_case)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Thruster {
     /// The thrust is to be provided in Newtons
     pub thrust_N: f64,
@@ -42,29 +46,38 @@ pub struct Thruster {
     pub isp_s: f64,
 }
 
+#[cfg_attr(feature = "python", pymethods)]
 impl Thruster {
     /// Returns the exhaust velocity v_e in meters per second
-    pub fn exhaust_velocity(&self) -> f64 {
+    pub fn exhaust_velocity_m_s(&self) -> f64 {
         self.isp_s * STD_GRAVITY
+    }
+
+    /// Creates a new Thruster given its thrust in Newton and its Isp in seconds
+    #[allow(non_snake_case)]
+    #[cfg(feature = "python")]
+    #[new]
+    fn py_new(thrust_N: f64, isp_s: f64) -> Self {
+        Self { thrust_N, isp_s }
     }
 }
 
 /// The `GuidanceLaw` trait handles guidance laws, optimizations, and other such methods for
-/// controlling the overall thrust direction when tied to a `Spacecraft`. For delta V control,
+/// controlling the overall thrust direction when tied to a `BaseSpacecraft`. For delta V control,
 /// tie the DeltaVctrl to a MissionArc.
-pub trait GuidanceLaw<X: SpacecraftExt>: fmt::Display + Send + Sync {
+pub trait GuidanceLaw: fmt::Display + Send + Sync {
     /// Returns a unit vector corresponding to the thrust direction in the inertial frame.
-    fn direction(&self, osc_state: &BaseSpacecraft<X>) -> Vector3<f64>;
+    fn direction(&self, osc_state: &Spacecraft) -> Vector3<f64>;
 
     /// Returns a number between [0;1] corresponding to the engine throttle level.
     /// For example, 0 means coasting, i.e. no thrusting, and 1 means maximum thrusting.
-    fn throttle(&self, osc_state: &BaseSpacecraft<X>) -> f64;
+    fn throttle(&self, osc_state: &Spacecraft) -> f64;
 
-    /// Updates the state of the spacecraft for the next maneuver, e.g. prepares the controller for the next maneuver
-    fn next(&self, next_state: &mut BaseSpacecraft<X>);
+    /// Updates the state of the BaseSpacecraft for the next maneuver, e.g. prepares the controller for the next maneuver
+    fn next(&self, next_state: &mut Spacecraft);
 
     /// Returns whether this thrust control has been achieved, if it has an objective
-    fn achieved(&self, _osc_state: &BaseSpacecraft<X>) -> Result<bool, NyxError> {
+    fn achieved(&self, _osc_state: &Spacecraft) -> Result<bool, NyxError> {
         Err(NyxError::NoObjectiveDefined)
     }
 }

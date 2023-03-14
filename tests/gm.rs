@@ -12,7 +12,7 @@ use nyx::{NyxError, State};
 
 use std::fmt;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Default, PartialEq)]
 struct BiasDriftState {
     epoch: Epoch,
     bias: f64,
@@ -25,7 +25,8 @@ impl fmt::Display for BiasDriftState {
         let decimals = f.precision().unwrap_or(6);
         write!(
             f,
-            "bias = {}\tdrift = {}",
+            "{},{},{}",
+            self.epoch.to_unix_seconds(),
             format!("{:.*}", decimals, self.bias),
             format!("{:.*}", decimals, self.drift),
         )
@@ -95,6 +96,8 @@ impl State for BiasDriftState {
 
         me
     }
+
+    fn unset_stm(&mut self) {}
 }
 
 #[derive(Clone)]
@@ -132,21 +135,6 @@ impl Dynamics for BiasDriftCoupledGM {
             OVector::<f64, Const<2>>::new(d.sample(&mut thread_rng()), d.sample(&mut thread_rng()));
 
         Ok(a_mat * state_vec + b_mat * w_vec)
-    }
-
-    #[allow(clippy::type_complexity)]
-    fn dual_eom(
-        &self,
-        _delta_t: f64,
-        _osculating_state: &Self::StateType,
-    ) -> Result<
-        (
-            OVector<f64, <Self::StateType as State>::Size>,
-            OMatrix<f64, <Self::StateType as State>::Size, <Self::StateType as State>::Size>,
-        ),
-        NyxError,
-    > {
-        unimplemented!()
     }
 }
 

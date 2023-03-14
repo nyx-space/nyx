@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -27,7 +27,8 @@ pub use crate::errors::NyxError;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::md::StateParameter;
-use crate::time::{Duration, Epoch, Unit, SECONDS_PER_DAY};
+use crate::time::{Duration, Epoch, Unit};
+use hifitime::SECONDS_PER_DAY;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
@@ -48,7 +49,7 @@ pub trait TimeTagged {
 
 /// A trait for generate propagation and estimation state.
 /// The first parameter is the size of the state, the second is the size of the propagated state including STM and extra items.
-pub trait State: Copy + PartialEq + fmt::Display + fmt::LowerExp + Send + Sync
+pub trait State: Default + Copy + PartialEq + fmt::Display + fmt::LowerExp + Send + Sync
 where
     Self: Sized,
     DefaultAllocator: Allocator<f64, Self::Size>
@@ -79,6 +80,9 @@ where
     fn reset_stm(&mut self) {
         unimplemented!()
     }
+
+    /// Unsets the STM for this state
+    fn unset_stm(&mut self);
 
     /// Set this state
     fn set(&mut self, epoch: Epoch, vector: &OVector<f64, Self::VecLength>)
@@ -130,19 +134,19 @@ impl XbEpoch {
                 unimplemented!("TAI")
             }
             1 => match self.repr {
-                5 => Epoch::from_jde_et(epoch_delta.in_unit(Unit::Day)),
+                5 => Epoch::from_jde_et(epoch_delta.to_unit(Unit::Day)),
                 _ => unimplemented!("ET"),
             },
             2 => match self.repr {
-                0 => Epoch::from_tt_seconds(epoch_delta.in_seconds()),
+                0 => Epoch::from_tt_seconds(epoch_delta.to_seconds()),
                 _ => unimplemented!("TT"),
             },
             3 => {
                 unimplemented!("UTC")
             }
             4 => match self.repr {
-                2 => Epoch::from_tdb_seconds(epoch_delta.in_seconds()),
-                5 => Epoch::from_jde_tdb(epoch_delta.in_unit(Unit::Day)),
+                2 => Epoch::from_tdb_seconds(epoch_delta.to_seconds()),
+                5 => Epoch::from_jde_tdb(epoch_delta.to_unit(Unit::Day)),
                 _ => unimplemented!("TDB"),
             },
             _ => unimplemented!(),
@@ -178,7 +182,7 @@ impl Xb {
 
         match Self::decode(input_xb_buf) {
             Ok(xb) => {
-                info!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
+                debug!("Loaded XB in {} ms.", decode_start.elapsed().as_millis());
                 Ok(xb)
             }
             Err(e) => Err(NyxError::LoadingError(format!("Could not decode XB: {e}"))),
@@ -188,7 +192,10 @@ impl Xb {
     /// Finds the ephemeris provided the path as usize, e.g. [3,1] would return the Moon with any DE xb.
     pub fn ephemeris_from_path<'a>(&'a self, path: &[usize]) -> Result<&'a Ephemeris, NyxError> {
         match &self.ephemeris_root {
-            None => Err(NyxError::ObjectNotFound("not ephemeris root".to_string())),
+            None => Err(NyxError::ObjectNotFound(
+                "not ephemeris root".to_string(),
+                self.ephemeris_get_names(),
+            )),
             Some(root) => {
                 if path.is_empty() {
                     return Ok(root);
@@ -196,7 +203,7 @@ impl Xb {
                 for pos in path {
                     if root.children.get(*pos).is_none() {
                         let hpath: String = path.iter().map(|p| format!("{p}")).collect::<String>();
-                        return Err(NyxError::ObjectNotFound(hpath));
+                        return Err(NyxError::ObjectNotFound(hpath, self.ephemeris_get_names()));
                     }
                 }
 
@@ -225,7 +232,10 @@ impl Xb {
         if e.name == name {
             Ok(cur_path.to_vec())
         } else if e.children.is_empty() {
-            Err(NyxError::ObjectNotFound(name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                name.to_string(),
+                e.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         } else {
             for (cno, child) in e.children.iter().enumerate() {
                 let mut this_path = cur_path.to_owned();
@@ -236,14 +246,20 @@ impl Xb {
                 }
             }
             // Could not find name in iteration, fail
-            Err(NyxError::ObjectNotFound(name.to_string()))
+            Err(NyxError::ObjectNotFound(
+                name.to_string(),
+                e.children.iter().map(|c| c.name.clone()).collect(),
+            ))
         }
     }
 
     /// Returns the machine path of the requested ephemeris
     pub fn ephemeris_find_path(&self, name: String) -> Result<Vec<usize>, NyxError> {
         match &self.ephemeris_root {
-            None => Err(NyxError::ObjectNotFound("No root!".to_string())),
+            None => Err(NyxError::ObjectNotFound(
+                "No root!".to_string(),
+                self.ephemeris_get_names(),
+            )),
             Some(root) => {
                 if root.name == name {
                     // Return an empty vector (but OK because we're asking for the root)

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,38 +16,217 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-extern crate flate2;
-extern crate regex;
-extern crate serde;
-extern crate serde_derive;
-
 use crate::errors::NyxError;
 use crate::time::Epoch;
+use crate::Orbit;
+pub(crate) mod watermark;
+use hifitime::Duration;
+use serde::de::DeserializeOwned;
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Deserializer};
+use serde::{Serialize, Serializer};
+use serde_yaml::Error as YamlError;
+use std::collections::HashMap;
 use std::convert::From;
 use std::fmt;
+use std::fmt::Debug;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Error as IoError;
+use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 
-/// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
-pub mod gravity;
+use self::orbit::OrbitSerde;
+use crate::cosmic::{Cosm, Frame};
 
 /// Handles writing to an XYZV file
 pub mod cosmo;
-
+pub mod dynamics;
+pub mod estimate;
+pub mod formatter;
 /// Handles reading from frames defined in input files
 pub mod frame_serde;
-
+/// Handles loading of gravity models using files of NASA PDS and GMAT COF. Several gunzipped files are provided with nyx.
+pub mod gravity;
+pub mod matrices;
+// pub mod odp;
+pub mod orbit;
+pub mod quantity;
 /// Handles reading random variables
 pub mod rv;
-
 pub mod scenario;
+pub mod stations;
+pub mod tracking_data;
+pub mod trajectory_data;
 
-pub mod odp;
+use std::io;
+use thiserror::Error;
 
-pub mod formatter;
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("Failed to read configuration file: {0}")]
+    ReadError(#[from] io::Error),
 
-pub mod quantity;
+    #[error("Failed to parse YAML configuration file: {0}")]
+    ParseError(#[source] serde_yaml::Error),
 
-pub mod ccsds;
+    #[error("Invalid configuration: {0}")]
+    InvalidConfig(String),
+}
+
+impl PartialEq for ConfigError {
+    /// No two configuration errors match
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+pub trait ConfigRepr: Debug + Sized + Serialize + DeserializeOwned {
+    /// Builds the configuration representation from the path to a yaml
+    fn load_yaml<P>(path: P) -> Result<Self, ConfigError>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+    }
+
+    /// Builds a sequence of "Selves" from the provided path to a yaml
+    fn load_many_yaml<P>(path: P) -> Result<Vec<Self>, ConfigError>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+    }
+
+    /// Builds a map of names to "selves" from the provided path to a yaml
+    fn load_named_yaml<P>(path: P) -> Result<HashMap<String, Self>, ConfigError>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+
+        serde_yaml::from_reader(reader).map_err(ConfigError::ParseError)
+    }
+
+    /// Builds a sequence of "Selves" from the provided string of a yaml
+    fn load_many(data: &str) -> Result<Vec<Self>, ConfigError> {
+        debug!("Loading YAML:\n{data}");
+        serde_yaml::from_str(data).map_err(ConfigError::ParseError)
+    }
+}
+
+/// Trait to specify that a structure can be configured from a file, either in TOML, YAML, JSON, INI, etc.
+pub trait Configurable
+where
+    Self: Sized,
+{
+    /// The intermediate representation needed to create `Self` or to serialize Self.
+    type IntermediateRepr: ConfigRepr;
+
+    fn from_yaml<P: AsRef<Path>>(path: P, cosm: Arc<Cosm>) -> Result<Self, ConfigError> {
+        Self::from_config(Self::IntermediateRepr::load_yaml(path)?, cosm)
+    }
+
+    /// Creates a new instance of `self` from the configuration.
+    fn from_config(cfg: Self::IntermediateRepr, cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    where
+        Self: Sized;
+
+    /// Converts self into the intermediate representation which is serializable.
+    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError>;
+}
+
+pub(crate) fn epoch_to_str<S>(epoch: &Epoch, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{epoch}"))
+}
+
+/// A deserializer from Epoch string
+pub(crate) fn epoch_from_str<'de, D>(deserializer: D) -> Result<Epoch, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // implementation of the custom deserialization function
+    let s = String::deserialize(deserializer)?;
+    Epoch::from_str(&s).map_err(serde::de::Error::custom)
+}
+
+pub(crate) fn duration_to_str<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{duration}"))
+}
+
+/// A deserializer from Duration string
+pub(crate) fn duration_from_str<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // implementation of the custom deserialization function
+    let s = String::deserialize(deserializer)?;
+    Duration::from_str(&s).map_err(serde::de::Error::custom)
+}
+
+pub(crate) fn frame_to_str<S>(frame: &Frame, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{frame}"))
+}
+
+pub(crate) fn frame_from_str<'de, D>(deserializer: D) -> Result<Frame, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    // TODO: Figure out how to use DeserializeSeed here, but I'm not sure it would work.
+    let cosm = Cosm::de438();
+    cosm.try_frame(&s).map_err(serde::de::Error::custom)
+}
+
+pub(crate) fn frames_to_str<S>(frames: &Vec<Frame>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(frames.len()))?;
+    for frame in frames {
+        seq.serialize_element(&format!("{frame}"))?;
+    }
+    seq.end()
+}
+
+pub(crate) fn frames_from_str<'de, D>(deserializer: D) -> Result<Vec<Frame>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let frame_names: Vec<String> = Vec::deserialize(deserializer)?;
+    let cosm = Cosm::de438();
+    let mut frames = Vec::new();
+    for name in frame_names {
+        frames.push(cosm.try_frame(&name).map_err(serde::de::Error::custom)?)
+    }
+    Ok(frames)
+}
+
+/// A deserializer from Epoch string
+pub(crate) fn orbit_from_str<'de, D>(deserializer: D) -> Result<Orbit, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let orbit_serde: OrbitSerde = Deserialize::deserialize(deserializer)?;
+    Ok(orbit_serde.into())
+}
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
@@ -69,6 +248,8 @@ pub enum ParsingError {
     Velocity(String),
     IllDefined(String),
     ExecutionError(NyxError),
+    IoError(IoError),
+    Yaml(YamlError),
 }
 
 impl From<NyxError> for ParsingError {
@@ -99,17 +280,17 @@ pub enum EpochFormat {
 impl EpochFormat {
     pub fn format(&self, dt: Epoch) -> String {
         match *self {
-            EpochFormat::GregorianUtc => dt.as_gregorian_utc_str(),
-            EpochFormat::GregorianTai => dt.as_gregorian_tai_str(),
-            EpochFormat::MjdTai => format!("{:.9}", dt.as_mjd_tai_days()),
-            EpochFormat::MjdTt => format!("{:.9}", dt.as_mjd_tt_days()),
-            EpochFormat::MjdUtc => format!("{:.9}", dt.as_mjd_utc_days()),
-            EpochFormat::JdeEt => format!("{:.9}", dt.as_jde_et_days()),
-            EpochFormat::JdeTai => format!("{:.9}", dt.as_jde_tai_days()),
-            EpochFormat::JdeTt => format!("{:.9}", dt.as_jde_tt_days()),
-            EpochFormat::JdeUtc => format!("{:.9}", dt.as_jde_utc_days()),
-            EpochFormat::TaiSecs(e) => format!("{:.9}", dt.as_tai_seconds() - e),
-            EpochFormat::TaiDays(e) => format!("{:.9}", dt.as_tai_days() - e),
+            EpochFormat::GregorianUtc => format!("{dt}"),
+            EpochFormat::GregorianTai => format!("{dt:x}",),
+            EpochFormat::MjdTai => format!("{:.9}", dt.to_mjd_tai_days()),
+            EpochFormat::MjdTt => format!("{:.9}", dt.to_mjd_tt_days()),
+            EpochFormat::MjdUtc => format!("{:.9}", dt.to_mjd_utc_days()),
+            EpochFormat::JdeEt => format!("{:.9}", dt.to_jde_et_days()),
+            EpochFormat::JdeTai => format!("{:.9}", dt.to_jde_tai_days()),
+            EpochFormat::JdeTt => format!("{:.9}", dt.to_jde_tt_days()),
+            EpochFormat::JdeUtc => format!("{:.9}", dt.to_jde_utc_days()),
+            EpochFormat::TaiSecs(e) => format!("{:.9}", dt.to_tai_seconds() - e),
+            EpochFormat::TaiDays(e) => format!("{:.9}", dt.to_tai_days() - e),
         }
     }
 }

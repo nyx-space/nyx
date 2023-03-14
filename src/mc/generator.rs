@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -425,7 +425,7 @@ fn generate_spacecraft() {
             isp_s: 300.0,
             thrust_N: 50.0,
         },
-        crate::io::odp::GuidanceMode::Inhibit,
+        crate::cosmic::GuidanceMode::Inhibit,
     );
 
     let sc_generator = GaussianGenerator::from_std_dev_prcts(

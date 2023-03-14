@@ -2,12 +2,14 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use rand::thread_rng;
+
 use self::nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
 use self::nyx::dynamics::orbital::OrbitalDynamics;
 use self::nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
 use self::nyx::io::formatter::NavSolutionFormatter;
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::ui::*;
+use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use self::nyx::time::{Epoch, Unit};
 use std::sync::mpsc;
@@ -36,17 +38,18 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let cosm = Cosm::de438();
 
+    let iau_earth = cosm.frame("IAU Earth");
     // Define the ground stations.
     let elevation_mask = 0.0;
     let range_noise = 0.0;
     let range_rate_noise = 0.0;
     let dss65_madrid =
-        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss65_madrid(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss34_canberra =
-        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, cosm.clone());
+        GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
-        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, cosm.clone());
-    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+        GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
+    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -78,14 +81,14 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let mut prop = setup.with(sc_init_state);
     let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
+    let mut rng = thread_rng();
     // Receive the states on the main thread, and populate the measurement channel.
     while let Ok(rx_sc_state) = truth_rx.try_recv() {
-        for station in all_stations.iter() {
+        for station in all_stations.iter_mut() {
             let rx_state = rx_sc_state.orbit;
-            let meas = station.measure(&rx_state).unwrap();
-            if meas.visible() {
+            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
                 measurements.push(meas);
-                break;
+                break; // We know that only one station is in visibility at each time.
             }
         }
     }
@@ -117,9 +120,10 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let ckf = KF::no_snc(initial_estimate, measurement_noise);
 
-    let mut odp = ODProcess::ckf(prop_est, ckf, all_stations);
+    let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&measurements).unwrap();
+    odp.process_measurements(&mut all_stations, &measurements)
+        .unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);

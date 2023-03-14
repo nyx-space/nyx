@@ -29,7 +29,7 @@ fn thrust_dir_tgt_sma_aop_raan() {
             thrust_N: 500.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -79,7 +79,7 @@ fn thrust_dir_rate_tgt_sma_aop_raan() {
             thrust_N: 500.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -131,7 +131,7 @@ fn thrust_profile_tgt_sma_aop_raan() {
             thrust_N: 500.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
         ..Default::default()
     };
 
@@ -182,13 +182,8 @@ fn val_tgt_finite_burn() {
     };
     let dry_mass = 1e3;
     let fuel_mass = 756.0;
-    let sc_state = Spacecraft::from_thruster(
-        orbit,
-        dry_mass,
-        fuel_mass,
-        monoprop,
-        GuidanceMode::Custom(0),
-    );
+    let sc_state =
+        Spacecraft::from_thruster(orbit, dry_mass, fuel_mass, monoprop, GuidanceMode::Thrust);
 
     let prop_time = 15.0 * Unit::Second;
 
@@ -224,9 +219,9 @@ fn val_tgt_finite_burn() {
     let impulsive_tgt = Optimizer::delta_v(
         &prop_no_thrust,
         [
-            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x, 1e-5),
-            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y, 1e-5),
-            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z, 1e-5),
+            Objective::within_tolerance(StateParameter::X, sc_xf_desired.orbit.x_km, 1e-5),
+            Objective::within_tolerance(StateParameter::Y, sc_xf_desired.orbit.y_km, 1e-5),
+            Objective::within_tolerance(StateParameter::Z, sc_xf_desired.orbit.z_km, 1e-5),
         ],
     )
     .try_achieve_from(sc_state, sc_state.epoch(), sc_xf_desired.epoch())

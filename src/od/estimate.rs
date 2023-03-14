@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::serde::ser::SerializeSeq;
-use super::serde::{Serialize, Serializer};
 use super::{CovarFormat, EpochFormat};
 use super::{EstimateFrom, State};
 use crate::cosmic::Orbit;
@@ -25,6 +23,8 @@ use crate::hifitime::Epoch;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
 use crate::Spacecraft;
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 use std::cmp::PartialEq;
 use std::fmt;
 
@@ -252,7 +252,7 @@ where
             f,
             "=== {} @ {} -- within 3 sigma: {} ===\nstate {}\nsigmas [{}]\n",
             word,
-            &self.epoch().as_gregorian_utc_str(),
+            &self.epoch(),
             self.within_3sigma(),
             &self.state(),
             fmt_cov.join(",")
@@ -293,23 +293,19 @@ where
         let dim = <T as State>::Size::dim();
         let mut seq = serializer.serialize_seq(Some(dim * 3 + 1))?;
         match self.epoch_fmt {
-            EpochFormat::GregorianUtc => {
-                seq.serialize_element(&self.epoch().as_gregorian_utc_str())?
-            }
-            EpochFormat::GregorianTai => {
-                seq.serialize_element(&self.epoch().as_gregorian_tai_str())?
-            }
-            EpochFormat::MjdTai => seq.serialize_element(&self.epoch().as_mjd_tai_days())?,
-            EpochFormat::MjdTt => seq.serialize_element(&self.epoch().as_mjd_tt_days())?,
-            EpochFormat::MjdUtc => seq.serialize_element(&self.epoch().as_mjd_utc_days())?,
-            EpochFormat::JdeEt => seq.serialize_element(&self.epoch().as_jde_et_days())?,
-            EpochFormat::JdeTai => seq.serialize_element(&self.epoch().as_jde_tai_days())?,
-            EpochFormat::JdeTt => seq.serialize_element(&self.epoch().as_jde_tt_days())?,
-            EpochFormat::JdeUtc => seq.serialize_element(&self.epoch().as_jde_utc_days())?,
+            EpochFormat::GregorianUtc => seq.serialize_element(&format!("{}", self.epoch()))?,
+            EpochFormat::GregorianTai => seq.serialize_element(&format!("{}", self.epoch()))?,
+            EpochFormat::MjdTai => seq.serialize_element(&self.epoch().to_mjd_tai_days())?,
+            EpochFormat::MjdTt => seq.serialize_element(&self.epoch().to_mjd_tt_days())?,
+            EpochFormat::MjdUtc => seq.serialize_element(&self.epoch().to_mjd_utc_days())?,
+            EpochFormat::JdeEt => seq.serialize_element(&self.epoch().to_jde_et_days())?,
+            EpochFormat::JdeTai => seq.serialize_element(&self.epoch().to_jde_tai_days())?,
+            EpochFormat::JdeTt => seq.serialize_element(&self.epoch().to_jde_tt_days())?,
+            EpochFormat::JdeUtc => seq.serialize_element(&self.epoch().to_jde_utc_days())?,
             EpochFormat::TaiSecs(e) => {
-                seq.serialize_element(&(self.epoch().as_tai_seconds() - e))?
+                seq.serialize_element(&(self.epoch().to_tai_seconds() - e))?
             }
-            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.epoch().as_tai_days() - e))?,
+            EpochFormat::TaiDays(e) => seq.serialize_element(&(self.epoch().to_tai_days() - e))?,
         }
         // Serialize the state
         for i in 0..dim {

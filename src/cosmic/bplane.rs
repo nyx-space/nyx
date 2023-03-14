@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -25,12 +25,14 @@ use crate::md::StateParameter;
 use crate::time::{Duration, Epoch, Unit};
 use crate::utils::between_pm_180;
 use crate::NyxError;
-
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use std::convert::From;
 use std::fmt;
 
 /// Stores a B-Plane
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct BPlane {
     /// The $B_T$ component, in kilometers
     pub b_t: OrbitPartial,
@@ -131,28 +133,6 @@ impl BPlane {
         Self::from_dual(OrbitDual::from(orbit))
     }
 
-    pub fn b_dot_t(&self) -> f64 {
-        self.b_t.real()
-    }
-
-    pub fn b_dot_r(&self) -> f64 {
-        self.b_r.real()
-    }
-
-    pub fn ltof(&self) -> Duration {
-        self.ltof_s.real() * Unit::Second
-    }
-
-    /// Returns the B plane angle in degrees between -180 and 180
-    pub fn angle(&self) -> f64 {
-        between_pm_180(self.b_dot_r().atan2(self.b_dot_t()).to_degrees())
-    }
-
-    /// Returns the B plane vector magnitude, in kilometers
-    pub fn mag(&self) -> f64 {
-        (self.b_dot_t().powi(2) + self.b_dot_r().powi(2)).sqrt()
-    }
-
     /// Returns the DCM to convert to the B Plane from the inertial frame
     pub fn inertial_to_bplane(&self) -> Matrix3<f64> {
         self.str_dcm
@@ -201,6 +181,41 @@ impl BPlane {
     }
 }
 
+#[cfg_attr(feature = "python", pymethods)]
+impl BPlane {
+    pub fn b_dot_t(&self) -> f64 {
+        self.b_t.real()
+    }
+
+    pub fn b_dot_r(&self) -> f64 {
+        self.b_r.real()
+    }
+
+    pub fn ltof(&self) -> Duration {
+        self.ltof_s.real() * Unit::Second
+    }
+
+    /// Returns the B plane angle in degrees between -180 and 180
+    pub fn angle(&self) -> f64 {
+        between_pm_180(self.b_dot_r().atan2(self.b_dot_t()).to_degrees())
+    }
+
+    /// Returns the B plane vector magnitude, in kilometers
+    pub fn mag(&self) -> f64 {
+        (self.b_dot_t().powi(2) + self.b_dot_r().powi(2)).sqrt()
+    }
+
+    #[cfg(feature = "python")]
+    pub fn __repr__(&self) -> String {
+        format!("{self:?}")
+    }
+
+    #[cfg(feature = "python")]
+    pub fn __str__(&self) -> String {
+        format!("{self}")
+    }
+}
+
 impl fmt::Display for BPlane {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -240,10 +255,10 @@ impl BPlaneTarget {
         Self {
             b_t_km,
             b_r_km,
-            ltof_s: ltof.in_seconds(),
+            ltof_s: ltof.to_seconds(),
             tol_b_t_km: 1e-6,
             tol_b_r_km: 1e-6,
-            tol_ltof_s: tol_ltof.in_seconds(),
+            tol_ltof_s: tol_ltof.to_seconds(),
         }
     }
 
@@ -257,7 +272,7 @@ impl BPlaneTarget {
             ltof_s: 0.0,
             tol_b_t_km: 1e-6,
             tol_b_r_km: 1e-6,
-            tol_ltof_s: ltof_tol.in_seconds(),
+            tol_ltof_s: ltof_tol.to_seconds(),
         }
     }
 
@@ -356,9 +371,9 @@ pub fn try_achieve_b_plane(
             total_dv[2] += dv[2];
 
             // Rebuild a new orbit
-            real_orbit.vx += dv[0];
-            real_orbit.vy += dv[1];
-            real_orbit.vz += dv[2];
+            real_orbit.vx_km_s += dv[0];
+            real_orbit.vy_km_s += dv[1];
+            real_orbit.vz_km_s += dv[2];
 
             attempt_no += 1;
         }
@@ -404,9 +419,9 @@ pub fn try_achieve_b_plane(
             total_dv[2] += dv[2];
 
             // Rebuild a new orbit
-            real_orbit.vx += dv[0];
-            real_orbit.vy += dv[1];
-            real_orbit.vz += dv[2];
+            real_orbit.vx_km_s += dv[0];
+            real_orbit.vy_km_s += dv[1];
+            real_orbit.vz_km_s += dv[2];
 
             attempt_no += 1;
         }

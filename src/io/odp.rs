@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -18,6 +18,8 @@
 
 extern crate csv;
 
+use rand::thread_rng;
+
 pub use crate::cosmic::*;
 use crate::dynamics::NyxError;
 use crate::io::formatter::NavSolutionFormatter;
@@ -26,9 +28,9 @@ use crate::io::scenario::ScenarioSerde;
 use crate::linalg::{Matrix2, Matrix6, Vector2, Vector6, U2, U3};
 use crate::md::ui::MDProcess;
 use crate::od::measurement::GroundStation;
-use crate::od::ui::snc::SNC3;
-use crate::od::ui::*;
-use crate::od::MeasurementDevice;
+use crate::od::prelude::snc::SNC3;
+use crate::od::prelude::*;
+use crate::od::TrackingDeviceSim;
 use crate::propagators::Propagator;
 use crate::time::{Duration, Unit};
 use crate::Orbit;
@@ -37,17 +39,18 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant;
 
-pub struct OdpScenario<'a> {
-    truth: MDProcess<'a>,
-    nav: MDProcess<'a>,
+pub struct OdpScenario {
+    truth: MDProcess,
+    nav: MDProcess,
     ekf_msr_trigger: usize,
     ekf_disable_time: Duration,
     kf: KF<Orbit, U3, U2>,
     stations: Vec<GroundStation>,
     formatter: Option<NavSolutionFormatter>,
+    cosm: Arc<Cosm>,
 }
 
-impl<'a> OdpScenario<'a> {
+impl OdpScenario {
     #[allow(clippy::identity_op)]
     pub fn try_from_scenario(
         scenario: &ScenarioSerde,
@@ -116,22 +119,22 @@ impl<'a> OdpScenario<'a> {
                                 let gs = if let Some(base) = &s.inherit {
                                     match base.to_lowercase().as_str() {
                                         "dss13" => GroundStation::dss13_goldstone(
-                                            s.elevation,
-                                            s.range_noise,
-                                            s.range_rate_noise,
-                                            cosm.clone(),
+                                            s.elevation_mask_deg,
+                                            s.range_noise_km,
+                                            s.range_rate_noise_km_s,
+                                            iau_earth,
                                         ),
                                         "dss34" => GroundStation::dss34_canberra(
-                                            s.elevation,
-                                            s.range_noise,
-                                            s.range_rate_noise,
-                                            cosm.clone(),
+                                            s.elevation_mask_deg,
+                                            s.range_noise_km,
+                                            s.range_rate_noise_km_s,
+                                            iau_earth,
                                         ),
                                         "dss65" => GroundStation::dss65_madrid(
-                                            s.elevation,
-                                            s.range_noise,
-                                            s.range_rate_noise,
-                                            cosm.clone(),
+                                            s.elevation_mask_deg,
+                                            s.range_noise_km,
+                                            s.range_rate_noise_km_s,
+                                            iau_earth,
                                         ),
                                         _ => {
                                             return Err(ParsingError::OD(format!(
@@ -143,14 +146,13 @@ impl<'a> OdpScenario<'a> {
                                     let station_name = device.clone();
                                     GroundStation::from_noise_values(
                                         station_name,
-                                        s.elevation,
-                                        s.latitude.unwrap(),
-                                        s.longitude.unwrap(),
-                                        s.height.unwrap(),
-                                        s.range_noise,
-                                        s.range_rate_noise,
+                                        s.elevation_mask_deg,
+                                        s.latitude_deg.unwrap(),
+                                        s.longitude_deg.unwrap(),
+                                        s.height_km.unwrap(),
+                                        s.range_noise_km,
+                                        s.range_rate_noise_km_s,
                                         iau_earth,
-                                        cosm.clone(),
                                     )
                                 };
                                 stations.push(gs);
@@ -300,7 +302,7 @@ impl<'a> OdpScenario<'a> {
                                     "output `{output}` not found",
                                 )))
                             }
-                            Some(output) => Some(output.to_nav_sol_formatter(cosm)?),
+                            Some(output) => Some(output.to_nav_sol_formatter(cosm.clone())?),
                         },
                         None => None,
                     };
@@ -314,11 +316,12 @@ impl<'a> OdpScenario<'a> {
                             None => 100_000,
                         },
                         ekf_disable_time: match &odp_seq.ekf_disable_time {
-                            Some(val) => *val,
+                            Some(val) => Duration::from_str(val).unwrap(),
                             None => 1 * Unit::Hour, // defaults to one hour
                         },
                         stations,
                         formatter,
+                        cosm,
                     });
                 }
             }
@@ -328,7 +331,7 @@ impl<'a> OdpScenario<'a> {
     }
 
     /// Will generate the measurements and run the filter.
-    pub fn execute(self) -> Result<(), NyxError> {
+    pub fn execute(mut self) -> Result<(), NyxError> {
         // Generate the measurements.
         let prop_time = self.truth.prop_time.unwrap();
 
@@ -372,6 +375,7 @@ impl<'a> OdpScenario<'a> {
         info!("\t\t{}", truth_prop.state);
         info!("\t\t{:x}", truth_prop.state);
 
+        let mut rng = thread_rng();
         let mut sim_measurements = Vec::with_capacity(10000);
         let start = Instant::now();
         while let Ok(rx_state) = rx.try_recv() {
@@ -390,9 +394,8 @@ impl<'a> OdpScenario<'a> {
                 wtr.serialize(self.truth.formatter.as_ref().unwrap().fmt(&rx_state.orbit))
                     .expect("could not format state");
             }
-            for station in self.stations.iter() {
-                let meas = station.measure(&rx_state).unwrap();
-                if meas.visible() {
+            for station in self.stations.iter_mut() {
+                if let Some(meas) = station.measure(&rx_state, &mut rng, self.cosm.clone()) {
                     sim_measurements.push(meas);
                     break; // We know that only one station is in visibility at each time.
                 }
@@ -415,8 +418,8 @@ impl<'a> OdpScenario<'a> {
         nav.set_step(10.0 * Unit::Second, true);
 
         let kf = self.kf;
-        let trig = StdEkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
-        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), trig);
+        let trig = EkfTrigger::new(self.ekf_msr_trigger, self.ekf_disable_time);
+        let mut odp = ODProcess::ekf(nav, kf, self.stations.clone(), trig, self.cosm.clone());
 
         odp.process_measurements(&sim_measurements)?;
 

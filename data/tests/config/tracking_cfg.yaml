@@ -1,0 +1,11 @@
+Demo ground station:
+  start: Visible
+  end: Visible
+  schedule: Continuous
+  sampling: 1 min
+
+Canberra:
+  start: Visible
+  end: Visible
+  schedule: Continuous
+  sampling: 1 min

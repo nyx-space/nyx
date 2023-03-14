@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -19,10 +19,12 @@
 use super::StateParameter;
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, Vector3};
+use crate::linalg::DefaultAllocator;
 use crate::time::{Duration, Unit};
 use crate::utils::between_pm_x;
 use crate::{Spacecraft, State};
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use std::default::Default;
 use std::fmt;
 use std::sync::Arc;
@@ -55,6 +57,13 @@ where
 
 /// Defines a state parameter event finder
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(
+    feature = "python",
+    pyo3(
+        text_signature = "(parameter, desired_value, epoch_precision=None, value_precision=None)"
+    )
+)]
 pub struct Event {
     /// The state parameter
     pub parameter: StateParameter,
@@ -76,7 +85,7 @@ impl fmt::Display for Event {
             if self.desired_value.abs() > 1e3 {
                 write!(f, " = {:e}", self.desired_value)?;
             } else {
-                write!(f, " = {}", self.desired_value,)?;
+                write!(f, " = {}", self.desired_value)?;
             }
         }
         if let Some((frame, _)) = self.in_frame {
@@ -155,7 +164,7 @@ impl Event {
 impl Default for Event {
     fn default() -> Self {
         Self {
-            parameter: StateParameter::Custom { mapping: 0 },
+            parameter: StateParameter::Periapsis,
             desired_value: 0.0,
             value_precision: 1e-3,
             epoch_precision: Unit::Second,
@@ -205,14 +214,6 @@ impl EventEvaluator<Orbit> for Event {
             }
             StateParameter::Apoapsis => angled_value(state.ta(), 180.0),
             StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
-            StateParameter::SlantAngle { x, y, z } => {
-                let mut tgt = Vector3::new(x, y, z);
-                tgt /= tgt.norm();
-                angled_value(
-                    state.r_hat().dot(&tgt).acos().to_degrees(),
-                    self.desired_value,
-                )
-            }
             _ => state.value(&self.parameter).unwrap() - self.desired_value,
         }
     }

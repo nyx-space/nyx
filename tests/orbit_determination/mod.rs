@@ -3,13 +3,14 @@ extern crate nalgebra as na;
 extern crate nyx_space as nyx;
 
 use self::nyx::cosmic::Orbit;
-use self::nyx::od::ui::{Estimate, Filter, KfEstimate, NyxError, KF};
+use self::nyx::od::prelude::{Estimate, Filter, KfEstimate, NyxError, KF};
 use self::nyx::State;
 
 mod measurements;
 mod multi_body;
 mod robust;
 mod spacecraft;
+mod trackingarc;
 mod two_body;
 mod xhat_dev;
 

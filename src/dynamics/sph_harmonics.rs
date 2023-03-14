@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -21,20 +21,17 @@ use super::hyperdual::{hyperspace_from_vector, Float, OHyperdual};
 use crate::cosmic::{Cosm, Frame, Orbit};
 use crate::dynamics::AccelModel;
 use crate::errors::NyxError;
-use crate::io::gravity::GravityPotentialStor;
+use crate::io::gravity::HarmonicsMem;
 use crate::linalg::{DMatrix, Matrix3, Vector3, U7};
 use std::cmp::min;
 use std::fmt;
 use std::sync::Arc;
 
 #[derive(Clone)]
-pub struct Harmonics<S>
-where
-    S: GravityPotentialStor,
-{
+pub struct Harmonics {
     cosm: Arc<Cosm>,
     compute_frame: Frame,
-    stor: S,
+    stor: HarmonicsMem,
     a_nm: DMatrix<f64>,
     b_nm: DMatrix<f64>,
     c_nm: DMatrix<f64>,
@@ -47,12 +44,9 @@ where
     vr11_h: DMatrix<OHyperdual<f64, U7>>,
 }
 
-impl<S> Harmonics<S>
-where
-    S: GravityPotentialStor,
-{
+impl Harmonics {
     /// Create a new Harmonics dynamical model from the provided gravity potential storage instance.
-    pub fn from_stor(compute_frame: Frame, stor: S, cosm: Arc<Cosm>) -> Arc<Self> {
+    pub fn from_stor(compute_frame: Frame, stor: HarmonicsMem, cosm: Arc<Cosm>) -> Arc<Self> {
         assert!(
             compute_frame.is_geoid(),
             "harmonics only work around geoids"
@@ -141,7 +135,7 @@ where
     }
 }
 
-impl<S: GravityPotentialStor + Send> fmt::Display for Harmonics<S> {
+impl fmt::Display for Harmonics {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -153,16 +147,16 @@ impl<S: GravityPotentialStor + Send> fmt::Display for Harmonics<S> {
     }
 }
 
-impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
+impl AccelModel for Harmonics {
     fn eom(&self, osc: &Orbit) -> Result<Vector3<f64>, NyxError> {
         // Convert the osculating orbit to the correct frame (needed for multiple harmonic fields)
         let state = self.cosm.frame_chg(osc, self.compute_frame);
 
         // Using the GMAT notation, with extra character for ease of highlight
         let r_ = state.rmag();
-        let s_ = state.x / r_;
-        let t_ = state.y / r_;
-        let u_ = state.z / r_;
+        let s_ = state.x_km / r_;
+        let t_ = state.y_km / r_;
+        let u_ = state.z_km / r_;
         let max_degree = self.stor.max_degree_n(); // In GMAT, the degree is NN
         let max_order = self.stor.max_order_m(); // In GMAT, the order is MM
 
@@ -242,7 +236,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
         // No. Therefore, we do not need to account for the transport theorem here.
         let dcm = self
             .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)?;
         Ok(dcm * accel)
     }
 
@@ -339,7 +333,7 @@ impl<S: GravityPotentialStor + Send> AccelModel for Harmonics<S> {
 
         let dcm = self
             .cosm
-            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.dt)?;
+            .try_position_dcm_from_to(&self.compute_frame, &osc.frame, osc.epoch)?;
 
         // Convert DCM to OHyperdual DCMs
         let mut dcm_d = Matrix3::<OHyperdual<f64, U7>>::zeros();

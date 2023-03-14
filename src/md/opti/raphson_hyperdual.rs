@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -69,22 +69,22 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         for (i, var) in self.variables.iter().enumerate() {
             match var.component {
                 Vary::PositionX => {
-                    xi.orbit.x += var.init_guess;
+                    xi.orbit.x_km += var.init_guess;
                 }
                 Vary::PositionY => {
-                    xi.orbit.y += var.init_guess;
+                    xi.orbit.y_km += var.init_guess;
                 }
                 Vary::PositionZ => {
-                    xi.orbit.z += var.init_guess;
+                    xi.orbit.z_km += var.init_guess;
                 }
                 Vary::VelocityX => {
-                    xi.orbit.vx += var.init_guess;
+                    xi.orbit.vx_km_s += var.init_guess;
                 }
                 Vary::VelocityY => {
-                    xi.orbit.vy += var.init_guess;
+                    xi.orbit.vy_km_s += var.init_guess;
                 }
                 Vary::VelocityZ => {
-                    xi.orbit.vz += var.init_guess;
+                    xi.orbit.vz_km_s += var.init_guess;
                 }
                 _ => {
                     return Err(NyxError::Targeter(Box::new(
@@ -221,12 +221,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                 // Convert the total correction from VNC back to integration frame in case that's needed.
                 for (i, var) in self.variables.iter().enumerate() {
                     match var.component {
-                        Vary::PositionX => state.orbit.x += total_correction[i],
-                        Vary::PositionY => state.orbit.y += total_correction[i],
-                        Vary::PositionZ => state.orbit.z += total_correction[i],
-                        Vary::VelocityX => state.orbit.vx += total_correction[i],
-                        Vary::VelocityY => state.orbit.vy += total_correction[i],
-                        Vary::VelocityZ => state.orbit.vz += total_correction[i],
+                        Vary::PositionX => state.orbit.x_km += total_correction[i],
+                        Vary::PositionY => state.orbit.y_km += total_correction[i],
+                        Vary::PositionZ => state.orbit.z_km += total_correction[i],
+                        Vary::VelocityX => state.orbit.vx_km_s += total_correction[i],
+                        Vary::VelocityY => state.orbit.vy_km_s += total_correction[i],
+                        Vary::VelocityZ => state.orbit.vz_km_s += total_correction[i],
                         _ => {
                             return Err(NyxError::Targeter(Box::new(
                                 TargetingError::UnsupportedVariable(*var),
@@ -289,22 +289,22 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
 
                 match var.component {
                     Vary::PositionX => {
-                        xi.orbit.x += delta[i];
+                        xi.orbit.x_km += delta[i];
                     }
                     Vary::PositionY => {
-                        xi.orbit.y += delta[i];
+                        xi.orbit.y_km += delta[i];
                     }
                     Vary::PositionZ => {
-                        xi.orbit.z += delta[i];
+                        xi.orbit.z_km += delta[i];
                     }
                     Vary::VelocityX => {
-                        xi.orbit.vx += delta[i];
+                        xi.orbit.vx_km_s += delta[i];
                     }
                     Vary::VelocityY => {
-                        xi.orbit.vy += delta[i];
+                        xi.orbit.vy_km_s += delta[i];
                     }
                     Vary::VelocityZ => {
-                        xi.orbit.vz += delta[i];
+                        xi.orbit.vz_km_s += delta[i];
                     }
                     _ => {
                         return Err(NyxError::Targeter(Box::new(

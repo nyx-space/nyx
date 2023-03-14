@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,24 +17,29 @@
 */
 
 use nalgebra::Vector3;
+use serde::{Deserialize, Serialize};
 
+use super::eclipse::Cosm;
 use super::{Orbit, State};
 use crate::dynamics::guidance::Thruster;
 use crate::errors::NyxError;
+use crate::io::{orbit_from_str, ConfigRepr, Configurable};
 use crate::linalg::{Const, DimName, Matrix6, OMatrix, OVector};
 use crate::md::StateParameter;
 use crate::time::Epoch;
 use crate::utils::rss_orbit_errors;
+
 use std::default::Default;
 use std::fmt;
 use std::ops::Add;
+use std::sync::Arc;
 
-/// Defines a spacecraft extension.
-/// This is useful for highly specialized guidance laws that need to store additional data in the spacecraft state.
-/// Most guidance laws can be implemented directly with the `Spacecraft` structure.
-pub trait SpacecraftExt: Clone + Copy + Default + fmt::Debug + Send + Sync {}
+use crate::io::ConfigError;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
 pub enum GuidanceMode {
     /// Guidance is turned off and Guidance Law may switch mode to Thrust for next call
     Coast,
@@ -42,7 +47,6 @@ pub enum GuidanceMode {
     Thrust,
     /// Guidance is turned off and Guidance Law may not change its mode (will need to be done externally to the guidance law).
     Inhibit,
-    Custom(u8),
 }
 
 impl Default for GuidanceMode {
@@ -51,53 +55,101 @@ impl Default for GuidanceMode {
     }
 }
 
-impl SpacecraftExt for GuidanceMode {}
-
 /// A spacecraft state
-#[derive(Clone, Copy, Debug)]
-pub struct BaseSpacecraft<X: SpacecraftExt> {
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "python", pyclass)]
+pub struct Spacecraft {
     /// Initial orbit the vehicle is in
+    #[serde(deserialize_with = "orbit_from_str")]
     pub orbit: Orbit,
     /// Dry mass, i.e. mass without fuel, in kg
     pub dry_mass_kg: f64,
     /// Fuel mass (if fuel mass is negative, thrusting will fail, unless configured to break laws of physics)
     pub fuel_mass_kg: f64,
-    /// in m^2
-    pub srp_area_m2: f64,
-    /// in m^2
-    pub drag_area_m2: f64,
-    /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back).
-    pub cr: f64,
-    /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere).
-    pub cd: f64,
+    /// Solar Radiation Pressure configuration for this spacecraft
+    #[serde(default)]
+    pub srp: SrpConfig,
+    #[serde(default)]
+    pub drag: DragConfig,
     pub thruster: Option<Thruster>,
-    /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
-    pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
     /// Any extra information or extension that is needed for specific guidance laws
-    pub ext: X,
+    #[serde(default)]
+    pub mode: GuidanceMode,
+    /// Optionally stores the state transition matrix from the start of the propagation until the current time (i.e. trajectory STM, not step-size STM)
+    #[serde(skip)]
+    pub stm: Option<OMatrix<f64, Const<9>, Const<9>>>,
 }
 
-/// A spacecraft state
-pub type Spacecraft = BaseSpacecraft<GuidanceMode>;
-
-impl<X: SpacecraftExt> Default for BaseSpacecraft<X> {
+impl Default for Spacecraft {
     fn default() -> Self {
         Self {
             orbit: Orbit::zeros(),
             dry_mass_kg: 0.0,
             fuel_mass_kg: 0.0,
-            srp_area_m2: 0.0,
-            drag_area_m2: 0.0,
-            cr: 1.8,
-            cd: 2.2,
+            srp: SrpConfig::default(),
+            drag: DragConfig::default(),
             thruster: None,
+            mode: GuidanceMode::default(),
             stm: None,
-            ext: X::default(),
         }
     }
 }
 
-impl<X: SpacecraftExt> BaseSpacecraft<X> {
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SrpConfig {
+    /// solar radiation pressure area
+    pub area_m2: f64,
+    /// coefficient of reflectivity, must be between 0.0 (translucent) and 2.0 (all radiation absorbed and twice the force is transmitted back), defaults to 1.8
+    pub cr: f64,
+}
+
+impl SrpConfig {
+    /// Initialize the SRP from the c_r default and the provided drag area
+    pub fn from_area(area_m2: f64) -> Self {
+        Self {
+            area_m2,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for SrpConfig {
+    fn default() -> Self {
+        Self {
+            area_m2: 0.0,
+            cr: 1.8,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct DragConfig {
+    /// drag area
+    pub area_m2: f64,
+    /// coefficient of drag; (spheres are between 2.0 and 2.1, use 2.2 in Earth's atmosphere (default)).
+    pub cd: f64,
+}
+
+impl DragConfig {
+    /// Initialize the drag from the c_d default and the provided drag area
+    pub fn from_area(area_m2: f64) -> Self {
+        Self {
+            area_m2,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for DragConfig {
+    fn default() -> Self {
+        Self {
+            area_m2: 0.0,
+            cd: 2.2,
+        }
+    }
+}
+
+impl Spacecraft {
     /// Initialize a spacecraft state from all of its parameters
     pub fn new(
         orbit: Orbit,
@@ -112,10 +164,14 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
             orbit,
             dry_mass_kg,
             fuel_mass_kg,
-            srp_area_m2,
-            drag_area_m2,
-            cr,
-            cd,
+            srp: SrpConfig {
+                area_m2: srp_area_m2,
+                cr,
+            },
+            drag: DragConfig {
+                area_m2: drag_area_m2,
+                cd,
+            },
             stm: orbit
                 .stm
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
@@ -123,20 +179,20 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
         }
     }
 
-    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing guidance laws whilke ignoring drag and SRP.
+    /// Initialize a spacecraft state from only a thruster and mass. Use this when designing guidance laws while ignoring drag and SRP.
     pub fn from_thruster(
         orbit: Orbit,
         dry_mass_kg: f64,
         fuel_mass_kg: f64,
         thruster: Thruster,
-        ext: X,
+        mode: GuidanceMode,
     ) -> Self {
         Self {
             orbit,
             dry_mass_kg,
             fuel_mass_kg,
             thruster: Some(thruster),
-            ext,
+            mode,
             stm: orbit
                 .stm
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
@@ -149,7 +205,7 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
         Self {
             orbit,
             dry_mass_kg,
-            srp_area_m2,
+            srp: SrpConfig::from_area(srp_area_m2),
             stm: orbit
                 .stm
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
@@ -162,7 +218,7 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
         Self {
             orbit,
             dry_mass_kg,
-            drag_area_m2,
+            drag: DragConfig::from_area(drag_area_m2),
             stm: orbit
                 .stm
                 .map(|_| OMatrix::<f64, Const<9>, Const<9>>::identity()),
@@ -193,44 +249,49 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
     /// Returns a copy of the state with a new SRP area and CR
     pub fn with_srp(self, srp_area_m2: f64, cr: f64) -> Self {
         let mut me = self;
-        me.srp_area_m2 = srp_area_m2;
-        me.cr = cr;
+        me.srp = SrpConfig {
+            area_m2: srp_area_m2,
+            cr,
+        };
+
         me
     }
 
     /// Returns a copy of the state with a new SRP area
     pub fn with_srp_area(self, srp_area_m2: f64) -> Self {
         let mut me = self;
-        me.srp_area_m2 = srp_area_m2;
+        me.srp.area_m2 = srp_area_m2;
         me
     }
 
     /// Returns a copy of the state with a new coefficient of reflectivity
     pub fn with_cr(self, cr: f64) -> Self {
         let mut me = self;
-        me.cr = cr;
+        me.srp.cr = cr;
         me
     }
 
     /// Returns a copy of the state with a new drag area and CD
     pub fn with_drag(self, drag_area_m2: f64, cd: f64) -> Self {
         let mut me = self;
-        me.drag_area_m2 = drag_area_m2;
-        me.cd = cd;
+        me.drag = DragConfig {
+            area_m2: drag_area_m2,
+            cd,
+        };
         me
     }
 
     /// Returns a copy of the state with a new SRP area
     pub fn with_drag_area(self, drag_area_m2: f64) -> Self {
         let mut me = self;
-        me.drag_area_m2 = drag_area_m2;
+        me.drag.area_m2 = drag_area_m2;
         me
     }
 
     /// Returns a copy of the state with a new coefficient of drag
     pub fn with_cd(self, cd: f64) -> Self {
         let mut me = self;
-        me.cd = cd;
+        me.drag.cd = cd;
         me
     }
 
@@ -272,37 +333,35 @@ impl<X: SpacecraftExt> BaseSpacecraft<X> {
         self.dry_mass_kg + self.fuel_mass_kg
     }
 
-    /// Allows the automatic conversion of a BaseSpacecraft into a standard spacecraft.
-    /// WARNING: This will IGNORE the `extra` of BaseSpacecraft
-    pub fn degrade_to_spacecraft(&self) -> Spacecraft {
-        Spacecraft {
-            orbit: self.orbit,
-            dry_mass_kg: self.dry_mass_kg,
-            fuel_mass_kg: self.fuel_mass_kg,
-            srp_area_m2: self.srp_area_m2,
-            drag_area_m2: self.drag_area_m2,
-            cr: self.cr,
-            cd: self.cd,
-            thruster: self.thruster,
-            stm: self.stm,
-            ext: GuidanceMode::Coast,
-        }
+    /// Returns a copy of the state with the provided guidance mode
+    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
+        let mut me = self;
+        me.mode = mode;
+        me
+    }
+
+    pub fn mode(&self) -> GuidanceMode {
+        self.mode
+    }
+
+    pub fn mut_mode(&mut self, mode: GuidanceMode) {
+        self.mode = mode;
     }
 }
 
-impl<X: SpacecraftExt> PartialEq for BaseSpacecraft<X> {
+impl PartialEq for Spacecraft {
     fn eq(&self, other: &Self) -> bool {
         let mass_tol = 1e-6; // milligram
         self.orbit == other.orbit
             && (self.dry_mass_kg - other.dry_mass_kg).abs() < mass_tol
             && (self.fuel_mass_kg - other.fuel_mass_kg).abs() < mass_tol
-            && (self.cr - other.cr).abs() < std::f64::EPSILON
-            && (self.cd - other.cd).abs() < std::f64::EPSILON
+            && self.srp == other.srp
+            && self.drag == other.drag
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
+impl fmt::Display for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -311,13 +370,13 @@ impl<X: SpacecraftExt> fmt::Display for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
+impl fmt::LowerExp for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -326,13 +385,13 @@ impl<X: SpacecraftExt> fmt::LowerExp for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*e}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
+impl fmt::UpperExp for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -341,13 +400,13 @@ impl<X: SpacecraftExt> fmt::UpperExp for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*E}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*E}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
+impl fmt::LowerHex for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -356,13 +415,13 @@ impl<X: SpacecraftExt> fmt::LowerHex for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*x}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
 #[allow(clippy::format_in_format_args)]
-impl<X: SpacecraftExt> fmt::UpperHex for BaseSpacecraft<X> {
+impl fmt::UpperHex for Spacecraft {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mass_prec = f.precision().unwrap_or(3);
         let orbit_prec = f.precision().unwrap_or(6);
@@ -371,12 +430,12 @@ impl<X: SpacecraftExt> fmt::UpperHex for BaseSpacecraft<X> {
             "total mass = {} kg @  {}  {:?}",
             format!("{:.*e}", mass_prec, self.dry_mass_kg + self.fuel_mass_kg),
             format!("{:.*X}", orbit_prec, self.orbit),
-            self.ext,
+            self.mode,
         )
     }
 }
 
-impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
+impl State for Spacecraft {
     type Size = Const<9>;
     type VecLength = Const<90>;
 
@@ -399,8 +458,8 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
             vector[if i < 6 { i } else { i + 3 }] = *val;
         }
         // Set the spacecraft parameters
-        vector[6] = self.cr;
-        vector[7] = self.cd;
+        vector[6] = self.srp.cr;
+        vector[7] = self.drag.cd;
         vector[8] = self.fuel_mass_kg;
         if let Some(mut stm) = self.stm {
             // Set the 6x6 of the orbit STM first
@@ -446,8 +505,8 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
         }
         // And set the orbit information
         self.orbit.set(epoch, &orbit_vec)?;
-        self.cr = sc_state[6];
-        self.cd = sc_state[7];
+        self.srp.cr = sc_state[6];
+        self.drag.cd = sc_state[7];
         self.fuel_mass_kg = sc_state[8];
         Ok(())
     }
@@ -462,11 +521,11 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
     }
 
     fn epoch(&self) -> Epoch {
-        self.orbit.dt
+        self.orbit.epoch
     }
 
     fn set_epoch(&mut self, epoch: Epoch) {
-        self.orbit.dt = epoch
+        self.orbit.epoch = epoch
     }
 
     fn add(self, other: OVector<f64, Self::Size>) -> Self {
@@ -475,8 +534,8 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
 
     fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
         match *param {
-            StateParameter::Cd => Ok(self.cd),
-            StateParameter::Cr => Ok(self.cr),
+            StateParameter::Cd => Ok(self.drag.cd),
+            StateParameter::Cr => Ok(self.srp.cr),
             StateParameter::FuelMass => Ok(self.fuel_mass_kg),
             StateParameter::Isp => match self.thruster {
                 Some(thruster) => Ok(thruster.isp_s),
@@ -492,8 +551,8 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
 
     fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
         match *param {
-            StateParameter::Cd => self.cd = val,
-            StateParameter::Cr => self.cr = val,
+            StateParameter::Cd => self.drag.cd = val,
+            StateParameter::Cr => self.srp.cr = val,
             StateParameter::FuelMass => self.fuel_mass_kg = val,
             StateParameter::Isp => match self.thruster {
                 Some(ref mut thruster) => thruster.isp_s = val,
@@ -507,58 +566,166 @@ impl<X: SpacecraftExt> State for BaseSpacecraft<X> {
         }
         Ok(())
     }
+
+    fn unset_stm(&mut self) {
+        self.stm = None;
+    }
 }
 
-impl<X: SpacecraftExt> Add<OVector<f64, Const<6>>> for BaseSpacecraft<X> {
+impl Add<OVector<f64, Const<6>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
     fn add(self, other: OVector<f64, Const<6>>) -> Self {
         let mut me = self;
-        me.orbit.x += other[0];
-        me.orbit.y += other[1];
-        me.orbit.z += other[2];
-        me.orbit.vx += other[3];
-        me.orbit.vy += other[4];
-        me.orbit.vz += other[5];
+        me.orbit.x_km += other[0];
+        me.orbit.y_km += other[1];
+        me.orbit.z_km += other[2];
+        me.orbit.vx_km_s += other[3];
+        me.orbit.vy_km_s += other[4];
+        me.orbit.vz_km_s += other[5];
 
         me
     }
 }
 
-impl<X: SpacecraftExt> Add<OVector<f64, Const<9>>> for BaseSpacecraft<X> {
+impl Add<OVector<f64, Const<9>>> for Spacecraft {
     type Output = Self;
 
     /// Adds the provided state deviation to this orbit
     fn add(self, other: OVector<f64, Const<9>>) -> Self {
         let mut me = self;
-        me.orbit.x += other[0];
-        me.orbit.y += other[1];
-        me.orbit.z += other[2];
-        me.orbit.vx += other[3];
-        me.orbit.vy += other[4];
-        me.orbit.vz += other[5];
-        me.cr += other[6];
-        me.cd += other[7];
+        me.orbit.x_km += other[0];
+        me.orbit.y_km += other[1];
+        me.orbit.z_km += other[2];
+        me.orbit.vx_km_s += other[3];
+        me.orbit.vy_km_s += other[4];
+        me.orbit.vz_km_s += other[5];
+        me.srp.cr += other[6];
+        me.drag.cd += other[7];
         me.fuel_mass_kg += other[8];
 
         me
     }
 }
 
-impl Spacecraft {
-    /// Returns a copy of the state with the provided guidance mode
-    pub fn with_guidance_mode(self, mode: GuidanceMode) -> Self {
-        let mut me = self;
-        me.ext = mode;
-        me
+impl ConfigRepr for Spacecraft {}
+
+impl Configurable for Spacecraft {
+    type IntermediateRepr = Self;
+
+    fn from_config(cfg: Self::IntermediateRepr, _cosm: Arc<Cosm>) -> Result<Self, ConfigError>
+    where
+        Self: Sized,
+    {
+        Ok(cfg)
     }
 
-    pub fn mode(&self) -> GuidanceMode {
-        self.ext
+    fn to_config(&self) -> Result<Self::IntermediateRepr, ConfigError> {
+        Ok(*self)
     }
+}
 
-    pub fn mut_mode(&mut self, mode: GuidanceMode) {
-        self.ext = mode;
-    }
+#[test]
+fn test_serde() {
+    use super::Cosm;
+    use serde_yaml;
+    use std::str::FromStr;
+
+    let cosm = Cosm::de438();
+    let orbit = Orbit::cartesian(
+        -9042.862234,
+        18536.333069,
+        6999.957069,
+        -3.288789,
+        -2.226285,
+        1.646738,
+        Epoch::from_str("2018-09-15T00:15:53.098 UTC").unwrap(),
+        cosm.frame("EME2000"),
+    );
+
+    let sc = Spacecraft::new(orbit, 500.0, 159.0, 2.0, 2.0, 1.8, 2.2);
+
+    let serialized_sc = serde_yaml::to_string(&sc).unwrap();
+    println!("{}", serialized_sc);
+
+    let deser_sc: Spacecraft = serde_yaml::from_str(&serialized_sc).unwrap();
+
+    assert_eq!(sc, deser_sc);
+
+    // Check that we can omit the thruster info entirely.
+    let s = r#"
+orbit:
+    x_km: -9042.862234
+    y_km: 18536.333069
+    z_km: 6999.957069
+    vx_km_s: -3.288789
+    vy_km_s: -2.226285
+    vz_km_s: 1.646738
+    epoch: 2018-09-15T00:15:53.098000000 UTC
+    frame: Earth J2000
+dry_mass_kg: 500.0
+fuel_mass_kg: 159.0
+srp:
+    area_m2: 2.0
+    cr: 1.8
+drag:
+    area_m2: 2.0
+    cd: 2.2
+    "#;
+
+    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    assert_eq!(sc, deser_sc);
+
+    // Check that we can specify a thruster info entirely.
+    let s = r#"
+orbit:
+    x_km: -9042.862234
+    y_km: 18536.333069
+    z_km: 6999.957069
+    vx_km_s: -3.288789
+    vy_km_s: -2.226285
+    vz_km_s: 1.646738
+    epoch: 2018-09-15T00:15:53.098000000 UTC
+    frame: Earth J2000
+dry_mass_kg: 500.0
+fuel_mass_kg: 159.0
+srp:
+    area_m2: 2.0
+    cr: 1.8
+drag:
+    area_m2: 2.0
+    cd: 2.2
+thruster:
+    thrust_N: 1e-5
+    isp_s: 300.5
+    "#;
+
+    let mut sc_thruster = sc;
+    sc_thruster.thruster = Some(Thruster {
+        isp_s: 300.5,
+        thrust_N: 1e-5,
+    });
+    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+    assert_eq!(sc_thruster, deser_sc);
+
+    // Tests the minimum definition which will set all of the defaults too
+    let s = r#"
+orbit:
+    x_km: -9042.862234
+    y_km: 18536.333069
+    z_km: 6999.957069
+    vx_km_s: -3.288789
+    vy_km_s: -2.226285
+    vz_km_s: 1.646738
+    epoch: 2018-09-15T00:15:53.098000000 UTC
+    frame: Earth J2000
+dry_mass_kg: 500.0
+fuel_mass_kg: 159.0
+"#;
+
+    let deser_sc: Spacecraft = serde_yaml::from_str(&s).unwrap();
+
+    let sc = Spacecraft::new(orbit, 500.0, 159.0, 0.0, 0.0, 1.8, 2.2);
+    assert_eq!(sc, deser_sc);
 }

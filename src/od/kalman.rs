@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -27,11 +27,9 @@ pub use crate::errors::NyxError;
 pub use crate::time::{Epoch, Unit};
 
 /// Defines both a Classical and an Extended Kalman filter (CKF and EKF)
-/// S: State size (not propagated vector size)
 /// A: Acceleration size (for SNC)
 /// M: Measurement size (used for the sensitivity matrix)
 /// T: Type of state
-/// P: Propagated vector size
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct KF<T, A, M>
@@ -250,7 +248,7 @@ where
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = OMatrix::<f64, <T as State>::Size, A>::zeros();
-                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).in_seconds();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).to_seconds();
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;
@@ -333,7 +331,7 @@ where
                 // Let's compute the Gamma matrix, an approximation of the time integral
                 // which assumes that the acceleration is constant between these two measurements.
                 let mut gamma = OMatrix::<f64, <T as State>::Size, A>::zeros();
-                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).in_seconds();
+                let delta_t = (nominal_state.epoch() - self.prev_estimate.epoch()).to_seconds();
                 for blk in 0..A::dim() / 3 {
                     for i in 0..3 {
                         let idx_i = i + A::dim() * blk;

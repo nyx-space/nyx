@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -36,9 +36,10 @@ pub struct Mnvr {
     pub start: Epoch,
     /// End epoch of the maneuver
     pub end: Epoch,
+    /// TODO: Add a thruster group set to specify which set of thrusters to use for this maneuver, should be a key to a thruster (maybe change thruster to a hashmap actually now that I don't care about embedded stuff).
     /// Thrust level, if 1.0 use all thruster available at full power
     /// TODO: Convert this to a common polynomial as well to optimize throttle, throttle rate (and accel?)
-    pub thrust_lvl: f64,
+    pub thrust_prct: f64,
     /// The interpolation polynomial for the in-plane angle
     pub alpha_inplane_radians: CommonPolynomial,
     /// The interpolation polynomial for the out-of-plane angle
@@ -51,13 +52,13 @@ impl fmt::Display for Mnvr {
     /// Prints the polynomial with the least significant coefficients first
     #[allow(clippy::identity_op)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if (self.end - self.start).abs() >= 1 * Unit::Millisecond {
+        if self.end != self.start {
             let start_vec = self.vector(self.start);
             let end_vec = self.vector(self.end);
             write!(
                 f,
                 "Finite burn maneuver @ {:.2}% on {} for {} (ending on {})",
-                100.0 * self.thrust_lvl,
+                100.0 * self.thrust_prct,
                 self.start,
                 self.end - self.start,
                 self.end,
@@ -102,7 +103,7 @@ impl Mnvr {
         Self {
             start,
             end,
-            thrust_lvl,
+            thrust_prct: thrust_lvl,
             alpha_inplane_radians: CommonPolynomial::Constant(alpha),
             delta_outofplane_radians: CommonPolynomial::Constant(delta),
             frame,
@@ -111,7 +112,7 @@ impl Mnvr {
 
     /// Return the thrust vector computed at the provided epoch
     pub fn vector(&self, epoch: Epoch) -> Vector3<f64> {
-        let t = (epoch - self.start).in_seconds();
+        let t = (epoch - self.start).to_seconds();
         let alpha = self.alpha_inplane_radians.eval(t);
         let delta = self.delta_outofplane_radians.eval(t);
         unit_vector_from_ra_dec(alpha, delta)
@@ -217,7 +218,7 @@ impl Mnvr {
     }
 }
 
-impl GuidanceLaw<GuidanceMode> for Mnvr {
+impl GuidanceLaw for Mnvr {
     fn direction(&self, osc: &Spacecraft) -> Vector3<f64> {
         match osc.mode() {
             GuidanceMode::Thrust => {
@@ -234,7 +235,7 @@ impl GuidanceLaw<GuidanceMode> for Mnvr {
     fn throttle(&self, osc: &Spacecraft) -> f64 {
         // match self.next(osc) {
         match osc.mode() {
-            GuidanceMode::Thrust => self.thrust_lvl,
+            GuidanceMode::Thrust => self.thrust_prct,
             _ => {
                 // We aren't in maneuver mode, so return 0% throttle
                 0.0

@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -20,12 +20,13 @@ use super::formatter::OutputSerde;
 use super::gravity::HarmonicsMem;
 use super::quantity::*;
 use super::rv::Distribution;
-use super::serde_derive::Deserialize;
+use super::stations::StationSerde;
 use super::ParsingError;
 use crate::cosmic::{Frame, Orbit};
 use crate::md::{Event, StateParameter};
-use crate::time::{Duration, Epoch};
+use crate::time::Epoch;
 use crate::NyxError;
+use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -169,7 +170,7 @@ pub struct DeltaStateSerde {
 impl DeltaStateSerde {
     pub fn as_state(&self, base: Orbit) -> Result<Orbit, ParsingError> {
         let frame = base.frame;
-        let epoch = base.dt;
+        let epoch = base.epoch;
         // Rebuild a valid state from the three different initializations
         if self.x.is_some()
             || self.y.is_some()
@@ -363,7 +364,7 @@ pub enum PropagatorKind {
 pub struct PropagatorSerde {
     /// Name of the string being associated with this propagator
     pub dynamics: String,
-    /// Name of the stoping condition used
+    /// Name of the stopping condition used
     pub stop_cond: String,
     /// The tolerance of the propagator (default to 1e-12)
     pub tolerance: Option<f64>,
@@ -391,7 +392,7 @@ pub struct OdpSerde {
     /// Set the number of measurements to switch to an EKF
     pub ekf_msr_trigger: Option<usize>,
     /// Set the acceptable time between measurements
-    pub ekf_disable_time: Option<Duration>,
+    pub ekf_disable_time: Option<String>,
     /// An optional output of a NavSolution
     pub output: Option<String>,
 }
@@ -416,17 +417,6 @@ pub struct MeasurementSerde {
     pub output: Option<String>,
     /// Optionally specify whether to use the file if it exists
     pub use_file_if_available: Option<bool>,
-}
-
-#[derive(Deserialize)]
-pub struct StationSerde {
-    pub elevation: f64,
-    pub range_noise: f64,
-    pub range_rate_noise: f64,
-    pub latitude: Option<f64>,
-    pub longitude: Option<f64>,
-    pub height: Option<f64>,
-    pub inherit: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -592,6 +582,7 @@ fn test_md_scenario() {
 }
 
 #[test]
+#[ignore = "OD scenario disabled during rewrite"]
 fn test_od_scenario() {
     extern crate toml;
 

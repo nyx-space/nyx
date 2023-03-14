@@ -20,7 +20,7 @@ fn tgt_c3_decl() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft::from_srp_defaults(xi_orig, 100.0, 0.0);
 
@@ -73,7 +73,7 @@ fn conv_tgt_sma_ecc() {
 
     let target_delta_t: Duration = xi_orig.period() / 2.0;
 
-    println!("Period: {} s", xi_orig.period().in_seconds() / 2.0);
+    println!("Period: {} s", xi_orig.period().to_seconds() / 2.0);
 
     let spacecraft = Spacecraft {
         orbit: xi_orig,
@@ -83,7 +83,7 @@ fn conv_tgt_sma_ecc() {
             thrust_N: 500.0,
             isp_s: 300.0,
         }),
-        ext: GuidanceMode::Thrust,
+        mode: GuidanceMode::Thrust,
 
         ..Default::default()
     };

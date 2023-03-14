@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -24,6 +24,7 @@ use crate::linalg::{
     allocator::Allocator, Const, DefaultAllocator, DimMin, DimMinimum, DimSub, OMatrix, OVector,
     SVector,
 };
+use crate::md::trajectory::INTERPOLATION_SAMPLES;
 use crate::polyfit::polynomial::{multiply, Polynomial};
 use crate::NyxError;
 
@@ -225,6 +226,140 @@ pub fn hermite<const DEGREE: usize>(
     }
 
     Ok(hermite)
+}
+
+pub fn hermite_eval(
+    xs: &[f64],
+    ys: &[f64],
+    ydots: &[f64],
+    x_eval: f64,
+) -> Result<(f64, f64), NyxError> {
+    if xs.len() != ys.len() || xs.len() != ydots.len() {
+        error!("Abscissas (xs), ordinates (ys), and first derivatives (ydots) must contain the same number of items, but they are of lengths {}, {}, and {}", xs.len(), ys.len(), ydots.len());
+        return Err(NyxError::MathDomain("=(".to_string()));
+    } else if xs.is_empty() {
+        error!("No interpolation data provided");
+        return Err(NyxError::MathDomain("=(".to_string()));
+    } else if xs.len() > 3 * INTERPOLATION_SAMPLES {
+        error!("More than {} samples provided, which is the maximum number of items allowed for a Hermite interpolation", 3 * INTERPOLATION_SAMPLES);
+        return Err(NyxError::MathDomain("=(".to_string()));
+    }
+
+    // At this point, we know that the lengths of items is correct, so we can directly address them without worry for overflowing the array.
+
+    let work: &mut [f64] = &mut [0.0; 256];
+    let n: usize = xs.len();
+
+    /*     Copy the input array into WORK.  After this, the first column */
+    /*     of WORK represents the first column of our triangular */
+    /*     interpolation table. */
+
+    for i in 0..n {
+        work[2 * i] = ys[i];
+        work[2 * i + 1] = ydots[i];
+    }
+
+    /*     Compute the second column of the interpolation table: this */
+    /*     consists of the N-1 values obtained by evaluating the */
+    /*     first-degree interpolants at X. We'll also evaluate the */
+    /*     derivatives of these interpolants at X and save the results in */
+    /*     the second column of WORK. Because the derivative computations */
+    /*     depend on the function computations from the previous column in */
+    /*     the interpolation table, and because the function interpolation */
+    /*     overwrites the previous column of interpolated function values, */
+    /*     we must evaluate the derivatives first. */
+
+    for i in 1..=n - 1 {
+        let c1 = xs[i] - x_eval;
+        let c2 = x_eval - xs[i - 1];
+        let denom = xs[i] - xs[i - 1];
+        if denom.abs() < f64::EPSILON {
+            return Err(NyxError::MathDomain("=(".to_string()));
+        }
+
+        /*        The second column of WORK contains interpolated derivative */
+        /*        values. */
+
+        /*        The odd-indexed interpolated derivatives are simply the input */
+        /*        derivatives. */
+
+        let prev = 2 * i - 1;
+        let curr = 2 * i;
+        work[prev + 2 * n - 1] = work[prev];
+
+        /*        The even-indexed interpolated derivatives are the slopes of */
+        /*        the linear interpolating polynomials for adjacent input */
+        /*        abscissa/ordinate pairs. */
+
+        work[prev + 2 * n] = (work[curr] - work[prev - 1]) / denom;
+
+        /*        The first column of WORK contains interpolated function values. */
+        /*        The odd-indexed entries are the linear Taylor polynomials, */
+        /*        for each input abscissa value, evaluated at X. */
+
+        let temp = work[prev] * (x_eval - xs[i - 1]) + work[prev - 1];
+        work[prev] = (c1 * work[prev - 1] + c2 * work[curr]) / denom;
+        work[prev - 1] = temp;
+    }
+
+    /*     The last column entries were not computed by the preceding loop; */
+    /*     compute them now. */
+
+    work[4 * n - 2] = work[(2 * n) - 1];
+    work[2 * (n - 1)] += work[(2 * n) - 1] * (x_eval - xs[n - 1]);
+
+    /*     Compute columns 3 through 2*N of the table. */
+
+    for j in 2..=(2 * n) - 1 {
+        for i in 1..=(2 * n) - j {
+            /*           In the theoretical construction of the interpolation table,
+             */
+            /*           there are 2*N abscissa values, since each input abcissa */
+            /*           value occurs with multiplicity two. In this theoretical */
+            /*           construction, the Jth column of the interpolation table */
+            /*           contains results of evaluating interpolants that span J+1 */
+            /*           consecutive abscissa values.  The indices XI and XIJ below */
+            /*           are used to pick the correct abscissa values out of the */
+            /*           physical XVALS array, in which the abscissa values are not */
+            /*           repeated. */
+
+            let xi = (i + 1) / 2;
+            let xij = (i + j + 1) / 2;
+            let c1 = xs[xij - 1] - x_eval;
+            let c2 = x_eval - xs[xi - 1];
+            let denom = xs[xij - 1] - xs[xi - 1];
+            if denom.abs() < f64::EPSILON {
+                return Err(NyxError::MathDomain("=(".to_string()));
+            }
+
+            /*           Compute the interpolated derivative at X for the Ith */
+            /*           interpolant. This is the derivative with respect to X of */
+            /*           the expression for the interpolated function value, which */
+            /*           is the second expression below. This derivative computation
+             */
+            /*           is done first because it relies on the interpolated */
+            /*           function values from the previous column of the */
+            /*           interpolation table. */
+
+            /*           The derivative expression here corresponds to equation */
+            /*           2.35 on page 64 in reference [2]. */
+
+            work[i + 2 * n - 1] =
+                (c1 * work[i + 2 * n - 1] + c2 * work[i + 2 * n] + (work[i] - work[i - 1])) / denom;
+
+            /*           Compute the interpolated function value at X for the Ith */
+            /*           interpolant. */
+
+            work[i - 1] = (c1 * work[i - 1] + c2 * work[i]) / denom;
+        }
+    }
+
+    /*     Our interpolated function value is sitting in WORK(1,1) at this */
+    /*     point.  The interpolated derivative is located in WORK(1,2). */
+
+    let f = work[0];
+    let df = work[2 * n];
+    Ok((f, df))
 }
 
 #[test]

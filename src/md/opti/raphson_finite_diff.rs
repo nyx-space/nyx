@@ -1,6 +1,6 @@
 /*
     Nyx, blazing fast astrodynamics
-    Copyright (C) 2022 Christopher Rabotin <christopher.rabotin@gmail.com>
+    Copyright (C) 2023 Christopher Rabotin <christopher.rabotin@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -74,7 +74,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
         let mut mnvr = Mnvr {
             start: correction_epoch,
             end: achievement_epoch,
-            thrust_lvl: 1.0,
+            thrust_prct: 1.0,
             alpha_inplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             delta_outofplane_radians: CommonPolynomial::Quadratic(0.0, 0.0, 0.0),
             frame: Frame::RCN,
@@ -140,11 +140,11 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         mnvr.set_accel(vector)?;
                     }
                     Vary::ThrustLevel => {
-                        mnvr.thrust_lvl += var.perturbation;
-                        if mnvr.thrust_lvl > 1.0 {
-                            mnvr.thrust_lvl = 1.0
-                        } else if mnvr.thrust_lvl < 0.0 {
-                            mnvr.thrust_lvl = 0.0
+                        mnvr.thrust_prct += var.perturbation;
+                        if mnvr.thrust_prct > 1.0 {
+                            mnvr.thrust_prct = 1.0
+                        } else if mnvr.thrust_prct < 0.0 {
+                            mnvr.thrust_prct = 0.0
                         }
                     }
                     _ => unreachable!(),
@@ -160,12 +160,12 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         dcm_vnc2inertial * state_correction.fixed_rows::<3>(3);
                     xi.orbit.apply_dv(velocity_correction);
                 } else {
-                    xi.orbit.x += state_correction[0];
-                    xi.orbit.y += state_correction[1];
-                    xi.orbit.z += state_correction[2];
-                    xi.orbit.vx += state_correction[3];
-                    xi.orbit.vy += state_correction[4];
-                    xi.orbit.vz += state_correction[5];
+                    xi.orbit.x_km += state_correction[0];
+                    xi.orbit.y_km += state_correction[1];
+                    xi.orbit.z_km += state_correction[2];
+                    xi.orbit.vx_km_s += state_correction[3];
+                    xi.orbit.vy_km_s += state_correction[4];
+                    xi.orbit.vz_km_s += state_correction[5];
                 }
             }
 
@@ -360,11 +360,11 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                                 this_mnvr.set_accel(vector).unwrap();
                             }
                             Vary::ThrustLevel => {
-                                this_mnvr.thrust_lvl += var.perturbation;
-                                if this_mnvr.thrust_lvl > 1.0 {
-                                    this_mnvr.thrust_lvl = 1.0
-                                } else if this_mnvr.thrust_lvl < 0.0 {
-                                    this_mnvr.thrust_lvl = 0.0
+                                this_mnvr.thrust_prct += var.perturbation;
+                                if this_mnvr.thrust_prct > 1.0 {
+                                    this_mnvr.thrust_prct = 1.0
+                                } else if this_mnvr.thrust_prct < 0.0 {
+                                    this_mnvr.thrust_prct = 0.0
                                 }
                             }
                             _ => unreachable!(),
@@ -549,7 +549,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             if corr.abs() > 1e-3 {
                                 // Check that we are within the bounds
                                 let init_duration_s =
-                                    (correction_epoch - achievement_epoch).in_seconds();
+                                    (correction_epoch - achievement_epoch).to_seconds();
                                 let acceptable_corr = var.apply_bounds(init_duration_s).seconds();
                                 mnvr.end = mnvr.start + acceptable_corr;
                             }
@@ -558,7 +558,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             if corr.abs() > 1e-3 {
                                 // Check that we are within the bounds
                                 let total_end_corr =
-                                    (mnvr.end + corr.seconds() - achievement_epoch).in_seconds();
+                                    (mnvr.end + corr.seconds() - achievement_epoch).to_seconds();
                                 let acceptable_corr = var.apply_bounds(total_end_corr).seconds();
                                 mnvr.end += acceptable_corr;
                             }
@@ -567,7 +567,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             if corr.abs() > 1e-3 {
                                 // Check that we are within the bounds
                                 let total_start_corr =
-                                    (mnvr.start + corr.seconds() - correction_epoch).in_seconds();
+                                    (mnvr.start + corr.seconds() - correction_epoch).to_seconds();
                                 let acceptable_corr = var.apply_bounds(total_start_corr).seconds();
                                 mnvr.end += acceptable_corr;
 
@@ -607,8 +607,8 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             mnvr.set_accel(vector)?;
                         }
                         Vary::ThrustLevel => {
-                            mnvr.thrust_lvl += corr;
-                            var.ensure_bounds(&mut mnvr.thrust_lvl);
+                            mnvr.thrust_prct += corr;
+                            var.ensure_bounds(&mut mnvr.thrust_prct);
                         }
                         _ => unreachable!(),
                     }
