@@ -78,10 +78,12 @@ def test_filter_arc():
     )
 
     msr_noise = [1e-3, 0, 0, 1e-6]  # TODO: Convert this to a numpy matrix
-    ekf_num_msr_trig = 100  # Switch from sequential to EKF after 100 measurements
+    # Switch from sequential to EKF after 100 measurements
+    ekf_num_msr_trig = 100  
+    # Unless there is a 2 hour gap in the measurements, and then switch back to classical
     ekf_disable_time = (
         Unit.Hour * 2
-    )  # Unless there is a 2 hour gap in the measurements, and then switch back to classical
+    )  
 
     estimates = process_tracking_arc(
         dynamics["hifi"],
@@ -93,7 +95,8 @@ def test_filter_arc():
         ekf_disable_time,
     )
 
-    assert len(estimates) == 846
+    assert len(estimates) == 1148
+    assert len([est for est in estimates if not est.is_predicted]) == 846
 
     # TODO: Add more tests
 

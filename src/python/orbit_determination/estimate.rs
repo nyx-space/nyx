@@ -128,6 +128,11 @@ impl OrbitEstimate {
         Ok(self.0.nominal_state)
     }
 
+    #[getter]
+    fn get_is_predicted(&self) -> PyResult<bool> {
+        Ok(self.0.predicted)
+    }
+
     fn __str__(&self) -> String {
         format!("{}", self.0)
     }

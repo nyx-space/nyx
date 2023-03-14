@@ -470,7 +470,7 @@ where
                                 &computed_meas.observation(),
                             ) {
                                 Ok((est, res)) => {
-                                    trace!("msr update #{} @ {}", msr_cnt, epoch);
+                                    debug!("msr update #{} @ {}", msr_cnt, epoch);
                                     // Switch to EKF if necessary, and update the dynamics and such
                                     // Note: we call enable_ekf first to ensure that the trigger gets
                                     // called in case it needs to save some information (e.g. the
@@ -515,7 +515,7 @@ where
                     break;
                 } else {
                     // No measurement can be used here, let's just do a time update
-                    trace!("time update {}", epoch);
+                    debug!("time update {}", epoch);
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update
@@ -580,8 +580,13 @@ where
                 let delta_t = next_msr_epoch - epoch;
 
                 // Propagator for the minimum time between the step size and the duration to the next measurement.
-                let next_step_size = delta_t.min(self.prop.details.step);
-                trace!("advancing propagator by {next_step_size}");
+                // Ensure that we don't go backward if the previous step we took was indeed backward.
+                let next_step_size = delta_t.min(if self.prop.details.step.is_negative() {
+                    step_size
+                } else {
+                    self.prop.details.step
+                });
+                debug!("advancing propagator by {next_step_size} (Δt to next msr: {delta_t})");
                 self.prop.for_duration(next_step_size)?;
 
                 // Now that we've advanced the propagator, let's see whether we're at the time of the next measurement.
@@ -615,7 +620,7 @@ where
                                     &computed_meas.observation(),
                                 ) {
                                     Ok((est, res)) => {
-                                        trace!("msr update #{msr_cnt} @ {epoch}");
+                                        debug!("msr update #{msr_cnt} @ {epoch}");
                                         // Switch to EKF if necessary, and update the dynamics and such
                                         // Note: we call enable_ekf first to ensure that the trigger gets
                                         // called in case it needs to save some information (e.g. the
@@ -661,7 +666,7 @@ where
                     break;
                 } else {
                     // No measurement can be used here, let's just do a time update and continue advancing the propagator.
-                    trace!("time update {epoch}");
+                    debug!("time update {epoch}");
                     match self.kf.time_update(nominal_state) {
                         Ok(est) => {
                             // State deviation is always zero for an EKF time update
@@ -703,7 +708,7 @@ where
             // Get the datetime and info needed to compute the theoretical measurement according to the model
             epoch = nominal_state.epoch();
             // No measurement can be used here, let's just do a time update
-            trace!("time update {epoch}");
+            debug!("time update {epoch}");
             match self.kf.time_update(nominal_state) {
                 Ok(est) => {
                     // State deviation is always zero for an EKF time update
