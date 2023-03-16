@@ -314,7 +314,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                     _ => unreachable!(),
                 }
             } else {
-                xf_dual.partial_for(&obj.parameter)?
+                xf_dual.partial_for(obj.parameter)?
             };
 
             let param_err = obj.desired_value - partial.real();

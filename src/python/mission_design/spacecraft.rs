@@ -104,7 +104,7 @@ impl Spacecraft {
 
     /// Returns the value of the provided state parameter if available
     #[cfg(feature = "python")]
-    fn value_of(&self, param: &StateParameter) -> Result<f64, NyxError> {
+    fn value_of(&self, param: StateParameter) -> Result<f64, NyxError> {
         self.value(param)
     }
 }

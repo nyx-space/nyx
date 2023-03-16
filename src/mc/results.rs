@@ -84,7 +84,7 @@ where
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
     pub fn every_value_of_between(
         &self,
-        param: &StateParameter,
+        param: StateParameter,
         step: Duration,
         start: Epoch,
         end: Epoch,
@@ -122,7 +122,7 @@ where
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
     pub fn every_value_of(
         &self,
-        param: &StateParameter,
+        param: StateParameter,
         step: Duration,
         value_if_run_failed: Option<f64>,
     ) -> Vec<f64> {
@@ -158,7 +158,7 @@ where
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
     pub fn first_values_of(
         &self,
-        param: &StateParameter,
+        param: StateParameter,
         value_if_run_failed: Option<f64>,
     ) -> Vec<f64> {
         let mut report = Vec::with_capacity(self.runs.len());
@@ -189,7 +189,7 @@ where
     /// using the value of `value_if_run_failed` if set and skipping that run if the run failed
     pub fn last_values_of(
         &self,
-        param: &StateParameter,
+        param: StateParameter,
         value_if_run_failed: Option<f64>,
     ) -> Vec<f64> {
         let mut report = Vec::with_capacity(self.runs.len());
@@ -217,11 +217,11 @@ where
     }
 
     /// Returns the dispersion values of the requested state parameter
-    pub fn dispersion_values_of(&self, param: &StateParameter) -> Result<Vec<f64>, NyxError> {
+    pub fn dispersion_values_of(&self, param: StateParameter) -> Result<Vec<f64>, NyxError> {
         let mut report = Vec::with_capacity(self.runs.len());
         'run_loop: for run in &self.runs {
             for (dparam, val) in &run.dispersed_state.actual_dispersions {
-                if dparam == param {
+                if dparam == &param {
                     report.push(*val);
                     continue 'run_loop;
                 }

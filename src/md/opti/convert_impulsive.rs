@@ -210,7 +210,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             // For each objective, we'll perturb the variables to compute the Jacobian with finite differencing.
             for (i, obj) in objectives.iter().enumerate() {
-                let achieved = sc_xf_achieved.value_and_deriv(&obj.parameter)?.0;
+                let achieved = sc_xf_achieved.value_and_deriv(obj.parameter)?.0;
                 // Check if this objective has been achieved
                 let (ok, param_err) = obj.assess_raw(achieved);
                 if !ok {
@@ -268,7 +268,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                         .unwrap();
 
                     let this_achieved = this_sc_xf_achieved
-                        .value_and_deriv(&obj.parameter)
+                        .value_and_deriv(obj.parameter)
                         .unwrap()
                         .0;
                     *jac_val = (this_achieved - achieved) / var.perturbation;

@@ -177,7 +177,7 @@ where
                 if let Availability::Epoch(start_epoch) = cfg.start {
                     if start_epoch > epoch {
                         if !start_trace_msg.contains(name) {
-                            trace!(
+                            debug!(
                                 "{name} tracking starts in {} (start = {start_epoch})",
                                 start_epoch - epoch
                             );
@@ -190,7 +190,7 @@ where
                 if let Availability::Epoch(end_epoch) = cfg.end {
                     if end_epoch < epoch {
                         if !end_trace_msg.contains(name) {
-                            trace!(
+                            debug!(
                                 "{name} tracking ended {} ago (end = {end_epoch})",
                                 epoch - end_epoch
                             );
@@ -214,7 +214,7 @@ where
                             if let Some(start_epoch) = device_sched.start {
                                 if (epoch - start_epoch) > on {
                                     if !sched_trace_msg.contains(name) {
-                                        trace!(
+                                        debug!(
                                             "{name} is now turned off after being on for {}",
                                             epoch - start_epoch
                                         );
@@ -227,7 +227,7 @@ where
                             if let Some(end_epoch) = device_sched.end {
                                 if (epoch - end_epoch) <= off {
                                     if !sched_trace_msg.contains(name) {
-                                        trace!(
+                                        debug!(
                                             "{name} will be available again in {}",
                                             epoch - end_epoch
                                         );
@@ -275,13 +275,13 @@ where
                         if device_sched.start.is_none() {
                             // Set the start time of this pass
                             device_sched.start = Some(epoch);
-                            trace!("{name} is now tracking {epoch}");
+                            debug!("{name} is now tracking {epoch}");
                         }
                         // In any case, set the end to none and set the prev to now.
                         device_sched.prev = Some(epoch);
                         device_sched.end = None;
                     } else {
-                        trace!("{name} is now tracking {epoch}");
+                        debug!("{name} is now tracking {epoch}");
                         // Oh, great, first measurement for this device!
                         sched.insert(
                             name.to_string(),

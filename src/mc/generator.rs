@@ -67,7 +67,7 @@ where
     /// Add a parameter dispersion to this Monte Carlo state generator.
     pub fn add_dispersion(&mut self, dispersion: Dispersion<D>) -> Result<(), NyxError> {
         // Try to set that parameter, and report an error on initialization if it fails
-        match self.template.clone().set_value(&dispersion.param, 0.0) {
+        match self.template.clone().set_value(dispersion.param, 0.0) {
             Ok(_) => {
                 self.dispersions.push(dispersion);
                 Ok(())
@@ -128,7 +128,7 @@ where
 
     /// Add a state dispersion from the provided 1-sigma value, zero mean
     pub fn add_std_dev(&mut self, param: StateParameter, std_dev: f64) -> Result<(), NyxError> {
-        match self.template.value(&param) {
+        match self.template.value(param) {
             Ok(_) => {
                 self.dispersions
                     .push(Dispersion::new(param, Normal::new(0.0, std_dev).unwrap()));
@@ -176,7 +176,7 @@ where
         }
         let mut me: Self = template.into();
 
-        me.add_3std_dev(param, template.value(&param)? * prct)?;
+        me.add_3std_dev(param, template.value(param)? * prct)?;
 
         Ok(me)
     }
@@ -195,7 +195,7 @@ where
                 )));
             }
 
-            me.add_3std_dev(*param, template.value(param)? * prct)?;
+            me.add_3std_dev(*param, template.value(*param)? * prct)?;
         }
 
         Ok(me)
@@ -227,7 +227,7 @@ where
                 )));
             }
 
-            me.add_std_dev(*param, template.value(param)? * prct)?;
+            me.add_std_dev(*param, template.value(*param)? * prct)?;
         }
 
         Ok(me)
@@ -260,7 +260,7 @@ where
 
         let mut me: Self = template.into();
 
-        me.add_std_dev(param, template.value(&param)? * prct)?;
+        me.add_std_dev(param, template.value(param)? * prct)?;
 
         Ok(me)
     }
@@ -293,12 +293,12 @@ where
         let mut actual_dispersions = Vec::new();
         for dispersion in &self.dispersions {
             // We know this state can return something for this param
-            let cur_value = state.value(&dispersion.param).unwrap();
+            let cur_value = state.value(dispersion.param).unwrap();
             // Apply the dispersion
             let delta = dispersion.distr.sample(rng);
             actual_dispersions.push((dispersion.param, delta));
             state
-                .set_value(&dispersion.param, cur_value + delta)
+                .set_value(dispersion.param, cur_value + delta)
                 .unwrap();
         }
 
@@ -445,17 +445,14 @@ fn generate_spacecraft() {
         .map(|dispersed_state| {
             // Check out of bounds
             let thrust_oob = (nominal_thrust
-                - dispersed_state
-                    .state
-                    .value(&StateParameter::Thrust)
-                    .unwrap())
+                - dispersed_state.state.value(StateParameter::Thrust).unwrap())
             .abs()
                 / nominal_thrust
                 > 0.05;
-            let isp_oob =
-                (nominal_isp - dispersed_state.state.value(&StateParameter::Isp).unwrap()).abs()
-                    / nominal_isp
-                    > 0.01;
+            let isp_oob = (nominal_isp - dispersed_state.state.value(StateParameter::Isp).unwrap())
+                .abs()
+                / nominal_isp
+                > 0.01;
             if thrust_oob || isp_oob {
                 1
             } else {

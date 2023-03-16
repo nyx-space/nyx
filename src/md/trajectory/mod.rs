@@ -82,19 +82,19 @@ where
     fn params() -> Vec<StateParameter>;
 
     /// Return the requested parameter and its time derivative
-    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
+    fn value_and_deriv(&self, param: StateParameter) -> Result<(f64, f64), NyxError> {
         Ok((self.value(param)?, self.deriv(param)?))
     }
 
     /// Return the time derivative requested parameter
-    fn deriv(&self, param: &StateParameter) -> Result<f64, NyxError> {
+    fn deriv(&self, param: StateParameter) -> Result<f64, NyxError> {
         Ok(self.value_and_deriv(param)?.1)
     }
 
     /// Sets the requested parameter
     fn set_value_and_deriv(
         &mut self,
-        param: &StateParameter,
+        param: StateParameter,
         value: f64,
         value_dt: f64,
     ) -> Result<(), NyxError>;
@@ -178,8 +178,8 @@ impl InterpState for Orbit {
         Ok(me)
     }
 
-    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        match *param {
+    fn value_and_deriv(&self, param: StateParameter) -> Result<(f64, f64), NyxError> {
+        match param {
             StateParameter::X => Ok((self.x_km, self.vx_km_s)),
             StateParameter::Y => Ok((self.y_km, self.vy_km_s)),
             StateParameter::Z => Ok((self.z_km, self.vz_km_s)),
@@ -192,11 +192,11 @@ impl InterpState for Orbit {
 
     fn set_value_and_deriv(
         &mut self,
-        param: &StateParameter,
+        param: StateParameter,
         value: f64,
         _: f64,
     ) -> Result<(), NyxError> {
-        match *param {
+        match param {
             StateParameter::X => {
                 self.x_km = value;
             }
@@ -262,8 +262,8 @@ impl InterpState for Spacecraft {
         Ok(me)
     }
 
-    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        match *param {
+    fn value_and_deriv(&self, param: StateParameter) -> Result<(f64, f64), NyxError> {
+        match param {
             StateParameter::X => Ok((self.orbit.x_km, self.orbit.vx_km_s)),
             StateParameter::Y => Ok((self.orbit.y_km, self.orbit.vy_km_s)),
             StateParameter::Z => Ok((self.orbit.z_km, self.orbit.vz_km_s)),
@@ -277,11 +277,11 @@ impl InterpState for Spacecraft {
 
     fn set_value_and_deriv(
         &mut self,
-        param: &StateParameter,
+        param: StateParameter,
         value: f64,
         _: f64,
     ) -> Result<(), NyxError> {
-        match *param {
+        match param {
             StateParameter::X => {
                 self.orbit.x_km = value;
             }

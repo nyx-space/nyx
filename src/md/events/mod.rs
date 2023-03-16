@@ -16,26 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub mod evaluators;
 use super::StateParameter;
-use crate::cosmic::{Cosm, Frame, Orbit};
+use crate::cosmic::{Cosm, Frame};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
 use crate::time::{Duration, Unit};
-use crate::utils::between_pm_x;
-use crate::{Spacecraft, State};
+use crate::State;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use std::default::Default;
 use std::fmt;
 use std::sync::Arc;
-
-fn angled_value(cur_angle: f64, desired_angle: f64) -> f64 {
-    if between_pm_x(cur_angle, desired_angle) > 0.0 {
-        cur_angle - desired_angle
-    } else {
-        cur_angle + 2.0 * desired_angle
-    }
-}
 
 /// A trait to specify how a specific event must be evaluated.
 pub trait EventEvaluator<S: State>: fmt::Display + Send + Sync
@@ -83,9 +75,23 @@ impl fmt::Display for Event {
         if self.parameter != StateParameter::Apoapsis && self.parameter != StateParameter::Periapsis
         {
             if self.desired_value.abs() > 1e3 {
-                write!(f, " = {:e}", self.desired_value)?;
+                write!(
+                    f,
+                    " = {:e} {} (± {:e} {})",
+                    self.desired_value,
+                    self.parameter.unit(),
+                    self.value_precision,
+                    self.parameter.unit()
+                )?;
             } else {
-                write!(f, " = {}", self.desired_value)?;
+                write!(
+                    f,
+                    " = {} {} (± {} {})",
+                    self.desired_value,
+                    self.parameter.unit(),
+                    self.value_precision,
+                    self.parameter.unit()
+                )?;
             }
         }
         if let Some((frame, _)) = self.in_frame {
@@ -170,69 +176,5 @@ impl Default for Event {
             epoch_precision: Unit::Second,
             in_frame: None,
         }
-    }
-}
-
-impl EventEvaluator<Orbit> for Event {
-    #[allow(clippy::identity_op)]
-    fn epoch_precision(&self) -> Duration {
-        1 * self.epoch_precision
-    }
-
-    fn value_precision(&self) -> f64 {
-        self.value_precision
-    }
-
-    fn eval(&self, state: &Orbit) -> f64 {
-        // Transform the state if needed
-        let state = if let Some((frame, cosm)) = &self.in_frame {
-            if state.frame == *frame {
-                *state
-            } else {
-                cosm.frame_chg(state, *frame)
-            }
-        } else {
-            *state
-        };
-
-        // Return the parameter centered around the desired value
-        match self.parameter {
-            StateParameter::AoL
-            | StateParameter::AoP
-            | StateParameter::Declination
-            | StateParameter::EccentricAnomaly
-            | StateParameter::FlightPathAngle
-            | StateParameter::HyperbolicAnomaly
-            | StateParameter::Inclination
-            | StateParameter::MeanAnomaly
-            | StateParameter::RightAscension
-            | StateParameter::RAAN
-            | StateParameter::TrueAnomaly
-            | StateParameter::TrueLongitude
-            | StateParameter::VelocityDeclination => {
-                angled_value(state.value(&self.parameter).unwrap(), self.desired_value)
-            }
-            StateParameter::Apoapsis => angled_value(state.ta(), 180.0),
-            StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
-            _ => state.value(&self.parameter).unwrap() - self.desired_value,
-        }
-    }
-}
-
-impl EventEvaluator<Spacecraft> for Event {
-    fn eval(&self, state: &Spacecraft) -> f64 {
-        match self.parameter {
-            StateParameter::FuelMass => state.fuel_mass_kg - self.desired_value,
-            _ => self.eval(&state.orbit),
-        }
-    }
-
-    #[allow(clippy::identity_op)]
-    fn epoch_precision(&self) -> Duration {
-        1 * self.epoch_precision
-    }
-
-    fn value_precision(&self) -> f64 {
-        self.value_precision
     }
 }

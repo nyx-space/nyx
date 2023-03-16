@@ -532,8 +532,8 @@ impl State for Spacecraft {
         self + other
     }
 
-    fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
-        match *param {
+    fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
+        match param {
             StateParameter::Cd => Ok(self.drag.cd),
             StateParameter::Cr => Ok(self.srp.cr),
             StateParameter::FuelMass => Ok(self.fuel_mass_kg),
@@ -549,8 +549,8 @@ impl State for Spacecraft {
         }
     }
 
-    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
-        match *param {
+    fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), NyxError> {
+        match param {
             StateParameter::Cd => self.drag.cd = val,
             StateParameter::Cr => self.srp.cr = val,
             StateParameter::FuelMass => self.fuel_mass_kg = val,

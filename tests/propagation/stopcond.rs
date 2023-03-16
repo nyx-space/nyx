@@ -3,13 +3,16 @@ extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
 use hifitime::J2000_OFFSET;
+use na::Vector3;
 use nyx::cosmic::{Bodies, Cosm, Orbit};
+use nyx::dynamics::guidance::{FiniteBurns, Mnvr, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::SpacecraftDynamics;
 use nyx::md::{Event, StateParameter};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
-use nyx::time::{Epoch, TimeUnits};
-use nyx::State;
+use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx::{Spacecraft, State};
 
 #[test]
 fn stop_cond_3rd_apo() {
@@ -261,4 +264,111 @@ fn latitude() {
         (2.0 - lon_state.geodetic_latitude()).abs() < lat_event.value_precision,
         "converged, yet convergence criteria not met"
     );
+}
+
+#[test]
+fn event_and_combination() {
+    /// Event combinations cannot be implemented with a brent solver (the approache used by Nyx to find events).
+    /// Instead, two events must be sought for, one after another.
+    use nyx::cosmic::Frame;
+    use nyx::dynamics::GuidanceMode;
+
+    if pretty_env_logger::try_init().is_err() {
+        println!("could not init env_logger");
+    }
+
+    // Setup a scenario
+    let cosm = Cosm::de438();
+    let eme2k = cosm.frame("EME2000");
+    let moonj2k = cosm.frame("Moon J2000");
+
+    let epoch = Epoch::now().unwrap();
+    // We're at periapse of a GTO
+    let orbit = Orbit::keplerian_altitude(42_165.0, 0.7, 30.0, 45.0, 45.0, 0.01, epoch, eme2k);
+
+    let sc = Spacecraft::from_thruster(
+        orbit,
+        100.0,
+        2500.0,
+        Thruster {
+            isp_s: 300.0,
+            thrust_N: 50.0,
+        },
+        GuidanceMode::Thrust,
+    );
+
+    println!("initial c3 = {}", sc.value(StateParameter::C3).unwrap());
+
+    // Thrust in the +X direction continuously
+    let burn = FiniteBurns::from_mnvrs(vec![Mnvr::from_time_invariant(
+        epoch + 1.minutes(),
+        epoch + 15.minutes(),
+        1.0,
+        Vector3::x(),
+        Frame::VNC,
+    )]);
+
+    let orbital_dyn = OrbitalDynamics::two_body();
+    let dynamics = SpacecraftDynamics::from_guidance_law(orbital_dyn, burn);
+
+    let setup = Propagator::default(dynamics);
+    let mut prop = setup.with(sc);
+
+    // First, propagate until apoapsis
+    let (sc_apo, traj) = prop
+        .until_event(orbit.period() * 4.0, &Event::apoapsis())
+        .unwrap();
+
+    // Convert the trajectory to the Moon frame
+    let traj_moon = traj.to_frame(moonj2k, cosm).unwrap();
+
+    let sc_moon_apo = traj_moon.at(sc_apo.epoch()).unwrap();
+
+    println!(
+        "Earth Apoapse\n{:x}\tc3 = {} km^2/s^2\n{:x}\tdecl = {} deg",
+        sc_apo,
+        sc_apo.value(StateParameter::C3).unwrap(),
+        sc_moon_apo,
+        sc_moon_apo.value(StateParameter::Declination).unwrap()
+    );
+
+    println!(
+        "End of prop\n{:x}\tc3 = {} km^2/s^2\n{:x}\tdecl = {} deg",
+        traj.last(),
+        traj.last().value(StateParameter::C3).unwrap(),
+        traj_moon.last(),
+        traj_moon.last().value(StateParameter::Declination).unwrap()
+    );
+
+    // Now let's find when the declination with the Moon is zero.
+    // Within one minute and with a precision of 1.0 degrees.
+    // NOTE: We're unwrapping here, so if the event isn't found, this will cause the test to fail.
+    for sc_decl_zero in traj_moon
+        .find_all(&Event::specific(
+            StateParameter::Declination,
+            6.0,
+            1.0,
+            Unit::Minute,
+        ))
+        .unwrap()
+    {
+        let decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
+        println!("{sc_decl_zero:x} => decl = {} deg", decl_deg);
+        assert!((decl_deg - 6.0).abs() < 1.0);
+    }
+
+    // We should be able to find a similar event with a larger bound too.
+    for sc_decl_zero in traj_moon
+        .find_all(&Event::specific(
+            StateParameter::Declination,
+            5.0,
+            2.0,
+            Unit::Minute,
+        ))
+        .unwrap()
+    {
+        let decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
+        println!("{sc_decl_zero:x} => decl = {} deg", decl_deg);
+        assert!((decl_deg - 5.0).abs() < 2.0);
+    }
 }

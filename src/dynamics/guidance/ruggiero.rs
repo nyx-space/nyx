@@ -139,8 +139,8 @@ impl Ruggiero {
 
     /// Computes the weight at which to correct this orbital element, will be zero if the current efficiency is below the threshold
     fn weighting(&self, obj: &Objective, osc_orbit: &Orbit, η_threshold: f64) -> f64 {
-        let init = self.init_state.value(&obj.parameter).unwrap();
-        let osc = osc_orbit.value(&obj.parameter).unwrap();
+        let init = self.init_state.value(obj.parameter).unwrap();
+        let osc = osc_orbit.value(obj.parameter).unwrap();
         let target = obj.desired_value;
         let tol = obj.tolerance;
 
@@ -173,7 +173,7 @@ impl GuidanceLaw for Ruggiero {
     /// Returns whether the guidance law has achieved all goals
     fn achieved(&self, state: &Spacecraft) -> Result<bool, NyxError> {
         for obj in self.objectives.iter().flatten() {
-            if !obj.assess_raw(state.orbit.value(&obj.parameter)?).0 {
+            if !obj.assess_raw(state.orbit.value(obj.parameter)?).0 {
                 return Ok(false);
             }
         }

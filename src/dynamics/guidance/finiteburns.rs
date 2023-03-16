@@ -38,8 +38,8 @@ impl FiniteBurns {
         Arc::new(Self { mnvrs })
     }
 
+    /// Find the maneuver with the closest start epoch that is less than or equal to the current epoch
     fn maneuver_at(&self, epoch: Epoch) -> Option<&Mnvr> {
-        // Find the maneuver with the closest start epoch that is less than or equal to the current epoch
         let index = self.mnvrs.binary_search_by_key(&epoch, |mnvr| mnvr.start);
         match index {
             Err(0) => None, // No maneuvers start before the current epoch
@@ -101,10 +101,18 @@ impl GuidanceLaw for FiniteBurns {
     }
 
     fn next(&self, sc: &mut Spacecraft) {
-        // Only switch to thrusting mode is the thrusting is not enabled and not inhibited.
-        if sc.mode() == GuidanceMode::Coast {
-            // If we haven't started the maneuvers yet, let's get ready to do so by switching to the mode
-            sc.mut_mode(GuidanceMode::Thrust)
-        };
+        // Grab the last maneuver
+        if let Some(last_mnvr) = self.mnvrs.last() {
+            // If the last maneuver ends before the current epoch, switch back into coast
+            if last_mnvr.end < sc.epoch() {
+                sc.mut_mode(GuidanceMode::Coast)
+            } else {
+                // Get ready for the maneuver
+                sc.mut_mode(GuidanceMode::Thrust)
+            }
+        } else {
+            // There aren't any maneuvers
+            sc.mut_mode(GuidanceMode::Coast)
+        }
     }
 }

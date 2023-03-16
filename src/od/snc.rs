@@ -177,7 +177,7 @@ where
             }
         }
 
-        trace!(
+        debug!(
             "@{} SNC diag {:?}",
             epoch,
             snc.diagonal().iter().copied().collect::<Vec<f64>>()

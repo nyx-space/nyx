@@ -364,7 +364,7 @@ where
         }
 
         if !snc_used {
-            trace!("@{} No SNC", nominal_state.epoch());
+            debug!("@{} No SNC", nominal_state.epoch());
         }
 
         let h_tilde_t = &self.h_tilde.transpose();

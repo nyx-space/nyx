@@ -810,7 +810,7 @@ impl Orbit {
     pub fn to_objectives(&self, params: &[StateParameter]) -> Result<Vec<Objective>, NyxError> {
         let mut rtn = Vec::with_capacity(params.len());
         for parameter in params {
-            rtn.push(Objective::new(*parameter, self.value(parameter)?));
+            rtn.push(Objective::new(*parameter, self.value(*parameter)?));
         }
         Ok(rtn)
     }
@@ -1690,7 +1690,7 @@ impl Orbit {
 
     /// Returns the value of the provided state parameter if available
     #[cfg(feature = "python")]
-    fn value_of(&self, param: &StateParameter) -> Result<f64, NyxError> {
+    fn value_of(&self, param: StateParameter) -> Result<f64, NyxError> {
         self.value(param)
     }
 }
@@ -2011,8 +2011,8 @@ impl State for Orbit {
         self + other
     }
 
-    fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
-        match *param {
+    fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
+        match param {
             StateParameter::ApoapsisRadius => Ok(self.apoapsis()),
             StateParameter::AoL => Ok(self.aol()),
             StateParameter::AoP => Ok(self.aop()),
@@ -2057,8 +2057,8 @@ impl State for Orbit {
         }
     }
 
-    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
-        match *param {
+    fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), NyxError> {
+        match param {
             StateParameter::AoP => self.set_aop(val),
             StateParameter::Eccentricity => self.set_ecc(val),
             StateParameter::Inclination => self.set_inc(val),

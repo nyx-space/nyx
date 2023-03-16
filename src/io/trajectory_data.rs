@@ -217,7 +217,7 @@ impl DynamicTrajectory {
 
                 for (j, (param, exists)) in found_fields.iter().enumerate() {
                     if *exists {
-                        state.set_value(param, shared_data[j].value(i))?;
+                        state.set_value(*param, shared_data[j].value(i))?;
                     }
                 }
 

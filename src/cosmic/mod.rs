@@ -110,13 +110,13 @@ where
     }
 
     /// Return the value of the parameter, returns an error by default
-    fn value(&self, _param: &StateParameter) -> Result<f64, NyxError> {
+    fn value(&self, _param: StateParameter) -> Result<f64, NyxError> {
         Err(NyxError::StateParameterUnavailable)
     }
 
     /// Allows setting the value of the given parameter.
     /// NOTE: Most parameters where the `value` is available CANNOT be also set for that parameter (it's a much harder problem!)
-    fn set_value(&mut self, _param: &StateParameter, _val: f64) -> Result<(), NyxError> {
+    fn set_value(&mut self, _param: StateParameter, _val: f64) -> Result<(), NyxError> {
         Err(NyxError::StateParameterUnavailable)
     }
 }

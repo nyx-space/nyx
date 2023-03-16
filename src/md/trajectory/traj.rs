@@ -176,10 +176,21 @@ where
 
         // Check if we're already at the root
         if ya.abs() <= event.value_precision().abs() {
+            debug!(
+                "{event} -- found with |{ya}| < {} @ {xa_e}",
+                event.value_precision().abs()
+            );
             return self.at(xa_e);
         } else if yb.abs() <= event.value_precision().abs() {
+            debug!(
+                "{event} -- found with |{yb}| < {} @ {xb_e}",
+                event.value_precision().abs()
+            );
             return self.at(xb_e);
         }
+
+        debug!("{event}: eval@{xa_e} = {ya}\t eval@{xb_e} = {yb}");
+
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
 
@@ -468,7 +479,7 @@ where
             record.push(Arc::new(Float64Array::from(
                 self.states
                     .iter()
-                    .map(|s| s.value(&field).unwrap())
+                    .map(|s| s.value(field).unwrap())
                     .collect::<Vec<f64>>(),
             )) as ArrayRef);
         }
