@@ -194,7 +194,7 @@ impl DynamicTrajectory {
                 // Read the fuel
                 shared_data.push(
                     batch
-                        .column_by_name("fuel (kg)")
+                        .column_by_name("fuel_mass (kg)")
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Float64Array>()

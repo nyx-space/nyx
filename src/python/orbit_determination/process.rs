@@ -66,8 +66,7 @@ pub(crate) fn process_tracking_arc(
 
     let concrete_arc = arc.to_tracking_arc()?;
 
-    odp.process_tracking_arc::<GroundStation>(&concrete_arc)
-        .unwrap();
+    odp.process_arc::<GroundStation>(&concrete_arc).unwrap();
 
     // Now build a vector of orbit estimates.
     let mut rslt = Vec::with_capacity(odp.estimates.len());

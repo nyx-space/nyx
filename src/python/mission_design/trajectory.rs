@@ -87,9 +87,10 @@ impl Traj {
 
     /// Saves this trajectory to a parquet file.
     fn to_parquet(&self, path: String) -> Result<String, NyxError> {
-        self.inner
-            .to_parquet(path, None)
-            .map_err(|e| NyxError::CustomError(e.to_string()))
+        match self.inner.to_parquet(path) {
+            Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
+            Err(e) => Err(NyxError::CustomError(e.to_string())),
+        }
     }
 
     fn __str__(&self) -> String {

@@ -21,13 +21,12 @@ use super::{ExportCfg, INTERPOLATION_SAMPLES};
 use super::{InterpState, TrajError};
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
-use crate::io::formatter::StateFormatter;
 use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::md::events::EventEvaluator;
 use crate::md::ui::GuidanceMode;
 use crate::md::StateParameter;
-use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
 use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
 use arrow::array::{ArrayRef, Float64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -465,30 +464,6 @@ where
         let schema = Arc::new(Schema::new(hdrs));
         let mut record = Vec::new();
 
-        // Build all of the records
-        record.push(Arc::new(StringArray::from(
-            self.states
-                .iter()
-                .map(|s| format!("{}", s.epoch()))
-                .collect::<Vec<String>>(),
-        )) as ArrayRef);
-
-        // TDB epoch
-        record.push(Arc::new(StringArray::from(
-            self.states
-                .iter()
-                .map(|s| format!("{:x}", s.epoch()))
-                .collect::<Vec<String>>(),
-        )) as ArrayRef);
-
-        // TDB Epoch seconds
-        record.push(Arc::new(Float64Array::from(
-            self.states
-                .iter()
-                .map(|s| s.epoch().to_tai_seconds())
-                .collect::<Vec<f64>>(),
-        )) as ArrayRef);
-
         // Build the states iterator
 
         if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
@@ -510,9 +485,31 @@ where
                 1.minutes()
             };
 
+            // Build all of the records
+            let mut data = Vec::new();
+            for s in self.every_between(step, start, end) {
+                data.push(format!("{}", s.epoch()));
+            }
+            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
+
+            // TDB epoch
+            let mut data = Vec::new();
+            for s in self.every_between(step, start, end) {
+                data.push(format!("{:x}", s.epoch()));
+            }
+            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
+
+            // TAI Epoch seconds
+            let mut data = Vec::new();
+            for s in self.every_between(step, start, end) {
+                data.push(s.epoch().to_tai_seconds());
+            }
+            record.push(Arc::new(Float64Array::from(data)) as ArrayRef);
+
             // Add all of the fields
             // This is super ugly, but I can't seem to convert the TrajIterator into an `Iter<S>`
             for field in fields {
+                let mut cnt = 0;
                 if field == StateParameter::GuidanceMode {
                     // This is the only string field
                     record.push(Arc::new(StringArray::from({
@@ -521,6 +518,7 @@ where
                             let mode = GuidanceMode::from(s.value(field).unwrap());
 
                             data.push(format!("{mode:?}"));
+                            cnt += 1;
                         }
                         data
                     })) as ArrayRef);
@@ -529,12 +527,38 @@ where
                         let mut data = Vec::new();
                         for s in self.every_between(step, start, end) {
                             data.push(s.value(field).unwrap());
+                            cnt += 1;
                         }
                         data
                     })) as ArrayRef);
                 }
+                println!("{field} => {cnt}");
             }
         } else {
+            // Build all of the records
+            record.push(Arc::new(StringArray::from(
+                self.states
+                    .iter()
+                    .map(|s| format!("{}", s.epoch()))
+                    .collect::<Vec<String>>(),
+            )) as ArrayRef);
+
+            // TDB epoch
+            record.push(Arc::new(StringArray::from(
+                self.states
+                    .iter()
+                    .map(|s| format!("{:x}", s.epoch()))
+                    .collect::<Vec<String>>(),
+            )) as ArrayRef);
+
+            // TDB Epoch seconds
+            record.push(Arc::new(Float64Array::from(
+                self.states
+                    .iter()
+                    .map(|s| s.epoch().to_tai_seconds())
+                    .collect::<Vec<f64>>(),
+            )) as ArrayRef);
+
             // Add all of the fields
             for field in fields {
                 if field == StateParameter::GuidanceMode {
