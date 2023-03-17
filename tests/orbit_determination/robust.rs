@@ -167,16 +167,16 @@ fn od_robust_test_ekf_realistic() {
     let delta = est.state() - final_truth_state;
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
     assert!(
-        delta.rmag() < 1e-2,
+        delta.rmag_km() < 1e-2,
         "Position error should be on meter level"
     );
     assert!(
-        delta.vmag() < 1e-5,
+        delta.vmag_km_s() < 1e-5,
         "Velocity error should be on millimeter level"
     );
 }
@@ -415,7 +415,7 @@ fn od_robust_ops_test() {
     );
 
     // Reenable after #147
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag_km();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",

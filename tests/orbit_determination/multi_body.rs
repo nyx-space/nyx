@@ -145,12 +145,12 @@ fn od_val_multi_body_ckf_perfect_stations() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 }
 
 #[ignore]
@@ -282,6 +282,6 @@ fn multi_body_ckf_covar_map() {
     let aop_event = Event::apoapsis();
     for found_event in nav_traj.find_all(&aop_event).unwrap() {
         println!("{:x}", found_event);
-        assert!((found_event.ta() - 180.0).abs() < 1e-2)
+        assert!((found_event.ta_deg() - 180.0).abs() < 1e-2)
     }
 }

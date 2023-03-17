@@ -331,12 +331,12 @@ fn generate_orbit() {
     let seed = 0;
     let rng = Pcg64Mcg::new(seed);
 
-    let init_sma = state.sma();
+    let init_sma = state.sma_km();
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
         .map(|dispersed_state| {
-            if (init_sma - dispersed_state.state.sma()).abs() > 1.0 {
+            if (init_sma - dispersed_state.state.sma_km()).abs() > 1.0 {
                 1
             } else {
                 0
@@ -356,12 +356,12 @@ fn generate_orbit() {
         GaussianGenerator::from_std_dev(state, StateParameter::Rmag, std_dev).unwrap();
 
     let rng = Pcg64Mcg::new(seed);
-    let init_rmag = state.rmag();
+    let init_rmag = state.rmag_km();
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
         .map(|dispersed_state| {
-            if (init_rmag - dispersed_state.state.rmag()).abs() > std_dev {
+            if (init_rmag - dispersed_state.state.rmag_km()).abs() > std_dev {
                 1
             } else {
                 0
@@ -381,12 +381,12 @@ fn generate_orbit() {
         GaussianGenerator::from_std_dev(state, StateParameter::Vmag, std_dev).unwrap();
 
     let rng = Pcg64Mcg::new(seed);
-    let init_vmag = state.vmag();
+    let init_vmag = state.vmag_km_s();
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
         .map(|dispersed_state| {
-            if (init_vmag - dispersed_state.state.vmag()).abs() > std_dev {
+            if (init_vmag - dispersed_state.state.vmag_km_s()).abs() > std_dev {
                 1
             } else {
                 0

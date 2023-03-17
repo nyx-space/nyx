@@ -264,11 +264,19 @@ where
         )))
     }
 
-    /// Find (usually) all of the states where the event happens.
-    /// WARNING: The initial search step is 1% of the duration of the trajectory duration!
+    /// Find all of the states where the event happens (usually, and with caveats).
+    ///
+    /// # Limitations
+    /// This method uses a Brent solver. If the function that defines the event is not unimodal, the event finder may not converge correctly.
+    ///
+    /// # Heuristic detail
+    /// The initial search step is 1% of the duration of the trajectory duration.
     /// For example, if the trajectory is 100 days long, then we split the trajectory into 100 chunks of 1 day and see whether
     /// the event is in there. If the event happens twice or more times within 1% of the trajectory duration, only the _one_ of
     /// such events will be found.
+    ///
+    /// If this heuristic fails to find any such events, then `find_minmax` is called on the event with a time precision of `Unit::Second`.
+    /// Then we search only within the min and max bounds of the provided event.
     #[allow(clippy::identity_op)]
     pub fn find_all<E>(&self, event: &E) -> Result<Vec<S>, NyxError>
     where

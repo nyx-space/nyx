@@ -98,7 +98,7 @@ impl Dynamics for OrbitalDynamics {
             (state, stm_as_vec)
         } else {
             // Still return something of size 42, but the STM will be zeros.
-            let body_acceleration = (-osc.frame.gm() / osc.rmag().powi(3)) * osc.radius();
+            let body_acceleration = (-osc.frame.gm() / osc.rmag_km().powi(3)) * osc.radius();
             let mut d_x = Vector6::from_iterator(
                 osc.velocity()
                     .iter()
@@ -246,7 +246,7 @@ impl AccelModel for PointMasses {
             );
 
             let r_ij = st_ij.radius();
-            let r_ij3 = st_ij.rmag().powi(3);
+            let r_ij3 = st_ij.rmag_km().powi(3);
             let r_j = osc.radius() - r_ij; // sc as seen from 3rd body
             let r_j3 = r_j.norm().powi(3);
             d_x += -third_body.gm() * (r_j / r_j3 + r_ij / r_ij3);

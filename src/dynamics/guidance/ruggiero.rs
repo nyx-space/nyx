@@ -103,12 +103,12 @@ impl Ruggiero {
         let e = osc_orbit.ecc();
         match parameter {
             StateParameter::SMA => {
-                let a = osc_orbit.sma();
+                let a = osc_orbit.sma_km();
                 let μ = osc_orbit.frame.gm();
-                Ok(osc_orbit.vmag() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
+                Ok(osc_orbit.vmag_km_s() * ((a * (1.0 - e)) / (μ * (1.0 + e))).sqrt())
             }
             StateParameter::Eccentricity => {
-                let ν_ta = osc_orbit.ta().to_radians();
+                let ν_ta = osc_orbit.ta_deg().to_radians();
                 let num = 1.0 + 2.0 * e * ν_ta.cos() + ν_ta.cos().powi(2);
                 let denom = 1.0 + e * ν_ta.cos();
                 // NOTE: There is a typo in IEPC 2011 102: the max of this efficiency function is at ν=0
@@ -117,16 +117,16 @@ impl Ruggiero {
                 Ok(num / (2.0 * denom))
             }
             StateParameter::Inclination => {
-                let ν_ta = osc_orbit.ta().to_radians();
-                let ω = osc_orbit.aop().to_radians();
+                let ν_ta = osc_orbit.ta_deg().to_radians();
+                let ω = osc_orbit.aop_deg().to_radians();
                 let num = (ω + ν_ta).cos().abs()
                     * ((1.0 - e.powi(2) * ω.sin().powi(2)).sqrt() - e * ω.cos().abs());
                 let denom = 1.0 + e * ν_ta.cos();
                 Ok(num / denom)
             }
             StateParameter::RAAN => {
-                let ν_ta = osc_orbit.ta().to_radians();
-                let ω = osc_orbit.aop().to_radians();
+                let ν_ta = osc_orbit.ta_deg().to_radians();
+                let ω = osc_orbit.aop_deg().to_radians();
                 let num = (ω + ν_ta).sin().abs()
                     * ((1.0 - e.powi(2) * ω.cos().powi(2)).sqrt() - e * ω.sin().abs());
                 let denom = 1.0 + e * ν_ta.cos();
@@ -192,23 +192,26 @@ impl GuidanceLaw for Ruggiero {
 
                 match obj.parameter {
                     StateParameter::SMA => {
-                        let num = osc.ecc() * osc.ta().to_radians().sin();
-                        let denom = 1.0 + osc.ecc() * osc.ta().to_radians().cos();
+                        let num = osc.ecc() * osc.ta_deg().to_radians().sin();
+                        let denom = 1.0 + osc.ecc() * osc.ta_deg().to_radians().cos();
                         let alpha = num.atan2(denom);
                         steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Eccentricity => {
-                        let num = osc.ta().to_radians().sin();
-                        let denom = osc.ta().to_radians().cos() + osc.ea().to_radians().cos();
+                        let num = osc.ta_deg().to_radians().sin();
+                        let denom =
+                            osc.ta_deg().to_radians().cos() + osc.ea_deg().to_radians().cos();
                         let alpha = num.atan2(denom);
                         steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                     }
                     StateParameter::Inclination => {
-                        let beta = half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).cos());
+                        let beta =
+                            half_pi.copysign(((osc.ta_deg() + osc.aop_deg()).to_radians()).cos());
                         steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::RAAN => {
-                        let beta = half_pi.copysign(((osc.ta() + osc.aop()).to_radians()).sin());
+                        let beta =
+                            half_pi.copysign(((osc.ta_deg() + osc.aop_deg()).to_radians()).sin());
                         steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                     }
                     StateParameter::AoP => {
@@ -221,22 +224,22 @@ impl GuidanceLaw for Ruggiero {
                             - 1.0 / osc.ecc())
                         .acos();
                         // Compute the optimal true anomaly for out of plane thrusting
-                        let opti_ta_beta = (-osc.ecc() * osc.aop().to_radians().cos()).acos()
-                            - osc.aop().to_radians();
+                        let opti_ta_beta = (-osc.ecc() * osc.aop_deg().to_radians().cos()).acos()
+                            - osc.aop_deg().to_radians();
                         // And choose whether to do an in-plane or out of plane thrust
-                        if (osc.ta().to_radians() - opti_ta_alpha).abs()
-                            < (osc.ta().to_radians() - opti_ta_beta).abs()
+                        if (osc.ta_deg().to_radians() - opti_ta_alpha).abs()
+                            < (osc.ta_deg().to_radians() - opti_ta_beta).abs()
                         {
                             // In plane
-                            let p = osc.semi_parameter();
-                            let (sin_ta, cos_ta) = osc.ta().to_radians().sin_cos();
-                            let alpha = (-p * cos_ta).atan2((p + osc.rmag()) * sin_ta);
+                            let p = osc.semi_parameter_km();
+                            let (sin_ta, cos_ta) = osc.ta_deg().to_radians().sin_cos();
+                            let alpha = (-p * cos_ta).atan2((p + osc.rmag_km()) * sin_ta);
                             steering += unit_vector_from_plane_angles(alpha, 0.0) * weight;
                         } else {
                             // Out of plane
-                            let beta = half_pi
-                                .copysign(-(osc.ta().to_radians() + osc.aop().to_radians()).sin())
-                                * osc.inc().to_radians().cos();
+                            let beta = half_pi.copysign(
+                                -(osc.ta_deg().to_radians() + osc.aop_deg().to_radians()).sin(),
+                            ) * osc.inc_deg().to_radians().cos();
                             steering += unit_vector_from_plane_angles(0.0, beta) * weight;
                         };
                     }

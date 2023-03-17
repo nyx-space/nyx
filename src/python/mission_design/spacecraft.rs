@@ -48,7 +48,7 @@ impl Spacecraft {
             dry_mass_kg,
             fuel_mass_kg,
             thruster,
-            mode: mode.or_else(|| Some(GuidanceMode::Coast)).unwrap(),
+            mode: mode.unwrap_or(GuidanceMode::Coast),
             stm: None,
             srp: SrpConfig {
                 area_m2: srp_area_m2,

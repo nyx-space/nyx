@@ -32,11 +32,6 @@ use crate::{
 
 use super::{estimate::OrbitEstimate, GroundStation};
 
-/// Defines an Orbit Determination Process
-#[pyclass]
-#[pyo3(text_signature = "(parameter, desired_value, epoch_precision=None, value_precision=None)")]
-pub struct ODP {}
-
 /// Propagates the provided spacecraft with the provided dynamics until the provided stopping condition (duration, epoch, or event [and optionally the count]).
 #[pyfunction]
 #[pyo3(

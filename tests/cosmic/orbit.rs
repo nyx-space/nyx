@@ -45,28 +45,28 @@ fn state_def_circ_inc() {
     f64_eq!(cart.vx_km_s, 5.088_611, "vx");
     f64_eq!(cart.vy_km_s, -5.088_611, "vy");
     f64_eq!(cart.vz_km_s, 0.0, "vz");
-    f64_eq!(cart.energy(), -25.842_247_282_849_137, "energy");
+    f64_eq!(cart.energy_km2_s2(), -25.842_247_282_849_137, "energy");
     assert_eq!(
         cart.period(),
         6_740.269_063_643_045 * Unit::Second,
         "period"
     );
-    f64_eq!(cart.hx(), 35_065.806_679_607_005, "HX");
-    f64_eq!(cart.hy(), 35_065.806_679_607_005, "HY");
-    f64_eq!(cart.hz(), 24_796.292_541_9, "HZ");
-    f64_eq!(cart.sma(), 7_712.186_117_895_043, "sma");
+    f64_eq!(cart.hx_km2_s(), 35_065.806_679_607_005, "HX");
+    f64_eq!(cart.hy_km2_s(), 35_065.806_679_607_005, "HY");
+    f64_eq!(cart.hz_km2_s(), 24_796.292_541_9, "HZ");
+    f64_eq!(cart.sma_km(), 7_712.186_117_895_043, "sma");
     f64_eq!(cart.ecc(), 0.000_999_582_831_432_052_5, "ecc");
-    f64_eq!(cart.inc(), 63.434_003_407_751_14, "inc");
-    f64_eq!(cart.raan(), 135.0, "raan");
-    f64_eq!(cart.aop(), 90.0, "aop");
-    f64_eq!(cart.ta(), 0.0, "ta");
-    f64_eq!(cart.tlong(), 225.0, "tlong");
-    f64_eq!(cart.ea(), 0.0, "ea");
-    f64_eq!(cart.ma(), 0.0, "ma");
-    f64_eq!(cart.apoapsis(), 7_719.895_086_731_299, "apo");
-    f64_eq!(cart.periapsis(), 7_704.477_149_058_786, "peri");
+    f64_eq!(cart.inc_deg(), 63.434_003_407_751_14, "inc");
+    f64_eq!(cart.raan_deg(), 135.0, "raan");
+    f64_eq!(cart.aop_deg(), 90.0, "aop");
+    f64_eq!(cart.ta_deg(), 0.0, "ta");
+    f64_eq!(cart.tlong_deg(), 225.0, "tlong");
+    f64_eq!(cart.ea_deg(), 0.0, "ea");
+    f64_eq!(cart.ma_deg(), 0.0, "ma");
+    f64_eq!(cart.apoapsis_km(), 7_719.895_086_731_299, "apo");
+    f64_eq!(cart.periapsis_km(), 7_704.477_149_058_786, "peri");
     f64_eq!(
-        cart.semi_parameter(),
+        cart.semi_parameter_km(),
         7_712.178_412_142_147,
         "semi parameter"
     );
@@ -78,30 +78,30 @@ fn state_def_circ_inc() {
     f64_eq!(kep.vx_km_s, -0.166_470_488_584_076_31, "vx");
     f64_eq!(kep.vy_km_s, 6.913_868_638_275_646_5, "vy");
     f64_eq!(kep.vz_km_s, 0.910_157_981_443_279_1, "vz");
-    f64_eq!(kep.sma(), 8_191.929_999_999_999, "sma");
+    f64_eq!(kep.sma_km(), 8_191.929_999_999_999, "sma");
     f64_eq!(kep.ecc(), 1.000_000_000_388_51e-06, "ecc");
-    f64_eq!(kep.inc(), 12.849_999_999_999_987, "inc");
-    f64_eq!(kep.raan(), 306.614, "raan");
-    f64_eq!(kep.aop(), 314.189_999_994_618_1, "aop");
-    f64_eq!(kep.ta(), 99.887_700_005_381_9, "ta");
-    f64_eq!(kep.energy(), -24.328_848_116_377_95, "energy");
+    f64_eq!(kep.inc_deg(), 12.849_999_999_999_987, "inc");
+    f64_eq!(kep.raan_deg(), 306.614, "raan");
+    f64_eq!(kep.aop_deg(), 314.189_999_994_618_1, "aop");
+    f64_eq!(kep.ta_deg(), 99.887_700_005_381_9, "ta");
+    f64_eq!(kep.energy_km2_s2(), -24.328_848_116_377_95, "energy");
     assert_eq!(kep.period(), 7_378.877_993_957_958 * Unit::Second, "period");
-    f64_eq!(kep.hx(), -10_200.784_799_426_574, "HX");
-    f64_eq!(kep.hy(), -7_579.639_346_783_497, "HY");
-    f64_eq!(kep.hz(), 55_711.757_929_384_25, "HZ");
-    f64_eq!(kep.tlong(), 0.691_700_000_000_082_6, "tlong");
-    f64_eq!(kep.ea(), 99.887_643_560_656_85, "ea");
-    f64_eq!(kep.ma(), 99.887_587_115_926_96, "ma");
-    f64_eq!(kep.apoapsis(), 8_191.938_191_930_002, "apo");
-    f64_eq!(kep.periapsis(), 8_191.921_808_069_997, "peri");
+    f64_eq!(kep.hx_km2_s(), -10_200.784_799_426_574, "HX");
+    f64_eq!(kep.hy_km2_s(), -7_579.639_346_783_497, "HY");
+    f64_eq!(kep.hz_km2_s(), 55_711.757_929_384_25, "HZ");
+    f64_eq!(kep.tlong_deg(), 0.691_700_000_000_082_6, "tlong");
+    f64_eq!(kep.ea_deg(), 99.887_643_560_656_85, "ea");
+    f64_eq!(kep.ma_deg(), 99.887_587_115_926_96, "ma");
+    f64_eq!(kep.apoapsis_km(), 8_191.938_191_930_002, "apo");
+    f64_eq!(kep.periapsis_km(), 8_191.921_808_069_997, "peri");
     f64_eq!(
-        kep.semi_parameter(),
+        kep.semi_parameter_km(),
         8_191.929_999_991_808,
         "semi parameter"
     );
 
     let kep = Orbit::keplerian(8_191.93, 0.2, 12.85, 306.614, 314.19, -99.887_7, dt, eme2k);
-    f64_eq!(kep.ta(), 260.1123, "ta");
+    f64_eq!(kep.ta_deg(), 260.1123, "ta");
 
     // Test that DCMs are valid
     let dcm = kep.dcm_from_traj_frame(Frame::VNC).unwrap();
@@ -133,28 +133,28 @@ fn state_def_elliptical() {
         dt,
         eme2k,
     );
-    f64_eq!(cart.energy(), -25.842_247_282_849_144, "energy");
+    f64_eq!(cart.energy_km2_s2(), -25.842_247_282_849_144, "energy");
     assert_eq!(
         cart.period(),
         6_740.269_063_643_042_5 * Unit::Second,
         "period"
     );
-    f64_eq!(cart.hx(), 0.015_409_898_034_704_383, "HX");
-    f64_eq!(cart.hy(), -44_146.106_010_690_01, "HY");
-    f64_eq!(cart.hz(), 32_364.892_694_481_765, "HZ");
-    f64_eq!(cart.sma(), 7_712.186_117_895_041, "sma");
+    f64_eq!(cart.hx_km2_s(), 0.015_409_898_034_704_383, "HX");
+    f64_eq!(cart.hy_km2_s(), -44_146.106_010_690_01, "HY");
+    f64_eq!(cart.hz_km2_s(), 32_364.892_694_481_765, "HZ");
+    f64_eq!(cart.sma_km(), 7_712.186_117_895_041, "sma");
     f64_eq!(cart.ecc(), 0.158_999_999_999_999_95, "ecc");
-    f64_eq!(cart.inc(), 53.753_69, "inc");
-    f64_eq!(cart.raan(), 1.998_632_864_211_17e-05, "raan");
-    f64_eq!(cart.aop(), 359.787_880_000_004, "aop");
-    f64_eq!(cart.ta(), 25.434_003_407_751_188, "ta");
-    f64_eq!(cart.tlong(), 25.221_903_394_083_824, "tlong");
-    f64_eq!(cart.ea(), 21.763_052_882_584_79, "ea");
-    f64_eq!(cart.ma(), 18.385_336_330_516_39, "ma");
-    f64_eq!(cart.apoapsis(), 8_938.423_710_640_353, "apo");
-    f64_eq!(cart.periapsis(), 6_485.948_525_149_73, "peri");
+    f64_eq!(cart.inc_deg(), 53.753_69, "inc");
+    f64_eq!(cart.raan_deg(), 1.998_632_864_211_17e-05, "raan");
+    f64_eq!(cart.aop_deg(), 359.787_880_000_004, "aop");
+    f64_eq!(cart.ta_deg(), 25.434_003_407_751_188, "ta");
+    f64_eq!(cart.tlong_deg(), 25.221_903_394_083_824, "tlong");
+    f64_eq!(cart.ea_deg(), 21.763_052_882_584_79, "ea");
+    f64_eq!(cart.ma_deg(), 18.385_336_330_516_39, "ma");
+    f64_eq!(cart.apoapsis_km(), 8_938.423_710_640_353, "apo");
+    f64_eq!(cart.periapsis_km(), 6_485.948_525_149_73, "peri");
     f64_eq!(
-        cart.semi_parameter(),
+        cart.semi_parameter_km(),
         7_517.214_340_648_537,
         "semi parameter"
     );
@@ -168,24 +168,24 @@ fn state_def_elliptical() {
     f64_eq!(kep.vx_km_s, -0.000_168_592_186_843_952_16, "vx");
     f64_eq!(kep.vy_km_s, 6.886_845_792_370_852, "vy");
     f64_eq!(kep.vz_km_s, 0.936_931_260_302_891_8, "vz");
-    f64_eq!(kep.sma(), 8_191.930_000_000_003, "sma");
+    f64_eq!(kep.sma_km(), 8_191.930_000_000_003, "sma");
     f64_eq!(kep.ecc(), 0.024_500_000_000_000_348, "ecc");
-    f64_eq!(kep.inc(), 12.850_000_000_000_016, "inc");
-    f64_eq!(kep.raan(), 306.614, "raan");
-    f64_eq!(kep.aop(), 314.190_000_000_000_4, "aop");
-    f64_eq!(kep.ta(), 99.887_699_999_999_58, "ta");
-    f64_eq!(kep.energy(), -24.328_848_116_377_94, "energy");
+    f64_eq!(kep.inc_deg(), 12.850_000_000_000_016, "inc");
+    f64_eq!(kep.raan_deg(), 306.614, "raan");
+    f64_eq!(kep.aop_deg(), 314.190_000_000_000_4, "aop");
+    f64_eq!(kep.ta_deg(), 99.887_699_999_999_58, "ta");
+    f64_eq!(kep.energy_km2_s2(), -24.328_848_116_377_94, "energy");
     assert_eq!(kep.period(), 7_378.877_993_957_964 * Unit::Second, "period");
-    f64_eq!(kep.hx(), -10_197.722_829_337_885, "HX");
-    f64_eq!(kep.hy(), -7_577.364_166_057_776, "HY");
-    f64_eq!(kep.hz(), 55_695.034_928_191_49, "HZ");
-    f64_eq!(kep.tlong(), 0.691_699_999_999_855_2, "tlong");
-    f64_eq!(kep.ea(), 98.501_748_370_880_22, "ea");
-    f64_eq!(kep.ma(), 97.113_427_049_323_43, "ma");
-    f64_eq!(kep.apoapsis(), 8_392.632_285_000_007, "apo");
-    f64_eq!(kep.periapsis(), 7_991.227_715_000_001, "peri");
+    f64_eq!(kep.hx_km2_s(), -10_197.722_829_337_885, "HX");
+    f64_eq!(kep.hy_km2_s(), -7_577.364_166_057_776, "HY");
+    f64_eq!(kep.hz_km2_s(), 55_695.034_928_191_49, "HZ");
+    f64_eq!(kep.tlong_deg(), 0.691_699_999_999_855_2, "tlong");
+    f64_eq!(kep.ea_deg(), 98.501_748_370_880_22, "ea");
+    f64_eq!(kep.ma_deg(), 97.113_427_049_323_43, "ma");
+    f64_eq!(kep.apoapsis_km(), 8_392.632_285_000_007, "apo");
+    f64_eq!(kep.periapsis_km(), 7_991.227_715_000_001, "peri");
     f64_eq!(
-        kep.semi_parameter(),
+        kep.semi_parameter_km(),
         8_187.012_794_017_503,
         "semi parameter"
     );
@@ -220,24 +220,24 @@ fn state_def_circ_eq() {
         dt,
         eme2k,
     );
-    f64_eq!(cart.energy(), -4.702_902_670_552_006, "energy");
+    f64_eq!(cart.energy_km2_s2(), -4.702_902_670_552_006, "energy");
     assert_eq!(cart.period(), 86_820.776_152_986_1 * Unit::Second, "period");
-    f64_eq!(cart.hx(), 2.225_951_522_241_969_5, "HX");
-    f64_eq!(cart.hy(), -0.436_714_326_090_944_6, "HY");
-    f64_eq!(cart.hz(), 129_969.001_391_865_75, "HZ");
-    f64_eq!(cart.sma(), 42_378.129_999_999_98, "sma");
+    f64_eq!(cart.hx_km2_s(), 2.225_951_522_241_969_5, "HX");
+    f64_eq!(cart.hy_km2_s(), -0.436_714_326_090_944_6, "HY");
+    f64_eq!(cart.hz_km2_s(), 129_969.001_391_865_75, "HZ");
+    f64_eq!(cart.sma_km(), 42_378.129_999_999_98, "sma");
     f64_eq!(cart.ecc(), 9.999_999_809_555_511e-9, "ecc");
-    f64_eq!(cart.inc(), 0.001_000_000_401_564_538_6, "inc");
-    f64_eq!(cart.raan(), 78.9, "raan");
-    f64_eq!(cart.aop(), 65.399_999_847_186_78, "aop");
-    f64_eq!(cart.ta(), 12.300_000_152_813_197, "ta");
-    f64_eq!(cart.tlong(), 156.599_999_999_999_97, "tlong");
-    f64_eq!(cart.ea(), 12.300_000_030_755_777, "ea");
-    f64_eq!(cart.ma(), 12.299_999_908_698_359, "ma");
-    f64_eq!(cart.apoapsis(), 42_378.130_423_781_27, "apo");
-    f64_eq!(cart.periapsis(), 42_378.129_576_218_69, "peri");
+    f64_eq!(cart.inc_deg(), 0.001_000_000_401_564_538_6, "inc");
+    f64_eq!(cart.raan_deg(), 78.9, "raan");
+    f64_eq!(cart.aop_deg(), 65.399_999_847_186_78, "aop");
+    f64_eq!(cart.ta_deg(), 12.300_000_152_813_197, "ta");
+    f64_eq!(cart.tlong_deg(), 156.599_999_999_999_97, "tlong");
+    f64_eq!(cart.ea_deg(), 12.300_000_030_755_777, "ea");
+    f64_eq!(cart.ma_deg(), 12.299_999_908_698_359, "ma");
+    f64_eq!(cart.apoapsis_km(), 42_378.130_423_781_27, "apo");
+    f64_eq!(cart.periapsis_km(), 42_378.129_576_218_69, "peri");
     f64_eq!(
-        cart.semi_parameter(),
+        cart.semi_parameter_km(),
         42_378.129_999_999_976,
         "semi parameter"
     );
@@ -249,28 +249,28 @@ fn state_def_circ_eq() {
     f64_eq!(kep.vx_km_s, 0.030_396_440_130_264_88, "vx");
     f64_eq!(kep.vy_km_s, 4.680_909_107_924_576, "vy");
     f64_eq!(kep.vz_km_s, 4.907_089_816_726_583e-8, "vz");
-    f64_eq!(kep.sma(), 18_191.098_000_000_013, "sma");
+    f64_eq!(kep.sma_km(), 18_191.098_000_000_013, "sma");
     f64_eq!(kep.ecc(), 9.999_999_997_416_087e-7, "ecc");
-    f64_eq!(kep.inc(), 1.207_418_269_725_733_3e-6, "inc");
-    f64_eq!(kep.raan(), 306.543, "raan");
-    f64_eq!(kep.aop(), 314.320_000_025_403_66, "aop");
-    f64_eq!(kep.ta(), 98.764_999_974_596_28, "ta");
-    f64_eq!(kep.energy(), -10.955_920_349_063_035, "energy");
+    f64_eq!(kep.inc_deg(), 1.207_418_269_725_733_3e-6, "inc");
+    f64_eq!(kep.raan_deg(), 306.543, "raan");
+    f64_eq!(kep.aop_deg(), 314.320_000_025_403_66, "aop");
+    f64_eq!(kep.ta_deg(), 98.764_999_974_596_28, "ta");
+    f64_eq!(kep.energy_km2_s2(), -10.955_920_349_063_035, "energy");
     assert_eq!(
         kep.period(),
         24_417.396_242_570_256 * Unit::Second,
         "period"
     );
-    f64_eq!(kep.hx(), -0.001_194_024_028_558_358_7, "HX");
-    f64_eq!(kep.hy(), -0.000_884_918_835_027_750_6, "HY");
-    f64_eq!(kep.hz(), 85_152.684_597_507_06, "HZ");
-    f64_eq!(kep.tlong(), 359.627_999_999_999_93, "tlong");
-    f64_eq!(kep.ea(), 98.764_943_347_932_57, "ea");
-    f64_eq!(kep.ma(), 98.764_886_721_264_56, "ma");
-    f64_eq!(kep.apoapsis(), 18_191.116_191_098_008, "apo");
-    f64_eq!(kep.periapsis(), 18_191.079_808_902_017, "peri");
+    f64_eq!(kep.hx_km2_s(), -0.001_194_024_028_558_358_7, "HX");
+    f64_eq!(kep.hy_km2_s(), -0.000_884_918_835_027_750_6, "HY");
+    f64_eq!(kep.hz_km2_s(), 85_152.684_597_507_06, "HZ");
+    f64_eq!(kep.tlong_deg(), 359.627_999_999_999_93, "tlong");
+    f64_eq!(kep.ea_deg(), 98.764_943_347_932_57, "ea");
+    f64_eq!(kep.ma_deg(), 98.764_886_721_264_56, "ma");
+    f64_eq!(kep.apoapsis_km(), 18_191.116_191_098_008, "apo");
+    f64_eq!(kep.periapsis_km(), 18_191.079_808_902_017, "peri");
     f64_eq!(
-        kep.semi_parameter(),
+        kep.semi_parameter_km(),
         18_191.097_999_981_823,
         "semi parameter"
     );
@@ -306,12 +306,12 @@ fn state_def_equatorial() {
         eme2k,
     );
 
-    f64_eq!(cart.sma(), 7278.136188379306, "sma");
+    f64_eq!(cart.sma_km(), 7278.136188379306, "sma");
     f64_eq!(cart.ecc(), 4.99846643158263e-05, "ecc");
-    f64_eq!(cart.inc(), 0.005000000478594339, "inc");
-    f64_eq!(cart.raan(), 360.0, "raan");
-    f64_eq!(cart.aop(), 177.9999736473912, "aop");
-    f64_eq!(cart.ta(), 2.650826247094554e-05, "ta");
+    f64_eq!(cart.inc_deg(), 0.005000000478594339, "inc");
+    f64_eq!(cart.raan_deg(), 360.0, "raan");
+    f64_eq!(cart.aop_deg(), 177.9999736473912, "aop");
+    f64_eq!(cart.ta_deg(), 2.650826247094554e-05, "ta");
 }
 
 #[test]
@@ -402,9 +402,9 @@ fn geodetic_vallado() {
     let long = 46.446_416_856_789_96; // Vallado 46.4464
     let height = 5_085.219_430_345_17; // Valldo: 5085.22
     let r = Orbit::from_position(ri, rj, rk, dt, eme2k);
-    f64_eq!(r.geodetic_latitude(), lat, "latitude (φ)");
-    f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
-    f64_eq!(r.geodetic_height(), height, "height");
+    f64_eq!(r.geodetic_latitude_deg(), lat, "latitude (φ)");
+    f64_eq!(r.geodetic_longitude_deg(), long, "longitude (λ)");
+    f64_eq!(r.geodetic_height_km(), height, "height");
     let r = Orbit::from_geodesic(lat, long, height, dt, eme2k);
     f64_eq!(r.x_km, ri_val, "r_i");
     f64_eq!(r.y_km, rj_val, "r_j");
@@ -424,9 +424,9 @@ fn geodetic_vallado() {
     f64_eq!(r.y_km, rj, "r_j");
     f64_eq!(r.z_km, rk, "r_k");
     let r = Orbit::from_position(ri, rj, rk, dt, eme2k);
-    f64_eq!(r.geodetic_latitude(), lat_val, "latitude (φ)");
-    f64_eq!(r.geodetic_longitude(), long, "longitude (λ)");
-    f64_eq!(r.geodetic_height(), height_val, "height");
+    f64_eq!(r.geodetic_latitude_deg(), lat_val, "latitude (φ)");
+    f64_eq!(r.geodetic_longitude_deg(), long, "longitude (λ)");
+    f64_eq!(r.geodetic_height_km(), height_val, "height");
 }
 
 #[test]
@@ -439,8 +439,8 @@ fn with_init() {
         8_191.93, 0.024_5, 12.85, 306.614, 314.19, 99.887_7, dt, eme2k,
     );
     for sma_incr in 100..1000 {
-        let new_sma = kep.sma() + f64::from(sma_incr);
-        f64_eq!(kep.with_sma(new_sma).sma(), new_sma, "wrong sma");
+        let new_sma = kep.sma_km() + f64::from(sma_incr);
+        f64_eq!(kep.with_sma(new_sma).sma_km(), new_sma, "wrong sma");
     }
     for ecc_incr in 0..100 {
         let new_ecc = kep.ecc() + f64::from(ecc_incr) / 100.0;
@@ -452,48 +452,52 @@ fn with_init() {
         );
     }
     for angle_incr in 0..360 {
-        let new_aop = between_0_360(kep.aop() + f64::from(angle_incr));
+        let new_aop = between_0_360(kep.aop_deg() + f64::from(angle_incr));
         let new_state = kep.add_aop(f64::from(angle_incr));
         f64_eq!(
-            new_state.aop(),
+            new_state.aop_deg(),
             new_aop,
-            format!("wrong aop: got {}\twanted {}", new_state.aop(), new_aop)
+            format!("wrong aop: got {}\twanted {}", new_state.aop_deg(), new_aop)
         );
     }
     for angle_incr in 0..360 {
-        let new_raan = between_0_360(kep.raan() + f64::from(angle_incr));
+        let new_raan = between_0_360(kep.raan_deg() + f64::from(angle_incr));
         let new_state = kep.add_raan(f64::from(angle_incr));
         f64_eq!(
-            new_state.raan(),
+            new_state.raan_deg(),
             new_raan,
-            format!("wrong raan: got {}\twanted {}", new_state.raan(), new_raan)
+            format!(
+                "wrong raan: got {}\twanted {}",
+                new_state.raan_deg(),
+                new_raan
+            )
         );
     }
     for angle_incr in 0..360 {
-        let new_ta = between_0_360(kep.ta() + f64::from(angle_incr));
+        let new_ta = between_0_360(kep.ta_deg() + f64::from(angle_incr));
         let new_state = kep.with_ta(new_ta);
         f64_eq!(
-            new_state.ta(),
+            new_state.ta_deg(),
             new_ta,
-            format!("wrong ta: got {}\twanted {}", new_state.aop(), new_ta)
+            format!("wrong ta: got {}\twanted {}", new_state.aop_deg(), new_ta)
         );
     }
     for angle_incr in 0..360 {
         // NOTE: Inclination is bounded between 0 and 180, hence the slightly different logic here.
-        let new_inc = between_pm_180(kep.inc() + f64::from(angle_incr)).abs();
+        let new_inc = between_pm_180(kep.inc_deg() + f64::from(angle_incr)).abs();
         let new_state = kep.add_inc(f64::from(angle_incr));
         f64_eq!(
-            new_state.inc(),
+            new_state.inc_deg(),
             new_inc,
-            format!("wrong inc: got {}\twanted {}", new_state.inc(), new_inc)
+            format!("wrong inc: got {}\twanted {}", new_state.inc_deg(), new_inc)
         );
     }
     for apsis_delta in 100..1000 {
-        let new_ra = kep.apoapsis() + f64::from(apsis_delta);
-        let new_rp = kep.periapsis() - f64::from(apsis_delta);
+        let new_ra = kep.apoapsis_km() + f64::from(apsis_delta);
+        let new_rp = kep.periapsis_km() - f64::from(apsis_delta);
         let new_orbit = kep.with_apoapsis_periapsis(new_ra, new_rp);
-        f64_eq!(new_orbit.apoapsis(), new_ra, "wrong ra");
-        f64_eq!(new_orbit.periapsis(), new_rp, "wrong rp");
+        f64_eq!(new_orbit.apoapsis_km(), new_ra, "wrong ra");
+        f64_eq!(new_orbit.periapsis_km(), new_rp, "wrong rp");
     }
 }
 

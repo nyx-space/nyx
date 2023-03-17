@@ -55,7 +55,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         // Calculate the u, dot u (=0) and ddot u from this state
         let u = dv / dv.norm();
         let r = spacecraft.orbit.radius();
-        let rmag = spacecraft.orbit.rmag();
+        let rmag = spacecraft.orbit.rmag_km();
         let u_ddot = (3.0 * spacecraft.orbit.frame.gm() / rmag.powi(5))
             * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
         // Compute the control rates at the time of the impulsive maneuver (tdv)

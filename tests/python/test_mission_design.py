@@ -74,14 +74,21 @@ def test_propagate():
     # Let's make sure that worked to within the default precision
     assert abs(rslt_apo.value_of(StateParameter.TrueAnomaly) - 180.0) < 0.001
 
+    event = Event(StateParameter.Apoapsis, 0.0, value_precision=1e-6)
+
     # But we can also be even more precise
-    rslt_apo, _ = propagate(
+    rslt_apo, traj = propagate(
         sc,
         dynamics["lofi"],
         sc.orbit.period() * 2,
-        event=Event(StateParameter.Apoapsis, 0.0, value_precision=1e-6),
+        event=event,
     )
-    assert abs(rslt_apo.value_of(StateParameter.TrueAnomaly) - 180.0) <= 1e-6
+    assert abs(rslt_apo.orbit.ta_deg() - 180.0) <= 1e-6
+
+    # Let's also search for this event in the trajectory
+    for sc_at_event in traj.find(event):
+        print(sc_at_event)
+        assert abs(sc_at_event.value_of(StateParameter.TrueAnomaly) - 180.0) <= 1e-6
 
 if __name__ == '__main__':
     test_propagate()

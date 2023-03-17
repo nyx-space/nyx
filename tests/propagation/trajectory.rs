@@ -44,12 +44,12 @@ fn traj_ephem_forward() {
     let mut cnt = 0.0;
     for state in ephem.every(1 * Unit::Day) {
         cnt += 1.0;
-        sum_sma += state.sma()
+        sum_sma += state.sma_km()
     }
     println!(
         "Average SMA: {:.3} km\tShould be: {:.3}",
         sum_sma / cnt,
-        start_state.sma()
+        start_state.sma_km()
     );
     // assert!(dbg!(sum_sma / cnt - start_state.sma()).abs() < 1e-6);
 
@@ -479,7 +479,7 @@ fn traj_ephem_backward() {
         // let state = ephem.at(epoch + 17 * Unit::Second).unwrap();
         // sum_sma += state.sma();
         match ephem.at(epoch) {
-            Ok(state) => sum_sma += state.sma(),
+            Ok(state) => sum_sma += state.sma_km(),
             Err(e) => println!("{}", e),
         }
     }

@@ -150,12 +150,12 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 }
 
 #[allow(clippy::identity_op)]
@@ -309,12 +309,12 @@ fn od_val_with_arc() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 }
 
 #[allow(clippy::identity_op)]
@@ -501,12 +501,12 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 
     // Iterate
     odp.iterate(
@@ -550,12 +550,12 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 1e-9, "More than 1 micrometer error");
-    assert!(delta.vmag() < 1e-9, "More than 1 micrometer/s error");
+    assert!(delta.rmag_km() < 1e-9, "More than 1 micrometer error");
+    assert!(delta.vmag_km_s() < 1e-9, "More than 1 micrometer/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -649,16 +649,16 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let delta = odp.estimates.last().unwrap().state() - final_truth;
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
     assert!(
-        delta.rmag() < range_noise,
+        delta.rmag_km() < range_noise,
         "More than station level position error"
     );
     assert!(
-        delta.vmag() < range_rate_noise,
+        delta.vmag_km_s() < range_rate_noise,
         "More than stattion level velocity error"
     );
 
@@ -679,21 +679,21 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     println!("{}\n{}", initial_state2, odp.estimates[0].state());
 
     // Compute the order of magnitude of the errors, and check that iteration either decreases it or keeps it the same
-    let err_it_oom = dstate_iteration.rmag().log10().floor() as i32;
-    let err_no_it_oom = dstate_no_iteration.rmag().log10().floor() as i32;
+    let err_it_oom = dstate_iteration.rmag_km().log10().floor() as i32;
+    let err_no_it_oom = dstate_no_iteration.rmag_km().log10().floor() as i32;
 
     println!(
         "Difference in initial states radii without iterations: {} km (order of magnitude: {})",
-        dstate_no_iteration.rmag(),
+        dstate_no_iteration.rmag_km(),
         err_no_it_oom
     );
     println!(
         "Difference in initial states radii with iterations: {} km (order of magnitude: {})",
-        dstate_iteration.rmag(),
+        dstate_iteration.rmag_km(),
         err_it_oom
     );
     assert!(
-        dstate_iteration.rmag() < dstate_no_iteration.rmag() || err_it_oom <= err_no_it_oom,
+        dstate_iteration.rmag_km() < dstate_no_iteration.rmag_km() || err_it_oom <= err_no_it_oom,
         "Iteration did not reduce initial error"
     );
 
@@ -703,12 +703,12 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 75e-3, "More than 75 meter error");
-    assert!(delta.vmag() < 50e-6, "More than 50 mm/s error");
+    assert!(delta.rmag_km() < 75e-3, "More than 75 meter error");
+    assert!(delta.vmag_km_s() < 50e-6, "More than 50 mm/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -840,12 +840,12 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 1e-3, "More than 1 meter error");
-    assert!(delta.vmag() < 1e-6, "More than 1 mm/s error");
+    assert!(delta.rmag_km() < 1e-3, "More than 1 meter error");
+    assert!(delta.vmag_km_s() < 1e-6, "More than 1 mm/s error");
 }
 
 #[allow(clippy::identity_op)]
@@ -1046,12 +1046,12 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 }
 
 #[allow(clippy::identity_op)]
@@ -1186,10 +1186,10 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let delta = est.state() - final_truth;
     println!(
         "RMAG error = {:.3} m\tVMAG error = {:.3} m/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e3
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e3
     );
 
-    assert!(delta.rmag() < 2e-16, "Position error should be zero");
-    assert!(delta.vmag() < 2e-16, "Velocity error should be zero");
+    assert!(delta.rmag_km() < 2e-16, "Position error should be zero");
+    assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 }

@@ -55,7 +55,7 @@ fn multi_thread_monte_carlo_demo() {
     let init_states: Vec<Orbit> = sma_dist
         .sample_iter(&mut thread_rng())
         .take(100)
-        .map(|delta_sma| state.with_sma(state.sma() + delta_sma))
+        .map(|delta_sma| state.with_sma(state.sma_km() + delta_sma))
         .collect();
 
     let prop_time = 1 * Unit::Day;

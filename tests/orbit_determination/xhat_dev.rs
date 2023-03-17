@@ -181,7 +181,7 @@ fn xhat_dev_test_ekf_two_body() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag_km();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",
@@ -369,7 +369,7 @@ fn xhat_dev_test_ekf_multi_body() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag_km();
     assert!(
         rmag_err < 1e-2,
         "final radius error should be on meter level (is instead {:.3} m)",
@@ -522,7 +522,7 @@ fn xhat_dev_test_ekf_harmonics() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag_km();
     // XXX: Revisit this test
     assert!(
         rmag_err < 2e-1,
@@ -674,7 +674,7 @@ fn xhat_dev_test_ekf_realistic() {
         est.epoch(),
         "time of final EST and TRUTH epochs differ"
     );
-    let rmag_err = (final_truth_state - est.state()).rmag();
+    let rmag_err = (final_truth_state - est.state()).rmag_km();
     assert!(
         rmag_err < 5e-1,
         "final radius error should be less than 500 m (is instead {:.3} m)",
@@ -1127,7 +1127,7 @@ fn xhat_dev_test_ekf_snc_smoother_multi_body() {
                 }
             }
 
-            let rmag_err = (truth_state - est.state()).rmag();
+            let rmag_err = (truth_state - est.state()).rmag_km();
             assert!(
                 rmag_err < 1e-2,
                 "final radius error should be on meter level (is instead {:.3} m)",
@@ -1385,7 +1385,7 @@ fn xhat_dev_test_ckf_iteration_multi_body() {
                 }
             }
 
-            let rmag_err = (truth_state - est.state()).rmag();
+            let rmag_err = (truth_state - est.state()).rmag_km();
             assert!(
                 rmag_err < 1e-2,
                 "final radius error should be on meter level (is instead {:.3} m)",

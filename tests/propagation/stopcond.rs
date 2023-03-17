@@ -61,7 +61,7 @@ fn stop_cond_3rd_apo() {
     );
 
     assert!(
-        (180.0 - third_apo.ta()).abs() < 1e-3,
+        (180.0 - third_apo.ta_deg()).abs() < 1e-3,
         "converged, yet convergence criteria not met"
     );
 }
@@ -114,7 +114,7 @@ fn stop_cond_3rd_peri() {
     );
 
     assert!(
-        third_peri.ta().abs() < 1e-1 || (360.0 - third_peri.ta().abs() < 1e-1),
+        third_peri.ta_deg().abs() < 1e-1 || (360.0 - third_peri.ta_deg().abs() < 1e-1),
         "converged, yet convergence criteria not met"
     );
 }
@@ -204,7 +204,7 @@ fn stop_cond_nrho_apo() {
     for event_state in &events {
         let delta_t = event_state.epoch() - dt;
         println!("{} after start:\n{:x}", delta_t, event_state);
-        assert!((event_state.ta() - 172.0).abs() < near_apo_event.value_precision);
+        assert!((event_state.ta_deg() - 172.0).abs() < near_apo_event.value_precision);
     }
 }
 
@@ -228,11 +228,11 @@ fn line_of_nodes() {
     println!(
         "{:x} => longitude = {} degrees",
         lon_state,
-        lon_state.geodetic_longitude()
+        lon_state.geodetic_longitude_deg()
     );
 
     assert!(
-        lon_state.geodetic_longitude().abs() < lon_event.value_precision,
+        lon_state.geodetic_longitude_deg().abs() < lon_event.value_precision,
         "converged, yet convergence criteria not met"
     );
 }
@@ -257,11 +257,11 @@ fn latitude() {
     println!(
         "{:x} => latitude = {} degrees",
         lon_state,
-        lon_state.geodetic_latitude()
+        lon_state.geodetic_latitude_deg()
     );
 
     assert!(
-        (2.0 - lon_state.geodetic_latitude()).abs() < lat_event.value_precision,
+        (2.0 - lon_state.geodetic_latitude_deg()).abs() < lat_event.value_precision,
         "converged, yet convergence criteria not met"
     );
 }
@@ -362,7 +362,7 @@ fn event_and_combination() {
         .find_all(&Event::specific(
             StateParameter::Declination,
             5.0,
-            2.0,
+            1.0,
             Unit::Minute,
         ))
         .unwrap()

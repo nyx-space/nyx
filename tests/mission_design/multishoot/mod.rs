@@ -166,8 +166,8 @@ fn alt_orbit_raising() {
                 .orbit,
             iau_earth,
         )
-        .geodetic_height();
-    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height();
+        .geodetic_height_km();
+    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height_km();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
@@ -348,8 +348,8 @@ fn vmag_orbit_raising() {
                 .orbit,
             iau_earth,
         )
-        .geodetic_height();
-    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height();
+        .geodetic_height_km();
+    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height_km();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"

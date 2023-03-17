@@ -186,10 +186,10 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let delta = est.state() - final_truth.orbit;
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 1e-9, "More than 1 micrometer error");
-    assert!(delta.vmag() < 1e-9, "More than 1 micrometer/s error");
+    assert!(delta.rmag_km() < 1e-9, "More than 1 micrometer error");
+    assert!(delta.vmag_km_s() < 1e-9, "More than 1 micrometer/s error");
 }

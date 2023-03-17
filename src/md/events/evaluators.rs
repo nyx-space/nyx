@@ -71,8 +71,8 @@ impl EventEvaluator<Orbit> for Event {
             | StateParameter::VelocityDeclination => {
                 angled_value(state.value(self.parameter).unwrap(), self.desired_value)
             }
-            StateParameter::Apoapsis => angled_value(state.ta(), 180.0),
-            StateParameter::Periapsis => between_pm_x(state.ta(), 180.0),
+            StateParameter::Apoapsis => angled_value(state.ta_deg(), 180.0),
+            StateParameter::Periapsis => between_pm_x(state.ta_deg(), 180.0),
             _ => state.value(self.parameter).unwrap() - self.desired_value,
         }
     }

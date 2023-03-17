@@ -76,7 +76,7 @@ impl GroundTrackingArcSim {
             .map_err(|e| NyxError::CustomError(e.to_string()))?;
 
         let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
-            .map_err(|e| NyxError::ConfigError(e))?;
+            .map_err(NyxError::ConfigError)?;
 
         Ok(Self { inner })
     }
