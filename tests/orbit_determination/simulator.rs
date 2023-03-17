@@ -13,7 +13,7 @@ use std::str::FromStr;
 
 #[test]
 fn continuous_tracking() {
-    // Test that continuous tracking 
+    // Test that continuous tracking
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -87,9 +87,10 @@ fn continuous_tracking() {
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk =
-        TrackingArcSim::<_, StdMeasurement, _>::with_seed(devices, trajectory, configs, 12345)
-            .unwrap();
+    let mut trk = TrackingArcSim::<Orbit, Orbit, StdMeasurement, _>::with_seed(
+        devices, trajectory, configs, 12345,
+    )
+    .unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 

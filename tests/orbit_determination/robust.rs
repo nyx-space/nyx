@@ -2,6 +2,10 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use std::collections::HashMap;
+
+use nyx::od::simulator::arc::TrackingArcSim;
+use nyx::od::simulator::TrkConfig;
 use rand::thread_rng;
 
 use self::nyx::cosmic::{Bodies, Cosm, Orbit};
@@ -10,7 +14,7 @@ use self::nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
 use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use self::nyx::od::prelude::*;
 use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, Unit};
+use self::nyx::time::{Epoch, TimeUnits, Unit};
 use self::nyx::utils::rss_orbit_errors;
 
 /*
@@ -42,16 +46,24 @@ fn od_robust_test_ekf_realistic() {
     let dss34_canberra =
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut all_stations = vec![dss65_madrid, dss34_canberra];
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -77,16 +89,11 @@ fn od_robust_test_ekf_realistic() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    let mut rng = thread_rng();
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
 
-    for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
@@ -119,9 +126,8 @@ fn od_robust_test_ekf_realistic() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
-    odp.iterate(&mut all_stations, &measurements, IterationConf::default())
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
         .unwrap();
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];

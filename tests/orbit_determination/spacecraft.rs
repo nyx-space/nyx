@@ -13,7 +13,6 @@ use nyx::od::simulator::TrkConfig;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use std::collections::HashMap;
-use std::sync::mpsc;
 
 #[allow(clippy::identity_op)]
 #[test]
@@ -61,6 +60,10 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         dss34_canberra.name.clone(),
         TrkConfig::from_sample_rate(10.seconds()),
     );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
 
     let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
@@ -68,10 +71,6 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000);
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -95,8 +94,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
     // Simulate tracking data
-    let mut arc_sim: TrackingArcSim<Spacecraft, _, _> =
-        TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
     arc_sim.disallow_overlap(); // Prevent overlapping measurements
 
     let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
