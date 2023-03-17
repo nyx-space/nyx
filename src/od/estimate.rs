@@ -21,8 +21,13 @@ use super::{EstimateFrom, State};
 use crate::cosmic::Orbit;
 use crate::hifitime::Epoch;
 use crate::linalg::allocator::Allocator;
-use crate::linalg::{DefaultAllocator, DimName, OMatrix, OVector};
+use crate::linalg::{DefaultAllocator, DimName, Matrix, OMatrix, OVector};
+use crate::mc::{Dispersion, GaussianGenerator};
+use crate::md::StateParameter;
 use crate::Spacecraft;
+use rand::SeedableRng;
+use rand_distr::Distribution;
+use rand_pcg::Pcg64Mcg;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use std::cmp::PartialEq;
@@ -155,12 +160,69 @@ where
         + Allocator<f64, <T as State>::VecLength>
         + Allocator<usize, <T as State>::Size, <T as State>::Size>,
 {
+    /// Initializes a new filter estimate from the nominal state (not dispersed) and the full covariance
     pub fn from_covar(
         nominal_state: T,
         covar: OMatrix<f64, <T as State>::Size, <T as State>::Size>,
     ) -> Self {
         Self {
             nominal_state,
+            state_deviation: OVector::<f64, <T as State>::Size>::zeros(),
+            covar: covar.clone(),
+            covar_bar: covar,
+            predicted: true,
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            epoch_fmt: EpochFormat::GregorianUtc,
+            covar_fmt: CovarFormat::Sqrt,
+        }
+    }
+
+    /// Initializes a new filter estimate from the nominal state (not dispersed) and the diagonal of the covariance
+    pub fn from_diag(nominal_state: T, diag: OVector<f64, <T as State>::Size>) -> Self {
+        let covar = Matrix::from_diagonal(&diag);
+        Self {
+            nominal_state,
+            state_deviation: OVector::<f64, <T as State>::Size>::zeros(),
+            covar: covar.clone(),
+            covar_bar: covar,
+            predicted: true,
+            stm: OMatrix::<f64, <T as State>::Size, <T as State>::Size>::identity(),
+            epoch_fmt: EpochFormat::GregorianUtc,
+            covar_fmt: CovarFormat::Sqrt,
+        }
+    }
+
+    /// Initializes a new filter estimate from the nominal state which will be dispersed according to the diagonal of the covariance.
+    /// Under the hood, this uses the same generation as the Monte Carlo.
+    /// If no seed is provided, one will be generated from entropy.
+    pub fn disperse_from_diag(
+        nominal_state: T,
+        diag: OVector<f64, <T as State>::Size>,
+        params: &[StateParameter],
+        seed: Option<u128>,
+    ) -> Self {
+        // Build a generator.
+        let dispersions = params
+            .iter()
+            .zip(diag.iter())
+            .map(|(param, std_dev)| Dispersion::from_3std_dev(*param, *std_dev))
+            .collect();
+        let gen = GaussianGenerator {
+            dispersions,
+            template: nominal_state,
+        };
+
+        let mut rng = match seed {
+            Some(seed) => Pcg64Mcg::new(seed),
+            None => Pcg64Mcg::from_entropy(),
+        };
+        let dispersed_state = gen.sample(&mut rng);
+
+        // Build the covar too
+        let covar = Matrix::from_diagonal(&diag);
+
+        Self {
+            nominal_state: dispersed_state.state,
             state_deviation: OVector::<f64, <T as State>::Size>::zeros(),
             covar: covar.clone(),
             covar_bar: covar,

@@ -56,12 +56,15 @@ pub mod prelude {
     pub use super::estimate::*;
     pub use super::kalman::*;
     pub use super::measurement::*;
+    pub use super::msr::*;
     pub use super::process::*;
     pub use super::residual::*;
+    pub use super::simulator::arc::TrackingArcSim;
+    pub use super::simulator::TrkConfig;
     pub use super::snc::*;
     pub use super::*;
 
-    pub use crate::time::{Duration, Unit};
+    pub use crate::time::{Duration, Epoch, TimeUnits, Unit};
 }
 
 /// Defines a Filter trait where S is the size of the estimated state, A the number of acceleration components of the EOMs (used for process noise matrix size), M the size of the measurements.

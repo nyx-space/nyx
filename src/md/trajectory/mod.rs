@@ -78,9 +78,6 @@ where
         + Allocator<f64, Self::Size, Self::Size>
         + Allocator<f64, Self::VecLength>,
 {
-    /// Return the parameters in order
-    fn params() -> Vec<StateParameter>;
-
     /// Return the requested parameter and its time derivative
     fn value_and_deriv(&self, param: StateParameter) -> Result<(f64, f64), NyxError> {
         Ok((self.value(param)?, self.deriv(param)?))
@@ -110,17 +107,6 @@ where
 }
 
 impl InterpState for Orbit {
-    fn params() -> Vec<StateParameter> {
-        vec![
-            StateParameter::X,
-            StateParameter::Y,
-            StateParameter::Z,
-            StateParameter::VX,
-            StateParameter::VY,
-            StateParameter::VZ,
-        ]
-    }
-
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
         // This is copied from ANISE
 
@@ -231,18 +217,6 @@ impl InterpState for Orbit {
 }
 
 impl InterpState for Spacecraft {
-    fn params() -> Vec<StateParameter> {
-        vec![
-            StateParameter::X,
-            StateParameter::Y,
-            StateParameter::Z,
-            StateParameter::VX,
-            StateParameter::VY,
-            StateParameter::VZ,
-            StateParameter::FuelMass,
-        ]
-    }
-
     fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
         // Use the Orbit interpolation first.
         let orbit = Orbit::interpolate(

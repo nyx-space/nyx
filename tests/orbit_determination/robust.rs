@@ -2,20 +2,16 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use nyx::cosmic::{Bodies, Cosm, Orbit};
+use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
+use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::md::StateParameter;
+use nyx::od::prelude::*;
+use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx::utils::rss_orbit_errors;
 use std::collections::HashMap;
-
-use nyx::od::simulator::arc::TrackingArcSim;
-use nyx::od::simulator::TrkConfig;
-use rand::thread_rng;
-
-use self::nyx::cosmic::{Bodies, Cosm, Orbit};
-use self::nyx::dynamics::orbital::OrbitalDynamics;
-use self::nyx::io::formatter::{NavSolutionFormatter, StateFormatter};
-use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::prelude::*;
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, TimeUnits, Unit};
-use self::nyx::utils::rss_orbit_errors;
 
 /*
  * These tests check that if we start with a state deviation in the estimate, the filter will eventually converge back.
@@ -101,15 +97,15 @@ fn od_robust_test_ekf_realistic() {
     let estimator = OrbitalDynamics::point_masses(&bodies, cosm.clone());
     let setup = Propagator::new::<RK4Fixed>(estimator, opts);
     let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e2;
-    let covar_velocity = 1.0e1;
+    let covar_radius_km = 1.0e2;
+    let covar_velocity_km_s = 1.0e1;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -126,7 +122,7 @@ fn od_robust_test_ekf_realistic() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
     odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
         .unwrap();
     // Check that the covariance deflated
@@ -154,12 +150,12 @@ fn od_robust_test_ekf_realistic() {
     for i in 0..6 {
         if i < 3 {
             assert!(
-                est.covar[(i, i)] < covar_radius,
+                est.covar[(i, i)] < covar_radius_km,
                 "covar radius did not decrease"
             );
         } else {
             assert!(
-                est.covar[(i, i)] < covar_velocity,
+                est.covar[(i, i)] < covar_velocity_km_s,
                 "covar velocity did not decrease"
             );
         }
@@ -209,32 +205,29 @@ fn od_robust_ops_test() {
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut all_stations = vec![dss65_madrid, dss34_canberra];
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
-    // Define the storages (channels for the states and a map for the measurements).
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
-
     // Define state information.
     let eme2k = cosm.frame("EME2000");
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.9, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
-    let mut initial_state_dev = initial_state;
-    initial_state_dev.x_km += 0.0005;
-    initial_state_dev.y_km -= 0.0005;
-    initial_state_dev.z_km += 0.0005;
-
-    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
-    println!(
-        "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
-        err_p * 1e3,
-        err_v * 1e3,
-        initial_state - initial_state_dev
-    );
 
     let orbital_dyn = OrbitalDynamics::point_masses(
         &[
@@ -260,16 +253,13 @@ fn od_robust_ops_test() {
     wtr.serialize(&truth_fmtr.headers)
         .expect("could not write headers");
 
-    let mut rng = thread_rng();
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-
         if let Some(first_state) = initial_state_out {
             wtr.serialize(&truth_fmtr.fmt(&first_state))
                 .expect("could not format state");
@@ -279,33 +269,46 @@ fn od_robust_ops_test() {
             .expect("could not format state");
     }
 
-    let ekf_msr_trig = measurements.len() / 1;
+    let ekf_msr_trig = arc.measurements.len() / 10;
 
     println!(
         "Generated {} measurements in total (using {} for CKF)",
-        measurements.len(),
+        arc.measurements.len(),
         ekf_msr_trig
     );
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
-    let orbital_dyn = OrbitalDynamics::point_masses(&[Bodies::Luna, Bodies::Sun], cosm.clone());
-    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
-    let prop_est = setup.with(initial_state_dev.with_stm());
-    let covar_radius = 1.0e2;
-    let covar_velocity = 1.0e1;
-    let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
-    ));
+
+    let covar_radius_km = 0.9;
+    let covar_velocity_km_s = 0.9e-3;
 
     // Define the initial estimate
-    let initial_estimate = KfEstimate::from_covar(initial_state_dev, init_covar);
+    let initial_estimate = KfEstimate::disperse_from_diag(
+        initial_state,
+        Vector6::new(
+            covar_radius_km,
+            covar_radius_km,
+            covar_radius_km,
+            covar_velocity_km_s,
+            covar_velocity_km_s,
+            covar_velocity_km_s,
+        ),
+        &[StateParameter::X, StateParameter::Y, StateParameter::Z],
+        None,
+    );
+
+    let initial_state_dev = initial_estimate.nominal_state;
+
+    let (err_p, err_v) = rss_orbit_errors(&initial_state_dev, &initial_state);
+    println!(
+        "Initial state dev: {:.3} m\t{:.3} m/s\n{}",
+        err_p * 1e3,
+        err_v * 1e3,
+        initial_state - initial_state_dev
+    );
+
     println!("Initial estimate:\n{}", initial_estimate);
 
     // Define the expected measurement noise (we will then expect the residuals to be within those bounds if we have correctly set up the filter)
@@ -318,10 +321,13 @@ fn od_robust_ops_test() {
     let mut trig = EkfTrigger::new(ekf_msr_trig, 10.0 * Unit::Second);
     trig.within_sigma = 3.0;
 
+    let orbital_dyn = OrbitalDynamics::point_masses(&[Bodies::Luna, Bodies::Sun], cosm.clone());
+    let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
+    let prop_est = setup.with(initial_state_dev.with_stm());
+
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Clone the initial estimate
     let pre_smooth_first_est = odp.estimates[0].clone();
@@ -355,7 +361,7 @@ fn od_robust_ops_test() {
     );
 
     // Iterate
-    odp.iterate(&mut all_stations, &measurements, IterationConf::default())
+    odp.iterate_arc::<GroundStation>(&arc, IterationConf::default())
         .unwrap();
 
     let fmtr = NavSolutionFormatter::default(

@@ -8,8 +8,6 @@ use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
 use nyx::io::formatter::NavSolutionFormatter;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::od::prelude::*;
-use nyx::od::simulator::arc::TrackingArcSim;
-use nyx::od::simulator::TrkConfig;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use std::collections::HashMap;
@@ -106,15 +104,15 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area);
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est);
-    let covar_radius = 1.0e-3_f64.powi(2);
-    let covar_velocity = 1.0e-6_f64.powi(2);
+    let covar_radius_km = 1.0e-3_f64.powi(2);
+    let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial orbit estimate
@@ -128,7 +126,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);

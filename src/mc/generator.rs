@@ -57,6 +57,18 @@ impl<Distr: Distribution<f64> + Copy> Dispersion<Distr> {
     }
 }
 
+impl Dispersion<Normal<f64>> {
+    /// Initializes a new normal dispersion of zero mean from the 1σ
+    pub fn from_std_dev(param: StateParameter, std_dev: f64) -> Self {
+        Self::new(param, Normal::new(0.0, std_dev).unwrap())
+    }
+
+    /// Initializes a new normal dispersion of zero mean from the 3σ
+    pub fn from_3std_dev(param: StateParameter, std_dev: f64) -> Self {
+        Self::new(param, Normal::new(0.0, std_dev / 3.0).unwrap())
+    }
+}
+
 impl<S: State, D: Distribution<f64> + Copy> Generator<S, D>
 where
     DefaultAllocator: Allocator<f64, S::Size>
@@ -207,8 +219,8 @@ where
         std_devs: &[(StateParameter, f64)],
     ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
-        for (param, three_sigma) in std_devs {
-            me.add_std_dev(*param, *three_sigma)?;
+        for (param, one_sigma) in std_devs {
+            me.add_std_dev(*param, *one_sigma)?;
         }
         Ok(me)
     }
@@ -403,7 +415,7 @@ fn generate_orbit() {
 
 #[test]
 fn generate_spacecraft() {
-    use crate::cosmic::{Cosm, Orbit, Spacecraft, State};
+    use crate::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft, State};
     use crate::dynamics::guidance::Thruster;
     use crate::time::Epoch;
     use rand_pcg::Pcg64Mcg;
@@ -425,7 +437,7 @@ fn generate_spacecraft() {
             isp_s: 300.0,
             thrust_N: 50.0,
         },
-        crate::cosmic::GuidanceMode::Inhibit,
+        GuidanceMode::Inhibit,
     );
 
     let sc_generator = GaussianGenerator::from_std_dev_prcts(

@@ -585,7 +585,7 @@ where
             self.estimates.push(smoothed[0].clone());
             self.kf.set_previous_estimate(&smoothed[0]);
             // And re-run the filter
-            self.process_tracking_arc::<Dev>(arc)?;
+            self.process_arc::<Dev>(arc)?;
 
             // Compute the new RMS
             let new_rms = if config.use_prefit {
@@ -660,7 +660,7 @@ where
 
     /// Process the provided tracking arc for this orbit determination process.
     #[allow(clippy::erasing_op)]
-    pub fn process_tracking_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
+    pub fn process_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {

@@ -2,20 +2,15 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use nyx::io::ConfigRepr;
-use nyx::od::msr::StdMeasurement;
-use nyx::od::simulator::arc::TrackingArcSim;
-use nyx::od::simulator::TrkConfig;
-
 use nyx::cosmic::{Cosm, Orbit};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::sph_harmonics::Harmonics;
 use nyx::io::formatter::NavSolutionFormatter;
 use nyx::io::gravity::*;
+use nyx::io::ConfigRepr;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use nyx::time::{Epoch, TimeUnits, Unit};
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
@@ -101,15 +96,15 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e-6;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-6;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -128,7 +123,7 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
         cosm.clone(),
     );
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -148,12 +143,12 @@ fn od_tb_val_ekf_fixed_step_perfect_stations() {
     for i in 0..6 {
         if i < 3 {
             assert!(
-                est.covar[(i, i)] < covar_radius,
+                est.covar[(i, i)] < covar_radius_km,
                 "covar radius did not decrease"
             );
         } else {
             assert!(
-                est.covar[(i, i)] < covar_velocity,
+                est.covar[(i, i)] < covar_velocity_km_s,
                 "covar velocity did not decrease"
             );
         }
@@ -260,15 +255,15 @@ fn od_tb_val_with_arc() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e-6;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-6;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -287,7 +282,7 @@ fn od_tb_val_with_arc() {
         cosm.clone(),
     );
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -307,12 +302,12 @@ fn od_tb_val_with_arc() {
     for i in 0..6 {
         if i < 3 {
             assert!(
-                est.covar[(i, i)] < covar_radius,
+                est.covar[(i, i)] < covar_radius_km,
                 "covar radius did not decrease"
             );
         } else {
             assert!(
-                est.covar[(i, i)] < covar_velocity,
+                est.covar[(i, i)] < covar_velocity_km_s,
                 "covar velocity did not decrease"
             );
         }
@@ -414,15 +409,15 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
     let initial_state_est = initial_state.with_stm();
     // Use the same setup as earlier
     let prop_est = setup.with(initial_state_est);
-    let covar_radius = 1.0e-3;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-3;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial orbit estimate
@@ -435,7 +430,7 @@ fn od_tb_val_ckf_fixed_step_perfect_stations() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("tb_ckf.csv".to_owned(), cosm);
@@ -647,15 +642,15 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e-3;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-3;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate (x_hat): add 100 meters in X, remove 100 meters in Y and add 50 meters in Z
@@ -672,7 +667,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Check the final estimate prior to iteration
     let delta = odp.estimates.last().unwrap().state() - final_truth;
@@ -806,15 +801,15 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
-    let covar_radius = 1.0e-3;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-3;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -831,7 +826,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
@@ -909,15 +904,15 @@ fn od_tb_ckf_map_covar() {
         PropOpts::with_fixed_step(step_size),
     );
     let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e-3;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-3;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     let initial_estimate = KfEstimate::from_covar(initial_state, init_covar);
@@ -951,12 +946,12 @@ fn od_tb_ckf_map_covar() {
     for i in 0..6 {
         if i < 3 {
             assert!(
-                est.covar[(i, i)] > covar_radius,
+                est.covar[(i, i)] > covar_radius_km,
                 "covar radius did not increase"
             );
         } else {
             assert!(
-                est.covar[(i, i)] > covar_velocity,
+                est.covar[(i, i)] > covar_velocity_km_s,
                 "covar velocity did not increase"
             );
         }
@@ -1033,15 +1028,15 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
     let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
-    let covar_radius = 1.0e-3;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-3;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -1054,7 +1049,7 @@ fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
     // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
@@ -1160,15 +1155,15 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let prop_est = setup.with(initial_state.with_stm());
 
     // Set up the filter
-    let covar_radius = 1.0e-3;
-    let covar_velocity = 1.0e-6;
+    let covar_radius_km = 1.0e-3;
+    let covar_velocity_km_s = 1.0e-6;
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -1198,7 +1193,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 

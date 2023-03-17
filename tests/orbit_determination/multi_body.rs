@@ -78,15 +78,15 @@ fn od_val_multi_body_ckf_perfect_stations() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e-3_f64.powi(2);
-    let covar_velocity = 1.0e-6_f64.powi(2);
+    let covar_radius_km = 1.0e-3_f64.powi(2);
+    let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -100,7 +100,7 @@ fn od_val_multi_body_ckf_perfect_stations() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
     let mut printed = false;
@@ -212,15 +212,15 @@ fn multi_body_ckf_covar_map() {
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let prop_est = setup.with(initial_state.with_stm());
-    let covar_radius = 1.0e-3_f64.powi(2);
-    let covar_velocity = 1.0e-6_f64.powi(2);
+    let covar_radius_km = 1.0e-3_f64.powi(2);
+    let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial estimate
@@ -234,7 +234,7 @@ fn multi_body_ckf_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     let mut num_pred = 0_u32;
     for est in odp.estimates.iter() {

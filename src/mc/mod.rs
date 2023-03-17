@@ -31,7 +31,7 @@ mod montecarlo;
 pub use montecarlo::MonteCarlo;
 
 mod generator;
-pub use generator::{DispersedState, GaussianGenerator, Generator};
+pub use generator::{DispersedState, Dispersion, GaussianGenerator, Generator};
 
 mod multivariate;
 pub use multivariate::MultivariateNormal;
