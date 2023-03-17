@@ -1,6 +1,7 @@
 use nyx_space::io::stations::StationSerde;
 use nyx_space::io::tracking_data::DynamicTrackingArc;
 use nyx_space::io::{ConfigRepr, Configurable};
+use nyx_space::md::trajectory::ExportCfg;
 use nyx_space::md::ui::*;
 use nyx_space::od::msr::StdMeasurement;
 use nyx_space::od::prelude::*;
@@ -50,7 +51,15 @@ fn continuous_tracking() {
     .iter()
     .collect();
 
-    trajectory.to_parquet(path, None).unwrap();
+    trajectory
+        .to_parquet_with_cfg(
+            path,
+            ExportCfg {
+                incl_timestamp: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     // Load the ground stations from the test data.
     let ground_station_yaml: PathBuf = [

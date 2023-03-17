@@ -11,6 +11,7 @@ use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[allow(clippy::identity_op)]
 #[test]
@@ -90,6 +91,17 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
     let mut prop = setup.with(sc_init_state);
     let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+
+    // Test the exporting of a spacecraft trajectory
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "sc_truth_val.parquet",
+    ]
+    .iter()
+    .collect();
+
+    traj.to_parquet(path).unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();

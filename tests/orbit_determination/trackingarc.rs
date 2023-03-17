@@ -49,7 +49,7 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    trajectory.to_parquet(path, None).unwrap();
+    trajectory.to_parquet(path).unwrap();
 
     // Load the ground stations from the test data.
     let ground_station_yaml: PathBuf = [
