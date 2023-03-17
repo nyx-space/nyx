@@ -6,26 +6,23 @@ use nyx::io::ConfigRepr;
 use nyx::od::msr::StdMeasurement;
 use nyx::od::simulator::arc::TrackingArcSim;
 use nyx::od::simulator::TrkConfig;
-use rand::thread_rng;
 
-use self::nyx::cosmic::{Cosm, Orbit};
-use self::nyx::dynamics::orbital::OrbitalDynamics;
-use self::nyx::dynamics::sph_harmonics::Harmonics;
-use self::nyx::io::formatter::NavSolutionFormatter;
-use self::nyx::io::gravity::*;
-use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::prelude::*;
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, Unit};
+use nyx::cosmic::{Cosm, Orbit};
+use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::sph_harmonics::Harmonics;
+use nyx::io::formatter::NavSolutionFormatter;
+use nyx::io::gravity::*;
+use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::od::prelude::*;
+use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::time::{Epoch, TimeUnits, Unit};
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
 
 #[allow(clippy::identity_op)]
 #[test]
-fn od_val_tb_ekf_fixed_step_perfect_stations() {
+fn od_tb_val_ekf_fixed_step_perfect_stations() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -46,16 +43,28 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -67,19 +76,26 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
+
     println!("{}", final_truth);
 
-    let mut rng = thread_rng();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // let mut rng = thread_rng();
+    // // Receive the states on the main thread, and populate the measurement channel.
+    // while let Ok(rx_state) = truth_rx.try_recv() {
+    //     for station in all_stations.iter_mut() {
+    //         if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
+    //             measurements.push(meas);
+    //             break; // We know that only one station is in visibility at each time.
+    //         }
+    //     }
+    // }
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -112,8 +128,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
         cosm.clone(),
     );
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates[odp.estimates.len() - 1];
@@ -160,7 +175,7 @@ fn od_val_tb_ekf_fixed_step_perfect_stations() {
 
 #[allow(clippy::identity_op)]
 #[test]
-fn od_val_with_arc() {
+fn od_tb_val_with_arc() {
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -319,7 +334,7 @@ fn od_val_with_arc() {
 
 #[allow(clippy::identity_op)]
 #[test]
-fn od_val_tb_ckf_fixed_step_perfect_stations() {
+fn od_tb_val_ckf_fixed_step_perfect_stations() {
     /*
      * This tests that the state transition matrix computation is correct with two body dynamics.
      *
@@ -351,16 +366,28 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000);
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -372,18 +399,14 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
 
-    let mut rng = thread_rng();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -412,8 +435,7 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("tb_ckf.csv".to_owned(), cosm);
@@ -424,16 +446,17 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     // Check that we have as many estimates as steps taken by the propagator.
     // Note that this test cannot work when using a variable step propagator in that same setup.
     // We're adding +1 because the propagation time is inclusive on both ends.
-    let expected_num_estimates = (prop_time.to_seconds() / step_size.to_seconds()) as usize + 1;
+    // We add another +1 because we have a measurement on the initial estimate of the propagator, so we propagate by zero seconds but still process that measurement.
+    let expected_num_estimates = (prop_time.to_seconds() / step_size.to_seconds()) as usize + 2;
 
     // Check that there are no duplicates of epochs.
     let mut prev_epoch = odp.estimates[0].epoch();
 
-    for est in odp.estimates.iter().skip(1) {
+    for est in odp.estimates.iter().skip(2) {
         let this_epoch = est.epoch();
         assert!(
             this_epoch > prev_epoch,
-            "Estimates not continuously going forward"
+            "Estimates not continuously going forward: {this_epoch} <= {prev_epoch}"
         );
         prev_epoch = this_epoch;
     }
@@ -509,9 +532,8 @@ fn od_val_tb_ckf_fixed_step_perfect_stations() {
     assert!(delta.vmag_km_s() < 2e-16, "Velocity error should be zero");
 
     // Iterate
-    odp.iterate(
-        &mut all_stations,
-        &measurements,
+    odp.iterate_arc::<GroundStation>(
+        &arc,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
             ..Default::default()
@@ -578,16 +600,28 @@ fn od_tb_ckf_fixed_step_iteration_test() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -597,21 +631,17 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
-    let mut rng = thread_rng();
     let mut prop = setup.with(initial_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
+
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Check that we have the same number of measurements as before the behavior change.
-    assert_eq!(measurements.len(), 7953);
+    assert_eq!(arc.measurements.len(), 7954);
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -642,8 +672,7 @@ fn od_tb_ckf_fixed_step_iteration_test() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Check the final estimate prior to iteration
     let delta = odp.estimates.last().unwrap().state() - final_truth;
@@ -659,13 +688,12 @@ fn od_tb_ckf_fixed_step_iteration_test() {
     );
     assert!(
         delta.vmag_km_s() < range_rate_noise,
-        "More than stattion level velocity error"
+        "More than station level velocity error"
     );
 
     // Iterate, and check that the initial state difference is lower
-    odp.iterate(
-        &mut all_stations,
-        &measurements,
+    odp.iterate_arc::<GroundStation>(
+        &arc,
         IterationConf {
             smoother: SmoothingArc::TimeGap(10.0 * Unit::Second),
             ..Default::default()
@@ -732,16 +760,28 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -752,18 +792,13 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
-    let mut rng = thread_rng();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -796,8 +831,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
@@ -931,7 +965,7 @@ fn od_tb_ckf_map_covar() {
 
 #[allow(clippy::identity_op)]
 #[test]
-fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
+fn od_tb_val_harmonics_ckf_fixed_step_perfect() {
     // Tests state noise compensation with covariance mapping
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
@@ -950,16 +984,28 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -973,18 +1019,13 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
 
     let mut prop = setup.with(initial_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
-    let mut rng = thread_rng();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1013,8 +1054,7 @@ fn od_val_tb_harmonics_ckf_fixed_step_perfect() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 
     // Let's export these to a CSV file, and also check that the covariance never falls below our sigma squared values
@@ -1075,16 +1115,28 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx): (Sender<Orbit>, Receiver<Orbit>) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -1094,18 +1146,13 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
     let orbital_dyn = OrbitalDynamics::two_body();
     let setup = Propagator::new::<RK4Fixed>(orbital_dyn, opts);
     let mut prop = setup.with(initial_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
-    let mut rng = thread_rng();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj, configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -1151,8 +1198,7 @@ fn od_tb_ckf_fixed_step_perfect_stations_several_snc_covar_map() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     let mut wtr = csv::Writer::from_path("./estimation.csv").unwrap();
 

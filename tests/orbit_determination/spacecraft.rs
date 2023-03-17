@@ -2,16 +2,17 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use rand::thread_rng;
-
-use self::nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
-use self::nyx::dynamics::orbital::OrbitalDynamics;
-use self::nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
-use self::nyx::io::formatter::NavSolutionFormatter;
-use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::prelude::*;
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, Unit};
+use nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
+use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
+use nyx::io::formatter::NavSolutionFormatter;
+use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::od::prelude::*;
+use nyx::od::simulator::arc::TrackingArcSim;
+use nyx::od::simulator::TrkConfig;
+use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::time::{Epoch, TimeUnits, Unit};
+use std::collections::HashMap;
 use std::sync::mpsc;
 
 #[allow(clippy::identity_op)]
@@ -49,7 +50,19 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
@@ -65,7 +78,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
     let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
 
-    let sc_dry_mass = 100.0; // in kg
+    let dry_mass_kg = 100.0; // in kg
     let sc_area = 5.0; // m^2
 
     // Generate the truth data on one thread.
@@ -75,29 +88,24 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let sc_dynamics =
         SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));
 
-    let sc_init_state = Spacecraft::from_srp_defaults(initial_state, sc_dry_mass, sc_area);
+    let sc_init_state = Spacecraft::from_srp_defaults(initial_state, dry_mass_kg, sc_area);
 
     let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
     let mut prop = setup.with(sc_init_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
-    let mut rng = thread_rng();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_sc_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            let rx_state = rx_sc_state.orbit;
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim: TrackingArcSim<Spacecraft, _, _> =
+        TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let initial_state_est = initial_state.with_stm();
-    let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, sc_dry_mass, sc_area);
+    let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area);
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est);
     let covar_radius = 1.0e-3_f64.powi(2);
@@ -122,8 +130,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);

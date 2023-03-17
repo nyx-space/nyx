@@ -56,6 +56,9 @@ where
     pub trajectory: Traj<Msr::State>,
     /// Configuration of each device
     pub configs: HashMap<String, TrkConfig>,
+    /// Set to true to allow for overlapping measurements (enabled by default),
+    /// i.e. if N ground stations are available at a given epoch, generate N measurements not just one.
+    pub allow_overlap: bool,
     /// Random number generator used for this tracking arc, ensures repeatability
     rng: StdRng,
     /// Greatest common denominator time series that allows this arc to meet all of the conditions.
@@ -114,6 +117,7 @@ where
             devices: devices_map,
             trajectory,
             configs,
+            allow_overlap: false,
             rng,
             time_series,
             _msr_in: PhantomData,
@@ -146,6 +150,11 @@ where
         Self::with_rng(devices, trajectory, configs, rng)
     }
 
+    /// Disallows overlapping measurements
+    pub fn disallow_overlap(&mut self) {
+        self.allow_overlap = false;
+    }
+
     /// Generates measurements from the simulated tracking arc.
     ///
     /// Notes:
@@ -168,7 +177,7 @@ where
         let mut measurements = Vec::new();
         // Clone the time series so we don't consume it.
         let ts = self.time_series.clone();
-        for epoch in ts {
+        'ts: for epoch in ts {
             // Get the state
             let state = self.trajectory.at(epoch)?;
             'devices: for (name, device) in self.devices.iter_mut() {
@@ -291,6 +300,12 @@ where
                                 end: None,
                             },
                         );
+                    }
+
+                    if !self.allow_overlap {
+                        // No need to check for the availability of other around station for this epoch
+                        // so let's move to the next epoch in the time series.
+                        continue 'ts;
                     }
                 } else if let Some(device_sched) = sched.get_mut(name) {
                     // No measurement was generated, so let's update the schedule if there is one.

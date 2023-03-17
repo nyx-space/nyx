@@ -2,17 +2,20 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
+use nyx::od::simulator::arc::TrackingArcSim;
+use nyx::od::simulator::TrkConfig;
 use rand::thread_rng;
 
-use self::nyx::cosmic::{Bodies, Cosm, Orbit};
-use self::nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
-use self::nyx::dynamics::sph_harmonics::Harmonics;
-use self::nyx::io::gravity::*;
-use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::prelude::*;
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, Unit};
-use self::nyx::utils::rss_orbit_errors;
+use nyx::cosmic::{Bodies, Cosm, Orbit};
+use nyx::dynamics::orbital::{OrbitalDynamics, PointMasses};
+use nyx::dynamics::sph_harmonics::Harmonics;
+use nyx::io::gravity::*;
+use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::od::prelude::*;
+use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::time::{Epoch, TimeUnits, Unit};
+use nyx::utils::rss_orbit_errors;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
 /*
@@ -44,15 +47,23 @@ fn xhat_dev_test_ekf_two_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut all_stations = vec![dss65_madrid, dss34_canberra];
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -78,15 +89,11 @@ fn xhat_dev_test_ekf_two_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    let mut rng = thread_rng();
-    for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -121,16 +128,11 @@ fn xhat_dev_test_ekf_two_body() {
         cosm.clone(),
     );
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
     let pre_smooth_first_est = odp.estimates[0].clone();
     let pre_smooth_num_est = odp.estimates.len();
-    odp.iterate(
-        &mut all_stations,
-        &measurements,
-        IterationConf::try_from(SmoothingArc::All).unwrap(),
-    )
-    .unwrap();
+    odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
+        .unwrap();
 
     assert_eq!(
         pre_smooth_num_est,
@@ -234,15 +236,23 @@ fn xhat_dev_test_ekf_multi_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut all_stations = vec![dss65_madrid, dss34_canberra];
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -270,15 +280,11 @@ fn xhat_dev_test_ekf_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    let mut rng = thread_rng();
-    for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -311,14 +317,9 @@ fn xhat_dev_test_ekf_multi_body() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
+    odp.iterate_arc::<GroundStation>(&arc, IterationConf::try_from(SmoothingArc::All).unwrap())
         .unwrap();
-    odp.iterate(
-        &mut all_stations,
-        &measurements,
-        IterationConf::try_from(SmoothingArc::All).unwrap(),
-    )
-    .unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -400,15 +401,23 @@ fn xhat_dev_test_ekf_harmonics() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut all_stations = vec![dss65_madrid, dss34_canberra];
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -444,16 +453,11 @@ fn xhat_dev_test_ekf_harmonics() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    let mut rng = thread_rng();
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
 
-    for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -486,8 +490,7 @@ fn xhat_dev_test_ekf_harmonics() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -554,15 +557,23 @@ fn xhat_dev_test_ekf_realistic() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut all_stations = vec![dss65_madrid, dss34_canberra];
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -589,15 +600,11 @@ fn xhat_dev_test_ekf_realistic() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    let mut rng = thread_rng();
-    for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be _nearly_ perfect because we've removed Saturn from the estimated trajectory
@@ -630,8 +637,7 @@ fn xhat_dev_test_ekf_realistic() {
 
     let mut odp = ODProcess::ekf(prop_est, kf, trig, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Check that the covariance deflated
     let est = &odp.estimates.last().unwrap();
@@ -701,15 +707,22 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
 
     // Note that we do not have Goldstone so we can test enabling and disabling the EKF.
-    let mut all_stations = vec![dss65_madrid, dss34_canberra];
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    let all_stations = vec![dss65_madrid, dss34_canberra];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
-
-    // Define the storages (channels for the states and a map for the measurements).
-    let mut measurements = Vec::with_capacity(10000); // Assume that we won't get more than 10k measurements.
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
@@ -736,15 +749,11 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
         .for_duration_with_traj(prop_time)
         .unwrap();
 
-    let mut rng = thread_rng();
-    for state in traj.every(10 * Unit::Second) {
-        for station in all_stations.iter_mut() {
-            if let Some(meas) = station.measure(&state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
@@ -772,8 +781,7 @@ fn xhat_dev_test_ckf_smoother_multi_body() {
 
     let mut odp = ODProcess::ckf(prop_est, kf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_tracking_arc::<GroundStation>(&arc).unwrap();
 
     // Smoother
     let smoothed_estimates = odp.smooth(SmoothingArc::All).unwrap();
