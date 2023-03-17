@@ -282,7 +282,7 @@ impl StateParameter {
         let unit = if self.unit().is_empty() {
             String::new()
         } else {
-            format!(" {}", self.unit())
+            format!(" ({})", self.unit())
         };
 
         Field::new(
