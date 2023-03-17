@@ -9,6 +9,7 @@ use self::nyx::State;
 mod measurements;
 mod multi_body;
 mod robust;
+mod simulator;
 mod spacecraft;
 mod trackingarc;
 mod two_body;
