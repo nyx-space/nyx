@@ -85,10 +85,16 @@ def test_propagate():
     )
     assert abs(rslt_apo.orbit.ta_deg() - 180.0) <= 1e-6
 
+    # Export this trajectory with additional metadata and the events
+    traj.to_parquet(
+        "lofi_with_events.parquet", metadata={"test key": "test value"}, events=[event]
+    )
+
     # Let's also search for this event in the trajectory
     for sc_at_event in traj.find(event):
         print(sc_at_event)
         assert abs(sc_at_event.value_of(StateParameter.TrueAnomaly) - 180.0) <= 1e-6
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_propagate()

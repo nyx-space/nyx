@@ -83,7 +83,7 @@ pub struct ExportCfg {
     /// Additional metadata to store in the Parquet metadata
     pub metadata: Option<HashMap<String, String>>,
     /// Set to true to append the timestamp to the filename
-    pub incl_timestamp: bool,
+    pub timestamp: bool,
 }
 
 impl ExportCfg {

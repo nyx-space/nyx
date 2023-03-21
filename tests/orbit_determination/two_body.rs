@@ -220,7 +220,7 @@ fn od_tb_val_with_arc() {
     ]
     .iter()
     .collect();
-    traj.to_parquet(path).unwrap();
+    traj.to_parquet_simple(path).unwrap();
 
     // Load the tracking configs
     let trkconfig_yaml: PathBuf = [
@@ -249,7 +249,7 @@ fn od_tb_val_with_arc() {
     .iter()
     .collect();
 
-    arc.to_parquet(path).unwrap();
+    arc.to_parquet_simple(path).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on

@@ -82,11 +82,18 @@ impl GroundTrackingArcSim {
     }
 
     /// Generates simulated measurements and returns the path where the parquet file containing said measurements is stored.
-    pub fn generate_measurements(&mut self, path: String) -> Result<String, NyxError> {
+    /// You may specify a metadata dictionary to be stored in the parquet file and whether the filename should include the timestamp.
+    #[pyo3(text_signature = "(path, metadata=None, timestamp=False)")]
+    pub fn generate_measurements(
+        &mut self,
+        path: String,
+        metadata: Option<HashMap<String, String>>,
+        timestamp: bool,
+    ) -> Result<String, NyxError> {
         let cosm = Cosm::de438();
         let arc = self.inner.generate_measurements(cosm)?;
         // Save the tracking arc
-        arc.to_parquet(path)
+        arc.to_parquet(path, metadata, timestamp)
             .map_err(|e| NyxError::CustomError(e.to_string()))
     }
 

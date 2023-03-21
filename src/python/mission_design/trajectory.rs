@@ -19,10 +19,13 @@
 use hifitime::{Epoch, Unit};
 use pyo3::prelude::*;
 
+use crate::md::trajectory::ExportCfg;
 use crate::{
-    md::{ui::Traj as TrajRs, Event},
+    md::{ui::Traj as TrajRs, Event, EventEvaluator},
     NyxError, Spacecraft, State,
 };
+
+use std::collections::HashMap;
 
 /// A structure that stores a spacecraft structure generated from a propagation
 #[pyclass]
@@ -85,9 +88,37 @@ impl Traj {
         self.inner.find_minmax(&event, precision)
     }
 
-    /// Saves this trajectory to a parquet file.
-    fn to_parquet(&self, path: String) -> Result<String, NyxError> {
-        match self.inner.to_parquet(path) {
+    /// Saves this trajectory to a parquet file, optionally adding the event columns to append and metadata
+    #[pyo3(text_signature = "(path, events=None, metadata=None")]
+    fn to_parquet(
+        &self,
+        path: String,
+        events: Option<Vec<Event>>,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<String, NyxError> {
+        let cfg = match metadata {
+            None => ExportCfg::default(),
+            Some(_) => ExportCfg {
+                metadata,
+                ..Default::default()
+            },
+        };
+
+        let maybe = match events {
+            None => self.inner.to_parquet(path, None, cfg),
+            Some(events) => {
+                let events = Some(
+                    events
+                        .iter()
+                        .map(|e| e as &dyn EventEvaluator<Spacecraft>)
+                        .collect::<Vec<&dyn EventEvaluator<Spacecraft>>>(),
+                );
+
+                self.inner.to_parquet(path, events, cfg)
+            }
+        };
+
+        match maybe {
             Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
             Err(e) => Err(NyxError::CustomError(e.to_string())),
         }

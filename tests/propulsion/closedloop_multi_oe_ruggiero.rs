@@ -356,7 +356,8 @@ fn qlaw_as_ruggiero_case_f() {
         .unwrap();
 
     // Save as parquet
-    traj.to_parquet("output_data/rugg_case_f.parquet").unwrap();
+    traj.to_parquet_simple("output_data/rugg_case_f.parquet")
+        .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;
     println!("[qlaw_as_ruggiero_case_f] {:x}", final_state.orbit);

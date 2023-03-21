@@ -122,8 +122,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         ),
     ]);
 
-    traj.to_parquet_with_events(path, Some(vec![&event]), cfg)
-        .unwrap();
+    traj.to_parquet(path, Some(vec![&event]), cfg).unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();

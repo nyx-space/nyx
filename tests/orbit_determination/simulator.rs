@@ -55,7 +55,7 @@ fn continuous_tracking() {
         .to_parquet_with_cfg(
             path,
             ExportCfg {
-                incl_timestamp: true,
+                timestamp: true,
                 ..Default::default()
             },
         )
@@ -114,7 +114,7 @@ fn continuous_tracking() {
     .iter()
     .collect();
 
-    let output_fn = arc.to_parquet(path).unwrap();
+    let output_fn = arc.to_parquet_simple(path).unwrap();
     println!("[{}] {arc}", output_fn.to_string_lossy());
 
     // Now read this file back in.

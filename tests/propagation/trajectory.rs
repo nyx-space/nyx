@@ -120,7 +120,7 @@ fn traj_ephem_forward() {
     .iter()
     .collect();
 
-    ephem.to_parquet(&path).unwrap();
+    ephem.to_parquet_simple(&path).unwrap();
 
     // Reload this trajectory and make sure that it matches
 

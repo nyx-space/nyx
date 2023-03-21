@@ -424,8 +424,8 @@ where
     }
 
     /// Store this trajectory arc to a parquet file with the default configuration (depends on the state type, search for `export_params` in the documentation for details).
-    pub fn to_parquet<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet_with_events(path, None, ExportCfg::default())
+    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet(path, None, ExportCfg::default())
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration
@@ -434,11 +434,11 @@ where
         path: P,
         cfg: ExportCfg,
     ) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet_with_events(path, None, cfg)
+        self.to_parquet(path, None, cfg)
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration and event evaluators
-    pub fn to_parquet_with_events<P: AsRef<Path>>(
+    pub fn to_parquet<P: AsRef<Path>>(
         &self,
         path: P,
         events: Option<Vec<&dyn EventEvaluator<S>>>,
@@ -628,13 +628,12 @@ where
                 metadata.insert(k, v);
             }
         }
-        // TODO: Add mission phases here or whatever events are passed as an input
 
         let props = pq_writer(Some(metadata));
 
         let mut path_buf = path.as_ref().to_path_buf();
 
-        if cfg.incl_timestamp {
+        if cfg.timestamp {
             if let Some(file_name) = path_buf.file_name() {
                 if let Some(file_name_str) = file_name.to_str() {
                     if let Some(extension) = path_buf.extension() {

@@ -49,7 +49,7 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    trajectory.to_parquet(path).unwrap();
+    trajectory.to_parquet_simple(path).unwrap();
 
     // Load the ground stations from the test data.
     let ground_station_yaml: PathBuf = [
@@ -104,7 +104,7 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    let output_fn = arc.to_parquet(path).unwrap();
+    let output_fn = arc.to_parquet_simple(path).unwrap();
     println!("[{}] {arc}", output_fn.to_string_lossy());
 
     // Now read this file back in.
