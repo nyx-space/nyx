@@ -40,7 +40,7 @@ fn energy_conservation() {
         .for_duration(prop_time)
         .unwrap();
 
-    let rk89_energy_bleed = rk89_final.energy() - start_state.energy();
+    let rk89_energy_bleed = rk89_final.energy_km2_s2() - start_state.energy_km2_s2();
 
     println!(
         "[RK89] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",
@@ -57,7 +57,7 @@ fn energy_conservation() {
         .for_duration(prop_time)
         .unwrap();
 
-    let dp78_energy_bleed = dp78_final.energy() - start_state.energy();
+    let dp78_energy_bleed = dp78_final.energy_km2_s2() - start_state.energy_km2_s2();
 
     println!(
         "[DP78] ==> energy_conservation absolute errors with RK89 val state\tenergy bleed = {:e}",

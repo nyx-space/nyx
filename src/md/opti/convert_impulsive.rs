@@ -22,7 +22,6 @@ use crate::dynamics::guidance::{ra_dec_from_unit_vector, Mnvr};
 // use crate::errors::TargetingError;
 use crate::linalg::{SMatrix, SVector, Vector3};
 use crate::md::objective::Objective;
-use crate::md::trajectory::InterpState;
 use crate::md::ui::*;
 use crate::md::StateParameter;
 pub use crate::md::{Variable, Vary};
@@ -55,7 +54,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
         // Calculate the u, dot u (=0) and ddot u from this state
         let u = dv / dv.norm();
         let r = spacecraft.orbit.radius();
-        let rmag = spacecraft.orbit.rmag();
+        let rmag = spacecraft.orbit.rmag_km();
         let u_ddot = (3.0 * spacecraft.orbit.frame.gm() / rmag.powi(5))
             * (r.dot(&u) * r - (r.dot(&u).powi(2) * u));
         // Compute the control rates at the time of the impulsive maneuver (tdv)
@@ -210,7 +209,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
 
             // For each objective, we'll perturb the variables to compute the Jacobian with finite differencing.
             for (i, obj) in objectives.iter().enumerate() {
-                let achieved = sc_xf_achieved.value_and_deriv(&obj.parameter)?.0;
+                let achieved = sc_xf_achieved.value(obj.parameter)?;
                 // Check if this objective has been achieved
                 let (ok, param_err) = obj.assess_raw(achieved);
                 if !ok {
@@ -267,10 +266,7 @@ impl<'a, E: ErrorCtrl> Optimizer<'a, E, 3, 6> {
                         .until_epoch(this_mnvr.end)
                         .unwrap();
 
-                    let this_achieved = this_sc_xf_achieved
-                        .value_and_deriv(&obj.parameter)
-                        .unwrap()
-                        .0;
+                    let this_achieved = this_sc_xf_achieved.value(obj.parameter).unwrap();
                     *jac_val = (this_achieved - achieved) / var.perturbation;
                 });
 

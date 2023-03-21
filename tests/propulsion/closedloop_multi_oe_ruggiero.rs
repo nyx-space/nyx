@@ -317,12 +317,6 @@ fn qlaw_as_ruggiero_case_f() {
         components of a spacecraft before defining the spacecraft itself.
     */
 
-    // We'll export this trajectory as a POC. Adding the needed crates here
-    extern crate csv;
-    use std::sync::mpsc;
-    use std::sync::mpsc::{Receiver, Sender};
-    use std::thread;
-
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
@@ -354,23 +348,15 @@ fn qlaw_as_ruggiero_case_f() {
     let sc = SpacecraftDynamics::from_guidance_law(orbital_dyn, ruggiero_ctrl);
     println!("[qlaw_as_ruggiero_case_f] {:x}", orbit);
 
-    let (tx, rx): (Sender<Spacecraft>, Receiver<Spacecraft>) = mpsc::channel();
-
-    // Set up the writing channel
-    thread::spawn(move || {
-        let mut wtr = csv::Writer::from_path("./rugg_case_f.csv").expect("could not create file");
-        while let Ok(rx_state) = rx.recv() {
-            // Serialize only the orbital state
-            wtr.serialize(rx_state.orbit)
-                .expect("could not serialize state");
-        }
-    });
-
     let setup =
         Propagator::new::<RK4Fixed>(sc.clone(), PropOpts::with_fixed_step(10.0 * Unit::Second));
-    let final_state = setup
+    let (final_state, traj) = setup
         .with(sc_state)
-        .for_duration_with_channel(prop_time, tx)
+        .for_duration_with_traj(prop_time)
+        .unwrap();
+
+    // Save as parquet
+    traj.to_parquet_simple("output_data/rugg_case_f.parquet")
         .unwrap();
 
     let fuel_usage = fuel_mass - final_state.fuel_mass_kg;

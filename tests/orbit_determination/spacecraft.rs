@@ -2,17 +2,18 @@ extern crate csv;
 extern crate nyx_space as nyx;
 extern crate pretty_env_logger;
 
-use rand::thread_rng;
-
-use self::nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
-use self::nyx::dynamics::orbital::OrbitalDynamics;
-use self::nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
-use self::nyx::io::formatter::NavSolutionFormatter;
-use self::nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
-use self::nyx::od::prelude::*;
-use self::nyx::propagators::{PropOpts, Propagator, RK4Fixed};
-use self::nyx::time::{Epoch, Unit};
-use std::sync::mpsc;
+use nyx::cosmic::{Bodies, Cosm, Orbit, Spacecraft};
+use nyx::dynamics::orbital::OrbitalDynamics;
+use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
+use nyx::io::formatter::NavSolutionFormatter;
+use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::md::trajectory::ExportCfg;
+use nyx::md::{Event, StateParameter};
+use nyx::od::prelude::*;
+use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
+use nyx::time::{Epoch, TimeUnits, Unit};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[allow(clippy::identity_op)]
 #[test]
@@ -49,23 +50,35 @@ fn od_val_sc_mb_srp_reals_duals_models() {
         GroundStation::dss34_canberra(elevation_mask, range_noise, range_rate_noise, iau_earth);
     let dss13_goldstone =
         GroundStation::dss13_goldstone(elevation_mask, range_noise, range_rate_noise, iau_earth);
-    let mut all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
+
+    // Define the tracking configurations
+    let mut configs = HashMap::new();
+    configs.insert(
+        dss65_madrid.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss34_canberra.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+    configs.insert(
+        dss13_goldstone.name.clone(),
+        TrkConfig::from_sample_rate(10.seconds()),
+    );
+
+    let all_stations = vec![dss65_madrid, dss34_canberra, dss13_goldstone];
 
     // Define the propagator information.
     let prop_time = 1 * Unit::Day;
     let step_size = 10.0 * Unit::Second;
     let opts = PropOpts::with_fixed_step(step_size);
 
-    // Define the storages (channels for the states and a map for the measurements).
-    let (truth_tx, truth_rx) = mpsc::channel();
-    let mut measurements = Vec::with_capacity(10000);
-
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
 
-    let sc_dry_mass = 100.0; // in kg
+    let dry_mass_kg = 100.0; // in kg
     let sc_area = 5.0; // m^2
 
     // Generate the truth data on one thread.
@@ -75,40 +88,64 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let sc_dynamics =
         SpacecraftDynamics::from_model(orbital_dyn, SolarPressure::default(eme2k, cosm.clone()));
 
-    let sc_init_state = Spacecraft::from_srp_defaults(initial_state, sc_dry_mass, sc_area);
+    let sc_init_state = Spacecraft::from_srp_defaults(initial_state, dry_mass_kg, sc_area);
 
     let setup = Propagator::new::<RK4Fixed>(sc_dynamics, opts);
     let mut prop = setup.with(sc_init_state);
-    let final_truth = prop.for_duration_with_channel(prop_time, truth_tx).unwrap();
+    let (final_truth, traj) = prop.for_duration_with_traj(prop_time).unwrap();
 
-    let mut rng = thread_rng();
-    // Receive the states on the main thread, and populate the measurement channel.
-    while let Ok(rx_sc_state) = truth_rx.try_recv() {
-        for station in all_stations.iter_mut() {
-            let rx_state = rx_sc_state.orbit;
-            if let Some(meas) = station.measure(&rx_state, &mut rng, cosm.clone()) {
-                measurements.push(meas);
-                break; // We know that only one station is in visibility at each time.
-            }
-        }
-    }
+    // Test the exporting of a spacecraft trajectory
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "output_data",
+        "sc_truth_val.parquet",
+    ]
+    .iter()
+    .collect();
+
+    // Adding some events to the exported trajectory
+    let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
+
+    let cfg = ExportCfg::from_metadata(vec![
+        (
+            "Dynamics".to_string(),
+            "SRP, Moon, Sun, Jupiter".to_string(),
+        ),
+        // An `Event:` metadata will be appropriately parsed and plotted with the Nyx plotting tools.
+        (
+            "Event: Comms Start".to_string(),
+            format!("{}", epoch + 6.minutes()),
+        ),
+        (
+            "Event: Comms End".to_string(),
+            format!("{}", epoch + 9.minutes()),
+        ),
+    ]);
+
+    traj.to_parquet(path, Some(vec![&event]), cfg).unwrap();
+
+    // Simulate tracking data
+    let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();
+    arc_sim.disallow_overlap(); // Prevent overlapping measurements
+
+    let arc = arc_sim.generate_measurements(cosm.clone()).unwrap();
 
     // Now that we have the truth data, let's start an OD with no noise at all and compute the estimates.
     // We expect the estimated orbit to be perfect since we're using strictly the same dynamics, no noise on
     // the measurements, and the same time step.
     let initial_state_est = initial_state.with_stm();
-    let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, sc_dry_mass, sc_area);
+    let sc_init_est = Spacecraft::from_srp_defaults(initial_state_est, dry_mass_kg, sc_area);
     // Use the same setup as earlier
     let prop_est = setup.with(sc_init_est);
-    let covar_radius = 1.0e-3_f64.powi(2);
-    let covar_velocity = 1.0e-6_f64.powi(2);
+    let covar_radius_km = 1.0e-3_f64.powi(2);
+    let covar_velocity_km_s = 1.0e-6_f64.powi(2);
     let init_covar = Matrix6::from_diagonal(&Vector6::new(
-        covar_radius,
-        covar_radius,
-        covar_radius,
-        covar_velocity,
-        covar_velocity,
-        covar_velocity,
+        covar_radius_km,
+        covar_radius_km,
+        covar_radius_km,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
+        covar_velocity_km_s,
     ));
 
     // Define the initial orbit estimate
@@ -122,8 +159,7 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     let mut odp = ODProcess::ckf(prop_est, ckf, cosm.clone());
 
-    odp.process_measurements(&mut all_stations, &measurements)
-        .unwrap();
+    odp.process_arc::<GroundStation>(&arc).unwrap();
 
     // Initialize the formatter
     let estimate_fmtr = NavSolutionFormatter::default("sc_ckf.csv".to_owned(), cosm);
@@ -186,10 +222,10 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     let delta = est.state() - final_truth.orbit;
     println!(
         "RMAG error = {:.2e} m\tVMAG error = {:.3e} mm/s",
-        delta.rmag() * 1e3,
-        delta.vmag() * 1e6
+        delta.rmag_km() * 1e3,
+        delta.vmag_km_s() * 1e6
     );
 
-    assert!(delta.rmag() < 1e-9, "More than 1 micrometer error");
-    assert!(delta.vmag() < 1e-9, "More than 1 micrometer/s error");
+    assert!(delta.rmag_km() < 1e-9, "More than 1 micrometer error");
+    assert!(delta.vmag_km_s() < 1e-9, "More than 1 micrometer/s error");
 }

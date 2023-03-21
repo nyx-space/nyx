@@ -16,21 +16,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+mod interp_state;
 mod traj;
 mod traj_it;
 
-pub(crate) const INTERPOLATION_SAMPLES: usize = 13;
-
+pub use interp_state::InterpState;
+pub(crate) use interp_state::INTERPOLATION_SAMPLES;
+use serde::{Deserialize, Serialize};
 pub use traj::Traj;
 
-use super::ui::Frame;
 use super::StateParameter;
-use crate::linalg::allocator::Allocator;
-use crate::linalg::DefaultAllocator;
-use crate::polyfit::hermite::hermite_eval;
 use crate::time::{Duration, Epoch};
-use crate::{NyxError, Orbit, Spacecraft, State};
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
@@ -71,248 +69,33 @@ impl fmt::Display for TrajError {
 
 impl Error for TrajError {}
 
-pub trait InterpState: State
-where
-    Self: Sized,
-    DefaultAllocator: Allocator<f64, Self::Size>
-        + Allocator<f64, Self::Size, Self::Size>
-        + Allocator<f64, Self::VecLength>,
-{
-    /// Return the parameters in order
-    fn params() -> Vec<StateParameter>;
-
-    /// Return the requested parameter and its time derivative
-    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        Ok((self.value(param)?, self.deriv(param)?))
-    }
-
-    /// Return the time derivative requested parameter
-    fn deriv(&self, param: &StateParameter) -> Result<f64, NyxError> {
-        Ok(self.value_and_deriv(param)?.1)
-    }
-
-    /// Sets the requested parameter
-    fn set_value_and_deriv(
-        &mut self,
-        param: &StateParameter,
-        value: f64,
-        value_dt: f64,
-    ) -> Result<(), NyxError>;
-
-    /// Interpolates a new state at the provided epochs given a slice of states.
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError>;
-
-    /// Returns the frame of this state
-    fn frame(&self) -> Frame;
-
-    /// Sets the frame of this state
-    fn set_frame(&mut self, frame: Frame);
+/// Configuration for exporting a trajectory to parquet.
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct ExportCfg {
+    /// Fields to export, if unset, defaults to all possible fields.
+    pub fields: Option<Vec<StateParameter>>,
+    /// Start epoch to export, defaults to the start of the trajectory
+    pub start_epoch: Option<Epoch>,
+    /// End epoch to export, defaults to the end of the trajectory
+    pub end_epoch: Option<Epoch>,
+    /// An optional step, defaults to every state in the trajectory (which likely isn't equidistant)
+    pub step: Option<Duration>,
+    /// Additional metadata to store in the Parquet metadata
+    pub metadata: Option<HashMap<String, String>>,
+    /// Set to true to append the timestamp to the filename
+    pub timestamp: bool,
 }
 
-impl InterpState for Orbit {
-    fn params() -> Vec<StateParameter> {
-        vec![
-            StateParameter::X,
-            StateParameter::Y,
-            StateParameter::Z,
-            StateParameter::VX,
-            StateParameter::VY,
-            StateParameter::VZ,
-        ]
-    }
-
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
-        // This is copied from ANISE
-
-        // Statically allocated arrays of the maximum number of samples
-        let mut epochs_tdb = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut xs = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut ys = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut zs = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut vxs = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut vys = [0.0; INTERPOLATION_SAMPLES + 1];
-        let mut vzs = [0.0; INTERPOLATION_SAMPLES + 1];
-
-        for (cno, state) in states.iter().enumerate() {
-            xs[cno] = state.x_km;
-            ys[cno] = state.y_km;
-            zs[cno] = state.z_km;
-            vxs[cno] = state.vx_km_s;
-            vys[cno] = state.vy_km_s;
-            vzs[cno] = state.vz_km_s;
-            epochs_tdb[cno] = state.epoch().to_tdb_seconds();
+impl ExportCfg {
+    /// Initialize a new configuration with the given metadata entries.
+    pub fn from_metadata(metadata: Vec<(String, String)>) -> Self {
+        let mut me = ExportCfg {
+            metadata: Some(HashMap::new()),
+            ..Default::default()
+        };
+        for (k, v) in metadata {
+            me.metadata.as_mut().unwrap().insert(k, v);
         }
-
-        // TODO: Once I switch to using ANISE, this should use the same function as ANISE and not a clone.
-        let (x_km, vx_km_s) = hermite_eval(
-            &epochs_tdb[..states.len()],
-            &xs[..states.len()],
-            &vxs[..states.len()],
-            epoch.to_et_seconds(),
-        )?;
-
-        let (y_km, vy_km_s) = hermite_eval(
-            &epochs_tdb[..states.len()],
-            &ys[..states.len()],
-            &vys[..states.len()],
-            epoch.to_et_seconds(),
-        )?;
-
-        let (z_km, vz_km_s) = hermite_eval(
-            &epochs_tdb[..states.len()],
-            &zs[..states.len()],
-            &vzs[..states.len()],
-            epoch.to_et_seconds(),
-        )?;
-
-        // And build the result
-        let mut me = self;
-        me.x_km = x_km;
-        me.y_km = y_km;
-        me.z_km = z_km;
-        me.vx_km_s = vx_km_s;
-        me.vy_km_s = vy_km_s;
-        me.vz_km_s = vz_km_s;
-        me.set_epoch(epoch);
-
-        Ok(me)
-    }
-
-    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        match *param {
-            StateParameter::X => Ok((self.x_km, self.vx_km_s)),
-            StateParameter::Y => Ok((self.y_km, self.vy_km_s)),
-            StateParameter::Z => Ok((self.z_km, self.vz_km_s)),
-            StateParameter::VX => Ok((self.vx_km_s, 0.0)),
-            StateParameter::VY => Ok((self.vy_km_s, 0.0)),
-            StateParameter::VZ => Ok((self.vz_km_s, 0.0)),
-            _ => Err(NyxError::StateParameterUnavailable),
-        }
-    }
-
-    fn set_value_and_deriv(
-        &mut self,
-        param: &StateParameter,
-        value: f64,
-        _: f64,
-    ) -> Result<(), NyxError> {
-        match *param {
-            StateParameter::X => {
-                self.x_km = value;
-            }
-            StateParameter::Y => {
-                self.y_km = value;
-            }
-            StateParameter::Z => {
-                self.z_km = value;
-            }
-            StateParameter::VX => {
-                self.vx_km_s = value;
-            }
-            StateParameter::VY => {
-                self.vy_km_s = value;
-            }
-            StateParameter::VZ => {
-                self.vz_km_s = value;
-            }
-
-            _ => return Err(NyxError::StateParameterUnavailable),
-        }
-        Ok(())
-    }
-
-    fn frame(&self) -> Frame {
-        self.frame
-    }
-
-    fn set_frame(&mut self, frame: Frame) {
-        self.frame = frame;
-    }
-}
-
-impl InterpState for Spacecraft {
-    fn params() -> Vec<StateParameter> {
-        vec![
-            StateParameter::X,
-            StateParameter::Y,
-            StateParameter::Z,
-            StateParameter::VX,
-            StateParameter::VY,
-            StateParameter::VZ,
-            StateParameter::FuelMass,
-        ]
-    }
-
-    fn interpolate(self, epoch: Epoch, states: &[Self]) -> Result<Self, NyxError> {
-        // Use the Orbit interpolation first.
-        let orbit = Orbit::interpolate(
-            self.orbit,
-            epoch,
-            &states.iter().map(|sc| sc.orbit).collect::<Vec<_>>(),
-        )?;
-
-        // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
-        let fuel_kg = (states.last().unwrap().fuel_mass_kg - states.first().unwrap().fuel_mass_kg)
-            / (states.last().unwrap().epoch().to_tdb_seconds()
-                - states.first().unwrap().epoch().to_tdb_seconds());
-
-        let mut me = self.with_orbit(orbit);
-        me.fuel_mass_kg = fuel_kg;
-
-        Ok(me)
-    }
-
-    fn value_and_deriv(&self, param: &StateParameter) -> Result<(f64, f64), NyxError> {
-        match *param {
-            StateParameter::X => Ok((self.orbit.x_km, self.orbit.vx_km_s)),
-            StateParameter::Y => Ok((self.orbit.y_km, self.orbit.vy_km_s)),
-            StateParameter::Z => Ok((self.orbit.z_km, self.orbit.vz_km_s)),
-            StateParameter::VX => Ok((self.orbit.vx_km_s, 0.0)),
-            StateParameter::VY => Ok((self.orbit.vy_km_s, 0.0)),
-            StateParameter::VZ => Ok((self.orbit.vz_km_s, 0.0)),
-            StateParameter::FuelMass => Ok((self.fuel_mass_kg, 0.0)),
-            _ => Err(NyxError::StateParameterUnavailable),
-        }
-    }
-
-    fn set_value_and_deriv(
-        &mut self,
-        param: &StateParameter,
-        value: f64,
-        _: f64,
-    ) -> Result<(), NyxError> {
-        match *param {
-            StateParameter::X => {
-                self.orbit.x_km = value;
-            }
-            StateParameter::Y => {
-                self.orbit.y_km = value;
-            }
-            StateParameter::Z => {
-                self.orbit.z_km = value;
-            }
-            StateParameter::VX => {
-                self.orbit.vx_km_s = value;
-            }
-            StateParameter::VY => {
-                self.orbit.vy_km_s = value;
-            }
-            StateParameter::VZ => {
-                self.orbit.vz_km_s = value;
-            }
-            StateParameter::Cr => self.srp.cr = value,
-            StateParameter::Cd => self.drag.cd = value,
-            StateParameter::FuelMass => self.fuel_mass_kg = value,
-            _ => return Err(NyxError::StateParameterUnavailable),
-        }
-        Ok(())
-    }
-
-    fn frame(&self) -> Frame {
-        self.orbit.frame
-    }
-
-    fn set_frame(&mut self, frame: Frame) {
-        self.orbit.frame = frame;
+        me
     }
 }

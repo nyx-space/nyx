@@ -90,7 +90,7 @@ impl Mnvr {
         Self::from_time_invariant(dt, dt + Unit::Millisecond, 1.0, vector, frame)
     }
 
-    /// Creates a manneuver from the provided time-invariant delta-v, in km/s
+    /// Creates a maneuver from the provided time-invariant delta-v, in km/s
     pub fn from_time_invariant(
         start: Epoch,
         end: Epoch,

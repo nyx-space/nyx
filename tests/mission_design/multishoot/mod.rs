@@ -1,5 +1,7 @@
 extern crate nyx_space as nyx;
 
+use std::path::PathBuf;
+
 use nyx::dynamics::guidance::Thruster;
 use nyx::md::opti::multishoot::*;
 use nyx::md::ui::*;
@@ -77,11 +79,12 @@ fn alt_orbit_raising() {
 
     let mut full_traj = all_trajectories[0].clone();
 
+    let output_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data"].iter().collect();
+
     for (i, traj) in all_trajectories.iter().enumerate() {
-        traj.to_csv_with_step(
-            &format!("multishoot_to_node_{}.csv", i),
+        traj.to_parquet_with_step(
+            output_path.join(format!("multishoot_to_node_{i}.parquet")),
             2 * Unit::Second,
-            cosm.clone(),
         )
         .unwrap();
         if i > 0 {
@@ -122,11 +125,7 @@ fn alt_orbit_raising() {
         .for_duration_with_traj(start.period())
         .unwrap()
         .1
-        .to_csv_with_step(
-            &"multishoot_start.csv".to_string(),
-            2 * Unit::Second,
-            cosm.clone(),
-        )
+        .to_parquet_with_step(output_path.join("multishoot_start.csv"), 2 * Unit::Second)
         .unwrap();
 
     // Propagate the initial orbit too
@@ -134,11 +133,7 @@ fn alt_orbit_raising() {
         .for_duration_with_traj(target.period())
         .unwrap()
         .1
-        .to_csv_with_step(
-            &"multishoot_target.csv".to_string(),
-            2 * Unit::Second,
-            cosm.clone(),
-        )
+        .to_parquet_with_step(output_path.join("multishoot_target.csv"), 2 * Unit::Second)
         .unwrap();
 
     // Just propagate this spacecraft for one orbit for plotting
@@ -148,11 +143,7 @@ fn alt_orbit_raising() {
         .unwrap();
 
     end_traj
-        .to_csv_with_step(
-            &"multishoot_to_end.csv".to_string(),
-            2 * Unit::Second,
-            cosm.clone(),
-        )
+        .to_parquet_with_step(output_path.join("multishoot_to_end.csv"), 2 * Unit::Second)
         .unwrap();
 
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
@@ -166,8 +157,8 @@ fn alt_orbit_raising() {
                 .orbit,
             iau_earth,
         )
-        .geodetic_height();
-    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height();
+        .geodetic_height_km();
+    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height_km();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
@@ -244,11 +235,12 @@ fn vmag_orbit_raising() {
 
     let mut full_traj = all_trajectories[0].clone();
 
+    let output_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "output_data"].iter().collect();
+
     for (i, traj) in all_trajectories.iter().enumerate() {
-        traj.to_csv_with_step(
-            &format!("multishoot_to_node_{}.csv", i),
+        traj.to_parquet_with_step(
+            output_path.join(format!("multishoot_to_node_{i}.parquet")),
             2 * Unit::Second,
-            cosm.clone(),
         )
         .unwrap();
         if i > 0 {
@@ -304,10 +296,9 @@ fn vmag_orbit_raising() {
         .for_duration_with_traj(start.period())
         .unwrap()
         .1
-        .to_csv_with_step(
-            &"multishoot_start.csv".to_string(),
+        .to_parquet_with_step(
+            output_path.join("multishoot_start.parquet"),
             2 * Unit::Second,
-            cosm.clone(),
         )
         .unwrap();
 
@@ -316,10 +307,9 @@ fn vmag_orbit_raising() {
         .for_duration_with_traj(target.period())
         .unwrap()
         .1
-        .to_csv_with_step(
-            &"multishoot_target.csv".to_string(),
+        .to_parquet_with_step(
+            output_path.join("multishoot_to_target.parquet"),
             2 * Unit::Second,
-            cosm.clone(),
         )
         .unwrap();
 
@@ -330,11 +320,7 @@ fn vmag_orbit_raising() {
         .unwrap();
 
     end_traj
-        .to_csv_with_step(
-            &"multishoot_to_end.csv".to_string(),
-            2 * Unit::Second,
-            cosm.clone(),
-        )
+        .to_parquet_with_step(output_path.join("multishoot_end.parquet"), 2 * Unit::Second)
         .unwrap();
 
     // Check that error is 50km or less. That isn't great, but I blame that on the scenario and the final node being optimized.
@@ -348,8 +334,8 @@ fn vmag_orbit_raising() {
                 .orbit,
             iau_earth,
         )
-        .geodetic_height();
-    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height();
+        .geodetic_height_km();
+    let target_geoheight = cosm.frame_chg(&target, iau_earth).geodetic_height_km();
     assert!(
         (achieved_geoheight - target_geoheight).abs() < 1e-3,
         "Geodetic height achieved greater than 1 m above goal"
@@ -361,11 +347,7 @@ fn vmag_orbit_raising() {
         .iter()
         .enumerate()
     {
-        traj.to_csv_with_step(
-            &format!("multishoot_to_node_{}.csv", i),
-            2 * Unit::Second,
-            cosm.clone(),
-        )
-        .unwrap();
+        traj.to_parquet_with_step(&format!("multishoot_to_node_{}.csv", i), 2 * Unit::Second)
+            .unwrap();
     }
 }

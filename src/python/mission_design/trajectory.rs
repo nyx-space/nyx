@@ -16,10 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use hifitime::Epoch;
+use hifitime::{Epoch, Unit};
 use pyo3::prelude::*;
 
-use crate::{md::ui::Traj as TrajRs, NyxError, Spacecraft};
+use crate::md::trajectory::ExportCfg;
+use crate::{
+    md::{ui::Traj as TrajRs, Event, EventEvaluator},
+    NyxError, Spacecraft, State,
+};
+
+use std::collections::HashMap;
 
 /// A structure that stores a spacecraft structure generated from a propagation
 #[pyclass]
@@ -29,14 +35,93 @@ pub(crate) struct Traj {
 
 #[pymethods]
 impl Traj {
+    /// Returns the state at the provided epoch, or raises an exception if the epoch is outside of the bounds of the trajectory
     fn at(&self, epoch: Epoch) -> Result<Spacecraft, NyxError> {
         self.inner.at(epoch)
     }
 
-    fn to_parquet(&self, path: String) -> Result<String, NyxError> {
-        self.inner
-            .to_parquet(path, None)
-            .map_err(|e| NyxError::CustomError(e.to_string()))
+    /// Return the first state of the trajectory
+    fn first(&self) -> Spacecraft {
+        *self.inner.first()
+    }
+
+    /// Return the last state of the trajectory
+    fn last(&self) -> Spacecraft {
+        *self.inner.last()
+    }
+
+    /// Finds a specific event in a trajectory.
+    ///
+    /// If a start or end epoch is provided (or both are provided), this function will return a list of a single event.
+    /// If none are provided, this function will search the whole trajectory for the event and return all of the states where such event happens.
+    fn find(
+        &self,
+        event: Event,
+        start: Option<Epoch>,
+        end: Option<Epoch>,
+    ) -> Result<Vec<Spacecraft>, NyxError> {
+        if start.is_some() || end.is_some() {
+            let start = if let Some(start) = start {
+                start
+            } else {
+                self.inner.first().epoch()
+            };
+
+            let end = if let Some(end) = end {
+                end
+            } else {
+                self.inner.last().epoch()
+            };
+
+            Ok(vec![self.inner.find_bracketed(start, end, &event)?])
+        } else {
+            self.inner.find_all(&event)
+        }
+    }
+
+    /// Find the minimum and maximum of the provided event through the trajectory with a specified time unit precision.
+    pub fn find_minmax(
+        &self,
+        event: Event,
+        precision: Unit,
+    ) -> Result<(Spacecraft, Spacecraft), NyxError> {
+        self.inner.find_minmax(&event, precision)
+    }
+
+    /// Saves this trajectory to a parquet file, optionally adding the event columns to append and metadata
+    #[pyo3(text_signature = "(path, events=None, metadata=None")]
+    fn to_parquet(
+        &self,
+        path: String,
+        events: Option<Vec<Event>>,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<String, NyxError> {
+        let cfg = match metadata {
+            None => ExportCfg::default(),
+            Some(_) => ExportCfg {
+                metadata,
+                ..Default::default()
+            },
+        };
+
+        let maybe = match events {
+            None => self.inner.to_parquet(path, None, cfg),
+            Some(events) => {
+                let events = Some(
+                    events
+                        .iter()
+                        .map(|e| e as &dyn EventEvaluator<Spacecraft>)
+                        .collect::<Vec<&dyn EventEvaluator<Spacecraft>>>(),
+                );
+
+                self.inner.to_parquet(path, events, cfg)
+            }
+        };
+
+        match maybe {
+            Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
+            Err(e) => Err(NyxError::CustomError(e.to_string())),
+        }
     }
 
     fn __str__(&self) -> String {

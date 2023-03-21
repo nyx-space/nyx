@@ -19,13 +19,15 @@
 use super::NyxError;
 use arrow::datatypes::{DataType, Field};
 use core::fmt;
+use enum_iterator::Sequence;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
 /// Common state parameters
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Sequence, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
 pub enum StateParameter {
     /// Argument of Latitude (deg)
@@ -50,6 +52,8 @@ pub enum StateParameter {
     Cr,
     /// Declination (deg)
     Declination,
+    /// Dry mass (kg)
+    DryMass,
     /// The epoch of the state
     Epoch,
     /// Eccentric anomaly (deg)
@@ -68,6 +72,8 @@ pub enum StateParameter {
     GeodeticLatitude,
     /// Geodetic longitude (deg)
     GeodeticLongitude,
+    /// Return the guidance mode of the spacecraft
+    GuidanceMode,
     /// Orbital momentum
     Hmag,
     /// X component of the orbital momentum vector
@@ -176,18 +182,37 @@ impl StateParameter {
 
             // Special
             Self::Energy => 1e-3,
-            Self::FuelMass => 1e-3,
+            Self::DryMass | Self::FuelMass => 1e-3,
             Self::Period => 1e-1,
-            _ => unimplemented!(),
+            _ => unimplemented!("{self} cannot be used for event finding"),
         }
     }
 
     /// Returns whether this parameter is of the B-Plane kind
-    pub fn is_b_plane(&self) -> bool {
-        self == &Self::BdotR || self == &Self::BdotT || self == &Self::BLTOF
+    pub const fn is_b_plane(&self) -> bool {
+        matches!(&self, Self::BdotR | Self::BdotT | Self::BLTOF)
     }
 
-    pub fn unit(&self) -> &'static str {
+    /// Returns whether this is an orbital parameter
+    pub const fn is_orbital(&self) -> bool {
+        !self.is_for_spacecraft() && !matches!(self, Self::Apoapsis | Self::Periapsis | Self::Epoch)
+    }
+
+    /// Returns whether this parameter is only applicable to a spacecraft state
+    pub const fn is_for_spacecraft(&self) -> bool {
+        matches!(
+            &self,
+            Self::DryMass
+                | Self::FuelMass
+                | Self::Cr
+                | Self::Cd
+                | Self::Isp
+                | Self::GuidanceMode
+                | Self::Thrust
+        )
+    }
+
+    pub const fn unit(&self) -> &'static str {
         match self {
             // Angles
             Self::AoL
@@ -229,7 +254,7 @@ impl StateParameter {
             // Velocities
             Self::C3 | Self::VX | Self::VY | Self::VZ | Self::Vmag => "km/s",
 
-            Self::FuelMass => "kg",
+            Self::DryMass | Self::FuelMass => "kg",
             Self::Isp => "isp",
             Self::Thrust => "N",
             _ => "",
@@ -245,7 +270,7 @@ impl StateParameter {
 
 impl StateParameter {
     /// Returns the parquet field of this parameter
-    pub fn to_field(self, more_meta: Option<Vec<(String, String)>>) -> Field {
+    pub(crate) fn to_field(self, more_meta: Option<Vec<(String, String)>>) -> Field {
         let mut meta = HashMap::new();
         meta.insert("unit".to_string(), self.unit().to_string());
         if let Some(more_data) = more_meta {
@@ -254,9 +279,19 @@ impl StateParameter {
             }
         }
 
+        let unit = if self.unit().is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", self.unit())
+        };
+
         Field::new(
-            format!("{self} ({})", self.unit()),
-            DataType::Float64,
+            format!("{self}{unit}"),
+            if self == Self::GuidanceMode {
+                DataType::Utf8
+            } else {
+                DataType::Float64
+            },
             false,
         )
         .with_metadata(meta)
@@ -277,12 +312,14 @@ impl FromStr for StateParameter {
             "cd" => Ok(Self::Cd),
             "cr" => Ok(Self::Cr),
             "declin" => Ok(Self::Declination),
+            "dry_mass" => Ok(Self::DryMass),
             "apoapsis_radius" => Ok(Self::ApoapsisRadius),
             "ea" => Ok(Self::EccentricAnomaly),
             "ecc" => Ok(Self::Eccentricity),
             "energy" => Ok(Self::Energy),
             "fpa" => Ok(Self::FlightPathAngle),
             "fuel_mass" => Ok(Self::FuelMass),
+            "guidance_mode" | "mode" => Ok(Self::GuidanceMode),
             "geodetic_height" => Ok(Self::GeodeticHeight),
             "geodetic_latitude" => Ok(Self::GeodeticLatitude),
             "geodetic_longitude" => Ok(Self::GeodeticLongitude),
@@ -332,12 +369,14 @@ impl fmt::Display for StateParameter {
             Self::Cd => "cd",
             Self::Cr => "cr",
             Self::Declination => "declin",
+            Self::DryMass => "dry_mass",
             Self::ApoapsisRadius => "apoapsis_radius",
             Self::EccentricAnomaly => "ea",
             Self::Eccentricity => "ecc",
             Self::Energy => "energy",
             Self::FlightPathAngle => "fpa",
             Self::FuelMass => "fuel_mass",
+            Self::GuidanceMode => "guidance_mode",
             Self::GeodeticHeight => "geodetic_height",
             Self::GeodeticLatitude => "geodetic_latitude",
             Self::GeodeticLongitude => "geodetic_longitude",

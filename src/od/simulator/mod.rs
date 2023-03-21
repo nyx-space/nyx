@@ -18,7 +18,6 @@
 
 pub use crate::dynamics::{Dynamics, NyxError};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
-
 pub mod arc;
 mod schedule;
 pub use schedule::Schedule;

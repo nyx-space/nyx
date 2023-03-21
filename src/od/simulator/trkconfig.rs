@@ -75,6 +75,16 @@ impl Configurable for TrkConfig {
     }
 }
 
+impl TrkConfig {
+    /// Initialize a default TrkConfig providing only the sample rate
+    pub fn from_sample_rate(sampling: Duration) -> Self {
+        Self {
+            sampling,
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for TrkConfig {
     /// The default configuration is to generate a measurement every minute (continuously) while the vehicle is visible
     fn default() -> Self {

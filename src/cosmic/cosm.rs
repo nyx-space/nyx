@@ -785,7 +785,7 @@ impl Cosm {
                 // It will take less than three iterations to converge
                 for _ in 0..3 {
                     // Compute the light time
-                    let lt = (tgt - obs).rmag() / SPEED_OF_LIGHT_KMS;
+                    let lt = (tgt - obs).rmag_km() / SPEED_OF_LIGHT_KMS;
                     // Compute the new target state
                     let lt_dt = datetime - lt * Unit::Second;
                     tgt =
@@ -805,7 +805,7 @@ impl Cosm {
 
                 // Incluee the range-rate term in the velocity computation as explained in
                 // https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/abcorr.html#Reception%20case
-                let state_acc = state.velocity() / state.rmag();
+                let state_acc = state.velocity() / state.rmag_km();
                 let dltdt = state.radius().dot(&state_acc) / SPEED_OF_LIGHT_KMS;
 
                 state.vx_km_s = tgt.vx_km_s * (1.0 - dltdt) - obs.vx_km_s;
@@ -952,7 +952,7 @@ impl Cosm {
         let state_ephem_path = state.frame.ephem_path();
 
         // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
-        let mut new_state = if state.rmag() > 0.0 {
+        let mut new_state = if state.rmag_km() > 0.0 {
             *state
         } else if state_ephem_path.is_empty() {
             // SSB, let's invert this
@@ -967,7 +967,7 @@ impl Cosm {
             let e_common_path = self.find_common_root(&new_ephem_path, &state_ephem_path);
 
             // This doesn't make sense, but somehow the following algorithm only works when converting spacecraft states
-            new_state = if state.rmag() > 0.0 {
+            new_state = if state.rmag_km() > 0.0 {
                 // Walk backward from current state up to common node
                 for i in (e_common_path.len()..state_ephem_path.len()).rev() {
                     let next_state =
@@ -1242,8 +1242,8 @@ mod tests {
         let sun2ear_state = cosm.celestial_state(&sun2k.ephem_path(), jde, eme2k, c);
         let ear2sun_state = cosm.celestial_state(&eme2k.ephem_path(), jde, sun2k, c);
         let state_sum = ear2sun_state + sun2ear_state;
-        assert!(state_sum.rmag() < 1e-8);
-        assert!(state_sum.vmag() < 1e-11);
+        assert!(state_sum.rmag_km() < 1e-8);
+        assert!(state_sum.vmag_km_s() < 1e-11);
     }
 
     #[test]
@@ -1281,12 +1281,12 @@ mod tests {
         println!("{}", lro_wrt_moon);
         let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
         // Note that the passing conditions are large. JPL uses de431MX, but nyx uses de438s.
-        assert!(lro_moon_earth_delta.rmag() < 1e-2);
-        assert!(lro_moon_earth_delta.vmag() < 1e-5);
+        assert!(lro_moon_earth_delta.rmag_km() < 1e-2);
+        assert!(lro_moon_earth_delta.vmag_km_s() < 1e-5);
         // And the converse
         let lro_wrt_earth = cosm.frame_chg(&lro_wrt_moon, eme2k);
-        assert!((lro_wrt_earth - lro).rmag() < std::f64::EPSILON);
-        assert!((lro_wrt_earth - lro).vmag() < std::f64::EPSILON);
+        assert!((lro_wrt_earth - lro).rmag_km() < std::f64::EPSILON);
+        assert!((lro_wrt_earth - lro).vmag_km_s() < std::f64::EPSILON);
     }
 
     #[test]
@@ -1324,12 +1324,12 @@ mod tests {
         println!("{}", lro_wrt_moon);
         let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
         // Note that the passing conditions are very large. JPL uses de431MX, but nyx uses de438s.
-        assert!(lro_moon_earth_delta.rmag() < 0.3);
-        assert!(lro_moon_earth_delta.vmag() < 1e-5);
+        assert!(lro_moon_earth_delta.rmag_km() < 0.3);
+        assert!(lro_moon_earth_delta.vmag_km_s() < 1e-5);
         // And the converse
         let lro_wrt_venus = cosm.frame_chg(&lro_wrt_moon, venus);
-        assert!((lro_wrt_venus - lro).rmag() < std::f64::EPSILON);
-        assert!((lro_wrt_venus - lro).vmag() < std::f64::EPSILON);
+        assert!((lro_wrt_venus - lro).rmag_km() < std::f64::EPSILON);
+        assert!((lro_wrt_venus - lro).vmag_km_s() < std::f64::EPSILON);
     }
 
     #[test]
@@ -1367,12 +1367,12 @@ mod tests {
         println!("{}", lro_wrt_moon);
         let lro_moon_earth_delta = lro_jpl - lro_wrt_moon;
         // Note that the passing conditions are very large. JPL uses de431MX, but nyx uses de438s.
-        assert!(dbg!(lro_moon_earth_delta.rmag()) < 0.25);
-        assert!(dbg!(lro_moon_earth_delta.vmag()) < 1e-5);
+        assert!(dbg!(lro_moon_earth_delta.rmag_km()) < 0.25);
+        assert!(dbg!(lro_moon_earth_delta.vmag_km_s()) < 1e-5);
         // And the converse
         let lro_wrt_ssb = cosm.frame_chg(&lro_wrt_moon, ssb);
-        assert!((lro_wrt_ssb - lro).rmag() < std::f64::EPSILON);
-        assert!((lro_wrt_ssb - lro).vmag() < std::f64::EPSILON);
+        assert!((lro_wrt_ssb - lro).rmag_km() < std::f64::EPSILON);
+        assert!((lro_wrt_ssb - lro).vmag_km_s() < std::f64::EPSILON);
     }
 
     #[test]
@@ -1442,11 +1442,11 @@ mod tests {
 
         // BUG: Temporarily allow for large error in rotation, will be fixed with #86.
         assert!(
-            dbg!(ear_sun_2k.rmag() - ear_sun_iau.rmag()).abs() <= 1e-7,
+            dbg!(ear_sun_2k.rmag_km() - ear_sun_iau.rmag_km()).abs() <= 1e-7,
             "a single rotation changes rmag"
         );
         assert!(
-            (ear_sun_2k_prime - ear_sun_2k).rmag() <= 1e-7,
+            (ear_sun_2k_prime - ear_sun_2k).rmag_km() <= 1e-7,
             "reverse rotation does not match initial state"
         );
 
@@ -1487,11 +1487,11 @@ mod tests {
         println!("{}", delta_state);
 
         assert!(
-            delta_state.rmag().abs() < 1e-11,
+            delta_state.rmag_km().abs() < 1e-11,
             "Inverse rotation is broken"
         );
         assert!(
-            delta_state.vmag().abs() < 1e-11,
+            delta_state.vmag_km_s().abs() < 1e-11,
             "Inverse rotation is broken"
         );
 
@@ -1974,19 +1974,19 @@ mod tests {
 
         println!(
             "err: {} \t {}\nWas: {}\nIs:  {}",
-            (moon_into_eme2k - sp_state_in_eme2k).rmag(),
-            (moon_into_eme2k - sp_state_in_eme2k).vmag(),
+            (moon_into_eme2k - sp_state_in_eme2k).rmag_km(),
+            (moon_into_eme2k - sp_state_in_eme2k).vmag_km_s(),
             moon_state,
             moon_into_eme2k
         );
         // SPICE only returns data down to the meter level, so we can't check less than that
         assert!(
-            (moon_into_eme2k - sp_state_in_eme2k).rmag() < 1e-3,
+            (moon_into_eme2k - sp_state_in_eme2k).rmag_km() < 1e-3,
             "error greater than expected"
         );
         // SPICE only returns data down to the millimeter per second level, so we can't check less than that
         assert!(
-            (moon_into_eme2k - sp_state_in_eme2k).vmag() < 1e-6,
+            (moon_into_eme2k - sp_state_in_eme2k).vmag_km_s() < 1e-6,
             "error greater than expected"
         );
 
@@ -2021,20 +2021,20 @@ mod tests {
 
         println!(
             "err: {} \t {}\nWas: {}\nIs:  {}",
-            (moon_into_eme2k - sp_state_in_eme2k).rmag(),
-            (moon_into_eme2k - sp_state_in_eme2k).vmag(),
+            (moon_into_eme2k - sp_state_in_eme2k).rmag_km(),
+            (moon_into_eme2k - sp_state_in_eme2k).vmag_km_s(),
             moon_state,
             moon_into_eme2k
         );
 
         // SPICE only returns data down to the meter level, so we can't check less than that
         assert!(
-            (moon_into_eme2k - sp_state_in_eme2k).rmag() < 1e-3,
+            (moon_into_eme2k - sp_state_in_eme2k).rmag_km() < 1e-3,
             "error greater than expected"
         );
         // SPICE only returns data down to the millimeter per second level, so we can't check less than that
         assert!(
-            (moon_into_eme2k - sp_state_in_eme2k).vmag() < 1e-6,
+            (moon_into_eme2k - sp_state_in_eme2k).vmag_km_s() < 1e-6,
             "error greater than expected"
         );
     }

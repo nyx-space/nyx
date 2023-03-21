@@ -65,7 +65,7 @@ def test_filter_arc():
     # Build the simulated tracking arc, setting the seed to zero
     arc_sim = GroundTrackingArcSim(devices, traj, trk_cfg, 0)
     # Generate the measurements
-    path = arc_sim.generate_measurements(str(outpath.joinpath("./from_python.parquet")))
+    path = arc_sim.generate_measurements(str(outpath.joinpath("./from_python.parquet")), timestamp=True, metadata={"test key": "test value"})
     print(f"Saved {arc_sim} to {path}")
 
     # Now let's filter this same data.
@@ -79,11 +79,9 @@ def test_filter_arc():
 
     msr_noise = [1e-3, 0, 0, 1e-6]  # TODO: Convert this to a numpy matrix
     # Switch from sequential to EKF after 100 measurements
-    ekf_num_msr_trig = 100  
+    ekf_num_msr_trig = 100
     # Unless there is a 2 hour gap in the measurements, and then switch back to classical
-    ekf_disable_time = (
-        Unit.Hour * 2
-    )  
+    ekf_disable_time = Unit.Hour * 2
 
     estimates = process_tracking_arc(
         dynamics["hifi"],
@@ -95,10 +93,11 @@ def test_filter_arc():
         ekf_disable_time,
     )
 
-    assert len(estimates) == 1148
-    assert len([est for est in estimates if not est.is_predicted]) == 846
+    assert len(estimates) == 1064
+    assert len([est for est in estimates if not est.is_predicted]) == 762
 
     # TODO: Add more tests
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_filter_arc()

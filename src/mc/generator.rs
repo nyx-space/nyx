@@ -57,6 +57,18 @@ impl<Distr: Distribution<f64> + Copy> Dispersion<Distr> {
     }
 }
 
+impl Dispersion<Normal<f64>> {
+    /// Initializes a new normal dispersion of zero mean from the 1σ
+    pub fn from_std_dev(param: StateParameter, std_dev: f64) -> Self {
+        Self::new(param, Normal::new(0.0, std_dev).unwrap())
+    }
+
+    /// Initializes a new normal dispersion of zero mean from the 3σ
+    pub fn from_3std_dev(param: StateParameter, std_dev: f64) -> Self {
+        Self::new(param, Normal::new(0.0, std_dev / 3.0).unwrap())
+    }
+}
+
 impl<S: State, D: Distribution<f64> + Copy> Generator<S, D>
 where
     DefaultAllocator: Allocator<f64, S::Size>
@@ -67,7 +79,7 @@ where
     /// Add a parameter dispersion to this Monte Carlo state generator.
     pub fn add_dispersion(&mut self, dispersion: Dispersion<D>) -> Result<(), NyxError> {
         // Try to set that parameter, and report an error on initialization if it fails
-        match self.template.clone().set_value(&dispersion.param, 0.0) {
+        match self.template.clone().set_value(dispersion.param, 0.0) {
             Ok(_) => {
                 self.dispersions.push(dispersion);
                 Ok(())
@@ -128,7 +140,7 @@ where
 
     /// Add a state dispersion from the provided 1-sigma value, zero mean
     pub fn add_std_dev(&mut self, param: StateParameter, std_dev: f64) -> Result<(), NyxError> {
-        match self.template.value(&param) {
+        match self.template.value(param) {
             Ok(_) => {
                 self.dispersions
                     .push(Dispersion::new(param, Normal::new(0.0, std_dev).unwrap()));
@@ -176,7 +188,7 @@ where
         }
         let mut me: Self = template.into();
 
-        me.add_3std_dev(param, template.value(&param)? * prct)?;
+        me.add_3std_dev(param, template.value(param)? * prct)?;
 
         Ok(me)
     }
@@ -195,7 +207,7 @@ where
                 )));
             }
 
-            me.add_3std_dev(*param, template.value(param)? * prct)?;
+            me.add_3std_dev(*param, template.value(*param)? * prct)?;
         }
 
         Ok(me)
@@ -207,8 +219,8 @@ where
         std_devs: &[(StateParameter, f64)],
     ) -> Result<Self, NyxError> {
         let mut me: Self = template.into();
-        for (param, three_sigma) in std_devs {
-            me.add_std_dev(*param, *three_sigma)?;
+        for (param, one_sigma) in std_devs {
+            me.add_std_dev(*param, *one_sigma)?;
         }
         Ok(me)
     }
@@ -227,7 +239,7 @@ where
                 )));
             }
 
-            me.add_std_dev(*param, template.value(param)? * prct)?;
+            me.add_std_dev(*param, template.value(*param)? * prct)?;
         }
 
         Ok(me)
@@ -260,7 +272,7 @@ where
 
         let mut me: Self = template.into();
 
-        me.add_std_dev(param, template.value(&param)? * prct)?;
+        me.add_std_dev(param, template.value(param)? * prct)?;
 
         Ok(me)
     }
@@ -293,12 +305,12 @@ where
         let mut actual_dispersions = Vec::new();
         for dispersion in &self.dispersions {
             // We know this state can return something for this param
-            let cur_value = state.value(&dispersion.param).unwrap();
+            let cur_value = state.value(dispersion.param).unwrap();
             // Apply the dispersion
             let delta = dispersion.distr.sample(rng);
             actual_dispersions.push((dispersion.param, delta));
             state
-                .set_value(&dispersion.param, cur_value + delta)
+                .set_value(dispersion.param, cur_value + delta)
                 .unwrap();
         }
 
@@ -331,12 +343,12 @@ fn generate_orbit() {
     let seed = 0;
     let rng = Pcg64Mcg::new(seed);
 
-    let init_sma = state.sma();
+    let init_sma = state.sma_km();
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
         .map(|dispersed_state| {
-            if (init_sma - dispersed_state.state.sma()).abs() > 1.0 {
+            if (init_sma - dispersed_state.state.sma_km()).abs() > 1.0 {
                 1
             } else {
                 0
@@ -356,12 +368,12 @@ fn generate_orbit() {
         GaussianGenerator::from_std_dev(state, StateParameter::Rmag, std_dev).unwrap();
 
     let rng = Pcg64Mcg::new(seed);
-    let init_rmag = state.rmag();
+    let init_rmag = state.rmag_km();
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
         .map(|dispersed_state| {
-            if (init_rmag - dispersed_state.state.rmag()).abs() > std_dev {
+            if (init_rmag - dispersed_state.state.rmag_km()).abs() > std_dev {
                 1
             } else {
                 0
@@ -381,12 +393,12 @@ fn generate_orbit() {
         GaussianGenerator::from_std_dev(state, StateParameter::Vmag, std_dev).unwrap();
 
     let rng = Pcg64Mcg::new(seed);
-    let init_vmag = state.vmag();
+    let init_vmag = state.vmag_km_s();
     let cnt_too_far: u16 = orbit_generator
         .sample_iter(rng)
         .take(1000)
         .map(|dispersed_state| {
-            if (init_vmag - dispersed_state.state.vmag()).abs() > std_dev {
+            if (init_vmag - dispersed_state.state.vmag_km_s()).abs() > std_dev {
                 1
             } else {
                 0
@@ -403,7 +415,7 @@ fn generate_orbit() {
 
 #[test]
 fn generate_spacecraft() {
-    use crate::cosmic::{Cosm, Orbit, Spacecraft, State};
+    use crate::cosmic::{Cosm, GuidanceMode, Orbit, Spacecraft, State};
     use crate::dynamics::guidance::Thruster;
     use crate::time::Epoch;
     use rand_pcg::Pcg64Mcg;
@@ -425,7 +437,7 @@ fn generate_spacecraft() {
             isp_s: 300.0,
             thrust_N: 50.0,
         },
-        crate::cosmic::GuidanceMode::Inhibit,
+        GuidanceMode::Inhibit,
     );
 
     let sc_generator = GaussianGenerator::from_std_dev_prcts(
@@ -445,17 +457,14 @@ fn generate_spacecraft() {
         .map(|dispersed_state| {
             // Check out of bounds
             let thrust_oob = (nominal_thrust
-                - dispersed_state
-                    .state
-                    .value(&StateParameter::Thrust)
-                    .unwrap())
+                - dispersed_state.state.value(StateParameter::Thrust).unwrap())
             .abs()
                 / nominal_thrust
                 > 0.05;
-            let isp_oob =
-                (nominal_isp - dispersed_state.state.value(&StateParameter::Isp).unwrap()).abs()
-                    / nominal_isp
-                    > 0.01;
+            let isp_oob = (nominal_isp - dispersed_state.state.value(StateParameter::Isp).unwrap())
+                .abs()
+                / nominal_isp
+                > 0.01;
             if thrust_oob || isp_oob {
                 1
             } else {

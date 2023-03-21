@@ -251,28 +251,28 @@ impl DeltaStateSerde {
             || self.ta.is_some()
         {
             let sma = match self.sma {
-                Some(sma) => sma + base.sma(),
-                None => base.sma(),
+                Some(sma) => sma + base.sma_km(),
+                None => base.sma_km(),
             };
             let ecc = match self.ecc {
                 Some(ecc) => ecc + base.ecc(),
                 None => base.ecc(),
             };
             let inc = match self.inc {
-                Some(inc) => inc + base.inc(),
-                None => base.inc(),
+                Some(inc) => inc + base.inc_deg(),
+                None => base.inc_deg(),
             };
             let raan = match self.raan {
-                Some(raan) => raan + base.raan(),
-                None => base.raan(),
+                Some(raan) => raan + base.raan_deg(),
+                None => base.raan_deg(),
             };
             let aop = match self.aop {
-                Some(aop) => aop + base.aop(),
-                None => base.aop(),
+                Some(aop) => aop + base.aop_deg(),
+                None => base.aop_deg(),
             };
             let ta = match self.ta {
-                Some(ta) => ta + base.ta(),
-                None => base.ta(),
+                Some(ta) => ta + base.ta_deg(),
+                None => base.ta_deg(),
             };
             Ok(Orbit::keplerian(sma, ecc, inc, raan, aop, ta, epoch, frame) + base)
         } else {

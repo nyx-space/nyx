@@ -537,9 +537,130 @@ where
         Ok(())
     }
 
+    /// Allows iterating on the filter solution. Requires specifying a smoothing condition to know where to stop the smoothing.
+    pub fn iterate_arc<Dev>(
+        &mut self,
+        arc: &TrackingArc<Msr>,
+        config: IterationConf,
+    ) -> Result<(), NyxError>
+    where
+        Dev: TrackingDeviceSim<S, Msr>,
+    {
+        let measurements = &arc.measurements;
+
+        // Compute the initial RMS
+        let mut best_rms = if config.use_prefit {
+            self.rms_prefit_residual()
+        } else {
+            self.rms_postfit_residual()
+        };
+        let mut previous_rms = best_rms;
+        let mut divergence_cnt = 0;
+        let mut iter_cnt = 0;
+        loop {
+            if best_rms <= config.absolute_tol {
+                info!("*****************");
+                info!("*** CONVERGED ***");
+                info!("*****************");
+
+                info!(
+                    "Filter converged to absolute tolerance ({:.2e} < {:.2e}) after {} iterations",
+                    best_rms, config.absolute_tol, iter_cnt
+                );
+                return Ok(());
+            }
+
+            iter_cnt += 1;
+
+            info!("***************************");
+            info!("*** Iteration number {} ***", iter_cnt);
+            info!("***************************");
+
+            // First, smooth the estimates
+            let smoothed = self.smooth(config.smoother)?;
+            // Reset the propagator
+            self.prop.state = self.init_state;
+            // Empty the estimates and add the first smoothed estimate as the initial estimate
+            self.estimates = Vec::with_capacity(measurements.len());
+            self.estimates.push(smoothed[0].clone());
+            self.kf.set_previous_estimate(&smoothed[0]);
+            // And re-run the filter
+            self.process_arc::<Dev>(arc)?;
+
+            // Compute the new RMS
+            let new_rms = if config.use_prefit {
+                self.rms_prefit_residual()
+            } else {
+                self.rms_postfit_residual()
+            };
+            let cur_rel_rms = (new_rms - best_rms).abs() / best_rms;
+            if cur_rel_rms < config.relative_tol {
+                info!("*****************");
+                info!("*** CONVERGED ***");
+                info!("*****************");
+                info!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    new_rms, previous_rms, best_rms
+                );
+                info!(
+                    "Filter converged to relative tolerance ({:.2e} < {:.2e}) after {} iterations",
+                    cur_rel_rms, config.relative_tol, iter_cnt
+                );
+                return Ok(());
+            }
+
+            if new_rms > previous_rms {
+                warn!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    new_rms, previous_rms, best_rms
+                );
+                divergence_cnt += 1;
+                previous_rms = new_rms;
+                if divergence_cnt >= config.max_divergences {
+                    let msg = format!(
+                        "Filter iterations have continuously diverged {} times: {}",
+                        config.max_divergences, config
+                    );
+                    if config.force_failure {
+                        return Err(NyxError::MaxIterReached(msg));
+                    } else {
+                        error!("{}", msg);
+                        return Ok(());
+                    }
+                } else {
+                    warn!("Filter iteration caused divergence {} of {} acceptable subsequent divergences", divergence_cnt, config.max_divergences);
+                }
+            } else {
+                info!(
+                    "New RMS: {:.5}\tPrevious RMS: {:.5}\tBest RMS: {:.5}",
+                    new_rms, previous_rms, best_rms
+                );
+                // Reset the counter
+                divergence_cnt = 0;
+                previous_rms = new_rms;
+                if previous_rms < best_rms {
+                    best_rms = previous_rms;
+                }
+            }
+
+            if iter_cnt >= config.max_iterations {
+                let msg = format!(
+                    "Filter has iterated {} times but failed to reach filter convergence criteria: {}",
+                    config.max_iterations, config
+                );
+                if config.force_failure {
+                    return Err(NyxError::MaxIterReached(msg));
+                } else {
+                    error!("{}", msg);
+                    return Ok(());
+                }
+            }
+        }
+    }
+
     /// Process the provided tracking arc for this orbit determination process.
     #[allow(clippy::erasing_op)]
-    pub fn process_tracking_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
+    pub fn process_arc<Dev>(&mut self, arc: &TrackingArc<Msr>) -> Result<(), NyxError>
     where
         Dev: TrackingDeviceSim<S, Msr>,
     {
@@ -553,8 +674,10 @@ where
         // Start by propagating the estimator (on the same thread).
         let num_msrs = measurements.len();
         let step_size = arc.min_duration_sep().unwrap();
-        // Update the step size of the navigation propagator
-        self.prop.set_step(step_size, false);
+        // Update the step size of the navigation propagator if it isn't already fixed step
+        if !self.prop.fixed_step {
+            self.prop.set_step(step_size, false);
+        }
         let prop_time = measurements[num_msrs - 1].1.epoch() - self.kf.previous_estimate().epoch();
         info!("Navigation propagating for a total of {prop_time} with step size {step_size}");
 
@@ -737,14 +860,14 @@ where
                 "No navigation trajectory to generate: run the OD process first".to_string(),
             ))
         } else {
-            todo!("generating a navigation trajectory #199");
-            // use std::sync::mpsc::channel;
-            // let (tx, rx) = channel();
-            // let start_state = self.estimates[0].state();
-            // for estimate in &self.estimates {
-            //     tx.send(estimate.state()).unwrap();
-            // }
-            // Traj::new(start_state, rx)
+            Ok(Traj {
+                states: self
+                    .estimates
+                    .iter()
+                    .map(|est| est.nominal_state())
+                    .collect(),
+                name: None,
+            })
         }
     }
 }

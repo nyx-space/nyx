@@ -70,13 +70,13 @@ impl<'a, E: ErrorCtrl> MultipleShooting<'a, E, Node, 3, 3> {
             // Convert this orbit into the body frame
             let orbit_point_bf = cosm.frame_chg(&orbit_point, body_frame);
             // Note that the altitude here might be different, so we scale the altitude change by the current altitude
-            let desired_alt_i = (xf_bf.geodetic_height() - orbit_point_bf.geodetic_height())
+            let desired_alt_i = (xf_bf.geodetic_height_km() - orbit_point_bf.geodetic_height_km())
                 / ((node_count - i) as f64).sqrt();
             // Build the node in the body frame and convert that to the original frame
             let node_bf = Orbit::from_geodesic(
-                orbit_point_bf.geodetic_latitude(),
-                orbit_point_bf.geodetic_longitude(),
-                orbit_point_bf.geodetic_height() + desired_alt_i,
+                orbit_point_bf.geodetic_latitude_deg(),
+                orbit_point_bf.geodetic_longitude_deg(),
+                orbit_point_bf.geodetic_height_km() + desired_alt_i,
                 this_epoch,
                 body_frame,
             );

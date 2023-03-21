@@ -460,12 +460,12 @@ impl Orbit {
 
     /// Returns the unit vector in the direction of the state radius
     pub fn r_hat(&self) -> Vector3<f64> {
-        self.radius() / self.rmag()
+        self.radius() / self.rmag_km()
     }
 
     /// Returns the unit vector in the direction of the state velocity
     pub fn v_hat(&self) -> Vector3<f64> {
-        perpv(&self.velocity(), &self.r_hat()) / self.rmag()
+        perpv(&self.velocity(), &self.r_hat()) / self.rmag_km()
     }
 
     /// Returns the eccentricity vector (no unit)
@@ -499,12 +499,12 @@ impl Orbit {
     /// Note that the time is **not** returned in the vector.
     pub fn to_keplerian_vec(self) -> Vector6<f64> {
         Vector6::new(
-            self.sma(),
+            self.sma_km(),
             self.ecc(),
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
+            self.inc_deg(),
+            self.raan_deg(),
+            self.aop_deg(),
+            self.ta_deg(),
         )
     }
 
@@ -547,14 +547,14 @@ impl Orbit {
     /// Returns a copy of the state with a new SMA
     pub fn with_sma(self, new_sma_km: f64) -> Self {
         let mut me = self;
-        me.set_sma(new_sma_km);
+        me.set_sma_km(new_sma_km);
         me
     }
 
     /// Returns a copy of the state with a provided SMA added to the current one
     pub fn add_sma(self, delta_sma: f64) -> Self {
         let mut me = self;
-        me.set_sma(me.sma() + delta_sma);
+        me.set_sma_km(me.sma_km() + delta_sma);
         me
     }
 
@@ -575,56 +575,56 @@ impl Orbit {
     /// Returns a copy of the state with a new INC
     pub fn with_inc(self, new_inc: f64) -> Self {
         let mut me = self;
-        me.set_inc(new_inc);
+        me.set_inc_deg(new_inc);
         me
     }
 
     /// Returns a copy of the state with a provided INC added to the current one
     pub fn add_inc(self, delta_inc: f64) -> Self {
         let mut me = self;
-        me.set_inc(me.inc() + delta_inc);
+        me.set_inc_deg(me.inc_deg() + delta_inc);
         me
     }
 
     /// Returns a copy of the state with a new AOP
     pub fn with_aop(self, new_aop: f64) -> Self {
         let mut me = self;
-        me.set_aop(new_aop);
+        me.set_aop_deg(new_aop);
         me
     }
 
     /// Returns a copy of the state with a provided AOP added to the current one
     pub fn add_aop(self, delta_aop: f64) -> Self {
         let mut me = self;
-        me.set_aop(me.aop() + delta_aop);
+        me.set_aop_deg(me.aop_deg() + delta_aop);
         me
     }
 
     /// Returns a copy of the state with a new RAAN
     pub fn with_raan(self, new_raan: f64) -> Self {
         let mut me = self;
-        me.set_raan(new_raan);
+        me.set_raan_deg(new_raan);
         me
     }
 
     /// Returns a copy of the state with a provided RAAN added to the current one
     pub fn add_raan(self, delta_raan: f64) -> Self {
         let mut me = self;
-        me.set_raan(me.raan() + delta_raan);
+        me.set_raan_deg(me.raan_deg() + delta_raan);
         me
     }
 
     /// Returns a copy of the state with a new TA
     pub fn with_ta(self, new_ta: f64) -> Self {
         let mut me = self;
-        me.set_ta(new_ta);
+        me.set_ta_deg(new_ta);
         me
     }
 
     /// Returns a copy of the state with a provided TA added to the current one
     pub fn add_ta(self, delta_ta: f64) -> Self {
         let mut me = self;
-        me.set_ta(me.ta() + delta_ta);
+        me.set_ta_deg(me.ta_deg() + delta_ta);
         me
     }
 
@@ -633,10 +633,10 @@ impl Orbit {
         Self::keplerian_apsis_radii(
             new_ra,
             new_rp,
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
+            self.inc_deg(),
+            self.raan_deg(),
+            self.aop_deg(),
+            self.ta_deg(),
             self.epoch,
             self.frame,
         )
@@ -645,12 +645,12 @@ impl Orbit {
     /// Returns a copy of this state with the provided apoasis and periapse added to the current values
     pub fn add_apoapsis_periapsis(self, delta_ra: f64, delta_rp: f64) -> Self {
         Self::keplerian_apsis_radii(
-            self.apoapsis() + delta_ra,
-            self.periapsis() + delta_rp,
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
+            self.apoapsis_km() + delta_ra,
+            self.periapsis_km() + delta_rp,
+            self.inc_deg(),
+            self.raan_deg(),
+            self.aop_deg(),
+            self.ta_deg(),
             self.epoch,
             self.frame,
         )
@@ -662,18 +662,18 @@ impl Orbit {
     /// let vector_inertial = dcm_vnc2inertial * vector_vnc;
     pub fn dcm_from_traj_frame(&self, from: Frame) -> Result<Matrix3<f64>, NyxError> {
         match from {
-            Frame::RIC => Ok(r3(-self.raan().to_radians())
-                * r1(-self.inc().to_radians())
-                * r3(-self.aol().to_radians())),
+            Frame::RIC => Ok(r3(-self.raan_deg().to_radians())
+                * r1(-self.inc_deg().to_radians())
+                * r3(-self.aol_deg().to_radians())),
             Frame::VNC => {
-                let v = self.velocity() / self.vmag();
-                let n = self.hvec() / self.hmag();
+                let v = self.velocity() / self.vmag_km_s();
+                let n = self.hvec() / self.hmag_km2_s();
                 let c = v.cross(&n);
                 Ok(Matrix3::new(v[0], v[1], v[2], n[0], n[1], n[2], c[0], c[1], c[2]).transpose())
             }
             Frame::RCN => {
-                let r = self.radius() / self.rmag();
-                let n = self.hvec() / self.hmag();
+                let r = self.radius() / self.rmag_km();
+                let n = self.hvec() / self.hmag_km2_s();
                 let c = n.cross(&r);
                 Ok(Matrix3::new(r[0], r[1], r[2], c[0], c[1], c[2], n[0], n[1], n[2]).transpose())
             }
@@ -688,8 +688,8 @@ impl Orbit {
                 if (self.x_km.powi(2) + self.y_km.powi(2)).sqrt() < 1e-3 {
                     warn!("SEZ frame ill-defined when close to the poles");
                 }
-                let phi = self.geodetic_latitude().to_radians();
-                let lambda = self.geodetic_longitude().to_radians();
+                let phi = self.geodetic_latitude_deg().to_radians();
+                let lambda = self.geodetic_longitude_deg().to_radians();
                 let z_hat = Vector3::new(
                     phi.cos() * lambda.cos(),
                     phi.cos() * lambda.sin(),
@@ -810,7 +810,7 @@ impl Orbit {
     pub fn to_objectives(&self, params: &[StateParameter]) -> Result<Vec<Objective>, NyxError> {
         let mut rtn = Vec::with_capacity(params.len());
         for parameter in params {
-            rtn.push(Objective::new(*parameter, self.value(parameter)?));
+            rtn.push(Objective::new(*parameter, self.value(*parameter)?));
         }
         Ok(rtn)
     }
@@ -861,12 +861,12 @@ impl Orbit {
 #[cfg_attr(feature = "python", pymethods)]
 impl Orbit {
     /// Returns the magnitude of the radius vector in km
-    pub fn rmag(&self) -> f64 {
+    pub fn rmag_km(&self) -> f64 {
         (self.x_km.powi(2) + self.y_km.powi(2) + self.z_km.powi(2)).sqrt()
     }
 
     /// Returns the magnitude of the velocity vector in km/s
-    pub fn vmag(&self) -> f64 {
+    pub fn vmag_km_s(&self) -> f64 {
         (self.vx_km_s.powi(2) + self.vy_km_s.powi(2) + self.vz_km_s.powi(2)).sqrt()
     }
 
@@ -881,52 +881,54 @@ impl Orbit {
     }
 
     /// Returns the orbital momentum value on the X axis
-    pub fn hx(&self) -> f64 {
+    pub fn hx_km2_s(&self) -> f64 {
         self.hvec()[0]
     }
 
     /// Returns the orbital momentum value on the Y axis
-    pub fn hy(&self) -> f64 {
+    pub fn hy_km2_s(&self) -> f64 {
         self.hvec()[1]
     }
 
     /// Returns the orbital momentum value on the Z axis
-    pub fn hz(&self) -> f64 {
+    pub fn hz_km2_s(&self) -> f64 {
         self.hvec()[2]
     }
 
     /// Returns the norm of the orbital momentum
-    pub fn hmag(&self) -> f64 {
+    pub fn hmag_km2_s(&self) -> f64 {
         self.hvec().norm()
     }
 
     /// Returns the specific mechanical energy in km^2/s^2
-    pub fn energy(&self) -> f64 {
+    pub fn energy_km2_s2(&self) -> f64 {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                self.vmag().powi(2) / 2.0 - gm / self.rmag()
+                self.vmag_km_s().powi(2) / 2.0 - gm / self.rmag_km()
             }
             _ => panic!("orbital energy not defined in this frame"),
         }
     }
 
     /// Returns the semi-major axis in km
-    pub fn sma(&self) -> f64 {
+    pub fn sma_km(&self) -> f64 {
         match self.frame {
-            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => -gm / (2.0 * self.energy()),
+            Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
+                -gm / (2.0 * self.energy_km2_s2())
+            }
             _ => panic!("sma not defined in this frame"),
         }
     }
 
     /// Mutates this orbit to change the SMA
-    pub fn set_sma(&mut self, new_sma_km: f64) {
+    pub fn set_sma_km(&mut self, new_sma_km: f64) {
         let me = Self::keplerian(
             new_sma_km,
             self.ecc(),
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
+            self.inc_deg(),
+            self.raan_deg(),
+            self.aop_deg(),
+            self.ta_deg(),
             self.epoch,
             self.frame,
         );
@@ -940,15 +942,15 @@ impl Orbit {
     }
 
     /// Returns the SMA altitude in km
-    pub fn sma_altitude(&self) -> f64 {
-        self.sma() - self.frame.equatorial_radius()
+    pub fn sma_altitude_km(&self) -> f64 {
+        self.sma_km() - self.frame.equatorial_radius()
     }
 
     /// Returns the period in seconds
     pub fn period(&self) -> Duration {
         match self.frame {
             Frame::Geoid { gm, .. } | Frame::Celestial { gm, .. } => {
-                2.0 * PI * (self.sma().powi(3) / gm).sqrt() * Unit::Second
+                2.0 * PI * (self.sma_km().powi(3) / gm).sqrt() * Unit::Second
             }
             _ => panic!("orbital period not defined in this frame"),
         }
@@ -962,12 +964,12 @@ impl Orbit {
     /// Mutates this orbit to change the ECC
     pub fn set_ecc(&mut self, new_ecc: f64) {
         let me = Self::keplerian(
-            self.sma(),
+            self.sma_km(),
             new_ecc,
-            self.inc(),
-            self.raan(),
-            self.aop(),
-            self.ta(),
+            self.inc_deg(),
+            self.raan_deg(),
+            self.aop_deg(),
+            self.ta_deg(),
             self.epoch,
             self.frame,
         );
@@ -981,24 +983,24 @@ impl Orbit {
     }
 
     /// Returns the inclination in degrees
-    pub fn inc(&self) -> f64 {
+    pub fn inc_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                (self.hvec()[2] / self.hmag()).acos().to_degrees()
+                (self.hvec()[2] / self.hmag_km2_s()).acos().to_degrees()
             }
             _ => panic!("inclination not defined in this frame"),
         }
     }
 
     /// Mutates this orbit to change the INC
-    pub fn set_inc(&mut self, new_inc: f64) {
+    pub fn set_inc_deg(&mut self, new_inc: f64) {
         let me = Self::keplerian(
-            self.sma(),
+            self.sma_km(),
             self.ecc(),
             new_inc,
-            self.raan(),
-            self.aop(),
-            self.ta(),
+            self.raan_deg(),
+            self.aop_deg(),
+            self.ta_deg(),
             self.epoch,
             self.frame,
         );
@@ -1012,7 +1014,7 @@ impl Orbit {
     }
 
     /// Returns the argument of periapsis in degrees
-    pub fn aop(&self) -> f64 {
+    pub fn aop_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
@@ -1035,14 +1037,14 @@ impl Orbit {
     }
 
     /// Mutates this orbit to change the AOP
-    pub fn set_aop(&mut self, new_aop: f64) {
+    pub fn set_aop_deg(&mut self, new_aop: f64) {
         let me = Self::keplerian(
-            self.sma(),
+            self.sma_km(),
             self.ecc(),
-            self.inc(),
-            self.raan(),
+            self.inc_deg(),
+            self.raan_deg(),
             new_aop,
-            self.ta(),
+            self.ta_deg(),
             self.epoch,
             self.frame,
         );
@@ -1056,7 +1058,7 @@ impl Orbit {
     }
 
     /// Returns the right ascension of ther ascending node in degrees
-    pub fn raan(&self) -> f64 {
+    pub fn raan_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 let n = Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec());
@@ -1079,14 +1081,14 @@ impl Orbit {
     }
 
     /// Mutates this orbit to change the RAAN
-    pub fn set_raan(&mut self, new_raan: f64) {
+    pub fn set_raan_deg(&mut self, new_raan: f64) {
         let me = Self::keplerian(
-            self.sma(),
+            self.sma_km(),
             self.ecc(),
-            self.inc(),
+            self.inc_deg(),
             new_raan,
-            self.aop(),
-            self.ta(),
+            self.aop_deg(),
+            self.ta_deg(),
             self.epoch,
             self.frame,
         );
@@ -1107,7 +1109,7 @@ impl Orbit {
     /// LIMITATION: For an orbit whose true anomaly is (very nearly) 0.0 or 180.0, this function may return either 0.0 or 180.0 with a very small time increment.
     /// This is due to the precision of the cosine calculation: if the arccosine calculation is out of bounds, the sign of the cosine of the true anomaly is used
     /// to determine whether the true anomaly should be 0.0 or 180.0. **In other words**, there is an ambiguity in the computation in the true anomaly exactly at 180.0 and 0.0.
-    pub fn ta(&self) -> f64 {
+    pub fn ta_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 if self.ecc() < ECC_EPSILON {
@@ -1116,7 +1118,7 @@ impl Orbit {
                         self.ecc()
                     );
                 }
-                let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag());
+                let cos_nu = self.evec().dot(&self.radius()) / (self.ecc() * self.rmag_km());
                 // If we're close the valid bounds, let's just do a sign check and return the true anomaly
                 let ta = cos_nu.acos();
                 if ta.is_nan() {
@@ -1136,13 +1138,13 @@ impl Orbit {
     }
 
     /// Mutates this orbit to change the TA
-    pub fn set_ta(&mut self, new_ta: f64) {
+    pub fn set_ta_deg(&mut self, new_ta: f64) {
         let me = Self::keplerian(
-            self.sma(),
+            self.sma_km(),
             self.ecc(),
-            self.inc(),
-            self.raan(),
-            self.aop(),
+            self.inc_deg(),
+            self.raan_deg(),
+            self.aop_deg(),
             new_ta,
             self.epoch,
             self.frame,
@@ -1157,11 +1159,11 @@ impl Orbit {
     }
 
     /// Returns the true longitude in degrees
-    pub fn tlong(&self) -> f64 {
+    pub fn tlong_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 // Angles already in degrees
-                between_0_360(self.aop() + self.raan() + self.ta())
+                between_0_360(self.aop_deg() + self.raan_deg() + self.ta_deg())
             }
             _ => panic!("true longitude not defined in this frame"),
         }
@@ -1171,13 +1173,13 @@ impl Orbit {
     ///
     /// NOTE: If the orbit is near circular, the AoL will be computed from the true longitude
     /// instead of relying on the ill-defined true anomaly.
-    pub fn aol(&self) -> f64 {
+    pub fn aol_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 between_0_360(if self.ecc() < ECC_EPSILON {
-                    self.tlong() - self.raan()
+                    self.tlong_deg() - self.raan_deg()
                 } else {
-                    self.aop() + self.ta()
+                    self.aop_deg() + self.ta_deg()
                 })
             }
             _ => panic!("argument of latitude not defined in this frame"),
@@ -1185,38 +1187,38 @@ impl Orbit {
     }
 
     /// Returns the radius of periapsis (or perigee around Earth), in kilometers.
-    pub fn periapsis(&self) -> f64 {
+    pub fn periapsis_km(&self) -> f64 {
         match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => self.sma() * (1.0 - self.ecc()),
+            Frame::Celestial { .. } | Frame::Geoid { .. } => self.sma_km() * (1.0 - self.ecc()),
             _ => panic!("periapsis not defined in this frame"),
         }
     }
 
     /// Returns the radius of apoapsis (or apogee around Earth), in kilometers.
-    pub fn apoapsis(&self) -> f64 {
+    pub fn apoapsis_km(&self) -> f64 {
         match self.frame {
-            Frame::Celestial { .. } | Frame::Geoid { .. } => self.sma() * (1.0 + self.ecc()),
+            Frame::Celestial { .. } | Frame::Geoid { .. } => self.sma_km() * (1.0 + self.ecc()),
             _ => panic!("apoapsis not defined in this frame"),
         }
     }
 
     /// Returns the altitude of periapsis (or perigee around Earth), in kilometers.
-    pub fn periapsis_altitude(&self) -> f64 {
-        self.periapsis() - self.frame.equatorial_radius()
+    pub fn periapsis_altitude_km(&self) -> f64 {
+        self.periapsis_km() - self.frame.equatorial_radius()
     }
 
     /// Returns the altitude of apoapsis (or apogee around Earth), in kilometers.
-    pub fn apoapsis_altitude(&self) -> f64 {
-        self.apoapsis() - self.frame.equatorial_radius()
+    pub fn apoapsis_altitude_km(&self) -> f64 {
+        self.apoapsis_km() - self.frame.equatorial_radius()
     }
 
     /// Returns the eccentric anomaly in degrees
     ///
     /// This is a conversion from GMAT's StateConversionUtil::TrueToEccentricAnomaly
-    pub fn ea(&self) -> f64 {
+    pub fn ea_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                let (sin_ta, cos_ta) = self.ta().to_radians().sin_cos();
+                let (sin_ta, cos_ta) = self.ta_deg().to_radians().sin_cos();
                 let ecc_cos_ta = self.ecc() * cos_ta;
                 let sin_ea = ((1.0 - self.ecc().powi(2)).sqrt() * sin_ta) / (1.0 + ecc_cos_ta);
                 let cos_ea = (self.ecc() + cos_ta) / (1.0 + ecc_cos_ta);
@@ -1228,8 +1230,8 @@ impl Orbit {
     }
 
     /// Returns the flight path angle in degrees
-    pub fn fpa(&self) -> f64 {
-        let nu = self.ta().to_radians();
+    pub fn fpa_deg(&self) -> f64 {
+        let nu = self.ta_deg().to_radians();
         let ecc = self.ecc();
         let denom = (1.0 + 2.0 * ecc * nu.cos() + ecc.powi(2)).sqrt();
         let sin_fpa = ecc * nu.sin() / denom;
@@ -1240,19 +1242,20 @@ impl Orbit {
     /// Returns the mean anomaly in degrees
     ///
     /// This is a conversion from GMAT's StateConversionUtil::TrueToMeanAnomaly
-    pub fn ma(&self) -> f64 {
+    pub fn ma_deg(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
                 if self.ecc() < 1.0 {
                     between_0_360(
-                        (self.ea().to_radians() - self.ecc() * self.ea().to_radians().sin())
-                            .to_degrees(),
+                        (self.ea_deg().to_radians()
+                            - self.ecc() * self.ea_deg().to_radians().sin())
+                        .to_degrees(),
                     )
                 } else if self.ecc() > 1.0 {
                     info!("computing the hyperbolic anomaly");
                     // From GMAT's TrueToHyperbolicAnomaly
-                    ((self.ta().to_radians().sin() * (self.ecc().powi(2) - 1.0)).sqrt()
-                        / (1.0 + self.ecc() * self.ta().to_radians().cos()))
+                    ((self.ta_deg().to_radians().sin() * (self.ecc().powi(2) - 1.0)).sqrt()
+                        / (1.0 + self.ecc() * self.ta_deg().to_radians().cos()))
                     .asinh()
                     .to_degrees()
                 } else {
@@ -1265,10 +1268,10 @@ impl Orbit {
     }
 
     /// Returns the semi parameter (or semilatus rectum)
-    pub fn semi_parameter(&self) -> f64 {
+    pub fn semi_parameter_km(&self) -> f64 {
         match self.frame {
             Frame::Celestial { .. } | Frame::Geoid { .. } => {
-                self.sma() * (1.0 - self.ecc().powi(2))
+                self.sma_km() * (1.0 - self.ecc().powi(2))
             }
             _ => panic!("semi parameter is not defined in this frame"),
         }
@@ -1282,13 +1285,13 @@ impl Orbit {
     /// NOTE: Mean Brouwer Short are only defined around Earth. However, `nyx` does *not* check the
     /// main celestial body around which the state is defined (GMAT does perform this verification).
     pub fn is_brouwer_short_valid(&self) -> bool {
-        if self.inc() > 180.0 {
+        if self.inc_deg() > 180.0 {
             info!("Brouwer Mean Short only applicable for inclinations less than 180.0");
             false
         } else if self.ecc() >= 1.0 || self.ecc() < 0.0 {
             info!("Brouwer Mean Short only applicable for elliptical orbits");
             false
-        } else if self.periapsis() < 3000.0 {
+        } else if self.periapsis_km() < 3000.0 {
             // NOTE: GMAT emits a warning if the periagee is less than the Earth radius, but we do not do that here.
             info!("Brouwer Mean Short only applicable for if perigee is greater than 3000 km");
             false
@@ -1301,7 +1304,7 @@ impl Orbit {
     ///
     /// Although the reference is not Vallado, the math from Vallado proves to be equivalent.
     /// Reference: G. Xu and Y. Xu, "GPS", DOI 10.1007/978-3-662-50367-6_2, 2016
-    pub fn geodetic_longitude(&self) -> f64 {
+    pub fn geodetic_longitude_deg(&self) -> f64 {
         match self.frame {
             Frame::Geoid { .. } => between_0_360(self.y_km.atan2(self.x_km).to_degrees()),
             _ => panic!("geodetic elements only defined in a Geoid frame"),
@@ -1311,7 +1314,7 @@ impl Orbit {
     /// Returns the geodetic latitude (φ) in degrees. Value is between -180 and +180 degrees.
     ///
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
-    pub fn geodetic_latitude(&self) -> f64 {
+    pub fn geodetic_latitude_deg(&self) -> f64 {
         match self.frame {
             Frame::Geoid {
                 flattening,
@@ -1325,7 +1328,7 @@ impl Orbit {
                 let max_attempts = 20;
                 let mut attempt_no = 0;
                 let r_delta = (self.x_km.powi(2) + self.y_km.powi(2)).sqrt();
-                let mut latitude = (self.z_km / self.rmag()).asin();
+                let mut latitude = (self.z_km / self.rmag_km()).asin();
                 let e2 = flattening * (2.0 - flattening);
                 loop {
                     attempt_no += 1;
@@ -1351,7 +1354,7 @@ impl Orbit {
     /// Returns the geodetic height in km.
     ///
     /// Reference: Vallado, 4th Ed., Algorithm 12 page 172.
-    pub fn geodetic_height(&self) -> f64 {
+    pub fn geodetic_height_km(&self) -> f64 {
         match self.frame {
             Frame::Geoid {
                 flattening,
@@ -1362,7 +1365,7 @@ impl Orbit {
                     warn!("Computation of geodetic height must be done in a body fixed frame and {} is not one!", self.frame);
                 }
                 let e2 = flattening * (2.0 - flattening);
-                let latitude = self.geodetic_latitude().to_radians();
+                let latitude = self.geodetic_latitude_deg().to_radians();
                 let sin_lat = latitude.sin();
                 if (latitude - 1.0).abs() < 0.1 {
                     // We are near poles, let's use another formulation.
@@ -1380,40 +1383,40 @@ impl Orbit {
     }
 
     /// Returns the right ascension of this orbit in degrees
-    pub fn right_ascension(&self) -> f64 {
+    pub fn right_ascension_deg(&self) -> f64 {
         between_0_360((self.y_km.atan2(self.x_km)).to_degrees())
     }
 
     /// Returns the declination of this orbit in degrees
-    pub fn declination(&self) -> f64 {
-        between_pm_180((self.z_km / self.rmag()).asin().to_degrees())
+    pub fn declination_deg(&self) -> f64 {
+        between_pm_180((self.z_km / self.rmag_km()).asin().to_degrees())
     }
 
     /// Returns the semi minor axis in km, includes code for a hyperbolic orbit
-    pub fn semi_minor_axis(&self) -> f64 {
+    pub fn semi_minor_axis_km(&self) -> f64 {
         if self.ecc() <= 1.0 {
-            ((self.sma() * self.ecc()).powi(2) - self.sma().powi(2)).sqrt()
+            ((self.sma_km() * self.ecc()).powi(2) - self.sma_km().powi(2)).sqrt()
         } else {
-            self.hmag().powi(2) / (self.frame.gm() * (self.ecc().powi(2) - 1.0).sqrt())
+            self.hmag_km2_s().powi(2) / (self.frame.gm() * (self.ecc().powi(2) - 1.0).sqrt())
         }
     }
 
     /// Returns the velocity declination of this orbit in degrees
-    pub fn velocity_declination(&self) -> f64 {
-        between_pm_180((self.vz_km_s / self.vmag()).asin().to_degrees())
+    pub fn velocity_declination_deg(&self) -> f64 {
+        between_pm_180((self.vz_km_s / self.vmag_km_s()).asin().to_degrees())
     }
 
     pub fn b_plane(&self) -> Result<BPlane, NyxError> {
         BPlane::new(*self)
     }
 
-    /// Returns the $C_3$ of this orbit
-    pub fn c3(&self) -> f64 {
-        -self.frame.gm() / self.sma()
+    /// Returns the $C_3$ of this orbit in km^2/s^2
+    pub fn c3_km2_s2(&self) -> f64 {
+        -self.frame.gm() / self.sma_km()
     }
 
     /// Returns the radius of periapse in kilometers for the provided turn angle of this hyperbolic orbit.
-    pub fn vinf_periapsis(&self, turn_angle_degrees: f64) -> Result<f64, NyxError> {
+    pub fn vinf_periapsis_km(&self, turn_angle_degrees: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
             Err(NyxError::NotHyperbolic(
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
@@ -1421,30 +1424,31 @@ impl Orbit {
         } else {
             let cos_rho = (0.5 * (PI - turn_angle_degrees.to_radians())).cos();
 
-            Ok((1.0 / cos_rho - 1.0) * self.frame.gm() / self.vmag().powi(2))
+            Ok((1.0 / cos_rho - 1.0) * self.frame.gm() / self.vmag_km_s().powi(2))
         }
     }
 
     /// Returns the turn angle in degrees for the provided radius of periapse passage of this hyperbolic orbit
-    pub fn vinf_turn_angle(&self, periapsis_km: f64) -> Result<f64, NyxError> {
+    pub fn vinf_turn_angle_deg(&self, periapsis_km: f64) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
             Err(NyxError::NotHyperbolic(
                 "Orbit is not hyperbolic. Convert to target object first".to_string(),
             ))
         } else {
-            let rho = (1.0 / (1.0 + self.vmag().powi(2) * (periapsis_km / self.frame.gm()))).acos();
+            let rho =
+                (1.0 / (1.0 + self.vmag_km_s().powi(2) * (periapsis_km / self.frame.gm()))).acos();
             Ok(between_0_360((PI - 2.0 * rho).to_degrees()))
         }
     }
 
     /// Returns the hyperbolic anomaly in degrees between 0 and 360.0
-    pub fn hyperbolic_anomaly(&self) -> Result<f64, NyxError> {
+    pub fn hyperbolic_anomaly_deg(&self) -> Result<f64, NyxError> {
         if self.ecc() <= 1.0 {
             Err(NyxError::NotHyperbolic(
                 "Orbit is not hyperbolic so there is no hyperbolic anomaly.".to_string(),
             ))
         } else {
-            let (sin_ta, cos_ta) = self.ta().to_radians().sin_cos();
+            let (sin_ta, cos_ta) = self.ta_deg().to_radians().sin_cos();
             let sinh_h = (sin_ta * (self.ecc().powi(2) - 1.0).sqrt()) / (1.0 + self.ecc() * cos_ta);
             Ok(between_0_360(sinh_h.asinh().to_degrees()))
         }
@@ -1649,7 +1653,7 @@ impl Orbit {
     #[cfg(feature = "python")]
     #[setter(sma_km)]
     fn py_set_sma(&mut self, new_sma_km: f64) -> PyResult<()> {
-        self.set_sma(new_sma_km);
+        self.set_sma_km(new_sma_km);
         Ok(())
     }
 
@@ -1663,34 +1667,34 @@ impl Orbit {
     #[cfg(feature = "python")]
     #[setter(inc_deg)]
     fn py_set_inc(&mut self, new_inc_deg: f64) -> PyResult<()> {
-        self.set_inc(new_inc_deg);
+        self.set_inc_deg(new_inc_deg);
         Ok(())
     }
 
     #[cfg(feature = "python")]
     #[setter(inc_deg)]
     fn py_set_raan(&mut self, new_raan_deg: f64) -> PyResult<()> {
-        self.set_raan(new_raan_deg);
+        self.set_raan_deg(new_raan_deg);
         Ok(())
     }
 
     #[cfg(feature = "python")]
     #[setter(aop_deg)]
     fn py_set_aop(&mut self, new_aop_deg: f64) -> PyResult<()> {
-        self.set_aop(new_aop_deg);
+        self.set_aop_deg(new_aop_deg);
         Ok(())
     }
 
     #[cfg(feature = "python")]
     #[setter(ta_deg)]
     fn py_set_ta(&mut self, new_ta_deg: f64) -> PyResult<()> {
-        self.set_ta(new_ta_deg);
+        self.set_ta_deg(new_ta_deg);
         Ok(())
     }
 
     /// Returns the value of the provided state parameter if available
     #[cfg(feature = "python")]
-    fn value_of(&self, param: &StateParameter) -> Result<f64, NyxError> {
+    fn value_of(&self, param: StateParameter) -> Result<f64, NyxError> {
         self.value(param)
     }
 }
@@ -1900,12 +1904,12 @@ impl fmt::LowerHex for Orbit {
             "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
             self.frame,
             self.epoch,
-            format!("{:.*}", decimals, self.sma()),
+            format!("{:.*}", decimals, self.sma_km()),
             format!("{:.*}", decimals, self.ecc()),
-            format!("{:.*}", decimals, self.inc()),
-            format!("{:.*}", decimals, self.raan()),
-            format!("{:.*}", decimals, self.aop()),
-            format!("{:.*}", decimals, self.ta()),
+            format!("{:.*}", decimals, self.inc_deg()),
+            format!("{:.*}", decimals, self.raan_deg()),
+            format!("{:.*}", decimals, self.aop_deg()),
+            format!("{:.*}", decimals, self.ta_deg()),
         )
     }
 }
@@ -1920,12 +1924,12 @@ impl fmt::UpperHex for Orbit {
             "[{}] {}\tsma = {} km\tecc = {}\tinc = {} deg\traan = {} deg\taop = {} deg\tta = {} deg",
             self.frame,
             self.epoch,
-            format!("{:.*e}", decimals, self.sma()),
+            format!("{:.*e}", decimals, self.sma_km()),
             format!("{:.*e}", decimals, self.ecc()),
-            format!("{:.*e}", decimals, self.inc()),
-            format!("{:.*e}", decimals, self.raan()),
-            format!("{:.*e}", decimals, self.aop()),
-            format!("{:.*e}", decimals, self.ta()),
+            format!("{:.*e}", decimals, self.inc_deg()),
+            format!("{:.*e}", decimals, self.raan_deg()),
+            format!("{:.*e}", decimals, self.aop_deg()),
+            format!("{:.*e}", decimals, self.ta_deg()),
         )
     }
 }
@@ -2011,42 +2015,42 @@ impl State for Orbit {
         self + other
     }
 
-    fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
-        match *param {
-            StateParameter::ApoapsisRadius => Ok(self.apoapsis()),
-            StateParameter::AoL => Ok(self.aol()),
-            StateParameter::AoP => Ok(self.aop()),
+    fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
+        match param {
+            StateParameter::ApoapsisRadius => Ok(self.apoapsis_km()),
+            StateParameter::AoL => Ok(self.aol_deg()),
+            StateParameter::AoP => Ok(self.aop_deg()),
             StateParameter::BdotR => Ok(BPlane::new(*self)?.b_r.real()),
             StateParameter::BdotT => Ok(BPlane::new(*self)?.b_t.real()),
             StateParameter::BLTOF => Ok(BPlane::new(*self)?.ltof_s.real()),
-            StateParameter::C3 => Ok(self.c3()),
-            StateParameter::Declination => Ok(self.declination()),
-            StateParameter::EccentricAnomaly => Ok(self.ea()),
+            StateParameter::C3 => Ok(self.c3_km2_s2()),
+            StateParameter::Declination => Ok(self.declination_deg()),
+            StateParameter::EccentricAnomaly => Ok(self.ea_deg()),
             StateParameter::Eccentricity => Ok(self.ecc()),
-            StateParameter::Energy => Ok(self.energy()),
-            StateParameter::FlightPathAngle => Ok(self.fpa()),
-            StateParameter::GeodeticHeight => Ok(self.geodetic_height()),
-            StateParameter::GeodeticLatitude => Ok(self.geodetic_latitude()),
-            StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude()),
-            StateParameter::Hmag => Ok(self.hmag()),
-            StateParameter::HX => Ok(self.hx()),
-            StateParameter::HY => Ok(self.hy()),
-            StateParameter::HZ => Ok(self.hz()),
-            StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly(),
-            StateParameter::Inclination => Ok(self.inc()),
-            StateParameter::MeanAnomaly => Ok(self.ma()),
-            StateParameter::PeriapsisRadius => Ok(self.periapsis()),
+            StateParameter::Energy => Ok(self.energy_km2_s2()),
+            StateParameter::FlightPathAngle => Ok(self.fpa_deg()),
+            StateParameter::GeodeticHeight => Ok(self.geodetic_height_km()),
+            StateParameter::GeodeticLatitude => Ok(self.geodetic_latitude_deg()),
+            StateParameter::GeodeticLongitude => Ok(self.geodetic_longitude_deg()),
+            StateParameter::Hmag => Ok(self.hmag_km2_s()),
+            StateParameter::HX => Ok(self.hx_km2_s()),
+            StateParameter::HY => Ok(self.hy_km2_s()),
+            StateParameter::HZ => Ok(self.hz_km2_s()),
+            StateParameter::HyperbolicAnomaly => self.hyperbolic_anomaly_deg(),
+            StateParameter::Inclination => Ok(self.inc_deg()),
+            StateParameter::MeanAnomaly => Ok(self.ma_deg()),
+            StateParameter::PeriapsisRadius => Ok(self.periapsis_km()),
             StateParameter::Period => Ok(self.period().to_seconds()),
-            StateParameter::RightAscension => Ok(self.right_ascension()),
-            StateParameter::RAAN => Ok(self.raan()),
-            StateParameter::Rmag => Ok(self.rmag()),
-            StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis()),
-            StateParameter::SemiParameter => Ok(self.semi_parameter()),
-            StateParameter::SMA => Ok(self.sma()),
-            StateParameter::TrueAnomaly => Ok(self.ta()),
-            StateParameter::TrueLongitude => Ok(self.tlong()),
-            StateParameter::VelocityDeclination => Ok(self.velocity_declination()),
-            StateParameter::Vmag => Ok(self.vmag()),
+            StateParameter::RightAscension => Ok(self.right_ascension_deg()),
+            StateParameter::RAAN => Ok(self.raan_deg()),
+            StateParameter::Rmag => Ok(self.rmag_km()),
+            StateParameter::SemiMinorAxis => Ok(self.semi_minor_axis_km()),
+            StateParameter::SemiParameter => Ok(self.semi_parameter_km()),
+            StateParameter::SMA => Ok(self.sma_km()),
+            StateParameter::TrueAnomaly => Ok(self.ta_deg()),
+            StateParameter::TrueLongitude => Ok(self.tlong_deg()),
+            StateParameter::VelocityDeclination => Ok(self.velocity_declination_deg()),
+            StateParameter::Vmag => Ok(self.vmag_km_s()),
             StateParameter::X => Ok(self.x_km),
             StateParameter::Y => Ok(self.y_km),
             StateParameter::Z => Ok(self.z_km),
@@ -2057,14 +2061,14 @@ impl State for Orbit {
         }
     }
 
-    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
-        match *param {
-            StateParameter::AoP => self.set_aop(val),
+    fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), NyxError> {
+        match param {
+            StateParameter::AoP => self.set_aop_deg(val),
             StateParameter::Eccentricity => self.set_ecc(val),
-            StateParameter::Inclination => self.set_inc(val),
-            StateParameter::RAAN => self.set_raan(val),
-            StateParameter::SMA => self.set_sma(val),
-            StateParameter::TrueAnomaly => self.set_ta(val),
+            StateParameter::Inclination => self.set_inc_deg(val),
+            StateParameter::RAAN => self.set_raan_deg(val),
+            StateParameter::SMA => self.set_sma_km(val),
+            StateParameter::TrueAnomaly => self.set_ta_deg(val),
             StateParameter::X => self.x_km = val,
             StateParameter::Y => self.y_km = val,
             StateParameter::Z => self.z_km = val,
@@ -2202,7 +2206,7 @@ epoch: 2018-09-15T00:15:53.098 UTC
     println!("{}", serde_yaml::to_string(&as_serde).unwrap());
 
     // Try to deserialize from Keplerian
-    let s = format!("sma_km: {}\necc: {}\ninc_deg: {}\nraan_deg: {}\naop_deg: {}\nta_deg: {}\nepoch: {}\nframe: {}", orbit.sma(), orbit.ecc(), orbit.inc(), orbit.raan(), orbit.aop(), orbit.ta(), orbit.epoch, orbit.frame);
+    let s = format!("sma_km: {}\necc: {}\ninc_deg: {}\nraan_deg: {}\naop_deg: {}\nta_deg: {}\nepoch: {}\nframe: {}", orbit.sma_km(), orbit.ecc(), orbit.inc_deg(), orbit.raan_deg(), orbit.aop_deg(), orbit.ta_deg(), orbit.epoch, orbit.frame);
     println!("{s}");
     let deserd: OrbitSerde = serde_yaml::from_str(&s).unwrap();
     let deser_orbit: Orbit = deserd.into();

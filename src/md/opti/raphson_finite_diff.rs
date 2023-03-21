@@ -255,7 +255,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                         _ => unreachable!(),
                     }
                 } else {
-                    xf_dual_obj_frame.partial_for(&obj.parameter)?
+                    xf_dual_obj_frame.partial_for(obj.parameter)?
                 };
 
                 let achieved = partial.real();
@@ -435,7 +435,7 @@ impl<'a, E: ErrorCtrl, const V: usize, const O: usize> Optimizer<'a, E, V, O> {
                             _ => unreachable!(),
                         }
                     } else {
-                        xf_dual_obj_frame.partial_for(&obj.parameter).unwrap()
+                        xf_dual_obj_frame.partial_for(obj.parameter).unwrap()
                     };
 
                     let this_achieved = partial.real();

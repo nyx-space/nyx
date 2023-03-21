@@ -55,6 +55,28 @@ impl Default for GuidanceMode {
     }
 }
 
+impl From<f64> for GuidanceMode {
+    fn from(value: f64) -> Self {
+        if value >= 1.0 {
+            Self::Thrust
+        } else if value < 0.0 {
+            Self::Inhibit
+        } else {
+            Self::Coast
+        }
+    }
+}
+
+impl From<GuidanceMode> for f64 {
+    fn from(mode: GuidanceMode) -> f64 {
+        match mode {
+            GuidanceMode::Coast => 0.0,
+            GuidanceMode::Thrust => 1.0,
+            GuidanceMode::Inhibit => -1.0,
+        }
+    }
+}
+
 /// A spacecraft state
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "python", pyclass)]
@@ -532,10 +554,11 @@ impl State for Spacecraft {
         self + other
     }
 
-    fn value(&self, param: &StateParameter) -> Result<f64, NyxError> {
-        match *param {
+    fn value(&self, param: StateParameter) -> Result<f64, NyxError> {
+        match param {
             StateParameter::Cd => Ok(self.drag.cd),
             StateParameter::Cr => Ok(self.srp.cr),
+            StateParameter::DryMass => Ok(self.dry_mass_kg),
             StateParameter::FuelMass => Ok(self.fuel_mass_kg),
             StateParameter::Isp => match self.thruster {
                 Some(thruster) => Ok(thruster.isp_s),
@@ -545,12 +568,13 @@ impl State for Spacecraft {
                 Some(thruster) => Ok(thruster.thrust_N),
                 None => Err(NyxError::NoThrusterAvail),
             },
+            StateParameter::GuidanceMode => Ok(self.mode.into()),
             _ => self.orbit.value(param),
         }
     }
 
-    fn set_value(&mut self, param: &StateParameter, val: f64) -> Result<(), NyxError> {
-        match *param {
+    fn set_value(&mut self, param: StateParameter, val: f64) -> Result<(), NyxError> {
+        match param {
             StateParameter::Cd => self.drag.cd = val,
             StateParameter::Cr => self.srp.cr = val,
             StateParameter::FuelMass => self.fuel_mass_kg = val,

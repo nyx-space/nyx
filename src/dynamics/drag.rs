@@ -131,7 +131,7 @@ impl ForceModel for Drag {
                 ref_alt_m,
             } => {
                 let rho = rho0
-                    * (-(osc.rmag() - (r0 + self.drag_frame.equatorial_radius())) / ref_alt_m)
+                    * (-(osc.rmag_km() - (r0 + self.drag_frame.equatorial_radius())) / ref_alt_m)
                         .exp();
 
                 let velocity_integr_frame = self.cosm.frame_chg(&osc, integration_frame).velocity();
@@ -141,7 +141,7 @@ impl ForceModel for Drag {
             }
 
             AtmDensity::StdAtm { max_alt_m } => {
-                let altitude_km = osc.rmag() - self.drag_frame.equatorial_radius();
+                let altitude_km = osc.rmag_km() - self.drag_frame.equatorial_radius();
                 let rho = if altitude_km > max_alt_m / 1_000.0 {
                     // Use a constant density
                     10.0_f64.powf((-7e-5) * altitude_km - 14.464)

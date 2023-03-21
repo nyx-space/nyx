@@ -189,6 +189,10 @@ impl EventEvaluator<Orbit> for UmbraEvent {
     fn value_precision(&self) -> f64 {
         0.02
     }
+
+    fn eval_string(&self, state: &Orbit) -> String {
+        format!("{}", self.e_loc.compute(state))
+    }
 }
 
 impl EventEvaluator<Spacecraft> for UmbraEvent {
@@ -208,6 +212,9 @@ impl EventEvaluator<Spacecraft> for UmbraEvent {
     /// Finds the darkest part of an eclipse within 2% of penumbra (i.e. 98% in shadow)
     fn value_precision(&self) -> f64 {
         0.02
+    }
+    fn eval_string(&self, state: &Spacecraft) -> String {
+        format!("{}", self.e_loc.compute(&state.orbit))
     }
 }
 
@@ -239,6 +246,10 @@ impl EventEvaluator<Orbit> for PenumbraEvent {
     fn value_precision(&self) -> f64 {
         0.02
     }
+
+    fn eval_string(&self, state: &Orbit) -> String {
+        format!("{}", self.e_loc.compute(state))
+    }
 }
 
 impl EventEvaluator<Spacecraft> for PenumbraEvent {
@@ -257,6 +268,10 @@ impl EventEvaluator<Spacecraft> for PenumbraEvent {
     /// Finds the slightest penumbra within 2%(i.e. 98% in visibility)
     fn value_precision(&self) -> f64 {
         0.02
+    }
+
+    fn eval_string(&self, state: &Spacecraft) -> String {
+        format!("{}", self.e_loc.compute(&state.orbit))
     }
 }
 

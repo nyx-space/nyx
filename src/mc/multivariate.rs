@@ -165,8 +165,8 @@ where
         for (delta, param) in zip(&x, &self.params) {
             actual_dispersions.push((*param, *delta));
             // We know this state can return something for this param
-            let cur_value = state.value(param).unwrap();
-            state.set_value(param, cur_value + delta).unwrap();
+            let cur_value = state.value(*param).unwrap();
+            state.set_value(*param, cur_value + delta).unwrap();
         }
 
         DispersedState {

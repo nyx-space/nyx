@@ -1,6 +1,7 @@
 use nyx_space::io::stations::StationSerde;
 use nyx_space::io::tracking_data::DynamicTrackingArc;
 use nyx_space::io::{ConfigRepr, Configurable};
+use nyx_space::md::trajectory::ExportCfg;
 use nyx_space::md::ui::*;
 use nyx_space::od::msr::StdMeasurement;
 use nyx_space::od::prelude::*;
@@ -12,7 +13,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 #[test]
-fn tracking_arc_simple() {
+fn continuous_tracking() {
+    // Test that continuous tracking
     if pretty_env_logger::try_init().is_err() {
         println!("could not init env_logger");
     }
@@ -49,7 +51,15 @@ fn tracking_arc_simple() {
     .iter()
     .collect();
 
-    trajectory.to_parquet_simple(path).unwrap();
+    trajectory
+        .to_parquet_with_cfg(
+            path,
+            ExportCfg {
+                timestamp: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     // Load the ground stations from the test data.
     let ground_station_yaml: PathBuf = [

@@ -32,11 +32,6 @@ use crate::{
 
 use super::{estimate::OrbitEstimate, GroundStation};
 
-/// Defines an Orbit Determination Process
-#[pyclass]
-#[pyo3(text_signature = "(parameter, desired_value, epoch_precision=None, value_precision=None)")]
-pub struct ODP {}
-
 /// Propagates the provided spacecraft with the provided dynamics until the provided stopping condition (duration, epoch, or event [and optionally the count]).
 #[pyfunction]
 #[pyo3(
@@ -71,8 +66,7 @@ pub(crate) fn process_tracking_arc(
 
     let concrete_arc = arc.to_tracking_arc()?;
 
-    odp.process_tracking_arc::<GroundStation>(&concrete_arc)
-        .unwrap();
+    odp.process_arc::<GroundStation>(&concrete_arc).unwrap();
 
     // Now build a vector of orbit estimates.
     let mut rslt = Vec::with_capacity(odp.estimates.len());

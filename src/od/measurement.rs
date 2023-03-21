@@ -160,7 +160,7 @@ impl GroundStation {
         let rho_sez = rx_sez - tx_sez;
 
         // Finally, compute the elevation (math is the same as declination)
-        let elevation = rho_sez.declination();
+        let elevation = rho_sez.declination_deg();
 
         // Return elevation in degrees and rx/tx in the inertial frame of the spacecraft
         (elevation, *rx, cosm.frame_chg(&tx_gs_frame, rx.frame))

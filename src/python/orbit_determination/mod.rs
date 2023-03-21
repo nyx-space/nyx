@@ -25,7 +25,7 @@ use crate::od::msr::StdMeasurement;
 use crate::od::simulator::arc::TrackingArcSim;
 pub use crate::od::simulator::TrkConfig;
 pub use crate::{io::ConfigError, od::prelude::GroundStation};
-use crate::{NyxError, Orbit};
+use crate::{NyxError, Orbit, Spacecraft};
 use pyo3::{prelude::*, py_run};
 pub(crate) mod estimate;
 mod ground_station;
@@ -57,7 +57,7 @@ pub(crate) fn register_od(py: Python<'_>, parent_module: &PyModule) -> PyResult<
 #[derive(Clone)]
 #[pyclass]
 pub struct GroundTrackingArcSim {
-    inner: TrackingArcSim<Orbit, StdMeasurement, GroundStation>,
+    inner: TrackingArcSim<Orbit, Spacecraft, StdMeasurement, GroundStation>,
 }
 
 #[pymethods]
@@ -76,18 +76,30 @@ impl GroundTrackingArcSim {
             .map_err(|e| NyxError::CustomError(e.to_string()))?;
 
         let inner = TrackingArcSim::with_seed(devices, traj, configs, seed)
-            .map_err(|e| NyxError::ConfigError(e))?;
+            .map_err(NyxError::ConfigError)?;
 
         Ok(Self { inner })
     }
 
     /// Generates simulated measurements and returns the path where the parquet file containing said measurements is stored.
-    pub fn generate_measurements(&mut self, path: String) -> Result<String, NyxError> {
+    /// You may specify a metadata dictionary to be stored in the parquet file and whether the filename should include the timestamp.
+    #[pyo3(text_signature = "(path, metadata=None, timestamp=False)")]
+    pub fn generate_measurements(
+        &mut self,
+        path: String,
+        metadata: Option<HashMap<String, String>>,
+        timestamp: bool,
+    ) -> Result<String, NyxError> {
         let cosm = Cosm::de438();
         let arc = self.inner.generate_measurements(cosm)?;
+
         // Save the tracking arc
-        arc.to_parquet(path)
-            .map_err(|e| NyxError::CustomError(e.to_string()))
+        let maybe = arc.to_parquet(path, metadata, timestamp);
+
+        match maybe {
+            Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
+            Err(e) => Err(NyxError::CustomError(e.to_string())),
+        }
     }
 
     pub fn __repr__(&self) -> String {

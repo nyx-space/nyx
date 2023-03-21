@@ -153,7 +153,7 @@ impl AccelModel for Harmonics {
         let state = self.cosm.frame_chg(osc, self.compute_frame);
 
         // Using the GMAT notation, with extra character for ease of highlight
-        let r_ = state.rmag();
+        let r_ = state.rmag_km();
         let s_ = state.x_km / r_;
         let t_ = state.y_km / r_;
         let u_ = state.z_km / r_;

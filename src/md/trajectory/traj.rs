@@ -17,21 +17,21 @@
 */
 
 use super::traj_it::TrajIterator;
-use super::INTERPOLATION_SAMPLES;
+use super::{ExportCfg, INTERPOLATION_SAMPLES};
 use super::{InterpState, TrajError};
 use crate::cosmic::{Cosm, Frame, Orbit, Spacecraft};
 use crate::errors::NyxError;
-use crate::io::formatter::StateFormatter;
 use crate::io::watermark::pq_writer;
 use crate::linalg::allocator::Allocator;
 use crate::linalg::DefaultAllocator;
+use crate::md::events::EventEvaluator;
+use crate::md::ui::GuidanceMode;
 use crate::md::StateParameter;
-use crate::md::{events::EventEvaluator, MdHdlr, OrbitStateOutput};
-use crate::time::{Duration, Epoch, TimeSeries, Unit};
-use crate::State;
+use crate::time::{Duration, Epoch, TimeSeries, TimeUnits, Unit};
 use arrow::array::{ArrayRef, Float64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use hifitime::prelude::{Format, Formatter};
 use parquet::arrow::ArrowWriter;
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -40,7 +40,8 @@ use std::fmt;
 use std::fs::File;
 use std::iter::Iterator;
 use std::ops;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Instant;
@@ -176,10 +177,21 @@ where
 
         // Check if we're already at the root
         if ya.abs() <= event.value_precision().abs() {
+            debug!(
+                "{event} -- found with |{ya}| < {} @ {xa_e}",
+                event.value_precision().abs()
+            );
             return self.at(xa_e);
         } else if yb.abs() <= event.value_precision().abs() {
+            debug!(
+                "{event} -- found with |{yb}| < {} @ {xb_e}",
+                event.value_precision().abs()
+            );
             return self.at(xb_e);
         }
+
+        debug!("{event}: eval@{xa_e} = {ya}\t eval@{xb_e} = {yb}");
+
         // The Brent solver, from the roots crate (sadly could not directly integrate it here)
         // Source: https://docs.rs/roots/0.0.5/src/roots/numerical/brent.rs.html#57-131
 
@@ -253,11 +265,19 @@ where
         )))
     }
 
-    /// Find (usually) all of the states where the event happens.
-    /// WARNING: The initial search step is 1% of the duration of the trajectory duration!
+    /// Find all of the states where the event happens (usually, and with caveats).
+    ///
+    /// # Limitations
+    /// This method uses a Brent solver. If the function that defines the event is not unimodal, the event finder may not converge correctly.
+    ///
+    /// # Heuristic detail
+    /// The initial search step is 1% of the duration of the trajectory duration.
     /// For example, if the trajectory is 100 days long, then we split the trajectory into 100 chunks of 1 day and see whether
     /// the event is in there. If the event happens twice or more times within 1% of the trajectory duration, only the _one_ of
     /// such events will be found.
+    ///
+    /// If this heuristic fails to find any such events, then `find_minmax` is called on the event with a time precision of `Unit::Second`.
+    /// Then we search only within the min and max bounds of the provided event.
     #[allow(clippy::identity_op)]
     pub fn find_all<E>(&self, event: &E) -> Result<Vec<S>, NyxError>
     where
@@ -356,7 +376,11 @@ where
         states.sort_by(|s1, s2| s1.epoch().partial_cmp(&s2.epoch()).unwrap());
         states.dedup();
         for (cnt, event_state) in states.iter().enumerate() {
-            info!("{} #{}: {}", event, cnt + 1, event_state);
+            info!(
+                "{event} #{}: {} for {event_state}",
+                cnt + 1,
+                event.eval_string(event_state)
+            );
         }
         Ok(states)
     }
@@ -399,27 +423,28 @@ where
         Ok((min_state, max_state))
     }
 
-    /// Store this tracking arc to a parquet file
+    /// Store this trajectory arc to a parquet file with the default configuration (depends on the state type, search for `export_params` in the documentation for details).
+    pub fn to_parquet_simple<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet(path, None, ExportCfg::default())
+    }
+
+    /// Store this trajectory arc to a parquet file with the provided configuration
+    pub fn to_parquet_with_cfg<P: AsRef<Path>>(
+        &self,
+        path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet(path, None, cfg)
+    }
+
+    /// Store this trajectory arc to a parquet file with the provided configuration and event evaluators
     pub fn to_parquet<P: AsRef<Path>>(
         &self,
         path: P,
-        additional_fields: Option<Vec<StateParameter>>,
-    ) -> Result<P, Box<dyn Error>> {
-        let mut fields = vec![
-            StateParameter::X,
-            StateParameter::Y,
-            StateParameter::Z,
-            StateParameter::VX,
-            StateParameter::VY,
-            StateParameter::VZ,
-        ];
-
-        if let Some(mut additional_fields) = additional_fields {
-            fields.append(&mut additional_fields);
-        }
-
+        events: Option<Vec<&dyn EventEvaluator<S>>>,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, Box<dyn Error>> {
         // Build the schema
-        // TODO: Add the custom headers and frame conversions, etc. from state formatter
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
             Field::new("Epoch:Gregorian TAI", DataType::Utf8, false),
@@ -430,56 +455,201 @@ where
             "Frame".to_string(),
             format!("{}", self.states[0].frame()),
         )]);
+
+        let mut fields = match cfg.fields {
+            Some(fields) => fields,
+            None => S::export_params(),
+        };
+
+        // Check that we can retrieve this information
+        fields.retain(|param| match self.first().value(*param) {
+            Ok(_) => true,
+            Err(_) => {
+                warn!("Removed unavailable field `{param}` from trajectory export",);
+                false
+            }
+        });
+
         for field in &fields {
             hdrs.push(field.to_field(more_meta.clone()));
+        }
+
+        if let Some(events) = events.as_ref() {
+            for event in events {
+                let field = Field::new(format!("{event}"), DataType::Float64, false);
+                hdrs.push(field);
+            }
         }
 
         // Build the schema
         let schema = Arc::new(Schema::new(hdrs));
         let mut record = Vec::new();
 
-        // Build all of the records
-        record.push(Arc::new(StringArray::from(
-            self.states
-                .iter()
-                .map(|s| format!("{}", s.epoch()))
-                .collect::<Vec<String>>(),
-        )) as ArrayRef);
+        // Build the states iterator
 
-        // TDB epoch
-        record.push(Arc::new(StringArray::from(
-            self.states
-                .iter()
-                .map(|s| format!("{:x}", s.epoch()))
-                .collect::<Vec<String>>(),
-        )) as ArrayRef);
+        if cfg.start_epoch.is_some() || cfg.end_epoch.is_some() || cfg.step.is_some() {
+            let start = if let Some(start) = cfg.start_epoch {
+                start
+            } else {
+                self.first().epoch()
+            };
 
-        // TDB Epoch seconds
-        record.push(Arc::new(Float64Array::from(
-            self.states
-                .iter()
-                .map(|s| s.epoch().to_tai_seconds())
-                .collect::<Vec<f64>>(),
-        )) as ArrayRef);
+            let end = if let Some(end) = cfg.end_epoch {
+                end
+            } else {
+                self.last().epoch()
+            };
 
-        // Add all of the fields
+            let step = if let Some(step) = cfg.step {
+                step
+            } else {
+                1.minutes()
+            };
 
-        for field in fields {
+            // Build all of the records
+            let mut data = Vec::new();
+            for s in self.every_between(step, start, end) {
+                data.push(format!("{}", s.epoch()));
+            }
+            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
+
+            // TDB epoch
+            let mut data = Vec::new();
+            for s in self.every_between(step, start, end) {
+                data.push(format!("{:x}", s.epoch()));
+            }
+            record.push(Arc::new(StringArray::from(data)) as ArrayRef);
+
+            // TAI Epoch seconds
+            let mut data = Vec::new();
+            for s in self.every_between(step, start, end) {
+                data.push(s.epoch().to_tai_seconds());
+            }
+            record.push(Arc::new(Float64Array::from(data)) as ArrayRef);
+
+            // Add all of the fields
+            // This is super ugly, but I can't seem to convert the TrajIterator into an `Iter<S>`
+            for field in fields {
+                if field == StateParameter::GuidanceMode {
+                    // This is the only string field
+                    record.push(Arc::new(StringArray::from({
+                        let mut data = Vec::new();
+                        for s in self.every_between(step, start, end) {
+                            let mode = GuidanceMode::from(s.value(field).unwrap());
+
+                            data.push(format!("{mode:?}"));
+                        }
+                        data
+                    })) as ArrayRef);
+                } else {
+                    record.push(Arc::new(Float64Array::from({
+                        let mut data = Vec::new();
+                        for s in self.every_between(step, start, end) {
+                            data.push(s.value(field).unwrap());
+                        }
+                        data
+                    })) as ArrayRef);
+                }
+            }
+            // Add all of the evaluated events
+            if let Some(events) = events {
+                for event in events {
+                    record.push(Arc::new(Float64Array::from({
+                        let mut data = Vec::new();
+                        for s in self.every_between(step, start, end) {
+                            data.push(event.eval(&s));
+                        }
+                        data
+                    })) as ArrayRef);
+                }
+            }
+        } else {
+            // Build all of the records
+            record.push(Arc::new(StringArray::from(
+                self.states
+                    .iter()
+                    .map(|s| format!("{}", s.epoch()))
+                    .collect::<Vec<String>>(),
+            )) as ArrayRef);
+
+            // TDB epoch
+            record.push(Arc::new(StringArray::from(
+                self.states
+                    .iter()
+                    .map(|s| format!("{:x}", s.epoch()))
+                    .collect::<Vec<String>>(),
+            )) as ArrayRef);
+
+            // TDB Epoch seconds
             record.push(Arc::new(Float64Array::from(
                 self.states
                     .iter()
-                    .map(|s| s.value(&field).unwrap())
+                    .map(|s| s.epoch().to_tai_seconds())
                     .collect::<Vec<f64>>(),
             )) as ArrayRef);
+
+            // Add all of the fields
+            for field in fields {
+                if field == StateParameter::GuidanceMode {
+                    record.push(Arc::new(StringArray::from(
+                        self.states
+                            .iter()
+                            .map(|s| format!("{:?}", GuidanceMode::from(s.value(field).unwrap())))
+                            .collect::<Vec<String>>(),
+                    )) as ArrayRef);
+                } else {
+                    record.push(Arc::new(Float64Array::from(
+                        self.states
+                            .iter()
+                            .map(|s| s.value(field).unwrap())
+                            .collect::<Vec<f64>>(),
+                    )) as ArrayRef);
+                }
+            }
+
+            // Add all of the evaluated events
+            if let Some(events) = events {
+                for event in events {
+                    record.push(Arc::new(Float64Array::from({
+                        self.states
+                            .iter()
+                            .map(|s| event.eval(s))
+                            .collect::<Vec<f64>>()
+                    })) as ArrayRef);
+                }
+            }
         }
 
         // Serialize all of the devices and add that to the parquet file too.
         let mut metadata = HashMap::new();
         metadata.insert("Purpose".to_string(), "Trajectory data".to_string());
-        // TODO: Add mission phases here or whatever events are passed as an input
+        if let Some(add_meta) = cfg.metadata {
+            for (k, v) in add_meta {
+                metadata.insert(k, v);
+            }
+        }
 
         let props = pq_writer(Some(metadata));
-        let file = File::create(&path)?;
+
+        let mut path_buf = path.as_ref().to_path_buf();
+
+        if cfg.timestamp {
+            if let Some(file_name) = path_buf.file_name() {
+                if let Some(file_name_str) = file_name.to_str() {
+                    if let Some(extension) = path_buf.extension() {
+                        let stamp = Formatter::new(
+                            Epoch::now().unwrap(),
+                            Format::from_str("%Y-%m-%dT%H-%M-%S").unwrap(),
+                        );
+                        let new_file_name =
+                            format!("{file_name_str}-{stamp}.{}", extension.to_str().unwrap());
+                        path_buf.set_file_name(new_file_name);
+                    }
+                }
+            }
+        };
+
+        let file = File::create(&path_buf)?;
         let mut writer = ArrowWriter::try_new(file, schema.clone(), props).unwrap();
 
         let batch = RecordBatch::try_new(schema, record)?;
@@ -487,7 +657,7 @@ where
         writer.close()?;
 
         // Return the path this was written to
-        Ok(path)
+        Ok(path_buf)
     }
 }
 
@@ -584,106 +754,30 @@ impl Traj<Orbit> {
         Ok(traj)
     }
 
-    /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
-    pub fn to_csv_with_step(
-        &self,
-        filename: &str,
-        step: Duration,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::default(filename.to_string(), cosm);
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        for state in self.every(step) {
-            out.handle(&state);
-        }
-        Ok(())
-    }
-
-    /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
-    pub fn to_csv_between_with_step(
-        &self,
-        filename: &str,
-        start: Option<Epoch>,
-        end: Option<Epoch>,
-        step: Duration,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::default(filename.to_string(), cosm);
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        let start = match start {
-            Some(s) => s,
-            None => self.first().epoch(),
-        };
-        let end = match end {
-            Some(e) => e,
-            None => self.last().epoch(),
-        };
-        for state in self.every_between(step, start, end) {
-            out.handle(&state);
-        }
-        Ok(())
-    }
-
-    /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
-    #[allow(clippy::identity_op)]
-    pub fn to_csv(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        self.to_csv_with_step(filename, 1 * Unit::Minute, cosm)
-    }
-
-    /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
-    #[allow(clippy::identity_op)]
-    pub fn to_csv_between(
-        &self,
-        filename: &str,
-        start: Option<Epoch>,
-        end: Option<Epoch>,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        self.to_csv_between_with_step(filename, start, end, 1 * Unit::Minute, cosm)
-    }
-
-    /// Exports this trajectory to the provided filename in CSV format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
+    /// Exports this trajectory to the provided filename in parquet format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
     /// Must provide a body fixed frame to correctly compute the latitude and longitude.
     #[allow(clippy::identity_op)]
-    pub fn to_groundtrack_csv(
+    pub fn to_groundtrack_parquet<P: AsRef<Path>>(
         &self,
-        filename: &str,
+        path: P,
         body_fixed_frame: Frame,
         cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::from_headers(
-            vec![
-                "epoch",
-                "geodetic_latitude",
-                "geodetic_longitude",
-                "geodetic_height",
-            ],
-            filename.to_string(),
-            cosm.clone(),
-        )?;
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        for state in self
-            .to_frame(body_fixed_frame, cosm)?
-            .every(1 * Unit::Minute)
-        {
-            out.handle(&state);
-        }
-        Ok(())
-    }
+    ) -> Result<(), Box<dyn Error>> {
+        let traj = self.to_frame(body_fixed_frame, cosm)?;
 
-    /// Exports this trajectory to the provided filename in CSV format with the provided headers and the provided step
-    pub fn to_csv_custom(
-        &self,
-        filename: &str,
-        headers: Vec<&str>,
-        step: Duration,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::from_headers(headers, filename.to_string(), cosm)?;
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        for state in self.every(step) {
-            out.handle(&state);
-        }
+        traj.to_parquet_with_cfg(
+            path,
+            ExportCfg {
+                fields: Some(vec![
+                    StateParameter::GeodeticLatitude,
+                    StateParameter::GeodeticLongitude,
+                    StateParameter::GeodeticHeight,
+                ]),
+                step: Some(1 * Unit::Minute),
+                ..Default::default()
+            },
+        )?;
+
         Ok(())
     }
 }
@@ -714,106 +808,47 @@ impl Traj<Spacecraft> {
         Ok(traj)
     }
 
-    /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
-    pub fn to_csv_with_step(
+    /// A shortcut to `to_parquet_with_csv`
+    pub fn to_parquet_with_step<P: AsRef<Path>>(
         &self,
-        filename: &str,
+        path: P,
         step: Duration,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::default(filename.to_string(), cosm);
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        for state in self.every(step) {
-            out.handle(&state);
-        }
+    ) -> Result<(), Box<dyn Error>> {
+        self.to_parquet_with_cfg(
+            path,
+            ExportCfg {
+                step: Some(step),
+                ..Default::default()
+            },
+        )?;
+
         Ok(())
     }
 
-    /// Exports this trajectory to the provided filename in CSV format with the default headers and the provided step
-    pub fn to_csv_between_with_step(
-        &self,
-        filename: &str,
-        start: Option<Epoch>,
-        end: Option<Epoch>,
-        step: Duration,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::default(filename.to_string(), cosm);
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        let start = match start {
-            Some(s) => s,
-            None => self.first().epoch(),
-        };
-        let end = match end {
-            Some(e) => e,
-            None => self.last().epoch(),
-        };
-        for state in self.every_between(step, start, end) {
-            out.handle(&state);
-        }
-        Ok(())
-    }
-
-    /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
-    #[allow(clippy::identity_op)]
-    pub fn to_csv(&self, filename: &str, cosm: Arc<Cosm>) -> Result<(), NyxError> {
-        self.to_csv_with_step(filename, 1 * Unit::Minute, cosm)
-    }
-
-    /// Exports this trajectory to the provided filename in CSV format with the default headers, one state per minute
-    #[allow(clippy::identity_op)]
-    pub fn to_csv_between(
-        &self,
-        filename: &str,
-        start: Option<Epoch>,
-        end: Option<Epoch>,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        self.to_csv_between_with_step(filename, start, end, 1 * Unit::Minute, cosm)
-    }
-
-    /// Exports this trajectory to the provided filename in CSV format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
+    /// Exports this trajectory to the provided filename in parquet format with only the epoch, the geodetic latitude, longitude, and height at one state per minute.
     /// Must provide a body fixed frame to correctly compute the latitude and longitude.
     #[allow(clippy::identity_op)]
-    pub fn to_groundtrack_csv(
+    pub fn to_groundtrack_parquet<P: AsRef<Path>>(
         &self,
-        filename: &str,
+        path: P,
         body_fixed_frame: Frame,
         cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::from_headers(
-            vec![
-                "epoch",
-                "geodetic_latitude",
-                "geodetic_longitude",
-                "geodetic_height",
-            ],
-            filename.to_string(),
-            cosm.clone(),
-        )?;
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        for state in self
-            .to_frame(body_fixed_frame, cosm)?
-            .every(1 * Unit::Minute)
-        {
-            out.handle(&state);
-        }
-        Ok(())
-    }
+    ) -> Result<(), Box<dyn Error>> {
+        let traj = self.to_frame(body_fixed_frame, cosm)?;
 
-    /// Exports this trajectory to the provided filename in CSV format with the provided headers and the provided step
-    pub fn to_csv_custom(
-        &self,
-        filename: &str,
-        headers: Vec<&str>,
-        step: Duration,
-        cosm: Arc<Cosm>,
-    ) -> Result<(), NyxError> {
-        let fmtr = StateFormatter::from_headers(headers, filename.to_string(), cosm)?;
-        let mut out = OrbitStateOutput::new(fmtr)?;
-        for state in self.every(step) {
-            out.handle(&state);
-        }
+        traj.to_parquet_with_cfg(
+            path,
+            ExportCfg {
+                fields: Some(vec![
+                    StateParameter::GeodeticLatitude,
+                    StateParameter::GeodeticLongitude,
+                    StateParameter::GeodeticHeight,
+                ]),
+                step: Some(1 * Unit::Minute),
+                ..Default::default()
+            },
+        )?;
+
         Ok(())
     }
 }

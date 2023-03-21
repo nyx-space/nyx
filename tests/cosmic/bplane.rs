@@ -134,7 +134,7 @@ fn val_b_plane_gmat() {
         let state = cosm.frame_chg(&eme2k_state, luna);
         println!("{}\n{:x}", state, state);
         assert!(
-            dbg!(eme2k_state.c3() - data.c3).abs() < 1e-5,
+            dbg!(eme2k_state.c3_km2_s2() - data.c3).abs() < 1e-5,
             "invalid c3 at {}",
             data.epoch
         );
@@ -192,11 +192,11 @@ fn b_plane_davis() {
     let bp = orbit.b_plane().unwrap();
     assert!((bp.b_dot_t() - 45892.323790).abs() < 1e-5, "incorrect B_T");
     assert!((bp.b_dot_r() - 10606.210428).abs() < 1e-5, "incorrect B_R");
-    println!("{} km/s\n{}", orbit.vmag(), bp);
+    println!("{} km/s\n{}", orbit.vmag_km_s(), bp);
 
     // Check reciprocity between the gravity assist functions.
-    let phi = orbit.vinf_turn_angle(300.0).unwrap();
-    let rp = orbit.vinf_periapsis(phi).unwrap();
+    let phi = orbit.vinf_turn_angle_deg(300.0).unwrap();
+    let rp = orbit.vinf_periapsis_km(phi).unwrap();
 
     assert!(
         (300.0 - rp).abs() < 1e-10,
