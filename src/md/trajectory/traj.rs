@@ -647,7 +647,6 @@ where
                     }
                 }
             }
-        } else {
         };
 
         let file = File::create(&path_buf)?;

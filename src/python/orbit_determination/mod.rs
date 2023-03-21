@@ -92,9 +92,14 @@ impl GroundTrackingArcSim {
     ) -> Result<String, NyxError> {
         let cosm = Cosm::de438();
         let arc = self.inner.generate_measurements(cosm)?;
+
         // Save the tracking arc
-        arc.to_parquet(path, metadata, timestamp)
-            .map_err(|e| NyxError::CustomError(e.to_string()))
+        let maybe = arc.to_parquet(path, metadata, timestamp);
+
+        match maybe {
+            Ok(path) => Ok(format!("{}", path.to_str().unwrap())),
+            Err(e) => Err(NyxError::CustomError(e.to_string())),
+        }
     }
 
     pub fn __repr__(&self) -> String {

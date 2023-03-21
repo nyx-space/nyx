@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -72,7 +72,10 @@ where
     DefaultAllocator: Allocator<f64, Msr::MeasurementSize>,
 {
     /// Store this tracking arc to a parquet file.
-    pub fn to_parquet_simple<P: AsRef<Path> + Debug>(&self, path: P) -> Result<P, Box<dyn Error>> {
+    pub fn to_parquet_simple<P: AsRef<Path> + Debug>(
+        &self,
+        path: P,
+    ) -> Result<PathBuf, Box<dyn Error>> {
         self.to_parquet(path, None, false)
     }
 
@@ -82,7 +85,7 @@ where
         path: P,
         extra_metadata: Option<HashMap<String, String>>,
         timestamp: bool,
-    ) -> Result<P, Box<dyn Error>> {
+    ) -> Result<PathBuf, Box<dyn Error>> {
         // Build the schema
         let mut hdrs = vec![
             Field::new("Epoch:Gregorian UTC", DataType::Utf8, false),
@@ -167,7 +170,6 @@ where
                     }
                 }
             }
-        } else {
         };
 
         let file = File::create(&path_buf)?;
@@ -181,7 +183,7 @@ where
         info!("Serialized {self} to {path:?}");
 
         // Return the path this was written to
-        Ok(path)
+        Ok(path_buf)
     }
 
     /// Returns the unique list of tracking devices in this tracking arc
