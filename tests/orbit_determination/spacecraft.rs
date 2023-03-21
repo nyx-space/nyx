@@ -7,6 +7,8 @@ use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::spacecraft::{SolarPressure, SpacecraftDynamics};
 use nyx::io::formatter::NavSolutionFormatter;
 use nyx::linalg::{Matrix2, Matrix6, Vector2, Vector6};
+use nyx::md::trajectory::ExportCfg;
+use nyx::md::{Event, StateParameter};
 use nyx::od::prelude::*;
 use nyx::propagators::{PropOpts, Propagator, RK4Fixed};
 use nyx::time::{Epoch, TimeUnits, Unit};
@@ -73,8 +75,8 @@ fn od_val_sc_mb_srp_reals_duals_models() {
 
     // Define state information.
     let eme2k = cosm.frame("EME2000");
-    let dt = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
-    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, dt, eme2k);
+    let epoch = Epoch::from_gregorian_tai_at_midnight(2020, 1, 1);
+    let initial_state = Orbit::keplerian(22000.0, 0.01, 30.0, 80.0, 40.0, 0.0, epoch, eme2k);
 
     let dry_mass_kg = 100.0; // in kg
     let sc_area = 5.0; // m^2
@@ -101,7 +103,27 @@ fn od_val_sc_mb_srp_reals_duals_models() {
     .iter()
     .collect();
 
-    traj.to_parquet(path).unwrap();
+    // Adding some events to the exported trajectory
+    let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
+
+    let cfg = ExportCfg::from_metadata(vec![
+        (
+            "Dynamics".to_string(),
+            "SRP, Moon, Sun, Jupiter".to_string(),
+        ),
+        // An `Event:` metadata will be appropriately parsed and plotted with the Nyx plotting tools.
+        (
+            "Event: Comms Start".to_string(),
+            format!("{}", epoch + 6.minutes()),
+        ),
+        (
+            "Event: Comms End".to_string(),
+            format!("{}", epoch + 9.minutes()),
+        ),
+    ]);
+
+    traj.to_parquet_with_events(path, Some(vec![&event]), cfg)
+        .unwrap();
 
     // Simulate tracking data
     let mut arc_sim = TrackingArcSim::with_seed(all_stations, traj.clone(), configs, 0).unwrap();

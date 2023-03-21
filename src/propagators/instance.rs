@@ -114,7 +114,7 @@ where
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan {
                     if let Err(e) = chan.send(self.state) {
-                        warn!("could not publish to channel: {}", e)
+                        warn!("{} when sending on channel", e)
                     }
                 }
 
@@ -133,7 +133,7 @@ where
                 // Publish to channel if provided
                 if let Some(ref chan) = maybe_tx_chan {
                     if let Err(e) = chan.send(self.state) {
-                        warn!("could not publish to channel: {}", e)
+                        warn!("{} when sending on channel", e)
                     }
                 }
             }
@@ -189,12 +189,15 @@ where
             // Channels that have a single state for the propagator
             let (tx, rx) = channel();
             // Propagate the dynamics
+            // Note that the end state is also sent on the channel before the return of this function.
             end_state = self.for_duration_with_channel(duration, tx)?;
             rx
         };
 
         traj.states = rx.into_iter().par_bridge().collect();
-        traj.states.push(start_state); // Push the start state -- will be reordered in the finalize instruction.
+        // Push the start state -- will be reordered in the finalize call.
+        // For some reason, this must happen at the end -- can't figure out why.
+        traj.states.push(start_state);
 
         traj.finalize();
 
@@ -269,14 +272,14 @@ where
     fn derive(
         &mut self,
     ) -> Result<(Duration, OVector<f64, <D::StateType as State>::VecLength>), NyxError> {
-        let state = &self.state.as_vector()?;
-        let ctx = &self.state;
+        let state_vec = &self.state.as_vector()?;
+        let state_ctx = &self.state;
         // Reset the number of attempts used (we don't reset the error because it's set before it's read)
         self.details.attempts = 1;
         // Convert the step size to seconds -- it's mutable because we may change it below
         let mut step_size = self.step_size.to_seconds();
         loop {
-            let ki = self.prop.dynamics.eom(0.0, state, ctx)?;
+            let ki = self.prop.dynamics.eom(0.0, state_vec, state_ctx)?;
             self.k[0] = ki;
             let mut a_idx: usize = 0;
             for i in 0..(self.prop.stages - 1) {
@@ -292,14 +295,15 @@ where
                     a_idx += 1;
                 }
 
-                let ki = self
-                    .prop
-                    .dynamics
-                    .eom(ci * step_size, &(state + step_size * wi), ctx)?;
+                let ki = self.prop.dynamics.eom(
+                    ci * step_size,
+                    &(state_vec + step_size * wi),
+                    state_ctx,
+                )?;
                 self.k[i + 1] = ki;
             }
             // Compute the next state and the error
-            let mut next_state = state.clone();
+            let mut next_state = state_vec.clone();
             // State error estimation from https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#Adaptive_Runge%E2%80%93Kutta_methods
             // This is consistent with GMAT https://github.com/ChristopherRabotin/GMAT/blob/37201a6290e7f7b941bc98ee973a527a5857104b/src/base/propagator/RungeKutta.cpp#L537
             let mut error_est =
@@ -319,7 +323,7 @@ where
                 return Ok(((self.details.step), next_state));
             } else {
                 // Compute the error estimate.
-                self.details.error = E::estimate(&error_est, &next_state, state);
+                self.details.error = E::estimate(&error_est, &next_state, state_vec);
                 if self.details.error <= self.prop.opts.tolerance
                     || step_size <= self.prop.opts.min_step.to_seconds()
                     || self.details.attempts >= self.prop.opts.attempts

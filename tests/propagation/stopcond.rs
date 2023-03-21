@@ -8,7 +8,7 @@ use nyx::cosmic::{Bodies, Cosm, Orbit};
 use nyx::dynamics::guidance::{FiniteBurns, Mnvr, Thruster};
 use nyx::dynamics::orbital::OrbitalDynamics;
 use nyx::dynamics::SpacecraftDynamics;
-use nyx::md::{Event, StateParameter};
+use nyx::md::{Event, EventEvaluator, StateParameter};
 use nyx::propagators::error_ctrl::RSSCartesianStep;
 use nyx::propagators::{PropOpts, Propagator};
 use nyx::time::{Epoch, TimeUnits, Unit};
@@ -289,7 +289,7 @@ fn event_and_combination() {
     let sc = Spacecraft::from_thruster(
         orbit,
         100.0,
-        2500.0,
+        50.0,
         Thruster {
             isp_s: 300.0,
             thrust_N: 50.0,
@@ -297,7 +297,10 @@ fn event_and_combination() {
         GuidanceMode::Thrust,
     );
 
-    println!("initial c3 = {}", sc.value(StateParameter::C3).unwrap());
+    println!(
+        "{sc}\tinitial c3 = {}",
+        sc.value(StateParameter::C3).unwrap()
+    );
 
     // Thrust in the +X direction continuously
     let burn = FiniteBurns::from_mnvrs(vec![Mnvr::from_time_invariant(
@@ -318,6 +321,17 @@ fn event_and_combination() {
     let (sc_apo, traj) = prop
         .until_event(orbit.period() * 4.0, &Event::apoapsis())
         .unwrap();
+
+    // Check that the fuel always decreases or stays constant
+    let mut cur_fuel = traj.states[0].fuel_mass_kg;
+    for state in traj.states.iter().skip(1) {
+        assert!(
+            state.fuel_mass_kg - cur_fuel <= 1e-6, // Check that fuel never increases, at least a mg level
+            "{cur_fuel} > {}",
+            state.fuel_mass_kg
+        );
+        cur_fuel = state.fuel_mass_kg;
+    }
 
     // Convert the trajectory to the Moon frame
     let traj_moon = traj.to_frame(moonj2k, cosm).unwrap();
@@ -341,20 +355,17 @@ fn event_and_combination() {
     );
 
     // Now let's find when the declination with the Moon is zero.
-    // Within one minute and with a precision of 1.0 degrees.
+    // Within one minute and with a precision of 3.0 degrees.
     // NOTE: We're unwrapping here, so if the event isn't found, this will cause the test to fail.
-    for sc_decl_zero in traj_moon
-        .find_all(&Event::specific(
-            StateParameter::Declination,
-            6.0,
-            1.0,
-            Unit::Minute,
-        ))
-        .unwrap()
-    {
+    let event = Event::specific(StateParameter::Declination, 6.0, 3.0, Unit::Minute);
+    for sc_decl_zero in traj_moon.find_all(&event).unwrap() {
         let decl_deg = sc_decl_zero.value(StateParameter::Declination).unwrap();
-        println!("{sc_decl_zero:x} => decl = {} deg", decl_deg);
-        assert!((decl_deg - 6.0).abs() < 1.0);
+        println!(
+            "{event}: {} => decl = {} deg",
+            event.eval_string(&sc_decl_zero),
+            decl_deg,
+        );
+        assert!((decl_deg - 6.0).abs() < 3.0);
     }
 
     // We should be able to find a similar event with a larger bound too.

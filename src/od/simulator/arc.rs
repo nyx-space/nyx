@@ -18,8 +18,8 @@
 
 use hifitime::{Duration, Epoch, TimeSeries};
 use num::integer::gcd;
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand_pcg::Pcg64Mcg;
 
 pub use crate::dynamics::{Dynamics, NyxError};
 use crate::io::ConfigError;
@@ -66,7 +66,7 @@ where
     /// i.e. if N ground stations are available at a given epoch, generate N measurements not just one.
     pub allow_overlap: bool,
     /// Random number generator used for this tracking arc, ensures repeatability
-    rng: StdRng,
+    rng: Pcg64Mcg,
     /// Greatest common denominator time series that allows this arc to meet all of the conditions.
     time_series: TimeSeries,
     _msr_in: PhantomData<MsrIn>,
@@ -95,7 +95,7 @@ where
         devices: Vec<D>,
         trajectory: Traj<MsrIn>,
         configs: HashMap<String, TrkConfig>,
-        rng: StdRng,
+        rng: Pcg64Mcg,
     ) -> Result<Self, ConfigError> {
         // Check that each device has an associated configurations.
         // We don't care if there are more configurations than chosen devices.
@@ -147,7 +147,7 @@ where
         configs: HashMap<String, TrkConfig>,
         seed: u64,
     ) -> Result<Self, ConfigError> {
-        let rng = StdRng::seed_from_u64(seed);
+        let rng = Pcg64Mcg::new(seed as u128);
 
         Self::with_rng(devices, trajectory, configs, rng)
     }
@@ -157,7 +157,7 @@ where
         trajectory: Traj<MsrIn>,
         configs: HashMap<String, TrkConfig>,
     ) -> Result<Self, ConfigError> {
-        let rng = StdRng::from_entropy();
+        let rng = Pcg64Mcg::from_entropy();
 
         Self::with_rng(devices, trajectory, configs, rng)
     }

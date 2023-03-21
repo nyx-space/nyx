@@ -85,3 +85,17 @@ pub struct ExportCfg {
     /// Set to true to append the timestamp to the filename
     pub incl_timestamp: bool,
 }
+
+impl ExportCfg {
+    /// Initialize a new configuration with the given metadata entries.
+    pub fn from_metadata(metadata: Vec<(String, String)>) -> Self {
+        let mut me = ExportCfg {
+            metadata: Some(HashMap::new()),
+            ..Default::default()
+        };
+        for (k, v) in metadata {
+            me.metadata.as_mut().unwrap().insert(k, v);
+        }
+        me
+    }
+}

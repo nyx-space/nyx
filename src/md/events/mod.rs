@@ -40,9 +40,10 @@ where
         self.eval(prev_state) * self.eval(next_state) < 0.0
     }
 
-    // Evaluation of the event, must return a value corresponding to whether the state is before or after the event
+    /// Evaluation of the event, must return a value corresponding to whether the state is before or after the event
     fn eval(&self, state: &S) -> f64;
-
+    /// Returns a string representation of the event evaluation for the given state
+    fn eval_string(&self, state: &S) -> String;
     fn epoch_precision(&self) -> Duration;
     fn value_precision(&self) -> f64;
 }

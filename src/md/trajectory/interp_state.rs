@@ -162,12 +162,14 @@ impl InterpState for Spacecraft {
         )?;
 
         // Fuel is linearly interpolated -- should really be a Lagrange interpolation here
-        let fuel_kg = (states.last().unwrap().fuel_mass_kg - states.first().unwrap().fuel_mass_kg)
+        let fuel_kg_dt = (states.last().unwrap().fuel_mass_kg
+            - states.first().unwrap().fuel_mass_kg)
             / (states.last().unwrap().epoch().to_tdb_seconds()
                 - states.first().unwrap().epoch().to_tdb_seconds());
 
         let mut me = self.with_orbit(orbit);
-        me.fuel_mass_kg = fuel_kg;
+        me.fuel_mass_kg += fuel_kg_dt
+            * (epoch.to_tdb_seconds() - states.first().unwrap().epoch().to_tdb_seconds());
 
         Ok(me)
     }

@@ -376,7 +376,11 @@ where
         states.sort_by(|s1, s2| s1.epoch().partial_cmp(&s2.epoch()).unwrap());
         states.dedup();
         for (cnt, event_state) in states.iter().enumerate() {
-            info!("{} #{}: {}", event, cnt + 1, event_state);
+            info!(
+                "{event} #{}: {} for {event_state}",
+                cnt + 1,
+                event.eval_string(event_state)
+            );
         }
         Ok(states)
     }
@@ -421,13 +425,23 @@ where
 
     /// Store this trajectory arc to a parquet file with the default configuration (depends on the state type, search for `export_params` in the documentation for details).
     pub fn to_parquet<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, Box<dyn Error>> {
-        self.to_parquet_with_cfg(path, ExportCfg::default())
+        self.to_parquet_with_events(path, None, ExportCfg::default())
     }
 
     /// Store this trajectory arc to a parquet file with the provided configuration
     pub fn to_parquet_with_cfg<P: AsRef<Path>>(
         &self,
         path: P,
+        cfg: ExportCfg,
+    ) -> Result<PathBuf, Box<dyn Error>> {
+        self.to_parquet_with_events(path, None, cfg)
+    }
+
+    /// Store this trajectory arc to a parquet file with the provided configuration and event evaluators
+    pub fn to_parquet_with_events<P: AsRef<Path>>(
+        &self,
+        path: P,
+        events: Option<Vec<&dyn EventEvaluator<S>>>,
         cfg: ExportCfg,
     ) -> Result<PathBuf, Box<dyn Error>> {
         // Build the schema
@@ -458,6 +472,13 @@ where
 
         for field in &fields {
             hdrs.push(field.to_field(more_meta.clone()));
+        }
+
+        if let Some(events) = events.as_ref() {
+            for event in events {
+                let field = Field::new(format!("{event}"), DataType::Float64, false);
+                hdrs.push(field);
+            }
         }
 
         // Build the schema
@@ -509,7 +530,6 @@ where
             // Add all of the fields
             // This is super ugly, but I can't seem to convert the TrajIterator into an `Iter<S>`
             for field in fields {
-                let mut cnt = 0;
                 if field == StateParameter::GuidanceMode {
                     // This is the only string field
                     record.push(Arc::new(StringArray::from({
@@ -518,7 +538,6 @@ where
                             let mode = GuidanceMode::from(s.value(field).unwrap());
 
                             data.push(format!("{mode:?}"));
-                            cnt += 1;
                         }
                         data
                     })) as ArrayRef);
@@ -527,12 +546,22 @@ where
                         let mut data = Vec::new();
                         for s in self.every_between(step, start, end) {
                             data.push(s.value(field).unwrap());
-                            cnt += 1;
                         }
                         data
                     })) as ArrayRef);
                 }
-                println!("{field} => {cnt}");
+            }
+            // Add all of the evaluated events
+            if let Some(events) = events {
+                for event in events {
+                    record.push(Arc::new(Float64Array::from({
+                        let mut data = Vec::new();
+                        for s in self.every_between(step, start, end) {
+                            data.push(event.eval(&s));
+                        }
+                        data
+                    })) as ArrayRef);
+                }
             }
         } else {
             // Build all of the records
@@ -575,6 +604,18 @@ where
                             .map(|s| s.value(field).unwrap())
                             .collect::<Vec<f64>>(),
                     )) as ArrayRef);
+                }
+            }
+
+            // Add all of the evaluated events
+            if let Some(events) = events {
+                for event in events {
+                    record.push(Arc::new(Float64Array::from({
+                        self.states
+                            .iter()
+                            .map(|s| event.eval(s))
+                            .collect::<Vec<f64>>()
+                    })) as ArrayRef);
                 }
             }
         }

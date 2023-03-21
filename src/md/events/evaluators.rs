@@ -56,24 +56,27 @@ impl EventEvaluator<Orbit> for Event {
 
         // Return the parameter centered around the desired value
         match self.parameter {
-            StateParameter::AoL
-            | StateParameter::AoP
-            | StateParameter::Declination
-            | StateParameter::EccentricAnomaly
-            | StateParameter::FlightPathAngle
-            | StateParameter::HyperbolicAnomaly
-            | StateParameter::Inclination
-            | StateParameter::MeanAnomaly
-            | StateParameter::RightAscension
-            | StateParameter::RAAN
-            | StateParameter::TrueAnomaly
-            | StateParameter::TrueLongitude
-            | StateParameter::VelocityDeclination => {
-                angled_value(state.value(self.parameter).unwrap(), self.desired_value)
-            }
             StateParameter::Apoapsis => angled_value(state.ta_deg(), 180.0),
             StateParameter::Periapsis => between_pm_x(state.ta_deg(), 180.0),
             _ => state.value(self.parameter).unwrap() - self.desired_value,
+        }
+    }
+
+    fn eval_string(&self, state: &Orbit) -> String {
+        match self.parameter {
+            StateParameter::Apoapsis | StateParameter::Periapsis => {
+                format!("{}", self.parameter)
+            }
+            _ => {
+                let unit = if self.parameter.unit().is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", self.parameter.unit())
+                };
+
+                let val = state.value(self.parameter).unwrap();
+                format!("{}{} = {:.3}{}", self.parameter, unit, val, unit)
+            }
         }
     }
 }
@@ -93,5 +96,22 @@ impl EventEvaluator<Spacecraft> for Event {
 
     fn value_precision(&self) -> f64 {
         self.value_precision
+    }
+
+    fn eval_string(&self, state: &Spacecraft) -> String {
+        match self.parameter {
+            StateParameter::Apoapsis | StateParameter::Periapsis => {
+                format!("{}", self.parameter)
+            }
+            _ => {
+                let unit = if self.parameter.unit().is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", self.parameter.unit())
+                };
+                let val = state.value(self.parameter).unwrap();
+                format!("{}{} = {:.3}{}", self.parameter, unit, val, unit)
+            }
+        }
     }
 }

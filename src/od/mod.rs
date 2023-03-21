@@ -34,8 +34,11 @@ pub mod measurement;
 /// Provides Estimate handling functionalities.
 pub mod estimate;
 
-/// Provide Residual handling functionalities.
+/// Provides Residual handling functionalities.
 pub mod residual;
+
+/// Provides noise modeling
+pub mod noise;
 
 /// Provides all of the support measurement models
 pub mod msr;
