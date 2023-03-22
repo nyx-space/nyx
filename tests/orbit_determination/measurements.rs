@@ -1,19 +1,20 @@
-use rand::thread_rng;
-
 extern crate nyx_space as nyx;
+
+use nyx::cosmic::{Cosm, Orbit};
+use nyx::od::prelude::*;
+use nyx::time::Epoch;
+use nyx::{dynamics::OrbitalDynamics, propagators::Propagator};
+use rand::thread_rng;
 
 #[test]
 fn nil_measurement() {
-    use self::nyx::cosmic::{Cosm, Orbit};
-    use self::nyx::od::prelude::*;
-    use self::nyx::time::Epoch;
     use hifitime::J2000_OFFSET;
     // Let's create a station and make it estimate the range and range rate of something which is strictly in the same spot.
 
     let lat = -7.906_635_7;
     let long = 345.5975;
     let height = 0.0;
-    let dt = Epoch::from_mjd_tai(J2000_OFFSET);
+    let epoch = Epoch::from_mjd_tai(J2000_OFFSET);
     let cosm = Cosm::de438();
     let eme2k = cosm.frame("EME2000");
 
@@ -28,11 +29,16 @@ fn nil_measurement() {
         eme2k,
     );
 
-    let at_station = Orbit::from_geodesic(lat, long, height, dt, eme2k);
+    let at_station = Orbit::from_geodesic(lat, long, height, epoch, eme2k);
+
+    let (_, traj) = Propagator::default(OrbitalDynamics::two_body())
+        .with(at_station)
+        .for_duration_with_traj(1.seconds())
+        .unwrap();
 
     let mut rng = thread_rng();
     assert!(station
-        .measure(&at_station, &mut rng, cosm.clone())
+        .measure(epoch, &traj, &mut rng, cosm.clone())
         .is_none());
 }
 
@@ -138,7 +144,7 @@ fn val_measurements_topo() {
     let mut traj1_msr_cnt = 0;
     for state in traj1.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure(&state, &mut rng, cosm.clone())
+            .measure(state.epoch(), &traj1, &mut rng, cosm.clone())
             .is_some()
         {
             traj1_msr_cnt += 1;
@@ -156,7 +162,7 @@ fn val_measurements_topo() {
         let state = traj1.at(now).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
-            .measure(&state, &mut rng, cosm.clone())
+            .measure(state.epoch(), &traj1, &mut rng, cosm.clone())
             .unwrap();
 
         let obs = meas.observation();
@@ -204,7 +210,7 @@ fn val_measurements_topo() {
     // Now iterate the trajectory to count the measurements.
     for state in traj2.every(1 * Unit::Minute) {
         if dss65_madrid
-            .measure(&state, &mut rng, cosm.clone())
+            .measure(state.epoch(), &traj2, &mut rng, cosm.clone())
             .is_some()
         {
             traj2_msr_cnt += 1;
@@ -222,7 +228,7 @@ fn val_measurements_topo() {
         let state = traj2.at(now).unwrap();
         // Will panic if the measurement is not visible
         let meas = dss65_madrid
-            .measure(&state, &mut rng, cosm.clone())
+            .measure(state.epoch(), &traj2, &mut rng, cosm.clone())
             .unwrap();
         let obs = meas.observation();
         println!(

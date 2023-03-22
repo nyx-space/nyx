@@ -162,10 +162,10 @@ impl Orbit {
         vx: f64,
         vy: f64,
         vz: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
-        let mut me = Self::cartesian(x, y, z, vx, vy, vz, dt, frame);
+        let mut me = Self::cartesian(x, y, z, vx, vy, vz, epoch, frame);
         me.enable_stm();
         me
     }
@@ -173,7 +173,7 @@ impl Orbit {
     /// Creates a new Orbit in the provided frame at the provided Epoch in time with 0.0 velocity.
     ///
     /// **Units:** km, km, km
-    pub fn from_position(x: f64, y: f64, z: f64, dt: Epoch, frame: Frame) -> Self {
+    pub fn from_position(x: f64, y: f64, z: f64, epoch: Epoch, frame: Frame) -> Self {
         Orbit {
             x_km: x,
             y_km: y,
@@ -181,7 +181,7 @@ impl Orbit {
             vx_km_s: 0.0,
             vy_km_s: 0.0,
             vz_km_s: 0.0,
-            epoch: dt,
+            epoch: epoch,
             frame,
             stm: None,
         }
@@ -191,7 +191,7 @@ impl Orbit {
     ///
     /// The state vector **must** be x, y, z, vx, vy, vz. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn cartesian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
+    pub fn cartesian_vec(state: &Vector6<f64>, epoch: Epoch, frame: Frame) -> Self {
         Orbit {
             x_km: state[0],
             y_km: state[1],
@@ -199,7 +199,7 @@ impl Orbit {
             vx_km_s: state[3],
             vy_km_s: state[4],
             vz_km_s: state[5],
-            epoch: dt,
+            epoch: epoch,
             frame,
             stm: None,
         }
@@ -323,7 +323,7 @@ impl Orbit {
         raan: f64,
         aop: f64,
         ta: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         Self::keplerian(
@@ -333,7 +333,7 @@ impl Orbit {
             raan,
             aop,
             ta,
-            dt,
+            epoch,
             frame,
         )
     }
@@ -389,7 +389,7 @@ impl Orbit {
         latitude: f64,
         longitude: f64,
         height: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         Self::from_altlatlong(
@@ -397,7 +397,7 @@ impl Orbit {
             longitude,
             height,
             frame.angular_velocity(),
-            dt,
+            epoch,
             frame,
         )
     }
@@ -412,7 +412,7 @@ impl Orbit {
         longitude: f64,
         height: f64,
         angular_velocity: f64,
-        dt: Epoch,
+        epoch: Epoch,
         frame: Frame,
     ) -> Self {
         match frame {
@@ -440,7 +440,7 @@ impl Orbit {
                     velocity[0],
                     velocity[1],
                     velocity[2],
-                    dt,
+                    epoch,
                     frame,
                 )
             }
@@ -512,10 +512,10 @@ impl Orbit {
     ///
     /// The state vector **must** be sma, ecc, inc, raan, aop, ta. This function is a shortcut to `cartesian`
     /// and as such it has the same unit requirements.
-    pub fn keplerian_vec(state: &Vector6<f64>, dt: Epoch, frame: Frame) -> Self {
+    pub fn keplerian_vec(state: &Vector6<f64>, epoch: Epoch, frame: Frame) -> Self {
         match frame {
             Frame::Geoid { .. } | Frame::Celestial { .. } => Self::keplerian(
-                state[0], state[1], state[2], state[3], state[4], state[5], dt, frame,
+                state[0], state[1], state[2], state[3], state[4], state[5], epoch, frame,
             ),
             _ => panic!("Frame is not Celestial or Geoid in kind"),
         }

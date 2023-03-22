@@ -36,8 +36,10 @@ use super::Availability;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "python", pyclass)]
 pub struct TrkConfig {
+    /// Availability configuration to start the tracking arc
     #[serde(default)]
     pub start: Availability,
+    /// Availability configuration to end the tracking arc
     #[serde(default)]
     pub end: Availability,
     #[serde(default)]

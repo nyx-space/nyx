@@ -19,8 +19,10 @@
 use super::msr::StdMeasurement;
 use super::TrackingDeviceSim;
 use crate::cosmic::{Cosm, Frame, Orbit};
+use crate::md::ui::Traj;
 use crate::time::Epoch;
 use crate::Spacecraft;
+use hifitime::Duration;
 use rand_distr::Normal;
 use std::fmt;
 use std::sync::Arc;
@@ -44,6 +46,10 @@ pub struct GroundStation {
     pub height_km: f64,
     /// Frame in which this station is defined
     pub frame: Frame,
+    /// Duration needed to generate a measurement (if unset, it is assumed to be instantaneous)
+    pub integration_time: Option<Duration>,
+    /// Whether to correct for light travel time
+    pub light_time_correction: bool,
     pub(crate) range_noise: Normal<f64>,
     pub(crate) range_rate_noise: Normal<f64>,
 }
@@ -67,6 +73,8 @@ impl GroundStation {
             longitude_deg: longitude,
             height_km: height,
             frame,
+            integration_time: None,
+            light_time_correction: false,
             range_noise: Normal::new(0.0, range_noise).unwrap(),
             range_rate_noise: Normal::new(0.0, range_rate_noise).unwrap(),
         }
@@ -182,11 +190,13 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure<R: Rng>(
         &mut self,
-        rx: &Orbit,
+        epoch: Epoch,
+        traj: &Traj<Orbit>,
         _rng: &mut R,
         cosm: Arc<Cosm>,
     ) -> Option<StdMeasurement> {
-        let (elevation, rx_rxf, tx_rxf) = self.elevation_of(rx, &cosm);
+        let rx = traj.at(epoch).unwrap();
+        let (elevation, rx_rxf, tx_rxf) = self.elevation_of(&rx, &cosm);
 
         if elevation >= self.elevation_mask_deg {
             Some(StdMeasurement::new(
@@ -211,10 +221,12 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
     /// Perform a measurement from the ground station to the receiver (rx).
     fn measure<R: Rng>(
         &mut self,
-        sc_rx: &Spacecraft,
+        epoch: Epoch,
+        traj: &Traj<Spacecraft>,
         _rng: &mut R,
         cosm: Arc<Cosm>,
     ) -> Option<StdMeasurement> {
+        let sc_rx = traj.at(epoch).unwrap();
         let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit, &cosm);
 
         if elevation >= self.elevation_mask_deg {

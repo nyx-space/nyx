@@ -18,9 +18,12 @@
 
 use std::sync::Arc;
 
+use hifitime::Epoch;
 use rand::Rng;
 
 use crate::linalg::DefaultAllocator;
+use crate::md::trajectory::InterpState;
+use crate::md::ui::Traj;
 use crate::od::SimMeasurement;
 use crate::State;
 use crate::{io::Configurable, linalg::allocator::Allocator};
@@ -30,7 +33,7 @@ use super::Cosm;
 /// Tracking device simulator.
 pub trait TrackingDeviceSim<MsrIn, Msr>: Configurable
 where
-    MsrIn: State,
+    MsrIn: InterpState,
     Msr: SimMeasurement,
     DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
         + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
@@ -44,6 +47,13 @@ where
     /// Returns the name of this tracking data simulator
     fn name(&self) -> String;
 
-    /// Observes the input state and returns a measurement from itself to the input state, and returns None of the object is not visible.
-    fn measure<R: Rng>(&mut self, input: &MsrIn, rng: &mut R, cosm: Arc<Cosm>) -> Option<Msr>;
+    /// Observes the input trajectory at the provided epoch, and returns a measurement from itself to the input state, and returns None of the object is not visible.
+    /// This trait function takes in a trajectory and epoch so it can properly simulate integration times for the measurements.
+    fn measure<R: Rng>(
+        &mut self,
+        epoch: Epoch,
+        traj: &Traj<MsrIn>,
+        rng: &mut R,
+        cosm: Arc<Cosm>,
+    ) -> Option<Msr>;
 }

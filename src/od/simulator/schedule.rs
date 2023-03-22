@@ -28,6 +28,7 @@ use std::fmt::Debug;
 #[derive(Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Schedule {
     Continuous,
+    /// An intermittent schedule has On and Off durations.
     Intermittent {
         #[serde(
             serialize_with = "duration_to_str",

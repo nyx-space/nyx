@@ -190,8 +190,6 @@ where
         // Clone the time series so we don't consume it.
         let ts = self.time_series.clone();
         'ts: for epoch in ts {
-            // Get the state
-            let state = self.trajectory.at(epoch)?;
             'devices: for (name, device) in self.devices.iter_mut() {
                 let cfg = &self.configs[name];
                 // Check the start condition
@@ -267,7 +265,7 @@ where
                 // Check the exclusion epochs
                 if let Some(excl_list) = &cfg.exclusion_epochs {
                     for excl in excl_list {
-                        if excl.contains(state.epoch()) {
+                        if excl.contains(epoch) {
                             // We are in an exclusion epoch, move to next device.
                             continue 'devices;
                         }
@@ -277,7 +275,7 @@ where
                 // Check the inclusion epochs
                 if let Some(incl_list) = &cfg.inclusion_epochs {
                     for incl in incl_list {
-                        if !incl.contains(state.epoch()) {
+                        if !incl.contains(epoch) {
                             // Current epoch is not included in the inclusion epochs list, move to next device.
                             continue 'devices;
                         }
@@ -289,7 +287,9 @@ where
                 sched_trace_msg.remove(name);
                 end_trace_msg.remove(name);
 
-                if let Some(msr) = device.measure(&state, &mut self.rng, cosm.clone()) {
+                if let Some(msr) =
+                    device.measure(epoch, &self.trajectory, &mut self.rng, cosm.clone())
+                {
                     measurements.push((name.clone(), msr));
                     // We have a new measurement, let's update the schedule.
                     if let Some(device_sched) = sched.get_mut(name) {

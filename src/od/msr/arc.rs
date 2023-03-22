@@ -29,6 +29,7 @@ use crate::io::watermark::pq_writer;
 use crate::io::{ConfigError, ConfigRepr};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
+use crate::md::trajectory::InterpState;
 use crate::od::{Measurement, SimMeasurement, TrackingDeviceSim};
 use crate::State;
 use arrow::array::{ArrayRef, Float64Array, StringArray};
@@ -229,7 +230,7 @@ where
         cosm: Arc<Cosm>,
     ) -> Result<HashMap<String, D>, ConfigError>
     where
-        MsrIn: State,
+        MsrIn: InterpState,
         D: TrackingDeviceSim<MsrIn, Msr>,
         DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
             + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>

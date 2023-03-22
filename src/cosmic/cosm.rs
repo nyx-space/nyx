@@ -803,7 +803,7 @@ impl Cosm {
                     frame,
                 );
 
-                // Incluee the range-rate term in the velocity computation as explained in
+                // Include the range-rate term in the velocity computation as explained in
                 // https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/abcorr.html#Reception%20case
                 let state_acc = state.velocity() / state.rmag_km();
                 let dltdt = state.radius().dot(&state_acc) / SPEED_OF_LIGHT_KMS;
