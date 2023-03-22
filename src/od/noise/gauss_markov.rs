@@ -16,10 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::io::{duration_from_str, duration_to_str};
 use crate::linalg::{Matrix2, Vector2};
 use hifitime::{Duration, Epoch};
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use rand::Rng;
 use rand_distr::{Distribution, Normal};
+use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 
 /// A Gauss-Markov process for modeling biases.
@@ -27,9 +31,14 @@ use std::fmt;
 /// If the natural frequency of the process is zero, then the process is a first-order Gauss Markov process as described in section 5.2.4 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
 /// Otherwise, it is a bias and drift couple first- and second-order Gauss Markov process as described in section 5.3.3 of the NASA Best Practices for Navigation Filters (D'Souza et al.).
 /// It is up to the caller to ensure that the units at initialization match the units used where the model is applied.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "python", pyclass)]
 pub struct GaussMarkov {
     /// Time constant of the Gauss-Markov process.
+    #[serde(
+        serialize_with = "duration_to_str",
+        deserialize_with = "duration_from_str"
+    )]
     pub tau: Duration,
     /// Standard deviation of the zero-mean white noise of the bias.
     pub bias_sigma: f64,
@@ -40,10 +49,13 @@ pub struct GaussMarkov {
     /// Standard deviation of the zero-mean white noise of the drift.
     pub drift_sigma: Option<f64>,
     /// Latest update epoch
+    #[serde(skip)]
     pub epoch: Epoch,
     /// Latest bias estimate
+    #[serde(skip)]
     pub bias: f64,
     /// Latest drift estimate
+    #[serde(skip)]
     pub drift: f64,
 }
 
@@ -135,6 +147,48 @@ impl GaussMarkov {
         Self::new(tau, bias_sigma, None, None, None, epoch, bias, 0.0)
     }
 
+    /// Create a new bias and drift coupled Gauss-Markov process. The bias is a second order order GM process and the couple drift is a first order GM process.
+    ///
+    /// # Arguments
+    ///
+    /// * `tau` - Time constant of the Gauss-Markov process.
+    /// * `bias_sigma` - Standard deviation of the zero-mean white noise of the bias.
+    /// * `omega_n_hz` - Natural frequency of the drift Gauss-Markov process.
+    /// * `damping_ratio` - Damping ratio of the drift Gauss-Markov process.
+    /// * `drift_sigma` - Standard deviation of the zero-mean white noise of the drift.
+    /// * `epoch` - Latest update epoch.
+    /// * `bias` - Latest bias estimate.
+    /// * `drift` - Latest drift estimate.
+    ///
+    /// # Panics
+    ///
+    /// If `tau` is zero.
+    /// If `bias_sigma` is negative.
+    /// If `omega_n_hz` is negative.
+    /// If `damping_ratio` is negative.
+    /// If `drift_sigma` is negative.
+    pub fn coupled_bias_drift(
+        tau: Duration,
+        bias_sigma: f64,
+        omega_n_hz: f64,
+        damping_ratio: f64,
+        drift_sigma: f64,
+        epoch: Epoch,
+        init_bias: f64,
+        init_drift: f64,
+    ) -> Self {
+        Self::new(
+            tau,
+            bias_sigma,
+            Some(omega_n_hz),
+            Some(damping_ratio),
+            Some(drift_sigma),
+            epoch,
+            init_bias,
+            init_drift,
+        )
+    }
+
     pub fn next_bias<R: Rng>(&mut self, epoch: Epoch, rng: &mut R) -> f64 {
         let omega_fact = match self.omega_n_hz {
             None => 0.0,
@@ -191,4 +245,94 @@ fn fogm_test() {
     assert_eq!(biases.amean().unwrap(), -1.64625561108865);
     assert_eq!(min_max.min, -5.978770428734303);
     assert_eq!(min_max.max, 1.137123841255601);
+}
+
+#[test]
+fn coupled_gm_test() {
+    use hifitime::TimeUnits;
+    use rand_pcg::Pcg64Mcg;
+    use rstats::{triangmat::Vecops, Stats};
+
+    let mut epoch = Epoch::now().unwrap();
+
+    let mut gm = GaussMarkov::coupled_bias_drift(24.hours(), 0.1, 0.1, 0.1, 0.1, epoch, 0.0, 0.0);
+
+    let mut biases = Vec::with_capacity(1000);
+
+    let mut rng = Pcg64Mcg::new(0);
+    for _ in 0..1000 {
+        epoch = epoch + 1.hours();
+        biases.push(gm.next_bias(epoch, &mut rng));
+    }
+
+    // Result was inspected visually, not sure how to correctly test this.
+    let min_max = biases.minmax();
+
+    assert_eq!(biases.amean().unwrap(), -0.19487332357366507);
+    assert_eq!(min_max.min, -17.878511214309935);
+    assert_eq!(min_max.max, 18.13775350010581);
+}
+
+#[test]
+fn zero_noise_test() {
+    use hifitime::TimeUnits;
+    use rand_pcg::Pcg64Mcg;
+    use rstats::{triangmat::Vecops, Stats};
+
+    let mut epoch = Epoch::now().unwrap();
+
+    let mut gm = GaussMarkov::first_order(Duration::MAX, 0.0, epoch, 0.0);
+
+    let mut biases = Vec::with_capacity(1000);
+
+    let mut rng = Pcg64Mcg::new(0);
+    for _ in 0..1000 {
+        epoch = epoch + 1.hours();
+        biases.push(gm.next_bias(epoch, &mut rng));
+    }
+
+    let min_max = biases.minmax();
+
+    assert_eq!(biases.amean().unwrap(), 0.0);
+    assert_eq!(min_max.min, 0.0);
+    assert_eq!(min_max.max, 0.0);
+}
+
+#[test]
+fn serde_test() {
+    use serde_yaml;
+    use std::str::FromStr;
+
+    let epoch = Epoch::now().unwrap();
+    // Note that we set the initial bias to zero because it is not serialized.
+    let gm = GaussMarkov::first_order(Duration::MAX, 0.1, epoch, 0.0);
+    let serialized = serde_yaml::to_string(&gm).unwrap();
+    println!("{serialized}");
+    let mut gm_deser: GaussMarkov = serde_yaml::from_str(&serialized).unwrap();
+    // We need to set the epoch manually because it is not serialized.
+    gm_deser.epoch = epoch;
+    assert_eq!(gm_deser, gm);
+
+    // Deserialize a coupled Gauss-Markov model
+    let s = r#"
+    tau: 1 hour 15 ns
+    bias_sigma: 0.1
+    omega_n_hz: 1.65
+    damping_ratio: 0.1
+    drift_sigma: 0.2
+    "#;
+
+    let gm_deser: GaussMarkov = serde_yaml::from_str(&s).unwrap();
+    let gm = GaussMarkov::coupled_bias_drift(
+        Duration::from_str("1 hour 15 ns").unwrap(),
+        0.1,
+        1.65,
+        0.1,
+        0.2,
+        Epoch::default(),
+        0.0,
+        0.0,
+    );
+
+    assert_eq!(gm_deser, gm);
 }
