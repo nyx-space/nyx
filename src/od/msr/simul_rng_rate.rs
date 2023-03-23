@@ -18,7 +18,7 @@
 
 use crate::cosmic::Orbit;
 use crate::linalg::{DimName, Matrix2x6, OVector, Vector2, U2, U6, U7};
-use crate::od::{Measurement, SimMeasurement};
+use crate::od::Measurement;
 use crate::time::Epoch;
 use crate::TimeTagged;
 use arrow::datatypes::Field;
@@ -104,7 +104,6 @@ impl StdMeasurement {
     }
 
     /// Generate a new measurement with the provided noise values.
-    #[allow(confusable_idents)]
     pub fn raw(
         dt: Epoch,
         tx: Orbit,
@@ -179,13 +178,13 @@ impl Measurement for StdMeasurement {
     }
 }
 
-impl SimMeasurement for StdMeasurement {
-    type State = Orbit;
+// impl SimMeasurement for StdMeasurement {
+//     type State = Orbit;
 
-    fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
-        self.h_tilde
-    }
-}
+//     fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
+//         self.h_tilde
+//     }
+// }
 
 impl TimeTagged for StdMeasurement {
     fn epoch(&self) -> Epoch {

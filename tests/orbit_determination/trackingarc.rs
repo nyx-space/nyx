@@ -86,10 +86,9 @@ fn tracking_arc_simple() {
     dbg!(&configs);
 
     // Build the tracking arc simulation to generate a "standard measurement".
-    let mut trk = TrackingArcSim::<Orbit, Orbit, StdMeasurement, _>::with_seed(
-        devices, trajectory, configs, 12345,
-    )
-    .unwrap();
+    let mut trk =
+        TrackingArcSim::<Orbit, StdMeasurement, _>::with_seed(devices, trajectory, configs, 12345)
+            .unwrap();
 
     let arc = trk.generate_measurements(cosm).unwrap();
 

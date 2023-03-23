@@ -47,10 +47,10 @@ pub struct ODProcess<
     'a,
     D: Dynamics,
     E: ErrorCtrl,
-    Msr: SimMeasurement<State = S>,
+    Msr: Measurement,
     T: KfTrigger,
     A: DimName,
-    S: EstimateFrom<D::StateType> + InterpState,
+    S: EstimateFrom<D::StateType, Msr> + InterpState,
     K: Filter<S, A, Msr::MeasurementSize>,
 > where
     D::StateType: InterpState + Add<OVector<f64, <S as State>::Size>, Output = D::StateType>,
@@ -93,10 +93,10 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: SimMeasurement<State = S>,
+        Msr: Measurement,
         T: KfTrigger,
         A: DimName,
-        S: EstimateFrom<D::StateType> + InterpState,
+        S: EstimateFrom<D::StateType, Msr> + InterpState,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, T, A, S, K>
 where
@@ -457,7 +457,7 @@ where
                     // Get the computed observations
                     match devices.get_mut(device_name) {
                         Some(device) => {
-                            if let Some(computed_meas) =
+                            if let Some((computed_meas, device_loc)) =
                                 device.measure(epoch, &traj, None, self.cosm.clone())
                             {
                                 // Switch back from extended if necessary
@@ -466,8 +466,12 @@ where
                                     info!("EKF disabled @ {epoch}");
                                 }
 
-                                self.kf
-                                    .update_h_tilde(computed_meas.sensitivity(nominal_state));
+                                let h_tilde = S::sensitivity(&msr, nominal_state, device_loc);
+
+                                self.kf.update_h_tilde(h_tilde);
+
+                                // self.kf
+                                //     .update_h_tilde(computed_meas.sensitivity(nominal_state));
 
                                 match self.kf.measurement_update(
                                     nominal_state,
@@ -608,9 +612,9 @@ impl<
         'a,
         D: Dynamics,
         E: ErrorCtrl,
-        Msr: SimMeasurement<State = S>,
+        Msr: Measurement,
         A: DimName,
-        S: EstimateFrom<D::StateType> + InterpState,
+        S: EstimateFrom<D::StateType, Msr> + InterpState,
         K: Filter<S, A, Msr::MeasurementSize>,
     > ODProcess<'a, D, E, Msr, CkfTrigger, A, S, K>
 where

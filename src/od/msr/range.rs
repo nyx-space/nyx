@@ -18,7 +18,7 @@
 
 use crate::cosmic::Orbit;
 use crate::linalg::{DimName, Matrix1x6, OVector, Vector1, U1, U6, U7};
-use crate::od::{Measurement, SimMeasurement};
+use crate::od::Measurement;
 use crate::time::Epoch;
 use crate::TimeTagged;
 use arrow::datatypes::{DataType, Field};
@@ -105,13 +105,13 @@ impl Measurement for RangeMsr {
     }
 }
 
-impl SimMeasurement for RangeMsr {
-    type State = Orbit;
+// impl SimMeasurement for RangeMsr {
+//     type State = Orbit;
 
-    fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
-        self.h_tilde
-    }
-}
+//     fn sensitivity(&self, _nominal: Orbit) -> Matrix1x6<f64> {
+//         self.h_tilde
+//     }
+// }
 
 impl TimeTagged for RangeMsr {
     fn epoch(&self) -> Epoch {

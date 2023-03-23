@@ -24,7 +24,7 @@ use rand_pcg::Pcg64Mcg;
 use crate::linalg::DefaultAllocator;
 use crate::md::trajectory::InterpState;
 use crate::md::ui::Traj;
-use crate::od::SimMeasurement;
+use crate::od::Measurement;
 use crate::State;
 use crate::{io::Configurable, linalg::allocator::Allocator};
 
@@ -34,12 +34,8 @@ use super::Cosm;
 pub trait TrackingDeviceSim<MsrIn, Msr>: Configurable
 where
     MsrIn: InterpState,
-    Msr: SimMeasurement,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>
+    Msr: Measurement,
+    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
         + Allocator<f64, MsrIn::Size>
         + Allocator<f64, MsrIn::Size, MsrIn::Size>
         + Allocator<f64, MsrIn::VecLength>,
@@ -59,5 +55,5 @@ where
         traj: &Traj<MsrIn>,
         rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<Msr>;
+    ) -> Option<(Msr, MsrIn)>;
 }

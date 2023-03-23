@@ -194,18 +194,21 @@ impl TrackingDeviceSim<Orbit, StdMeasurement> for GroundStation {
         traj: &Traj<Orbit>,
         _rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<StdMeasurement> {
+    ) -> Option<(StdMeasurement, Orbit)> {
         let rx = traj.at(epoch).unwrap();
         let (elevation, rx_rxf, tx_rxf) = self.elevation_of(&rx, &cosm);
 
         if elevation >= self.elevation_mask_deg {
-            Some(StdMeasurement::new(
-                rx.epoch,
+            Some((
+                StdMeasurement::new(
+                    rx.epoch,
+                    tx_rxf,
+                    rx_rxf,
+                    true,
+                    &self.range_noise,
+                    &self.range_rate_noise,
+                ),
                 tx_rxf,
-                rx_rxf,
-                true,
-                &self.range_noise,
-                &self.range_rate_noise,
             ))
         } else {
             None
@@ -225,18 +228,21 @@ impl TrackingDeviceSim<Spacecraft, StdMeasurement> for GroundStation {
         traj: &Traj<Spacecraft>,
         _rng: Option<&mut Pcg64Mcg>,
         cosm: Arc<Cosm>,
-    ) -> Option<StdMeasurement> {
+    ) -> Option<(StdMeasurement, Spacecraft)> {
         let sc_rx = traj.at(epoch).unwrap();
         let (elevation, rx_ssb, tx_ssb) = self.elevation_of(&sc_rx.orbit, &cosm);
 
         if elevation >= self.elevation_mask_deg {
-            Some(StdMeasurement::new(
-                rx_ssb.epoch,
-                tx_ssb,
-                rx_ssb,
-                true,
-                &self.range_noise,
-                &self.range_rate_noise,
+            Some((
+                StdMeasurement::new(
+                    rx_ssb.epoch,
+                    tx_ssb,
+                    rx_ssb,
+                    true,
+                    &self.range_noise,
+                    &self.range_rate_noise,
+                ),
+                sc_rx.with_orbit(tx_ssb), // XXX: This is wrong! This should return whatever is estimated. I think ... ?
             ))
         } else {
             None

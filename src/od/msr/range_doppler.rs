@@ -23,7 +23,7 @@ use hifitime::{Epoch, Unit};
 use crate::cosmic::Orbit;
 use crate::linalg::{DimName, Matrix2x6, OVector, Vector2, U2, U6, U7};
 use crate::od::msr::{RangeMsr, RangeRate};
-use crate::od::{Measurement, SimMeasurement};
+use crate::od::Measurement;
 use crate::TimeTagged;
 use arrow::datatypes::{DataType, Field};
 
@@ -148,10 +148,10 @@ impl Measurement for RangeDoppler {
     }
 }
 
-impl SimMeasurement for RangeDoppler {
-    type State = Orbit;
+// impl SimMeasurement for RangeDoppler {
+//     type State = Orbit;
 
-    fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
-        todo!()
-    }
-}
+//     fn sensitivity(&self, _nominal: Orbit) -> Matrix2x6<f64> {
+//         todo!()
+//     }
+// }

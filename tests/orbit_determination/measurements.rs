@@ -159,7 +159,7 @@ fn val_measurements_topo() {
         let now = cislunar1.epoch() + truth.offset;
         let state = traj1.at(now).unwrap();
         // Will panic if the measurement is not visible
-        let meas = dss65_madrid
+        let (meas, _) = dss65_madrid
             .measure(state.epoch(), &traj1, Some(&mut rng), cosm.clone())
             .unwrap();
 
@@ -226,7 +226,7 @@ fn val_measurements_topo() {
         let now = cislunar2.epoch() + truth.offset;
         let state = traj2.at(now).unwrap();
         // Will panic if the measurement is not visible
-        let meas = dss65_madrid
+        let (meas, _) = dss65_madrid
             .measure(state.epoch(), &traj2, Some(&mut rng), cosm.clone())
             .unwrap();
         let obs = meas.observation();

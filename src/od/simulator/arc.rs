@@ -26,7 +26,7 @@ use crate::io::ConfigError;
 use crate::md::trajectory::InterpState;
 use crate::od::msr::arc::TrackingArc;
 use crate::od::simulator::{Availability, Schedule};
-use crate::od::{EstimateFrom, SimMeasurement};
+use crate::od::{EstimateFrom, Measurement};
 pub use crate::{cosmic::Cosm, State, TimeTagged};
 use crate::{linalg::allocator::Allocator, od::TrackingDeviceSim};
 use crate::{linalg::DefaultAllocator, md::ui::Traj};
@@ -38,23 +38,17 @@ use std::sync::Arc;
 use super::TrkConfig;
 
 #[derive(Clone)]
-pub struct TrackingArcSim<S, MsrIn, Msr, D>
+pub struct TrackingArcSim<MsrIn, Msr, D>
 where
     D: TrackingDeviceSim<MsrIn, Msr>,
     MsrIn: State,
-    Msr: SimMeasurement<State = S>,
-    S: EstimateFrom<MsrIn>,
+    Msr: Measurement,
     MsrIn: InterpState,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <MsrIn as State>::Size>
+    DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize, <MsrIn as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>,
+        + Allocator<f64, Msr::MeasurementSize>,
 {
     /// Map of devices from their names.
     pub devices: HashMap<String, D>,
@@ -73,23 +67,17 @@ where
     _msr: PhantomData<Msr>,
 }
 
-impl<S, MsrIn, Msr, D> TrackingArcSim<S, MsrIn, Msr, D>
+impl<MsrIn, Msr, D> TrackingArcSim<MsrIn, Msr, D>
 where
     D: TrackingDeviceSim<MsrIn, Msr>,
     MsrIn: State,
-    Msr: SimMeasurement<State = S>,
-    S: EstimateFrom<MsrIn>,
+    Msr: Measurement,
     MsrIn: InterpState,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <MsrIn as State>::Size>
+    DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize, <MsrIn as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>,
+        + Allocator<f64, Msr::MeasurementSize>,
 {
     pub fn with_rng(
         devices: Vec<D>,
@@ -287,7 +275,7 @@ where
                 sched_trace_msg.remove(name);
                 end_trace_msg.remove(name);
 
-                if let Some(msr) =
+                if let Some((msr, _)) =
                     device.measure(epoch, &self.trajectory, Some(&mut self.rng), cosm.clone())
                 {
                     measurements.push((name.clone(), msr));
@@ -351,23 +339,17 @@ where
     }
 }
 
-impl<S, MsrIn, Msr, D> Display for TrackingArcSim<S, MsrIn, Msr, D>
+impl<MsrIn, Msr, D> Display for TrackingArcSim<MsrIn, Msr, D>
 where
     D: TrackingDeviceSim<MsrIn, Msr>,
     MsrIn: State,
-    Msr: SimMeasurement<State = S>,
-    S: EstimateFrom<MsrIn>,
+    Msr: Measurement,
     MsrIn: InterpState,
-    DefaultAllocator: Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <MsrIn as State>::Size>
+    DefaultAllocator: Allocator<f64, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::Size, <MsrIn as State>::Size>
         + Allocator<f64, <MsrIn as State>::VecLength>
         + Allocator<f64, Msr::MeasurementSize, <MsrIn as State>::Size>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, <S as State>::Size>
-        + Allocator<f64, <S as State>::Size, <S as State>::Size>
-        + Allocator<f64, <S as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize, <S as State>::Size>,
+        + Allocator<f64, Msr::MeasurementSize>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

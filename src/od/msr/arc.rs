@@ -30,7 +30,7 @@ use crate::io::{ConfigError, ConfigRepr};
 use crate::linalg::allocator::Allocator;
 use crate::linalg::{DefaultAllocator, DimName};
 use crate::md::trajectory::InterpState;
-use crate::od::{Measurement, SimMeasurement, TrackingDeviceSim};
+use crate::od::{Measurement, TrackingDeviceSim};
 use crate::State;
 use arrow::array::{ArrayRef, Float64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -215,13 +215,8 @@ where
 
 impl<Msr> TrackingArc<Msr>
 where
-    Msr: SimMeasurement,
-    DefaultAllocator: Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, Msr::MeasurementSize>
-        + Allocator<f64, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::Size, <Msr::State as State>::Size>
-        + Allocator<f64, <Msr::State as State>::VecLength>
-        + Allocator<f64, Msr::MeasurementSize, <Msr::State as State>::Size>,
+    Msr: Measurement,
+    DefaultAllocator: Allocator<f64, Msr::MeasurementSize> + Allocator<f64, Msr::MeasurementSize>,
 {
     /// If this tracking arc has devices that can be used to generate simulated measurements,
     /// then this function can be used to rebuild said measurement devices

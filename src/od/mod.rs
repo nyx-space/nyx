@@ -147,26 +147,26 @@ pub trait Measurement: TimeTagged {
         DefaultAllocator: Allocator<f64, Self::MeasurementSize>;
 }
 
-/// A trait defining a simulated measurement. This trait is separate from the `Measurement` trait to allow for multiple implementations of the `SimMeasurement` trait for different estimated states.
-pub trait SimMeasurement: Measurement
-where
-    DefaultAllocator: Allocator<f64, Self::MeasurementSize>
-        + Allocator<f64, <Self::State as State>::Size>
-        + Allocator<f64, <Self::State as State>::Size, <Self::State as State>::Size>
-        + Allocator<f64, <Self::State as State>::VecLength>
-        + Allocator<f64, Self::MeasurementSize, <Self::State as State>::Size>,
-{
-    /// Defines the estimated state
-    type State: State;
+// A trait defining a simulated measurement. This trait is separate from the `Measurement` trait to allow for multiple implementations of the `SimMeasurement` trait for different estimated states.
+// pub trait SimMeasurement: Measurement
+// where
+//     DefaultAllocator: Allocator<f64, Self::MeasurementSize>
+//         + Allocator<f64, <Self::State as State>::Size>
+//         + Allocator<f64, <Self::State as State>::Size, <Self::State as State>::Size>
+//         + Allocator<f64, <Self::State as State>::VecLength>
+//         + Allocator<f64, Self::MeasurementSize, <Self::State as State>::Size>,
+// {
+//     /// Defines the estimated state
+//     type State: State;
 
-    /// Returns the measurement sensitivity (often referred to as H tilde).
-    fn sensitivity(
-        &self,
-        nominal: Self::State,
-    ) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
-    where
-        DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
-}
+//     /// Returns the measurement sensitivity (often referred to as H tilde).
+//     fn sensitivity(
+//         &self,
+//         nominal: Self::State,
+//     ) -> OMatrix<f64, Self::MeasurementSize, <Self::State as State>::Size>
+//     where
+//         DefaultAllocator: Allocator<f64, <Self::State as State>::Size, Self::MeasurementSize>;
+// }
 
 /// The Estimate trait defines the interface that is the opposite of a `SolveFor`.
 /// For example, `impl EstimateFrom<Spacecraft> for Orbit` means that the `Orbit` can be estimated (i.e. "solved for") from a `Spacecraft`.
@@ -174,7 +174,7 @@ where
 /// In the future, there will be a way to estimate ground station biases, for example. This will need a new State that includes both the Spacecraft and
 /// the ground station bias information. Then, the `impl EstimateFrom<SpacecraftAndBias> for OrbitAndBias` will be added, where `OrbitAndBias` is the
 /// new State that includes the orbit and the bias of one ground station.
-pub trait EstimateFrom<O: State>
+pub trait EstimateFrom<O: State, M: Measurement>
 where
     Self: State,
     DefaultAllocator: Allocator<f64, <O as State>::Size>
@@ -186,4 +186,14 @@ where
 {
     /// From the state extract the state to be estimated
     fn extract(from: O) -> Self;
+
+    /// Returns the measurement sensitivity (often referred to as H tilde).
+    /// self is the RECEIVER, e.g. the spacecraft -- consider making this a static function
+    fn sensitivity(
+        msr: &M,
+        receiver: Self,
+        transmitter: Self,
+    ) -> OMatrix<f64, M::MeasurementSize, Self::Size>
+    where
+        DefaultAllocator: Allocator<f64, M::MeasurementSize, Self::Size>;
 }
